@@ -30,6 +30,9 @@ G = nx.Graph()
 # Global neuron ID counter to ensure unique IDs
 neuron_id_counter = 0
 
+# Sentence counter to manage activation traces
+sentence_counter = 0
+
 # Lists for POS types
 concept_pos_list = ['NOUN', 'PROPN', 'PRON', 'X']  # POS types for concept columns
 relation_pos_list = ['VERB', 'ADP', 'CONJ']        # POS types for relation neurons
@@ -152,6 +155,9 @@ for sentence in sentences:
     words = [token.text for token in doc]
     pos_tags = [token.pos_ for token in doc]
 
+    # Increase the sentence counter
+    sentence_counter += 1
+
     # Ensure all words are in columns
     for word in words:
         if not word.isalpha():
@@ -162,6 +168,7 @@ for sentence in sentences:
             columns[word] = {
                 'concept_neuron': concept_neuron_id,
                 'permanence': 3,  # Initialized to 3
+                'concept_activation_trace_counter': 0,  # Activation trace counter
                 'relation_neurons': {},
                 'quality_neurons': {},
                 'instance_connections': {}
@@ -183,6 +190,9 @@ for sentence in sentences:
 
         activated_concepts[word] = True
 
+        # Set activation trace for concept neuron
+        columns[word]['concept_activation_trace_counter'] = 5  # Reset to 5
+
         # Collect qualities for this word
         qualities_found = []
         # Check previous word
@@ -200,6 +210,7 @@ for sentence in sentences:
                         columns[word]['quality_neurons'][prev_word] = {
                             'neuron_id': quality_neuron_id,
                             'permanence': 3,  # Initialized to 3
+                            'activation_trace_counter': 5,  # Activation trace counter
                             'pos': prev_pos_tag,
                             'first_activation': True
                         }
@@ -211,7 +222,9 @@ for sentence in sentences:
                         G.add_edge(prev_word_concept_id, quality_neuron_id, type='concept_source')
                     else:
                         quality_neuron_id = columns[word]['quality_neurons'][prev_word]['neuron_id']
-        # Check next word
+                        # Reset activation trace counter
+                        columns[word]['quality_neurons'][prev_word]['activation_trace_counter'] = 5
+            # Check next word
         if idx < len(words) - 1:
             next_word = words[idx + 1]
             next_pos_tag = pos_tags[idx + 1]
@@ -225,6 +238,7 @@ for sentence in sentences:
                         columns[word]['quality_neurons'][next_word] = {
                             'neuron_id': quality_neuron_id,
                             'permanence': 3,  # Initialized to 3
+                            'activation_trace_counter': 5,  # Activation trace counter
                             'pos': next_pos_tag,
                             'first_activation': True
                         }
@@ -236,6 +250,8 @@ for sentence in sentences:
                         G.add_edge(next_word_concept_id, quality_neuron_id, type='concept_source')
                     else:
                         quality_neuron_id = columns[word]['quality_neurons'][next_word]['neuron_id']
+                        # Reset activation trace counter
+                        columns[word]['quality_neurons'][next_word]['activation_trace_counter'] = 5
 
         # Store the qualities found for this concept in this sentence
         activated_qualities[word] = qualities_found
@@ -245,8 +261,11 @@ for sentence in sentences:
         # Quality neurons
         for qual_word in qualities_found:
             if qual_word in columns[word]['quality_neurons']:
-                qual_neuron_id = columns[word]['quality_neurons'][qual_word]['neuron_id']
+                qual_neuron_info = columns[word]['quality_neurons'][qual_word]
+                qual_neuron_id = qual_neuron_info['neuron_id']
                 instance_neurons.append(qual_neuron_id)
+                # Reset activation trace counter
+                qual_neuron_info['activation_trace_counter'] = 5
 
         # Store activated instance neurons for this concept
         activated_instances[word] = instance_neurons
@@ -272,6 +291,7 @@ for sentence in sentences:
                     columns[word]['relation_neurons'][next_word] = {
                         'neuron_id': relation_neuron_id,
                         'permanence': 3,  # Initialized to 3
+                        'activation_trace_counter': 5,  # Activation trace counter
                         'pos': next_pos_tag,
                         'target_connections': {},
                         'first_activation': True
@@ -280,9 +300,14 @@ for sentence in sentences:
                     G.add_node(relation_neuron_id)
                     # Draw concept source connection
                     relation_word_concept_id = columns[next_word]['concept_neuron']
+                    # Reset activation trace counter for relation word concept neuron
+                    columns[next_word]['concept_activation_trace_counter'] = 5
                     G.add_edge(relation_word_concept_id, relation_neuron_id, type='concept_source')
                 else:
-                    relation_neuron_id = columns[word]['relation_neurons'][next_word]['neuron_id']
+                    relation_neuron_info = columns[word]['relation_neurons'][next_word]
+                    relation_neuron_id = relation_neuron_info['neuron_id']
+                    # Reset activation trace counter
+                    relation_neuron_info['activation_trace_counter'] = 5
 
                 # Initialize activated relation targets
                 if relation_neuron_id not in activated_relation_targets:
@@ -304,8 +329,12 @@ for sentence in sentences:
                         if target_concept_neuron_id not in columns[word]['relation_neurons'][next_word]['target_connections']:
                             columns[word]['relation_neurons'][next_word]['target_connections'][target_concept_neuron_id] = {
                                 'permanence': 3,  # Initialized to 3
+                                'activation_trace_counter': 5,  # Activation trace counter
                                 'first_activation': True
                             }
+                        else:
+                            # Reset activation trace counter
+                            columns[word]['relation_neurons'][next_word]['target_connections'][target_concept_neuron_id]['activation_trace_counter'] = 5
                         # Add to activated targets
                         activated_relation_targets.setdefault(relation_neuron_id, []).append(target_concept_neuron_id)
                         # Now connect the relation neuron to activated instance neurons in the target column
@@ -315,9 +344,15 @@ for sentence in sentences:
                                 if target_instance_neuron_id not in columns[word]['relation_neurons'][next_word]['target_connections']:
                                     columns[word]['relation_neurons'][next_word]['target_connections'][target_instance_neuron_id] = {
                                         'permanence': 3,  # Initialized to 3
+                                        'activation_trace_counter': 5,  # Activation trace counter
                                         'first_activation': True
                                     }
+                                else:
+                                    # Reset activation trace counter
+                                    columns[word]['relation_neurons'][next_word]['target_connections'][target_instance_neuron_id]['activation_trace_counter'] = 5
                                 activated_relation_targets[relation_neuron_id].append(target_instance_neuron_id)
+                        # Reset activation trace for target concept neuron
+                        columns[target_word]['concept_activation_trace_counter'] = 5
                         break  # Only connect to the first concept word after relation word
             else:
                 if next_pos_tag in concept_pos_list or next_pos_tag in quality_pos_list:
@@ -335,8 +370,11 @@ for sentence in sentences:
         # Relation neurons
         for rel_word in relations_found:
             if rel_word in columns[word]['relation_neurons']:
-                rel_neuron_id = columns[word]['relation_neurons'][rel_word]['neuron_id']
+                rel_neuron_info = columns[word]['relation_neurons'][rel_word]
+                rel_neuron_id = rel_neuron_info['neuron_id']
                 instance_neurons.append(rel_neuron_id)
+                # Reset activation trace counter
+                rel_neuron_info['activation_trace_counter'] = 5
         # Update activated_instances[word]
         activated_instances[word] = instance_neurons
 
@@ -351,11 +389,15 @@ for sentence in sentences:
                     if neuron_pair not in columns[word]['instance_connections']:
                         columns[word]['instance_connections'][neuron_pair] = {
                             'permanence': 3,  # Initialized to 3
+                            'activation_trace_counter': 5,  # Activation trace counter
                             'first_activation': True
                         }
-                    # Add edge to graph if not already present
-                    if not G.has_edge(neuron_pair[0], neuron_pair[1]):
-                        G.add_edge(neuron_pair[0], neuron_pair[1], type='instance_connection')
+                        # Add edge to graph if not already present
+                        if not G.has_edge(neuron_pair[0], neuron_pair[1]):
+                            G.add_edge(neuron_pair[0], neuron_pair[1], type='instance_connection')
+                    else:
+                        # Reset activation trace counter
+                        columns[word]['instance_connections'][neuron_pair]['activation_trace_counter'] = 5
 
     # Update permanence values for concept neurons
     for concept_word, neurons in columns.items():
@@ -451,6 +493,32 @@ for sentence in sentences:
                         if G.has_edge(neuron_pair[0], neuron_pair[1]):
                             G.remove_edge(neuron_pair[0], neuron_pair[1])
                         del neurons['instance_connections'][neuron_pair]
+
+    # Decrease activation trace counters for all neurons and connections
+    for concept_word, neurons in columns.items():
+        # Concept neuron
+        if neurons['concept_activation_trace_counter'] > 0:
+            neurons['concept_activation_trace_counter'] -= 1
+
+        # Relation neurons
+        for relation_info in neurons['relation_neurons'].values():
+            if relation_info['activation_trace_counter'] > 0:
+                relation_info['activation_trace_counter'] -= 1
+            # Target connections
+            if 'target_connections' in relation_info:
+                for target_conn_info in relation_info['target_connections'].values():
+                    if target_conn_info['activation_trace_counter'] > 0:
+                        target_conn_info['activation_trace_counter'] -= 1
+
+        # Quality neurons
+        for quality_info in neurons['quality_neurons'].values():
+            if quality_info['activation_trace_counter'] > 0:
+                quality_info['activation_trace_counter'] -= 1
+
+        # Instance connections
+        for connection_info in neurons['instance_connections'].values():
+            if connection_info['activation_trace_counter'] > 0:
+                connection_info['activation_trace_counter'] -= 1
 
     # Visualize the network
     visualize_network(G, columns)
