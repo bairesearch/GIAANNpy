@@ -23,7 +23,7 @@ text = '\n'.join(dataset['text'])
 sentences = sent_tokenize(text)
 
 # Initialize the neural network representation
-columns = {}  # key: lemma (concept), value: {'concept_neuron', 'permanence', 'relation_neurons', 'quality_neurons', 'instance_connections'}
+columns = {}  # key: lemma (concept), value: {'concept_neuron', 'permanence', 'relation_neurons', 'quality_neurons'}
 
 # Initialize NetworkX graph
 G = nx.Graph()
@@ -33,6 +33,9 @@ neuron_id_counter = 0
 
 # Sentence counter to manage activation traces
 sentence_counter = 0
+
+# Global instance connections
+global_instance_connections = {}
 
 # Lists for POS types
 concept_pos_list = ['NOUN', 'PROPN', 'PRON', 'X']  # POS types for concept columns
@@ -181,8 +184,7 @@ def ensure_words_in_columns(lemmas, tokens):
                 'permanence': 3,  # Initialized to 3
                 'concept_activation_trace_counter': 0,  # Activation trace counter
                 'relation_neurons': {},
-                'quality_neurons': {},
-                'instance_connections': {}
+                'quality_neurons': {}
             }
             # Add the concept neuron to the graph
             G.add_node(concept_neuron_id)
@@ -451,25 +453,25 @@ def process_definitions(tokens):
                     continue
 
 def update_instance_connections(activated_instances):
-    for lemma, instance_neurons in activated_instances.items():
-        if 'instance_connections' not in columns[lemma]:
-            columns[lemma]['instance_connections'] = {}
-        if len(instance_neurons) >= 2:
-            for i in range(len(instance_neurons)):
-                for j in range(i + 1, len(instance_neurons)):
-                    neuron_pair = tuple(sorted((instance_neurons[i], instance_neurons[j])))
-                    if neuron_pair not in columns[lemma]['instance_connections']:
-                        columns[lemma]['instance_connections'][neuron_pair] = {
-                            'permanence': 3,  # Initialized to 3
-                            'activation_trace_counter': 5,  # Activation trace counter
-                            'first_activation': True
-                        }
-                        # Add edge to graph if not already present
-                        if not G.has_edge(neuron_pair[0], neuron_pair[1]):
-                            G.add_edge(neuron_pair[0], neuron_pair[1], type='instance_connection')
-                    else:
-                        # Reset activation trace counter
-                        columns[lemma]['instance_connections'][neuron_pair]['activation_trace_counter'] = 5
+    all_instance_neurons = []
+    for instance_neurons in activated_instances.values():
+        all_instance_neurons.extend(instance_neurons)
+    if len(all_instance_neurons) >= 2:
+        for i in range(len(all_instance_neurons)):
+            for j in range(i + 1, len(all_instance_neurons)):
+                neuron_pair = tuple(sorted((all_instance_neurons[i], all_instance_neurons[j])))
+                if neuron_pair not in global_instance_connections:
+                    global_instance_connections[neuron_pair] = {
+                        'permanence': 3,  # Initialized to 3
+                        'activation_trace_counter': 5,  # Activation trace counter
+                        'first_activation': True
+                    }
+                    # Add edge to graph if not already present
+                    if not G.has_edge(neuron_pair[0], neuron_pair[1]):
+                        G.add_edge(neuron_pair[0], neuron_pair[1], type='instance_connection')
+                else:
+                    # Reset activation trace counter
+                    global_instance_connections[neuron_pair]['activation_trace_counter'] = 5
 
 def update_permanence_values_concept_neurons(activated_concepts):
     for concept_lemma, neurons in columns.items():
@@ -539,32 +541,33 @@ def update_permanence_values_quality_neurons(activated_concepts, activated_quali
                             G.remove_node(quality_neuron_id)
                         del neurons['quality_neurons'][quality_lemma]
 
-def update_permanence_values_instance_connections(activated_concepts, activated_instances):
-    for concept_lemma, neurons in columns.items():
-        if concept_lemma in activated_concepts:
-            active_pairs = set()
-            if concept_lemma in activated_instances:
-                instance_neurons = activated_instances[concept_lemma]
-                if len(instance_neurons) >= 2:
-                    active_pairs = set(
-                        tuple(sorted((instance_neurons[i], instance_neurons[j])))
-                        for i in range(len(instance_neurons))
-                        for j in range(i + 1, len(instance_neurons))
-                    )
-            for neuron_pair, connection_info in list(neurons['instance_connections'].items()):
-                if neuron_pair in active_pairs:
-                    if connection_info.get('first_activation', False):
-                        connection_info['first_activation'] = False
-                    else:
-                        connection_info['permanence'] = connection_info['permanence'] ** 2
-                else:
-                    # Decrease permanence by 1
-                    connection_info['permanence'] -= 1
-                    if connection_info['permanence'] <= 0:
-                        # Remove the connection
-                        if G.has_edge(neuron_pair[0], neuron_pair[1]):
-                            G.remove_edge(neuron_pair[0], neuron_pair[1])
-                        del neurons['instance_connections'][neuron_pair]
+def update_permanence_values_instance_connections(activated_instances):
+    active_pairs = set()
+    # Collect all activated instance neurons
+    all_instance_neurons = []
+    for instance_neurons in activated_instances.values():
+        all_instance_neurons.extend(instance_neurons)
+    if len(all_instance_neurons) >= 2:
+        active_pairs = set(
+            tuple(sorted((all_instance_neurons[i], all_instance_neurons[j])))
+            for i in range(len(all_instance_neurons))
+            for j in range(i + 1, len(all_instance_neurons))
+        )
+    # Now update the permanence values for all instance connections
+    for neuron_pair, connection_info in list(global_instance_connections.items()):
+        if neuron_pair in active_pairs:
+            if connection_info.get('first_activation', False):
+                connection_info['first_activation'] = False
+            else:
+                connection_info['permanence'] = connection_info['permanence'] ** 2
+        else:
+            # Decrease permanence by 1
+            connection_info['permanence'] -= 1
+            if connection_info['permanence'] <= 0:
+                # Remove the connection
+                if G.has_edge(neuron_pair[0], neuron_pair[1]):
+                    G.remove_edge(neuron_pair[0], neuron_pair[1])
+                del global_instance_connections[neuron_pair]
 
 def decrease_activation_trace_counters():
     for concept_lemma, neurons in columns.items():
@@ -587,10 +590,10 @@ def decrease_activation_trace_counters():
             if quality_info['activation_trace_counter'] > 0:
                 quality_info['activation_trace_counter'] -= 1
 
-        # Instance connections
-        for connection_info in neurons['instance_connections'].values():
-            if connection_info['activation_trace_counter'] > 0:
-                connection_info['activation_trace_counter'] -= 1
+    # Decrease activation trace counters for global instance connections
+    for connection_info in global_instance_connections.values():
+        if connection_info['activation_trace_counter'] > 0:
+            connection_info['activation_trace_counter'] -= 1
 
 def draw_dependency_tree(sentence, tokens, columns, G):
     # Extract lemmas and positions
@@ -782,7 +785,7 @@ def process_sentences(sentences):
         # Process definition connections
         process_definitions(tokens_to_use)
 
-        # Update instance connections within the concept column
+        # Update instance connections across all instance neurons in the sentence
         update_instance_connections(activated_instances)
 
         # Update permanence values for concept neurons
@@ -796,7 +799,7 @@ def process_sentences(sentences):
         update_permanence_values_quality_neurons(activated_concepts, activated_qualities)
 
         # Update permanence values for instance connections
-        update_permanence_values_instance_connections(activated_concepts, activated_instances)
+        update_permanence_values_instance_connections(activated_instances)
 
         # Decrease activation trace counters
         decrease_activation_trace_counters()
