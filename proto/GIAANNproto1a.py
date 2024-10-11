@@ -1,6 +1,7 @@
 import torch
 import networkx as nx
 import matplotlib.pyplot as plt
+import matplotlib.patches
 import nltk
 import spacy
 from nltk.tokenize import sent_tokenize
@@ -297,6 +298,10 @@ def process_relations(lemmas, pos_tags, tokens, activated_instances):
                 continue
 
             if next_pos_tag in relation_pos_list:
+                # Ignore "be" and "do" auxiliaries
+                if next_lemma in ['be', 'do'] and tokens[next_idx].dep_ == 'aux':
+                    continue
+
                 relations_found.append(next_lemma)
                 # Ensure the relation neuron exists in the column
                 if next_lemma not in columns[lemma]['relation_neurons']:
@@ -587,6 +592,141 @@ def decrease_activation_trace_counters():
             if connection_info['activation_trace_counter'] > 0:
                 connection_info['activation_trace_counter'] -= 1
 
+def draw_dependency_tree(sentence, tokens, columns, G):
+    # Extract lemmas and positions
+    lemmas = [token.lemma_ for token in tokens]
+    pos_tags = [token.pos_ for token in tokens]
+    dep_tags = [token.dep_ for token in tokens]
+    tags = [token.tag_ for token in tokens]
+
+    # Prepare the plot
+    plt.figure(figsize=(12, 6))
+
+    # Positions for nodes on x-axis
+    x_positions = list(range(len(lemmas)))
+    y_position = 0  # All nodes on the same vertical height
+
+    # Determine node colors
+    node_colors = []
+    for idx, lemma in enumerate(lemmas):
+        pos_tag = pos_tags[idx]
+        if pos_tag in concept_pos_list:
+            node_colors.append('blue')  # Concept node
+        elif pos_tag in relation_pos_list:
+            if lemma == 'have':
+                node_colors.append('cyan')  # 'have' auxiliary action relations
+            elif pos_tag == 'VERB':
+                node_colors.append('green')  # Action
+            elif pos_tag == 'ADP':
+                node_colors.append('red')    # Condition
+            elif pos_tag == 'CONJ':
+                node_colors.append('green')  # Conjunctions colored as action
+            else:
+                node_colors.append('gray')
+        elif pos_tag in quality_pos_list:
+            node_colors.append('turquoise')  # Quality node
+        else:
+            node_colors.append('gray')
+
+    # Draw nodes as circles without edge colors
+    node_size = 750 / (1.5 ** 2)  # Reduced size to decrease radius by a factor of 1.5
+    plt.scatter(x_positions, [y_position]*len(lemmas), s=node_size, c=node_colors)
+
+    # Draw lemma text inside the nodes with reduced font size
+    for idx, lemma in enumerate(lemmas):
+        plt.text(x_positions[idx], y_position, lemma, fontsize=8, ha='center', va='center', color='black')
+
+    # Now determine the dependencies
+    # We will store dependencies as tuples: (head_idx, dep_idx, dep_type, color)
+    dependencies = []
+
+    # For each concept lemma in the sentence
+    for idx, lemma in enumerate(lemmas):
+        token_pos = pos_tags[idx]
+        if lemma not in columns:
+            continue
+        neurons = columns[lemma]
+        # Process qualities
+        for quality_lemma, quality_info in neurons.get('quality_neurons', {}).items():
+            if quality_lemma in lemmas:
+                quality_idx = lemmas.index(quality_lemma)
+                # Check permanence value
+                permanence = quality_info.get('permanence', 0)
+                if permanence >= 3:
+                    # Add dependency
+                    dependencies.append((idx, quality_idx, 'quality', 'turquoise'))
+
+        # Process relations
+        for relation_lemma, relation_info in neurons.get('relation_neurons', {}).items():
+            if relation_lemma in lemmas:
+                relation_idx = lemmas.index(relation_lemma)
+                # Check permanence value
+                permanence = relation_info.get('permanence', 0)
+                if permanence >= 3:
+                    # Add dependency from concept to relation
+                    # Determine color
+                    pos = relation_info.get('pos', '')
+                    if relation_lemma == 'have':
+                        color = 'cyan'
+                    elif pos == 'VERB':
+                        color = 'green'
+                    elif pos == 'ADP':
+                        color = 'red'
+                    elif pos == 'CONJ':
+                        color = 'green'
+                    else:
+                        color = 'gray'
+                    dependencies.append((idx, relation_idx, 'relation', color))
+                    # Now check target connections
+                    relation_neuron_id = relation_info['neuron_id']
+                    if 'target_connections' in relation_info:
+                        for target_neuron_id, target_conn_info in relation_info['target_connections'].items():
+                            target_lemma = None
+                            # Find the lemma corresponding to target_neuron_id
+                            for i, l in enumerate(lemmas):
+                                if l in columns and columns[l]['concept_neuron'] == target_neuron_id:
+                                    target_lemma = l
+                                    target_idx = i
+                                    break
+                            if target_lemma is not None:
+                                # Check permanence
+                                target_perm = target_conn_info.get('permanence', 0)
+                                if target_perm >= 3:
+                                    # Add dependency from relation to target concept
+                                    dependencies.append((relation_idx, target_idx, 'relation_target', color))
+        # Process definitions
+        concept_neuron_id = neurons['concept_neuron']
+        for other_idx, other_lemma in enumerate(lemmas):
+            if other_lemma != lemma and other_lemma in columns:
+                other_concept_neuron_id = columns[other_lemma]['concept_neuron']
+                if G.has_edge(concept_neuron_id, other_concept_neuron_id):
+                    edge_data = G.get_edge_data(concept_neuron_id, other_concept_neuron_id)
+                    if edge_data.get('type') == 'definition':
+                        dependencies.append((idx, other_idx, 'definition', 'darkblue'))
+
+    # Now, draw the dependencies
+    for head_idx, dep_idx, dep_type, color in dependencies:
+        x1 = x_positions[head_idx]
+        x2 = x_positions[dep_idx]
+        xm = (x1 + x2) / 2
+        width = abs(x2 - x1)
+        if width == 0:
+            width = 0.5  # Avoid zero width
+        # Set height proportional to width to make arcs visible
+        height = width / 2  # Increased height for better visibility
+        # Draw an arc from x1 to x2
+        arc = matplotlib.patches.Arc((xm, y_position), width=width, height=height, angle=0, theta1=0, theta2=180, color=color)
+        plt.gca().add_patch(arc)
+
+    plt.xlim(-1, len(lemmas))
+    plt.ylim(-1, max(1.5, height))  # Adjusted ylim to ensure arcs are visible
+
+    # Ensure the aspect ratio is equal to make nodes circular
+    plt.gca().set_aspect('equal', adjustable='datalim')
+
+    plt.axis('off')
+    plt.show()
+
 def process_sentences(sentences):
     global sentence_counter
     for sentence in sentences:
@@ -663,6 +803,9 @@ def process_sentences(sentences):
 
         # Visualize the network
         visualize_network(G, columns)
+
+        # Draw the dependency tree
+        draw_dependency_tree(sentence, tokens_to_use, columns, G)
 
 # Call the main processing function
 process_sentences(sentences)
