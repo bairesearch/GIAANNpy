@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1a5b;
+o1 preview prompt 1a5c;
 
 v1a2x:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -50,11 +50,12 @@ v1a5x:
 CHATONLY:	- Revert this previous change: 'Ignore all "be" auxiliary lemmas when detecting qualities and action/condition relations.'
 CHATONLY:	- Revert this previous change: 'Ignore all "do" auxiliary lemmas when detecting action relations.'
 CHATONLY:	- Remove adverbs from the original concept quality neuron detection code (as adverbs are now assigned as feature modifiers for relations and qualities and are connected to individual relation and quality instance neurons). Only detect quality words for every sentence word of POS type determiner or adjective (e.g. "the" or "blue) [i.e. ignore adverbs] appearing before or after the current sentence concept word being processed, assuming there is no relation word between the quality word and current sentence concept word.
-	
+- Verbs/prepositions that occur directly before another verb/preposition word are drawn in the same concept column. The connection between them is an internal action/condition relation. For example 1, "rode to" will create an internal condition relation, between the "rode" and "to" action/condition instance neurons. For example 2, "around of" will create an internal condition relation, between the "around" and "of" condition instance neurons. For example 3, "did eat" would create an internal action relation, between the "did" and "eat" action instance neurons. Internal action/condition relations are drawn in the same colours as external action/condition relations (green/red respectively). Verbs/prepositions that a) occur last in a subsequence of consecutive verbs and/or prepositions, or b) are not in a subsequence of consecutive verbs/prepositions form external action/condition relations (already implemented).
+
 ---
 You have previously created code based on the following natural language specification;
 
-Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
+Create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
 - Use the pytorch API for hardware acceleration of all arrays (for efficient parallel processing of connectivity). Do not initialise the array with a predetermined dictionary; dynamically populate the arrays as new dictionary words and relations are encountered. Will be discussed below.
 - Use vector graphics library such as networkx to always maintain a complete visualisation of the network (including active neurons). Only draw the parts of the network that are not empty.
 - The application continuously reads sentences from a large textual corpus from huggingface (such as a Wikipedia dataset). Please use the library nltk.
@@ -74,7 +75,7 @@ Please create an abstract biological neural neural network simulation for natura
 - Print each sentence in the command line.
 - Each word is assigned a unique concept column (this includes all pos types; even relation words are assigned a unique concept column). Please store all exclusive concept neurons POS types in a list, such that it can be easily modified (noun, proper noun, and pronoun, and unknown). 
 - In addition to creating action and condition relation neurons, create relation neurons for conjunction POS types. Please store all relation word POS types in a list, such that it can be easily modified (verb, preposition, conjunction). 
-- Detect quality words for every sentence word of POS type determiner, adverb, or adjective (e.g. "the", "very", or "blue") appearing before or after the current sentence concept word being processed, assuming there is no relation word between the quality word and current sentence concept word. Add associated quality neurons to the concept columns next to the relation neurons. Quality neurons are similar to relation neurons except they do not connect to a target concept column.  Please store all quality word POS types in a list, such that it can be easily modified (determiner, adverb, adjective). Note for now, quality words are assigned a unique quality neuron for every concept they are associated with, however quality neurons are only created for clarity (and programmatic ease).
+- Detect quality words for every sentence word of POS type determiner or adjective (e.g. "the" or "blue) appearing before or after the current sentence concept word being processed, assuming there is no relation word between the quality word and current sentence concept word. Add associated quality neurons to the concept columns next to the relation neurons. Quality neurons are similar to relation neurons except they do not connect to a target concept column.  Please store all quality word POS types in a list, such that it can be easily modified (determiner, adjective). Note for now, quality words are assigned a unique quality neuron for every concept they are associated with, however quality neurons are only created for clarity (and programmatic ease).
 - Draw the concept neurons blue, the action relation neurons green, the condition relation neurons red, and the quality neurons in turquoise.
 - Draw a connection between every concept column representing a relation word (e.g. "eat" or "near") or quality word (e.g. "blue") to the bottom of every one of its relation or quality neuron instances within a concept column. These are concept "source" connections, and should be all drawn in blue. They communicate the semantic meaning of the particular relation or quality.
 - Draw all action relation neuron target (object) connections in green, and all condition target (object) connections in red. These should be drawn from the side of the relation instance neuron and the target (object) concept neuron.
@@ -90,7 +91,7 @@ Please create an abstract biological neural neural network simulation for natura
 - For every sentence parsed by the program, draw a projective dependency tree with the most likely semantic dependencies between lemmas in a new window. The semantic dependencies include relations (actions and conditions), qualities, and definitions. Each lemma in the sentence is assigned a node in the projective dependency graph. The projective dependency tree should draw each sentence lemma node on a horizontal line (of the same vertical height). The semantic dependency connections should be drawn as semicircular loops above them (between relevant pairs of nodes). Consider the example sentences; "the man drives the car", or "the pear is near the tree". Relation (i.e. action or condition) semantic dependencies should be drawn by a) connecting the subject concept node (e.g. "man" or "pear") and the relation instance node (e.g. "drive" or "near"), and b) connecting the relation instance node (e.g. "drive" or "near") and the target concept node (e.g. "car" or "tree") in the projective dependency tree. Consider the next example phrase; "brown rat". Quality semantic dependencies should be drawn by connecting the subject concept node (e.g. "rat") and the quality instance node (e.g. "brown"). Consider the next example sentence; "monkeys are animals". Definition semantic dependencies should be drawn by connecting the subject concept node (e.g. "monkey") and the object concept node (e.g. "animal"). Use the same colours in the projective dependency tree as the neural network for the different likely node types (concepts, actions, relations, qualities) and semantic dependency connections. Have auxiliary action dependency connections should be drawn in cyan, all other action semantic dependency conections should be drawn in green. Condition semantic dependency conections should be drawn in red. Quality semantic dependency conections should be drawn in turqoise. Definition semantic dependency conections should be drawn in dark blue. To determine the most probable semantic dependencies for each concept node in the sentence, search the existing neural network. For example (#1), consider the context "The red boat floats in the sea. The dog rows the red boat". In the second sentence the quality lemma "red" is connected to the "boat" concept and not the "eat" concept because, the network has previously encountered "red boat" in the first sentence, and connected the "red" quality to the "boat" concept node. For example (#2), consider the context "The blue flag is near the island. The flag near the island is shiny". In the second sentence the condition lemma "near" is connected to "island" and not "eat" because, the network has previously encountered "blue flag" in the first sentence, and connected the "blue" quality to the "flag" concept node.  If a most probable semantic dependency is unable to be determined, draw all possible semantic dependencies between concepts (all of the relations (actions, conditions), qualities, and definitions identified/generated in the neural network for this sentence). 
 
 Please modify the code by implementing these changes:
-- Remove adverbs from the original concept quality neuron detection code. Only detect quality words for every sentence word of POS type determiner or adjective (e.g. "the" or "blue) [i.e. ignore adverbs] appearing before or after the current sentence concept word being processed, assuming there is no relation word between the quality word and current sentence concept word.
+- Verbs/prepositions that occur directly before another verb/preposition word are drawn in the same concept column. The connection between them is an internal action/condition relation. For example 1, "rode to" will create an internal condition relation, between the "rode" and "to" action/condition instance neurons. For example 2, "around of" will create an internal condition relation, between the "around" and "of" condition instance neurons. For example 3, "did eat" would create an internal action relation, between the "did" and "eat" action instance neurons. Internal action/condition relations are drawn in the same colours as external action/condition relations (green/red respectively). Verbs/prepositions that a) occur last in a subsequence of consecutive verbs and/or prepositions, or b) are not in a subsequence of consecutive verbs/prepositions form external action/condition relations (already implemented).
 
 
 Existing Code:
@@ -136,7 +137,7 @@ global_instance_connections = {}
 # Lists for POS types
 concept_pos_list = ['NOUN', 'PROPN', 'PRON', 'X']  # POS types for concept columns
 relation_pos_list = ['VERB', 'ADP', 'CONJ']        # POS types for relation neurons
-quality_pos_list = ['DET', 'ADV', 'ADJ']           # Restored 'DET' to process other determiners
+quality_pos_list = ['DET', 'ADJ']                  # Removed 'ADV' to exclude adverbs from quality detection
 
 
 # Function to visualize the network
@@ -687,7 +688,7 @@ def decrease_activation_trace_counters():
     for connection_info in global_instance_connections.values():
         if connection_info['activation_trace_counter'] > 0:
             connection_info['activation_trace_counter'] -= 1
-			
+
 def draw_dependency_tree(sentence, tokens, columns, G):
     # Extract lemmas and positions
     lemmas = [token.lemma_ for token in tokens]
@@ -908,4 +909,4 @@ def process_sentences(sentences):
 process_sentences(sentences)
 
 
-
+				
