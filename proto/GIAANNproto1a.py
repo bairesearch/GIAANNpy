@@ -22,7 +22,7 @@ text = '\n'.join(dataset['text'])
 sentences = sent_tokenize(text)
 
 # Initialize the neural network representation
-columns = {}  # key: word (concept), value: {'concept_neuron', 'permanence', 'relation_neurons', 'quality_neurons', 'instance_connections'}
+columns = {}  # key: lemma (concept), value: {'concept_neuron', 'permanence', 'relation_neurons', 'quality_neurons', 'instance_connections'}
 
 # Initialize NetworkX graph
 G = nx.Graph()
@@ -50,28 +50,28 @@ def visualize_network(G, columns):
     max_y = 0
 
     # Draw concept columns
-    for i, (concept_word, neurons) in enumerate(columns.items()):
+    for i, (concept_lemma, neurons) in enumerate(columns.items()):
         # x position is i * x_margin
         x = i * x_margin * 2
-        x_positions[concept_word] = x
+        x_positions[concept_lemma] = x
         # Concept neuron at bottom (y=0)
         concept_neuron_id = neurons['concept_neuron']
         pos[concept_neuron_id] = (x, 0)
-        labels[concept_neuron_id] = concept_word
+        labels[concept_neuron_id] = concept_lemma
         # Relation neurons above
-        for j, (relation_word, relation_info) in enumerate(neurons['relation_neurons'].items()):
+        for j, (relation_lemma, relation_info) in enumerate(neurons['relation_neurons'].items()):
             relation_neuron_id = relation_info['neuron_id']
             y = (j + 1) * y_margin * 2  # y position for relation neurons
             pos[relation_neuron_id] = (x, y)
-            labels[relation_neuron_id] = relation_word
+            labels[relation_neuron_id] = relation_lemma
             if y > max_y:
                 max_y = y
         # Quality neurons above relation neurons
-        for k, (quality_word, quality_info) in enumerate(neurons['quality_neurons'].items()):
+        for k, (quality_lemma, quality_info) in enumerate(neurons['quality_neurons'].items()):
             quality_neuron_id = quality_info['neuron_id']
             y = (len(neurons['relation_neurons']) + k + 1) * y_margin * 2
             pos[quality_neuron_id] = (x, y)
-            labels[quality_neuron_id] = quality_word
+            labels[quality_neuron_id] = quality_lemma
             if y > max_y:
                 max_y = y
 
@@ -83,7 +83,7 @@ def visualize_network(G, columns):
         elif any(node_id in [info['neuron_id'] for info in neurons['relation_neurons'].values()] for neurons in columns.values()):
             # Relation neurons
             for neurons in columns.values():
-                for relation_word, relation_info in neurons['relation_neurons'].items():
+                for relation_lemma, relation_info in neurons['relation_neurons'].items():
                     if relation_info['neuron_id'] == node_id:
                         relation_pos = relation_info['pos']
                         if relation_pos == 'VERB':
@@ -130,9 +130,9 @@ def visualize_network(G, columns):
     nx.draw_networkx_labels(G, pos, labels, font_size=8)
 
     # Draw rectangles around columns
-    for concept_word, x in x_positions.items():
+    for concept_lemma, x in x_positions.items():
         # Get y positions of neurons in this column
-        neurons = columns[concept_word]
+        neurons = columns[concept_lemma]
         y_positions = [pos[neurons['concept_neuron']][1]]
         for relation_info in neurons['relation_neurons'].values():
             y_positions.append(pos[relation_info['neuron_id']][1])
@@ -145,15 +145,15 @@ def visualize_network(G, columns):
     plt.axis('off')
     plt.show()
 
-def ensure_words_in_columns(words):
+def ensure_words_in_columns(lemmas):
     global neuron_id_counter
-    for word in words:
-        if not word.isalpha():
+    for lemma in lemmas:
+        if not lemma.isalpha():
             continue
-        if word not in columns:
+        if lemma not in columns:
             neuron_id_counter += 1
             concept_neuron_id = neuron_id_counter
-            columns[word] = {
+            columns[lemma] = {
                 'concept_neuron': concept_neuron_id,
                 'permanence': 3,  # Initialized to 3
                 'concept_activation_trace_counter': 0,  # Activation trace counter
@@ -164,35 +164,35 @@ def ensure_words_in_columns(words):
             # Add the concept neuron to the graph
             G.add_node(concept_neuron_id)
 
-def collect_qualities_and_initialize_instances(words, pos_tags):
-    global neuron_id_counter  # Moved to the top
+def collect_qualities_and_initialize_instances(lemmas, pos_tags):
+    global neuron_id_counter
     activated_concepts = {}
     activated_instances = {}
     activated_qualities = {}
-    for idx, (word, pos_tag) in enumerate(zip(words, pos_tags)):
-        if not word.isalpha():
+    for idx, (lemma, pos_tag) in enumerate(zip(lemmas, pos_tags)):
+        if not lemma.isalpha():
             continue
 
-        activated_concepts[word] = True
+        activated_concepts[lemma] = True
 
         # Set activation trace for concept neuron
-        columns[word]['concept_activation_trace_counter'] = 5  # Reset to 5
+        columns[lemma]['concept_activation_trace_counter'] = 5  # Reset to 5
 
-        # Collect qualities for this word
+        # Collect qualities for this lemma
         qualities_found = []
-        # Check previous word
+        # Check previous lemma
         if idx > 0:
-            prev_word = words[idx - 1]
+            prev_lemma = lemmas[idx - 1]
             prev_pos_tag = pos_tags[idx - 1]
             if prev_pos_tag in quality_pos_list:
-                intervening_words = pos_tags[idx - 1:idx]
-                if not any(pos in relation_pos_list for pos in intervening_words):
-                    qualities_found.append(prev_word)
+                intervening_pos = pos_tags[idx - 1:idx]
+                if not any(pos in relation_pos_list for pos in intervening_pos):
+                    qualities_found.append(prev_lemma)
                     # Ensure the quality neuron exists in the column
-                    if prev_word not in columns[word]['quality_neurons']:
+                    if prev_lemma not in columns[lemma]['quality_neurons']:
                         neuron_id_counter += 1
                         quality_neuron_id = neuron_id_counter
-                        columns[word]['quality_neurons'][prev_word] = {
+                        columns[lemma]['quality_neurons'][prev_lemma] = {
                             'neuron_id': quality_neuron_id,
                             'permanence': 3,  # Initialized to 3
                             'activation_trace_counter': 5,  # Activation trace counter
@@ -201,26 +201,27 @@ def collect_qualities_and_initialize_instances(words, pos_tags):
                         }
                         # Add the quality neuron to the graph
                         G.add_node(quality_neuron_id)
-                        # Ensure prev_word has a concept neuron
-                        prev_word_concept_id = columns[prev_word]['concept_neuron']
+                        # Ensure prev_lemma has a concept neuron
+                        ensure_words_in_columns([prev_lemma])
+                        prev_lemma_concept_id = columns[prev_lemma]['concept_neuron']
                         # Draw concept source connection
-                        G.add_edge(prev_word_concept_id, quality_neuron_id, type='concept_source')
+                        G.add_edge(prev_lemma_concept_id, quality_neuron_id, type='concept_source')
                     else:
-                        quality_neuron_id = columns[word]['quality_neurons'][prev_word]['neuron_id']
+                        quality_neuron_id = columns[lemma]['quality_neurons'][prev_lemma]['neuron_id']
                         # Reset activation trace counter
-                        columns[word]['quality_neurons'][prev_word]['activation_trace_counter'] = 5
-        # Check next word
-        if idx < len(words) - 1:
-            next_word = words[idx + 1]
+                        columns[lemma]['quality_neurons'][prev_lemma]['activation_trace_counter'] = 5
+        # Check next lemma
+        if idx < len(lemmas) - 1:
+            next_lemma = lemmas[idx + 1]
             next_pos_tag = pos_tags[idx + 1]
             if next_pos_tag in quality_pos_list:
-                intervening_words = pos_tags[idx + 1:idx + 2]
-                if not any(pos in relation_pos_list for pos in intervening_words):
-                    qualities_found.append(next_word)
-                    if next_word not in columns[word]['quality_neurons']:
+                intervening_pos = pos_tags[idx + 1:idx + 2]
+                if not any(pos in relation_pos_list for pos in intervening_pos):
+                    qualities_found.append(next_lemma)
+                    if next_lemma not in columns[lemma]['quality_neurons']:
                         neuron_id_counter += 1
                         quality_neuron_id = neuron_id_counter
-                        columns[word]['quality_neurons'][next_word] = {
+                        columns[lemma]['quality_neurons'][next_lemma] = {
                             'neuron_id': quality_neuron_id,
                             'permanence': 3,  # Initialized to 3
                             'activation_trace_counter': 5,  # Activation trace counter
@@ -229,56 +230,57 @@ def collect_qualities_and_initialize_instances(words, pos_tags):
                         }
                         # Add the quality neuron to the graph
                         G.add_node(quality_neuron_id)
-                        # Ensure next_word has a concept neuron
-                        next_word_concept_id = columns[next_word]['concept_neuron']
+                        # Ensure next_lemma has a concept neuron
+                        ensure_words_in_columns([next_lemma])
+                        next_lemma_concept_id = columns[next_lemma]['concept_neuron']
                         # Draw concept source connection
-                        G.add_edge(next_word_concept_id, quality_neuron_id, type='concept_source')
+                        G.add_edge(next_lemma_concept_id, quality_neuron_id, type='concept_source')
                     else:
-                        quality_neuron_id = columns[word]['quality_neurons'][next_word]['neuron_id']
+                        quality_neuron_id = columns[lemma]['quality_neurons'][next_lemma]['neuron_id']
                         # Reset activation trace counter
-                        columns[word]['quality_neurons'][next_word]['activation_trace_counter'] = 5
+                        columns[lemma]['quality_neurons'][next_lemma]['activation_trace_counter'] = 5
 
         # Store the qualities found for this concept in this sentence
-        activated_qualities[word] = qualities_found
+        activated_qualities[lemma] = qualities_found
 
         # Collect instance neurons for this word
         instance_neurons = []
         # Quality neurons
-        for qual_word in qualities_found:
-            if qual_word in columns[word]['quality_neurons']:
-                qual_neuron_info = columns[word]['quality_neurons'][qual_word]
+        for qual_lemma in qualities_found:
+            if qual_lemma in columns[lemma]['quality_neurons']:
+                qual_neuron_info = columns[lemma]['quality_neurons'][qual_lemma]
                 qual_neuron_id = qual_neuron_info['neuron_id']
                 instance_neurons.append(qual_neuron_id)
                 # Reset activation trace counter
                 qual_neuron_info['activation_trace_counter'] = 5
 
         # Store activated instance neurons for this concept
-        activated_instances[word] = instance_neurons
+        activated_instances[lemma] = instance_neurons
 
     return activated_concepts, activated_instances, activated_qualities
 
-def process_relations(words, pos_tags, activated_instances):
-    global neuron_id_counter  # Moved to the top
+def process_relations(lemmas, pos_tags, activated_instances):
+    global neuron_id_counter
     activated_relations = {}
     activated_relation_targets = {}
-    for idx, (word, pos_tag) in enumerate(zip(words, pos_tags)):
-        if not word.isalpha():
+    for idx, (lemma, pos_tag) in enumerate(zip(lemmas, pos_tags)):
+        if not lemma.isalpha():
             continue
 
         relations_found = []
-        for next_idx in range(idx+1, len(words)):
-            next_word = words[next_idx]
+        for next_idx in range(idx+1, len(lemmas)):
+            next_lemma = lemmas[next_idx]
             next_pos_tag = pos_tags[next_idx]
-            if not next_word.isalpha():
+            if not next_lemma.isalpha():
                 continue
 
             if next_pos_tag in relation_pos_list:
-                relations_found.append(next_word)
+                relations_found.append(next_lemma)
                 # Ensure the relation neuron exists in the column
-                if next_word not in columns[word]['relation_neurons']:
+                if next_lemma not in columns[lemma]['relation_neurons']:
                     neuron_id_counter += 1
                     relation_neuron_id = neuron_id_counter
-                    columns[word]['relation_neurons'][next_word] = {
+                    columns[lemma]['relation_neurons'][next_lemma] = {
                         'neuron_id': relation_neuron_id,
                         'permanence': 3,  # Initialized to 3
                         'activation_trace_counter': 5,  # Activation trace counter
@@ -289,12 +291,13 @@ def process_relations(words, pos_tags, activated_instances):
                     # Add the relation neuron to the graph
                     G.add_node(relation_neuron_id)
                     # Draw concept source connection
-                    relation_word_concept_id = columns[next_word]['concept_neuron']
+                    ensure_words_in_columns([next_lemma])
+                    relation_lemma_concept_id = columns[next_lemma]['concept_neuron']
                     # Reset activation trace counter for relation word concept neuron
-                    columns[next_word]['concept_activation_trace_counter'] = 5
-                    G.add_edge(relation_word_concept_id, relation_neuron_id, type='concept_source')
+                    columns[next_lemma]['concept_activation_trace_counter'] = 5
+                    G.add_edge(relation_lemma_concept_id, relation_neuron_id, type='concept_source')
                 else:
-                    relation_neuron_info = columns[word]['relation_neurons'][next_word]
+                    relation_neuron_info = columns[lemma]['relation_neurons'][next_lemma]
                     relation_neuron_id = relation_neuron_info['neuron_id']
                     # Reset activation trace counter
                     relation_neuron_info['activation_trace_counter'] = 5
@@ -304,45 +307,45 @@ def process_relations(words, pos_tags, activated_instances):
                     activated_relation_targets[relation_neuron_id] = []
 
                 # Now find the target word
-                for target_idx in range(next_idx+1, len(words)):
-                    target_word = words[target_idx]
+                for target_idx in range(next_idx+1, len(lemmas)):
+                    target_lemma = lemmas[target_idx]
                     target_pos_tag = pos_tags[target_idx]
-                    if not target_word.isalpha():
+                    if not target_lemma.isalpha():
                         continue
                     if target_pos_tag in concept_pos_list:
-                        target_concept_neuron_id = columns[target_word]['concept_neuron']
+                        target_concept_neuron_id = columns[target_lemma]['concept_neuron']
                         # Connect the relation neuron to the target concept neuron
                         G.add_edge(relation_neuron_id, target_concept_neuron_id, type='relation_target', pos=next_pos_tag)
                         # Store the permanence value for the connection
-                        if 'target_connections' not in columns[word]['relation_neurons'][next_word]:
-                            columns[word]['relation_neurons'][next_word]['target_connections'] = {}
-                        if target_concept_neuron_id not in columns[word]['relation_neurons'][next_word]['target_connections']:
-                            columns[word]['relation_neurons'][next_word]['target_connections'][target_concept_neuron_id] = {
+                        if 'target_connections' not in columns[lemma]['relation_neurons'][next_lemma]:
+                            columns[lemma]['relation_neurons'][next_lemma]['target_connections'] = {}
+                        if target_concept_neuron_id not in columns[lemma]['relation_neurons'][next_lemma]['target_connections']:
+                            columns[lemma]['relation_neurons'][next_lemma]['target_connections'][target_concept_neuron_id] = {
                                 'permanence': 3,  # Initialized to 3
                                 'activation_trace_counter': 5,  # Activation trace counter
                                 'first_activation': True
                             }
                         else:
                             # Reset activation trace counter
-                            columns[word]['relation_neurons'][next_word]['target_connections'][target_concept_neuron_id]['activation_trace_counter'] = 5
+                            columns[lemma]['relation_neurons'][next_lemma]['target_connections'][target_concept_neuron_id]['activation_trace_counter'] = 5
                         # Add to activated targets
                         activated_relation_targets.setdefault(relation_neuron_id, []).append(target_concept_neuron_id)
                         # Now connect the relation neuron to activated instance neurons in the target column
-                        if target_word in activated_instances:
-                            for target_instance_neuron_id in activated_instances[target_word]:
+                        if target_lemma in activated_instances:
+                            for target_instance_neuron_id in activated_instances[target_lemma]:
                                 G.add_edge(relation_neuron_id, target_instance_neuron_id, type='relation_target', pos=next_pos_tag)
-                                if target_instance_neuron_id not in columns[word]['relation_neurons'][next_word]['target_connections']:
-                                    columns[word]['relation_neurons'][next_word]['target_connections'][target_instance_neuron_id] = {
+                                if target_instance_neuron_id not in columns[lemma]['relation_neurons'][next_lemma]['target_connections']:
+                                    columns[lemma]['relation_neurons'][next_lemma]['target_connections'][target_instance_neuron_id] = {
                                         'permanence': 3,  # Initialized to 3
                                         'activation_trace_counter': 5,  # Activation trace counter
                                         'first_activation': True
                                     }
                                 else:
                                     # Reset activation trace counter
-                                    columns[word]['relation_neurons'][next_word]['target_connections'][target_instance_neuron_id]['activation_trace_counter'] = 5
+                                    columns[lemma]['relation_neurons'][next_lemma]['target_connections'][target_instance_neuron_id]['activation_trace_counter'] = 5
                                 activated_relation_targets[relation_neuron_id].append(target_instance_neuron_id)
                         # Reset activation trace for target concept neuron
-                        columns[target_word]['concept_activation_trace_counter'] = 5
+                        columns[target_lemma]['concept_activation_trace_counter'] = 5
                         break  # Only connect to the first concept word after relation word
             else:
                 if next_pos_tag in concept_pos_list or next_pos_tag in quality_pos_list:
@@ -350,36 +353,36 @@ def process_relations(words, pos_tags, activated_instances):
                 continue
 
         # Store the relations found for this concept in this sentence
-        activated_relations[word] = relations_found
+        activated_relations[lemma] = relations_found
 
         # Collect instance neurons for this word
-        if word in activated_instances:
-            instance_neurons = activated_instances[word]
+        if lemma in activated_instances:
+            instance_neurons = activated_instances[lemma]
         else:
             instance_neurons = []
         # Relation neurons
-        for rel_word in relations_found:
-            if rel_word in columns[word]['relation_neurons']:
-                rel_neuron_info = columns[word]['relation_neurons'][rel_word]
+        for rel_lemma in relations_found:
+            if rel_lemma in columns[lemma]['relation_neurons']:
+                rel_neuron_info = columns[lemma]['relation_neurons'][rel_lemma]
                 rel_neuron_id = rel_neuron_info['neuron_id']
                 instance_neurons.append(rel_neuron_id)
                 # Reset activation trace counter
                 rel_neuron_info['activation_trace_counter'] = 5
-        # Update activated_instances[word]
-        activated_instances[word] = instance_neurons
+        # Update activated_instances[lemma]
+        activated_instances[lemma] = instance_neurons
 
     return activated_relations, activated_relation_targets
 
 def update_instance_connections(activated_instances):
-    for word, instance_neurons in activated_instances.items():
-        if 'instance_connections' not in columns[word]:
-            columns[word]['instance_connections'] = {}
+    for lemma, instance_neurons in activated_instances.items():
+        if 'instance_connections' not in columns[lemma]:
+            columns[lemma]['instance_connections'] = {}
         if len(instance_neurons) >= 2:
             for i in range(len(instance_neurons)):
                 for j in range(i + 1, len(instance_neurons)):
                     neuron_pair = tuple(sorted((instance_neurons[i], instance_neurons[j])))
-                    if neuron_pair not in columns[word]['instance_connections']:
-                        columns[word]['instance_connections'][neuron_pair] = {
+                    if neuron_pair not in columns[lemma]['instance_connections']:
+                        columns[lemma]['instance_connections'][neuron_pair] = {
                             'permanence': 3,  # Initialized to 3
                             'activation_trace_counter': 5,  # Activation trace counter
                             'first_activation': True
@@ -389,20 +392,20 @@ def update_instance_connections(activated_instances):
                             G.add_edge(neuron_pair[0], neuron_pair[1], type='instance_connection')
                     else:
                         # Reset activation trace counter
-                        columns[word]['instance_connections'][neuron_pair]['activation_trace_counter'] = 5
+                        columns[lemma]['instance_connections'][neuron_pair]['activation_trace_counter'] = 5
 
 def update_permanence_values_concept_neurons(activated_concepts):
-    for concept_word, neurons in columns.items():
-        if concept_word in activated_concepts:
+    for concept_lemma, neurons in columns.items():
+        if concept_lemma in activated_concepts:
             neurons['permanence'] += 1  # No change required
 
 def update_permanence_values_relation_neurons(activated_concepts, activated_relations, activated_relation_targets):
-    for concept_word, neurons in columns.items():
-        if concept_word in activated_concepts:
-            active_relations = activated_relations.get(concept_word, [])
-            for relation_word, relation_info in list(neurons['relation_neurons'].items()):
+    for concept_lemma, neurons in columns.items():
+        if concept_lemma in activated_concepts:
+            active_relations = activated_relations.get(concept_lemma, [])
+            for relation_lemma, relation_info in list(neurons['relation_neurons'].items()):
                 relation_neuron_id = relation_info['neuron_id']
-                if relation_word in active_relations:
+                if relation_lemma in active_relations:
                     if relation_info.get('first_activation', False):
                         relation_info['first_activation'] = False
                     else:
@@ -429,7 +432,7 @@ def update_permanence_values_relation_neurons(activated_concepts, activated_rela
                         # Remove relation neuron
                         if G.has_node(relation_neuron_id):
                             G.remove_node(relation_neuron_id)
-                        del neurons['relation_neurons'][relation_word]
+                        del neurons['relation_neurons'][relation_lemma]
                     else:
                         # Decrease permanence of target connections
                         if 'target_connections' in relation_info:
@@ -442,11 +445,11 @@ def update_permanence_values_relation_neurons(activated_concepts, activated_rela
                                     del relation_info['target_connections'][target_neuron_id]
 
 def update_permanence_values_quality_neurons(activated_concepts, activated_qualities):
-    for concept_word, neurons in columns.items():
-        if concept_word in activated_concepts:
-            active_qualities = activated_qualities.get(concept_word, [])
-            for quality_word, quality_info in list(neurons['quality_neurons'].items()):
-                if quality_word in active_qualities:
+    for concept_lemma, neurons in columns.items():
+        if concept_lemma in activated_concepts:
+            active_qualities = activated_qualities.get(concept_lemma, [])
+            for quality_lemma, quality_info in list(neurons['quality_neurons'].items()):
+                if quality_lemma in active_qualities:
                     if quality_info.get('first_activation', False):
                         quality_info['first_activation'] = False
                     else:
@@ -457,14 +460,14 @@ def update_permanence_values_quality_neurons(activated_concepts, activated_quali
                         quality_neuron_id = quality_info['neuron_id']
                         if G.has_node(quality_neuron_id):
                             G.remove_node(quality_neuron_id)
-                        del neurons['quality_neurons'][quality_word]
+                        del neurons['quality_neurons'][quality_lemma]
 
 def update_permanence_values_instance_connections(activated_concepts, activated_instances):
-    for concept_word, neurons in columns.items():
-        if concept_word in activated_concepts:
+    for concept_lemma, neurons in columns.items():
+        if concept_lemma in activated_concepts:
             active_pairs = set()
-            if concept_word in activated_instances:
-                instance_neurons = activated_instances[concept_word]
+            if concept_lemma in activated_instances:
+                instance_neurons = activated_instances[concept_lemma]
                 if len(instance_neurons) >= 2:
                     active_pairs = set(
                         tuple(sorted((instance_neurons[i], instance_neurons[j])))
@@ -487,7 +490,7 @@ def update_permanence_values_instance_connections(activated_concepts, activated_
                         del neurons['instance_connections'][neuron_pair]
 
 def decrease_activation_trace_counters():
-    for concept_word, neurons in columns.items():
+    for concept_lemma, neurons in columns.items():
         # Concept neuron
         if neurons['concept_activation_trace_counter'] > 0:
             neurons['concept_activation_trace_counter'] -= 1
@@ -520,20 +523,21 @@ def process_sentences(sentences):
 
         # Process sentence
         doc = nlp(sentence)
-        words = [token.text for token in doc]
-        pos_tags = [token.pos_ for token in doc]
+        tokens = [token for token in doc]
+        lemmas = [token.lemma_ for token in tokens]
+        pos_tags = [token.pos_ for token in tokens]
 
         # Increase the sentence counter
         sentence_counter += 1
 
-        # Ensure all words are in columns
-        ensure_words_in_columns(words)
+        # Ensure all lemmas are in columns
+        ensure_words_in_columns(lemmas)
 
         # Collect qualities and initialize instance neurons
-        activated_concepts, activated_instances, activated_qualities = collect_qualities_and_initialize_instances(words, pos_tags)
+        activated_concepts, activated_instances, activated_qualities = collect_qualities_and_initialize_instances(lemmas, pos_tags)
 
         # Process relations
-        activated_relations, activated_relation_targets = process_relations(words, pos_tags, activated_instances)
+        activated_relations, activated_relation_targets = process_relations(lemmas, pos_tags, activated_instances)
 
         # Update instance connections within the concept column
         update_instance_connections(activated_instances)

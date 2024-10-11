@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1a3a;
+o1 preview prompt 1a3b;
 
 v1a2x:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -36,13 +36,5 @@ CHATONLY:	- Please change the concept column integer permanence values from bein
 
 v1a3x:
 - Place the main processing loop in a separate function, and place every for loop within the first level (i.e. lowest nesting depth) of the main processing loop in a separate function.
-
-
----
-I get this error;
-
-line 221
-    global neuron_id_counter
-    ^^^^^^^^^^^^^^^^^^^^^^^^
-SyntaxError: name 'neuron_id_counter' is used prior to global declaration
+- Perform lemmatisation of each word in sentence before processing it in the neural network. Use a suitable python library, e.g. spacy.
 
