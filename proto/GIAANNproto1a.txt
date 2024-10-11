@@ -1,5 +1,5 @@
-//do:
-o1 preview prompt 1a2c;
+DONE//do:
+o1 preview prompt 1a2d;
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specificiation:
 - Use the pytorch API for hardware acceleration of all arrays (for efficient parallel processing of connectivity). Do not initialise the array with a predetermined dictionary; dynamically populate the arrays as new dictionary words and relations are encountered. Will be discussed below.
 - Use vector graphics library such as networkx to always maintain a complete visualisation of the network (including active neurons). Only draw the parts of the network that are not empty.
@@ -17,4 +17,23 @@ Please create an abstract biological neural neural network simulation for natura
 - The columns should be visualised along the horizontal x axis (they should each be a tall rectangle). Each concept word neuron should be stored at the bottom of each column. The relation neurons should be stored along the vertical y axis of each column, above the concept neurons. Only draw the connections between the relation neurons and their target (object), not their source concept neuron (subject).  
 - Please draw separate rectangles for each concept column. The concept column rectangles need to be drawn around the contents (concept and relation neurons) of each column. Ensure the neuron sizes are too large to be encapsulated by the rectangles and all the neurons (including the relation neurons) are drawin within the column rectangles.
 - Every relation neuron in a concept column has an integer permanence value (initialised as 0). A relation neuron's permanence integer is increased by 3 every time the concept column neuron is activated by a sentence with that particular relation neuron being activated.  A relation neuron's permanence integer is decreased by 1 every time the concept column neuron is activated by a sentence without that particular relation neuron being activated. If a relation neuron's permanence decreases to 0, then the relation neuron is removed from the column and it will no longer be visualised.
-- Print each sentence in the command line
+- Print each sentence in the command line.
+CHATONLY:	- Please delete the following feature; Pause the simulation after every sentence, and accept any key to continue the simulation.
+CHATONLY:	- Please change the concept column integer permanence values from being initialised as 3 to being initialised as 0.
+- Each word is assigned a unique concept column (this includes all pos types; even relation words are assigned a unique concept column). Please store all exclusive concept neurons POS types in a list, such that it can be easily modified (noun, proper noun, and pronoun, and unknown). 
+- In addition to creating action and condition relation neurons, create relation neurons for conjunction POS types. Please store all relation word POS types in a list, such that it can be easily modified (verb, preposition, conjunction). 
+- Detect quality words for every sentence word of POS type determiner, adverb, or adjective (e.g. "the", "very", or "blue) appearing before or after the current sentence concept word being processed, assuming there is no relation word between the quality word and current sentence concept word. Add associated quality neurons to the concept columns next to the relation neurons. Quality neurons are similar to relation neurons except they do not connect to a target concept column.  Please store all quality word POS types in a list, such that it can be easily modified (determiner, adverb, adjective). Note for now, quality words are assigned a unique quality neuron for every concept they are associated with, however quality neurons are only created for clarity (and programatic ease). In a future implementation, qualities can be associated with concept columns by simply connecting them directly to concept column neurons.
+- Draw the concept neurons blue, the action relation neurons green, the condition relation neurons red, and the quality neurons in cyan.
+- Draw a connection between every concept column representing a relation word (e.g. "eat" or "near") or quality word (e.g. "blue") to the bottom of every one of its relation or quality neuron instances within a concept column. These are concept "source" connections, and should be all drawn in blue. They communicate the semantic meaning of the particular relation or quality.
+- Draw all action relation neuron target (object) connections in green, and all condition target (object) connections in red. These should be drawn from the side of the relation instance neuron and the target (object) concept neuron.
+- Extend the exact same permanence rules to quality instance neurons as relation instance neurons. Every quality instance neuron in a concept column has an integer permanence value (initialised as 0). 
+
+---
+I get an error executing "quality_word_concept_id = columns[next_word]['concept_neuron']";
+
+ Senj\u014d no Valkyria 3 : Unrecorded Chronicles ( Japanese : \u6226\u5834\u306e\u30f4\u30a1\u30eb\u30ad\u30e5\u30ea\u30a23 , lit .
+Traceback (most recent call last):
+  File "/media/user/large/source/ANNpython/GIAANNpy/proto/GIAANNproto1a2d.py", line 288, in <module>
+    quality_word_concept_id = columns[next_word]['concept_neuron']
+                              ~~~~~~~^^^^^^^^^^^
+KeyError: 'no'
