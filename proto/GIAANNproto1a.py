@@ -40,7 +40,7 @@ global_instance_connections = {}
 # Lists for POS types
 concept_pos_list = ['NOUN', 'PROPN', 'PRON', 'X']  # POS types for concept columns
 relation_pos_list = ['VERB', 'ADP', 'CONJ']        # POS types for relation neurons
-quality_pos_list = ['DET', 'ADV', 'ADJ']           # Restored 'DET' to process other determiners
+quality_pos_list = ['DET', 'ADJ']                  # Removed 'ADV' to exclude adverbs from quality detection
 
 
 # Function to visualize the network
@@ -591,7 +591,7 @@ def decrease_activation_trace_counters():
     for connection_info in global_instance_connections.values():
         if connection_info['activation_trace_counter'] > 0:
             connection_info['activation_trace_counter'] -= 1
-			
+
 def draw_dependency_tree(sentence, tokens, columns, G):
     # Extract lemmas and positions
     lemmas = [token.lemma_ for token in tokens]
