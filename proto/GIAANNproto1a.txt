@@ -1,5 +1,5 @@
-DONE//do:
-o1 preview prompt 1a3c;
+FAIL//do:
+o1 preview prompt 1a3d;
 
 v1a2x:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -40,3 +40,20 @@ v1a3x:
 CHATONLY: - Draw the quality neurons in turquoise instead of cyan.
 CHATONLY: - Draw the quality connections (between quality neurons and their concept column neuron) in turquoise (instead of blue).
 CHATONLY: - Revert the last change "Draw the quality connections (between quality neurons and their concept column neuron) in turquoise (instead of blue)."
+- Ignore all "be" auxiliary lemmas when detecting qualities and action/condition relations. Do not assign a "be" action relation for qualities (e.g. "dogs are green"), conditions (e.g. "the cat is near the park"), or actions (e.g. "the bat is flying in the sky"). Quality neurons (e.g. "green") are directly connected to concept neurons (e.g. "dog"). Condition relations (prepositions; e.g. "near") are directly connected to their subject (e.g. "cat"). Action relations (verbs; e.g. "fly") are directly connected to their subject (e.g. "bat").
+- Ignore all "do" auxiliary lemmas when detecting action relations. Do not assign a "do" action relation for actions (e.g. "the mouse does eat the cheese"). Action relations (verbs; e.g. "eat") are directly connected to their subject (e.g. "mouse").
+- Convert all possessive ending/clitic lemmas ("'s") to the "have" auxilary lemma ("have"). For example in the sentence "the student's apple", a "have" action relation will be created between "student" and "apple". "Have" auxiliary action connections are a special class of relations ('property relations') but we will not call them 'property relations' for clarity; we will call them 'action relations' in the specification, so that our code generalises (because they follow the same rules as action/condition relations). However, please draw have auxiliary action relation neurons in cyan (instead of green); their unique colour is their only difference for now.
+- Create a definition connection (draw in dark blue) when a "be" auxiliary lemma is detected between two concept nodes, without an intermediary action/condition relation (e.g. "an alsatian is a black dog" will generate a definition connection between "alsatian" and "dog"). Definition connections are a special class of relation ('definition relations') but we will not call them 'definition relations' for clarity; we will call them "definition connections" in the specification, so that our code generalises (to distinguish them from action/condition relations).
+
+---
+Please revert all your last code changes. I will simplify the instructions to help you understand exactly what requires changing;
+
+- Ignore all "be" auxiliary lemmas (do not create concept column nodes for them).
+- Ignore all "do" auxiliary lemmas (do not create concept column nodes for them).
+- Convert all possessive ending/clitic lemmas ("'s") to the "have" auxilary lemma ("have"). Draw all have auxiliary action relations in cyan (instead of green).
+- Create a definition connection (draw in dark blue) when a "be" auxiliary lemma is detected between two concept lemmas, without an intermediary action/condition relation (e.g. "an alsatian is a black dog" will generate a definition connection between "alsatian" and "dog"). 
+
+---
+Full debug history has been archived.
+
+Model performance decreases, and is unable to make further successful changes to the code. Appears to have run out of context memory. Further changes are introduced into a new o1 prompt session.
