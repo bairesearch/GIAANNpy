@@ -41,7 +41,7 @@ global_instance_connections = {}
 concept_pos_list = ['NOUN', 'PROPN', 'PRON', 'X']  # POS types for concept columns
 relation_pos_list = ['VERB', 'ADP', 'CONJ']        # POS types for relation neurons
 quality_pos_list = ['DET', 'ADJ']                  # Removed 'ADV' to exclude adverbs from quality detection
-
+modifier_pos_list = ['ADV']                        # POS types for modifier neurons
 
 # Function to visualize the network
 def visualize_network(G, columns):
@@ -63,23 +63,54 @@ def visualize_network(G, columns):
         concept_neuron_id = neurons['concept_neuron']
         pos[concept_neuron_id] = (x, 0)
         labels[concept_neuron_id] = concept_lemma
+        current_y = y_margin  # Start placing neurons above the concept neuron
+
         # Relation neurons above
-        for j, (relation_lemma, relation_info) in enumerate(neurons['relation_neurons'].items()):
+        for relation_lemma, relation_info in neurons['relation_neurons'].items():
             relation_neuron_id = relation_info['neuron_id']
-            y = (j + 1) * y_margin * 2  # y position for relation neurons
-            pos[relation_neuron_id] = (x, y)
+            pos[relation_neuron_id] = (x, current_y)
             labels[relation_neuron_id] = relation_lemma
-            relation_info['y_pos'] = y  # Store y position for internal relation drawing
-            if y > max_y:
-                max_y = y
+            relation_info['y_pos'] = current_y  # Store y position for internal relation drawing
+
+            # Modifiers for relation neurons
+            if 'modifiers' in relation_info:
+                for modifier_lemma, modifier_info in relation_info['modifiers'].items():
+                    modifier_neuron_id = modifier_info['neuron_id']
+                    current_y += y_margin
+                    pos[modifier_neuron_id] = (x, current_y)
+                    labels[modifier_neuron_id] = modifier_lemma
+            current_y += y_margin
+            if current_y > max_y:
+                max_y = current_y
+
         # Quality neurons above relation neurons
-        for k, (quality_lemma, quality_info) in enumerate(neurons['quality_neurons'].items()):
+        for quality_lemma, quality_info in neurons['quality_neurons'].items():
             quality_neuron_id = quality_info['neuron_id']
-            y = (len(neurons['relation_neurons']) + k + 1) * y_margin * 2
-            pos[quality_neuron_id] = (x, y)
+            pos[quality_neuron_id] = (x, current_y)
             labels[quality_neuron_id] = quality_lemma
-            if y > max_y:
-                max_y = y
+
+            # Modifiers for quality neurons
+            if 'modifiers' in quality_info:
+                for modifier_lemma, modifier_info in quality_info['modifiers'].items():
+                    modifier_neuron_id = modifier_info['neuron_id']
+                    current_y += y_margin
+                    pos[modifier_neuron_id] = (x, current_y)
+                    labels[modifier_neuron_id] = modifier_lemma
+            current_y += y_margin
+            if current_y > max_y:
+                max_y = current_y
+
+    # Assign positions to any remaining nodes that haven't been assigned yet
+    unpositioned_nodes = set(G.nodes()) - set(pos.keys())
+    if unpositioned_nodes:
+        current_x = (len(columns) + 1) * x_margin * 2  # Start after the last column
+        current_y = y_margin
+        for node_id in unpositioned_nodes:
+            pos[node_id] = (current_x, current_y)
+            labels[node_id] = f"Node {node_id}"
+            current_y += y_margin * 2
+            if current_y > max_y:
+                max_y = current_y
 
     # Draw nodes
     node_colors = []
@@ -106,8 +137,12 @@ def visualize_network(G, columns):
                         break
         elif any(node_id in [info['neuron_id'] for info in neurons['quality_neurons'].values()] for neurons in columns.values()):
             node_colors.append('turquoise')  # Quality neurons
+        elif any(node_id in [modifier_info['neuron_id'] for neuron_info in neurons['relation_neurons'].values() if 'modifiers' in neuron_info for modifier_info in neuron_info['modifiers'].values()] for neurons in columns.values()):
+            node_colors.append('lightblue')  # Modifier neurons for relations
+        elif any(node_id in [modifier_info['neuron_id'] for neuron_info in neurons['quality_neurons'].values() if 'modifiers' in neuron_info for modifier_info in neuron_info['modifiers'].values()] for neurons in columns.values()):
+            node_colors.append('lightblue')  # Modifier neurons for qualities
         else:
-            node_colors.append('gray')
+            node_colors.append('lightblue')  # Default color for unpositioned modifier nodes
 
     # Draw edges
     edge_colors = []
@@ -147,6 +182,9 @@ def visualize_network(G, columns):
             else:
                 edge_colors.append('gray')
             edge_styles.append('solid')
+        elif edge['type'] == 'modifier':
+            edge_colors.append('lightblue')
+            edge_styles.append('solid')
         else:
             edge_colors.append('gray')
             edge_styles.append('solid')
@@ -162,8 +200,14 @@ def visualize_network(G, columns):
         y_positions = [pos[neurons['concept_neuron']][1]]
         for relation_info in neurons['relation_neurons'].values():
             y_positions.append(pos[relation_info['neuron_id']][1])
+            if 'modifiers' in relation_info:
+                for modifier_info in relation_info['modifiers'].values():
+                    y_positions.append(pos[modifier_info['neuron_id']][1])
         for quality_info in neurons['quality_neurons'].values():
             y_positions.append(pos[quality_info['neuron_id']][1])
+            if 'modifiers' in quality_info:
+                for modifier_info in quality_info['modifiers'].values():
+                    y_positions.append(pos[modifier_info['neuron_id']][1])
         y_min = min(y_positions) - y_margin
         y_max = max(y_positions) + y_margin
         # Draw rectangle
@@ -203,6 +247,28 @@ def ensure_words_in_columns(lemmas, tokens):
             # Add the concept neuron to the graph
             G.add_node(concept_neuron_id)
 
+def collect_modifiers(idx, lemmas, pos_tags):
+    modifiers_found = []
+    # Check previous lemma
+    if idx > 0:
+        prev_lemma = lemmas[idx - 1]
+        prev_pos_tag = pos_tags[idx - 1]
+        if prev_pos_tag in modifier_pos_list:
+            # Ensure no intervening relation words
+            intervening_pos = pos_tags[idx - 1:idx]
+            if not any(pos in relation_pos_list for pos in intervening_pos):
+                modifiers_found.append((prev_lemma, idx - 1))
+    # Check next lemma
+    if idx < len(lemmas) - 1:
+        next_lemma = lemmas[idx + 1]
+        next_pos_tag = pos_tags[idx + 1]
+        if next_pos_tag in modifier_pos_list:
+            # Ensure no intervening relation words
+            intervening_pos = pos_tags[idx + 1:idx + 2]
+            if not any(pos in relation_pos_list for pos in intervening_pos):
+                modifiers_found.append((next_lemma, idx + 1))
+    return modifiers_found
+
 def collect_qualities_and_initialize_instances(lemmas, pos_tags, tokens):
     global neuron_id_counter
     activated_concepts = {}
@@ -236,7 +302,8 @@ def collect_qualities_and_initialize_instances(lemmas, pos_tags, tokens):
                             'permanence': 3,  # Initialized to 3
                             'activation_trace_counter': 5,  # Activation trace counter
                             'pos': prev_pos_tag,
-                            'first_activation': True
+                            'first_activation': True,
+                            'modifiers': {}
                         }
                         # Add the quality neuron to the graph
                         G.add_node(quality_neuron_id)
@@ -249,6 +316,29 @@ def collect_qualities_and_initialize_instances(lemmas, pos_tags, tokens):
                         quality_neuron_id = columns[lemma]['quality_neurons'][prev_lemma]['neuron_id']
                         # Reset activation trace counter
                         columns[lemma]['quality_neurons'][prev_lemma]['activation_trace_counter'] = 5
+                    # Now check for modifiers for this quality neuron
+                    quality_neuron_info = columns[lemma]['quality_neurons'][prev_lemma]
+                    modifiers_found = collect_modifiers(idx - 1, lemmas, pos_tags)
+                    for modifier_lemma, modifier_idx in modifiers_found:
+                        if modifier_lemma not in quality_neuron_info['modifiers']:
+                            neuron_id_counter += 1
+                            modifier_neuron_id = neuron_id_counter
+                            quality_neuron_info['modifiers'][modifier_lemma] = {
+                                'neuron_id': modifier_neuron_id,
+                                'permanence': 3,
+                                'activation_trace_counter': 5,
+                                'first_activation': True
+                            }
+                            # Add the modifier neuron to the graph
+                            G.add_node(modifier_neuron_id)
+                            # Draw edge from modifier neuron to quality neuron
+                            G.add_edge(modifier_neuron_id, quality_neuron_id, type='modifier')
+                        else:
+                            modifier_neuron_info = quality_neuron_info['modifiers'][modifier_lemma]
+                            # Reset activation trace counter
+                            modifier_neuron_info['activation_trace_counter'] = 5
+
+            # Similar check for modifiers when quality is in the next lemma
         # Check next lemma
         if idx < len(lemmas) - 1:
             next_lemma = lemmas[idx + 1]
@@ -265,7 +355,8 @@ def collect_qualities_and_initialize_instances(lemmas, pos_tags, tokens):
                             'permanence': 3,  # Initialized to 3
                             'activation_trace_counter': 5,  # Activation trace counter
                             'pos': next_pos_tag,
-                            'first_activation': True
+                            'first_activation': True,
+                            'modifiers': {}
                         }
                         # Add the quality neuron to the graph
                         G.add_node(quality_neuron_id)
@@ -278,6 +369,27 @@ def collect_qualities_and_initialize_instances(lemmas, pos_tags, tokens):
                         quality_neuron_id = columns[lemma]['quality_neurons'][next_lemma]['neuron_id']
                         # Reset activation trace counter
                         columns[lemma]['quality_neurons'][next_lemma]['activation_trace_counter'] = 5
+                    # Now check for modifiers for this quality neuron
+                    quality_neuron_info = columns[lemma]['quality_neurons'][next_lemma]
+                    modifiers_found = collect_modifiers(idx + 1, lemmas, pos_tags)
+                    for modifier_lemma, modifier_idx in modifiers_found:
+                        if modifier_lemma not in quality_neuron_info['modifiers']:
+                            neuron_id_counter += 1
+                            modifier_neuron_id = neuron_id_counter
+                            quality_neuron_info['modifiers'][modifier_lemma] = {
+                                'neuron_id': modifier_neuron_id,
+                                'permanence': 3,
+                                'activation_trace_counter': 5,
+                                'first_activation': True
+                            }
+                            # Add the modifier neuron to the graph
+                            G.add_node(modifier_neuron_id)
+                            # Draw edge from modifier neuron to quality neuron
+                            G.add_edge(modifier_neuron_id, quality_neuron_id, type='modifier')
+                        else:
+                            modifier_neuron_info = quality_neuron_info['modifiers'][modifier_lemma]
+                            # Reset activation trace counter
+                            modifier_neuron_info['activation_trace_counter'] = 5
 
         # Store the qualities found for this concept in this sentence
         activated_qualities[lemma] = qualities_found
@@ -337,6 +449,7 @@ def process_relations(lemmas, pos_tags, tokens, activated_instances):
                     'lemma': lemma,
                     'target_connections': {},
                     'internal_relations': {},
+                    'modifiers': {},
                     'first_activation': True
                 }
                 # Add the relation neuron to the graph
@@ -376,6 +489,27 @@ def process_relations(lemmas, pos_tags, tokens, activated_instances):
             else:
                 # This is the first relation word after a concept
                 pass  # No internal relation to create
+
+            # Collect modifiers for this relation neuron
+            modifiers_found = collect_modifiers(idx, lemmas, pos_tags)
+            for modifier_lemma, modifier_idx in modifiers_found:
+                if modifier_lemma not in relation_info['modifiers']:
+                    neuron_id_counter += 1
+                    modifier_neuron_id = neuron_id_counter
+                    relation_info['modifiers'][modifier_lemma] = {
+                        'neuron_id': modifier_neuron_id,
+                        'permanence': 3,
+                        'activation_trace_counter': 5,
+                        'first_activation': True
+                    }
+                    # Add the modifier neuron to the graph
+                    G.add_node(modifier_neuron_id)
+                    # Draw edge from modifier neuron to relation neuron
+                    G.add_edge(modifier_neuron_id, relation_neuron_id, type='modifier')
+                else:
+                    modifier_neuron_info = relation_info['modifiers'][modifier_lemma]
+                    # Reset activation trace counter
+                    modifier_neuron_info['activation_trace_counter'] = 5
 
             # Update prev_relation variables
             prev_relation_neuron_id = relation_neuron_id
@@ -547,6 +681,13 @@ def update_permanence_values_relation_neurons(activated_concepts, activated_rela
                                 internal_conn_info['first_activation'] = False
                             else:
                                 internal_conn_info['permanence'] = internal_conn_info['permanence'] ** 2
+                    # Update modifiers
+                    if 'modifiers' in relation_info:
+                        for modifier_lemma, modifier_info in list(relation_info['modifiers'].items()):
+                            if modifier_info.get('first_activation', False):
+                                modifier_info['first_activation'] = False
+                            else:
+                                modifier_info['permanence'] = modifier_info['permanence'] ** 2
                 else:
                     # Decrease permanence by 1
                     relation_info['permanence'] -= 1
@@ -574,6 +715,17 @@ def update_permanence_values_relation_neurons(activated_concepts, activated_rela
                                     if G.has_edge(relation_neuron_id, internal_neuron_id):
                                         G.remove_edge(relation_neuron_id, internal_neuron_id)
                                     del relation_info['internal_relations'][internal_neuron_id]
+                        # Decrease permanence of modifiers
+                        if 'modifiers' in relation_info:
+                            for modifier_lemma, modifier_info in list(relation_info['modifiers'].items()):
+                                modifier_info['permanence'] -= 1
+                                if modifier_info['permanence'] <= 0:
+                                    modifier_neuron_id = modifier_info['neuron_id']
+                                    if G.has_node(modifier_neuron_id):
+                                        G.remove_node(modifier_neuron_id)
+                                    if G.has_edge(modifier_neuron_id, relation_neuron_id):
+                                        G.remove_edge(modifier_neuron_id, relation_neuron_id)
+                                    del relation_info['modifiers'][modifier_lemma]
 
 def update_permanence_values_quality_neurons(activated_concepts, activated_qualities):
     for concept_lemma, neurons in columns.items():
@@ -585,6 +737,13 @@ def update_permanence_values_quality_neurons(activated_concepts, activated_quali
                         quality_info['first_activation'] = False
                     else:
                         quality_info['permanence'] = quality_info['permanence'] ** 2
+                    # Update modifiers
+                    if 'modifiers' in quality_info:
+                        for modifier_lemma, modifier_info in list(quality_info['modifiers'].items()):
+                            if modifier_info.get('first_activation', False):
+                                modifier_info['first_activation'] = False
+                            else:
+                                modifier_info['permanence'] = modifier_info['permanence'] ** 2
                 else:
                     quality_info['permanence'] -= 1
                     if quality_info['permanence'] <= 0:
@@ -592,6 +751,18 @@ def update_permanence_values_quality_neurons(activated_concepts, activated_quali
                         if G.has_node(quality_neuron_id):
                             G.remove_node(quality_neuron_id)
                         del neurons['quality_neurons'][quality_lemma]
+                    else:
+                        # Decrease permanence of modifiers
+                        if 'modifiers' in quality_info:
+                            for modifier_lemma, modifier_info in list(quality_info['modifiers'].items()):
+                                modifier_info['permanence'] -= 1
+                                if modifier_info['permanence'] <= 0:
+                                    modifier_neuron_id = modifier_info['neuron_id']
+                                    if G.has_node(modifier_neuron_id):
+                                        G.remove_node(modifier_neuron_id)
+                                    if G.has_edge(modifier_neuron_id, quality_neuron_id):
+                                        G.remove_edge(modifier_neuron_id, quality_neuron_id)
+                                    del quality_info['modifiers'][modifier_lemma]
 
 def update_permanence_values_instance_connections(activated_instances):
     active_pairs = set()
@@ -641,11 +812,21 @@ def decrease_activation_trace_counters():
                 for internal_conn_info in relation_info['internal_relations'].values():
                     if internal_conn_info['activation_trace_counter'] > 0:
                         internal_conn_info['activation_trace_counter'] -= 1
+            # Modifiers
+            if 'modifiers' in relation_info:
+                for modifier_info in relation_info['modifiers'].values():
+                    if modifier_info['activation_trace_counter'] > 0:
+                        modifier_info['activation_trace_counter'] -= 1
 
         # Quality neurons
         for quality_info in neurons['quality_neurons'].values():
             if quality_info['activation_trace_counter'] > 0:
                 quality_info['activation_trace_counter'] -= 1
+            # Modifiers
+            if 'modifiers' in quality_info:
+                for modifier_info in quality_info['modifiers'].values():
+                    if modifier_info['activation_trace_counter'] > 0:
+                        modifier_info['activation_trace_counter'] -= 1
 
     # Decrease activation trace counters for global instance connections
     for connection_info in global_instance_connections.values():
@@ -685,6 +866,8 @@ def draw_dependency_tree(sentence, tokens, columns, G):
                 node_colors.append('gray')
         elif pos_tag in quality_pos_list:
             node_colors.append('turquoise')  # Quality node
+        elif pos_tag in modifier_pos_list:
+            node_colors.append('lightblue')  # Modifier node
         else:
             node_colors.append('gray')
 
@@ -715,6 +898,12 @@ def draw_dependency_tree(sentence, tokens, columns, G):
                 if permanence >= 3:
                     # Add dependency
                     dependencies.append((idx, quality_idx, 'quality', 'turquoise'))
+                    # Process modifiers
+                    if 'modifiers' in quality_info:
+                        for modifier_lemma, modifier_info in quality_info['modifiers'].items():
+                            if modifier_lemma in lemmas:
+                                modifier_idx = lemmas.index(modifier_lemma)
+                                dependencies.append((modifier_idx, quality_idx, 'modifier', 'lightblue'))
 
         # Process relations
         for relation_lemma, relation_info in neurons.get('relation_neurons', {}).items():
@@ -737,6 +926,12 @@ def draw_dependency_tree(sentence, tokens, columns, G):
                     else:
                         color = 'gray'
                     dependencies.append((idx, relation_idx, 'relation', color))
+                    # Process modifiers
+                    if 'modifiers' in relation_info:
+                        for modifier_lemma, modifier_info in relation_info['modifiers'].items():
+                            if modifier_lemma in lemmas:
+                                modifier_idx = lemmas.index(modifier_lemma)
+                                dependencies.append((modifier_idx, relation_idx, 'modifier', 'lightblue'))
                     # Now check target connections
                     relation_neuron_id = relation_info['neuron_id']
                     if 'target_connections' in relation_info:
