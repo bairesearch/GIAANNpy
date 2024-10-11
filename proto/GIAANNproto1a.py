@@ -40,7 +40,8 @@ global_instance_connections = {}
 # Lists for POS types
 concept_pos_list = ['NOUN', 'PROPN', 'PRON', 'X']  # POS types for concept columns
 relation_pos_list = ['VERB', 'ADP', 'CONJ']        # POS types for relation neurons
-quality_pos_list = ['DET', 'ADV', 'ADJ']           # POS types for quality neurons
+quality_pos_list = ['DET', 'ADV', 'ADJ']           # Restored 'DET' to process determiners other than 'the', 'a', 'an'
+
 
 # Function to visualize the network
 def visualize_network(G, columns):
@@ -166,6 +167,10 @@ def ensure_words_in_columns(lemmas, tokens):
 
         # Ignore "be" and "do" auxiliaries
         if dep_tag == 'aux' and lemma in ['be', 'do']:
+            continue
+
+        # Ignore specific determiners: 'the', 'a', 'an'
+        if lemma.lower() in ['the', 'a', 'an']:
             continue
 
         # Convert possessive clitic to "have"
@@ -402,6 +407,7 @@ def process_relations(lemmas, pos_tags, tokens, activated_instances):
         activated_instances[lemma] = instance_neurons
 
     return activated_relations, activated_relation_targets
+
 
 def process_definitions(tokens):
     lemmas = [token.lemma_ for token in tokens]
@@ -754,6 +760,10 @@ def process_sentences(sentences):
 
             # Ignore "be" and "do" auxiliaries
             if dep_tag == 'aux' and lemma in ['be', 'do']:
+                continue
+
+            # Ignore specific determiners: 'the', 'a', 'an'
+            if lemma.lower() in ['the', 'a', 'an']:
                 continue
 
             # Convert possessive clitic to "have"
