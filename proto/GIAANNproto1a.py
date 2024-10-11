@@ -40,7 +40,7 @@ global_instance_connections = {}
 # Lists for POS types
 concept_pos_list = ['NOUN', 'PROPN', 'PRON', 'X']  # POS types for concept columns
 relation_pos_list = ['VERB', 'ADP', 'CONJ']        # POS types for relation neurons
-quality_pos_list = ['DET', 'ADV', 'ADJ']           # Restored 'DET' to process determiners other than 'the', 'a', 'an'
+quality_pos_list = ['DET', 'ADV', 'ADJ']           # Restored 'DET' to process other determiners
 
 
 # Function to visualize the network
@@ -164,10 +164,6 @@ def ensure_words_in_columns(lemmas, tokens):
         pos_tag = token.pos_
         dep_tag = token.dep_
         tag = token.tag_
-
-        # Ignore "be" and "do" auxiliaries
-        if dep_tag == 'aux' and lemma in ['be', 'do']:
-            continue
 
         # Ignore specific determiners: 'the', 'a', 'an'
         if lemma.lower() in ['the', 'a', 'an']:
@@ -305,10 +301,6 @@ def process_relations(lemmas, pos_tags, tokens, activated_instances):
                 continue
 
             if next_pos_tag in relation_pos_list:
-                # Ignore "be" and "do" auxiliaries
-                if next_lemma in ['be', 'do'] and tokens[next_idx].dep_ == 'aux':
-                    continue
-
                 relations_found.append(next_lemma)
                 # Ensure the relation neuron exists in the column
                 if next_lemma not in columns[lemma]['relation_neurons']:
@@ -407,7 +399,6 @@ def process_relations(lemmas, pos_tags, tokens, activated_instances):
         activated_instances[lemma] = instance_neurons
 
     return activated_relations, activated_relation_targets
-
 
 def process_definitions(tokens):
     lemmas = [token.lemma_ for token in tokens]
@@ -600,7 +591,7 @@ def decrease_activation_trace_counters():
     for connection_info in global_instance_connections.values():
         if connection_info['activation_trace_counter'] > 0:
             connection_info['activation_trace_counter'] -= 1
-
+			
 def draw_dependency_tree(sentence, tokens, columns, G):
     # Extract lemmas and positions
     lemmas = [token.lemma_ for token in tokens]
@@ -758,10 +749,6 @@ def process_sentences(sentences):
             dep_tag = token.dep_
             tag = token.tag_
 
-            # Ignore "be" and "do" auxiliaries
-            if dep_tag == 'aux' and lemma in ['be', 'do']:
-                continue
-
             # Ignore specific determiners: 'the', 'a', 'an'
             if lemma.lower() in ['the', 'a', 'an']:
                 continue
@@ -819,6 +806,7 @@ def process_sentences(sentences):
 
         # Draw the dependency tree
         draw_dependency_tree(sentence, tokens_to_use, columns, G)
+
 
 # Call the main processing function
 process_sentences(sentences)
