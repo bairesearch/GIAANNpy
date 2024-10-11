@@ -1,5 +1,5 @@
-DONE//do:
-o1 preview prompt 1a2e;
+FAIL//do:
+o1 preview prompt 1a2f;
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specificiation:
 - Use the pytorch API for hardware acceleration of all arrays (for efficient parallel processing of connectivity). Do not initialise the array with a predetermined dictionary; dynamically populate the arrays as new dictionary words and relations are encountered. Will be discussed below.
 - Use vector graphics library such as networkx to always maintain a complete visualisation of the network (including active neurons). Only draw the parts of the network that are not empty.
@@ -28,18 +28,9 @@ CHATONLY:	- Please change the concept column integer permanence values from bein
 - Draw all action relation neuron target (object) connections in green, and all condition target (object) connections in red. These should be drawn from the side of the relation instance neuron and the target (object) concept neuron.
 - Extend the exact same permanence rules to quality instance neurons as relation instance neurons. Every quality instance neuron in a concept column has an integer permanence value (initialised as 0). 
 - Relation or quality instance nodes within a concept column represent possible features of a given concept. Connect instance nodes that a) are within the same concept column and b) occur in the same sentence together, with an instance or specific concept connection (draw as yellow). Store a permanence value for every instance or specific concept connection, using the same permanence rules used for quality or relation instance neurons.
+- Relation instance nodes are connected to target column concept neurons (already implemented). Also connect relation instance nodes to every instance (i.e. feature) node in the target column that was generated or activated by the current sentence. Use the same colour scheme for target connections (conditional relations in red, and action relations in green). Store a permanence value for every relation target connection, to both target column concept neurons and target column instance neurons, using the same permanence rules used for quality or relation instance neurons and instance or specific concept connections.
 
 ---
-I get an error executing "active_pairs = set(tuple(sorted((instance_neurons[i], instance_neurons[j])))";
+Full debug history has been archived.
 
-Valkyria of the Battlefield 3 ) , commonly referred to as Valkyria Chronicles III outside Japan , is a tactical role @-@ playing video game developed by Sega and Media.Vision for the PlayStation Portable .
-Traceback (most recent call last):
-  File "/media/user/large/source/ANNpython/GIAANNpy/proto/GIAANNproto1a2e.py", line 359, in <module>
-    active_pairs = set(tuple(sorted((instance_neurons[i], instance_neurons[j])))
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/media/user/large/source/ANNpython/GIAANNpy/proto/GIAANNproto1a2e.py", line 359, in <genexpr>
-    active_pairs = set(tuple(sorted((instance_neurons[i], instance_neurons[j])))
-                                     ~~~~~~~~~~~~~~~~^^^
-IndexError: list index out of range
-
-
+Model performance decreases, and is unable to make further successful changes to the code. Appears to have run out of context memory. Further changes are introduced into a new o1 prompt session.
