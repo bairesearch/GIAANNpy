@@ -86,7 +86,10 @@ def visualize_network(G, columns):
                 for relation_lemma, relation_info in neurons['relation_neurons'].items():
                     if relation_info['neuron_id'] == node_id:
                         relation_pos = relation_info['pos']
-                        if relation_pos == 'VERB':
+                        relation_lemma = relation_info['lemma']
+                        if relation_lemma == 'have':
+                            node_colors.append('cyan')  # 'have' auxiliary action relations
+                        elif relation_pos == 'VERB':
                             node_colors.append('green')  # Action
                         elif relation_pos == 'ADP':
                             node_colors.append('red')    # Condition
@@ -96,7 +99,7 @@ def visualize_network(G, columns):
                             node_colors.append('gray')
                         break
         elif any(node_id in [info['neuron_id'] for info in neurons['quality_neurons'].values()] for neurons in columns.values()):
-            node_colors.append('turquoise')  # Quality neurons (changed from 'cyan' to 'turquoise')
+            node_colors.append('turquoise')  # Quality neurons
         else:
             node_colors.append('gray')
 
@@ -106,7 +109,9 @@ def visualize_network(G, columns):
     for u, v in G.edges():
         edge = G.get_edge_data(u, v)
         if edge['type'] == 'relation_target':
-            if edge['pos'] == 'VERB':
+            if edge.get('lemma') == 'have':
+                edge_colors.append('cyan')
+            elif edge['pos'] == 'VERB':
                 edge_colors.append('green')
             elif edge['pos'] == 'ADP':
                 edge_colors.append('red')
@@ -117,6 +122,9 @@ def visualize_network(G, columns):
             edge_styles.append('solid')
         elif edge['type'] == 'concept_source':
             edge_colors.append('blue')  # All concept_source edges are colored blue
+            edge_styles.append('solid')
+        elif edge['type'] == 'definition':
+            edge_colors.append('darkblue')  # Definition connections
             edge_styles.append('solid')
         elif edge['type'] == 'instance_connection':
             edge_colors.append('yellow')
@@ -145,9 +153,23 @@ def visualize_network(G, columns):
     plt.axis('off')
     plt.show()
 
-def ensure_words_in_columns(lemmas):
+def ensure_words_in_columns(lemmas, tokens):
     global neuron_id_counter
-    for lemma in lemmas:
+    for lemma, token in zip(lemmas, tokens):
+        pos_tag = token.pos_
+        dep_tag = token.dep_
+        tag = token.tag_
+
+        # Ignore "be" and "do" auxiliaries
+        if dep_tag == 'aux' and lemma in ['be', 'do']:
+            continue
+
+        # Convert possessive clitic to "have"
+        if tag == 'POS':
+            lemma = 'have'
+            pos_tag = 'VERB'
+            dep_tag = 'aux'
+
         if not lemma.isalpha():
             continue
         if lemma not in columns:
@@ -164,7 +186,7 @@ def ensure_words_in_columns(lemmas):
             # Add the concept neuron to the graph
             G.add_node(concept_neuron_id)
 
-def collect_qualities_and_initialize_instances(lemmas, pos_tags):
+def collect_qualities_and_initialize_instances(lemmas, pos_tags, tokens):
     global neuron_id_counter
     activated_concepts = {}
     activated_instances = {}
@@ -202,7 +224,7 @@ def collect_qualities_and_initialize_instances(lemmas, pos_tags):
                         # Add the quality neuron to the graph
                         G.add_node(quality_neuron_id)
                         # Ensure prev_lemma has a concept neuron
-                        ensure_words_in_columns([prev_lemma])
+                        ensure_words_in_columns([prev_lemma], [tokens[idx - 1]])
                         prev_lemma_concept_id = columns[prev_lemma]['concept_neuron']
                         # Draw concept source connection
                         G.add_edge(prev_lemma_concept_id, quality_neuron_id, type='concept_source')
@@ -231,7 +253,7 @@ def collect_qualities_and_initialize_instances(lemmas, pos_tags):
                         # Add the quality neuron to the graph
                         G.add_node(quality_neuron_id)
                         # Ensure next_lemma has a concept neuron
-                        ensure_words_in_columns([next_lemma])
+                        ensure_words_in_columns([next_lemma], [tokens[idx + 1]])
                         next_lemma_concept_id = columns[next_lemma]['concept_neuron']
                         # Draw concept source connection
                         G.add_edge(next_lemma_concept_id, quality_neuron_id, type='concept_source')
@@ -259,7 +281,7 @@ def collect_qualities_and_initialize_instances(lemmas, pos_tags):
 
     return activated_concepts, activated_instances, activated_qualities
 
-def process_relations(lemmas, pos_tags, activated_instances):
+def process_relations(lemmas, pos_tags, tokens, activated_instances):
     global neuron_id_counter
     activated_relations = {}
     activated_relation_targets = {}
@@ -285,13 +307,14 @@ def process_relations(lemmas, pos_tags, activated_instances):
                         'permanence': 3,  # Initialized to 3
                         'activation_trace_counter': 5,  # Activation trace counter
                         'pos': next_pos_tag,
+                        'lemma': next_lemma,  # Store the lemma
                         'target_connections': {},
                         'first_activation': True
                     }
                     # Add the relation neuron to the graph
                     G.add_node(relation_neuron_id)
                     # Draw concept source connection
-                    ensure_words_in_columns([next_lemma])
+                    ensure_words_in_columns([next_lemma], [tokens[next_idx]])
                     relation_lemma_concept_id = columns[next_lemma]['concept_neuron']
                     # Reset activation trace counter for relation word concept neuron
                     columns[next_lemma]['concept_activation_trace_counter'] = 5
@@ -315,7 +338,7 @@ def process_relations(lemmas, pos_tags, activated_instances):
                     if target_pos_tag in concept_pos_list:
                         target_concept_neuron_id = columns[target_lemma]['concept_neuron']
                         # Connect the relation neuron to the target concept neuron
-                        G.add_edge(relation_neuron_id, target_concept_neuron_id, type='relation_target', pos=next_pos_tag)
+                        G.add_edge(relation_neuron_id, target_concept_neuron_id, type='relation_target', pos=next_pos_tag, lemma=next_lemma)
                         # Store the permanence value for the connection
                         if 'target_connections' not in columns[lemma]['relation_neurons'][next_lemma]:
                             columns[lemma]['relation_neurons'][next_lemma]['target_connections'] = {}
@@ -333,7 +356,7 @@ def process_relations(lemmas, pos_tags, activated_instances):
                         # Now connect the relation neuron to activated instance neurons in the target column
                         if target_lemma in activated_instances:
                             for target_instance_neuron_id in activated_instances[target_lemma]:
-                                G.add_edge(relation_neuron_id, target_instance_neuron_id, type='relation_target', pos=next_pos_tag)
+                                G.add_edge(relation_neuron_id, target_instance_neuron_id, type='relation_target', pos=next_pos_tag, lemma=next_lemma)
                                 if target_instance_neuron_id not in columns[lemma]['relation_neurons'][next_lemma]['target_connections']:
                                     columns[lemma]['relation_neurons'][next_lemma]['target_connections'][target_instance_neuron_id] = {
                                         'permanence': 3,  # Initialized to 3
@@ -372,6 +395,55 @@ def process_relations(lemmas, pos_tags, activated_instances):
         activated_instances[lemma] = instance_neurons
 
     return activated_relations, activated_relation_targets
+
+def process_definitions(tokens):
+    lemmas = [token.lemma_ for token in tokens]
+    pos_tags = [token.pos_ for token in tokens]
+    dep_tags = [token.dep_ for token in tokens]
+
+    for idx, token in enumerate(tokens):
+        lemma = token.lemma_
+        pos_tag = token.pos_
+        if not lemma.isalpha():
+            continue
+        # Check if current lemma is a concept lemma
+        if pos_tag in concept_pos_list:
+            # Look ahead for 'be' auxiliary lemma
+            for next_idx in range(idx+1, len(tokens)):
+                next_token = tokens[next_idx]
+                next_lemma = next_token.lemma_
+                next_pos_tag = next_token.pos_
+                if not next_lemma.isalpha():
+                    continue
+                if next_pos_tag in concept_pos_list:
+                    # Found another concept lemma without an intermediary action/condition relation
+                    # Now check if there was a 'be' auxiliary lemma in between
+                    be_found = False
+                    intermediary_found = False
+                    for in_between_idx in range(idx+1, next_idx):
+                        in_between_token = tokens[in_between_idx]
+                        in_between_lemma = in_between_token.lemma_
+                        in_between_pos = in_between_token.pos_
+                        in_between_dep = in_between_token.dep_
+                        if in_between_lemma == 'be' and in_between_dep == 'aux':
+                            be_found = True
+                        elif in_between_pos in relation_pos_list:
+                            intermediary_found = True
+                            break
+                    if be_found and not intermediary_found:
+                        # Create definition connection between lemma and next_lemma
+                        concept_neuron_id_1 = columns[lemma]['concept_neuron']
+                        concept_neuron_id_2 = columns[next_lemma]['concept_neuron']
+                        # Add edge if not already present
+                        if not G.has_edge(concept_neuron_id_1, concept_neuron_id_2):
+                            G.add_edge(concept_neuron_id_1, concept_neuron_id_2, type='definition')
+                        break  # Only connect to the first concept word satisfying the condition
+                    elif intermediary_found:
+                        break  # An intermediary relation is found, so break
+                elif next_pos_tag in relation_pos_list:
+                    break  # An intermediary action/condition relation is found, so break
+                else:
+                    continue
 
 def update_instance_connections(activated_instances):
     for lemma, instance_neurons in activated_instances.items():
@@ -524,20 +596,51 @@ def process_sentences(sentences):
         # Process sentence
         doc = nlp(sentence)
         tokens = [token for token in doc]
-        lemmas = [token.lemma_ for token in tokens]
-        pos_tags = [token.pos_ for token in tokens]
+        # Prepare adjusted lists
+        adjusted_lemmas = []
+        adjusted_pos_tags = []
+        adjusted_dep_tags = []
+        adjusted_tags = []
+        tokens_to_use = []
+
+        for token in tokens:
+            lemma = token.lemma_
+            pos_tag = token.pos_
+            dep_tag = token.dep_
+            tag = token.tag_
+
+            # Ignore "be" and "do" auxiliaries
+            if dep_tag == 'aux' and lemma in ['be', 'do']:
+                continue
+
+            # Convert possessive clitic to "have"
+            if tag == 'POS':
+                lemma = 'have'
+                pos_tag = 'VERB'
+                dep_tag = 'aux'
+
+            adjusted_lemmas.append(lemma)
+            adjusted_pos_tags.append(pos_tag)
+            adjusted_dep_tags.append(dep_tag)
+            adjusted_tags.append(tag)
+            tokens_to_use.append(token)
 
         # Increase the sentence counter
         sentence_counter += 1
 
         # Ensure all lemmas are in columns
-        ensure_words_in_columns(lemmas)
+        ensure_words_in_columns(adjusted_lemmas, tokens_to_use)
 
         # Collect qualities and initialize instance neurons
-        activated_concepts, activated_instances, activated_qualities = collect_qualities_and_initialize_instances(lemmas, pos_tags)
+        activated_concepts, activated_instances, activated_qualities = collect_qualities_and_initialize_instances(
+            adjusted_lemmas, adjusted_pos_tags, tokens_to_use)
 
         # Process relations
-        activated_relations, activated_relation_targets = process_relations(lemmas, pos_tags, activated_instances)
+        activated_relations, activated_relation_targets = process_relations(
+            adjusted_lemmas, adjusted_pos_tags, tokens_to_use, activated_instances)
+
+        # Process definition connections
+        process_definitions(tokens_to_use)
 
         # Update instance connections within the concept column
         update_instance_connections(activated_instances)
@@ -546,7 +649,8 @@ def process_sentences(sentences):
         update_permanence_values_concept_neurons(activated_concepts)
 
         # Update permanence values for relation neurons and their target connections
-        update_permanence_values_relation_neurons(activated_concepts, activated_relations, activated_relation_targets)
+        update_permanence_values_relation_neurons(
+            activated_concepts, activated_relations, activated_relation_targets)
 
         # Update permanence values for quality neurons
         update_permanence_values_quality_neurons(activated_concepts, activated_qualities)
