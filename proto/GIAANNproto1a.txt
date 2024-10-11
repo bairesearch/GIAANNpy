@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1a3b;
+o1 preview prompt 1a3c;
 
 v1a2x:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -25,7 +25,7 @@ CHATONLY:	- Please change the concept column integer permanence values from bein
 - Each word is assigned a unique concept column (this includes all pos types; even relation words are assigned a unique concept column). Please store all exclusive concept neurons POS types in a list, such that it can be easily modified (noun, proper noun, and pronoun, and unknown). 
 - In addition to creating action and condition relation neurons, create relation neurons for conjunction POS types. Please store all relation word POS types in a list, such that it can be easily modified (verb, preposition, conjunction). 
 - Detect quality words for every sentence word of POS type determiner, adverb, or adjective (e.g. "the", "very", or "blue) appearing before or after the current sentence concept word being processed, assuming there is no relation word between the quality word and current sentence concept word. Add associated quality neurons to the concept columns next to the relation neurons. Quality neurons are similar to relation neurons except they do not connect to a target concept column.  Please store all quality word POS types in a list, such that it can be easily modified (determiner, adverb, adjective). Note for now, quality words are assigned a unique quality neuron for every concept they are associated with, however quality neurons are only created for clarity (and programmatic	 ease). In a future implementation, qualities can be associated with concept columns by simply connecting them directly to concept column neurons.
-- Draw the concept neurons blue, the action relation neurons green, the condition relation neurons red, and the quality neurons in cyan.
+- Draw the concept neurons blue, the action relation neurons green, the condition relation neurons red, and the quality neurons in turquoise.
 - Draw a connection between every concept column representing a relation word (e.g. "eat" or "near") or quality word (e.g. "blue") to the bottom of every one of its relation or quality neuron instances within a concept column. These are concept "source" connections, and should be all drawn in blue. They communicate the semantic meaning of the particular relation or quality.
 - Draw all action relation neuron target (object) connections in green, and all condition target (object) connections in red. These should be drawn from the side of the relation instance neuron and the target (object) concept neuron.
 - Extend the exact same permanence rules to quality instance neurons as relation instance neurons. Every quality instance neuron in a concept column has an integer permanence value (initialised as 0). 
@@ -37,4 +37,6 @@ CHATONLY:	- Please change the concept column integer permanence values from bein
 v1a3x:
 - Place the main processing loop in a separate function, and place every for loop within the first level (i.e. lowest nesting depth) of the main processing loop in a separate function.
 - Perform lemmatisation of each word in sentence before processing it in the neural network. Use a suitable python library, e.g. spacy.
-
+CHATONLY: - Draw the quality neurons in turquoise instead of cyan.
+CHATONLY: - Draw the quality connections (between quality neurons and their concept column neuron) in turquoise (instead of blue).
+CHATONLY: - Revert the last change "Draw the quality connections (between quality neurons and their concept column neuron) in turquoise (instead of blue)."

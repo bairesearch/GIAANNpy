@@ -96,7 +96,7 @@ def visualize_network(G, columns):
                             node_colors.append('gray')
                         break
         elif any(node_id in [info['neuron_id'] for info in neurons['quality_neurons'].values()] for neurons in columns.values()):
-            node_colors.append('cyan')  # Quality neurons
+            node_colors.append('turquoise')  # Quality neurons (changed from 'cyan' to 'turquoise')
         else:
             node_colors.append('gray')
 
@@ -116,7 +116,7 @@ def visualize_network(G, columns):
                 edge_colors.append('gray')
             edge_styles.append('solid')
         elif edge['type'] == 'concept_source':
-            edge_colors.append('blue')
+            edge_colors.append('blue')  # All concept_source edges are colored blue
             edge_styles.append('solid')
         elif edge['type'] == 'instance_connection':
             edge_colors.append('yellow')
