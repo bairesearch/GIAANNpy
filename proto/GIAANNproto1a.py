@@ -145,20 +145,8 @@ def visualize_network(G, columns):
     plt.axis('off')
     plt.show()
 
-# Main processing loop
-for sentence in sentences:
-    # Print the sentence
-    print(sentence)
-
-    # Process sentence
-    doc = nlp(sentence)
-    words = [token.text for token in doc]
-    pos_tags = [token.pos_ for token in doc]
-
-    # Increase the sentence counter
-    sentence_counter += 1
-
-    # Ensure all words are in columns
+def ensure_words_in_columns(words):
+    global neuron_id_counter
     for word in words:
         if not word.isalpha():
             continue
@@ -176,14 +164,11 @@ for sentence in sentences:
             # Add the concept neuron to the graph
             G.add_node(concept_neuron_id)
 
-    # Initialize activation trackers
+def collect_qualities_and_initialize_instances(words, pos_tags):
+    global neuron_id_counter  # Moved to the top
     activated_concepts = {}
     activated_instances = {}
-    activated_relations = {}
     activated_qualities = {}
-    activated_relation_targets = {}
-
-    # First pass: Collect qualities and initialize instance neurons
     for idx, (word, pos_tag) in enumerate(zip(words, pos_tags)):
         if not word.isalpha():
             continue
@@ -224,7 +209,7 @@ for sentence in sentences:
                         quality_neuron_id = columns[word]['quality_neurons'][prev_word]['neuron_id']
                         # Reset activation trace counter
                         columns[word]['quality_neurons'][prev_word]['activation_trace_counter'] = 5
-            # Check next word
+        # Check next word
         if idx < len(words) - 1:
             next_word = words[idx + 1]
             next_pos_tag = pos_tags[idx + 1]
@@ -270,7 +255,12 @@ for sentence in sentences:
         # Store activated instance neurons for this concept
         activated_instances[word] = instance_neurons
 
-    # Second pass: Process relations starting from each word
+    return activated_concepts, activated_instances, activated_qualities
+
+def process_relations(words, pos_tags, activated_instances):
+    global neuron_id_counter  # Moved to the top
+    activated_relations = {}
+    activated_relation_targets = {}
     for idx, (word, pos_tag) in enumerate(zip(words, pos_tags)):
         if not word.isalpha():
             continue
@@ -378,7 +368,9 @@ for sentence in sentences:
         # Update activated_instances[word]
         activated_instances[word] = instance_neurons
 
-    # Update instance connections within the concept column
+    return activated_relations, activated_relation_targets
+
+def update_instance_connections(activated_instances):
     for word, instance_neurons in activated_instances.items():
         if 'instance_connections' not in columns[word]:
             columns[word]['instance_connections'] = {}
@@ -399,12 +391,12 @@ for sentence in sentences:
                         # Reset activation trace counter
                         columns[word]['instance_connections'][neuron_pair]['activation_trace_counter'] = 5
 
-    # Update permanence values for concept neurons
+def update_permanence_values_concept_neurons(activated_concepts):
     for concept_word, neurons in columns.items():
         if concept_word in activated_concepts:
             neurons['permanence'] += 1  # No change required
 
-    # Update permanence values for relation neurons and their target connections
+def update_permanence_values_relation_neurons(activated_concepts, activated_relations, activated_relation_targets):
     for concept_word, neurons in columns.items():
         if concept_word in activated_concepts:
             active_relations = activated_relations.get(concept_word, [])
@@ -449,7 +441,7 @@ for sentence in sentences:
                                         G.remove_edge(relation_neuron_id, target_neuron_id)
                                     del relation_info['target_connections'][target_neuron_id]
 
-    # Update permanence values for quality neurons
+def update_permanence_values_quality_neurons(activated_concepts, activated_qualities):
     for concept_word, neurons in columns.items():
         if concept_word in activated_concepts:
             active_qualities = activated_qualities.get(concept_word, [])
@@ -467,7 +459,7 @@ for sentence in sentences:
                             G.remove_node(quality_neuron_id)
                         del neurons['quality_neurons'][quality_word]
 
-    # Update permanence values for instance connections
+def update_permanence_values_instance_connections(activated_concepts, activated_instances):
     for concept_word, neurons in columns.items():
         if concept_word in activated_concepts:
             active_pairs = set()
@@ -494,7 +486,7 @@ for sentence in sentences:
                             G.remove_edge(neuron_pair[0], neuron_pair[1])
                         del neurons['instance_connections'][neuron_pair]
 
-    # Decrease activation trace counters for all neurons and connections
+def decrease_activation_trace_counters():
     for concept_word, neurons in columns.items():
         # Concept neuron
         if neurons['concept_activation_trace_counter'] > 0:
@@ -520,7 +512,49 @@ for sentence in sentences:
             if connection_info['activation_trace_counter'] > 0:
                 connection_info['activation_trace_counter'] -= 1
 
-    # Visualize the network
-    visualize_network(G, columns)
+def process_sentences(sentences):
+    global sentence_counter
+    for sentence in sentences:
+        # Print the sentence
+        print(sentence)
 
-    # No pause; continue to next sentence
+        # Process sentence
+        doc = nlp(sentence)
+        words = [token.text for token in doc]
+        pos_tags = [token.pos_ for token in doc]
+
+        # Increase the sentence counter
+        sentence_counter += 1
+
+        # Ensure all words are in columns
+        ensure_words_in_columns(words)
+
+        # Collect qualities and initialize instance neurons
+        activated_concepts, activated_instances, activated_qualities = collect_qualities_and_initialize_instances(words, pos_tags)
+
+        # Process relations
+        activated_relations, activated_relation_targets = process_relations(words, pos_tags, activated_instances)
+
+        # Update instance connections within the concept column
+        update_instance_connections(activated_instances)
+
+        # Update permanence values for concept neurons
+        update_permanence_values_concept_neurons(activated_concepts)
+
+        # Update permanence values for relation neurons and their target connections
+        update_permanence_values_relation_neurons(activated_concepts, activated_relations, activated_relation_targets)
+
+        # Update permanence values for quality neurons
+        update_permanence_values_quality_neurons(activated_concepts, activated_qualities)
+
+        # Update permanence values for instance connections
+        update_permanence_values_instance_connections(activated_concepts, activated_instances)
+
+        # Decrease activation trace counters
+        decrease_activation_trace_counters()
+
+        # Visualize the network
+        visualize_network(G, columns)
+
+# Call the main processing function
+process_sentences(sentences)

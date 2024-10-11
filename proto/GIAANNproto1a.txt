@@ -1,5 +1,8 @@
-o1 preview prompt 1a2i;
-Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specificiation:
+DONE//do:
+o1 preview prompt 1a3a;
+
+v1a2x:
+Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
 - Use the pytorch API for hardware acceleration of all arrays (for efficient parallel processing of connectivity). Do not initialise the array with a predetermined dictionary; dynamically populate the arrays as new dictionary words and relations are encountered. Will be discussed below.
 - Use vector graphics library such as networkx to always maintain a complete visualisation of the network (including active neurons). Only draw the parts of the network that are not empty.
 - The application continuously reads sentences from a large textual corpus from huggingface (such as a Wikipedia dataset). Please use the library nltk.
@@ -30,3 +33,16 @@ CHATONLY:	- Please change the concept column integer permanence values from bein
 - Relation instance nodes are connected to target column concept neurons (already implemented). Also connect relation instance nodes to every instance (i.e. feature) node in the target column that was generated or activated by the current sentence. Use the same colour scheme for target connections (conditional relations in red, and action relations in green). Store a permanence value for every relation target connection, to both target column concept neurons and target column instance neurons, using the same permanence rules used for quality or relation instance neurons and instance or specific concept connections.
 - Every time a neuron or connection's permanence is increased (assuming the neuron or connection already exists), it exponentially increases its permanence from its current value. Use a squared function of its current integer permanence value (rather than a simple linear increase of +3). Initialise all permanence values to +3 (instead of 0), but do not square them when they are first initialised. Permanence still decreases linearly every time a concept column is activated by the current word but the connection or neuron within it is not referenced by the sentence (-1); already implemented so no change is required. The higher the permanence the stronger the weight for next word prediction. We are ignoring next word prediction for now, which involves an iterative topk selection of most activated neurons (similar to hopfield networks).
 - Introduce an integer activation trace for every neuron and connection in the network. A neuron or connection is temporarily excited (set an activation trace value of +1) every time it is referenced by a word in a sentence. This temporary excitation lasts for 5 sentences before being removed (set an activation trace value of 0), unless it is activated by another sentence in the meantime. If it is activated by another sentence in the meantime, its activation trace is not modified (keep an activation trace value of +1), but overwrite this value in the code (set an activation trace value of +1) in case an implementation change is introduced in the future. The higher the activation trace the stronger the weight for next word prediction. We are ignoring next word prediction for now.
+
+v1a3x:
+- Place the main processing loop in a separate function, and place every for loop within the first level (i.e. lowest nesting depth) of the main processing loop in a separate function.
+
+
+---
+I get this error;
+
+line 221
+    global neuron_id_counter
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+SyntaxError: name 'neuron_id_counter' is used prior to global declaration
+
