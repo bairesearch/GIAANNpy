@@ -69,7 +69,8 @@ def visualize_network(G, columns):
         for relation_lemma, relation_info in neurons['relation_neurons'].items():
             relation_neuron_id = relation_info['neuron_id']
             pos[relation_neuron_id] = (x, current_y)
-            labels[relation_neuron_id] = relation_lemma
+            # Use the original word (text) as the label
+            labels[relation_neuron_id] = relation_info.get('text', relation_lemma)
             relation_info['y_pos'] = current_y  # Store y position for internal relation drawing
 
             # Modifiers for relation neurons
@@ -77,8 +78,8 @@ def visualize_network(G, columns):
                 for modifier_lemma, modifier_info in relation_info['modifiers'].items():
                     modifier_neuron_id = modifier_info['neuron_id']
                     current_y += y_margin
-                    pos[modifier_neuron_id] = (x, current_y)
                     labels[modifier_neuron_id] = modifier_lemma
+                    pos[modifier_neuron_id] = (x, current_y)
             current_y += y_margin
             if current_y > max_y:
                 max_y = current_y
@@ -123,8 +124,8 @@ def visualize_network(G, columns):
                 for relation_lemma, relation_info in neurons['relation_neurons'].items():
                     if relation_info['neuron_id'] == node_id:
                         relation_pos = relation_info['pos']
-                        relation_lemma = relation_info['lemma']
-                        if relation_lemma == 'have':
+                        relation_text = relation_info.get('text', relation_lemma)
+                        if relation_text == 'have':
                             node_colors.append('cyan')  # 'have' auxiliary action relations
                         elif relation_pos == 'VERB':
                             node_colors.append('green')  # Action
@@ -150,7 +151,7 @@ def visualize_network(G, columns):
     for u, v in G.edges():
         edge = G.get_edge_data(u, v)
         if edge['type'] == 'relation_target':
-            if edge.get('lemma') == 'have':
+            if edge.get('text') == 'have':
                 edge_colors.append('cyan')
             elif edge['pos'] == 'VERB':
                 edge_colors.append('green')
@@ -171,7 +172,7 @@ def visualize_network(G, columns):
             edge_colors.append('yellow')
             edge_styles.append('solid')
         elif edge['type'] == 'internal_relation':
-            if edge.get('lemma') == 'have':
+            if edge.get('text') == 'have':
                 edge_colors.append('cyan')
             elif edge['pos'] == 'VERB':
                 edge_colors.append('green')
@@ -437,6 +438,9 @@ def process_relations(lemmas, pos_tags, tokens, activated_instances):
             if prev_concept_lemma is None:
                 continue  # Skip if there's no preceding concept word
 
+            # Get the original word (token text)
+            relation_text = tokens[idx].text
+
             # Create a relation neuron in the concept column
             if lemma not in columns[prev_concept_lemma]['relation_neurons']:
                 neuron_id_counter += 1
@@ -447,6 +451,7 @@ def process_relations(lemmas, pos_tags, tokens, activated_instances):
                     'activation_trace_counter': 5,  # Activation trace counter
                     'pos': pos_tag,
                     'lemma': lemma,
+                    'text': relation_text,  # Store original word
                     'target_connections': {},
                     'internal_relations': {},
                     'modifiers': {},
@@ -465,6 +470,10 @@ def process_relations(lemmas, pos_tags, tokens, activated_instances):
                 relation_neuron_id = relation_info['neuron_id']
                 relation_info['activation_trace_counter'] = 5
 
+            # Ensure relation_info is assigned in both cases
+            relation_info = columns[prev_concept_lemma]['relation_neurons'][lemma]
+            relation_neuron_id = relation_info['neuron_id']
+
             # Need to keep track of activated_relations
             if prev_concept_lemma not in activated_relations:
                 activated_relations[prev_concept_lemma] = []
@@ -474,7 +483,7 @@ def process_relations(lemmas, pos_tags, tokens, activated_instances):
             if prev_relation_neuron_id is not None:
                 # Create internal relation between prev_relation_neuron_id and current relation_neuron_id
                 edge_type = 'internal_relation'
-                G.add_edge(prev_relation_neuron_id, relation_neuron_id, type=edge_type, pos=pos_tag, lemma=lemma)
+                G.add_edge(prev_relation_neuron_id, relation_neuron_id, type=edge_type, pos=pos_tag, text=relation_text)
                 # Need to store permanence and activation trace for internal relations
                 prev_relation_info = columns[prev_concept_lemma]['relation_neurons'][prev_relation_lemma]
                 if relation_neuron_id not in prev_relation_info['internal_relations']:
@@ -528,7 +537,7 @@ def process_relations(lemmas, pos_tags, tokens, activated_instances):
                     if target_pos_tag in concept_pos_list:
                         target_concept_neuron_id = columns[target_lemma]['concept_neuron']
                         # Connect the relation neuron to the target concept neuron
-                        G.add_edge(relation_neuron_id, target_concept_neuron_id, type='relation_target', pos=pos_tag, lemma=lemma)
+                        G.add_edge(relation_neuron_id, target_concept_neuron_id, type='relation_target', pos=pos_tag, text=relation_text)
                         # Store the permanence value for the connection
                         relation_info = columns[prev_concept_lemma]['relation_neurons'][lemma]
                         if target_concept_neuron_id not in relation_info['target_connections']:
@@ -545,7 +554,7 @@ def process_relations(lemmas, pos_tags, tokens, activated_instances):
                         # Now connect the relation neuron to activated instance neurons in the target column
                         if target_lemma in activated_instances:
                             for target_instance_neuron_id in activated_instances[target_lemma]:
-                                G.add_edge(relation_neuron_id, target_instance_neuron_id, type='relation_target', pos=pos_tag, lemma=lemma)
+                                G.add_edge(relation_neuron_id, target_instance_neuron_id, type='relation_target', pos=pos_tag, text=relation_text)
                                 if target_instance_neuron_id not in relation_info['target_connections']:
                                     relation_info['target_connections'][target_instance_neuron_id] = {
                                         'permanence': 3,  # Initialized to 3
