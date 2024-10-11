@@ -79,6 +79,7 @@ def visualize_network(G, columns):
 # Main processing loop
 for sentence in sentences:
     # Process sentence
+    print(sentence)
     doc = nlp(sentence)
     words = [token.text for token in doc]
     pos_tags = [token.pos_ for token in doc]
@@ -121,7 +122,7 @@ for sentence in sentences:
                         # Assign a unique neuron ID for the relation neuron
                         neuron_id_counter += 1
                         relation_neuron_id = neuron_id_counter
-                        columns[word]['relation_neurons'][next_word] = {'neuron_id': relation_neuron_id, 'permanence': 3}
+                        columns[word]['relation_neurons'][next_word] = {'neuron_id': relation_neuron_id, 'permanence': 0}
                         # Add the relation neuron to the graph
                         G.add_node(relation_neuron_id)
                     else:
@@ -176,9 +177,10 @@ for sentence in sentences:
 
     # Visualize the network
     visualize_network(G, columns)
-
+'''
     # Pause the simulation after every sentence
     try:
         input("Press Enter to continue or Ctrl-D to exit...")
     except EOFError:
         break  # Exit the simulation
+'''
