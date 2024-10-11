@@ -152,14 +152,8 @@ for sentence in sentences:
     words = [token.text for token in doc]
     pos_tags = [token.pos_ for token in doc]
 
-    # Keep track of activated concepts and their relations and qualities in this sentence
-    activated_concepts = {}
-    activated_relations = {}
-    activated_qualities = {}
-    activated_instances = {}  # For instance connections
-
-    # First, ensure all words are in columns
-    for word, pos_tag in zip(words, pos_tags):
+    # Ensure all words are in columns
+    for word in words:
         if not word.isalpha():
             continue
         if word not in columns:
@@ -175,63 +169,21 @@ for sentence in sentences:
             # Add the concept neuron to the graph
             G.add_node(concept_neuron_id)
 
-    # For each word in the sentence, identify concept words and their relations and qualities
+    # Initialize activation trackers
+    activated_concepts = {}
+    activated_instances = {}
+    activated_relations = {}
+    activated_qualities = {}
+    activated_relation_targets = {}
+
+    # First pass: Collect qualities and initialize instance neurons
     for idx, (word, pos_tag) in enumerate(zip(words, pos_tags)):
         if not word.isalpha():
             continue
 
-        concept_neuron_id = columns[word]['concept_neuron']
-
-        # Mark this concept as activated
         activated_concepts[word] = True
 
-        # Process relations
-        relations_found = []
-        for next_idx in range(idx+1, len(words)):
-            next_word = words[next_idx]
-            next_pos_tag = pos_tags[next_idx]
-            if not next_word.isalpha():
-                continue
-
-            if next_pos_tag in relation_pos_list:
-                relations_found.append(next_word)
-                # Ensure the relation neuron exists in the column
-                if next_word not in columns[word]['relation_neurons']:
-                    neuron_id_counter += 1
-                    relation_neuron_id = neuron_id_counter
-                    columns[word]['relation_neurons'][next_word] = {
-                        'neuron_id': relation_neuron_id,
-                        'permanence': 0,
-                        'pos': next_pos_tag
-                    }
-                    # Add the relation neuron to the graph
-                    G.add_node(relation_neuron_id)
-                    # Draw concept source connection
-                    relation_word_concept_id = columns[next_word]['concept_neuron']
-                    G.add_edge(relation_word_concept_id, relation_neuron_id, type='concept_source')
-                else:
-                    relation_neuron_id = columns[word]['relation_neurons'][next_word]['neuron_id']
-
-                # Connect the relation neuron to its target(s)
-                # The target is the next concept word after the relation word
-                for target_idx in range(next_idx+1, len(words)):
-                    target_word = words[target_idx]
-                    target_pos_tag = pos_tags[target_idx]
-                    if not target_word.isalpha():
-                        continue
-                    if target_pos_tag in concept_pos_list:
-                        target_concept_neuron_id = columns[target_word]['concept_neuron']
-                        # Connect the relation neuron to the target concept neuron
-                        G.add_edge(relation_neuron_id, target_concept_neuron_id, type='relation_target', pos=next_pos_tag)
-                        break  # Only connect to the first concept word after relation word
-            else:
-                if next_pos_tag in concept_pos_list or next_pos_tag in quality_pos_list:
-                    break
-                continue
-        # Store the relations found for this concept in this sentence
-        activated_relations[word] = relations_found
-
-        # Process qualities
+        # Collect qualities for this word
         qualities_found = []
         # Check previous word
         if idx > 0:
@@ -241,6 +193,7 @@ for sentence in sentences:
                 intervening_words = pos_tags[idx - 1:idx]
                 if not any(pos in relation_pos_list for pos in intervening_words):
                     qualities_found.append(prev_word)
+                    # Ensure the quality neuron exists in the column
                     if prev_word not in columns[word]['quality_neurons']:
                         neuron_id_counter += 1
                         quality_neuron_id = neuron_id_counter
@@ -285,23 +238,101 @@ for sentence in sentences:
         # Store the qualities found for this concept in this sentence
         activated_qualities[word] = qualities_found
 
-        # Collect activated instance neurons (relation and quality neurons)
+        # Collect instance neurons for this word
         instance_neurons = []
-        # Relation neurons
-        for rel_word in relations_found:
-            if rel_word in columns[word]['relation_neurons']:
-                rel_neuron_id = columns[word]['relation_neurons'][rel_word]['neuron_id']
-                instance_neurons.append(rel_neuron_id)
         # Quality neurons
         for qual_word in qualities_found:
             if qual_word in columns[word]['quality_neurons']:
                 qual_neuron_id = columns[word]['quality_neurons'][qual_word]['neuron_id']
                 instance_neurons.append(qual_neuron_id)
+
         # Store activated instance neurons for this concept
         activated_instances[word] = instance_neurons
 
-        # Update instance connections within the concept column
-        if word not in columns[word]['instance_connections']:
+    # Second pass: Process relations starting from each word
+    for idx, (word, pos_tag) in enumerate(zip(words, pos_tags)):
+        if not word.isalpha():
+            continue
+
+        relations_found = []
+        for next_idx in range(idx+1, len(words)):
+            next_word = words[next_idx]
+            next_pos_tag = pos_tags[next_idx]
+            if not next_word.isalpha():
+                continue
+
+            if next_pos_tag in relation_pos_list:
+                relations_found.append(next_word)
+                # Ensure the relation neuron exists in the column
+                if next_word not in columns[word]['relation_neurons']:
+                    neuron_id_counter += 1
+                    relation_neuron_id = neuron_id_counter
+                    columns[word]['relation_neurons'][next_word] = {
+                        'neuron_id': relation_neuron_id,
+                        'permanence': 0,
+                        'pos': next_pos_tag,
+                        'target_connections': {}
+                    }
+                    # Add the relation neuron to the graph
+                    G.add_node(relation_neuron_id)
+                    # Draw concept source connection
+                    relation_word_concept_id = columns[next_word]['concept_neuron']
+                    G.add_edge(relation_word_concept_id, relation_neuron_id, type='concept_source')
+                else:
+                    relation_neuron_id = columns[word]['relation_neurons'][next_word]['neuron_id']
+
+                # Initialize activated relation targets
+                if relation_neuron_id not in activated_relation_targets:
+                    activated_relation_targets[relation_neuron_id] = []
+
+                # Now find the target word
+                for target_idx in range(next_idx+1, len(words)):
+                    target_word = words[target_idx]
+                    target_pos_tag = pos_tags[target_idx]
+                    if not target_word.isalpha():
+                        continue
+                    if target_pos_tag in concept_pos_list:
+                        target_concept_neuron_id = columns[target_word]['concept_neuron']
+                        # Connect the relation neuron to the target concept neuron
+                        G.add_edge(relation_neuron_id, target_concept_neuron_id, type='relation_target', pos=next_pos_tag)
+                        # Store the permanence value for the connection
+                        if 'target_connections' not in columns[word]['relation_neurons'][next_word]:
+                            columns[word]['relation_neurons'][next_word]['target_connections'] = {}
+                        columns[word]['relation_neurons'][next_word]['target_connections'][target_concept_neuron_id] = {'permanence': 0}
+                        # Add to activated targets
+                        activated_relation_targets[relation_neuron_id].append(target_concept_neuron_id)
+                        # Now connect the relation neuron to activated instance neurons in the target column
+                        if target_word in activated_instances:
+                            for target_instance_neuron_id in activated_instances[target_word]:
+                                G.add_edge(relation_neuron_id, target_instance_neuron_id, type='relation_target', pos=next_pos_tag)
+                                columns[word]['relation_neurons'][next_word]['target_connections'][target_instance_neuron_id] = {'permanence': 0}
+                                # Add to activated targets
+                                activated_relation_targets[relation_neuron_id].append(target_instance_neuron_id)
+                        break  # Only connect to the first concept word after relation word
+            else:
+                if next_pos_tag in concept_pos_list or next_pos_tag in quality_pos_list:
+                    break
+                continue
+
+        # Store the relations found for this concept in this sentence
+        activated_relations[word] = relations_found
+
+        # Collect instance neurons for this word
+        if word in activated_instances:
+            instance_neurons = activated_instances[word]
+        else:
+            instance_neurons = []
+        # Relation neurons
+        for rel_word in relations_found:
+            if rel_word in columns[word]['relation_neurons']:
+                rel_neuron_id = columns[word]['relation_neurons'][rel_word]['neuron_id']
+                instance_neurons.append(rel_neuron_id)
+        # Update activated_instances[word]
+        activated_instances[word] = instance_neurons
+
+    # Update instance connections within the concept column
+    for word, instance_neurons in activated_instances.items():
+        if 'instance_connections' not in columns[word]:
             columns[word]['instance_connections'] = {}
         if len(instance_neurons) >= 2:
             for i in range(len(instance_neurons)):
@@ -309,8 +340,8 @@ for sentence in sentences:
                     neuron_pair = tuple(sorted((instance_neurons[i], instance_neurons[j])))
                     if neuron_pair not in columns[word]['instance_connections']:
                         columns[word]['instance_connections'][neuron_pair] = {'permanence': 0}
-                    # Increase permanence by 1 since activated
-                    columns[word]['instance_connections'][neuron_pair]['permanence'] += 1
+                    # Increase permanence by 3 since activated
+                    columns[word]['instance_connections'][neuron_pair]['permanence'] += 3
                     # Add edge to graph if not already present
                     if not G.has_edge(neuron_pair[0], neuron_pair[1]):
                         G.add_edge(neuron_pair[0], neuron_pair[1], type='instance_connection')
@@ -320,30 +351,53 @@ for sentence in sentences:
         if concept_word in activated_concepts:
             neurons['permanence'] += 1
 
-    # Update permanence values for relation neurons
+    # Update permanence values for relation neurons and their target connections
     for concept_word, neurons in columns.items():
         if concept_word in activated_concepts:
             active_relations = activated_relations.get(concept_word, [])
-            relations_to_remove = []
             for relation_word, relation_info in list(neurons['relation_neurons'].items()):
+                relation_neuron_id = relation_info['neuron_id']
                 if relation_word in active_relations:
-                    relation_info['permanence'] += 1
+                    # Increase permanence by 3
+                    relation_info['permanence'] += 3
+                    # Update target connections
+                    if 'target_connections' in relation_info:
+                        for target_neuron_id, target_conn_info in list(relation_info['target_connections'].items()):
+                            if relation_neuron_id in activated_relation_targets and target_neuron_id in activated_relation_targets[relation_neuron_id]:
+                                target_conn_info['permanence'] += 3
+                            else:
+                                target_conn_info['permanence'] -= 1
+                                if target_conn_info['permanence'] <= 0:
+                                    # Remove edge
+                                    if G.has_edge(relation_neuron_id, target_neuron_id):
+                                        G.remove_edge(relation_neuron_id, target_neuron_id)
+                                    del relation_info['target_connections'][target_neuron_id]
                 else:
+                    # Decrease permanence by 1
                     relation_info['permanence'] -= 1
                     if relation_info['permanence'] <= 0:
-                        relation_neuron_id = relation_info['neuron_id']
+                        # Remove relation neuron
                         if G.has_node(relation_neuron_id):
                             G.remove_node(relation_neuron_id)
                         del neurons['relation_neurons'][relation_word]
+                    else:
+                        # Decrease permanence of target connections
+                        if 'target_connections' in relation_info:
+                            for target_neuron_id, target_conn_info in list(relation_info['target_connections'].items()):
+                                target_conn_info['permanence'] -= 1
+                                if target_conn_info['permanence'] <= 0:
+                                    # Remove edge
+                                    if G.has_edge(relation_neuron_id, target_neuron_id):
+                                        G.remove_edge(relation_neuron_id, target_neuron_id)
+                                    del relation_info['target_connections'][target_neuron_id]
 
     # Update permanence values for quality neurons
     for concept_word, neurons in columns.items():
         if concept_word in activated_concepts:
             active_qualities = activated_qualities.get(concept_word, [])
-            qualities_to_remove = []
             for quality_word, quality_info in list(neurons['quality_neurons'].items()):
                 if quality_word in active_qualities:
-                    quality_info['permanence'] += 1
+                    quality_info['permanence'] += 3
                 else:
                     quality_info['permanence'] -= 1
                     if quality_info['permanence'] <= 0:
@@ -367,10 +421,10 @@ for sentence in sentences:
             connections_to_remove = []
             for neuron_pair, connection_info in list(neurons['instance_connections'].items()):
                 if neuron_pair in active_pairs:
-                    # Increase permanence since activated
-                    connection_info['permanence'] += 1
+                    # Increase permanence by 3
+                    connection_info['permanence'] += 3
                 else:
-                    # Decrease permanence since not activated
+                    # Decrease permanence by 1
                     connection_info['permanence'] -= 1
                     if connection_info['permanence'] <= 0:
                         # Remove the connection
