@@ -311,8 +311,20 @@ def load_or_create_observed_column(concept_index):
     return observed_column
 
 def process_concept_words(doc, lemmas, pos_tags, observed_columns_dict):
-    global c, f
-    q = len(doc)
+    """
+    For every concept word (lemma) i in the sequence, identify every feature neuron in that column
+    that occurs q words before or after the concept word in the sequence, including the concept neuron.
+    If usePOS is disabled, set q to 5. If usePOS is enabled, set q to the distance to the previous/next noun
+    (depending on whether the feature selected is before or after the current concept word in the sequence).
+    Always ensure the feature neuron selected is not out of bounds of the sequence.
+    """
+    global c, f, lowMem, global_feature_neurons_strength, global_feature_neurons_permanence, global_feature_neurons_activation
+    if usePOS:
+        # Precompute noun indices
+        noun_indices = [index for index, pos in enumerate(pos_tags) if pos in noun_pos_tags]
+    else:
+        q = 5
+
     for i, token in enumerate(doc):
         lemma_i = lemmas[i]
         pos_i = pos_tags[i]
@@ -324,70 +336,43 @@ def process_concept_words(doc, lemmas, pos_tags, observed_columns_dict):
             # Set to track feature neurons activated in this sequence for this concept
             activated_feature_indices = set()
 
-            # Include the concept neuron (index 0)
-            # For positions j in [i - q, i + q], excluding i
-            start = max(0, i - q)
-            end = min(len(doc), i + q + 1)
+            if usePOS:
+                # Compute distances to previous and next nouns
+                # Get index of previous noun before i
+                prev_noun_index = None
+                for idx in range(i - 1, -1, -1):
+                    if pos_tags[idx] in noun_pos_tags:
+                        prev_noun_index = idx
+                        break
+                dist_to_prev_noun = i - prev_noun_index - 1 if prev_noun_index is not None else i
 
-            for j in range(start, end):
-                if j == i:
-                    continue  # Exclude the current word
+                # Get index of next noun after i
+                next_noun_index = None
+                for idx in range(i + 1, len(doc)):
+                    if pos_tags[idx] in noun_pos_tags:
+                        next_noun_index = idx
+                        break
+                dist_to_next_noun = next_noun_index - i - 1 if next_noun_index is not None else len(doc) - i - 1
+            else:
+                q = 5
 
-                token_j = doc[j]
-                word_j = token_j.text
-                lemma_j = lemmas[j]
-                pos_j = pos_tags[j]
+            # Process positions before i
+            if usePOS:
+                start = max(0, i - dist_to_prev_noun)
+            else:
+                start = max(0, i - q)
 
-                # Assign feature neurons to words not lemmas
-                feature_word = word_j.lower()
+            for j in range(start, i):
+                process_feature(observed_column, i, j, doc, lemmas, pos_tags, activated_feature_indices, observed_columns_dict)
 
-                # Get or assign feature neuron index for feature_word in this column
-                if feature_word not in observed_column.feature_word_to_index:
-                    feature_index = observed_column.next_feature_index
-                    observed_column.feature_word_to_index[feature_word] = feature_index
-                    observed_column.feature_index_to_word[feature_index] = feature_word
-                    observed_column.next_feature_index += 1
-                    # Expand feature arrays if needed
-                    if feature_index >= f:
-                        f = feature_index + 1
-                        if not lowMem:
-                            # Expand global feature neuron arrays
-                            global_feature_neurons_strength = torch.cat([global_feature_neurons_strength, torch.zeros(global_feature_neurons_strength.shape[0], 1)], dim=1)
-                            global_feature_neurons_permanence = torch.cat([global_feature_neurons_permanence, torch.full((global_feature_neurons_permanence.shape[0], 1), z1, dtype=torch.int32)], dim=1)
-                            global_feature_neurons_activation = torch.cat([global_feature_neurons_activation, torch.zeros(global_feature_neurons_activation.shape[0], 1, dtype=torch.int32)], dim=1)
-                        # Expand connection and feature arrays for all observed columns
-                        for obs_col in observed_columns_dict.values():
-                            obs_col.expand_feature_arrays(f)
-                else:
-                    feature_index = observed_column.feature_word_to_index[feature_word]
+            # Process positions after i
+            if usePOS:
+                end = min(len(doc), i + dist_to_next_noun + 1)
+            else:
+                end = min(len(doc), i + q + 1)
 
-                # Add feature index to activated set
-                activated_feature_indices.add(feature_index)
-
-                # Increment the strength of the feature neuron
-                if lowMem:
-                    observed_column.feature_neurons_strength[feature_index] += 1
-                    # Increase permanence exponentially
-                    observed_column.feature_neurons_permanence[feature_index] = observed_column.feature_neurons_permanence[feature_index] ** 2
-                    # Set activation trace to j1 sequences
-                    observed_column.feature_neurons_activation[feature_index] = j1  # Overwrite with j1
-                else:
-                    global_feature_neurons_strength[concept_index_i, feature_index] += 1
-                    # Increase permanence exponentially
-                    global_feature_neurons_permanence[concept_index_i, feature_index] = global_feature_neurons_permanence[concept_index_i, feature_index] ** 2
-                    # Set activation trace to j1 sequences
-                    global_feature_neurons_activation[concept_index_i, feature_index] = j1
-
-                # Create connections
-                # Connect these feature neurons to every other feature neuron in every other concept column in the sequence
-                for other_lemma, other_observed_column in observed_columns_dict.items():
-                    other_concept_index = other_observed_column.concept_index
-                    if other_concept_index != concept_index_i:
-                        observed_column.connection_strength[feature_index, other_concept_index] += 1
-                        # Increase permanence exponentially
-                        observed_column.connection_permanence[feature_index, other_concept_index] = observed_column.connection_permanence[feature_index, other_concept_index] ** 2
-                        # Set activation trace to j1 sequences
-                        observed_column.connection_activation[feature_index, other_concept_index] = j1
+            for j in range(i + 1, end):
+                process_feature(observed_column, i, j, doc, lemmas, pos_tags, activated_feature_indices, observed_columns_dict)
 
             # Decrease permanence for feature neurons not activated
             all_feature_indices = set(observed_column.feature_word_to_index.values())
@@ -423,6 +408,71 @@ def process_concept_words(doc, lemmas, pos_tags, observed_columns_dict):
                             if observed_column.connection_permanence[feature_index, other_concept_index] <= 0:
                                 observed_column.connection_permanence[feature_index, other_concept_index] = 0
                                 observed_column.connection_activation[feature_index, other_concept_index] = 0
+
+def process_feature(observed_column, i, j, doc, lemmas, pos_tags, activated_feature_indices, observed_columns_dict):
+    """
+    Helper function to process a feature at position j for the concept at position i.
+    """
+    global c, f, lowMem, global_feature_neurons_strength, global_feature_neurons_permanence, global_feature_neurons_activation
+    lemma_i = lemmas[i]
+    lemma_j = lemmas[j]
+    pos_j = pos_tags[j]
+    token_j = doc[j]
+    word_j = token_j.text
+
+    # Assign feature neurons to words not lemmas
+    feature_word = word_j.lower()
+
+    # Get or assign feature neuron index for feature_word in this column
+    if feature_word not in observed_column.feature_word_to_index:
+        feature_index = observed_column.next_feature_index
+        observed_column.feature_word_to_index[feature_word] = feature_index
+        observed_column.feature_index_to_word[feature_index] = feature_word
+        observed_column.next_feature_index += 1
+        # Expand feature arrays if needed
+        if feature_index >= f:
+            f = feature_index + 1
+            if not lowMem:
+                # Expand global feature neuron arrays
+                extra_cols = f - global_feature_neurons_strength.shape[1]
+                global_feature_neurons_strength = torch.cat([global_feature_neurons_strength, torch.zeros(global_feature_neurons_strength.shape[0], extra_cols)], dim=1)
+                global_feature_neurons_permanence = torch.cat([global_feature_neurons_permanence, torch.full((global_feature_neurons_permanence.shape[0], extra_cols), z1, dtype=torch.int32)], dim=1)
+                global_feature_neurons_activation = torch.cat([global_feature_neurons_activation, torch.zeros(global_feature_neurons_activation.shape[0], extra_cols, dtype=torch.int32)], dim=1)
+            # Expand connection and feature arrays for all observed columns
+            for obs_col in observed_columns_dict.values():
+                obs_col.expand_feature_arrays(f)
+    else:
+        feature_index = observed_column.feature_word_to_index[feature_word]
+
+    # Add feature index to activated set
+    activated_feature_indices.add(feature_index)
+
+    # Increment the strength of the feature neuron
+    if lowMem:
+        observed_column.feature_neurons_strength[feature_index] += 1
+        # Increase permanence exponentially
+        observed_column.feature_neurons_permanence[feature_index] = observed_column.feature_neurons_permanence[feature_index] ** 2
+        # Set activation trace to j1 sequences
+        observed_column.feature_neurons_activation[feature_index] = j1  # Overwrite with j1
+    else:
+        concept_index_i = observed_column.concept_index
+        global_feature_neurons_strength[concept_index_i, feature_index] += 1
+        # Increase permanence exponentially
+        global_feature_neurons_permanence[concept_index_i, feature_index] = global_feature_neurons_permanence[concept_index_i, feature_index] ** 2
+        # Set activation trace to j1 sequences
+        global_feature_neurons_activation[concept_index_i, feature_index] = j1
+
+    # Create connections
+    # Connect these feature neurons to every other feature neuron in every other concept column in the sequence
+    for other_lemma, other_observed_column in observed_columns_dict.items():
+        other_concept_index = other_observed_column.concept_index
+        if other_concept_index != observed_column.concept_index:
+            observed_column.connection_strength[feature_index, other_concept_index] += 1
+            # Increase permanence exponentially
+            observed_column.connection_permanence[feature_index, other_concept_index] = observed_column.connection_permanence[feature_index, other_concept_index] ** 2
+            # Set activation trace to j1 sequences
+            observed_column.connection_activation[feature_index, other_concept_index] = j1
+
 
 def update_permanence_and_activation(observed_columns_dict):
     # For each observed column, update activation traces
