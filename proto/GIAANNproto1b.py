@@ -32,20 +32,20 @@ if not lowMem:
     feature_neurons_permanence_file = 'global_feature_neurons_permanence.pt'
     feature_neurons_activation_file = 'global_feature_neurons_activation.pt'
 
-# Obtain lists of nouns and non-nouns using the NLTK wordnet library
-nouns = set()
-for synset in wn.all_synsets('n'):
-    for lemma in synset.lemma_names():
-        nouns.add(lemma.lower())
-
-all_words = set()
-for synset in wn.all_synsets():
-    for lemma in synset.lemma_names():
-        all_words.add(lemma.lower())
-
-non_nouns = all_words - nouns
-max_num_non_nouns = len(non_nouns)
-
+if usePOS and not lowMem:
+    # Obtain lists of nouns and non-nouns using the NLTK wordnet library
+    nouns = set()
+    for synset in wn.all_synsets('n'):
+        for lemma in synset.lemma_names():
+            nouns.add(lemma.lower())
+    
+    all_words = set()
+    for synset in wn.all_synsets():
+        for lemma in synset.lemma_names():
+            all_words.add(lemma.lower())
+    
+    non_nouns = all_words - nouns
+    max_num_non_nouns = len(non_nouns)
 
 # Initialize the concept columns dictionary
 if useInference and os.path.exists(concept_columns_dict_file):
@@ -142,9 +142,10 @@ class ObservedColumn:
             self.next_feature_index += 1
             #print("create class ObservedColumn: adding: feature_word = ", feature_word)
 
-    def resize_connection_arrays(self, new_c):
-        if new_c > self.connection_strength.shape[1]:
-            extra_cols = new_c - self.connection_strength.shape[1]
+    def resize_concept_arrays(self, new_c):
+        load_c = self.connection_strength.shape[1]
+        if new_c > load_c:
+            extra_cols = new_c - load_c
             # Expand along dimension 1 (columns)
             self.connection_strength = torch.cat([self.connection_strength, torch.zeros(self.connection_strength.shape[0], extra_cols, self.connection_strength.shape[2], dtype=torch.int32)], dim=1)
             self.connection_permanence = torch.cat([self.connection_permanence, torch.full((self.connection_permanence.shape[0], extra_cols, self.connection_permanence.shape[2]), z1, dtype=torch.int32)], dim=1)
@@ -350,13 +351,13 @@ def load_or_create_observed_column(concept_index, lemma=None):
     if os.path.exists(observed_column_file):
         observed_column = ObservedColumn.load_from_disk(concept_index, lemma)
         # Resize connection arrays if c has increased
-        observed_column.resize_connection_arrays(c)
+        observed_column.resize_concept_arrays(c)
         # Also expand feature arrays if f has increased
         observed_column.expand_feature_arrays(f)
     else:
         observed_column = ObservedColumn(concept_index, lemma)
         # Initialize connection arrays with correct size
-        observed_column.resize_connection_arrays(c)
+        observed_column.resize_concept_arrays(c)
         observed_column.expand_feature_arrays(f)
     return observed_column
 
