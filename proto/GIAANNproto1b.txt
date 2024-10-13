@@ -1,7 +1,7 @@
 DONE//do:
-o1 preview prompt 1b2c;
+o1 preview prompt 1b2d;
 
-v1b2c:
+v1b2d:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
 - Use the pytorch API for hardware acceleration of all arrays (for efficient parallel processing of connectivity). Do not initialise the array with a predetermined dictionary; dynamically populate the arrays as new dictionary words and relations are encountered. Will be discussed below.
 - Use vector graphics library such as networkx to always maintain a complete visualisation of the network (including active neurons). Only draw the parts of the network that are not empty.
@@ -43,5 +43,5 @@ FUTURE; - Create a wrapper function called prediction for when useInference mode
 CHATONLY/MANUAL; - If usePOS is disabled, set q to 5. If usePOS is enabled, set q to the distance to the previous/next noun - 1 (depending on whether the feature selected is before or after the current concept word in the sequence). Always ensure the feature neuron selected is not out of bounds of the sequence.
 CHATONLY; - Expand all the observed column feature connection arrays by 1 dimension (from 2D to 3D) to be each of size f * c * f, where c is the length of the dictionary of columns, and f is the maximum number of feature neurons per column. Update the existing feature connection code; feature neurons are connected to every other identified feature neuron (observed in the current sequence) in every other concept column in the sequence.
 MANUAL; - If usePOS is enabled and lowMem is disabled, set the size of the feature arrays (f) to the maximum number of non-nouns in an English dictionary. Otherwise, set the size of the feature arrays (f) to the current number of concept columns (c).
-
+MANUAL; - Create the concept neuron in the feature array of the observed column.
 

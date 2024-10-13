@@ -94,7 +94,7 @@ class ObservedColumn:
     connection arrays. The observed column class also contains a list of feature neuron arrays
     when lowMem mode is enabled.
     """
-    def __init__(self, concept_index):
+    def __init__(self, concept_index, lemma):
         self.concept_index = concept_index  # Index to the concept columns dictionary
 
         if lowMem:
@@ -108,6 +108,8 @@ class ObservedColumn:
         self.feature_word_to_index = {}  # Maps feature words to indices
         self.feature_index_to_word = {}  # Maps indices to feature words
         self.next_feature_index = 1  # Start from 1 since index 0 is reserved for concept neuron
+        self.feature_word_to_index[lemma] = 0
+        self.feature_index_to_word[0] = lemma
 
         # Store all connections for each source column in a list of integer feature connection arrays,
         # each of size f * c * f, where c is the length of the dictionary of columns, and f is the maximum
@@ -166,14 +168,14 @@ class ObservedColumn:
             torch.save(self.feature_neurons_activation, os.path.join(observed_columns_dir, f"{self.concept_index}_feature_neurons_activation.pt"))
 
     @classmethod
-    def load_from_disk(cls, concept_index):
+    def load_from_disk(cls, concept_index, lemma):
         """
         Load the observed column data from disk.
         """
         # Load the data dictionary
         with open(os.path.join(observed_columns_dir, f"{concept_index}_data.pkl"), 'rb') as f:
             data = pickle.load(f)
-        instance = cls(concept_index)
+        instance = cls(concept_index, lemma)
         instance.feature_word_to_index = data['feature_word_to_index']
         instance.feature_index_to_word = data['feature_index_to_word']
         instance.next_feature_index = data['next_feature_index']
@@ -249,6 +251,8 @@ def process_sentence(sentence):
 
 def first_pass(doc):
     global c, f, concept_columns_dict, concept_columns_list
+    if not lowMem:
+        global global_feature_neurons_strength, global_feature_neurons_permanence, global_feature_neurons_activation
     words = []
     lemmas = []
     pos_tags = []
@@ -300,25 +304,25 @@ def second_pass(lemmas, pos_tags):
             if pos in noun_pos_tags:
                 concept_index = concept_columns_dict[lemma]
                 # Load observed column from disk or create new one
-                observed_column = load_or_create_observed_column(concept_index)
+                observed_column = load_or_create_observed_column(concept_index, lemma)
                 observed_columns_dict[lemma] = observed_column
         else:
             concept_index = concept_columns_dict[lemma]
             # Load observed column from disk or create new one
-            observed_column = load_or_create_observed_column(concept_index)
+            observed_column = load_or_create_observed_column(concept_index, lemma)
             observed_columns_dict[lemma] = observed_column
     return observed_columns_dict
 
-def load_or_create_observed_column(concept_index):
+def load_or_create_observed_column(concept_index, lemma=None):
     observed_column_file = os.path.join(observed_columns_dir, f"{concept_index}_data.pkl")
     if os.path.exists(observed_column_file):
-        observed_column = ObservedColumn.load_from_disk(concept_index)
+        observed_column = ObservedColumn.load_from_disk(concept_index, lemma)
         # Resize connection arrays if c has increased
         observed_column.resize_connection_arrays(c)
         # Also expand feature arrays if f has increased
         observed_column.expand_feature_arrays(f)
     else:
-        observed_column = ObservedColumn(concept_index)
+        observed_column = ObservedColumn(concept_index, lemma)
         # Initialize connection arrays with correct size
         observed_column.resize_connection_arrays(c)
         observed_column.expand_feature_arrays(f)
@@ -527,22 +531,22 @@ def visualize_graph(observed_columns_dict):
     for lemma, observed_column in observed_columns_dict.items():
         concept_index = observed_column.concept_index
 
-        # Draw the concept neuron (blue)
-        concept_node = f"{lemma}_concept"
-        G.add_node(concept_node, pos=(x_offset, 0), color='blue', label=lemma)
-
-        # Draw feature neurons (cyan)
+        # Draw feature neurons
         y_offset = 1
         for feature_index, feature_word in observed_column.feature_index_to_word.items():
+            if feature_index==0:
+                neuron_color = 'blue'
+            else:
+                neuron_color = 'cyan'
             if lowMem:
                 # Only visualize feature neurons with permanence > 0
                 if observed_column.feature_neurons_permanence[feature_index] > 0:
                     feature_node = f"{lemma}_{feature_word}_{feature_index}"
-                    G.add_node(feature_node, pos=(x_offset, y_offset), color='cyan', label=feature_word)
+                    G.add_node(feature_node, pos=(x_offset, y_offset), color=neuron_color, label=feature_word)
                     y_offset += 1
             else:
                 feature_node = f"{lemma}_{feature_word}_{feature_index}"
-                G.add_node(feature_node, pos=(x_offset, y_offset), color='cyan', label=feature_word)
+                G.add_node(feature_node, pos=(x_offset, y_offset), color=neuron_color, label=feature_word)
                 y_offset += 1
 
         # Draw rectangle around the column
@@ -553,14 +557,16 @@ def visualize_graph(observed_columns_dict):
     # Draw connections
     for lemma, observed_column in observed_columns_dict.items():
         concept_index = observed_column.concept_index
-        # Concept node
-        concept_node = f"{lemma}_concept"
 
         # Internal connections (yellow)
         for feature_index, feature_word in observed_column.feature_index_to_word.items():
             source_node = f"{lemma}_{feature_word}_{feature_index}"
             if G.has_node(source_node):
-                G.add_edge(concept_node, source_node, color='yellow')
+                for other_feature_index, other_feature_word in observed_column.feature_index_to_word.items():
+                    target_node = f"{lemma}_{other_feature_word}_{other_feature_index}"
+                    if G.has_node(target_node):
+                        if feature_index != other_feature_index:
+                            G.add_edge(source_node, target_node, color='yellow')
 
         # External connections (orange)
         for feature_index, feature_word in observed_column.feature_index_to_word.items():
