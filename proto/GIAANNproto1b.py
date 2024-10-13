@@ -46,7 +46,7 @@ non_nouns = all_words - nouns
 max_num_non_nouns = len(non_nouns)
 
 # Set the size of the feature arrays (f)
-if usePOS:
+if usePOS and not lowMem:
     f = max_num_non_nouns  # Maximum number of non-nouns in an English dictionary
 else:
     f = 0  # Will be updated dynamically based on c
