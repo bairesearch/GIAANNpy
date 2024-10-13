@@ -70,7 +70,7 @@ if not lowMem:
         global_feature_neurons_activation = torch.load(feature_neurons_activation_file)
     else:
         global_feature_neurons_strength = torch.zeros(c, f)
-        global_feature_neurons_permanence = torch.full((c, f), 3)  # Initialize permanence to z1=3
+        global_feature_neurons_permanence = torch.full((c, f), 3, dtype=torch.int32)  # Initialize permanence to z1=3
         global_feature_neurons_activation = torch.zeros(c, f, dtype=torch.int32)  # Activation trace
 
 # Initialize spaCy model
@@ -349,6 +349,7 @@ def detect_new_features(words, lemmas, pos_tags, observed_columns_dict):
 
     # After processing all features, update f
     f = max([col.next_feature_index for col in observed_columns_dict.values()])
+
     # Now, expand arrays accordingly
     if not lowMem:
         if f > global_feature_neurons_strength.shape[1]:
@@ -596,15 +597,20 @@ def visualize_graph(observed_columns_dict):
             else:
                 neuron_color = 'cyan'
             if lowMem:
-                # Only visualize feature neurons with permanence > 0
-                if observed_column.feature_neurons_permanence[feature_index] > 0:
+                # Only visualize feature neurons with strength > 0 and permanence > 0
+                if (feature_index < f and
+                    observed_column.feature_neurons_strength[feature_index] > 0 and
+                    observed_column.feature_neurons_permanence[feature_index] > 0):
                     feature_node = f"{lemma}_{feature_word}_{feature_index}"
                     G.add_node(feature_node, pos=(x_offset, y_offset), color=neuron_color, label=feature_word)
                     y_offset += 1
             else:
-                feature_node = f"{lemma}_{feature_word}_{feature_index}"
-                G.add_node(feature_node, pos=(x_offset, y_offset), color=neuron_color, label=feature_word)
-                y_offset += 1
+                if (feature_index < f and
+                    global_feature_neurons_strength[concept_index, feature_index] > 0 and
+                    global_feature_neurons_permanence[concept_index, feature_index] > 0):
+                    feature_node = f"{lemma}_{feature_word}_{feature_index}"
+                    G.add_node(feature_node, pos=(x_offset, y_offset), color=neuron_color, label=feature_word)
+                    y_offset += 1
 
         # Draw rectangle around the column
         plt.gca().add_patch(plt.Rectangle((x_offset - 0.5, -0.5), 1, max(y_offset, 1) + 0.5, fill=False, edgecolor='black'))
@@ -623,7 +629,12 @@ def visualize_graph(observed_columns_dict):
                     target_node = f"{lemma}_{other_feature_word}_{other_feature_index}"
                     if G.has_node(target_node):
                         if feature_index != other_feature_index:
-                            G.add_edge(source_node, target_node, color='yellow')
+                            # Only visualize connections with strength > 0 and permanence > 0
+                            if (feature_index < f and
+                                other_feature_index < f and
+                                observed_column.connection_strength[feature_index, concept_index, other_feature_index] > 0 and
+                                observed_column.connection_permanence[feature_index, concept_index, other_feature_index] > 0):
+                                G.add_edge(source_node, target_node, color='yellow')
 
         # External connections (orange)
         for feature_index, feature_word in observed_column.feature_index_to_word.items():
@@ -634,11 +645,14 @@ def visualize_graph(observed_columns_dict):
                         other_lemma = concept_columns_list[other_concept_index]
                         other_observed_column = observed_columns_dict.get(other_lemma)
                         if other_observed_column is not None:
-                            for other_feature_index, other_feature_word in other_observed_column.feature_index_to_word.items():
+                            for other_feature_index, other_feature_word in other_observed_column.feature_word_to_index.items():
                                 target_node = f"{other_lemma}_{other_feature_word}_{other_feature_index}"
                                 if G.has_node(target_node):
-                                    # Only visualize connections with permanence > 0
-                                    if observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] > 0:
+                                    # Only visualize connections with strength > 0 and permanence > 0
+                                    if (feature_index < f and
+                                        other_feature_index < f and
+                                        observed_column.connection_strength[feature_index, other_concept_index, other_feature_index] > 0 and
+                                        observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] > 0):
                                         G.add_edge(source_node, target_node, color='orange')
 
     # Get positions and colors for drawing
@@ -648,8 +662,9 @@ def visualize_graph(observed_columns_dict):
     labels = nx.get_node_attributes(G, 'label')
 
     # Draw the graph
-    # plt.figure(figsize=(12, 8))
-    nx.draw(G, pos, with_labels=True, labels=labels, node_color=colors, edge_color=edge_colors)
+    #plt.figure(figsize=(12, 8))
+    nx.draw(G, pos, with_labels=True, labels=labels, node_color=colors, edge_color=edge_colors, node_size=500, font_size=8)
+    plt.axis('off')  # Hide the axes
     plt.show()
 
 def save_data(observed_columns_dict):

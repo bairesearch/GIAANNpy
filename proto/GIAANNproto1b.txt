@@ -1,7 +1,7 @@
 DONE//do:
-o1 preview prompt 1b2e;
+o1 preview prompt 1b2f;
 
-v1b2e:
+v1b2f:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
 - Use the pytorch API for hardware acceleration of all arrays (for efficient parallel processing of connectivity). Do not initialise the array with a predetermined dictionary; dynamically populate the arrays as new dictionary words and relations are encountered. Will be discussed below.
 - Use vector graphics library such as networkx to always maintain a complete visualisation of the network (including active neurons). Only draw the parts of the network that are not empty.
@@ -45,7 +45,7 @@ CHATONLY; - Expand all the observed column feature connection arrays by 1 dimens
 MANUAL; - If usePOS is enabled and lowMem is disabled, set the size of the feature arrays (f) to the maximum number of non-nouns in an English dictionary. Otherwise, set the size of the feature arrays (f) to the current number of concept columns (c).
 MANUAL; - Create the concept neuron in the feature array of the observed column.
 - when usePOS mode is enabled, do not update f and expanding the observed column and global feature arrays after every new feature is detected by an observed column (e.g. process_concept_words:process_feature:expand_feature_arrays). Instead, usePOS mode should update f and expanding the observed column and global feature arrays prior to processing the concept words (e.g. process_concept_words). Create a dedicated function to detect all possible new features in the sequence, and update f and expand the observed column and global feature arrays accordingly. Update the arrays just once for a given sequence, instead of updating them incrementally for every new feature detected in the sequence. When usePOS mode is enabled, all possible new features in the sequence can be detected simply by searching for all new non-nouns in the sequence.
-
+- only draw column feature neurons and connections if their strength is > 0, and their permanence is > 0.
 
 ---
 You have previously created code based on the following natural language specification;
@@ -85,9 +85,10 @@ You have previously created code based on the following natural language specifi
 - Likewise, store a permanence value for every feature connection, using the same permanence rules used for feature neurons.
 - Every time a feature neuron or connection's permanence is increased (assuming the feature neuron or connection already exists), it exponentially increases its permanence from its current value (via the function zf). Set zf to a squared function of its current integer permanence value. All permanence values are intialised to z1 (3), but do not square them when they are first initialised. Permanence still decreases linearly every time a concept column is activated by the current word but the connection or neuron within it is not referenced by the sequence (-1). The higher the permanence the stronger the weight for next word prediction. We are ignoring next word prediction for now, which involves an iterative topk selection of most activated neurons/columns (similar to hopfield networks).
 - Set an integer activation trace for every neuron and connection in the network. A feature neuron or connection is temporarily excited (set an activation trace value of +1) every time it is referenced by a word in a sequence. This temporary excitation lasts for j1=5 sequences before being removed (set an activation trace value of 0), unless it is activated by another sequence in the meantime. If it is activated by another sequence in the meantime, its activation trace is not modified (keep an activation trace value of +1), but overwrite this value in the code (set an activation trace value of +1) in case an implementation change is introduced in the future. The higher the activation trace the stronger the weight for next word prediction. We are not implementing next word prediction yet.
+- when usePOS mode is enabled, do not update f and expanding the observed column and global feature arrays after every new feature is detected by an observed column (e.g. process_concept_words:process_feature:expand_feature_arrays). Instead, usePOS mode should update f and expanding the observed column and global feature arrays prior to processing the concept words (e.g. process_concept_words). Create a dedicated function to detect all possible new features in the sequence, and update f and expand the observed column and global feature arrays accordingly. Update the arrays just once for a given sequence, instead of updating them incrementally for every new feature detected in the sequence. When usePOS mode is enabled, all possible new features in the sequence can be detected simply by searching for all new non-nouns in the sequence.
 
 Please modify the code by implementing this change:
-- when usePOS mode is enabled, do not update f and expanding the observed column and global feature arrays after every new feature is detected by an observed column (e.g. process_concept_words:process_feature:expand_feature_arrays). Instead, usePOS mode should update f and expanding the observed column and global feature arrays prior to processing the concept words (e.g. process_concept_words). Create a dedicated function to detect all possible new features in the sequence, and update f and expand the observed column and global feature arrays accordingly. Update the arrays just once for a given sequence, instead of updating them incrementally for every new feature detected in the sequence. When usePOS mode is enabled, all possible new features in the sequence can be detected simply by searching for all new non-nouns in the sequence.
+- only draw column feature neurons and connections if their strength is > 0, and their permanence is > 0.
 
 Existing Code:
 # Import necessary libraries
@@ -209,7 +210,7 @@ class ObservedColumn:
         self.connection_strength = torch.zeros(f, c, f, dtype=torch.int32)
         self.connection_permanence = torch.full((f, c, f), z1, dtype=torch.int32)  # Initialize permanence to z1=3
         self.connection_activation = torch.zeros(f, c, f, dtype=torch.int32)  # Activation trace counters
-        
+
     def resize_connection_arrays(self, new_c):
         if new_c > self.connection_strength.shape[1]:
             extra_cols = new_c - self.connection_strength.shape[1]
@@ -217,7 +218,7 @@ class ObservedColumn:
             self.connection_strength = torch.cat([self.connection_strength, torch.zeros(self.connection_strength.shape[0], extra_cols, self.connection_strength.shape[2], dtype=torch.int32)], dim=1)
             self.connection_permanence = torch.cat([self.connection_permanence, torch.full((self.connection_permanence.shape[0], extra_cols, self.connection_permanence.shape[2]), z1, dtype=torch.int32)], dim=1)
             self.connection_activation = torch.cat([self.connection_activation, torch.zeros(self.connection_activation.shape[0], extra_cols, self.connection_activation.shape[2], dtype=torch.int32)], dim=1)
-        
+
     def expand_feature_arrays(self, new_f):
         if new_f > self.connection_strength.shape[0]:
             extra_rows = new_f - self.connection_strength.shape[0]
@@ -236,7 +237,7 @@ class ObservedColumn:
                 self.feature_neurons_strength = torch.cat([self.feature_neurons_strength, torch.zeros(extra_rows)], dim=0)
                 self.feature_neurons_permanence = torch.cat([self.feature_neurons_permanence, torch.full((extra_rows,), z1, dtype=torch.int32)], dim=0)
                 self.feature_neurons_activation = torch.cat([self.feature_neurons_activation, torch.zeros(extra_rows, dtype=torch.int32)], dim=0)
-        
+
     def save_to_disk(self):
         """
         Save the observed column data to disk.
@@ -318,6 +319,10 @@ def process_sentence(sentence):
 
     # Second pass: Create observed_columns_dict
     observed_columns_dict = second_pass(lemmas, pos_tags)
+
+    # When usePOS is enabled, detect all possible new features in the sequence
+    if usePOS:
+        detect_new_features(words, lemmas, pos_tags, observed_columns_dict)
 
     # Process each observed column to ensure connection arrays are resized if needed
     for observed_column in observed_columns_dict.values():
@@ -419,6 +424,51 @@ def load_or_create_observed_column(concept_index, lemma=None):
         observed_column.resize_connection_arrays(c)
         observed_column.expand_feature_arrays(f)
     return observed_column
+
+def detect_new_features(words, lemmas, pos_tags, observed_columns_dict):
+    """
+    When usePOS mode is enabled, detect all possible new features in the sequence
+    by searching for all new non-nouns in the sequence.
+    """
+    global f, lowMem, global_feature_neurons_strength, global_feature_neurons_permanence, global_feature_neurons_activation
+
+    max_feature_index = 0
+
+    for i, lemma_i in enumerate(lemmas):
+        if lemma_i in observed_columns_dict:
+            observed_column = observed_columns_dict[lemma_i]
+            for j, (word_j, pos_j) in enumerate(zip(words, pos_tags)):
+                process_feature_detection(observed_column, i, j, word_j, pos_tags)
+
+    # After processing all features, update f
+    f = max([col.next_feature_index for col in observed_columns_dict.values()])
+    # Now, expand arrays accordingly
+    if not lowMem:
+        if f > global_feature_neurons_strength.shape[1]:
+            extra_cols = f - global_feature_neurons_strength.shape[1]
+            global_feature_neurons_strength = torch.cat([global_feature_neurons_strength, torch.zeros(global_feature_neurons_strength.shape[0], extra_cols)], dim=1)
+            global_feature_neurons_permanence = torch.cat([global_feature_neurons_permanence, torch.full((global_feature_neurons_permanence.shape[0], extra_cols), z1, dtype=torch.int32)], dim=1)
+            global_feature_neurons_activation = torch.cat([global_feature_neurons_activation, torch.zeros(global_feature_neurons_activation.shape[0], extra_cols, dtype=torch.int32)], dim=1)
+
+    # Expand feature arrays in observed columns
+    for observed_column in observed_columns_dict.values():
+        observed_column.expand_feature_arrays(f)
+
+def process_feature_detection(observed_column, i, j, word_j, pos_tags):
+    """
+    Helper function to detect new features prior to processing concept words.
+    """
+    pos_j = pos_tags[j]
+    feature_word = word_j.lower()
+    
+    if pos_j in noun_pos_tags:
+        return  # Skip nouns as features
+
+    if feature_word not in observed_column.feature_word_to_index:
+        feature_index = observed_column.next_feature_index
+        observed_column.feature_word_to_index[feature_word] = feature_index
+        observed_column.feature_index_to_word[feature_index] = feature_word
+        observed_column.next_feature_index += 1
 
 def process_concept_words(doc, lemmas, pos_tags, observed_columns_dict):
     """
@@ -536,24 +586,32 @@ def process_feature(observed_column, i, j, doc, lemmas, pos_tags, activated_feat
     # Assign feature neurons to words not lemmas
     feature_word = word_j.lower()
 
-    # Get or assign feature neuron index for feature_word in this column
+    # Skip nouns as features when usePOS is enabled
+    if usePOS and pos_j in noun_pos_tags:
+        return
+
+    # Get feature neuron index for feature_word in this column
     if feature_word not in observed_column.feature_word_to_index:
-        feature_index = observed_column.next_feature_index
-        observed_column.feature_word_to_index[feature_word] = feature_index
-        observed_column.feature_index_to_word[feature_index] = feature_word
-        observed_column.next_feature_index += 1
-        # Expand feature arrays if needed
-        if feature_index >= f:
-            f = feature_index + 1
-            if not lowMem:
-                # Expand global feature neuron arrays
-                extra_cols = f - global_feature_neurons_strength.shape[1]
-                global_feature_neurons_strength = torch.cat([global_feature_neurons_strength, torch.zeros(global_feature_neurons_strength.shape[0], extra_cols)], dim=1)
-                global_feature_neurons_permanence = torch.cat([global_feature_neurons_permanence, torch.full((global_feature_neurons_permanence.shape[0], extra_cols), z1, dtype=torch.int32)], dim=1)
-                global_feature_neurons_activation = torch.cat([global_feature_neurons_activation, torch.zeros(global_feature_neurons_activation.shape[0], extra_cols, dtype=torch.int32)], dim=1)
-            # Expand connection and feature arrays for all observed columns
-            for obs_col in observed_columns_dict.values():
-                obs_col.expand_feature_arrays(f)
+        if usePOS:
+            print("Should not happen as features are pre-detected")
+            return
+        else:
+            feature_index = observed_column.next_feature_index
+            observed_column.feature_word_to_index[feature_word] = feature_index
+            observed_column.feature_index_to_word[feature_index] = feature_word
+            observed_column.next_feature_index += 1
+            # Expand feature arrays if needed
+            if feature_index >= f:
+                f = feature_index + 1
+                if not lowMem:
+                    # Expand global feature neuron arrays
+                    extra_cols = f - global_feature_neurons_strength.shape[1]
+                    global_feature_neurons_strength = torch.cat([global_feature_neurons_strength, torch.zeros(global_feature_neurons_strength.shape[0], extra_cols)], dim=1)
+                    global_feature_neurons_permanence = torch.cat([global_feature_neurons_permanence, torch.full((global_feature_neurons_permanence.shape[0], extra_cols), z1, dtype=torch.int32)], dim=1)
+                    global_feature_neurons_activation = torch.cat([global_feature_neurons_activation, torch.zeros(global_feature_neurons_activation.shape[0], extra_cols, dtype=torch.int32)], dim=1)
+                # Expand connection and feature arrays for all observed columns
+                for obs_col in observed_columns_dict.values():
+                    obs_col.expand_feature_arrays(f)
     else:
         feature_index = observed_column.feature_word_to_index[feature_word]
 
@@ -626,7 +684,7 @@ def visualize_graph(observed_columns_dict):
         # Draw feature neurons
         y_offset = 1
         for feature_index, feature_word in observed_column.feature_index_to_word.items():
-            if feature_index==0:
+            if feature_index == 0:
                 neuron_color = 'blue'
             else:
                 neuron_color = 'cyan'
@@ -683,7 +741,7 @@ def visualize_graph(observed_columns_dict):
     labels = nx.get_node_attributes(G, 'label')
 
     # Draw the graph
-    #plt.figure(figsize=(12, 8))
+    # plt.figure(figsize=(12, 8))
     nx.draw(G, pos, with_labels=True, labels=labels, node_color=colors, edge_color=edge_colors)
     plt.show()
 
@@ -707,3 +765,4 @@ dataset = load_dataset('wikipedia', '20220301.en', split='train', streaming=True
 
 # Start processing the dataset
 process_dataset(dataset)
+
