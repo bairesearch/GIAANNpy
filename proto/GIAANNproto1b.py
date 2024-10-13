@@ -110,30 +110,39 @@ class ObservedColumn:
         self.next_feature_index = 1  # Start from 1 since index 0 is reserved for concept neuron
 
         # Store all connections for each source column in a list of integer feature connection arrays,
-        # each of size f * c, where c is the length of the dictionary of columns, and f is the maximum
+        # each of size f * c * f, where c is the length of the dictionary of columns, and f is the maximum
         # number of feature neurons.
-        self.connection_strength = torch.zeros(f, c, dtype=torch.int32)
-        self.connection_permanence = torch.full((f, c), z1, dtype=torch.int32)  # Initialize permanence to z1=3
-        self.connection_activation = torch.zeros(f, c, dtype=torch.int32)  # Activation trace counters
-
+        self.connection_strength = torch.zeros(f, c, f, dtype=torch.int32)
+        self.connection_permanence = torch.full((f, c, f), z1, dtype=torch.int32)  # Initialize permanence to z1=3
+        self.connection_activation = torch.zeros(f, c, f, dtype=torch.int32)  # Activation trace counters
+        
     def resize_connection_arrays(self, new_c):
         if new_c > self.connection_strength.shape[1]:
             extra_cols = new_c - self.connection_strength.shape[1]
-            self.connection_strength = torch.cat([self.connection_strength, torch.zeros(self.connection_strength.shape[0], extra_cols, dtype=torch.int32)], dim=1)
-            self.connection_permanence = torch.cat([self.connection_permanence, torch.full((self.connection_permanence.shape[0], extra_cols), z1, dtype=torch.int32)], dim=1)
-            self.connection_activation = torch.cat([self.connection_activation, torch.zeros(self.connection_activation.shape[0], extra_cols, dtype=torch.int32)], dim=1)
-
+            # Expand along dimension 1 (columns)
+            self.connection_strength = torch.cat([self.connection_strength, torch.zeros(self.connection_strength.shape[0], extra_cols, self.connection_strength.shape[2], dtype=torch.int32)], dim=1)
+            self.connection_permanence = torch.cat([self.connection_permanence, torch.full((self.connection_permanence.shape[0], extra_cols, self.connection_permanence.shape[2]), z1, dtype=torch.int32)], dim=1)
+            self.connection_activation = torch.cat([self.connection_activation, torch.zeros(self.connection_activation.shape[0], extra_cols, self.connection_activation.shape[2], dtype=torch.int32)], dim=1)
+        
     def expand_feature_arrays(self, new_f):
         if new_f > self.connection_strength.shape[0]:
             extra_rows = new_f - self.connection_strength.shape[0]
-            self.connection_strength = torch.cat([self.connection_strength, torch.zeros(extra_rows, self.connection_strength.shape[1], dtype=torch.int32)], dim=0)
-            self.connection_permanence = torch.cat([self.connection_permanence, torch.full((extra_rows, self.connection_permanence.shape[1]), z1, dtype=torch.int32)], dim=0)
-            self.connection_activation = torch.cat([self.connection_activation, torch.zeros(extra_rows, self.connection_activation.shape[1], dtype=torch.int32)], dim=0)
+            # Expand along dimension 0 (rows) and dimension 2
+            self.connection_strength = torch.cat([self.connection_strength, torch.zeros(extra_rows, self.connection_strength.shape[1], self.connection_strength.shape[2], dtype=torch.int32)], dim=0)
+            self.connection_permanence = torch.cat([self.connection_permanence, torch.full((extra_rows, self.connection_permanence.shape[1], self.connection_permanence.shape[2]), z1, dtype=torch.int32)], dim=0)
+            self.connection_activation = torch.cat([self.connection_activation, torch.zeros(extra_rows, self.connection_activation.shape[1], self.connection_activation.shape[2], dtype=torch.int32)], dim=0)
+
+            # Also expand along dimension 2
+            extra_slices = new_f - self.connection_strength.shape[2]
+            self.connection_strength = torch.cat([self.connection_strength, torch.zeros(self.connection_strength.shape[0], self.connection_strength.shape[1], extra_slices, dtype=torch.int32)], dim=2)
+            self.connection_permanence = torch.cat([self.connection_permanence, torch.full((self.connection_permanence.shape[0], self.connection_permanence.shape[1], extra_slices), z1, dtype=torch.int32)], dim=2)
+            self.connection_activation = torch.cat([self.connection_activation, torch.zeros(self.connection_activation.shape[0], self.connection_activation.shape[1], extra_slices, dtype=torch.int32)], dim=2)
+
             if lowMem:
                 self.feature_neurons_strength = torch.cat([self.feature_neurons_strength, torch.zeros(extra_rows)], dim=0)
                 self.feature_neurons_permanence = torch.cat([self.feature_neurons_permanence, torch.full((extra_rows,), z1, dtype=torch.int32)], dim=0)
                 self.feature_neurons_activation = torch.cat([self.feature_neurons_activation, torch.zeros(extra_rows, dtype=torch.int32)], dim=0)
-
+        
     def save_to_disk(self):
         """
         Save the observed column data to disk.
@@ -219,6 +228,8 @@ def process_sentence(sentence):
     # Process each observed column to ensure connection arrays are resized if needed
     for observed_column in observed_columns_dict.values():
         observed_column.resize_connection_arrays(c)
+        # Also need to expand feature arrays if f has increased
+        observed_column.expand_feature_arrays(f)
 
     # Process each concept word in the sequence
     process_concept_words(doc, lemmas, pos_tags, observed_columns_dict)
@@ -304,10 +315,13 @@ def load_or_create_observed_column(concept_index):
         observed_column = ObservedColumn.load_from_disk(concept_index)
         # Resize connection arrays if c has increased
         observed_column.resize_connection_arrays(c)
+        # Also expand feature arrays if f has increased
+        observed_column.expand_feature_arrays(f)
     else:
         observed_column = ObservedColumn(concept_index)
         # Initialize connection arrays with correct size
         observed_column.resize_connection_arrays(c)
+        observed_column.expand_feature_arrays(f)
     return observed_column
 
 def process_concept_words(doc, lemmas, pos_tags, observed_columns_dict):
@@ -402,12 +416,15 @@ def process_concept_words(doc, lemmas, pos_tags, observed_columns_dict):
             for feature_index in inactive_feature_indices:
                 for other_concept_index in range(c):
                     if other_concept_index != concept_index_i:
-                        if observed_column.connection_permanence[feature_index, other_concept_index] > 0:
-                            observed_column.connection_permanence[feature_index, other_concept_index] -= z2
-                            # Remove connection if permanence <= 0
-                            if observed_column.connection_permanence[feature_index, other_concept_index] <= 0:
-                                observed_column.connection_permanence[feature_index, other_concept_index] = 0
-                                observed_column.connection_activation[feature_index, other_concept_index] = 0
+                        other_observed_column = load_or_create_observed_column(other_concept_index)
+                        all_other_feature_indices = set(other_observed_column.feature_word_to_index.values())
+                        for other_feature_index in all_other_feature_indices:
+                            if observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] > 0:
+                                observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] -= z2
+                                # Remove connection if permanence <= 0
+                                if observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] <= 0:
+                                    observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] = 0
+                                    observed_column.connection_activation[feature_index, other_concept_index, other_feature_index] = 0
 
 def process_feature(observed_column, i, j, doc, lemmas, pos_tags, activated_feature_indices, observed_columns_dict):
     """
@@ -463,16 +480,17 @@ def process_feature(observed_column, i, j, doc, lemmas, pos_tags, activated_feat
         global_feature_neurons_activation[concept_index_i, feature_index] = j1
 
     # Create connections
-    # Connect these feature neurons to every other feature neuron in every other concept column in the sequence
+    # Connect these feature neurons to every other identified feature neuron (observed in the current sequence) in every other concept column in the sequence
     for other_lemma, other_observed_column in observed_columns_dict.items():
         other_concept_index = other_observed_column.concept_index
         if other_concept_index != observed_column.concept_index:
-            observed_column.connection_strength[feature_index, other_concept_index] += 1
-            # Increase permanence exponentially
-            observed_column.connection_permanence[feature_index, other_concept_index] = observed_column.connection_permanence[feature_index, other_concept_index] ** 2
-            # Set activation trace to j1 sequences
-            observed_column.connection_activation[feature_index, other_concept_index] = j1
-
+            for other_feature_word, other_feature_index in other_observed_column.feature_word_to_index.items():
+                # Update the connection arrays
+                observed_column.connection_strength[feature_index, other_concept_index, other_feature_index] += 1
+                # Increase permanence exponentially
+                observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] = observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] ** 2
+                # Set activation trace to j1 sequences
+                observed_column.connection_activation[feature_index, other_concept_index, other_feature_index] = j1
 
 def update_permanence_and_activation(observed_columns_dict):
     # For each observed column, update activation traces
@@ -493,12 +511,12 @@ def update_permanence_and_activation(observed_columns_dict):
         for idx in active_indices:
             i = idx[0].item()
             j = idx[1].item()
-            if observed_column.connection_activation[i, j] > 0:
-                observed_column.connection_activation[i, j] -= 1
-                if observed_column.connection_activation[i, j] == 0:
+            k = idx[2].item()
+            if observed_column.connection_activation[i, j, k] > 0:
+                observed_column.connection_activation[i, j, k] -= 1
+                if observed_column.connection_activation[i, j, k] == 0:
                     # Activation trace expired
                     pass  # Do nothing for now
-
 
 def visualize_graph(observed_columns_dict):
     G.clear()
@@ -535,6 +553,7 @@ def visualize_graph(observed_columns_dict):
     # Draw connections
     for lemma, observed_column in observed_columns_dict.items():
         concept_index = observed_column.concept_index
+        # Concept node
         concept_node = f"{lemma}_concept"
 
         # Internal connections (yellow)
@@ -547,14 +566,17 @@ def visualize_graph(observed_columns_dict):
         for feature_index, feature_word in observed_column.feature_index_to_word.items():
             source_node = f"{lemma}_{feature_word}_{feature_index}"
             if G.has_node(source_node):
-                for other_lemma, other_observed_column in observed_columns_dict.items():
-                    other_concept_index = other_observed_column.concept_index
-                    other_concept_node = f"{other_lemma}_concept"
+                for other_concept_index in range(c):
                     if other_concept_index != concept_index:
-                        if G.has_node(other_concept_node):
-                            # Only visualize connections with permanence > 0
-                            if observed_column.connection_permanence[feature_index, other_concept_index] > 0:
-                                G.add_edge(source_node, other_concept_node, color='orange')
+                        other_lemma = concept_columns_list[other_concept_index]
+                        other_observed_column = observed_columns_dict.get(other_lemma)
+                        if other_observed_column is not None:
+                            for other_feature_index, other_feature_word in other_observed_column.feature_index_to_word.items():
+                                target_node = f"{other_lemma}_{other_feature_word}_{other_feature_index}"
+                                if G.has_node(target_node):
+                                    # Only visualize connections with permanence > 0
+                                    if observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] > 0:
+                                        G.add_edge(source_node, target_node, color='orange')
 
     # Get positions and colors for drawing
     pos = nx.get_node_attributes(G, 'pos')
