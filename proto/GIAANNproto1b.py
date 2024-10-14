@@ -460,13 +460,13 @@ def process_concept_words(doc, lemmas, pos_tags, observed_columns_dict):
             for j in range(start, i):
                 process_feature(observed_column, i, j, doc, lemmas, pos_tags, activated_feature_indices, observed_columns_dict)
 
-            # Process positions after i
+            # Process positions including and after i
             if usePOS:
                 end = min(len(doc), i + dist_to_next_noun + 1)
             else:
                 end = min(len(doc), i + q + 1)
 
-            for j in range(i + 1, end):
+            for j in range(i, end):    #start at the concept neuron i in the feature array
                 process_feature(observed_column, i, j, doc, lemmas, pos_tags, activated_feature_indices, observed_columns_dict)
 
             # Increment the strength of the concept neuron
@@ -532,12 +532,16 @@ def process_feature(observed_column, i, j, doc, lemmas, pos_tags, activated_feat
     token_j = doc[j]
     word_j = token_j.text
 
-    # Assign feature neurons to words not lemmas
-    feature_word = word_j.lower()
-
-    # Skip nouns as features when usePOS is enabled
-    if usePOS and pos_j in noun_pos_tags:
-        return
+    if(i == j):
+        #concept neuron
+        feature_word = lemma_j    #.lower() has already been executed
+    else:
+        #feature neuron
+        # Assign feature neurons to words not lemmas
+        feature_word = word_j.lower()
+        # Skip nouns as features when usePOS is enabled
+        if usePOS and pos_j in noun_pos_tags:
+            return
 
     # Get feature neuron index for feature_word in this column
     if feature_word not in observed_column.feature_word_to_index:
@@ -569,14 +573,16 @@ def process_feature(observed_column, i, j, doc, lemmas, pos_tags, activated_feat
     for other_lemma, other_observed_column in observed_columns_dict.items():
         other_concept_index = other_observed_column.concept_index
         for other_feature_word, other_feature_index in other_observed_column.feature_word_to_index.items():
-            if not(other_concept_index == observed_column.concept_index and other_feature_index == feature_index):
-                #print("creating connection; feature_index = ", feature_index, ", other_concept_index = ", other_concept_index, ", other_feature_index = ", other_feature_index)
-                # Update the connection arrays
-                observed_column.connection_strength[feature_index, other_concept_index, other_feature_index] += 1
-                # Increase permanence exponentially
-                observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] = observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] ** 2
-                # Set activation trace to j1 sequences
-                observed_column.connection_activation[feature_index, other_concept_index, other_feature_index] = j1
+            # Only connect column features to future or present (not past) column features
+            if other_concept_index >= observed_column.concept_index:
+                if not(other_concept_index == observed_column.concept_index and other_feature_index == feature_index):
+                    #print("creating connection; feature_index = ", feature_index, ", other_concept_index = ", other_concept_index, ", other_feature_index = ", other_feature_index)
+                    # Update the connection arrays
+                    observed_column.connection_strength[feature_index, other_concept_index, other_feature_index] += 1
+                    # Increase permanence exponentially
+                    observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] = observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] ** 2
+                    # Set activation trace to j1 sequences
+                    observed_column.connection_activation[feature_index, other_concept_index, other_feature_index] = j1
 
 def update_permanence_and_activation(observed_columns_dict):
     # For each observed column, update activation traces
