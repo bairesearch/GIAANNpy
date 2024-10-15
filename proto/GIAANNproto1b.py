@@ -262,45 +262,238 @@ class SequenceObservedColumns:
         self.connection_activation = torch.zeros(self.cs, self.fs, self.cs, self.fs, dtype=torch.int32)
 
         # Populate arrays with data from observed_columns_dict
+        self.populate_arrays(observed_columns_dict)
+
+
+    def populate_arrays(self, observed_columns_dict):
+        # Collect indices and data for feature neurons
+        c_idx_list = []
+        f_idx_list = []
+        feature_strength_list = []
+        feature_permanence_list = []
+        feature_activation_list = []
+
         for lemma, observed_column in observed_columns_dict.items():
             c_idx = self.concept_name_to_index[lemma]
-            for feature_word, feature_index_in_observed_column in observed_column.feature_word_to_index.items():
-                f_idx = self.feature_word_to_index[feature_word]
-                if lowMem:
-                    self.feature_neurons_strength[c_idx, f_idx] = observed_column.feature_neurons_strength[feature_index_in_observed_column]
-                    self.feature_neurons_permanence[c_idx, f_idx] = observed_column.feature_neurons_permanence[feature_index_in_observed_column]
-                    self.feature_neurons_activation[c_idx, f_idx] = observed_column.feature_neurons_activation[feature_index_in_observed_column]
-                # Copy connections
-                for other_concept_index in range(c):
-                    other_lemma = concept_columns_list[other_concept_index]
-                    if other_lemma in observed_columns_dict:
-                        other_c_idx = self.concept_name_to_index[other_lemma]
-                        other_observed_column = observed_columns_dict[other_lemma]
-                        for other_feature_word, other_feature_index_in_observed_column in other_observed_column.feature_word_to_index.items():
-                            other_f_idx = self.feature_word_to_index[other_feature_word]
-                            self.connection_strength[c_idx, f_idx, other_c_idx, other_f_idx] = observed_column.connection_strength[feature_index_in_observed_column, other_concept_index, other_feature_index_in_observed_column]
-                            self.connection_permanence[c_idx, f_idx, other_c_idx, other_f_idx] = observed_column.connection_permanence[feature_index_in_observed_column, other_concept_index, other_feature_index_in_observed_column]
-                            self.connection_activation[c_idx, f_idx, other_c_idx, other_f_idx] = observed_column.connection_activation[feature_index_in_observed_column, other_concept_index, other_feature_index_in_observed_column]
+            feature_words = list(observed_column.feature_word_to_index.keys())
+            feature_indices_in_observed = torch.tensor(
+                list(observed_column.feature_word_to_index.values()), dtype=torch.long
+            )
+            f_idx_tensor = torch.tensor(
+                [self.feature_word_to_index[fw] for fw in feature_words], dtype=torch.long
+            )
+
+            num_features = len(f_idx_tensor)
+
+            c_idx_list.append(torch.full((num_features,), c_idx, dtype=torch.long))
+            f_idx_list.append(f_idx_tensor)
+
+            feature_strength_list.append(
+                observed_column.feature_neurons_strength[feature_indices_in_observed]
+            )
+            feature_permanence_list.append(
+                observed_column.feature_neurons_permanence[feature_indices_in_observed]
+            )
+            feature_activation_list.append(
+                observed_column.feature_neurons_activation[feature_indices_in_observed]
+            )
+
+        # Concatenate lists to tensors
+        c_idx_tensor = torch.cat(c_idx_list)
+        f_idx_tensor = torch.cat(f_idx_list)
+        feature_strength_tensor = torch.cat(feature_strength_list)
+        feature_permanence_tensor = torch.cat(feature_permanence_list)
+        feature_activation_tensor = torch.cat(feature_activation_list)
+
+        if lowMem:
+            # Use advanced indexing to assign values
+            self.feature_neurons_strength[c_idx_tensor, f_idx_tensor] = feature_strength_tensor
+            self.feature_neurons_permanence[c_idx_tensor, f_idx_tensor] = feature_permanence_tensor
+            self.feature_neurons_activation[c_idx_tensor, f_idx_tensor] = feature_activation_tensor
+
+        # Now handle connections
+        connection_indices = []
+        connection_strength_values = []
+        connection_permanence_values = []
+        connection_activation_values = []
+
+        for lemma, observed_column in observed_columns_dict.items():
+            c_idx = self.concept_name_to_index[lemma]
+            feature_words = list(observed_column.feature_word_to_index.keys())
+            feature_indices_in_observed = torch.tensor(
+                list(observed_column.feature_word_to_index.values()), dtype=torch.long
+            )
+            f_idx_tensor = torch.tensor(
+                [self.feature_word_to_index[fw] for fw in feature_words], dtype=torch.long
+            )
+
+            for other_lemma, other_observed_column in observed_columns_dict.items():
+                other_c_idx = self.concept_name_to_index[other_lemma]
+                other_concept_index = other_observed_column.concept_index
+                other_feature_words = list(other_observed_column.feature_word_to_index.keys())
+                other_feature_indices_in_observed = torch.tensor(
+                    list(other_observed_column.feature_word_to_index.values()), dtype=torch.long
+                )
+                other_f_idx_tensor = torch.tensor(
+                    [self.feature_word_to_index[fw] for fw in other_feature_words], dtype=torch.long
+                )
+
+                # Create meshgrid of indices
+                feature_idx_obs_mesh, other_feature_idx_obs_mesh = torch.meshgrid(
+                    feature_indices_in_observed, other_feature_indices_in_observed, indexing='ij'
+                )
+                f_idx_mesh, other_f_idx_mesh = torch.meshgrid(
+                    f_idx_tensor, other_f_idx_tensor, indexing='ij'
+                )
+
+                # Flatten the meshgrid indices
+                feature_idx_obs_flat = feature_idx_obs_mesh.reshape(-1)
+                other_feature_idx_obs_flat = other_feature_idx_obs_mesh.reshape(-1)
+                f_idx_flat = f_idx_mesh.reshape(-1)
+                other_f_idx_flat = other_f_idx_mesh.reshape(-1)
+
+                # Create tensors for concept indices
+                c_idx_flat = torch.full_like(f_idx_flat, c_idx, dtype=torch.long)
+                other_c_idx_flat = torch.full_like(other_f_idx_flat, other_c_idx, dtype=torch.long)
+
+                # Get the corresponding values from observed_column arrays
+                strength_values = observed_column.connection_strength[
+                    feature_idx_obs_flat, other_concept_index, other_feature_idx_obs_flat
+                ]
+                permanence_values = observed_column.connection_permanence[
+                    feature_idx_obs_flat, other_concept_index, other_feature_idx_obs_flat
+                ]
+                activation_values = observed_column.connection_activation[
+                    feature_idx_obs_flat, other_concept_index, other_feature_idx_obs_flat
+                ]
+
+                # Append to lists
+                connection_indices.append((c_idx_flat, f_idx_flat, other_c_idx_flat, other_f_idx_flat))
+                connection_strength_values.append(strength_values)
+                connection_permanence_values.append(permanence_values)
+                connection_activation_values.append(activation_values)
+
+        # Concatenate tensors
+        c_idx_conn_tensor = torch.cat([idx[0] for idx in connection_indices])
+        f_idx_conn_tensor = torch.cat([idx[1] for idx in connection_indices])
+        other_c_idx_conn_tensor = torch.cat([idx[2] for idx in connection_indices])
+        other_f_idx_conn_tensor = torch.cat([idx[3] for idx in connection_indices])
+
+        connection_strength_tensor = torch.cat(connection_strength_values)
+        connection_permanence_tensor = torch.cat(connection_permanence_values)
+        connection_activation_tensor = torch.cat(connection_activation_values)
+
+        # Use advanced indexing to assign connection values
+        self.connection_strength[
+            c_idx_conn_tensor, f_idx_conn_tensor, other_c_idx_conn_tensor, other_f_idx_conn_tensor
+        ] = connection_strength_tensor
+        self.connection_permanence[
+            c_idx_conn_tensor, f_idx_conn_tensor, other_c_idx_conn_tensor, other_f_idx_conn_tensor
+        ] = connection_permanence_tensor
+        self.connection_activation[
+            c_idx_conn_tensor, f_idx_conn_tensor, other_c_idx_conn_tensor, other_f_idx_conn_tensor
+        ] = connection_activation_tensor
+
+
 
     def update_observed_columns(self, observed_columns_dict):
         # Update observed columns with data from sequence arrays
         for lemma, observed_column in observed_columns_dict.items():
             c_idx = self.concept_name_to_index[lemma]
-            for feature_word, feature_index_in_observed_column in observed_column.feature_word_to_index.items():
-                f_idx = self.feature_word_to_index[feature_word]
-                if lowMem:
-                    observed_column.feature_neurons_strength[feature_index_in_observed_column] = self.feature_neurons_strength[c_idx, f_idx]
-                    observed_column.feature_neurons_permanence[feature_index_in_observed_column] = self.feature_neurons_permanence[c_idx, f_idx]
-                    observed_column.feature_neurons_activation[feature_index_in_observed_column] = self.feature_neurons_activation[c_idx, f_idx]
-                # Update connections
-                for other_lemma, other_observed_column in observed_columns_dict.items():
-                    other_c_idx = self.concept_name_to_index[other_lemma]
-                    other_concept_index = other_observed_column.concept_index
-                    for other_feature_word, other_feature_index_in_observed_column in other_observed_column.feature_word_to_index.items():
-                        other_f_idx = self.feature_word_to_index[other_feature_word]
-                        observed_column.connection_strength[feature_index_in_observed_column, other_concept_index, other_feature_index_in_observed_column] = self.connection_strength[c_idx, f_idx, other_c_idx, other_f_idx]
-                        observed_column.connection_permanence[feature_index_in_observed_column, other_concept_index, other_feature_index_in_observed_column] = self.connection_permanence[c_idx, f_idx, other_c_idx, other_f_idx]
-                        observed_column.connection_activation[feature_index_in_observed_column, other_concept_index, other_feature_index_in_observed_column] = self.connection_activation[c_idx, f_idx, other_c_idx, other_f_idx]
+            feature_words = list(observed_column.feature_word_to_index.keys())
+            feature_indices_in_observed = torch.tensor(
+                list(observed_column.feature_word_to_index.values()), dtype=torch.long
+            )
+            f_idx_tensor = torch.tensor(
+                [self.feature_word_to_index[fw] for fw in feature_words], dtype=torch.long
+            )
+
+            if lowMem:
+                # Use advanced indexing to get values from self.feature_neurons_*
+                strength_values = self.feature_neurons_strength[c_idx, f_idx_tensor]
+                permanence_values = self.feature_neurons_permanence[c_idx, f_idx_tensor]
+                activation_values = self.feature_neurons_activation[c_idx, f_idx_tensor]
+
+                # Assign values to observed_column's feature_neurons_* arrays
+                observed_column.feature_neurons_strength[feature_indices_in_observed] = strength_values
+                observed_column.feature_neurons_permanence[feature_indices_in_observed] = permanence_values
+                observed_column.feature_neurons_activation[feature_indices_in_observed] = activation_values
+
+            # Now handle connections
+            conn_feature_indices_obs = []
+            conn_other_concept_indices = []
+            conn_other_feature_indices_obs = []
+            conn_strength_values = []
+            conn_permanence_values = []
+            conn_activation_values = []
+
+            for other_lemma, other_observed_column in observed_columns_dict.items():
+                other_c_idx = self.concept_name_to_index[other_lemma]
+                other_concept_index = other_observed_column.concept_index
+                other_feature_words = list(other_observed_column.feature_word_to_index.keys())
+                other_feature_indices_in_observed = torch.tensor(
+                    list(other_observed_column.feature_word_to_index.values()), dtype=torch.long
+                )
+                other_f_idx_tensor = torch.tensor(
+                    [self.feature_word_to_index[fw] for fw in other_feature_words], dtype=torch.long
+                )
+
+                # Create meshgrid of indices
+                feature_idx_obs_mesh, other_feature_idx_obs_mesh = torch.meshgrid(
+                    feature_indices_in_observed, other_feature_indices_in_observed, indexing='ij'
+                )
+                f_idx_mesh, other_f_idx_mesh = torch.meshgrid(
+                    f_idx_tensor, other_f_idx_tensor, indexing='ij'
+                )
+
+                # Flatten the meshgrid indices
+                feature_idx_obs_flat = feature_idx_obs_mesh.reshape(-1)
+                other_feature_idx_obs_flat = other_feature_idx_obs_mesh.reshape(-1)
+                f_idx_flat = f_idx_mesh.reshape(-1)
+                other_f_idx_flat = other_f_idx_mesh.reshape(-1)
+
+                # Get the corresponding values from self.connection_* arrays
+                strength_values = self.connection_strength[
+                    c_idx, f_idx_flat, other_c_idx, other_f_idx_flat
+                ]
+                permanence_values = self.connection_permanence[
+                    c_idx, f_idx_flat, other_c_idx, other_f_idx_flat
+                ]
+                activation_values = self.connection_activation[
+                    c_idx, f_idx_flat, other_c_idx, other_f_idx_flat
+                ]
+
+                # Append data to lists
+                conn_feature_indices_obs.append(feature_idx_obs_flat)
+                conn_other_concept_indices.append(
+                    torch.full_like(feature_idx_obs_flat, other_concept_index, dtype=torch.long)
+                )
+                conn_other_feature_indices_obs.append(other_feature_idx_obs_flat)
+                conn_strength_values.append(strength_values)
+                conn_permanence_values.append(permanence_values)
+                conn_activation_values.append(activation_values)
+
+            # Concatenate lists to form tensors
+            conn_feature_indices_obs = torch.cat(conn_feature_indices_obs)
+            conn_other_concept_indices = torch.cat(conn_other_concept_indices)
+            conn_other_feature_indices_obs = torch.cat(conn_other_feature_indices_obs)
+            conn_strength_values = torch.cat(conn_strength_values)
+            conn_permanence_values = torch.cat(conn_permanence_values)
+            conn_activation_values = torch.cat(conn_activation_values)
+
+            # Assign values to observed_column's connection_* arrays using advanced indexing
+            observed_column.connection_strength[
+                conn_feature_indices_obs, conn_other_concept_indices, conn_other_feature_indices_obs
+            ] = conn_strength_values
+            observed_column.connection_permanence[
+                conn_feature_indices_obs, conn_other_concept_indices, conn_other_feature_indices_obs
+            ] = conn_permanence_values
+            observed_column.connection_activation[
+                conn_feature_indices_obs, conn_other_concept_indices, conn_other_feature_indices_obs
+            ] = conn_activation_values
+
+
+
 
 # Initialize NetworkX graph for visualization
 G = nx.Graph()
