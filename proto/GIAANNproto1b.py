@@ -229,7 +229,7 @@ G = nx.Graph()
 
 # For the purpose of the example, process a limited number of sentences
 sentence_count = 0
-max_sentences = 5  # Adjust as needed
+max_sentences = 1000  # Adjust as needed
 
 def process_dataset(dataset):
     global sentence_count
@@ -269,14 +269,14 @@ def process_sentence(sentence):
     # Process each concept word in the sequence
     process_concept_words(doc, lemmas, pos_tags, observed_columns_dict)
 
-    # Update permanence and activation traces for feature neurons and connections
-    update_permanence_and_activation(observed_columns_dict)
+    # Update activation traces for feature neurons and connections
+    update_activation(observed_columns_dict)
 
     # Visualize the complete graph every time a new sentence is parsed by the application.
     visualize_graph(observed_columns_dict)
 
     # Save observed columns to disk
-    #save_data(observed_columns_dict, concept_features_dict)
+    save_data(observed_columns_dict, concept_features_dict)
 
     # Break if we've reached the maximum number of sentences
     global sentence_count
@@ -483,44 +483,63 @@ def process_concept_words(doc, lemmas, pos_tags, observed_columns_dict):
                 # Set activation trace to j1 sequences
                 global_feature_neurons_activation[concept_index_i, feature_index_concept_neuron] = j1
             
-            # Decrease permanence for feature neurons not activated
-            all_feature_indices = set(observed_column.feature_word_to_index.values())
-            inactive_feature_indices = all_feature_indices - activated_feature_indices
-            for feature_index in inactive_feature_indices:
-                # Decrease permanence linearly
-                if lowMem:
-                    observed_column.feature_neurons_permanence[feature_index] -= z2
-                    # Remove feature neuron if permanence <= 0
-                    if observed_column.feature_neurons_permanence[feature_index] <= 0:
-                        # Remove feature neuron from the column
-                        del_word = observed_column.feature_index_to_word[feature_index]
-                        del observed_column.feature_word_to_index[del_word]
-                        del observed_column.feature_index_to_word[feature_index]
-                        # Set permanence and activation to zero
-                        observed_column.feature_neurons_permanence[feature_index] = 0
-                        observed_column.feature_neurons_activation[feature_index] = 0
-                else:
-                    global_feature_neurons_permanence[concept_index_i, feature_index] -= z2
-                    # Remove feature neuron if permanence <= 0
-                    if global_feature_neurons_permanence[concept_index_i, feature_index] <= 0:
-                        # Set permanence and activation to zero
-                        global_feature_neurons_permanence[concept_index_i, feature_index] = 0
-                        global_feature_neurons_activation[concept_index_i, feature_index] = 0
+            decrease_permanence(observed_column, concept_index_i, activated_feature_indices, observed_columns_dict)
 
-            # Decrease permanence for connections not activated
-            for feature_index in inactive_feature_indices:
-                for other_concept_index in range(c):
-                    if other_concept_index != concept_index_i:
-                        other_observed_column = load_or_create_observed_column(other_concept_index)
-                        all_other_feature_indices = set(other_observed_column.feature_word_to_index.values())
-                        for other_feature_index in all_other_feature_indices:
-                            if observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] > 0:
-                                observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] -= z2
-                                # Remove connection if permanence <= 0
-                                if observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] <= 0:
-                                    observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] = 0
-                                    observed_column.connection_activation[feature_index, other_concept_index, other_feature_index] = 0
+def decrease_permanence(observed_column, concept_index_i, activated_feature_indices, observed_columns_dict):
+    # Decrease permanence for feature neurons not activated
+    all_feature_indices = set(observed_column.feature_word_to_index.values())
+    inactive_feature_indices = all_feature_indices - activated_feature_indices
+    for feature_index in inactive_feature_indices:
+        # Decrease permanence linearly
+        if lowMem:
+            observed_column.feature_neurons_permanence[feature_index] -= z2
+            # Remove feature neuron if permanence <= 0
+            if observed_column.feature_neurons_permanence[feature_index] <= 0:
+                # Set permanence and activation to zero
+                observed_column.feature_neurons_permanence[feature_index] = 0
+                observed_column.feature_neurons_activation[feature_index] = 0
+        else:
+            global_feature_neurons_permanence[concept_index_i, feature_index] -= z2
+            # Remove feature neuron if permanence <= 0
+            if global_feature_neurons_permanence[concept_index_i, feature_index] <= 0:
+                # Set permanence and activation to zero
+                global_feature_neurons_permanence[concept_index_i, feature_index] = 0
+                global_feature_neurons_activation[concept_index_i, feature_index] = 0
+    '''
+    # Decrease permanence of connections from inactive feature neurons in column
+    for feature_index in inactive_feature_indices:
+        #Inefficient; Decrease permanence of inactive connections between all columns:
+        #for other_concept_index in range(c):
+        #   other_observed_column = load_or_create_observed_column(other_concept_index)
+        #Decrease permanence of inactive connections between observed columns:
+        for other_lemma, other_observed_column in observed_columns_dict.items():
+            other_concept_index = other_observed_column.concept_index
+            all_other_feature_indices = set(other_observed_column.feature_word_to_index.values())
+            for other_feature_index in all_other_feature_indices:
+                if observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] > 0:
+                    observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] -= z2
+                    # Remove connection if permanence <= 0
+                    if observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] <= 0:
+                        observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] = 0
+                        observed_column.connection_activation[feature_index, other_concept_index, other_feature_index] = 0
+    '''
+    # Decrease permanence of inactive connections for activated features in column 
+    for feature_index in activated_feature_indices:
+        #Inefficient; Decrease permanence of inactive connections between all columns:
+        #for other_concept_index in range(c):
+        #   other_observed_column = load_or_create_observed_column(other_concept_index)
+        #Decrease permanence of inactive connections between observed columns:
+        for other_lemma, other_observed_column in observed_columns_dict.items():
+            other_concept_index = other_observed_column.concept_index
+            for other_feature_index in inactive_feature_indices:
+                if observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] > 0:
+                    observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] -= z2
+                    # Remove connection if permanence <= 0
+                    if observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] <= 0:
+                        observed_column.connection_permanence[feature_index, other_concept_index, other_feature_index] = 0
+                        observed_column.connection_activation[feature_index, other_concept_index, other_feature_index] = 0
 
+                   
 def process_feature(observed_column, i, j, doc, lemmas, pos_tags, activated_feature_indices, observed_columns_dict):
     """
     Helper function to process a feature at position j for the concept at position i.
@@ -584,7 +603,7 @@ def process_feature(observed_column, i, j, doc, lemmas, pos_tags, activated_feat
                     # Set activation trace to j1 sequences
                     observed_column.connection_activation[feature_index, other_concept_index, other_feature_index] = j1
 
-def update_permanence_and_activation(observed_columns_dict):
+def update_activation(observed_columns_dict):
     # For each observed column, update activation traces
     for observed_column in observed_columns_dict.values():
         # Feature neurons

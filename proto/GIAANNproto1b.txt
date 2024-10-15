@@ -1,7 +1,7 @@
 DONE//do:
-o1 preview prompt 1b2h;
+o1 preview prompt 1b2i;
 
-v1b2h:
+v1b2i:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
 - Use the pytorch API for hardware acceleration of all arrays (for efficient parallel processing of connectivity). Do not initialise the array with a predetermined dictionary; dynamically populate the arrays as new dictionary words and relations are encountered. Will be discussed below.
 - Use vector graphics library such as networkx to always maintain a complete visualisation of the network (including active neurons). Only draw the parts of the network that are not empty.
@@ -49,5 +49,6 @@ MANUAL; - Create the concept neuron in the feature array of the observed column.
 MANUAL; - Maintain a concept features dictionary (of every feature name in the columns). The concept features dictionary is also saved to disk after every sentence. When useInference is enabled, the concept features dictionary is loaded from disk during startup, before processing the first sequence in the dataset.
 MANUAL; - Increment the strength of the feature concept neurons
 MANUAL; - Only connect column features to future or present (not past) column features. Create connections for concept neurons. 
+MANUAL; - Decrease permanence of inactive connections between observed columns (not all columns). Do not remove feature neurons from columns (just set their permanence to 0). Decrease permanence of inactive connections in the same column. Add method; decrease permanence of inactive connections for activated features in column (instead of connections from inactive feature neurons in column). Move all the decrease permanence code to a separate function.
 
 
