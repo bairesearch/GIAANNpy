@@ -8,13 +8,14 @@ from datasets import load_dataset
 import os
 import pickle
 import numpy as np
+torch.set_printoptions(threshold=float('inf'))
 
 # Set boolean variables as per specification
 useInference = False  # Disable useInference mode
 lowMem = True		 # Enable lowMem mode (can only be used when useInference is disabled)
 usePOS = True		 # Enable usePOS mode
 useParallelProcessing = True	#mandatory (else restore original code pre-GIAANNproto1b3a)
-useSaveData = False
+useSaveData = True
 
 useDedicatedFeatureLists = False
 if usePOS and not lowMem:
@@ -701,9 +702,8 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, o
 			elif(feature_word in sequence_observed_columns.feature_word_to_index):
 				sequence_feature_index = sequence_observed_columns.feature_word_to_index[feature_word]
 				feature_neurons_active[sequence_concept_index, sequence_feature_index] = 1
-	#feature_neurons_active[:, feature_index_concept_neuron] = 1	#always use the concept neuron feature of each column during training	#index 0 is not reserved
 	feature_neurons_inactive = 1 - feature_neurons_active
-	   
+	 
 	if lowMem:
 		# Update feature neurons in sequence_observed_columns
 		sequence_observed_columns.feature_neurons_strength[:, :] += feature_neurons_active
@@ -712,35 +712,36 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, o
 	else:
 		pass  # Not lowMem mode
 
-	feature_connections_active = feature_neurons_active.unsqueeze(2).unsqueeze(3).expand(cs, fs, cs, fs)
+	feature_neurons_active_1d = feature_neurons_active.view(cs*fs)
+	feature_connections_active = torch.matmul(feature_neurons_active_1d.unsqueeze(1), feature_neurons_active_1d.unsqueeze(0)).view(cs, fs, cs, fs)
 	feature_connections_inactive = 1 - feature_connections_active
-	
+
 	sequence_observed_columns.connection_strength[:, :, :, :] += feature_connections_active
 	sequence_observed_columns.connection_permanence[:, :, :, :] = feature_connections_active*(sequence_observed_columns.connection_permanence ** 2) + feature_connections_inactive*sequence_observed_columns.connection_permanence
 	sequence_observed_columns.connection_activation[:, :, :, :] = feature_connections_active*j1
 
-	#decrease_permanence(observed_columns_dict, sequence_observed_columns, feature_neurons_active, feature_neurons_inactive, feature_connections_active, feature_connections_inactive)
+	decrease_permanence(observed_columns_dict, sequence_observed_columns, feature_neurons_active, feature_neurons_inactive)
  
-def decrease_permanence(observed_columns_dict, sequence_observed_columns, feature_neurons_active, feature_neurons_inactive, feature_connections_active, feature_connections_inactive):
+def decrease_permanence(observed_columns_dict, sequence_observed_columns, feature_neurons_active, feature_neurons_inactive):
+	cs = sequence_observed_columns.cs
+	fs = sequence_observed_columns.fs 
+	
 	# Decrease permanence for feature neurons not activated
 	sequence_observed_columns.feature_neurons_permanence[:, :] -= z2
 	sequence_observed_columns.feature_neurons_permanence = torch.clamp(sequence_observed_columns.feature_neurons_permanence, min=0)
 
-	feature_neurons_all = torch.ones((sequence_observed_columns.cs, sequence_observed_columns.fs), dtype=torch.long)
-	feature_neurons_all_expand1 = feature_neurons_all.unsqueeze(2).unsqueeze(3)	# Shape (c, f, 1, 1)
-	feature_neurons_all_expand2 = feature_neurons_all.unsqueeze(0).unsqueeze(1)	# Shape (1, 1, c, f)
-	feature_connections_active_expand1 = feature_neurons_active.unsqueeze(2).unsqueeze(3)	# Shape (c, f, 1, 1)
-	feature_connections_inactive_expand1 = feature_neurons_inactive.unsqueeze(2).unsqueeze(3)	# Shape (c, f, 1, 1)
-	feature_connections_active_expand2 = feature_neurons_active.unsqueeze(0).unsqueeze(1)	# Shape (1, 1, c, f)
-	feature_connections_inactive_expand2 = feature_neurons_inactive.unsqueeze(0).unsqueeze(1)	# Shape (1, 1, c, f)
+	feature_neurons_all = torch.ones((cs, fs), dtype=torch.long)
+	feature_neurons_all_1d = feature_neurons_all.view(cs*fs)
+	feature_neurons_active_1d = feature_neurons_active.view(cs*fs)
+	feature_neurons_inactive_1d = feature_neurons_inactive.view(cs*fs)
 	 
 	# Decrease permanence of connections from inactive feature neurons in column
-	feature_connections_decrease1 = feature_connections_inactive_expand1 * feature_neurons_all_expand2	# Shape (c, f, c, f)
+	feature_connections_decrease1 = torch.matmul(feature_neurons_inactive_1d.unsqueeze(1), feature_neurons_all_1d.unsqueeze(0)).view(cs, fs, cs, fs)
 	sequence_observed_columns.connection_permanence[:, :, :, :] -= feature_connections_decrease1
 	sequence_observed_columns.connection_permanence = torch.clamp(sequence_observed_columns.connection_permanence, min=0)
 	
 	# Decrease permanence of inactive connections for activated features in column 
-	feature_connections_decrease2 = feature_connections_active_expand1 * feature_connections_inactive_expand2	# Shape (c, f, c, f)
+	feature_connections_decrease2 = torch.matmul(feature_neurons_active_1d.unsqueeze(1), feature_neurons_inactive_1d.unsqueeze(0)).view(cs, fs, cs, fs)
 	sequence_observed_columns.connection_permanence[:, :, :, :] -= feature_connections_decrease2
 	sequence_observed_columns.connection_permanence = torch.clamp(sequence_observed_columns.connection_permanence, min=0)
   
