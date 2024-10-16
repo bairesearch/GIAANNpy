@@ -20,7 +20,7 @@ from nltk.tokenize import sent_tokenize
 useInference = False  # Disable useInference mode
 lowMem = True         # Enable lowMem mode (can only be used when useInference is disabled)
 usePOS = True         # Enable usePOS mode
-useParallelProcessing = True
+useParallelProcessing = True    #mandatory (else restore original code)
 useSaveData = True
 
 # Paths for saving data
@@ -732,18 +732,24 @@ def process_concept_words(doc, lemmas, pos_tags, observed_columns_dict, sequence
             else:
                 start = max(0, i - q)
 
-            for j in range(start, i):
-                process_feature(observed_column, i, j, doc, lemmas, pos_tags, activated_feature_indices, observed_columns_dict, sequence_observed_columns, c_idx)
-
+            if(useParallelProcessing):
+                process_features(observed_column, start, i, doc, lemmas, pos_tags, activated_feature_indices, observed_columns_dict, sequence_observed_columns, c_idx)
+            else:
+                # Non-parallel processing (restore original code)
+                pass
+                
             # Process positions including and after i
             if usePOS:
                 end = min(len(doc), i + dist_to_next_noun + 1)
             else:
                 end = min(len(doc), i + q + 1)
 
-            for j in range(i, end):    # start at the concept neuron i in the feature array
-                process_feature(observed_column, i, j, doc, lemmas, pos_tags, activated_feature_indices, observed_columns_dict, sequence_observed_columns, c_idx)
-
+            if(useParallelProcessing):
+                process_features(observed_column, i, end, doc, lemmas, pos_tags, activated_feature_indices, observed_columns_dict, sequence_observed_columns, c_idx)
+            else:
+                # Non-parallel processing (restore original code)
+                pass
+                
             # Increment the strength of the concept neuron
             feature_word = lemma_i  # For concept neuron, feature word is the lemma itself
             feature_index_in_observed_column = observed_column.feature_word_to_index[feature_word]
@@ -759,6 +765,97 @@ def process_concept_words(doc, lemmas, pos_tags, observed_columns_dict, sequence
                 pass  # Not lowMem mode
 
             decrease_permanence(observed_column, concept_index_i, activated_feature_indices, observed_columns_dict, sequence_observed_columns, c_idx)
+
+def process_features(observed_column, start, end, doc, lemmas, pos_tags, activated_feature_indices, observed_columns_dict, sequence_observed_columns, c_idx):
+    """
+    Helper function to process a feature at position j for the concept at position i.
+    """
+    # Collect indices from start to end (exclusive)
+    j_indices = torch.arange(start, end)
+
+    # Extract lemmas, POS tags, tokens, and words for positions j
+    lemmas_j = [lemmas[j] for j in j_indices]
+    pos_tags_j = [pos_tags[j] for j in j_indices]
+    tokens_j = [doc[j] for j in j_indices]
+    word_j = [token.text for token in tokens_j]
+    word_j_lower = [w.lower() for w in word_j]
+
+    # Determine if we need to skip any positions based on POS tags
+    if usePOS:
+        noun_pos_tags_set = set(noun_pos_tags)
+        skip_mask = [pos in noun_pos_tags_set for pos in pos_tags_j]
+    else:
+        skip_mask = [False] * len(j_indices)
+
+    # For all positions, feature_word is word_j_lower (since i != j in this range)
+    feature_words = word_j_lower
+
+    # Check if feature_word is in observed_column.feature_word_to_index
+    observed_feature_words_set = set(observed_column.feature_word_to_index.keys())
+    in_dict_mask = [fw in observed_feature_words_set for fw in feature_words]
+
+    # Combine masks to get valid positions
+    valid_mask = [not skip and in_dict for skip, in_dict in zip(skip_mask, in_dict_mask)]
+    valid_indices = [idx for idx, valid in zip(j_indices, valid_mask) if valid]
+
+    if valid_indices:
+        # Get valid feature words and their indices
+        valid_feature_words = [feature_words[idx - start] for idx in valid_indices]
+        feature_indices_in_observed_column = [observed_column.feature_word_to_index[fw] for fw in valid_feature_words]
+        f_indices = [sequence_observed_columns.feature_word_to_index[fw] for fw in valid_feature_words]
+
+        # Add feature indices to activated set
+        activated_feature_indices.update(f_indices)
+
+        f_indices_tensor = torch.tensor(f_indices, dtype=torch.long)
+        c_idx_tensor = torch.tensor(c_idx, dtype=torch.long)
+
+        if lowMem:
+            # Update feature neurons in sequence_observed_columns
+            sequence_observed_columns.feature_neurons_strength[c_idx_tensor, f_indices_tensor] += 1
+            sequence_observed_columns.feature_neurons_permanence[c_idx_tensor, f_indices_tensor] = sequence_observed_columns.feature_neurons_permanence[c_idx_tensor, f_indices_tensor] ** 2
+            sequence_observed_columns.feature_neurons_activation[c_idx_tensor, f_indices_tensor] = j1
+        else:
+            pass  # Not lowMem mode
+
+        # Prepare other concept and feature indices
+        other_concept_indices = []
+        other_feature_indices = []
+
+        for other_lemma, other_observed_column in observed_columns_dict.items():
+            other_c_idx = sequence_observed_columns.concept_name_to_index[other_lemma]
+            if other_c_idx >= c_idx:
+                other_features = list(sequence_observed_columns.feature_word_to_index.values())
+                other_concept_indices.extend([other_c_idx] * len(other_features))
+                other_feature_indices.extend(other_features)
+
+        if other_concept_indices:
+            other_concept_indices_tensor = torch.tensor(other_concept_indices, dtype=torch.long)
+            other_feature_indices_tensor = torch.tensor(other_feature_indices, dtype=torch.long)
+
+            # Expand f_indices to match other features
+            N = len(f_indices)
+            M = len(other_feature_indices_tensor)
+            f_indices_expand = f_indices_tensor.unsqueeze(1).expand(-1, M)
+            other_concept_indices_expand = other_concept_indices_tensor.unsqueeze(0).expand(N, -1)
+            other_feature_indices_expand = other_feature_indices_tensor.unsqueeze(0).expand(N, -1)
+            c_idx_expand = c_idx_tensor.unsqueeze(0).unsqueeze(1).expand(N, M)
+
+            # Filter out self-connections
+            mask = ~((other_concept_indices_expand == c_idx_expand) & (other_feature_indices_expand == f_indices_expand))
+            masked_c_idx_expand = c_idx_expand[mask]
+            masked_f_indices_expand = f_indices_expand[mask]
+            masked_other_concept_indices_expand = other_concept_indices_expand[mask]
+            masked_other_feature_indices_expand = other_feature_indices_expand[mask]
+
+            # Update connection arrays
+            sequence_observed_columns.connection_strength[masked_c_idx_expand, masked_f_indices_expand, masked_other_concept_indices_expand, masked_other_feature_indices_expand] += 1
+            sequence_observed_columns.connection_permanence[masked_c_idx_expand, masked_f_indices_expand, masked_other_concept_indices_expand, masked_other_feature_indices_expand] = sequence_observed_columns.connection_permanence[masked_c_idx_expand, masked_f_indices_expand, masked_other_concept_indices_expand, masked_other_feature_indices_expand] ** 2
+            sequence_observed_columns.connection_activation[masked_c_idx_expand, masked_f_indices_expand, masked_other_concept_indices_expand, masked_other_feature_indices_expand] = j1
+        else:
+            pass  # No other concept indices available
+
+
 
 def decrease_permanence(observed_column, concept_index_i, activated_feature_indices, observed_columns_dict, sequence_observed_columns, c_idx):
     if(useParallelProcessing):
@@ -837,82 +934,9 @@ def decrease_permanence(observed_column, concept_index_i, activated_feature_indi
         zero_perm_mask = sequence_observed_columns.connection_permanence[c_idx, feature_indices_flat[mask], other_concept_indices_flat[mask], other_feature_indices_flat[mask]] == 0
         sequence_observed_columns.connection_activation[c_idx, feature_indices_flat[mask][zero_perm_mask], other_concept_indices_flat[mask][zero_perm_mask], other_feature_indices_flat[mask][zero_perm_mask]] = 0
     else:
-        # Non-parallel processing (similar adjustments needed)
+        # Non-parallel processing (restore original code)
         pass
-
-def process_feature(observed_column, i, j, doc, lemmas, pos_tags, activated_feature_indices, observed_columns_dict, sequence_observed_columns, c_idx):
-    """
-    Helper function to process a feature at position j for the concept at position i.
-    """
-    global c, f, lowMem, global_feature_neurons_strength, global_feature_neurons_permanence, global_feature_neurons_activation
-    lemma_i = lemmas[i]
-    lemma_j = lemmas[j]
-    pos_j = pos_tags[j]
-    token_j = doc[j]
-    word_j = token_j.text
-
-    if(i == j):
-        # Concept neuron
-        feature_word = lemma_j
-    else:
-        # Feature neuron
-        feature_word = word_j.lower()
-        # Skip nouns as features when usePOS is enabled
-        if usePOS and pos_j in noun_pos_tags:
-            return
-
-    # Get feature neuron index for feature_word in this column
-    if feature_word not in observed_column.feature_word_to_index:
-        print("process_feature error: feature_word not in observed_column.feature_word_to_index: Should not happen as features are pre-detected: feature_word = ", feature_word)
-        return
-    else:
-        feature_index_in_observed_column = observed_column.feature_word_to_index[feature_word]
-        f_idx = sequence_observed_columns.feature_word_to_index[feature_word]
-
-    # Add feature index to activated set
-    activated_feature_indices.add(f_idx)
-
-    # Increment the strength of the feature neuron
-    if lowMem:
-        sequence_observed_columns.feature_neurons_strength[c_idx, f_idx] += 1
-        # Increase permanence exponentially
-        sequence_observed_columns.feature_neurons_permanence[c_idx, f_idx] = sequence_observed_columns.feature_neurons_permanence[c_idx, f_idx] ** 2
-        # Set activation trace to j1 sequences
-        sequence_observed_columns.feature_neurons_activation[c_idx, f_idx] = j1
-    else:
-        pass  # Not lowMem mode
-
-    # Create connections
-    if(useParallelProcessing):
-        # Prepare other concept indices and feature indices
-        other_concept_indices = []
-        other_feature_indices = []
-        for other_lemma, other_observed_column in observed_columns_dict.items():
-            other_c_idx = sequence_observed_columns.concept_name_to_index[other_lemma]
-            # Only connect to future or present columns
-            if other_c_idx >= c_idx:
-                other_features = list(sequence_observed_columns.feature_word_to_index.values())
-                other_concept_indices.extend([other_c_idx] * len(other_features))
-                other_feature_indices.extend(other_features)
-        other_concept_indices = torch.tensor(other_concept_indices, dtype=torch.long)
-        other_feature_indices = torch.tensor(other_feature_indices, dtype=torch.long)
-
-        # Filter out the same feature to avoid self-connections
-        mask = ~((other_concept_indices == c_idx) & (other_feature_indices == f_idx))
-        other_concept_indices = other_concept_indices[mask]
-        other_feature_indices = other_feature_indices[mask]
-
-        # Expand current feature index to match other features
-        feature_indices_expand = torch.full_like(other_feature_indices, f_idx)
-
-        # Update connection arrays
-        sequence_observed_columns.connection_strength[c_idx, feature_indices_expand, other_concept_indices, other_feature_indices] += 1
-        sequence_observed_columns.connection_permanence[c_idx, feature_indices_expand, other_concept_indices, other_feature_indices] = sequence_observed_columns.connection_permanence[c_idx, feature_indices_expand, other_concept_indices, other_feature_indices] ** 2
-        sequence_observed_columns.connection_activation[c_idx, feature_indices_expand, other_concept_indices, other_feature_indices] = j1
-    else:
-        # Non-parallel processing (similar adjustments needed)
-        pass
-
+        
 def update_activation(observed_columns_dict, sequence_observed_columns):
     # Update activation traces for feature neurons
     active_indices = sequence_observed_columns.feature_neurons_activation.nonzero(as_tuple=False)
