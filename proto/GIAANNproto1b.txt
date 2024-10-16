@@ -1,7 +1,7 @@
 DONE//do:
-o1 preview prompt 1b4c;
+o1 preview prompt 1b5a;
 
-v1b4c:
+v1b5a:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
 - Use the pytorch API for hardware acceleration of all arrays (for efficient parallel processing of connectivity). Do not initialise the array with a predetermined dictionary; dynamically populate the arrays as new dictionary words and relations are encountered. Will be discussed below.
 - Use vector graphics library such as networkx to always maintain a complete visualisation of the network (including active neurons). Only draw the parts of the network that are not empty.
@@ -54,86 +54,4 @@ CHATONLY; - Replace all connections modification code in the functions decrease_
 CHATONLY; - Introduce sequence observed columns object arrays to improve the efficiency of training. Create a sequence observed columns class (SequenceObservedColumns) that contains sequence observed columns object arrays which stack a feature subset of the observed columns object arrays for the current sequence. Sequence observed columns object arrays are created for each feature neuron and feature connection array type currently stored within the observed columns class objects for the current sequence. The sequence observed columns object arrays only contain the features identified for the sequence (not every column feature, as is the case with the observed columns object arrays). The feature neuron arrays in the sequence observed columns class are of 2D shape cs * fs, where cs is the number of concept columns in the sequence, and fs is the number of unique features in the sequence. The feature connection arrays in the sequence observed columns class are of 4D shape cs * fs * cs * fs. The first dimension of the sequence observed columns arrays corresponds to observed column index in the sequence being processed. All other dimensions are similar to those in the original observed column object arrays (except that they contain sequence subsets cs and fs (instead of using c and f). Create a dictionary in the sequence observed columns object which maps the concept name corresponding to each observed column stored in a sequence observed columns array (key) to its index in the array (value). Populate the observed columns objects with their array data when loading the observed columns (creation of new concept column or reading from disk), as currently implemented. Once every observed column for a sequence has been loaded the sequence observed column arrays are then populated. Converted all sentence processing code to use the sequence observed columns object arrays (instead of observed columns object arrays), and the code should these arrays by passing the sequence observed columns object between functions. When the sentence has finished processing the sequence observed columns object arrays are then used to repopulate the observed columns object arrays. The observed columns object arrays are then saved (writing to disk), as currently implemented.
 CHATONLY; - Parallelise all SequenceObservedColumns class operations (populate_arrays/update_observed_columns). Parallelise these serial operations by using appropriate mask arrays. Instead of using for loops, use array operations.
 CHATONLY; - Parallelise the execution of process_feature. Instead of using the for loop, use pytorch array operations.
-
----
-Parallelise the execution of process_feature. Instead of using the for loop, use pytorch array operations.
-
-Existing Code:
-
-for j in range(start, i):
-    process_feature(observed_column, i, j, doc, lemmas, pos_tags, activated_feature_indices, observed_columns_dict, sequence_observed_columns, c_idx)
-
-def process_feature(observed_column, i, j, doc, lemmas, pos_tags, activated_feature_indices, observed_columns_dict, sequence_observed_columns, c_idx):
-    """
-    Helper function to process a feature at position j for the concept at position i.
-    """
-    global c, f, lowMem, global_feature_neurons_strength, global_feature_neurons_permanence, global_feature_neurons_activation
-    lemma_i = lemmas[i]
-    lemma_j = lemmas[j]
-    pos_j = pos_tags[j]
-    token_j = doc[j]
-    word_j = token_j.text
-
-    if(i == j):
-        # Concept neuron
-        feature_word = lemma_j
-    else:
-        # Feature neuron
-        feature_word = word_j.lower()
-        # Skip nouns as features when usePOS is enabled
-        if usePOS and pos_j in noun_pos_tags:
-            return
-
-    # Get feature neuron index for feature_word in this column
-    if feature_word not in observed_column.feature_word_to_index:
-        print("process_feature error: feature_word not in observed_column.feature_word_to_index: Should not happen as features are pre-detected: feature_word = ", feature_word)
-        return
-    else:
-        feature_index_in_observed_column = observed_column.feature_word_to_index[feature_word]
-        f_idx = sequence_observed_columns.feature_word_to_index[feature_word]
-
-    # Add feature index to activated set
-    activated_feature_indices.add(f_idx)
-
-    # Increment the strength of the feature neuron
-    if lowMem:
-        sequence_observed_columns.feature_neurons_strength[c_idx, f_idx] += 1
-        # Increase permanence exponentially
-        sequence_observed_columns.feature_neurons_permanence[c_idx, f_idx] = sequence_observed_columns.feature_neurons_permanence[c_idx, f_idx] ** 2
-        # Set activation trace to j1 sequences
-        sequence_observed_columns.feature_neurons_activation[c_idx, f_idx] = j1
-    else:
-        pass  # Not lowMem mode
-
-    # Create connections
-    if(useParallelProcessing):
-        # Prepare other concept indices and feature indices
-        other_concept_indices = []
-        other_feature_indices = []
-        for other_lemma, other_observed_column in observed_columns_dict.items():
-            other_c_idx = sequence_observed_columns.concept_name_to_index[other_lemma]
-            # Only connect to future or present columns
-            if other_c_idx >= c_idx:
-                other_features = list(sequence_observed_columns.feature_word_to_index.values())
-                other_concept_indices.extend([other_c_idx] * len(other_features))
-                other_feature_indices.extend(other_features)
-        other_concept_indices = torch.tensor(other_concept_indices, dtype=torch.long)
-        other_feature_indices = torch.tensor(other_feature_indices, dtype=torch.long)
-
-        # Filter out the same feature to avoid self-connections
-        mask = ~((other_concept_indices == c_idx) & (other_feature_indices == f_idx))
-        other_concept_indices = other_concept_indices[mask]
-        other_feature_indices = other_feature_indices[mask]
-
-        # Expand current feature index to match other features
-        feature_indices_expand = torch.full_like(other_feature_indices, f_idx)
-
-        # Update connection arrays
-        sequence_observed_columns.connection_strength[c_idx, feature_indices_expand, other_concept_indices, other_feature_indices] += 1
-        sequence_observed_columns.connection_permanence[c_idx, feature_indices_expand, other_concept_indices, other_feature_indices] = sequence_observed_columns.connection_permanence[c_idx, feature_indices_expand, other_concept_indices, other_feature_indices] ** 2
-        sequence_observed_columns.connection_activation[c_idx, feature_indices_expand, other_concept_indices, other_feature_indices] = j1
-    else:
-        # Non-parallel processing (similar adjustments needed)
-        pass
-		
-
+MANUAL; - Parallelise the execution of process_concept_words. Instead of using the for loop, use pytorch array operations.
