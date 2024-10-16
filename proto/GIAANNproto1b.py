@@ -9,20 +9,30 @@ import os
 import pickle
 import numpy as np
 
-# Download required NLTK data
-nltk.download('punkt')
-nltk.download('wordnet')
-nltk.download('omw-1.4')
-
-from nltk.corpus import wordnet as wn
-from nltk.tokenize import sent_tokenize
-
 # Set boolean variables as per specification
 useInference = False  # Disable useInference mode
 lowMem = True		 # Enable lowMem mode (can only be used when useInference is disabled)
 usePOS = True		 # Enable usePOS mode
 useParallelProcessing = True	#mandatory (else restore original code pre-GIAANNproto1b3a)
 useSaveData = False
+
+useDedicatedFeatureLists = False
+if usePOS and not lowMem:
+	useDedicatedFeatureLists = True
+useDedicatedConceptNames = False
+if usePOS:
+	useDedicatedConceptNames = True	#same word can have different pos making it classed as an instance features or concept feature
+	concept_prefix = "C_"
+	
+if(useDedicatedFeatureLists):
+	nltk.download('punkt')
+	nltk.download('wordnet')
+	nltk.download('omw-1.4')
+	from nltk.corpus import wordnet as wn
+	from nltk.tokenize import sent_tokenize
+
+# Initialize spaCy model
+nlp = spacy.load('en_core_web_sm')
 
 # Paths for saving data
 concept_columns_dict_file = 'concept_columns_dict.pkl'
@@ -35,7 +45,7 @@ if not lowMem:
 	feature_neurons_permanence_file = 'global_feature_neurons_permanence.pt'
 	feature_neurons_activation_file = 'global_feature_neurons_activation.pt'
 
-if usePOS and not lowMem:
+if useDedicatedFeatureLists:
 	# Obtain lists of nouns and non-nouns using the NLTK wordnet library
 	nouns = set()
 	for synset in wn.all_synsets('n'):
@@ -75,8 +85,8 @@ else:
 	concept_features_dict[variableConceptNeuronFeatureName] = len(concept_features_dict)
 	f = 1  # Will be updated dynamically based on c
 
-	if usePOS and not lowMem:
-		print("error: usePOS and not lowMem case not yet coded - need to set f and populate concept_features_list/concept_features_dict etc")
+	if useDedicatedFeatureLists:
+		print("error: useDedicatedFeatureLists case not yet coded - need to set f and populate concept_features_list/concept_features_dict etc")
 		exit()
 		# f = max_num_non_nouns + 1  # Maximum number of non-nouns in an English dictionary, plus the concept neuron of each column
   
@@ -90,9 +100,6 @@ if not lowMem:
 		global_feature_neurons_strength = torch.zeros(c, f)
 		global_feature_neurons_permanence = torch.full((c, f), 3, dtype=torch.int32)  # Initialize permanence to z1=3
 		global_feature_neurons_activation = torch.zeros(c, f, dtype=torch.int32)  # Activation trace
-
-# Initialize spaCy model
-nlp = spacy.load('en_core_web_sm')
 
 # Define POS tag sets for nouns and non-nouns
 noun_pos_tags = {'NOUN', 'PROPN'}
@@ -445,27 +452,25 @@ def process_dataset(dataset):
 
 def process_article(article):
 	global sentence_count
-	sentences = sent_tokenize(article['text'])
-	for sentence in sentences:
+	#sentences = sent_tokenize(article['text'])
+	sentences = nlp(article['text'])
+	for sentence in sentences.sents:
 		process_sentence(sentence)
 		if sentence_count >= max_sentences:
 			break
 
-def process_sentence(sentence):
+def process_sentence(doc):
 	global sentence_count, c, f, concept_columns_dict, concept_columns_list, concept_features_dict, concept_features_list
-	print(f"Processing sentence: {sentence}")
+	print(f"Processing sentence: {doc.text}")
 
 	# Refresh the observed columns dictionary for each new sequence
 	observed_columns_dict = {}  # key: lemma, value: ObservedColumn
-
-	# Process the sentence with spaCy
-	doc = nlp(sentence)
 
 	# First pass: Extract words, lemmas, POS tags, and update concept_columns_dict and c
 	words, lemmas, pos_tags = first_pass(doc)
 
 	# When usePOS is enabled, detect all possible new features in the sequence
-	if not (usePOS and not lowMem):
+	if not (useDedicatedFeatureLists):
 		detect_new_features(words, lemmas, pos_tags)
 		
 	# Second pass: Create observed_columns_dict
@@ -508,13 +513,11 @@ def first_pass(doc):
 		lemma = token.lemma_.lower()
 		pos = token.pos_  # Part-of-speech tag
 
-		words.append(word)
-		lemmas.append(lemma)
-		pos_tags.append(pos)
-
 		if usePOS:
 			if pos in noun_pos_tags:
 				# Only assign unique concept columns for nouns
+				if(useDedicatedConceptNames):
+					lemma = concept_prefix + lemma
 				if lemma not in concept_columns_dict:
 					# Add to concept columns dictionary
 					concept_columns_dict[lemma] = c
@@ -529,6 +532,10 @@ def first_pass(doc):
 				c += 1
 				new_concepts_added = True
 
+		words.append(word)
+		lemmas.append(lemma)
+		pos_tags.append(pos)
+		
 	# If new concept columns have been added, expand arrays as needed
 	if new_concepts_added:
 		if not lowMem:
@@ -644,7 +651,7 @@ def process_concept_words(doc, words, lemmas, pos_tags, observed_columns_dict, s
 		prev_concept_exists = prev_concept_positions >= 0
 		prev_concept_positions = prev_concept_positions.clamp(min=0)
 		prev_concept_indices = torch.where(prev_concept_exists, concept_indices_sorted[prev_concept_positions], torch.zeros_like(concept_indices))
-		dist_to_prev_concept = torch.where(prev_concept_exists, concept_indices - prev_concept_indices, concept_indices) #If no previous concept, distance is the index itself
+		dist_to_prev_concept = torch.where(prev_concept_exists, concept_indices - prev_concept_indices, concept_indices+1) #If no previous concept, distance is the index itself
 		
 		# Find next concept indices for each concept index
 		next_concept_positions = torch.searchsorted(concept_indices_sorted, concept_indices, right=True)
@@ -659,7 +666,7 @@ def process_concept_words(doc, words, lemmas, pos_tags, observed_columns_dict, s
 
 	# Calculate start and end indices for each concept word
 	if usePOS:
-		start_indices = (concept_indices - dist_to_prev_concept).clamp(min=0)
+		start_indices = (concept_indices - dist_to_prev_concept + 1).clamp(min=0)
 		end_indices = (concept_indices + dist_to_next_concept).clamp(max=len(doc))
 	else:
 		start_indices = (concept_indices - q).clamp(min=0)
@@ -668,7 +675,7 @@ def process_concept_words(doc, words, lemmas, pos_tags, observed_columns_dict, s
 	process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, observed_columns_dict, sequence_observed_columns, concept_indices)
    
 def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, observed_columns_dict, sequence_observed_columns, concept_indices):
-
+	
 	'''
 	#not possible as sequence_observed_columns feature arrays are only defined for sequence features, not all sequence words;
 	#convert start/end indices to active features arrays
@@ -688,11 +695,11 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, o
 		for j in range(start_indices[i], end_indices[i]):	#sequence word index
 			feature_word = words[j].lower()
 			feature_lemma = lemmas[j]
-			if(feature_word in sequence_observed_columns.feature_word_to_index):
-				sequence_feature_index = sequence_observed_columns.feature_word_to_index[feature_word]
-				feature_neurons_active[sequence_concept_index, sequence_feature_index] = 1
-			elif(feature_lemma in sequence_observed_columns.feature_word_to_index):	#feature_lemma test is required for concept neurons
+			if(feature_lemma in sequence_observed_columns.feature_word_to_index):	#feature_lemma test is required for concept neurons
 				sequence_feature_index = sequence_observed_columns.feature_word_to_index[feature_lemma]
+				feature_neurons_active[sequence_concept_index, sequence_feature_index] = 1
+			elif(feature_word in sequence_observed_columns.feature_word_to_index):
+				sequence_feature_index = sequence_observed_columns.feature_word_to_index[feature_word]
 				feature_neurons_active[sequence_concept_index, sequence_feature_index] = 1
 	#feature_neurons_active[:, feature_index_concept_neuron] = 1	#always use the concept neuron feature of each column during training	#index 0 is not reserved
 	feature_neurons_inactive = 1 - feature_neurons_active
