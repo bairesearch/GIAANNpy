@@ -41,10 +41,32 @@ concept_features_dict_file = 'concept_features_dict.pkl'
 observed_columns_dir = 'observed_columns'
 os.makedirs(observed_columns_dir, exist_ok=True)
 
+#common array indices
+array_index_properties_strength = 0
+array_index_properties_permanence = 1
+array_index_properties_activation = 2
+array_index_type_all = 0
+array_type = torch.float32	#torch.long	#torch.float32
+
+# Define POS tag sets for nouns and non-nouns
+noun_pos_tags = {'NOUN', 'PROPN'}
+non_noun_pos_tags = {'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X'}
+
+# Define constants for permanence and activation trace
+z1 = 3  # Initial permanence value
+z2 = 1  # Decrement value when not activated
+j1 = 5   # Activation trace duration
+
+# Initialize NetworkX graph for visualization
+G = nx.Graph()
+
+# For the purpose of the example, process a limited number of sentences
+sentence_count = 0
+max_sentences = 1000  # Adjust as needed
+
+
 if not lowMem:
-	feature_neurons_strength_file = 'global_feature_neurons_strength.pt'
-	feature_neurons_permanence_file = 'global_feature_neurons_permanence.pt'
-	feature_neurons_activation_file = 'global_feature_neurons_activation.pt'
+	feature_neurons_file = 'global_feature_neurons.pt'
 
 if useDedicatedFeatureLists:
 	# Obtain lists of nouns and non-nouns using the NLTK wordnet library
@@ -93,41 +115,22 @@ else:
   
 # Initialize global feature neuron arrays if lowMem is disabled
 if not lowMem:
-	if os.path.exists(feature_neurons_strength_file):
-		global_feature_neurons_strength = torch.load(feature_neurons_strength_file)
-		global_feature_neurons_permanence = torch.load(feature_neurons_permanence_file)
-		global_feature_neurons_activation = torch.load(feature_neurons_activation_file)
+	if os.path.exists(feature_neurons_file):
+		global_feature_neurons = torch.load(feature_neurons_file)
 	else:
-		global_feature_neurons_strength = torch.zeros(c, f)
-		global_feature_neurons_permanence = torch.full((c, f), 3, dtype=torch.int32)  # Initialize permanence to z1=3
-		global_feature_neurons_activation = torch.zeros(c, f, dtype=torch.int32)  # Activation trace
-
-# Define POS tag sets for nouns and non-nouns
-noun_pos_tags = {'NOUN', 'PROPN'}
-non_noun_pos_tags = {'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X'}
-
-# Define constants for permanence and activation trace
-z1 = 3  # Initial permanence value
-z2 = 1  # Decrement value when not activated
-j1 = 5   # Activation trace duration
+		global_feature_neurons = SequenceObservedColumns.initialiseFeatureNeuronsSequence(c, f)
 
 # Define the ObservedColumn class
 class ObservedColumn:
 	"""
-	Create a class defining observed columns. The observed column class contains an index to the
-	dataset concept column dictionary. The observed column class contains a list of feature
-	connection arrays. The observed column class also contains a list of feature neuron arrays
-	when lowMem mode is enabled.
+	Create a class defining observed columns. The observed column class contains an index to the dataset concept column dictionary. The observed column class contains a list of feature connection arrays. The observed column class also contains a list of feature neuron arrays when lowMem mode is enabled.
 	"""
 	def __init__(self, concept_index, lemma):
 		self.concept_index = concept_index  # Index to the concept columns dictionary
 
 		if lowMem:
-			# If lowMem is enabled, the observed columns contain a list of arrays (pytorch)
-			# of f feature neurons, where f is the maximum number of feature neurons per column.
-			self.feature_neurons_strength = torch.zeros(f)
-			self.feature_neurons_permanence = torch.full((f,), z1, dtype=torch.int32)  # Initialize permanence to z1=3
-			self.feature_neurons_activation = torch.zeros(f, dtype=torch.int32)  # Activation trace counters
+			# If lowMem is enabled, the observed columns contain a list of arrays (pytorch) of f feature neurons, where f is the maximum number of feature neurons per column.
+			self.feature_neurons = self.initialiseFeatureNeurons(f)
 
 		# Map from feature words to indices in feature neurons
 		self.feature_word_to_index = {}  # Maps feature words to indices
@@ -136,12 +139,8 @@ class ObservedColumn:
 		self.feature_word_to_index[lemma] = 0
 		self.feature_index_to_word[0] = lemma
 
-		# Store all connections for each source column in a list of integer feature connection arrays,
-		# each of size f * c * f, where c is the length of the dictionary of columns, and f is the maximum
-		# number of feature neurons.
-		self.connection_strength = torch.zeros(f, c, f, dtype=torch.int32)
-		self.connection_permanence = torch.full((f, c, f), z1, dtype=torch.int32)  # Initialize permanence to z1=3
-		self.connection_activation = torch.zeros(f, c, f, dtype=torch.int32)  # Activation trace counters
+		# Store all connections for each source column in a list of integer feature connection arrays, each of size f * c * f, where c is the length of the dictionary of columns, and f is the maximum number of feature neurons.
+		self.feature_connections = self.initialiseFeatureConnections(c, f) 
 
 		for feature_index in range(1, f, 1):
 			feature_word = concept_features_list[feature_index]
@@ -149,35 +148,46 @@ class ObservedColumn:
 			self.feature_index_to_word[feature_index] = feature_word
 			self.next_feature_index += 1
 
+	@staticmethod
+	def initialiseFeatureNeurons(f):
+		feature_neurons_strength = torch.zeros(f, dtype=array_type)
+		feature_neurons_permanence = torch.full((f,), z1, dtype=array_type)  # Initialize permanence to z1=3
+		feature_neurons_activation = torch.zeros(f, dtype=array_type)  # Activation trace counters
+		feature_neurons = torch.stack([feature_neurons_strength, feature_neurons_permanence, feature_neurons_activation])
+		feature_neurons = feature_neurons.unsqueeze(1)	#add type dimension (action, condition, quality, modifier etc) #not currently used
+		return feature_neurons
+
+	@staticmethod
+	def initialiseFeatureConnections(c, f):
+		connection_strength = torch.zeros(f, c, f, dtype=array_type)
+		connection_permanence = torch.full((f, c, f), z1, dtype=array_type)  # Initialize permanence to z1=3
+		connection_activation = torch.zeros(f, c, f, dtype=array_type)  # Activation trace counters
+		feature_connections = torch.stack([connection_strength, connection_permanence, connection_activation])
+		feature_connections = feature_connections.unsqueeze(1)	#add type dimension (action, condition, quality, modifier etc) #not currently used
+		return feature_connections
+	
 	def resize_concept_arrays(self, new_c):
-		load_c = self.connection_strength.shape[1]
+		load_c = self.feature_connections.shape[3]
 		if new_c > load_c:
 			extra_cols = new_c - load_c
-			# Expand along dimension 1 (columns)
-			self.connection_strength = torch.cat([self.connection_strength, torch.zeros(self.connection_strength.shape[0], extra_cols, self.connection_strength.shape[2], dtype=torch.int32)], dim=1)
-			self.connection_permanence = torch.cat([self.connection_permanence, torch.full((self.connection_permanence.shape[0], extra_cols, self.connection_permanence.shape[2]), z1, dtype=torch.int32)], dim=1)
-			self.connection_activation = torch.cat([self.connection_activation, torch.zeros(self.connection_activation.shape[0], extra_cols, self.connection_activation.shape[2], dtype=torch.int32)], dim=1)
+			# Expand along dimension 3
+			self.feature_connections = torch.cat([self.feature_connections, torch.zeros(self.feature_connections.shape[0], self.feature_connections.shape[1], self.feature_connections.shape[2], extra_cols, self.feature_connections.shape[4], dtype=array_type)], dim=3)
 
 	def expand_feature_arrays(self, new_f):
-		load_f = self.connection_strength.shape[0]	# or self.connection_strength.shape[2]	   
+		load_f = self.feature_connections.shape[2]	# or self.feature_connections.shape[4]	   
 		if new_f > load_f:
 			extra_features = new_f - load_f
 			
-			# Expand along dimension 0 (rows) and dimension 2
-			self.connection_strength = torch.cat([self.connection_strength, torch.zeros(extra_features, self.connection_strength.shape[1], self.connection_strength.shape[2], dtype=torch.int32)], dim=0)
-			self.connection_permanence = torch.cat([self.connection_permanence, torch.full((extra_features, self.connection_permanence.shape[1], self.connection_permanence.shape[2]), z1, dtype=torch.int32)], dim=0)
-			self.connection_activation = torch.cat([self.connection_activation, torch.zeros(extra_features, self.connection_activation.shape[1], self.connection_activation.shape[2], dtype=torch.int32)], dim=0)
+			# Expand along dimension 2
+			self.feature_connections = torch.cat([self.feature_connections, torch.zeros(self.feature_connections.shape[0], self.feature_connections.shape[1], extra_features, self.feature_connections.shape[3], self.feature_connections.shape[4], dtype=array_type)], dim=2)
 
-			# Also expand along dimension 2
-			self.connection_strength = torch.cat([self.connection_strength, torch.zeros(self.connection_strength.shape[0], self.connection_strength.shape[1], extra_features, dtype=torch.int32)], dim=2)
-			self.connection_permanence = torch.cat([self.connection_permanence, torch.full((self.connection_permanence.shape[0], self.connection_permanence.shape[1], extra_features), z1, dtype=torch.int32)], dim=2)
-			self.connection_activation = torch.cat([self.connection_activation, torch.zeros(self.connection_activation.shape[0], self.connection_activation.shape[1], extra_features, dtype=torch.int32)], dim=2)
+			# Also expand along dimension 4
+			self.feature_connections = torch.cat([self.feature_connections, torch.zeros(self.feature_connections.shape[0], self.feature_connections.shape[1], self.feature_connections.shape[2], self.feature_connections.shape[3], extra_features, dtype=array_type)], dim=4)
 
 			if lowMem:
-				self.feature_neurons_strength = torch.cat([self.feature_neurons_strength, torch.zeros(extra_features)], dim=0)
-				self.feature_neurons_permanence = torch.cat([self.feature_neurons_permanence, torch.full((extra_features,), z1, dtype=torch.int32)], dim=0)
-				self.feature_neurons_activation = torch.cat([self.feature_neurons_activation, torch.zeros(extra_features, dtype=torch.int32)], dim=0)
- 
+				extra_feature_neurons = self.initialiseFeatureNeurons(extra_features)
+				self.feature_neurons = torch.cat([self.feature_neurons, extra_feature_neurons], dim=2)
+
 			for feature_index in range(load_f, new_f, 1):
 				feature_word = concept_features_list[feature_index]
 				self.feature_word_to_index[feature_word] = feature_index
@@ -198,13 +208,9 @@ class ObservedColumn:
 		with open(os.path.join(observed_columns_dir, f"{self.concept_index}_data.pkl"), 'wb') as f:
 			pickle.dump(data, f)
 		# Save the tensors using torch.save
-		torch.save(self.connection_strength, os.path.join(observed_columns_dir, f"{self.concept_index}_connection_strength.pt"))
-		torch.save(self.connection_permanence, os.path.join(observed_columns_dir, f"{self.concept_index}_connection_permanence.pt"))
-		torch.save(self.connection_activation, os.path.join(observed_columns_dir, f"{self.concept_index}_connection_activation.pt"))
+		torch.save(self.feature_connections, os.path.join(observed_columns_dir, f"{self.concept_index}_feature_connections.pt"))
 		if lowMem:
-			torch.save(self.feature_neurons_strength, os.path.join(observed_columns_dir, f"{self.concept_index}_feature_neurons_strength.pt"))
-			torch.save(self.feature_neurons_permanence, os.path.join(observed_columns_dir, f"{self.concept_index}_feature_neurons_permanence.pt"))
-			torch.save(self.feature_neurons_activation, os.path.join(observed_columns_dir, f"{self.concept_index}_feature_neurons_activation.pt"))
+			torch.save(self.feature_neurons, os.path.join(observed_columns_dir, f"{self.concept_index}_feature_neurons.pt"))
 
 	@classmethod
 	def load_from_disk(cls, concept_index, lemma):
@@ -219,13 +225,9 @@ class ObservedColumn:
 		instance.feature_index_to_word = data['feature_index_to_word']
 		instance.next_feature_index = data['next_feature_index']
 		# Load the tensors
-		instance.connection_strength = torch.load(os.path.join(observed_columns_dir, f"{concept_index}_connection_strength.pt"))
-		instance.connection_permanence = torch.load(os.path.join(observed_columns_dir, f"{concept_index}_connection_permanence.pt"))
-		instance.connection_activation = torch.load(os.path.join(observed_columns_dir, f"{concept_index}_connection_activation.pt"))
+		instance.feature_connections = torch.load(os.path.join(observed_columns_dir, f"{concept_index}_feature_connections.pt"))
 		if lowMem:
-			instance.feature_neurons_strength = torch.load(os.path.join(observed_columns_dir, f"{concept_index}_feature_neurons_strength.pt"))
-			instance.feature_neurons_permanence = torch.load(os.path.join(observed_columns_dir, f"{concept_index}_feature_neurons_permanence.pt"))
-			instance.feature_neurons_activation = torch.load(os.path.join(observed_columns_dir, f"{concept_index}_feature_neurons_activation.pt"))
+			instance.feature_neurons = torch.load(os.path.join(observed_columns_dir, f"{concept_index}_feature_neurons.pt"))
 		return instance
 
 # Define the SequenceObservedColumns class
@@ -261,24 +263,35 @@ class SequenceObservedColumns:
 				self.feature_index_map[(lemma, feature_word)] = f_idx
 
 		# Initialize arrays
-		self.feature_neurons_strength = torch.zeros(self.cs, self.fs)
-		self.feature_neurons_permanence = torch.full((self.cs, self.fs), z1, dtype=torch.int32)
-		self.feature_neurons_activation = torch.zeros(self.cs, self.fs, dtype=torch.int32)
-
-		self.connection_strength = torch.zeros(self.cs, self.fs, self.cs, self.fs, dtype=torch.int32)
-		self.connection_permanence = torch.full((self.cs, self.fs, self.cs, self.fs), z1, dtype=torch.int32)
-		self.connection_activation = torch.zeros(self.cs, self.fs, self.cs, self.fs, dtype=torch.int32)
+		self.feature_neurons = self.initialiseFeatureNeuronsSequence(self.cs, self.fs)
+		self.feature_connections = self.initialiseFeatureConnectionsSequence(self.cs, self.fs)
 
 		# Populate arrays with data from observed_columns_dict
 		self.populate_arrays(observed_columns_dict)
 
+	@staticmethod
+	def initialiseFeatureNeuronsSequence(cs, fs):
+		feature_neurons_strength = torch.zeros(cs, fs, dtype=array_type)
+		feature_neurons_permanence = torch.full((cs, fs), z1, dtype=array_type)
+		feature_neurons_activation = torch.zeros(cs, fs, dtype=array_type)
+		feature_neurons = torch.stack([feature_neurons_strength, feature_neurons_permanence, feature_neurons_activation])
+		feature_neurons = feature_neurons.unsqueeze(1)	#add type dimension (action, condition, quality, modifier etc) #not currently used
+		return feature_neurons
+
+	@staticmethod
+	def initialiseFeatureConnectionsSequence(cs, fs):
+		connection_strength = torch.zeros(cs, fs, cs, fs, dtype=array_type)
+		connection_permanence = torch.full((cs, fs, cs, fs), z1, dtype=array_type)
+		connection_activation = torch.zeros(cs, fs, cs, fs, dtype=array_type)
+		feature_connections = torch.stack([connection_strength, connection_permanence, connection_activation])
+		feature_connections = feature_connections.unsqueeze(1)	#add type dimension (action, condition, quality, modifier etc) #not currently used
+		return feature_connections
+	
 	def populate_arrays(self, observed_columns_dict):
 		# Collect indices and data for feature neurons
 		c_idx_list = []
 		f_idx_list = []
-		feature_strength_list = []
-		feature_permanence_list = []
-		feature_activation_list = []
+		feature_list = []
 
 		for lemma, observed_column in observed_columns_dict.items():
 			c_idx = self.concept_name_to_index[lemma]
@@ -291,28 +304,20 @@ class SequenceObservedColumns:
 			c_idx_list.append(torch.full((num_features,), c_idx, dtype=torch.long))
 			f_idx_list.append(f_idx_tensor)
 
-			feature_strength_list.append(observed_column.feature_neurons_strength[feature_indices_in_observed])
-			feature_permanence_list.append(observed_column.feature_neurons_permanence[feature_indices_in_observed])
-			feature_activation_list.append(observed_column.feature_neurons_activation[feature_indices_in_observed])
+			feature_list.append(observed_column.feature_neurons[:, :, feature_indices_in_observed])
 
 		# Concatenate lists to tensors
 		c_idx_tensor = torch.cat(c_idx_list)
 		f_idx_tensor = torch.cat(f_idx_list)
-		feature_strength_tensor = torch.cat(feature_strength_list)
-		feature_permanence_tensor = torch.cat(feature_permanence_list)
-		feature_activation_tensor = torch.cat(feature_activation_list)
+		feature_tensor = torch.cat(feature_list, dim=2)
 
 		if lowMem:
 			# Use advanced indexing to assign values
-			self.feature_neurons_strength[c_idx_tensor, f_idx_tensor] = feature_strength_tensor
-			self.feature_neurons_permanence[c_idx_tensor, f_idx_tensor] = feature_permanence_tensor
-			self.feature_neurons_activation[c_idx_tensor, f_idx_tensor] = feature_activation_tensor
+			self.feature_neurons[:, :, c_idx_tensor, f_idx_tensor] = feature_tensor
 
 		# Now handle connections
 		connection_indices = []
-		connection_strength_values = []
-		connection_permanence_values = []
-		connection_activation_values = []
+		connection_values = []
 
 		for lemma, observed_column in observed_columns_dict.items():
 			c_idx = self.concept_name_to_index[lemma]
@@ -342,15 +347,11 @@ class SequenceObservedColumns:
 				other_c_idx_flat = torch.full_like(other_f_idx_flat, other_c_idx, dtype=torch.long)
 
 				# Get the corresponding values from observed_column arrays
-				strength_values = observed_column.connection_strength[feature_idx_obs_flat, other_concept_index, other_feature_idx_obs_flat]
-				permanence_values = observed_column.connection_permanence[feature_idx_obs_flat, other_concept_index, other_feature_idx_obs_flat]
-				activation_values = observed_column.connection_activation[feature_idx_obs_flat, other_concept_index, other_feature_idx_obs_flat]
+				values = observed_column.feature_connections[:, :, feature_idx_obs_flat, other_concept_index, other_feature_idx_obs_flat]
 
 				# Append to lists
 				connection_indices.append((c_idx_flat, f_idx_flat, other_c_idx_flat, other_f_idx_flat))
-				connection_strength_values.append(strength_values)
-				connection_permanence_values.append(permanence_values)
-				connection_activation_values.append(activation_values)
+				connection_values.append(values)
 
 		# Concatenate tensors
 		c_idx_conn_tensor = torch.cat([idx[0] for idx in connection_indices])
@@ -358,14 +359,10 @@ class SequenceObservedColumns:
 		other_c_idx_conn_tensor = torch.cat([idx[2] for idx in connection_indices])
 		other_f_idx_conn_tensor = torch.cat([idx[3] for idx in connection_indices])
 
-		connection_strength_tensor = torch.cat(connection_strength_values)
-		connection_permanence_tensor = torch.cat(connection_permanence_values)
-		connection_activation_tensor = torch.cat(connection_activation_values)
+		connection_tensor = torch.cat(connection_values, dim=2)
 
 		# Use advanced indexing to assign connection values
-		self.connection_strength[c_idx_conn_tensor, f_idx_conn_tensor, other_c_idx_conn_tensor, other_f_idx_conn_tensor] = connection_strength_tensor
-		self.connection_permanence[c_idx_conn_tensor, f_idx_conn_tensor, other_c_idx_conn_tensor, other_f_idx_conn_tensor] = connection_permanence_tensor
-		self.connection_activation[c_idx_conn_tensor, f_idx_conn_tensor, other_c_idx_conn_tensor, other_f_idx_conn_tensor] = connection_activation_tensor
+		self.feature_connections[:, :, c_idx_conn_tensor, f_idx_conn_tensor, other_c_idx_conn_tensor, other_f_idx_conn_tensor] = connection_tensor
 
 	def update_observed_columns(self, observed_columns_dict):
 		# Update observed columns with data from sequence arrays
@@ -377,23 +374,17 @@ class SequenceObservedColumns:
 
 			if lowMem:
 				# Use advanced indexing to get values from self.feature_neurons_*
-				strength_values = self.feature_neurons_strength[c_idx, f_idx_tensor]
-				permanence_values = self.feature_neurons_permanence[c_idx, f_idx_tensor]
-				activation_values = self.feature_neurons_activation[c_idx, f_idx_tensor]
+				values = self.feature_neurons[:, :, c_idx, f_idx_tensor]
 
 				# Assign values to observed_column's feature_neurons_* arrays
-				observed_column.feature_neurons_strength[feature_indices_in_observed] = strength_values
-				observed_column.feature_neurons_permanence[feature_indices_in_observed] = permanence_values
-				observed_column.feature_neurons_activation[feature_indices_in_observed] = activation_values
+				observed_column.feature_neurons[:, :, feature_indices_in_observed] = values
 
 			# Now handle connections
 			conn_feature_indices_obs = []
 			conn_other_concept_indices = []
 			conn_other_feature_indices_obs = []
-			conn_strength_values = []
-			conn_permanence_values = []
-			conn_activation_values = []
-
+			conn_values = []
+			
 			for other_lemma, other_observed_column in observed_columns_dict.items():
 				other_c_idx = self.concept_name_to_index[other_lemma]
 				other_concept_index = other_observed_column.concept_index
@@ -412,37 +403,22 @@ class SequenceObservedColumns:
 				other_f_idx_flat = other_f_idx_mesh.reshape(-1)
 
 				# Get the corresponding values from self.connection_* arrays
-				strength_values = self.connection_strength[c_idx, f_idx_flat, other_c_idx, other_f_idx_flat]
-				permanence_values = self.connection_permanence[c_idx, f_idx_flat, other_c_idx, other_f_idx_flat]
-				activation_values = self.connection_activation[c_idx, f_idx_flat, other_c_idx, other_f_idx_flat]
+				values = self.feature_connections[:, :, c_idx, f_idx_flat, other_c_idx, other_f_idx_flat]
 
 				# Append data to lists
 				conn_feature_indices_obs.append(feature_idx_obs_flat)
 				conn_other_concept_indices.append(torch.full_like(feature_idx_obs_flat, other_concept_index, dtype=torch.long))
 				conn_other_feature_indices_obs.append(other_feature_idx_obs_flat)
-				conn_strength_values.append(strength_values)
-				conn_permanence_values.append(permanence_values)
-				conn_activation_values.append(activation_values)
+				conn_values.append(values)
 
 			# Concatenate lists to form tensors
 			conn_feature_indices_obs = torch.cat(conn_feature_indices_obs)
 			conn_other_concept_indices = torch.cat(conn_other_concept_indices)
 			conn_other_feature_indices_obs = torch.cat(conn_other_feature_indices_obs)
-			conn_strength_values = torch.cat(conn_strength_values)
-			conn_permanence_values = torch.cat(conn_permanence_values)
-			conn_activation_values = torch.cat(conn_activation_values)
+			conn_values = torch.cat(conn_values, dim=2)
 
 			# Assign values to observed_column's connection_* arrays using advanced indexing
-			observed_column.connection_strength[conn_feature_indices_obs, conn_other_concept_indices, conn_other_feature_indices_obs] = conn_strength_values
-			observed_column.connection_permanence[conn_feature_indices_obs, conn_other_concept_indices, conn_other_feature_indices_obs] = conn_permanence_values
-			observed_column.connection_activation[conn_feature_indices_obs, conn_other_concept_indices, conn_other_feature_indices_obs] = conn_activation_values
-
-# Initialize NetworkX graph for visualization
-G = nx.Graph()
-
-# For the purpose of the example, process a limited number of sentences
-sentence_count = 0
-max_sentences = 1000  # Adjust as needed
+			observed_column.feature_connections[:, :, conn_feature_indices_obs, conn_other_concept_indices, conn_other_feature_indices_obs] = conn_values
 
 def process_dataset(dataset):
 	global sentence_count
@@ -468,33 +444,34 @@ def process_sentence(doc):
 	observed_columns_dict = {}  # key: lemma, value: ObservedColumn
 
 	# First pass: Extract words, lemmas, POS tags, and update concept_columns_dict and c
-	words, lemmas, pos_tags = first_pass(doc)
+	concepts_found, words, lemmas, pos_tags = first_pass(doc)
 
-	# When usePOS is enabled, detect all possible new features in the sequence
-	if not (useDedicatedFeatureLists):
-		detect_new_features(words, lemmas, pos_tags)
-		
-	# Second pass: Create observed_columns_dict
-	observed_columns_dict = second_pass(lemmas, pos_tags)
+	if(concepts_found):
+		# When usePOS is enabled, detect all possible new features in the sequence
+		if not (useDedicatedFeatureLists):
+			detect_new_features(words, lemmas, pos_tags)
 
-	# Create the sequence observed columns object
-	sequence_observed_columns = SequenceObservedColumns(observed_columns_dict)
+		# Second pass: Create observed_columns_dict
+		observed_columns_dict = second_pass(lemmas, pos_tags)
 
-	# Process each concept word in the sequence
-	process_concept_words(doc, words, lemmas, pos_tags, observed_columns_dict, sequence_observed_columns)
+		# Create the sequence observed columns object
+		sequence_observed_columns = SequenceObservedColumns(observed_columns_dict)
 
-	# Update activation traces for feature neurons and connections
-	update_activation(observed_columns_dict, sequence_observed_columns)
+		# Process each concept word in the sequence
+		process_concept_words(doc, words, lemmas, pos_tags, observed_columns_dict, sequence_observed_columns)
 
-	# Visualize the complete graph every time a new sentence is parsed by the application.
-	visualize_graph(observed_columns_dict, sequence_observed_columns)
+		# Update activation traces for feature neurons and connections
+		#update_activation(observed_columns_dict, sequence_observed_columns)
 
-	# Update observed columns from sequence observed columns
-	sequence_observed_columns.update_observed_columns(observed_columns_dict)
+		# Visualize the complete graph every time a new sentence is parsed by the application.
+		visualize_graph(observed_columns_dict, sequence_observed_columns)
 
-	# Save observed columns to disk
-	if(useSaveData):
-		save_data(observed_columns_dict, concept_features_dict)
+		# Update observed columns from sequence observed columns
+		sequence_observed_columns.update_observed_columns(observed_columns_dict)
+
+		# Save observed columns to disk
+		if(useSaveData):
+			save_data(observed_columns_dict, concept_features_dict)
 
 	# Break if we've reached the maximum number of sentences
 	global sentence_count
@@ -503,12 +480,13 @@ def process_sentence(doc):
 def first_pass(doc):
 	global c, f, concept_columns_dict, concept_columns_list
 	if not lowMem:
-		global global_feature_neurons_strength, global_feature_neurons_permanence, global_feature_neurons_activation
+		global global_feature_neurons
 	words = []
 	lemmas = []
 	pos_tags = []
 	new_concepts_added = False
-
+	concepts_found = False
+	
 	for token in doc:
 		word = token.text
 		lemma = token.lemma_.lower()
@@ -517,6 +495,7 @@ def first_pass(doc):
 		if usePOS:
 			if pos in noun_pos_tags:
 				# Only assign unique concept columns for nouns
+				concepts_found = True
 				if(useDedicatedConceptNames):
 					lemma = concept_prefix + lemma
 				if lemma not in concept_columns_dict:
@@ -527,6 +506,7 @@ def first_pass(doc):
 					new_concepts_added = True
 		else:
 			# When usePOS is disabled, assign concept columns for every new lemma encountered
+			concepts_found = True
 			if lemma not in concept_columns_dict:
 				concept_columns_dict[lemma] = c
 				concept_columns_list.append(lemma)
@@ -541,13 +521,12 @@ def first_pass(doc):
 	if new_concepts_added:
 		if not lowMem:
 			# Expand global feature neuron arrays
-			if global_feature_neurons_strength.shape[0] < c:
-				extra_rows = c - global_feature_neurons_strength.shape[0]
-				global_feature_neurons_strength = torch.cat([global_feature_neurons_strength, torch.zeros(extra_rows, f)], dim=0)
-				global_feature_neurons_permanence = torch.cat([global_feature_neurons_permanence, torch.full((extra_rows, f), z1, dtype=torch.int32)], dim=0)
-				global_feature_neurons_activation = torch.cat([global_feature_neurons_activation, torch.zeros(extra_rows, f, dtype=torch.int32)], dim=0)
-
-	return words, lemmas, pos_tags
+			if global_feature_neurons.shape[2] < c:
+				extra_rows = c - global_feature_neurons.shape[2]
+				extra_global_feature_neurons = SequenceObservedColumns.initialiseFeatureNeuronsSequence(extra_rows, f)
+				global_feature_neurons = torch.cat([global_feature_neurons, extra_global_feature_neurons], dim=2)
+				
+	return concepts_found, words, lemmas, pos_tags
 
 def second_pass(lemmas, pos_tags):
 	observed_columns_dict = {}
@@ -586,7 +565,7 @@ def detect_new_features(words, lemmas, pos_tags):
 	When usePOS mode is enabled, detect all possible new features in the sequence
 	by searching for all new non-nouns in the sequence.
 	"""
-	global f, lowMem, global_feature_neurons_strength, global_feature_neurons_permanence, global_feature_neurons_activation
+	global f, lowMem, global_feature_neurons
 
 	num_new_features = 0
 	for j, (word_j, pos_j) in enumerate(zip(words, pos_tags)):
@@ -598,11 +577,10 @@ def detect_new_features(words, lemmas, pos_tags):
 
 	# Now, expand arrays accordingly
 	if not lowMem:
-		if f > global_feature_neurons_strength.shape[1]:
-			extra_cols = f - global_feature_neurons_strength.shape[1]
-			global_feature_neurons_strength = torch.cat([global_feature_neurons_strength, torch.zeros(global_feature_neurons_strength.shape[0], extra_cols)], dim=1)
-			global_feature_neurons_permanence = torch.cat([global_feature_neurons_permanence, torch.full((global_feature_neurons_permanence.shape[0], extra_cols), z1, dtype=torch.int32)], dim=1)
-			global_feature_neurons_activation = torch.cat([global_feature_neurons_activation, torch.zeros(global_feature_neurons_activation.shape[0], extra_cols, dtype=torch.int32)], dim=1)
+		if f > global_feature_neurons.shape[3]:
+			extra_cols = f - global_feature_neurons_strength.shape[3]
+			extra_global_feature_neurons = SequenceObservedColumns.initialiseFeatureNeuronsSequence(global_feature_neurons.shape[2], extra_cols)
+			global_feature_neurons = torch.cat([global_feature_neurons, extra_global_feature_neurons], dim=3)
 
 def process_feature_detection(j, word_j, pos_tags):
 	"""
@@ -627,11 +605,9 @@ def process_feature_detection(j, word_j, pos_tags):
 
 def process_concept_words(doc, words, lemmas, pos_tags, observed_columns_dict, sequence_observed_columns):
 	"""
-	For every concept word (lemma) in the sequence, identify every feature neuron in that column
-	that occurs q words before or after the concept word in the sequence, including the concept neuron.
-	This function has been parallelized using PyTorch array operations.
+	For every concept word (lemma) in the sequence, identify every feature neuron in that column that occurs q words before or after the concept word in the sequence, including the concept neuron. This function has been parallelized using PyTorch array operations.
 	"""
-	global c, f, lowMem, global_feature_neurons_strength, global_feature_neurons_permanence, global_feature_neurons_activation
+	global c, f, lowMem, global_feature_neurons
 
 	if not usePOS:
 		q = 5  # Fixed window size when not using POS tags
@@ -689,7 +665,7 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, o
  
 	cs = sequence_observed_columns.cs #will be different than len(concept_indices) if there are multiple instances of a concept in a sequence
 	fs = sequence_observed_columns.fs  #will be different than len(doc) as not every word in the sequence has a feature neuron assigned in the concept columns
-	feature_neurons_active = torch.zeros((cs, fs), dtype=torch.long)
+	feature_neurons_active = torch.zeros((cs, fs), dtype=array_type)
 	for i in range(concept_indices.shape[0]):
 		concept_lemma = lemmas[concept_indices[i]]
 		sequence_concept_index = sequence_observed_columns.concept_name_to_index[concept_lemma]
@@ -706,9 +682,9 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, o
 	 
 	if lowMem:
 		# Update feature neurons in sequence_observed_columns
-		sequence_observed_columns.feature_neurons_strength[:, :] += feature_neurons_active
-		sequence_observed_columns.feature_neurons_permanence[:, :] = feature_neurons_active*(sequence_observed_columns.feature_neurons_permanence ** 2) + feature_neurons_inactive*sequence_observed_columns.feature_neurons_permanence
-		sequence_observed_columns.feature_neurons_activation[:, :] = feature_neurons_active*j1
+		sequence_observed_columns.feature_neurons[array_index_properties_strength, array_index_type_all, :, :] += feature_neurons_active
+		sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all, :, :] = feature_neurons_active*(sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all] ** 2) + feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all]
+		sequence_observed_columns.feature_neurons[array_index_properties_activation, array_index_type_all, :, :] = feature_neurons_active*j1
 	else:
 		pass  # Not lowMem mode
 
@@ -716,9 +692,9 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, o
 	feature_connections_active = torch.matmul(feature_neurons_active_1d.unsqueeze(1), feature_neurons_active_1d.unsqueeze(0)).view(cs, fs, cs, fs)
 	feature_connections_inactive = 1 - feature_connections_active
 
-	sequence_observed_columns.connection_strength[:, :, :, :] += feature_connections_active
-	sequence_observed_columns.connection_permanence[:, :, :, :] = feature_connections_active*(sequence_observed_columns.connection_permanence ** 2) + feature_connections_inactive*sequence_observed_columns.connection_permanence
-	sequence_observed_columns.connection_activation[:, :, :, :] = feature_connections_active*j1
+	sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, :, :, :, :] += feature_connections_active
+	sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, :, :, :, :] = feature_connections_active*(sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all] ** 2) + feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all]
+	sequence_observed_columns.feature_connections[array_index_properties_activation, array_index_type_all, :, :, :, :] = feature_connections_active*j1
 
 	decrease_permanence(observed_columns_dict, sequence_observed_columns, feature_neurons_active, feature_neurons_inactive)
  
@@ -727,45 +703,45 @@ def decrease_permanence(observed_columns_dict, sequence_observed_columns, featur
 	fs = sequence_observed_columns.fs 
 	
 	# Decrease permanence for feature neurons not activated
-	sequence_observed_columns.feature_neurons_permanence[:, :] -= z2
-	sequence_observed_columns.feature_neurons_permanence = torch.clamp(sequence_observed_columns.feature_neurons_permanence, min=0)
+	sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all, :, :] -= z2
+	sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all] = torch.clamp(sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all], min=0)
 
-	feature_neurons_all = torch.ones((cs, fs), dtype=torch.long)
+	feature_neurons_all = torch.ones((cs, fs), dtype=array_type)
 	feature_neurons_all_1d = feature_neurons_all.view(cs*fs)
 	feature_neurons_active_1d = feature_neurons_active.view(cs*fs)
 	feature_neurons_inactive_1d = feature_neurons_inactive.view(cs*fs)
 	 
 	# Decrease permanence of connections from inactive feature neurons in column
 	feature_connections_decrease1 = torch.matmul(feature_neurons_inactive_1d.unsqueeze(1), feature_neurons_all_1d.unsqueeze(0)).view(cs, fs, cs, fs)
-	sequence_observed_columns.connection_permanence[:, :, :, :] -= feature_connections_decrease1
-	sequence_observed_columns.connection_permanence = torch.clamp(sequence_observed_columns.connection_permanence, min=0)
+	sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, :, :, :, :] -= feature_connections_decrease1
+	sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all] = torch.clamp(sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all], min=0)
 	
 	# Decrease permanence of inactive connections for activated features in column 
 	feature_connections_decrease2 = torch.matmul(feature_neurons_active_1d.unsqueeze(1), feature_neurons_inactive_1d.unsqueeze(0)).view(cs, fs, cs, fs)
-	sequence_observed_columns.connection_permanence[:, :, :, :] -= feature_connections_decrease2
-	sequence_observed_columns.connection_permanence = torch.clamp(sequence_observed_columns.connection_permanence, min=0)
+	sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, :, :, :, :] -= feature_connections_decrease2
+	sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all] = torch.clamp(sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all], min=0)
   
 def update_activation(observed_columns_dict, sequence_observed_columns):
 	# Update activation traces for feature neurons
-	active_indices = sequence_observed_columns.feature_neurons_activation.nonzero(as_tuple=False)
+	active_indices = sequence_observed_columns.feature_neurons[array_index_properties_activation, array_index_type_all].nonzero(as_tuple=False)
 	for idx in active_indices:
 		c_idx = idx[0].item()
 		f_idx = idx[1].item()
-		if sequence_observed_columns.feature_neurons_activation[c_idx, f_idx] > 0:
-			sequence_observed_columns.feature_neurons_activation[c_idx, f_idx] -= 1
-			if sequence_observed_columns.feature_neurons_activation[c_idx, f_idx] == 0:
+		if sequence_observed_columns.feature_neurons[array_index_properties_activation, array_index_type_all, c_idx, f_idx] > 0:
+			sequence_observed_columns.feature_neurons[array_index_properties_activation, array_index_type_all, c_idx, f_idx] -= 1
+			if sequence_observed_columns.feature_neurons[array_index_properties_activation, array_index_type_all, c_idx, f_idx] == 0:
 				pass  # Activation trace expired
 
 	# Update activation traces for connections
-	active_indices = sequence_observed_columns.connection_activation.nonzero(as_tuple=False)
+	active_indices = sequence_observed_columns.feature_connections[array_index_properties_activation, array_index_type_all].nonzero(as_tuple=False)
 	for idx in active_indices:
 		c_i = idx[0].item()
 		f_i = idx[1].item()
 		c_j = idx[2].item()
 		f_j = idx[3].item()
-		if sequence_observed_columns.connection_activation[c_i, f_i, c_j, f_j] > 0:
-			sequence_observed_columns.connection_activation[c_i, f_i, c_j, f_j] -= 1
-			if sequence_observed_columns.connection_activation[c_i, f_i, c_j, f_j] == 0:
+		if sequence_observed_columns.feature_connections[array_index_properties_activation, array_index_type_all, c_i, f_i, c_j, f_j] > 0:
+			sequence_observed_columns.feature_connections[array_index_properties_activation, array_index_type_all, c_i, f_i, c_j, f_j] -= 1
+			if sequence_observed_columns.feature_connections[array_index_properties_activation, array_index_type_all, c_i, f_i, c_j, f_j] == 0:
 				pass  # Activation trace expired
 
 def visualize_graph(observed_columns_dict, sequence_observed_columns):
@@ -785,8 +761,8 @@ def visualize_graph(observed_columns_dict, sequence_observed_columns):
 			neuron_color = 'blue' if feature_index_in_observed_column == 0 else 'cyan'
 			if lowMem:
 				if (f_idx < sequence_observed_columns.fs and
-					sequence_observed_columns.feature_neurons_strength[c_idx, f_idx] > 0 and
-					sequence_observed_columns.feature_neurons_permanence[c_idx, f_idx] > 0):
+					sequence_observed_columns.feature_neurons[array_index_properties_strength, array_index_type_all, c_idx, f_idx] > 0 and
+					sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all, c_idx, f_idx] > 0):
 					feature_node = f"{lemma}_{feature_word}_{f_idx}"
 					G.add_node(feature_node, pos=(x_offset, y_offset), color=neuron_color, label=feature_word)
 					y_offset += 1
@@ -813,8 +789,8 @@ def visualize_graph(observed_columns_dict, sequence_observed_columns):
 							other_f_idx = sequence_observed_columns.feature_word_to_index[other_feature_word]
 							if (f_idx < sequence_observed_columns.fs and
 								other_f_idx < sequence_observed_columns.fs and
-								sequence_observed_columns.connection_strength[c_idx, f_idx, c_idx, other_f_idx] > 0 and
-								sequence_observed_columns.connection_permanence[c_idx, f_idx, c_idx, other_f_idx] > 0):
+								sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, c_idx, f_idx, c_idx, other_f_idx] > 0 and
+								sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, c_idx, f_idx, c_idx, other_f_idx] > 0):
 								G.add_edge(source_node, target_node, color='yellow')
 
 		# External connections (orange)
@@ -831,8 +807,8 @@ def visualize_graph(observed_columns_dict, sequence_observed_columns):
 								other_f_idx = sequence_observed_columns.feature_word_to_index[other_feature_word]
 								if (f_idx < sequence_observed_columns.fs and
 									other_f_idx < sequence_observed_columns.fs and
-									sequence_observed_columns.connection_strength[c_idx, f_idx, other_c_idx, other_f_idx] > 0 and
-									sequence_observed_columns.connection_permanence[c_idx, f_idx, other_c_idx, other_f_idx] > 0):
+									sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, c_idx, f_idx, other_c_idx, other_f_idx] > 0 and
+									sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, c_idx, f_idx, other_c_idx, other_f_idx] > 0):
 									G.add_edge(source_node, target_node, color='orange')
 
 	# Get positions and colors for drawing
@@ -853,9 +829,7 @@ def save_data(observed_columns_dict, concept_features_dict):
 
 	# Save global feature neuron arrays if not lowMem
 	if not lowMem:
-		torch.save(global_feature_neurons_strength, feature_neurons_strength_file)
-		torch.save(global_feature_neurons_permanence, feature_neurons_permanence_file)
-		torch.save(global_feature_neurons_activation, feature_neurons_activation_file)
+		torch.save(global_feature_neurons, feature_neurons_file)
 
 	# Save concept columns dictionary to disk
 	with open(concept_columns_dict_file, 'wb') as f_out:

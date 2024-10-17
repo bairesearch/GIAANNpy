@@ -1,7 +1,7 @@
 DONE//do:
-o1 preview prompt 1b5c;
+o1 preview prompt 1b6a;
 
-v1b5c:
+v1b6a:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
 - Use the pytorch API for hardware acceleration of all arrays (for efficient parallel processing of connectivity). Do not initialise the array with a predetermined dictionary; dynamically populate the arrays as new dictionary words and relations are encountered. Will be discussed below.
 - Use vector graphics library such as networkx to always maintain a complete visualisation of the network (including active neurons). Only draw the parts of the network that are not empty.
@@ -57,3 +57,4 @@ CHATONLY; - Parallelise the execution of process_feature. Instead of using the f
 MANUAL; - Parallelise the execution of process_concept_words. Instead of using the for loop, use pytorch array operations.
 MANUAL; - Use spacy instead of nltk to parse sentences. Add useDedicatedConceptNames - same word can have different pos making it classed as an instance feature or concept feature. Upgrade process_features to prioritise concept feature detection over instance feature detection.
 MANUAL; - Patch process_features:feature_connections_active - only add connections for sequence activated neurons.
+MANUAL; - Add dimensions to neurons and connections arrays; properties (strength, permanence, activation, time etc), type (all; with provision for action, condition, quality, modifier, concept etc). Collapse strength, permanence, activation arrays into single array (properties dim).
