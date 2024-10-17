@@ -1,7 +1,7 @@
 DONE//do:
-o1 preview prompt 1b7a;
+o1 preview prompt 1b8a;
 
-v1b7a:
+v1b8a:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
 - Use the pytorch API for hardware acceleration of all arrays (for efficient parallel processing of connectivity). Do not initialise the array with a predetermined dictionary; dynamically populate the arrays as new dictionary words and relations are encountered. Will be discussed below.
 - Use vector graphics library such as networkx to always maintain a complete visualisation of the network (including active neurons). Only draw the parts of the network that are not empty.
@@ -59,3 +59,4 @@ MANUAL; - Use spacy instead of nltk to parse sentences. Add useDedicatedConceptN
 MANUAL; - Patch process_features:feature_connections_active - only add connections for sequence activated neurons.
 MANUAL; - Add dimensions to neurons and connections arrays; properties (strength, permanence, activation, time etc), type (all; with provision for action, condition, quality, modifier, concept etc). Collapse strength, permanence, activation arrays into single array (properties dim).
 MANUAL; - Add sequenceObservedColumnsUseSequenceFeaturesOnly - sequence observed columns arrays only store sequence features. Add drawSequenceObservedColumns - draw sequence observed columns (instead of complete observed columns).
+MANUAL; - Add useDedicatedConceptNames2 - Rename each concept neuron in observed columns/sequence observed columns to a replacement name variableConceptNeuronFeature, so that each observed column feature array has exactly the same set of features. Add SequenceObservedColumn.observed_columns_dict and SequenceObservedColumn.observed_columns_sequence_word_index_dict. Add ObservedColumn.concept_name and ObservedColumn.concept_sequence_word_index.
