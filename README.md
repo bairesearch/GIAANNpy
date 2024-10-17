@@ -14,8 +14,8 @@ MIT License
 
 ### Installation
 ```
+conda create -n pytorchsenv
 source activate pytorchsenv
-python ANNpt_main.py
 pip install networkx
 pip install matplotlib
 pip install yattag
@@ -29,9 +29,11 @@ pip install benepar
 ### Execution
 ```
 source activate pytorchsenv
-python3 GIAANNproto1a.py
+python3 GIAANNproto1b.py
 ```
 
 ### References
 
 Jamali, M., Grannan, B., Cai, J., Khanna, A.R., Muñoz, W., Caprara, I., Paulk, A.C., Cash, S.S., Fedorenko, E. and Williams, Z.M. (2024). Semantic encoding during language comprehension at single-cell resolution. Nature, 1-7.
+
+General Artificial Intelligence Method and Computer System (AU provisional) - 28 Mar 2012 (App No. 2012901230)
