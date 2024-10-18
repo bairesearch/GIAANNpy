@@ -8,6 +8,7 @@ from datasets import load_dataset
 import os
 import pickle
 import numpy as np
+import random
 torch.set_printoptions(threshold=float('inf'))
 
 # Set boolean variables as per specification
@@ -15,10 +16,11 @@ useInference = False  # Disable useInference mode
 lowMem = True		 # Enable lowMem mode (can only be used when useInference is disabled)
 usePOS = True		 # Enable usePOS mode
 useParallelProcessing = True	#mandatory (else restore original code pre-GIAANNproto1b3a)
-useSaveData = True
+useSaveData = False
 sequenceObservedColumnsUseSequenceFeaturesOnly = True	#sequence observed columns arrays only store sequence features.
 drawSequenceObservedColumns = False	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !sequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns
-	
+randomiseColumnFeatureXposition = True	#shuffle x position of column internal features such that their connections can be better visualised
+
 useDedicatedFeatureLists = False
 if usePOS and not lowMem:
 	useDedicatedFeatureLists = True
@@ -66,7 +68,7 @@ z2 = 1  # Decrement value when not activated
 j1 = 5   # Activation trace duration
 
 # Initialize NetworkX graph for visualization
-G = nx.Graph()
+G = nx.DiGraph()
 
 # For the purpose of the example, process a limited number of sentences
 sentence_count = 0
@@ -251,7 +253,7 @@ class SequenceObservedColumns:
 	"""
 	def __init__(self, words, lemmas, observed_columns_dict, observed_columns_sequence_word_index_dict):
 		self.observed_columns_dict = observed_columns_dict
-		self.observed_columns_sequence_word_index_dict = observed_columns_sequence_word_index_dict
+		self.observed_columns_sequence_word_index_dict = observed_columns_sequence_word_index_dict	#may be slightly longer than number of columns in sequence, if there are multiple instances of the same concept/noun lemma in the sequence
 		
 		# Map from concept names to indices in sequence arrays
 		self.concept_name_to_index = {}
@@ -667,6 +669,7 @@ def process_concept_words(doc, words, lemmas, pos_tags, sequence_observed_column
 	# Identify all concept word indices
 	concept_mask = torch.tensor([i in sequence_observed_columns.observed_columns_sequence_word_index_dict for i in range(len(lemmas))], dtype=torch.bool)
 	concept_indices = torch.nonzero(concept_mask).squeeze(1)
+	#concept_indices may be slightly longer than number of columns in sequence, if there are multiple instances of the same concept/noun lemma in the sequence
 	
 	if concept_indices.numel() == 0:
 		return  # No concept words to process
@@ -718,6 +721,8 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 	cs = sequence_observed_columns.cs #will be different than len(concept_indices) if there are multiple instances of a concept in a sequence
 	fs = sequence_observed_columns.fs  #will be different than len(doc) as not every word in the sequence has a feature neuron assigned in the concept columns
 	feature_neurons_active = torch.zeros((cs, fs), dtype=array_type)
+	feature_neurons_word_order = torch.zeros((cs, fs), dtype=torch.long)
+	columns_word_order = torch.zeros((cs), dtype=torch.long)
 	for i in range(concept_indices.shape[0]):
 		concept_lemma = lemmas[concept_indices[i]]
 		sequence_concept_index = sequence_observed_columns.concept_name_to_index[concept_lemma]
@@ -725,15 +730,17 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 			feature_word = words[j].lower()
 			feature_lemma = lemmas[j]
 			if(j in sequence_observed_columns.observed_columns_sequence_word_index_dict):	#test is required for concept neurons
+				columns_word_order[sequence_concept_index] = j
 				if(useDedicatedConceptNames2):
 					sequence_feature_index = sequence_observed_columns.feature_word_to_index[variableConceptNeuronFeatureName]
 				else:
 					sequence_feature_index = sequence_observed_columns.feature_word_to_index[feature_lemma]
 				feature_neurons_active[sequence_concept_index, sequence_feature_index] = 1
-				#print("feature_lemma concept set active = ", feature_lemma)
+				feature_neurons_word_order[sequence_concept_index, sequence_feature_index] = j
 			elif(feature_word in sequence_observed_columns.feature_word_to_index):
 				sequence_feature_index = sequence_observed_columns.feature_word_to_index[feature_word]
 				feature_neurons_active[sequence_concept_index, sequence_feature_index] = 1
+				feature_neurons_word_order[sequence_concept_index, sequence_feature_index] = j
 	feature_neurons_inactive = 1 - feature_neurons_active
 	 
 	if lowMem:
@@ -746,6 +753,27 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 
 	feature_neurons_active_1d = feature_neurons_active.view(cs*fs)
 	feature_connections_active = torch.matmul(feature_neurons_active_1d.unsqueeze(1), feature_neurons_active_1d.unsqueeze(0)).view(cs, fs, cs, fs)
+
+	#ensure word order is maintained (between connection source/target) for internal and external feature connections;
+	feature_neurons_word_order_expanded_1 = feature_neurons_word_order.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)  # For the first node
+	feature_neurons_word_order_expanded_2 = feature_neurons_word_order.view(1, 1, cs, fs).expand(cs, fs, cs, fs)  # For the second node
+	word_order_mask = feature_neurons_word_order_expanded_2 > feature_neurons_word_order_expanded_1
+	feature_connections_active = feature_connections_active * word_order_mask
+	
+	#ensure word order is maintained for connections between columns (does not support multiple same concepts in same sentence);
+	columns_word_order_expanded_1 = columns_word_order.view(cs, 1, 1, 1).expand(cs, fs, cs, fs)  # For the first node's cs index
+	columns_word_order_expanded_2 = columns_word_order.view(1, 1, cs, 1).expand(cs, fs, cs, fs)  # For the second node's cs index
+	columns_word_order_mask = columns_word_order_expanded_2 >= columns_word_order_expanded_1
+	feature_connections_active = feature_connections_active * columns_word_order_mask
+	
+	#ensure identical feature nodes are not connected together;
+	cs_indices_1 = torch.arange(cs).view(cs, 1, 1, 1).expand(cs, fs, cs, fs)  # First cs dimension
+	cs_indices_2 = torch.arange(cs).view(1, 1, cs, 1).expand(cs, fs, cs, fs)  # Second cs dimension
+	fs_indices_1 = torch.arange(fs).view(1, fs, 1, 1).expand(cs, fs, cs, fs)  # First fs dimension
+	fs_indices_2 = torch.arange(fs).view(1, 1, 1, fs).expand(cs, fs, cs, fs)  # Second fs dimension
+	identity_mask = (cs_indices_1 != cs_indices_2) | (fs_indices_1 != fs_indices_2)
+	feature_connections_active = feature_connections_active * identity_mask
+	
 	feature_connections_inactive = 1 - feature_connections_active
 
 	sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, :, :, :, :] += feature_connections_active
@@ -803,44 +831,65 @@ def update_activation(sequence_observed_columns):
 def visualize_graph(sequence_observed_columns):
 	G.clear()
 
-	if(drawSequenceObservedColumns):
-		# Draw concept columns
-		pos_dict = {}
-		x_offset = 0
-		for lemma, observed_column in sequence_observed_columns.observed_columns_dict.items():
-			concept_index = observed_column.concept_index
-			c_idx = sequence_observed_columns.concept_name_to_index[lemma]
+	# Draw concept columns
+	pos_dict = {}
+	x_offset = 0
+	for lemma, observed_column in sequence_observed_columns.observed_columns_dict.items():
+		concept_index = observed_column.concept_index
 
-			# Draw feature neurons
-			y_offset = 1
-			for feature_word, feature_index_in_observed_column in observed_column.feature_word_to_index.items():
-				if(useDedicatedConceptNames2):
-					if feature_word==variableConceptNeuronFeatureName:
-						neuron_color = 'blue'
-						neuron_name = observed_column.concept_name
-					else:
-						neuron_color = 'cyan'
-						neuron_name = feature_word
+		# Draw feature neurons
+		y_offset = 1
+		for feature_word, feature_index_in_observed_column in observed_column.feature_word_to_index.items():
+			conceptNeuronFeature = False
+			
+			if(useDedicatedConceptNames2):
+				if feature_word==variableConceptNeuronFeatureName:
+					neuron_color = 'blue'
+					neuron_name = observed_column.concept_name
+					conceptNeuronFeature = True
 				else:
-					neuron_color = 'blue' if feature_index_in_observed_column == 0 else 'cyan'
+					neuron_color = 'cyan'
 					neuron_name = feature_word
+			else:
+				if(feature_index_in_observed_column):
+					neuron_color = 'blue'
+					conceptNeuronFeature = True
+				else:
+					neuron_color = 'cyan'
+				neuron_name = feature_word
+				
+			featureActive = False
+			if(drawSequenceObservedColumns):
+				c_idx = sequence_observed_columns.concept_name_to_index[lemma]
 				if(feature_word in sequence_observed_columns.feature_word_to_index):
 					f_idx = sequence_observed_columns.feature_word_to_index[feature_word]
-					if lowMem:
-						if(f_idx < sequence_observed_columns.fs and sequence_observed_columns.feature_neurons[array_index_properties_strength, array_index_type_all, c_idx, f_idx] > 0 and sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all, c_idx, f_idx] > 0):
-							feature_node = f"{lemma}_{feature_word}_{f_idx}"
-							G.add_node(feature_node, pos=(x_offset, y_offset), color=neuron_color, label=neuron_name)
-							y_offset += 1
+					if(f_idx < sequence_observed_columns.fs and sequence_observed_columns.feature_neurons[array_index_properties_strength, array_index_type_all, c_idx, f_idx] > 0 and sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all, c_idx, f_idx] > 0):
+						featureActive = True
+			else:
+				c_idx = concept_columns_dict[lemma]
+				f_idx = feature_index_in_observed_column
+				if lowMem:
+					if(observed_column.feature_neurons[array_index_properties_strength, array_index_type_all, feature_index_in_observed_column] > 0 and observed_column.feature_neurons[array_index_properties_permanence, array_index_type_all, feature_index_in_observed_column] > 0):
+						featureActive = True
+			
+			if(featureActive):	
+				feature_node = f"{lemma}_{feature_word}_{f_idx}"
+				if(randomiseColumnFeatureXposition and not conceptNeuronFeature):
+					x_offset_shuffled = x_offset + random.uniform(-0.5, 0.5)
+				else:
+					x_offset_shuffled = x_offset
+				G.add_node(feature_node, pos=(x_offset_shuffled, y_offset), color=neuron_color, label=neuron_name)
+				y_offset += 1
 
-			# Draw rectangle around the column
-			plt.gca().add_patch(plt.Rectangle((x_offset - 0.5, -0.5), 1, max(y_offset, 1) + 0.5, fill=False, edgecolor='black'))
-			x_offset += 2  # Adjust x_offset for the next column
+		# Draw rectangle around the column
+		plt.gca().add_patch(plt.Rectangle((x_offset - 0.5, -0.5), 1, max(y_offset, 1) + 0.5, fill=False, edgecolor='black'))
+		x_offset += 2  # Adjust x_offset for the next column
 
-		# Draw connections
-		for lemma, observed_column in sequence_observed_columns.observed_columns_dict.items():
+	# Draw connections
+	for lemma, observed_column in sequence_observed_columns.observed_columns_dict.items():
+		if(drawSequenceObservedColumns):
 			concept_index = observed_column.concept_index
 			c_idx = sequence_observed_columns.concept_name_to_index[lemma]
-
 			# Internal connections (yellow)
 			for feature_word, feature_index_in_observed_column in observed_column.feature_word_to_index.items():
 				if(feature_word in sequence_observed_columns.feature_word_to_index):
@@ -855,7 +904,6 @@ def visualize_graph(sequence_observed_columns):
 										other_f_idx = sequence_observed_columns.feature_word_to_index[other_feature_word]
 										if(f_idx < sequence_observed_columns.fs and other_f_idx < sequence_observed_columns.fs and sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, c_idx, f_idx, c_idx, other_f_idx] > 0 and sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, c_idx, f_idx, c_idx, other_f_idx] > 0):
 											G.add_edge(source_node, target_node, color='yellow')
-
 			# External connections (orange)
 			for feature_word, feature_index_in_observed_column in observed_column.feature_word_to_index.items():
 				if(feature_word in sequence_observed_columns.feature_word_to_index):
@@ -872,42 +920,9 @@ def visualize_graph(sequence_observed_columns):
 											other_f_idx = sequence_observed_columns.feature_word_to_index[other_feature_word]
 											if(f_idx < sequence_observed_columns.fs and other_f_idx < sequence_observed_columns.fs and sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, c_idx, f_idx, other_c_idx, other_f_idx] > 0 and sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, c_idx, f_idx, other_c_idx, other_f_idx] > 0):
 												G.add_edge(source_node, target_node, color='orange')
-	else:
-		# Draw concept columns
-		pos_dict = {}
-		x_offset = 0
-		for lemma, observed_column in sequence_observed_columns.observed_columns_dict.items():
+		else:
 			concept_index = observed_column.concept_index
 			c_idx = concept_columns_dict[lemma]
-
-			# Draw feature neurons
-			y_offset = 1
-			for feature_word, feature_index_in_observed_column in observed_column.feature_word_to_index.items():
-				if(useDedicatedConceptNames2):
-					if feature_word==variableConceptNeuronFeatureName:
-						neuron_color = 'blue'
-						neuron_name = observed_column.concept_name
-					else:
-						neuron_color = 'cyan'
-						neuron_name = feature_word
-				else:
-					neuron_color = 'blue' if feature_index_in_observed_column == 0 else 'cyan'
-					neuron_name = feature_word
-				f_idx = feature_index_in_observed_column
-				if(observed_column.feature_neurons[array_index_properties_strength, array_index_type_all, feature_index_in_observed_column] > 0 and observed_column.feature_neurons[array_index_properties_permanence, array_index_type_all, feature_index_in_observed_column] > 0):
-					feature_node = f"{lemma}_{feature_word}_{f_idx}"
-					G.add_node(feature_node, pos=(x_offset, y_offset), color=neuron_color, label=neuron_name)
-					y_offset += 1
-
-			# Draw rectangle around the column
-			plt.gca().add_patch(plt.Rectangle((x_offset - 0.5, -0.5), 1, max(y_offset, 1) + 0.5, fill=False, edgecolor='black'))
-			x_offset += 2  # Adjust x_offset for the next column
-
-		# Draw connections
-		for lemma, observed_column in sequence_observed_columns.observed_columns_dict.items():
-			concept_index = observed_column.concept_index
-			c_idx = concept_columns_dict[lemma]
-		
 			# Internal connections (yellow)
 			for feature_word, feature_index_in_observed_column in observed_column.feature_word_to_index.items():
 				source_node = f"{lemma}_{feature_word}_{observed_column.feature_word_to_index[feature_word]}"
@@ -920,7 +935,6 @@ def visualize_graph(sequence_observed_columns):
 								other_f_idx = observed_column.feature_word_to_index[other_feature_word]
 								if(observed_column.feature_connections[array_index_properties_strength, array_index_type_all, f_idx, c_idx, other_f_idx] > 0 and observed_column.feature_connections[array_index_properties_permanence, array_index_type_all, f_idx, c_idx, other_f_idx] > 0):
 									G.add_edge(source_node, target_node, color='yellow')
-
 			# External connections (orange)
 			for feature_word, feature_index_in_observed_column in observed_column.feature_word_to_index.items():
 				source_node = f"{lemma}_{feature_word}_{observed_column.feature_word_to_index[feature_word]}"
@@ -943,7 +957,7 @@ def visualize_graph(sequence_observed_columns):
 	labels = nx.get_node_attributes(G, 'label')
 
 	# Draw the graph
-	nx.draw(G, pos, with_labels=True, labels=labels, node_color=colors, edge_color=edge_colors, node_size=500, font_size=8)
+	nx.draw(G, pos, with_labels=True, labels=labels, arrows=True, node_color=colors, edge_color=edge_colors, node_size=500, font_size=8)
 	plt.axis('off')  # Hide the axes
 	plt.show()
 
