@@ -12,9 +12,9 @@ import random
 torch.set_printoptions(threshold=float('inf'))
 
 # Set boolean variables as per specification
-useInference = False  # Disable useInference mode
-lowMem = True		 # Enable lowMem mode (can only be used when useInference is disabled)
-usePOS = True		 # Enable usePOS mode
+useInference = False  # useInference mode
+lowMem = True		 # lowMem mode (can only be used when useInference is disabled)
+usePOS = True		 # usePOS mode
 useParallelProcessing = True	#mandatory (else restore original code pre-GIAANNproto1b3a)
 useSaveData = True
 sequenceObservedColumnsUseSequenceFeaturesOnly = True	#sequence observed columns arrays only store sequence features.
@@ -22,8 +22,8 @@ drawSequenceObservedColumns = False	#draw sequence observed columns (instead of 
 randomiseColumnFeatureXposition = True	#shuffle x position of column internal features such that their connections can be better visualised
 
 useDedicatedFeatureLists = False
-if usePOS and not lowMem:
-	useDedicatedFeatureLists = True
+#if usePOS and not lowMem:
+#	useDedicatedFeatureLists = True
 	
 useDedicatedConceptNames1 = False
 useDedicatedConceptNames2 = False
@@ -33,8 +33,7 @@ if usePOS:
 	#useDedicatedConceptNames1 = True
 	if(useDedicatedConceptNames1):
 		concept_prefix = "C_"
-	
-	
+
 if(useDedicatedFeatureLists):
 	nltk.download('punkt')
 	nltk.download('wordnet')
@@ -76,7 +75,7 @@ max_sentences = 1000  # Adjust as needed
 
 
 if not lowMem:
-	feature_neurons_file = 'global_feature_neurons.pt'
+	global_feature_neurons_file = 'global_feature_neurons.pt'
 
 if useDedicatedFeatureLists:
 	# Obtain lists of nouns and non-nouns using the NLTK wordnet library
@@ -93,8 +92,11 @@ if useDedicatedFeatureLists:
 	non_nouns = all_words - nouns
 	max_num_non_nouns = len(non_nouns)
 
+variableConceptNeuronFeatureName = "variableConceptNeuronFeature"
+feature_index_concept_neuron = 0
+
 # Initialize the concept columns dictionary
-if useInference and os.path.exists(concept_columns_dict_file):
+if(os.path.exists(concept_columns_dict_file)):
 	with open(concept_columns_dict_file, 'rb') as f_in:
 		concept_columns_dict = pickle.load(f_in)
 	c = len(concept_columns_dict)
@@ -112,24 +114,15 @@ else:
 	f = 0  # current number of concept features
 	
 	# Add dummy feature for concept neuron (different per concept column)
-	feature_index_concept_neuron = 0
-	variableConceptNeuronFeatureName = "variableConceptNeuronFeature"
 	concept_features_list.append(variableConceptNeuronFeatureName)
 	concept_features_dict[variableConceptNeuronFeatureName] = len(concept_features_dict)
-	f = 1  # Will be updated dynamically based on c
+	f += 1  # Will be updated dynamically based on c
 
 	if useDedicatedFeatureLists:
 		print("error: useDedicatedFeatureLists case not yet coded - need to set f and populate concept_features_list/concept_features_dict etc")
 		exit()
 		# f = max_num_non_nouns + 1  # Maximum number of non-nouns in an English dictionary, plus the concept neuron of each column
   
-# Initialize global feature neuron arrays if lowMem is disabled
-if not lowMem:
-	if os.path.exists(feature_neurons_file):
-		global_feature_neurons = torch.load(feature_neurons_file)
-	else:
-		global_feature_neurons = SequenceObservedColumns.initialiseFeatureNeuronsSequence(c, f)
-
 # Define the ObservedColumn class
 class ObservedColumn:
 	"""
@@ -355,16 +348,18 @@ class SequenceObservedColumns:
 			c_idx_list.append(torch.full((num_features,), c_idx, dtype=torch.long))
 			f_idx_list.append(f_idx_tensor)
 
-			feature_list.append(observed_column.feature_neurons[:, :, feature_indices_in_observed])
-
+			if lowMem:
+				feature_list.append(observed_column.feature_neurons[:, :, feature_indices_in_observed])
+			else:
+				feature_list.append(global_feature_neurons[:, :, observed_column.concept_index, feature_indices_in_observed])
+			
 		# Concatenate lists to tensors
 		c_idx_tensor = torch.cat(c_idx_list)
 		f_idx_tensor = torch.cat(f_idx_list)
 		feature_tensor = torch.cat(feature_list, dim=2)
 
-		if lowMem:
-			# Use advanced indexing to assign values
-			self.feature_neurons[:, :, c_idx_tensor, f_idx_tensor] = feature_tensor
+		# Use advanced indexing to assign values
+		self.feature_neurons[:, :, c_idx_tensor, f_idx_tensor] = feature_tensor
 
 		# Now handle connections
 		connection_indices = []
@@ -422,13 +417,15 @@ class SequenceObservedColumns:
 			feature_words, feature_indices_in_observed = self.getObservedColumnFeatureWords(self.words, self.lemmas, observed_column)
 			f_idx_tensor = torch.tensor([self.feature_word_to_index[fw] for fw in feature_words], dtype=torch.long)
 
+			# Use advanced indexing to get values from self.feature_neurons_*
+			values = self.feature_neurons[:, :, c_idx, f_idx_tensor]
+
 			if lowMem:
-				# Use advanced indexing to get values from self.feature_neurons_*
-				values = self.feature_neurons[:, :, c_idx, f_idx_tensor]
-				
 				# Assign values to observed_column's feature_neurons_* arrays
 				observed_column.feature_neurons[:, :, feature_indices_in_observed] = values
-
+			else:
+				global_feature_neurons[:, :, observed_column.concept_index, feature_indices_in_observed] = values
+				
 			# Now handle connections
 			conn_feature_indices_obs = []
 			conn_other_concept_indices = []
@@ -469,6 +466,13 @@ class SequenceObservedColumns:
 
 			# Assign values to observed_column's connection_* arrays using advanced indexing
 			observed_column.feature_connections[:, :, conn_feature_indices_obs, conn_other_concept_indices, conn_other_feature_indices_obs] = conn_values
+
+# Initialize global feature neuron arrays if lowMem is disabled
+if not lowMem:
+	if os.path.exists(global_feature_neurons_file):
+		global_feature_neurons = torch.load(global_feature_neurons_file)
+	else:
+		global_feature_neurons = SequenceObservedColumns.initialiseFeatureNeuronsSequence(c, f)
 
 def process_dataset(dataset):
 	global sentence_count
@@ -632,7 +636,7 @@ def detect_new_features(words, lemmas, pos_tags):
 	# Now, expand arrays accordingly
 	if not lowMem:
 		if f > global_feature_neurons.shape[3]:
-			extra_cols = f - global_feature_neurons_strength.shape[3]
+			extra_cols = f - global_feature_neurons.shape[3]
 			extra_global_feature_neurons = SequenceObservedColumns.initialiseFeatureNeuronsSequence(global_feature_neurons.shape[2], extra_cols)
 			global_feature_neurons = torch.cat([global_feature_neurons, extra_global_feature_neurons], dim=3)
 
@@ -743,13 +747,10 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 				feature_neurons_word_order[sequence_concept_index, sequence_feature_index] = j
 	feature_neurons_inactive = 1 - feature_neurons_active
 	 
-	if lowMem:
-		# Update feature neurons in sequence_observed_columns
-		sequence_observed_columns.feature_neurons[array_index_properties_strength, array_index_type_all, :, :] += feature_neurons_active
-		sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all, :, :] += feature_neurons_active*z1	#orig = feature_neurons_active*(sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all] ** 2) + feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all]
-		sequence_observed_columns.feature_neurons[array_index_properties_activation, array_index_type_all, :, :] = feature_neurons_active*j1
-	else:
-		pass  # Not lowMem mode
+	# Update feature neurons in sequence_observed_columns
+	sequence_observed_columns.feature_neurons[array_index_properties_strength, array_index_type_all, :, :] += feature_neurons_active
+	sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all, :, :] += feature_neurons_active*z1	#orig = feature_neurons_active*(sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all] ** 2) + feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all]
+	sequence_observed_columns.feature_neurons[array_index_properties_activation, array_index_type_all, :, :] = feature_neurons_active*j1
 
 	feature_neurons_active_1d = feature_neurons_active.view(cs*fs)
 	feature_connections_active = torch.matmul(feature_neurons_active_1d.unsqueeze(1), feature_neurons_active_1d.unsqueeze(0)).view(cs, fs, cs, fs)
@@ -836,10 +837,16 @@ def visualize_graph(sequence_observed_columns):
 	x_offset = 0
 	for lemma, observed_column in sequence_observed_columns.observed_columns_dict.items():
 		concept_index = observed_column.concept_index
+		
+		if(drawSequenceObservedColumns):
+			feature_word_to_index = sequence_observed_columns.feature_word_to_index
+			y_offset = 1 + 1	#reserve space at bottom of column for feature concept neuron (as it will not appear first in sequence_observed_columns.feature_word_to_index, only observed_column.feature_word_to_index)
+		else:
+			feature_word_to_index = observed_column.feature_word_to_index
+			y_offset = 1
 
 		# Draw feature neurons
-		y_offset = 1
-		for feature_word, feature_index_in_observed_column in observed_column.feature_word_to_index.items():
+		for feature_word, feature_index_in_observed_column in feature_word_to_index.items():
 			conceptNeuronFeature = False
 			
 			if(useDedicatedConceptNames2):
@@ -851,7 +858,7 @@ def visualize_graph(sequence_observed_columns):
 					neuron_color = 'cyan'
 					neuron_name = feature_word
 			else:
-				if(feature_index_in_observed_column):
+				if(feature_index_in_observed_column == feature_index_concept_neuron):
 					neuron_color = 'blue'
 					conceptNeuronFeature = True
 				else:
@@ -871,15 +878,23 @@ def visualize_graph(sequence_observed_columns):
 				if lowMem:
 					if(observed_column.feature_neurons[array_index_properties_strength, array_index_type_all, feature_index_in_observed_column] > 0 and observed_column.feature_neurons[array_index_properties_permanence, array_index_type_all, feature_index_in_observed_column] > 0):
 						featureActive = True
-			
+				else:
+					if(global_feature_neurons[array_index_properties_strength, array_index_type_all, concept_index, feature_index_in_observed_column] > 0 and global_feature_neurons[array_index_properties_permanence, array_index_type_all, concept_index, feature_index_in_observed_column] > 0):
+						featureActive = True
 			if(featureActive):	
 				feature_node = f"{lemma}_{feature_word}_{f_idx}"
 				if(randomiseColumnFeatureXposition and not conceptNeuronFeature):
 					x_offset_shuffled = x_offset + random.uniform(-0.5, 0.5)
 				else:
 					x_offset_shuffled = x_offset
+				if(drawSequenceObservedColumns and conceptNeuronFeature):
+					y_offset_prev = y_offset
+					y_offset = 1
 				G.add_node(feature_node, pos=(x_offset_shuffled, y_offset), color=neuron_color, label=neuron_name)
-				y_offset += 1
+				if(drawSequenceObservedColumns and conceptNeuronFeature):
+					y_offset = y_offset_prev
+				else:
+					y_offset += 1
 
 		# Draw rectangle around the column
 		plt.gca().add_patch(plt.Rectangle((x_offset - 0.5, -0.5), 1, max(y_offset, 1) + 0.5, fill=False, edgecolor='black'))
@@ -887,68 +902,63 @@ def visualize_graph(sequence_observed_columns):
 
 	# Draw connections
 	for lemma, observed_column in sequence_observed_columns.observed_columns_dict.items():
+	
+		concept_index = observed_column.concept_index
 		if(drawSequenceObservedColumns):
-			concept_index = observed_column.concept_index
+			feature_word_to_index = sequence_observed_columns.feature_word_to_index
+			other_feature_word_to_index = sequence_observed_columns.feature_word_to_index
 			c_idx = sequence_observed_columns.concept_name_to_index[lemma]
-			# Internal connections (yellow)
-			for feature_word, feature_index_in_observed_column in observed_column.feature_word_to_index.items():
-				if(feature_word in sequence_observed_columns.feature_word_to_index):
-					source_node = f"{lemma}_{feature_word}_{sequence_observed_columns.feature_word_to_index[feature_word]}"
-					if G.has_node(source_node):
-						for other_feature_word, other_feature_index_in_observed_column in observed_column.feature_word_to_index.items():
-							if(other_feature_word in sequence_observed_columns.feature_word_to_index):
-								target_node = f"{lemma}_{other_feature_word}_{sequence_observed_columns.feature_word_to_index[other_feature_word]}"
-								if G.has_node(target_node):
-									if feature_word != other_feature_word:
-										f_idx = sequence_observed_columns.feature_word_to_index[feature_word]
-										other_f_idx = sequence_observed_columns.feature_word_to_index[other_feature_word]
-										if(sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, c_idx, f_idx, c_idx, other_f_idx] > 0 and sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, c_idx, f_idx, c_idx, other_f_idx] > 0):
-											G.add_edge(source_node, target_node, color='yellow')
-			# External connections (orange)
-			for feature_word, feature_index_in_observed_column in observed_column.feature_word_to_index.items():
-				if(feature_word in sequence_observed_columns.feature_word_to_index):
-					source_node = f"{lemma}_{feature_word}_{sequence_observed_columns.feature_word_to_index[feature_word]}"
-					if G.has_node(source_node):
-						for other_lemma, other_observed_column in sequence_observed_columns.observed_columns_dict.items():
-							for other_feature_word, other_feature_index_in_observed_column in other_observed_column.feature_word_to_index.items():
-								if(other_feature_word in sequence_observed_columns.feature_word_to_index):
-									target_node = f"{other_lemma}_{other_feature_word}_{sequence_observed_columns.feature_word_to_index[other_feature_word]}"
-									if G.has_node(target_node):
-										other_c_idx = sequence_observed_columns.concept_name_to_index[other_lemma]
-										if other_c_idx != c_idx:
-											f_idx = sequence_observed_columns.feature_word_to_index[feature_word]
-											other_f_idx = sequence_observed_columns.feature_word_to_index[other_feature_word]
-											if(sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, c_idx, f_idx, other_c_idx, other_f_idx] > 0 and sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, c_idx, f_idx, other_c_idx, other_f_idx] > 0):
-												G.add_edge(source_node, target_node, color='orange')
 		else:
-			concept_index = observed_column.concept_index
+			feature_word_to_index = observed_column.feature_word_to_index
+			other_feature_word_to_index = observed_column.feature_word_to_index
 			c_idx = concept_columns_dict[lemma]
-			# Internal connections (yellow)
-			for feature_word, feature_index_in_observed_column in observed_column.feature_word_to_index.items():
-				source_node = f"{lemma}_{feature_word}_{observed_column.feature_word_to_index[feature_word]}"
-				if G.has_node(source_node):
-					for other_feature_word, other_feature_index_in_observed_column in observed_column.feature_word_to_index.items():
-						target_node = f"{lemma}_{other_feature_word}_{observed_column.feature_word_to_index[other_feature_word]}"
-						if G.has_node(target_node):
-							if feature_word != other_feature_word:
-								f_idx = observed_column.feature_word_to_index[feature_word]
-								other_f_idx = observed_column.feature_word_to_index[other_feature_word]
+
+		# Internal connections (yellow)
+		for feature_word, feature_index_in_observed_column in feature_word_to_index.items():
+			source_node = f"{lemma}_{feature_word}_{feature_index_in_observed_column}"
+			if G.has_node(source_node):
+				for other_feature_word, other_feature_index_in_observed_column in feature_word_to_index.items():
+					target_node = f"{lemma}_{other_feature_word}_{other_feature_index_in_observed_column}"
+					if G.has_node(target_node):
+						if feature_word != other_feature_word:
+							f_idx = feature_word_to_index[feature_word]
+							other_f_idx = feature_word_to_index[other_feature_word]
+							featureActive = False
+							if(drawSequenceObservedColumns):
+								if(sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, c_idx, f_idx, c_idx, other_f_idx] > 0 and sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, c_idx, f_idx, c_idx, other_f_idx] > 0):
+									featureActive = True
+							else:
 								if(observed_column.feature_connections[array_index_properties_strength, array_index_type_all, f_idx, c_idx, other_f_idx] > 0 and observed_column.feature_connections[array_index_properties_permanence, array_index_type_all, f_idx, c_idx, other_f_idx] > 0):
-									G.add_edge(source_node, target_node, color='yellow')
-			# External connections (orange)
-			for feature_word, feature_index_in_observed_column in observed_column.feature_word_to_index.items():
-				source_node = f"{lemma}_{feature_word}_{observed_column.feature_word_to_index[feature_word]}"
-				if G.has_node(source_node):
-					for other_lemma, other_observed_column in sequence_observed_columns.observed_columns_dict.items():
-						for other_feature_word, other_feature_index_in_observed_column in other_observed_column.feature_word_to_index.items():
-							target_node = f"{other_lemma}_{other_feature_word}_{other_observed_column.feature_word_to_index[other_feature_word]}"
-							if G.has_node(target_node):
+									featureActive = True
+							if(featureActive):
+								G.add_edge(source_node, target_node, color='yellow')
+		# External connections (orange)
+		for feature_word, feature_index_in_observed_column in feature_word_to_index.items():
+			source_node = f"{lemma}_{feature_word}_{feature_index_in_observed_column}"
+			if G.has_node(source_node):
+				for other_lemma, other_observed_column in sequence_observed_columns.observed_columns_dict.items():
+					if(drawSequenceObservedColumns):
+						other_feature_word_to_index = sequence_observed_columns.feature_word_to_index
+					else:
+						other_feature_word_to_index = other_observed_column.feature_word_to_index
+					for other_feature_word, other_feature_index_in_observed_column in other_feature_word_to_index.items():
+						target_node = f"{other_lemma}_{other_feature_word}_{other_feature_index_in_observed_column}"
+						if G.has_node(target_node):
+							f_idx = feature_word_to_index[feature_word]
+							other_f_idx = other_feature_word_to_index[other_feature_word]
+							featureActive = False
+							if(drawSequenceObservedColumns):
+								other_c_idx = sequence_observed_columns.concept_name_to_index[other_lemma]
+								if other_c_idx != c_idx:
+									if(sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, c_idx, f_idx, other_c_idx, other_f_idx] > 0 and sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, c_idx, f_idx, other_c_idx, other_f_idx] > 0):
+										featureActive = True
+							else:
 								other_c_idx = concept_columns_dict[other_lemma]
-								f_idx = observed_column.feature_word_to_index[feature_word]
-								other_f_idx = other_observed_column.feature_word_to_index[other_feature_word]
 								if lemma != other_lemma:	#if observed_column != other_observed_column:
 									if(observed_column.feature_connections[array_index_properties_strength, array_index_type_all, f_idx, other_c_idx, other_f_idx] > 0 and observed_column.feature_connections[array_index_properties_permanence, array_index_type_all, f_idx, other_c_idx, other_f_idx] > 0):
-										G.add_edge(source_node, target_node, color='orange')
+										featureActive = True
+							if(featureActive):
+								G.add_edge(source_node, target_node, color='orange')
 								
 	# Get positions and colors for drawing
 	pos = nx.get_node_attributes(G, 'pos')
@@ -968,7 +978,7 @@ def save_data(observed_columns_dict, concept_features_dict):
 
 	# Save global feature neuron arrays if not lowMem
 	if not lowMem:
-		torch.save(global_feature_neurons, feature_neurons_file)
+		torch.save(global_feature_neurons, global_feature_neurons_file)
 
 	# Save concept columns dictionary to disk
 	with open(concept_columns_dict_file, 'wb') as f_out:
