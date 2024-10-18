@@ -16,7 +16,7 @@ useInference = False  # Disable useInference mode
 lowMem = True		 # Enable lowMem mode (can only be used when useInference is disabled)
 usePOS = True		 # Enable usePOS mode
 useParallelProcessing = True	#mandatory (else restore original code pre-GIAANNproto1b3a)
-useSaveData = False
+useSaveData = True
 sequenceObservedColumnsUseSequenceFeaturesOnly = True	#sequence observed columns arrays only store sequence features.
 drawSequenceObservedColumns = False	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !sequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns
 randomiseColumnFeatureXposition = True	#shuffle x position of column internal features such that their connections can be better visualised
@@ -746,7 +746,7 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 	if lowMem:
 		# Update feature neurons in sequence_observed_columns
 		sequence_observed_columns.feature_neurons[array_index_properties_strength, array_index_type_all, :, :] += feature_neurons_active
-		sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all, :, :] = feature_neurons_active*(sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all] ** 2) + feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all]
+		sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all, :, :] += feature_neurons_active*z1	#orig = feature_neurons_active*(sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all] ** 2) + feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all]
 		sequence_observed_columns.feature_neurons[array_index_properties_activation, array_index_type_all, :, :] = feature_neurons_active*j1
 	else:
 		pass  # Not lowMem mode
@@ -777,7 +777,7 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 	feature_connections_inactive = 1 - feature_connections_active
 
 	sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, :, :, :, :] += feature_connections_active
-	sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, :, :, :, :] = feature_connections_active*(sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all] ** 2) + feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all]
+	sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, :, :, :, :] += feature_connections_active*z1	#orig = feature_connections_active*(sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all] ** 2) + feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all]
 	sequence_observed_columns.feature_connections[array_index_properties_activation, array_index_type_all, :, :, :, :] = feature_connections_active*j1
 
 	decrease_permanence(sequence_observed_columns, feature_neurons_active, feature_neurons_inactive)
@@ -863,7 +863,7 @@ def visualize_graph(sequence_observed_columns):
 				c_idx = sequence_observed_columns.concept_name_to_index[lemma]
 				if(feature_word in sequence_observed_columns.feature_word_to_index):
 					f_idx = sequence_observed_columns.feature_word_to_index[feature_word]
-					if(f_idx < sequence_observed_columns.fs and sequence_observed_columns.feature_neurons[array_index_properties_strength, array_index_type_all, c_idx, f_idx] > 0 and sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all, c_idx, f_idx] > 0):
+					if(sequence_observed_columns.feature_neurons[array_index_properties_strength, array_index_type_all, c_idx, f_idx] > 0 and sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all, c_idx, f_idx] > 0):
 						featureActive = True
 			else:
 				c_idx = concept_columns_dict[lemma]
@@ -902,7 +902,7 @@ def visualize_graph(sequence_observed_columns):
 									if feature_word != other_feature_word:
 										f_idx = sequence_observed_columns.feature_word_to_index[feature_word]
 										other_f_idx = sequence_observed_columns.feature_word_to_index[other_feature_word]
-										if(f_idx < sequence_observed_columns.fs and other_f_idx < sequence_observed_columns.fs and sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, c_idx, f_idx, c_idx, other_f_idx] > 0 and sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, c_idx, f_idx, c_idx, other_f_idx] > 0):
+										if(sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, c_idx, f_idx, c_idx, other_f_idx] > 0 and sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, c_idx, f_idx, c_idx, other_f_idx] > 0):
 											G.add_edge(source_node, target_node, color='yellow')
 			# External connections (orange)
 			for feature_word, feature_index_in_observed_column in observed_column.feature_word_to_index.items():
@@ -918,7 +918,7 @@ def visualize_graph(sequence_observed_columns):
 										if other_c_idx != c_idx:
 											f_idx = sequence_observed_columns.feature_word_to_index[feature_word]
 											other_f_idx = sequence_observed_columns.feature_word_to_index[other_feature_word]
-											if(f_idx < sequence_observed_columns.fs and other_f_idx < sequence_observed_columns.fs and sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, c_idx, f_idx, other_c_idx, other_f_idx] > 0 and sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, c_idx, f_idx, other_c_idx, other_f_idx] > 0):
+											if(sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, c_idx, f_idx, other_c_idx, other_f_idx] > 0 and sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, c_idx, f_idx, other_c_idx, other_f_idx] > 0):
 												G.add_edge(source_node, target_node, color='orange')
 		else:
 			concept_index = observed_column.concept_index

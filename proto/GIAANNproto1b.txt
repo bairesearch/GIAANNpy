@@ -1,7 +1,7 @@
 DONE//do:
-o1 preview prompt 1b9a;
+o1 preview prompt 1b9b;
 
-v1b9a:
+v1b9b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
 - Use the pytorch API for hardware acceleration of all arrays (for efficient parallel processing of connectivity). Do not initialise the array with a predetermined dictionary; dynamically populate the arrays as new dictionary words and relations are encountered. Will be discussed below.
 - Use vector graphics library such as networkx to always maintain a complete visualisation of the network (including active neurons). Only draw the parts of the network that are not empty.
@@ -61,4 +61,4 @@ MANUAL; - Add dimensions to neurons and connections arrays; properties (strength
 MANUAL; - Add sequenceObservedColumnsUseSequenceFeaturesOnly - sequence observed columns arrays only store sequence features. Add drawSequenceObservedColumns - draw sequence observed columns (instead of complete observed columns).
 MANUAL; - Add useDedicatedConceptNames2 - Rename each concept neuron in observed columns/sequence observed columns to a replacement name variableConceptNeuronFeature, so that each observed column feature array has exactly the same set of features. Add SequenceObservedColumn.observed_columns_dict and SequenceObservedColumn.observed_columns_sequence_word_index_dict. Add ObservedColumn.concept_name and ObservedColumn.concept_sequence_word_index.
 MANUAL; - Ensure word order is maintained for internal and external feature connections. Ensure word order is maintained for connections between columns (does not support multiple same concepts in same sentence). Ensure identical feature nodes are not connected together. Change networkx graph to directed graph. Add randomiseColumnFeatureXposition - shuffle x position of column internal features such that their connections can be better visualised.
-
+MANUAL; - Set neuron/connection permanence increase function zf to be linear (+z1).
