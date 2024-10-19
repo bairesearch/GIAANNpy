@@ -15,10 +15,14 @@ torch.set_printoptions(threshold=float('inf'))
 useInference = False  # useInference mode
 lowMem = True		 # lowMem mode (can only be used when useInference is disabled)
 usePOS = True		 # usePOS mode
+useSaveData = True	#save data is required to allow consecutive train/inference execution runs		#will also affect which network changes can be visualised
+if(useInference):
+	sequenceObservedColumnsUseSequenceFeaturesOnly = False	#must be set to false as global_feature_neurons are updated (which have complete feature lists, not sequence limited feature lists)
+else:
+	sequenceObservedColumnsUseSequenceFeaturesOnly = True	#sequence observed columns arrays only store sequence features.	#optional (will affect which network changes can be visualised)
+drawSequenceObservedColumns = False	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !sequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns	#optional (will affect which network changes can be visualised)
+
 useParallelProcessing = True	#mandatory (else restore original code pre-GIAANNproto1b3a)
-useSaveData = True
-sequenceObservedColumnsUseSequenceFeaturesOnly = True	#sequence observed columns arrays only store sequence features.
-drawSequenceObservedColumns = False	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !sequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns
 randomiseColumnFeatureXposition = True	#shuffle x position of column internal features such that their connections can be better visualised
 
 useDedicatedFeatureLists = False
@@ -34,6 +38,17 @@ if usePOS:
 	if(useDedicatedConceptNames1):
 		concept_prefix = "C_"
 
+if(useInference):
+	num_seed_tokens = 5	#number of words to seed network from dataset before prediction
+	num_prediction_tokens = 10	#number of words to predict after network seed
+	k = 1 	#topk next concept column prediction
+	#kf = 1 	#topk next feature within column prediction
+	activationDecrementPerPredictedColumn = 0.01
+	assert useDedicatedConceptNames2, "useInference: words, lemmas, pos tag lists of sentence cannot be modified; features must be renamed, not lemmas"
+	assert not lowMem, "useInference: global feature neuron lists are required" 
+else:
+	activationDecrementPerPredictedSentence = 0.1
+	
 if(useDedicatedFeatureLists):
 	nltk.download('punkt')
 	nltk.download('wordnet')
@@ -248,6 +263,11 @@ class SequenceObservedColumns:
 		self.observed_columns_dict = observed_columns_dict
 		self.observed_columns_sequence_word_index_dict = observed_columns_sequence_word_index_dict	#may be slightly longer than number of columns in sequence, if there are multiple instances of the same concept/noun lemma in the sequence
 		
+		concept_indices_in_observed_list = []
+		for observed_column in observed_columns_dict.values():
+			concept_indices_in_observed_list.append(observed_column.concept_index)
+		self.concept_indices_in_observed_tensor = torch.tensor(concept_indices_in_observed_list, dtype=torch.long)
+			
 		# Map from concept names to indices in sequence arrays
 		self.concept_name_to_index = {}
 		self.index_to_concept_name = {}
@@ -259,11 +279,18 @@ class SequenceObservedColumns:
 		# Collect all feature words from observed columns
 		self.words = words
 		self.lemmas = lemmas
-		feature_words = []
-		for observed_column in observed_columns_dict.values():
-			column_feature_words, _ = self.getObservedColumnFeatureWords(words, lemmas, observed_column)
-			feature_words.extend(column_feature_words)
-		feature_words = self.removeDuplicates(feature_words)
+		if(useDedicatedConceptNames2):
+			#identify feature indices from complete ObservedColumns.featureNeurons or globalFeatureNeurons feature lists currently stored in SequenceObservedColumns.feature_neurons	#required for useInference
+			observed_column = list(observed_columns_dict.values())[0]	#all features (including words) are identical per observed column
+			self.feature_words, self.feature_indices_in_observed_tensor, self.f_idx_tensor = self.identifyObservedColumnFeatureWords(words, lemmas, observed_column)
+			feature_words = self.feature_words
+		else:
+			feature_words = []
+			self.feature_word_to_index = None
+			for observed_column in observed_columns_dict.values():
+				column_feature_words, self.feature_indices_in_observed_tensor, _ = self.identifyObservedColumnFeatureWords(words, lemmas, observed_column)
+				feature_words.extend(column_feature_words)
+			self.feature_words = self.removeDuplicates(feature_words)
 			
 		self.fs = len(feature_words)
 		self.feature_word_to_index = {}
@@ -272,6 +299,9 @@ class SequenceObservedColumns:
 			self.feature_word_to_index[feature_word] = idx
 			self.index_to_feature_word[idx] = feature_word
 		
+		if(not useDedicatedConceptNames2):
+			self.f_idx_tensor = torch.tensor([self.feature_word_to_index[fw] for fw in self.feature_words], dtype=torch.long)
+		
 		# Initialize arrays
 		self.feature_neurons = self.initialiseFeatureNeuronsSequence(self.cs, self.fs)
 		self.feature_connections = self.initialiseFeatureConnectionsSequence(self.cs, self.fs)
@@ -279,7 +309,8 @@ class SequenceObservedColumns:
 		# Populate arrays with data from observed_columns_dict
 		self.populate_arrays(words, lemmas, observed_columns_dict)
 
-	def getObservedColumnFeatureWords(self, words, lemmas, observed_column):
+
+	def identifyObservedColumnFeatureWords(self, words, lemmas, observed_column):
 		if(sequenceObservedColumnsUseSequenceFeaturesOnly):
 			conceptNeuronFound = False
 			feature_words = []
@@ -287,19 +318,20 @@ class SequenceObservedColumns:
 			for word, lemma in zip(words, lemmas):
 				feature_word = word.lower()
 				feature_lemma = lemma
-				if(feature_lemma == observed_column.concept_name):
+				if(feature_lemma == observed_column.concept_name):	
 					if(useDedicatedConceptNames2):
+						#case useDedicatedConceptNames2 only provides 1 observed_column to identifyObservedColumnFeatureWords (therefore this condition will only be triggered once when when feature_lemma == observed_column.concept_name of some arbitrary concept column. Once triggered a singular artificial variableConceptNeuronFeatureName will be added)
 						feature_words.append(variableConceptNeuronFeatureName)
 					else:
 						feature_words.append(feature_lemma)
-					feature_indices_in_observed.append(feature_index_concept_neuron)	#or observed_column.feature_word_to_index[feature_lemma]
+					feature_indices_in_observed.append(feature_index_concept_neuron)
 					conceptNeuronFound = True
 					#print("concept node found = ", feature_lemma)
 				elif(feature_word in observed_column.feature_word_to_index):
 					feature_words.append(feature_word)
 					feature_indices_in_observed.append(observed_column.feature_word_to_index[feature_word])
 			feature_indices_in_observed = self.removeDuplicates(feature_indices_in_observed)
-			feature_indices_in_observed_tensor = torch.tensor(list(feature_indices_in_observed), dtype=torch.long)
+			feature_indices_in_observed_tensor = torch.tensor(feature_indices_in_observed, dtype=torch.long)
 			if(not conceptNeuronFound):
 				print("getObservedColumnFeatureWords error: !conceptNeuronFound")
 				exit()
@@ -307,7 +339,16 @@ class SequenceObservedColumns:
 			feature_words = observed_column.feature_word_to_index.keys()
 			feature_indices_in_observed_tensor = torch.tensor(list(observed_column.feature_word_to_index.values()), dtype=torch.long)
 		feature_words = self.removeDuplicates(feature_words)
-		return feature_words, feature_indices_in_observed_tensor
+		
+		feature_word_to_index = {}
+		for idx, feature_word in enumerate(feature_words):
+			feature_word_to_index[feature_word] = idx
+		f_idx_tensor = torch.tensor([feature_word_to_index[fw] for fw in feature_words], dtype=torch.long)
+		
+		return feature_words, feature_indices_in_observed_tensor, f_idx_tensor
+		
+	def getObservedColumnFeatureIndices(self, words, lemmas, observed_column):
+		return self.feature_indices_in_observed_tensor, self.f_idx_tensor
 	
 	def removeDuplicates(self, lst):
 		#python requires ordered sets
@@ -339,9 +380,8 @@ class SequenceObservedColumns:
 		feature_list = []
 
 		for lemma, observed_column in observed_columns_dict.items():
-			feature_words, feature_indices_in_observed = self.getObservedColumnFeatureWords(self.words, self.lemmas, observed_column)
+			feature_indices_in_observed, f_idx_tensor = self.getObservedColumnFeatureIndices(self.words, self.lemmas, observed_column)
 			c_idx = self.concept_name_to_index[lemma]
-			f_idx_tensor = torch.tensor([self.feature_word_to_index[fw] for fw in feature_words], dtype=torch.long)
 
 			num_features = len(f_idx_tensor)
 
@@ -366,15 +406,13 @@ class SequenceObservedColumns:
 		connection_values = []
 
 		for lemma, observed_column in observed_columns_dict.items():
-			feature_words, feature_indices_in_observed = self.getObservedColumnFeatureWords(self.words, self.lemmas, observed_column)
+			feature_indices_in_observed, f_idx_tensor = self.getObservedColumnFeatureIndices(self.words, self.lemmas, observed_column)
 			c_idx = self.concept_name_to_index[lemma]
-			f_idx_tensor = torch.tensor([self.feature_word_to_index[fw] for fw in feature_words], dtype=torch.long)
 
 			for other_lemma, other_observed_column in observed_columns_dict.items():
-				other_feature_words, other_feature_indices_in_observed = self.getObservedColumnFeatureWords(self.words, self.lemmas, other_observed_column)
+				other_feature_indices_in_observed, other_f_idx_tensor = self.getObservedColumnFeatureIndices(self.words, self.lemmas, other_observed_column)
 				other_c_idx = self.concept_name_to_index[other_lemma]
 				other_concept_index = other_observed_column.concept_index
-				other_f_idx_tensor = torch.tensor([self.feature_word_to_index[fw] for fw in other_feature_words], dtype=torch.long)
 
 				# Create meshgrid of indices
 				feature_idx_obs_mesh, other_feature_idx_obs_mesh = torch.meshgrid(feature_indices_in_observed, other_feature_indices_in_observed, indexing='ij')
@@ -414,8 +452,7 @@ class SequenceObservedColumns:
 		self.index_to_feature_word = {}
 		for lemma, observed_column in self.observed_columns_dict.items():
 			c_idx = self.concept_name_to_index[lemma]
-			feature_words, feature_indices_in_observed = self.getObservedColumnFeatureWords(self.words, self.lemmas, observed_column)
-			f_idx_tensor = torch.tensor([self.feature_word_to_index[fw] for fw in feature_words], dtype=torch.long)
+			feature_indices_in_observed, f_idx_tensor = self.getObservedColumnFeatureIndices(self.words, self.lemmas, observed_column)
 
 			# Use advanced indexing to get values from self.feature_neurons_*
 			values = self.feature_neurons[:, :, c_idx, f_idx_tensor]
@@ -434,10 +471,8 @@ class SequenceObservedColumns:
 			
 			for other_lemma, other_observed_column in self.observed_columns_dict.items():
 				other_c_idx = self.concept_name_to_index[other_lemma]
-				other_feature_words_set, other_feature_indices_in_observed = self.getObservedColumnFeatureWords(self.words, self.lemmas, other_observed_column)
+				other_feature_indices_in_observed, other_f_idx_tensor = self.getObservedColumnFeatureIndices(self.words, self.lemmas, other_observed_column)
 				other_concept_index = other_observed_column.concept_index
-				other_feature_words = list(other_feature_words_set)
-				other_f_idx_tensor = torch.tensor([self.feature_word_to_index[fw] for fw in other_feature_words], dtype=torch.long)
 
 				# Create meshgrid of indices
 				feature_idx_obs_mesh, other_feature_idx_obs_mesh = torch.meshgrid(feature_indices_in_observed, other_feature_indices_in_observed, indexing='ij')
@@ -497,6 +532,11 @@ def process_sentence(doc):
 	# Refresh the observed columns dictionary for each new sequence
 	observed_columns_dict = {}  # key: lemma, value: ObservedColumn
 	observed_columns_sequence_word_index_dict = {}  # key: sequence word index, value: concept_index
+	
+	if(useInference):
+		doc_seed = doc[0:num_seed_tokens]	#prompt
+		doc_predict = doc[num_seed_tokens:]
+		doc = doc_seed
 
 	# First pass: Extract words, lemmas, POS tags, and update concept_columns_dict and c
 	concepts_found, words, lemmas, pos_tags = first_pass(doc)
@@ -512,11 +552,12 @@ def process_sentence(doc):
 		# Create the sequence observed columns object
 		sequence_observed_columns = SequenceObservedColumns(words, lemmas, observed_columns_dict, observed_columns_sequence_word_index_dict)
 
-		# Process each concept word in the sequence
-		process_concept_words(doc, words, lemmas, pos_tags, sequence_observed_columns)
-
-		# Update activation traces for feature neurons and connections
-		#update_activation(sequence_observed_columns)
+		if(useInference):
+			# Process each concept word in the sequence (predict)
+			process_concept_words_predict(doc_seed, doc_predict, sequence_observed_columns, num_seed_tokens, num_prediction_tokens)
+		else:
+			# Process each concept word in the sequence (train)
+			process_concept_words_train(doc, words, lemmas, pos_tags, sequence_observed_columns)
 
 		# Update observed columns from sequence observed columns
 		sequence_observed_columns.update_observed_columns()
@@ -531,7 +572,7 @@ def process_sentence(doc):
 	# Break if we've reached the maximum number of sentences
 	global sentence_count
 	sentence_count += 1
-
+		
 def first_pass(doc):
 	global c, f, concept_columns_dict, concept_columns_list
 	if not lowMem:
@@ -660,8 +701,106 @@ def process_feature_detection(j, word_j, pos_tags):
 	else:
 		return False
 	
+def getLemmas(doc):
+	words = []
+	lemmas = []
+	pos_tags = []
+	
+	for token in doc:
+		word = token.text
+		lemma = token.lemma_.lower()
+		pos = token.pos_  # Part-of-speech tag
+		words.append(word)
+		lemmas.append(lemma)
+		pos_tags.append(pos)
+	
+	return words, lemmas, pos_tags
+	
+def process_concept_words_predict(doc_seed, doc_predict, sequence_observed_columns, num_seed_tokens, num_prediction_tokens):
 
-def process_concept_words(doc, words, lemmas, pos_tags, sequence_observed_columns):
+	#seed network;
+	words_seed, lemmas_seed, pos_tags_seed = getLemmas(doc_seed)
+	process_concept_words_train(doc_seed, words_seed, lemmas_seed, pos_tags_seed, sequence_observed_columns, train=False)
+	
+	#identify first activated column(s) in prediction phase:
+	if(k == 1):
+		concept_columns_indices = sequence_observed_columns.concept_indices_in_observed_tensor[-1]
+		concept_columns_indices_list = [concept_columns_indices.item()]
+	else:
+		assert k == 1, "process_concept_words_seed error; the number of prediction candidates must currently match the first list of prediction candidates (1) from the seed sequence" 
+	
+	sequence_observed_columns = None	#will be reset every token prediction
+	
+	#predict next columns;
+	columnPredictionIndex = 0
+	for p in range(num_prediction_tokens):
+		concept_columns_indices = process_column_prediction(columnPredictionIndex, concept_columns_indices_list)
+		columnPredictionIndex += 1
+		
+		#TODO: compare to doc_predict
+		
+		'''
+		#perform next token (ie feature) prediction within activated columns
+		featureTokenPredictionIndex = 0
+		while(True):
+			topLemmaPredicted = process_token_prediction(featureTokenPredictionIndex)
+			featureTokenPredictionIndex += 1
+		'''
+
+
+def process_column_prediction(columnPredictionIndex, concept_columns_indices_list):
+	print(f"process_column_prediction: {columnPredictionIndex}; concept_columns_indices_list = ", concept_columns_indices_list)
+
+	# Refresh the observed columns dictionary for each new sequence
+	observed_columns_dict = {}  # key: lemma, value: ObservedColumn
+	observed_columns_sequence_word_index_dict = {}  # key: sequence word index, value: concept_index
+	
+	words = []
+	lemmas = []
+	for concept_index in concept_columns_indices_list:
+		i = concept_index	#estimate of predicted observed_columns_sequence_word_index (not correct as predicting feature tokens within concept columns also)
+		lemma = concept_columns_list[concept_index]
+		word = lemma	#same for concepts
+		lemmas.append(lemma)
+		words.append(word)
+		# Load observed column from disk or create new one
+		observed_column = load_or_create_observed_column(concept_index, lemma, i)
+		observed_columns_dict[lemma] = observed_column
+		observed_columns_sequence_word_index_dict[i] = concept_index
+
+	sequence_observed_columns = SequenceObservedColumns(words, lemmas, observed_columns_dict, observed_columns_sequence_word_index_dict)
+	
+	feature_neurons_active = global_feature_neurons[array_index_properties_activation, array_index_type_all, sequence_observed_columns.concept_indices_in_observed_tensor, :]
+	#if(sequence_observed_columns.concept_indices_in_observed_tensor = [1])
+	#	feature_neurons_active.unsqueeze(0)	#only a single source concept column is used for prediction phase
+	
+	process_features_active(sequence_observed_columns, feature_neurons_active, sequence_observed_columns.cs, sequence_observed_columns.fs, train=False)
+
+	concept_columns_activation = torch.sum(global_feature_neurons[array_index_properties_activation, array_index_type_all, :, :], dim=1)	#average across all feature activations in columns
+	concept_columns_activation_topk = torch.topk(concept_columns_activation, k)
+	concept_columns_indices_next_list = concept_columns_activation_topk.indices.tolist()
+	
+	#decrement activation after each prediction interval
+	global_feature_neurons[array_index_properties_activation, array_index_type_all] -= activationDecrementPerPredictedColumn
+
+	if(not drawSequenceObservedColumns):
+		# Update observed columns from sequence observed columns
+		sequence_observed_columns.update_observed_columns()	#only required if connection activation changes are used. connection activation changes are not currently used (activations are directly transferred to target neurons)
+	
+	visualize_graph(sequence_observed_columns)
+	
+	'''
+	# Save observed columns to disk (train/save is not currently used during prediction phase)
+	if(useSaveData):
+		save_data(observed_columns_dict, concept_features_dict)
+	'''
+	
+	return concept_columns_indices_next_list
+	 
+
+	
+
+def process_concept_words_train(doc, words, lemmas, pos_tags, sequence_observed_columns, train=True):
 	"""
 	For every concept word (lemma) in the sequence, identify every feature neuron in that column that occurs q words before or after the concept word in the sequence, including the concept neuron. This function has been parallelized using PyTorch array operations.
 	"""
@@ -708,9 +847,9 @@ def process_concept_words(doc, words, lemmas, pos_tags, sequence_observed_column
 		start_indices = (concept_indices - q).clamp(min=0)
 		end_indices = (concept_indices + q + 1).clamp(max=len(doc))
 
-	process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, sequence_observed_columns, concept_indices)
-   
-def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, sequence_observed_columns, concept_indices):
+	process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, sequence_observed_columns, concept_indices, train)
+
+def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, sequence_observed_columns, concept_indices, train=True):
 	
 	'''
 	#not possible as sequence_observed_columns feature arrays are only defined for sequence features, not all sequence words;
@@ -745,27 +884,35 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 				sequence_feature_index = sequence_observed_columns.feature_word_to_index[feature_word]
 				feature_neurons_active[sequence_concept_index, sequence_feature_index] = 1
 				feature_neurons_word_order[sequence_concept_index, sequence_feature_index] = j
+	
+	process_features_active(sequence_observed_columns, feature_neurons_active, cs, fs, columns_word_order, feature_neurons_word_order, train)
+
+#useInference; first dim restricted to a single word (or candiate set of words). !useInference; first dim pertains to every concept node in sentence
+def process_features_active(sequence_observed_columns, feature_neurons_active, cs, fs, columns_word_order=None, feature_neurons_word_order=None, train=True):
+
 	feature_neurons_inactive = 1 - feature_neurons_active
-	 
-	# Update feature neurons in sequence_observed_columns
-	sequence_observed_columns.feature_neurons[array_index_properties_strength, array_index_type_all, :, :] += feature_neurons_active
-	sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all, :, :] += feature_neurons_active*z1	#orig = feature_neurons_active*(sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all] ** 2) + feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all]
-	sequence_observed_columns.feature_neurons[array_index_properties_activation, array_index_type_all, :, :] = feature_neurons_active*j1
+ 
+	if(train):
+		# Update feature neurons in sequence_observed_columns
+		sequence_observed_columns.feature_neurons[array_index_properties_strength, array_index_type_all, :, :] += feature_neurons_active
+		sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all, :, :] += feature_neurons_active*z1	#orig = feature_neurons_active*(sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all] ** 2) + feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all]
+		#sequence_observed_columns.feature_neurons[array_index_properties_activation, array_index_type_all, :, :] += feature_neurons_active*j1	#update the activations of the target not source nodes
 
 	feature_neurons_active_1d = feature_neurons_active.view(cs*fs)
 	feature_connections_active = torch.matmul(feature_neurons_active_1d.unsqueeze(1), feature_neurons_active_1d.unsqueeze(0)).view(cs, fs, cs, fs)
 
-	#ensure word order is maintained (between connection source/target) for internal and external feature connections;
-	feature_neurons_word_order_expanded_1 = feature_neurons_word_order.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)  # For the first node
-	feature_neurons_word_order_expanded_2 = feature_neurons_word_order.view(1, 1, cs, fs).expand(cs, fs, cs, fs)  # For the second node
-	word_order_mask = feature_neurons_word_order_expanded_2 > feature_neurons_word_order_expanded_1
-	feature_connections_active = feature_connections_active * word_order_mask
-	
-	#ensure word order is maintained for connections between columns (does not support multiple same concepts in same sentence);
-	columns_word_order_expanded_1 = columns_word_order.view(cs, 1, 1, 1).expand(cs, fs, cs, fs)  # For the first node's cs index
-	columns_word_order_expanded_2 = columns_word_order.view(1, 1, cs, 1).expand(cs, fs, cs, fs)  # For the second node's cs index
-	columns_word_order_mask = columns_word_order_expanded_2 >= columns_word_order_expanded_1
-	feature_connections_active = feature_connections_active * columns_word_order_mask
+	if(feature_neurons_word_order is not None):
+		#ensure word order is maintained (between connection source/target) for internal and external feature connections;
+		feature_neurons_word_order_expanded_1 = feature_neurons_word_order.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)  # For the first node
+		feature_neurons_word_order_expanded_2 = feature_neurons_word_order.view(1, 1, cs, fs).expand(cs, fs, cs, fs)  # For the second node
+		word_order_mask = feature_neurons_word_order_expanded_2 > feature_neurons_word_order_expanded_1
+		feature_connections_active = feature_connections_active * word_order_mask
+	if(columns_word_order is not None):
+		#ensure word order is maintained for connections between columns (does not support multiple same concepts in same sentence);
+		columns_word_order_expanded_1 = columns_word_order.view(cs, 1, 1, 1).expand(cs, fs, cs, fs)  # For the first node's cs index
+		columns_word_order_expanded_2 = columns_word_order.view(1, 1, cs, 1).expand(cs, fs, cs, fs)  # For the second node's cs index
+		columns_word_order_mask = columns_word_order_expanded_2 >= columns_word_order_expanded_1
+		feature_connections_active = feature_connections_active * columns_word_order_mask
 	
 	#ensure identical feature nodes are not connected together;
 	cs_indices_1 = torch.arange(cs).view(cs, 1, 1, 1).expand(cs, fs, cs, fs)  # First cs dimension
@@ -777,13 +924,27 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 	
 	feature_connections_inactive = 1 - feature_connections_active
 
-	sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, :, :, :, :] += feature_connections_active
-	sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, :, :, :, :] += feature_connections_active*z1	#orig = feature_connections_active*(sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all] ** 2) + feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all]
-	sequence_observed_columns.feature_connections[array_index_properties_activation, array_index_type_all, :, :, :, :] = feature_connections_active*j1
+	if(train):
+		sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, :, :, :, :] += feature_connections_active
+		sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, :, :, :, :] += feature_connections_active*z1	#orig = feature_connections_active*(sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all] ** 2) + feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all]
+		sequence_observed_columns.feature_connections[array_index_properties_activation, array_index_type_all, :, :, :, :] += feature_connections_active*j1	#connection activations are not currently used
+	else:
+		#update the activations of the target nodes;
+		feature_neurons_target_activation = feature_connections_active[0, 0, :, :]
+		'''
+		print("feature_neurons_target_activation.shape = ", feature_neurons_target_activation.shape)
+		print("global_feature_neurons.shape = ", global_feature_neurons.shape)
+		print("sequence_observed_columns.concept_indices_in_observed_tensor = ", sequence_observed_columns.concept_indices_in_observed_tensor)
+		print("sequence_observed_columns.feature_indices_in_observed_tensor = ", sequence_observed_columns.feature_indices_in_observed_tensor)
+		'''
+		#global_feature_neurons[array_index_properties_activation, array_index_type_all, sequence_observed_columns.concept_indices_in_observed_tensor, sequence_observed_columns.feature_indices_in_observed_tensor] += feature_neurons_target_activation*j1
+		global_feature_neurons[array_index_properties_activation, array_index_type_all][sequence_observed_columns.concept_indices_in_observed_tensor][:, sequence_observed_columns.feature_indices_in_observed_tensor] += feature_neurons_target_activation*j1
+		
+	if(train):
+		decrease_permanence_active(sequence_observed_columns, feature_neurons_active, feature_neurons_inactive)
 
-	decrease_permanence(sequence_observed_columns, feature_neurons_active, feature_neurons_inactive)
- 
-def decrease_permanence(sequence_observed_columns, feature_neurons_active, feature_neurons_inactive):
+		
+def decrease_permanence_active(sequence_observed_columns, feature_neurons_active, feature_neurons_inactive):
 	cs = sequence_observed_columns.cs
 	fs = sequence_observed_columns.fs 
 	
@@ -805,30 +966,9 @@ def decrease_permanence(sequence_observed_columns, feature_neurons_active, featu
 	feature_connections_decrease2 = torch.matmul(feature_neurons_active_1d.unsqueeze(1), feature_neurons_inactive_1d.unsqueeze(0)).view(cs, fs, cs, fs)
 	sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, :, :, :, :] -= feature_connections_decrease2
 	sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all] = torch.clamp(sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all], min=0)
-  
-def update_activation(sequence_observed_columns):
-	# Update activation traces for feature neurons
-	active_indices = sequence_observed_columns.feature_neurons[array_index_properties_activation, array_index_type_all].nonzero(as_tuple=False)
-	for idx in active_indices:
-		c_idx = idx[0].item()
-		f_idx = idx[1].item()
-		if sequence_observed_columns.feature_neurons[array_index_properties_activation, array_index_type_all, c_idx, f_idx] > 0:
-			sequence_observed_columns.feature_neurons[array_index_properties_activation, array_index_type_all, c_idx, f_idx] -= 1
-			if sequence_observed_columns.feature_neurons[array_index_properties_activation, array_index_type_all, c_idx, f_idx] == 0:
-				pass  # Activation trace expired
-
-	# Update activation traces for connections
-	active_indices = sequence_observed_columns.feature_connections[array_index_properties_activation, array_index_type_all].nonzero(as_tuple=False)
-	for idx in active_indices:
-		c_i = idx[0].item()
-		f_i = idx[1].item()
-		c_j = idx[2].item()
-		f_j = idx[3].item()
-		if sequence_observed_columns.feature_connections[array_index_properties_activation, array_index_type_all, c_i, f_i, c_j, f_j] > 0:
-			sequence_observed_columns.feature_connections[array_index_properties_activation, array_index_type_all, c_i, f_i, c_j, f_j] -= 1
-			if sequence_observed_columns.feature_connections[array_index_properties_activation, array_index_type_all, c_i, f_i, c_j, f_j] == 0:
-				pass  # Activation trace expired
-
+ 
+	#current limitation; will not deactivate neurons or remove their strength if their permanence goes to zero
+	
 def visualize_graph(sequence_observed_columns):
 	G.clear()
 

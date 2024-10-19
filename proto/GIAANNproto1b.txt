@@ -1,7 +1,7 @@
 DONE//do:
-o1 preview prompt 1b10a;
+o1 preview prompt 1b11a;
 
-v1b10a:
+v1b11a:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
 - Use the pytorch API for hardware acceleration of all arrays (for efficient parallel processing of connectivity). Do not initialise the array with a predetermined dictionary; dynamically populate the arrays as new dictionary words and relations are encountered. Will be discussed below.
 - Use vector graphics library such as networkx to always maintain a complete visualisation of the network (including active neurons). Only draw the parts of the network that are not empty.
@@ -63,3 +63,4 @@ MANUAL; - Add useDedicatedConceptNames2 - Rename each concept neuron in observed
 MANUAL; - Ensure word order is maintained for internal and external feature connections. Ensure word order is maintained for connections between columns (does not support multiple same concepts in same sentence). Ensure identical feature nodes are not connected together. Change networkx graph to directed graph. Add randomiseColumnFeatureXposition - shuffle x position of column internal features such that their connections can be better visualised.
 MANUAL; - Set neuron/connection permanence increase function zf to be linear (+z1).
 MANUAL; - Even when not in inference mode, load concept_columns_dict_file/concept_features_dict from database. Prepare non low memory for inference. Generalise graph draw code for all modes.
+MANUAL; - Start inference mode. Update neuron activation to be cumulative (but reset upon dataset/database load). Update neuron connection activation to immediately add activation to their target nodes. Add SequenceObservedColumns.concept_indices_in_observed_list. Extract SequenceObservedColumns.identifyObservedColumnFeatureWords and SequenceObservedColumns.getObservedColumnFeatureIndices from SequenceObservedColumns.getObservedColumnFeatureWords.
