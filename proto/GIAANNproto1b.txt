@@ -1,7 +1,7 @@
 DONE//do:
-o1 preview prompt 1b12a;
+o1 preview prompt 1b12b;
 
-v1b12a:
+v1b12b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
 - Use the pytorch API for hardware acceleration of all arrays (for efficient parallel processing of connectivity). Do not initialise the array with a predetermined dictionary; dynamically populate the arrays as new dictionary words and relations are encountered. Will be discussed below.
 - Use vector graphics library such as networkx to always maintain a complete visualisation of the network (including active neurons). Only draw the parts of the network that are not empty.
@@ -66,3 +66,4 @@ MANUAL; - Even when not in inference mode, load concept_columns_dict_file/concep
 MANUAL; - Start inference mode. Update neuron activation to be cumulative (but reset upon dataset/database load). Update neuron connection activation to immediately add activation to their target nodes. Add SequenceObservedColumns.concept_indices_in_observed_list. Extract SequenceObservedColumns.identifyObservedColumnFeatureWords and SequenceObservedColumns.getObservedColumnFeatureIndices from SequenceObservedColumns.getObservedColumnFeatureWords.
 MANUAL; - Start topk feature selection within topk columns.
 MANUAL; - Add option sequenceObservedColumnsMatchSequenceWords: update sequence observed column arrays to store columns and features in order of sentence word index. Upgrade process features; prefer closer than further target neurons when strengthening connections or activating target neurons in sentence. Upgrade process features; add target neuron activation dependence on connection strength. Upgrade process features with option deactivateNeuronsUponPrediction; suppress neuron activations once processed. During inference, for each prediction predict both next word and column (same/diff to existing column). During inference, load an inference prompt (seed sentences) from disk. Remove useDedicatedConceptNames1. Store word.lower() in words list. Extract columns_index_sequence_word_index_dict from observed_columns_sequence_word_index_dict.
+MANUAL; - Patch process_column_prediction. Extract process_features_active_train/predict from process_features_active; predict all targets in global feature arrays. Patch process_features_active; feature_connections_activation_update = feature_connections_active * feature_connections[array_index_properties_strength].
