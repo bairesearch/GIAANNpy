@@ -1,7 +1,7 @@
 DONE//do:
-o1 preview prompt 1b13b;
+o1 preview prompt 1b13c;
 
-v1b13b:
+v1b13c:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
 - Use the pytorch API for hardware acceleration of all arrays (for efficient parallel processing of connectivity). Do not initialise the array with a predetermined dictionary; dynamically populate the arrays as new dictionary words and relations are encountered. Will be discussed below.
 - Use vector graphics library such as networkx to always maintain a complete visualisation of the network (including active neurons). Only draw the parts of the network that are not empty.
@@ -69,3 +69,4 @@ MANUAL; - Add option sequenceObservedColumnsMatchSequenceWords: update sequence 
 MANUAL; - Patch process_column_prediction. Extract process_features_active_train/predict from process_features_active; predict all targets in global feature arrays. Patch process_features_active; feature_connections_activation_update = feature_connections_active * feature_connections[array_index_properties_strength].
 MANUAL; - Upgrade inference; once a concept column has been activated and its feature neurons have fired (connection targets have been activated), prevent them from firing again until a new concept column is activated. Upgrade inference seed phase to activate global target neurons and not train (process_column_inference_seed).
 MANUAL; - Upgrade inference; draw feature neuron activation. Extract SequenceObservedColumnsInferenceSeed/SequenceObservedColumnsInferencePrediction from SequenceObservedColumns. Partially revert inference; fire feature neurons (and activate their connection targets) independently. Patch first_pass; only execute addConceptToConceptColumnsDict if pos in noun_pos_tags. Patch update_observed_columns; set global global_feature_neurons. Update process_features_active(not train):deactivateNeuronsUponPrediction to deactivate based on feature_neurons_inactive_source (i.e. mask by source concept columns only).
+MANUAL; - Update process_features_active - disable activation trace during train, patch calculation of feature_neurons_inactive_source.
