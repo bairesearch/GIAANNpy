@@ -17,11 +17,12 @@ if(useInference):
 	lowMem = False		#mandatory
 	sequenceObservedColumnsUseSequenceFeaturesOnly = False	#mandatory	#must be set to false as global_feature_neurons are updated (which have complete feature lists, not sequence limited feature lists)
 	drawSequenceObservedColumns = False	#mandatory
+	drawRelationTypes = False	#False: draw activation status
 else:
 	lowMem = True		 #optional
 	sequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#optional (will affect which network changes can be visualised)
 	drawSequenceObservedColumns = False	#optional	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !sequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns	#optional (will affect which network changes can be visualised)
-useSaveData = True	#save data is required to allow consecutive sentence training and inference (because connection data are stored in observed columns, which are refreshed every sentence)
+	drawRelationTypes = True	#draw feature neuron and connection relation types in different colours
 
 sequenceObservedColumnsMatchSequenceWords = False
 if(sequenceObservedColumnsUseSequenceFeaturesOnly):
@@ -31,6 +32,7 @@ if(sequenceObservedColumnsMatchSequenceWords):
 	#sumChangesToConceptNeuronSequenceInstances = True	#mandatory	#for multiple instances of concept in sequence, need to take the sum of the changes between the existing and modified arrays for each instance of a same concept in the sequence
 	assert not drawSequenceObservedColumns, "sequenceObservedColumnsMatchSequenceWords does not currently support drawSequenceObservedColumns"
 
+useSaveData = True	#save data is required to allow consecutive sentence training and inference (because connection data are stored in observed columns, which are refreshed every sentence)
 usePOS = True		 # usePOS mode	#mandatory
 useParallelProcessing = True	#mandatory (else restore original code pre-GIAANNproto1b3a)
 randomiseColumnFeatureXposition = True	#shuffle x position of column internal features such that their connections can be better visualised
@@ -97,12 +99,96 @@ os.makedirs(observed_columns_dir, exist_ok=True)
 array_index_properties_strength = 0
 array_index_properties_permanence = 1
 array_index_properties_activation = 2
+array_index_properties_time = 3
+array_index_properties_pos = 4
 array_index_type_all = 0
 array_type = torch.float32	#torch.long	#torch.float32
 
 # Define POS tag sets for nouns and non-nouns
 noun_pos_tags = {'NOUN', 'PROPN'}
 non_noun_pos_tags = {'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X'}
+
+def pos_int_to_pos_string(pos_int):
+	if pos_int in nlp.vocab.strings:
+		return nlp.vocab[pos_int].text
+	else:
+		return ''
+		
+def pos_string_to_pos_int(pos_string):
+	return nlp.vocab.strings[pos_string]
+		
+if(drawRelationTypes):
+	relation_type_concept_pos1 = 'NOUN'
+	relation_type_concept_pos2 = 'PROPN'
+	relation_type_action_pos = 'VERB'
+	relation_type_condition_pos = 'ADP'
+	relation_type_quality_pos = 'ADJ'
+	relation_type_modifier_pos = 'ADV'
+	
+	relation_type_determiner_pos = 'DET'
+	relation_type_conjunction_pos1 = 'CCONJ'
+	relation_type_conjunction_pos2 = 'SCONJ'
+	relation_type_quantity_pos1 = 'SYM'
+	relation_type_quantity_pos2 = 'NUM'
+	relation_type_aux_pos = 'AUX'
+
+	neuron_pos_to_relation_type_dict = {}
+	neuron_pos_to_relation_type_dict[relation_type_concept_pos1] = 'blue'
+	neuron_pos_to_relation_type_dict[relation_type_concept_pos2] = 'blue'
+	neuron_pos_to_relation_type_dict[relation_type_action_pos] = 'green'
+	neuron_pos_to_relation_type_dict[relation_type_condition_pos] = 'red'
+	neuron_pos_to_relation_type_dict[relation_type_quality_pos] = 'turquoise'
+	neuron_pos_to_relation_type_dict[relation_type_modifier_pos] = 'lightskyblue'
+	
+	neuron_pos_to_relation_type_dict[relation_type_determiner_pos] = 'magenta'
+	neuron_pos_to_relation_type_dict[relation_type_conjunction_pos1] = 'black'
+	neuron_pos_to_relation_type_dict[relation_type_conjunction_pos2] = 'black'
+	neuron_pos_to_relation_type_dict[relation_type_quantity_pos1] = 'purple'
+	neuron_pos_to_relation_type_dict[relation_type_quantity_pos2] = 'purple'
+	neuron_pos_to_relation_type_dict[relation_type_aux_pos] = 'lightskyblue'
+
+	relation_type_part_property_col = 'cyan'
+	relation_type_aux_definition_col = 'blue'
+	relation_type_aux_quality_col = 'turquoise'
+	relation_type_aux_action_col = 'green'
+	relation_type_aux_property_col = 'cyan'
+	
+	relation_type_other_col = 'gray'	#INTJ, X, other AUX
+	
+	be_auxiliaries = ["am", "is", "are", "was", "were", "being", "been"]
+	have_auxiliaries = ["have", "has", "had", "having"]
+	do_auxiliaries = ["do", "does", "did", "doing"]
+
+	def generateFeatureNeuronColour(pos_float_torch, word, internal_connection=False):
+		#print("pos_float_torch = ", pos_float_torch)
+		pos_int = pos_float_torch.int().item()
+		pos_string = pos_int_to_pos_string(pos_int)
+		if(pos_string):
+			if(pos_string in neuron_pos_to_relation_type_dict):
+				colour = neuron_pos_to_relation_type_dict[pos_string]
+			else:
+				colour = relation_type_other_col
+				
+			#special cases;
+			if(pos_string == 'AUX'):
+				if(word in have_auxiliaries):
+					colour = relation_type_aux_property_col
+				elif(word in be_auxiliaries):
+					if(internal_connection):
+						colour = relation_type_aux_quality_col
+					else:
+						colour = relation_type_aux_definition_col
+				elif(word in do_auxiliaries):
+					colour = relation_type_aux_action_col
+			if(pos_string == 'PART'):
+				if(word == "'s"):
+					colour = relation_type_part_property_col
+		else:
+			colour = relation_type_other_col
+			#print("generateFeatureNeuronColour error; pos int = 0")
+			
+		return colour
+	
 
 # Define constants for permanence and activation trace	#TODO: train hyperparameters
 z1 = 3  # Initial permanence value	
@@ -206,7 +292,9 @@ class ObservedColumn:
 		feature_neurons_strength = torch.zeros(f, dtype=array_type)
 		feature_neurons_permanence = torch.full((f,), z1, dtype=array_type)  # Initialize permanence to z1=3
 		feature_neurons_activation = torch.zeros(f, dtype=array_type)  # Activation trace counters
-		feature_neurons = torch.stack([feature_neurons_strength, feature_neurons_permanence, feature_neurons_activation])
+		feature_neurons_time = torch.zeros(f, dtype=array_type)
+		feature_neurons_pos = torch.zeros(f, dtype=array_type)
+		feature_neurons = torch.stack([feature_neurons_strength, feature_neurons_permanence, feature_neurons_activation, feature_neurons_time, feature_neurons_pos])
 		feature_neurons = feature_neurons.unsqueeze(1)	#add type dimension (action, condition, quality, modifier etc) #not currently used
 		return feature_neurons
 
@@ -215,7 +303,9 @@ class ObservedColumn:
 		connection_strength = torch.zeros(f, c, f, dtype=array_type)
 		connection_permanence = torch.full((f, c, f), z1, dtype=array_type)  # Initialize permanence to z1=3
 		connection_activation = torch.zeros(f, c, f, dtype=array_type)  # Activation trace counters
-		feature_connections = torch.stack([connection_strength, connection_permanence, connection_activation])
+		connection_time = torch.zeros(f, c, f, dtype=array_type)
+		connection_pos = torch.zeros(f, c, f, dtype=array_type)
+		feature_connections = torch.stack([connection_strength, connection_permanence, connection_activation, connection_time, connection_pos])
 		feature_connections = feature_connections.unsqueeze(1)	#add type dimension (action, condition, quality, modifier etc) #not currently used
 		return feature_connections
 	
@@ -435,7 +525,9 @@ class SequenceObservedColumns:
 		feature_neurons_strength = torch.zeros(cs, fs, dtype=array_type)
 		feature_neurons_permanence = torch.full((cs, fs), z1, dtype=array_type)
 		feature_neurons_activation = torch.zeros(cs, fs, dtype=array_type)
-		feature_neurons = torch.stack([feature_neurons_strength, feature_neurons_permanence, feature_neurons_activation])
+		feature_neurons_time = torch.zeros(cs, fs, dtype=array_type)
+		feature_neurons_pos = torch.zeros(cs, fs, dtype=array_type)
+		feature_neurons = torch.stack([feature_neurons_strength, feature_neurons_permanence, feature_neurons_activation, feature_neurons_time, feature_neurons_pos])
 		feature_neurons = feature_neurons.unsqueeze(1)	#add type dimension (action, condition, quality, modifier etc) #not currently used
 		return feature_neurons
 
@@ -444,7 +536,9 @@ class SequenceObservedColumns:
 		connection_strength = torch.zeros(cs, fs, cs, fs, dtype=array_type)
 		connection_permanence = torch.full((cs, fs, cs, fs), z1, dtype=array_type)
 		connection_activation = torch.zeros(cs, fs, cs, fs, dtype=array_type)
-		feature_connections = torch.stack([connection_strength, connection_permanence, connection_activation])
+		connection_time = torch.zeros(cs, fs, cs, fs, dtype=array_type)
+		connection_pos = torch.zeros(cs, fs, cs, fs, dtype=array_type)
+		feature_connections = torch.stack([connection_strength, connection_permanence, connection_activation, connection_time, connection_pos])
 		feature_connections = feature_connections.unsqueeze(1)	#add type dimension (action, condition, quality, modifier etc) #not currently used
 		return feature_connections
 	
@@ -1040,7 +1134,6 @@ def process_concept_words(doc, words, lemmas, pos_tags, sequence_observed_column
 	
 def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, sequence_observed_columns, concept_indices, train, num_seed_tokens=None, numberConceptsInSeed=None):
 	numberConceptsInSequence = concept_indices.shape[0]
-	print("numberConceptsInSequence = ", numberConceptsInSequence)
 	
 	cs = sequence_observed_columns.cs #!sequenceObservedColumnsMatchSequenceWords: will be less than len(concept_indices) if there are multiple instances of a concept in a sequence
 	fs = sequence_observed_columns.fs  #sequenceObservedColumnsMatchSequenceWords: len(doc), else number of feature neurons per column
@@ -1048,6 +1141,7 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 	feature_neurons_word_order = torch.arange(fs).unsqueeze(0).repeat(cs, 1)
 	torch.zeros((cs, fs), dtype=torch.long)
 	columns_word_order = torch.zeros((cs), dtype=torch.long)
+	feature_neurons_pos = torch.zeros((cs, fs), dtype=array_type)
 	
 	concept_indices_list = concept_indices.tolist()
 	#convert start/end indices to active features arrays
@@ -1058,6 +1152,9 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 			columns_word_order[sequence_concept_index] = sequence_concept_index	#CHECKTHIS; or sequence_concept_word_index
 			sequence_concept_index_mask[:, sequence_concept_word_index] = 0	#ignore concept feature neurons from other columns
 			sequence_concept_index_mask[sequence_concept_index, sequence_concept_word_index] = 1
+			for j in range(start_indices[sequence_concept_index], end_indices[sequence_concept_index]):
+				feature_pos = pos_string_to_pos_int(pos_tags[j])
+				feature_neurons_pos[sequence_concept_index, j] = feature_pos
 	else:
 		sequence_concept_index_mask = None
 		for i in range(numberConceptsInSequence):
@@ -1066,6 +1163,7 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 			for j in range(start_indices[i], end_indices[i]):	#sequence word index
 				feature_word = words[j].lower()
 				feature_lemma = lemmas[j]
+				feature_pos = pos_string_to_pos_int(pos_tags[j])
 				if(j in sequence_observed_columns.columns_index_sequence_word_index_dict):	#test is required for concept neurons
 					sequence_concept_word_index = j
 					columns_word_order[sequence_concept_index] = sequence_concept_word_index	#CHECKTHIS; or sequence_concept_index
@@ -1079,11 +1177,12 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 					sequence_feature_index = sequence_observed_columns.feature_word_to_index[feature_word]
 					feature_neurons_active[sequence_concept_index, sequence_feature_index] = 1
 					feature_neurons_word_order[sequence_concept_index, sequence_feature_index] = j
+				feature_neurons_pos[sequence_concept_index, sequence_feature_index] = feature_pos
 	
-	process_features_active(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, train, num_seed_tokens, numberConceptsInSeed)
+	process_features_active(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos, train, num_seed_tokens, numberConceptsInSeed)
 
 #first dim cs1 pertains to every concept node in sequence
-def process_features_active(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, train, num_seed_tokens=None, numberConceptsInSeed=None):
+def process_features_active(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos, train, num_seed_tokens=None, numberConceptsInSeed=None):
 	feature_neurons_inactive = 1 - feature_neurons_active
 	
 	if(train):
@@ -1091,7 +1190,9 @@ def process_features_active(sequence_observed_columns, feature_neurons_active, c
 		sequence_observed_columns.feature_neurons[array_index_properties_strength, array_index_type_all, :, :] += feature_neurons_active
 		sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all, :, :] += feature_neurons_active*z1	#orig = feature_neurons_active*(sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all] ** 2) + feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_permanence, array_index_type_all]
 		#sequence_observed_columns.feature_neurons[array_index_properties_activation, array_index_type_all, :, :] += feature_neurons_active*j1	#update the activations of the target not source nodes
-
+		sequence_observed_columns.feature_neurons[array_index_properties_time, array_index_type_all, :, :] = feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_time, array_index_type_all] + feature_neurons_active*sentence_count
+		sequence_observed_columns.feature_neurons[array_index_properties_pos, array_index_type_all, :, :] = feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_pos, array_index_type_all] + feature_neurons_active*feature_neurons_pos
+		
 	feature_neurons_active_1d = feature_neurons_active.view(cs*fs)
 	feature_connections_active = torch.matmul(feature_neurons_active_1d.unsqueeze(1), feature_neurons_active_1d.unsqueeze(0)).view(cs, fs, cs, fs)
 
@@ -1116,6 +1217,8 @@ def process_features_active(sequence_observed_columns, feature_neurons_active, c
 	identity_mask = (cs_indices_1 != cs_indices_2) | (fs_indices_1 != fs_indices_2)
 	feature_connections_active = feature_connections_active * identity_mask
 
+	feature_connections_pos = feature_neurons_pos.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)	#CHECKTHIS
+	
 	if(not train):
 		firstWordIndexPredictPhase = num_seed_tokens
 		word_order_mask = feature_neurons_word_order_expanded_1 < firstWordIndexPredictPhase
@@ -1131,7 +1234,9 @@ def process_features_active(sequence_observed_columns, feature_neurons_active, c
 		sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, :, :, :, :] += feature_connections_strength_update
 		sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, :, :, :, :] += feature_connections_active*z1	#orig = feature_connections_active*(sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all] ** 2) + feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all]
 		#sequence_observed_columns.feature_connections[array_index_properties_activation, array_index_type_all, :, :, :, :] += feature_connections_active*j1	#connection activations are not currently used
-
+		sequence_observed_columns.feature_connections[array_index_properties_time, array_index_type_all, :, :, :, :] = feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_time, array_index_type_all] +  feature_connections_active*sentence_count
+		sequence_observed_columns.feature_connections[array_index_properties_pos, array_index_type_all, :, :, :, :] = feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_pos, array_index_type_all] + feature_connections_active*feature_connections_pos
+		
 		#decrease permanence;
 		decrease_permanence_active(sequence_observed_columns, feature_neurons_active, feature_neurons_inactive, sequence_concept_index_mask)
 	else:
@@ -1240,12 +1345,22 @@ def visualize_graph(sequence_observed_columns):
 					if(global_feature_neurons[array_index_properties_activation, array_index_type_all, concept_index, feature_index_in_observed_column] > 0):
 						featureActive = True
 			if(featurePresent):	
-				if(featureActive):
+			
+				if(drawRelationTypes):
+					if not conceptNeuronFeature:
+						if(drawSequenceObservedColumns):
+							neuron_color = generateFeatureNeuronColour(sequence_observed_columns.feature_neurons[array_index_properties_pos, array_index_type_all, c_idx, f_idx], feature_word)
+						else:
+							if lowMem:
+								neuron_color = generateFeatureNeuronColour(observed_column.feature_neurons[array_index_properties_pos, array_index_type_all, feature_index_in_observed_column], feature_word)
+							else:
+								neuron_color = generateFeatureNeuronColour(global_feature_neurons[array_index_properties_pos, array_index_type_all, concept_index, feature_index_in_observed_column], feature_word)
+				elif(featureActive):
 					if(conceptNeuronFeature):
 						neuron_color = 'lightskyblue'
 					else:
 						neuron_color = 'cyan'
-				
+							
 				feature_node = f"{lemma}_{feature_word}_{f_idx}"
 				if(randomiseColumnFeatureXposition and not conceptNeuronFeature):
 					x_offset_shuffled = x_offset + random.uniform(-0.5, 0.5)
@@ -1294,8 +1409,15 @@ def visualize_graph(sequence_observed_columns):
 							else:
 								if(observed_column.feature_connections[array_index_properties_strength, array_index_type_all, f_idx, c_idx, other_f_idx] > 0 and observed_column.feature_connections[array_index_properties_permanence, array_index_type_all, f_idx, c_idx, other_f_idx] > 0):
 									featurePresent = True
+							if(drawRelationTypes):
+								if(drawSequenceObservedColumns):
+									connection_color = generateFeatureNeuronColour(sequence_observed_columns.feature_connections[array_index_properties_pos, array_index_type_all, c_idx, f_idx, c_idx, other_f_idx], feature_word, internal_connection=True)
+								else:
+									connection_color = generateFeatureNeuronColour(observed_column.feature_connections[array_index_properties_pos, array_index_type_all, f_idx, c_idx, other_f_idx], feature_word, internal_connection=True)
+							else:
+								connection_color = 'yellow'
 							if(featurePresent):
-								G.add_edge(source_node, target_node, color='yellow')
+								G.add_edge(source_node, target_node, color=connection_color)
 		# External connections (orange)
 		for feature_word, feature_index_in_observed_column in feature_word_to_index.items():
 			source_node = f"{lemma}_{feature_word}_{feature_index_in_observed_column}"
@@ -1321,8 +1443,15 @@ def visualize_graph(sequence_observed_columns):
 								if lemma != other_lemma:	#if observed_column != other_observed_column:
 									if(observed_column.feature_connections[array_index_properties_strength, array_index_type_all, f_idx, other_c_idx, other_f_idx] > 0 and observed_column.feature_connections[array_index_properties_permanence, array_index_type_all, f_idx, other_c_idx, other_f_idx] > 0):
 										featurePresent = True
+							if(drawRelationTypes):
+								if(drawSequenceObservedColumns):
+									connection_color = generateFeatureNeuronColour(sequence_observed_columns.feature_connections[array_index_properties_pos, array_index_type_all, c_idx, f_idx, other_c_idx, other_f_idx], feature_word, internal_connection=False)
+								else:
+									connection_color = generateFeatureNeuronColour(observed_column.feature_connections[array_index_properties_pos, array_index_type_all, f_idx, other_c_idx, other_f_idx], feature_word, internal_connection=False)
+							else:
+								connection_color = 'orange'
 							if(featurePresent):
-								G.add_edge(source_node, target_node, color='orange')
+								G.add_edge(source_node, target_node, color=connection_color)
 								
 	# Get positions and colors for drawing
 	pos = nx.get_node_attributes(G, 'pos')
