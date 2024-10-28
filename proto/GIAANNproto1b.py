@@ -37,13 +37,17 @@ usePOS = True		 # usePOS mode	#mandatory
 useParallelProcessing = True	#mandatory (else restore original code pre-GIAANNproto1b3a)
 randomiseColumnFeatureXposition = True	#shuffle x position of column internal features such that their connections can be better visualised
 
+increaseColumnInternalConnectionsStrength = True #Increase column internal connections strength
+if(increaseColumnInternalConnectionsStrength):
+ 	increaseColumnInternalConnectionsStrengthModifier = 10.0
+	
 #debug vars;
 debugSmallDataset = False
 debugConceptFeaturesOccurFirstInSubsequence = False #Constrain column feature detection to be after concept feature detection
 debugConnectColumnsToNextColumnsInSequenceOnly = False
 debugDrawNeuronStrengths = False
 if(useInference):
-	#debugConceptFeaturesOccurFirstInSubsequence = True
+	debugConceptFeaturesOccurFirstInSubsequence = True	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
 	debugDrawNeuronStrengths = True
 
 useDedicatedFeatureLists = False
@@ -64,7 +68,7 @@ inference_prompt_file = 'inference_prompt.txt'
 if(useInference):
 	deactivateNeuronsUponPrediction = True
 
-	num_seed_tokens = 6	#5	#number of seed tokens in last sentence of inference prompt (remaining tokens will be prediction tokens)
+	num_seed_tokens = 5	#number of seed tokens in last sentence of inference prompt (remaining tokens will be prediction tokens)
 	num_prediction_tokens = 10	#number of words to predict after network seed
 
 	#TODO: train hyperparameters
@@ -1235,8 +1239,8 @@ def process_features_active(sequence_observed_columns, feature_neurons_active, c
 	fs_indices_2 = torch.arange(fs).view(1, 1, 1, fs).expand(cs, fs, cs, fs)  # Second fs dimension
 	identity_mask = (cs_indices_1 != cs_indices_2) | (fs_indices_1 != fs_indices_2)
 	feature_connections_active = feature_connections_active * identity_mask
-
-	feature_connections_pos = feature_neurons_pos.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)	#CHECKTHIS
+	
+	feature_connections_pos = feature_neurons_pos.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
 	
 	if(not train):
 		firstWordIndexPredictPhase = num_seed_tokens
@@ -1252,6 +1256,11 @@ def process_features_active(sequence_observed_columns, feature_neurons_active, c
 	feature_connections_strength_update = feature_connections_active*feature_connections_proximity
 	#print("feature_connections_strength_update = ", feature_connections_strength_update)
 
+	if(increaseColumnInternalConnectionsStrength):
+		column_internal_connections_mask = (cs_indices_1 == cs_indices_2)
+		column_internal_connections_mask_off = torch.logical_not(column_internal_connections_mask)
+		feature_connections_strength_update = column_internal_connections_mask.float()*feature_connections_strength_update*increaseColumnInternalConnectionsStrengthModifier + column_internal_connections_mask_off.float()*feature_connections_strength_update
+		
 	if(train):
 		sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, :, :, :, :] += feature_connections_strength_update
 		sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all, :, :, :, :] += feature_connections_active*z1	#orig = feature_connections_active*(sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all] ** 2) + feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all]
@@ -1272,11 +1281,9 @@ def process_features_active(sequence_observed_columns, feature_neurons_active, c
 			#will only activate target neurons in sequence_observed_columns (not suitable for inference seed/prediction phase)
 
 		if(deactivateNeuronsUponPrediction):
-			feature_neurons_source_mask = torch.zeros_like(feature_neurons_active)
-			feature_neurons_source_mask[:numberConceptsInSeed, :] = 1
+			feature_neurons_source_mask = feature_neurons_word_order < num_seed_tokens
 			feature_neurons_active_source = torch.logical_and(feature_neurons_source_mask, feature_neurons_active > 0)
 			feature_neurons_inactive_source = torch.logical_not(feature_neurons_active_source).float()
-
 			sequence_observed_columns.feature_neurons[array_index_properties_activation, array_index_type_all, :, :] *= feature_neurons_inactive_source
 		
 def decrease_permanence_active(sequence_observed_columns, feature_neurons_active, feature_neurons_inactive, sequence_concept_index_mask):
