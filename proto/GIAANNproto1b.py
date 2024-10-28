@@ -15,7 +15,7 @@ torch.set_printoptions(threshold=float('inf'))
 useInference = False  # useInference mode
 if(useInference):
 	lowMem = False		#mandatory
-	sequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
+	sequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised	#during seed phase only (will bias prediction towards target sentence words)
 	drawSequenceObservedColumns = False	#mandatory
 	drawRelationTypes = False	#False: draw activation status
 else:
@@ -41,6 +41,10 @@ randomiseColumnFeatureXposition = True	#shuffle x position of column internal fe
 debugSmallDataset = False
 debugConceptFeaturesOccurFirstInSubsequence = False #Constrain column feature detection to be after concept feature detection
 debugConnectColumnsToNextColumnsInSequenceOnly = False
+debugDrawNeuronStrengths = False
+if(useInference):
+	#debugConceptFeaturesOccurFirstInSubsequence = True
+	debugDrawNeuronStrengths = True
 
 useDedicatedFeatureLists = False
 #if usePOS and not lowMem:
@@ -60,7 +64,7 @@ inference_prompt_file = 'inference_prompt.txt'
 if(useInference):
 	deactivateNeuronsUponPrediction = True
 
-	num_seed_tokens = 5	#number of seed tokens in last sentence of inference prompt (remaining tokens will be prediction tokens)
+	num_seed_tokens = 6	#5	#number of seed tokens in last sentence of inference prompt (remaining tokens will be prediction tokens)
 	num_prediction_tokens = 10	#number of words to predict after network seed
 
 	#TODO: train hyperparameters
@@ -988,8 +992,8 @@ def process_column_inference_prediction(observed_columns_dict, wordPredictionInd
 		sequence_observed_columns_prediction = SequenceObservedColumnsInferencePrediction(words, lemmas, observed_columns_dict, observed_columns_sequence_candidate_index_dict)
 	
 		#process features (activate global target neurons);
-		feature_neurons_active = global_feature_neurons[array_index_properties_activation, array_index_type_all, concept_columns_indices, concept_columns_feature_indices]	#or sequence_observed_columns_prediction.concept_indices_in_sequence_observed_tensor
-		process_features_active_predict(sequence_observed_columns_prediction, feature_neurons_active)
+		process_features_active_predict(sequence_observed_columns_prediction, concept_columns_indices, concept_columns_feature_indices)
+		#process_features_active_predict_single(sequence_observed_columns_prediction, concept_columns_indices, concept_columns_feature_indices)
 
 		#decrement activations;
 		if(useActivationDecrement):
@@ -1050,30 +1054,35 @@ def process_column_inference_prediction(observed_columns_dict, wordPredictionInd
 	
 	return featurePredictionTargetMatch, concept_columns_indices_next, concept_columns_feature_indices_next
 	 
+#first dim cs1 restricted to a single token
+def process_features_active_predict_single(sequence_observed_columns, concept_columns_indices, concept_columns_feature_indices):
+	global global_feature_neurons
+	feature_neurons_active = global_feature_neurons[array_index_properties_activation, array_index_type_all, concept_columns_indices, concept_columns_feature_indices]
+
+	#target neuron activation dependence on connection strength;
+	feature_neurons_target_activation = feature_neurons_active * sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, 0, concept_columns_feature_indices.squeeze(), :, :]
+	
+	#update the activations of the target nodes;
+	global_feature_neurons[array_index_properties_activation, array_index_type_all] += feature_neurons_target_activation*j1
+		
+
 #first dim cs1 restricted to a single token (or candiate set of tokens).
-def process_features_active_predict(sequence_observed_columns, feature_neurons_active):
+def process_features_active_predict(sequence_observed_columns, concept_columns_indices, concept_columns_feature_indices):
 	global global_feature_neurons
 
-	#print("global_feature_neurons[array_index_properties_activation] = ", global_feature_neurons[array_index_properties_activation])
-	#print("feature_neurons_active = ", feature_neurons_active)
+	feature_neurons_active = torch.zeros(sequence_observed_columns.cs2, sequence_observed_columns.fs2)
+	feature_neurons_active[:, concept_columns_feature_indices] = 1.0
 	
 	feature_neurons_active_expanded = feature_neurons_active.unsqueeze(2).unsqueeze(3)
 	feature_connections_active = feature_neurons_active_expanded.expand(-1, -1, sequence_observed_columns.cs2, sequence_observed_columns.fs2)
-	#print("feature_connections_active = ", feature_connections_active)
-	#print("sequence_observed_columns.feature_connections.shape = ", sequence_observed_columns.feature_connections.shape)
-	
-	#not required as predicted nodes are deactivated upon firing; ensure identical feature nodes are not connected together
 	
 	#target neuron activation dependence on connection strength;
 	feature_connections_activation_update = feature_connections_active * sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all]
 	#update the activations of the target nodes;
 	feature_neurons_target_activation = torch.sum(feature_connections_activation_update, dim=(0, 1))
-	#print("feature_neurons_target_activation = ", feature_neurons_target_activation)
 
-	#print("global_feature_neurons[array_index_properties_activation, array_index_type_all].shape = ", global_feature_neurons[array_index_properties_activation, array_index_type_all].shape)
-	#print("feature_neurons_target_activation.shape = ", feature_neurons_target_activation.shape)
 	global_feature_neurons[array_index_properties_activation, array_index_type_all] += feature_neurons_target_activation*j1
-		
+	
 				
 def process_concept_words(doc, words, lemmas, pos_tags, sequence_observed_columns, train=True, num_seed_tokens=None, numberConceptsInSeed=None):
 	"""
@@ -1235,10 +1244,13 @@ def process_features_active(sequence_observed_columns, feature_neurons_active, c
 		feature_connections_active = feature_connections_active * word_order_mask
 			
 	feature_connections_inactive = 1 - feature_connections_active
-	
-	#prefer closer than further target neurons when strengthening connections or activating target neurons in sentence;
-	feature_neurons_word_order_expanded_1 = feature_neurons_word_order.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)  # For the first node
-	feature_connections_strength_update = feature_connections_active*feature_neurons_word_order_expanded_1	#orig: feature_connections_active
+
+	#prefer closer than further target neurons when strengthening connections (and activating target neurons) in sentence;
+	feature_neurons_word_order_1d = feature_neurons_word_order.flatten()
+	feature_connections_distances = torch.abs(feature_neurons_word_order_1d.unsqueeze(1) - feature_neurons_word_order_1d).reshape(cs, fs, cs, fs)
+	feature_connections_proximity = 1/(feature_connections_distances + 1) * 10
+	feature_connections_strength_update = feature_connections_active*feature_connections_proximity
+	#print("feature_connections_strength_update = ", feature_connections_strength_update)
 
 	if(train):
 		sequence_observed_columns.feature_connections[array_index_properties_strength, array_index_type_all, :, :, :, :] += feature_connections_strength_update
@@ -1295,7 +1307,15 @@ def decrease_permanence_active(sequence_observed_columns, feature_neurons_active
 	sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all] = torch.clamp(sequence_observed_columns.feature_connections[array_index_properties_permanence, array_index_type_all], min=0)
  
 	#current limitation; will not deactivate neurons or remove their strength if their permanence goes to zero
+
+def createNeuronLabelWithStrength(name, strength):
+	label = name + "\n" + floatToString(strength)
+	return label
 	
+def floatToString(value):
+	result = str(round(value.item(), 2))
+	return result
+		
 def visualize_graph(sequence_observed_columns):
 	G.clear()
 
@@ -1369,7 +1389,16 @@ def visualize_graph(sequence_observed_columns):
 						neuron_color = 'lightskyblue'
 					else:
 						neuron_color = 'cyan'
-							
+						
+				if(debugDrawNeuronStrengths):
+					if(drawSequenceObservedColumns):
+						neuron_name = createNeuronLabelWithStrength(neuron_name, sequence_observed_columns.feature_neurons[array_index_properties_activation, array_index_type_all, c_idx, f_idx])
+					else:
+						if lowMem:
+							neuron_name = createNeuronLabelWithStrength(neuron_name, observed_column.feature_neurons[array_index_properties_activation, array_index_type_all, feature_index_in_observed_column])
+						else:
+							neuron_name = createNeuronLabelWithStrength(neuron_name, global_feature_neurons[array_index_properties_activation, array_index_type_all, concept_index, feature_index_in_observed_column])
+
 				feature_node = f"{lemma}_{feature_word}_{f_idx}"
 				if(randomiseColumnFeatureXposition and not conceptNeuronFeature):
 					x_offset_shuffled = x_offset + random.uniform(-0.5, 0.5)
