@@ -17,23 +17,20 @@ if(useInference):
 	inferenceSeedTargetActivationsGlobalFeatureArrays = False
 	lowMem = False		#mandatory
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-		sequenceObservedColumnsUseSequenceFeaturesOnly = False	#mandatory	#global feature arrays are directly written to
+		sequenceObservedColumnsUseSequenceFeaturesOnly = False	#mandatory	#global feature arrays are directly written to during inference seed phase
 	else:
 		sequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised	#during seed phase only (will bias prediction towards target sentence words)
+	sequenceObservedColumnsMatchSequenceWords = True	#optional	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sentence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
 	drawSequenceObservedColumns = False	#mandatory
 	drawRelationTypes = False	#False: draw activation status
 	drawNetworkDuringTrain = False
 else:
 	lowMem = True		 #optional
-	sequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
+	sequenceObservedColumnsUseSequenceFeaturesOnly = False	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
+	sequenceObservedColumnsMatchSequenceWords = True	#optional	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sentence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
 	drawSequenceObservedColumns = False	#optional	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !sequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns	#optional (will affect which network changes can be visualised)
 	drawRelationTypes = True	#draw feature neuron and connection relation types in different colours
 	drawNetworkDuringTrain = True
-
-
-sequenceObservedColumnsMatchSequenceWords = False
-if(sequenceObservedColumnsUseSequenceFeaturesOnly):
-	sequenceObservedColumnsMatchSequenceWords = True	#optional	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sentence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)
 
 if(sequenceObservedColumnsMatchSequenceWords):
 	#sumChangesToConceptNeuronSequenceInstances = True	#mandatory	#for multiple instances of concept in sequence, need to take the sum of the changes between the existing and modified arrays for each instance of a same concept in the sequence
@@ -456,18 +453,15 @@ class SequenceObservedColumns:
 		observed_column = list(observed_columns_dict.values())[0]	#all features (including words) are identical per observed column
 		self.feature_words, self.feature_indices_in_observed_tensor, self.f_idx_tensor = self.identifyObservedColumnFeatureWords(words, lemmas, observed_column)
 
-		if(sequenceObservedColumnsMatchSequenceWords):
+		if(sequenceObservedColumnsUseSequenceFeaturesOnly):
 			self.fs = self.feature_indices_in_observed_tensor.shape[0]
-			self.index_to_feature_word = {}
-			for idx, feature_word in enumerate(self.feature_words):
-				self.index_to_feature_word[idx] = feature_word
 		else:
 			self.fs = len(self.feature_words)
-			self.feature_word_to_index = {}
-			self.index_to_feature_word = {}
-			for idx, feature_word in enumerate(self.feature_words):
-				self.feature_word_to_index[feature_word] = idx
-				self.index_to_feature_word[idx] = feature_word
+		self.feature_word_to_index = {}
+		self.index_to_feature_word = {}
+		for idx, feature_word in enumerate(self.feature_words):
+			self.feature_word_to_index[feature_word] = idx
+			self.index_to_feature_word[idx] = feature_word
 
 		# Initialize arrays
 		self.feature_neurons = self.initialiseFeatureNeuronsSequence(self.cs, self.fs)
@@ -499,18 +493,13 @@ class SequenceObservedColumns:
 					feature_indices_in_observed.append(observed_column.feature_word_to_index[feature_word])
 			if(not sequenceObservedColumnsMatchSequenceWords):
 				feature_indices_in_observed = self.removeDuplicates(feature_indices_in_observed)
+				feature_words = self.removeDuplicates(feature_words)
 			feature_indices_in_observed_tensor = torch.tensor(feature_indices_in_observed, dtype=torch.long)
 		else:
-			if(sequenceObservedColumnsMatchSequenceWords):
-				print("identifyObservedColumnFeatureWords+!sequenceObservedColumnsUseSequenceFeaturesOnly+sequenceObservedColumnsMatchSequenceWords requires coding:")
-				exit()
-			else:
-				feature_words = observed_column.feature_word_to_index.keys()
-				feature_indices_in_observed_tensor = torch.tensor(list(observed_column.feature_word_to_index.values()), dtype=torch.long)
-		if(not sequenceObservedColumnsMatchSequenceWords):
-			feature_words = self.removeDuplicates(feature_words)
+			feature_words = observed_column.feature_word_to_index.keys()
+			feature_indices_in_observed_tensor = torch.tensor(list(observed_column.feature_word_to_index.values()), dtype=torch.long)
 		
-		if(sequenceObservedColumnsMatchSequenceWords):
+		if(sequenceObservedColumnsUseSequenceFeaturesOnly and sequenceObservedColumnsMatchSequenceWords):
 			f_idx_tensor = torch.arange(len(feature_words), dtype=torch.long)
 		else:
 			feature_word_to_index = {}
@@ -1168,18 +1157,26 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 	numberConceptsInSequence = concept_indices.shape[0]
 	
 	cs = sequence_observed_columns.cs #!sequenceObservedColumnsMatchSequenceWords: will be less than len(concept_indices) if there are multiple instances of a concept in a sequence
-	fs = sequence_observed_columns.fs  #sequenceObservedColumnsMatchSequenceWords: len(doc), else number of feature neurons per column
+	fs = sequence_observed_columns.fs  #sequenceObservedColumnsUseSequenceFeaturesOnly+sequenceObservedColumnsMatchSequenceWords: len(doc), sequenceObservedColumnsUseSequenceFeaturesOnly+!sequenceObservedColumnsMatchSequenceWords: number of feature neurons in sentence, !sequenceObservedColumnsUseSequenceFeaturesOnly: number of feature neurons in column
 	feature_neurons_active = torch.zeros((cs, fs), dtype=array_type)
 	feature_neurons_word_order = torch.arange(fs).unsqueeze(0).repeat(cs, 1)
 	torch.zeros((cs, fs), dtype=torch.long)
 	columns_word_order = torch.zeros((cs), dtype=torch.long)
 	feature_neurons_pos = torch.zeros((cs, fs), dtype=array_type)
-	
-	concept_indices_list = concept_indices.tolist()
-	#convert start/end indices to active features arrays
 	if(sequenceObservedColumnsMatchSequenceWords):
 		sequence_concept_index_mask = torch.ones((cs, fs), dtype=array_type)	#ensure to ignore concept feature neurons from other columns
-		for sequence_concept_index, sequence_concept_word_index in enumerate(concept_indices_list):
+	else:
+		sequence_concept_index_mask = None
+		
+	concept_indices_list = concept_indices.tolist()
+	#convert start/end indices to active features arrays
+	for i, sequence_concept_word_index in enumerate(concept_indices_list):
+		if(sequenceObservedColumnsMatchSequenceWords):
+			sequence_concept_index = i
+		else:
+			concept_lemma = lemmas[concept_indices[i]]
+			sequence_concept_index = sequence_observed_columns.concept_name_to_index[concept_lemma]
+		if(sequenceObservedColumnsUseSequenceFeaturesOnly and sequenceObservedColumnsMatchSequenceWords):
 			feature_neurons_active[sequence_concept_index, start_indices[sequence_concept_index]:end_indices[sequence_concept_index]] = 1
 			columns_word_order[sequence_concept_index] = sequence_concept_index
 			sequence_concept_index_mask[:, sequence_concept_word_index] = 0	#ignore concept feature neurons from other columns
@@ -1188,12 +1185,7 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 				feature_pos = pos_string_to_pos_int(pos_tags[j])
 				feature_neurons_pos[sequence_concept_index, j] = feature_pos
 				feature_neurons_word_order[sequence_concept_index, j] = j
-	else:
-		sequence_concept_index_mask = None
-		for i in range(numberConceptsInSequence):
-			concept_lemma = lemmas[concept_indices[i]]
-			sequence_concept_index = sequence_observed_columns.concept_name_to_index[concept_lemma]
-			#print("concept_lemma = ", concept_lemma, ", i = ", i, ", sequence_concept_index = ", sequence_concept_index)
+		else:
 			for j in range(start_indices[i], end_indices[i]):	#sequence word index
 				feature_word = words[j].lower()
 				feature_lemma = lemmas[j]
@@ -1212,7 +1204,6 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 					feature_neurons_active[sequence_concept_index, sequence_feature_index] = 1
 					feature_neurons_word_order[sequence_concept_index, sequence_feature_index] = j
 				feature_neurons_pos[sequence_concept_index, sequence_feature_index] = feature_pos
-	
 	if(train):
 		process_features_active_train(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos)
 	else:

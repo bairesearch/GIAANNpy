@@ -1,7 +1,7 @@
 DONE//do:
-o1 preview prompt 1b16a;
+o1 preview prompt 1b17a;
 
-v1b16a:
+v1b17a:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
 - Use the pytorch API for hardware acceleration of all arrays (for efficient parallel processing of connectivity). Do not initialise the array with a predetermined dictionary; dynamically populate the arrays as new dictionary words and relations are encountered. Will be discussed below.
 - Use vector graphics library such as networkx to always maintain a complete visualisation of the network (including active neurons). Only draw the parts of the network that are not empty.
@@ -75,3 +75,4 @@ MANUAL; - Update inference; enable sequenceObservedColumnsUseSequenceFeaturesOnl
 MANUAL; - Patch dependency of connection strength on word order distance. Patch process_features_active_predict.
 MANUAL; - Add option increaseColumnInternalConnectionsStrength - increase column internal connections strength. Patch process_features_active:deactivateNeuronsUponPrediction to only deactivate source feature neurons (not all source feature neurons in seed concept columns).
 MANUAL; - Start option inferenceSeedTargetActivationsGlobalFeatureArrays - activate entire network during inference seed phase. Extract process_features_active_train/seed from process_features_active. Update SequenceObservedColumns.update_observed_columns(mode=="applySummedChangesToConceptNeuronSequenceInstances") - ensure arrays remain positive (summation of multiple negative differences cannot result in the final array being below zero).
+MANUAL; - Make sequenceObservedColumnsUseSequenceFeaturesOnly independent of sequenceObservedColumnsMatchSequenceWords.
