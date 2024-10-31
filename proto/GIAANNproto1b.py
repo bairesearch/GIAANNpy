@@ -11,6 +11,9 @@ import numpy as np
 import random
 torch.set_printoptions(threshold=float('inf'))
 
+if torch.cuda.is_available():
+	torch.set_default_device(torch.device("cuda"))
+	
 # Set boolean variables as per specification
 useInference = False  # useInference mode
 if(useInference):
@@ -30,7 +33,7 @@ else:
 	sequenceObservedColumnsMatchSequenceWords = True	#optional	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sentence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
 	drawSequenceObservedColumns = False	#optional	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !sequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns	#optional (will affect which network changes can be visualised)
 	drawRelationTypes = True	#draw feature neuron and connection relation types in different colours
-	drawNetworkDuringTrain = True
+	drawNetworkDuringTrain = False	#default: True
 
 if(sequenceObservedColumnsMatchSequenceWords):
 	#sumChangesToConceptNeuronSequenceInstances = True	#mandatory	#for multiple instances of concept in sequence, need to take the sum of the changes between the existing and modified arrays for each instance of a same concept in the sequence
@@ -40,6 +43,7 @@ useSaveData = True	#save data is required to allow consecutive sentence training
 usePOS = True		 # usePOS mode	#mandatory
 useParallelProcessing = True	#mandatory (else restore original code pre-GIAANNproto1b3a)
 randomiseColumnFeatureXposition = True	#shuffle x position of column internal features such that their connections can be better visualised
+databaseFolder = "" #default: ""
 
 increaseColumnInternalConnectionsStrength = True #Increase column internal connections strength
 if(increaseColumnInternalConnectionsStrength):
@@ -68,7 +72,7 @@ if usePOS:
 
 #if usePOS: same word can have different pos making it classed as an instance feature or concept feature
 
-inference_prompt_file = 'inference_prompt.txt'
+inference_prompt_file = databaseFolder + 'inference_prompt.txt'
 if(useInference):
 	deactivateNeuronsUponPrediction = True
 
@@ -102,9 +106,9 @@ if(useDedicatedFeatureLists):
 nlp = spacy.load('en_core_web_sm')
 
 # Paths for saving data
-concept_columns_dict_file = 'concept_columns_dict.pkl'
-concept_features_dict_file = 'concept_features_dict.pkl'
-observed_columns_dir = 'observed_columns'
+concept_columns_dict_file = databaseFolder + 'concept_columns_dict.pkl'
+concept_features_dict_file = databaseFolder + 'concept_features_dict.pkl'
+observed_columns_dir = databaseFolder + 'observed_columns'
 os.makedirs(observed_columns_dir, exist_ok=True)
 
 #common array indices
@@ -216,7 +220,7 @@ max_sentences_train = 1000  # Adjust as needed
 
 
 if not lowMem:
-	global_feature_neurons_file = 'global_feature_neurons.pt'
+	global_feature_neurons_file = databaseFolder + 'global_feature_neurons.pt'
 
 if useDedicatedFeatureLists:
 	# Obtain lists of nouns and non-nouns using the NLTK wordnet library
