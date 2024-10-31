@@ -29,11 +29,11 @@ if(useInference):
 	drawNetworkDuringTrain = False
 else:
 	lowMem = True		 #optional
-	sequenceObservedColumnsUseSequenceFeaturesOnly = False	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
+	sequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
 	sequenceObservedColumnsMatchSequenceWords = True	#optional	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sentence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
 	drawSequenceObservedColumns = False	#optional	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !sequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns	#optional (will affect which network changes can be visualised)
 	drawRelationTypes = True	#draw feature neuron and connection relation types in different colours
-	drawNetworkDuringTrain = False	#default: True
+	drawNetworkDuringTrain = True	#default: True
 
 if(sequenceObservedColumnsMatchSequenceWords):
 	#sumChangesToConceptNeuronSequenceInstances = True	#mandatory	#for multiple instances of concept in sequence, need to take the sum of the changes between the existing and modified arrays for each instance of a same concept in the sequence
@@ -117,7 +117,9 @@ array_index_properties_permanence = 1
 array_index_properties_activation = 2
 array_index_properties_time = 3
 array_index_properties_pos = 4
+array_number_of_properties = 5
 array_index_type_all = 0
+array_number_of_types = 1
 array_type = torch.float32	#torch.long	#torch.float32
 
 # Define POS tag sets for nouns and non-nouns
@@ -305,24 +307,12 @@ class ObservedColumn:
 			
 	@staticmethod
 	def initialiseFeatureNeurons(f):
-		feature_neurons_strength = torch.zeros(f, dtype=array_type)
-		feature_neurons_permanence = torch.full((f,), z1, dtype=array_type)  # Initialize permanence to z1=3
-		feature_neurons_activation = torch.zeros(f, dtype=array_type)  # Activation trace counters
-		feature_neurons_time = torch.zeros(f, dtype=array_type)
-		feature_neurons_pos = torch.zeros(f, dtype=array_type)
-		feature_neurons = torch.stack([feature_neurons_strength, feature_neurons_permanence, feature_neurons_activation, feature_neurons_time, feature_neurons_pos])
-		feature_neurons = feature_neurons.unsqueeze(1)	#add type dimension (action, condition, quality, modifier etc) #not currently used
+		feature_neurons = torch.zeros(array_number_of_properties, array_number_of_types, f, dtype=array_type)
 		return feature_neurons
 
 	@staticmethod
 	def initialiseFeatureConnections(c, f):
-		connection_strength = torch.zeros(f, c, f, dtype=array_type)
-		connection_permanence = torch.full((f, c, f), z1, dtype=array_type)  # Initialize permanence to z1=3
-		connection_activation = torch.zeros(f, c, f, dtype=array_type)  # Activation trace counters
-		connection_time = torch.zeros(f, c, f, dtype=array_type)
-		connection_pos = torch.zeros(f, c, f, dtype=array_type)
-		feature_connections = torch.stack([connection_strength, connection_permanence, connection_activation, connection_time, connection_pos])
-		feature_connections = feature_connections.unsqueeze(1)	#add type dimension (action, condition, quality, modifier etc) #not currently used
+		feature_connections = torch.zeros(array_number_of_properties, array_number_of_types, f, c, f, dtype=array_type)
 		return feature_connections
 	
 	def resize_concept_arrays(self, new_c):
@@ -523,24 +513,12 @@ class SequenceObservedColumns:
 				
 	@staticmethod
 	def initialiseFeatureNeuronsSequence(cs, fs):
-		feature_neurons_strength = torch.zeros(cs, fs, dtype=array_type)
-		feature_neurons_permanence = torch.full((cs, fs), z1, dtype=array_type)
-		feature_neurons_activation = torch.zeros(cs, fs, dtype=array_type)
-		feature_neurons_time = torch.zeros(cs, fs, dtype=array_type)
-		feature_neurons_pos = torch.zeros(cs, fs, dtype=array_type)
-		feature_neurons = torch.stack([feature_neurons_strength, feature_neurons_permanence, feature_neurons_activation, feature_neurons_time, feature_neurons_pos])
-		feature_neurons = feature_neurons.unsqueeze(1)	#add type dimension (action, condition, quality, modifier etc) #not currently used
+		feature_neurons = torch.zeros(array_number_of_properties, array_number_of_types, cs, fs, dtype=array_type)
 		return feature_neurons
 
 	@staticmethod
 	def initialiseFeatureConnectionsSequence(cs, fs):
-		connection_strength = torch.zeros(cs, fs, cs, fs, dtype=array_type)
-		connection_permanence = torch.full((cs, fs, cs, fs), z1, dtype=array_type)
-		connection_activation = torch.zeros(cs, fs, cs, fs, dtype=array_type)
-		connection_time = torch.zeros(cs, fs, cs, fs, dtype=array_type)
-		connection_pos = torch.zeros(cs, fs, cs, fs, dtype=array_type)
-		feature_connections = torch.stack([connection_strength, connection_permanence, connection_activation, connection_time, connection_pos])
-		feature_connections = feature_connections.unsqueeze(1)	#add type dimension (action, condition, quality, modifier etc) #not currently used
+		feature_connections = torch.zeros(array_number_of_properties, array_number_of_types, cs, fs, cs, fs, dtype=array_type)
 		return feature_connections
 	
 	def populate_arrays(self, words, lemmas, sequence_observed_columns_dict):
@@ -1560,7 +1538,7 @@ def save_data(observed_columns_dict, concept_features_dict):
 	# Save concept columns dictionary to disk
 	with open(concept_columns_dict_file, 'wb') as f_out:
 		pickle.dump(concept_columns_dict, f_out)
-		
+
 	# Save concept features dictionary to disk
 	with open(concept_features_dict_file, 'wb') as f_out:
 		pickle.dump(concept_features_dict, f_out)
@@ -1568,9 +1546,9 @@ def save_data(observed_columns_dict, concept_features_dict):
 # Load the Wikipedia dataset using Hugging Face datasets
 dataset = load_dataset('wikipedia', '20220301.en', split='train', streaming=True)
 
-	
 # Start processing the dataset
 if(useInference or debugSmallDataset):
 	process_prompt()
 else:
 	process_dataset(dataset)
+
