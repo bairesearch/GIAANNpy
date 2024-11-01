@@ -1,7 +1,7 @@
 DONE//do:
-o1 preview prompt 1b19a;
+o1 preview prompt 1b19b;
 
-v1b19a:
+v1b19b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
 - Use the pytorch API for hardware acceleration of all arrays (for efficient parallel processing of connectivity). Do not initialise the array with a predetermined dictionary; dynamically populate the arrays as new dictionary words and relations are encountered. Will be discussed below.
 - Use vector graphics library such as networkx to always maintain a complete visualisation of the network (including active neurons). Only draw the parts of the network that are not empty.
@@ -79,3 +79,4 @@ MANUAL; - Make sequenceObservedColumnsUseSequenceFeaturesOnly independent of seq
 MANUAL; - Add databaseFolder. Set torch default device to GPU. 
 MANUAL; - Initialise all feature neuron and feature connection tensors to zero (only set z1 permanence when first assigning a neuron/connection).
 /MANUAL; - Convert the global feature_neurons arrays and the ObservedColumns class feature_neurons and feature_connections arrays from dense to sparse tensors.
+MANUAL; - patch populate_arrays self.feature_connections generation from sparse tensors.
