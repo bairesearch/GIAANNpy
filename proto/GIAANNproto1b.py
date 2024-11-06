@@ -115,7 +115,6 @@ nlp = spacy.load('en_core_web_sm')
 concept_columns_dict_file = databaseFolder + 'concept_columns_dict.pkl'
 concept_features_dict_file = databaseFolder + 'concept_features_dict.pkl'
 observed_columns_dir = databaseFolder + 'observed_columns'
-pytorch_tensor_file_extension = ".pt"
 os.makedirs(observed_columns_dir, exist_ok=True)
 
 #common array indices
@@ -125,7 +124,9 @@ array_index_properties_activation = 2
 array_index_properties_time = 3
 array_index_properties_pos = 4
 array_number_of_properties = 5
-array_properties_list = [array_index_properties_strength, array_index_properties_permanence, array_index_properties_activation, array_index_properties_time, array_index_properties_pos]
+array_index_segment_first = 0
+array_index_segment_internal_column = 9
+array_number_of_segments = 10	#max number of SANI segments per sequence (= max number of concept columns per sequence)
 array_type = torch.float32	#torch.long	#torch.float32
 
 # Define POS tag sets for nouns and non-nouns
@@ -227,35 +228,30 @@ sentence_count = 0
 max_sentences_train = 1000  # Adjust as needed
 
 
-'''
-def subtract_sparse_tensors(sparse_tensor1, sparse_tensor2):
-	sparse_tensor1 = sparse_tensor1.coalesce()
-	sparse_tensor2 = sparse_tensor2.coalesce()
-	#print("sparse_tensor1.indices() = ", sparse_tensor1.indices())
-	#print("sparse_tensor2.indices() = ", sparse_tensor2.indices())
-		
-	#neg_sparse_tensor2 = torch.sparse_coo_tensor(sparse_tensor2.indices(), -sparse_tensor2.values(), sparse_tensor2.size())
-	#result = sparse_tensor1 + neg_sparse_tensor2
-	
-	#assume indices of sparse_tensor1 and sparse_tensor2 are identical;
-	result = sparse_tensor1 - sparse_tensor2
-	return result
-'''
-
 def modify_sparse_tensor(sparse_tensor, indices_to_update, new_value):
-
 	sparse_tensor = sparse_tensor.coalesce()
 	
-	# Broadcast comparison to find all matches at once
-	matches = (sparse_tensor.indices().unsqueeze(-1) == indices_to_update.unsqueeze(1)).all(dim=0)
+	# Transpose indices_to_update to match dimensions
+	indices_to_update = indices_to_update.t()  # Shape: (3, N)
 	
-	# Find where any column in `matches` has all True, indicating an exact match
-	match_mask = matches.any(dim=-1)
+	# Get sparse tensor indices
+	sparse_indices = sparse_tensor.indices()   # Shape: (3, nnz)
 	
-	# Update values where match_mask is True
+	# Expand dimensions to enable broadcasting
+	sparse_indices_expanded = sparse_indices.unsqueeze(2)	   # Shape: (3, nnz, 1)
+	indices_to_update_expanded = indices_to_update.unsqueeze(1) # Shape: (3, 1, N)
+	
+	# Compare indices
+	matches = (sparse_indices_expanded == indices_to_update_expanded).all(dim=0)  # Shape: (nnz, N)
+	
+	# Identify matches
+	match_mask = matches.any(dim=1)  # Shape: (nnz,)
+	
+	# Update the values at the matched indices
 	sparse_tensor.values()[match_mask] = new_value
 	
 	return sparse_tensor
+
 	
 def merge_tensor_slices_sum(original_sparse_tensor, sparse_slices, d):
 	# Extract indices and values from the original tensor
@@ -437,7 +433,7 @@ def slice_sparse_tensor(sparse_tensor, slice_dim, slice_index):
 '''
 
 if not lowMem:
-	global_feature_neurons_file = 'global_feature_neurons'
+	global_feature_neurons_file = databaseFolder + 'global_feature_neurons.pt'
 
 if useDedicatedFeatureLists:
 	# Obtain lists of nouns and non-nouns using the NLTK wordnet library
@@ -500,11 +496,8 @@ def initialiseConceptColumnsDictionary():
 initialiseConceptColumnsDictionary()
 
 def createEmptySparseTensor(shape):
-	sparse_tensor_list = []
-	for i in range(array_number_of_properties):
-		sparse_tensor = torch.sparse_coo_tensor(indices=torch.empty((len(shape), 0), dtype=torch.long), values=torch.empty(0), size=shape)
-		sparse_tensor_list.append(sparse_tensor)
-	return sparse_tensor_list
+	sparse_zero_tensor = torch.sparse_coo_tensor(indices=torch.empty((len(shape), 0), dtype=torch.long), values=torch.empty(0), size=shape)
+	return sparse_zero_tensor
 
 # Define the ObservedColumn class
 class ObservedColumn:
@@ -519,10 +512,7 @@ class ObservedColumn:
 		if lowMem:
 			# If lowMem is enabled, the observed columns contain a list of arrays (pytorch) of f feature neurons, where f is the maximum number of feature neurons per column.
 			self.feature_neurons = self.initialiseFeatureNeurons(f)
-		else:
-			#temporary SequenceObservedColumns/ObservedColumns array conversion variables;
-			self.feature_neurons = [None]*array_number_of_properties
-		
+
 		# Map from feature words to indices in feature neurons
 		self.feature_word_to_index = {}  # Maps feature words to indices
 		self.feature_index_to_word = {}  # Maps indices to feature words
@@ -544,34 +534,32 @@ class ObservedColumn:
 					
 	@staticmethod
 	def initialiseFeatureNeurons(f):
-		feature_neurons = createEmptySparseTensor((f,))
+		feature_neurons = createEmptySparseTensor((array_number_of_properties, array_number_of_segments, f))
 		return feature_neurons
 
 	@staticmethod
 	def initialiseFeatureConnections(c, f):
-		feature_connections = createEmptySparseTensor((f, c, f))
+		feature_connections = createEmptySparseTensor((array_number_of_properties, array_number_of_segments, f, c, f))
 		return feature_connections
 	
 	def resize_concept_arrays(self, new_c):
-		for i in range(array_number_of_properties):
-			load_c = self.feature_connections[i].shape[1]
-			if new_c > load_c:
-				expanded_size = (self.feature_connections[i].shape[0], new_c, self.feature_connections[i].shape[2])
-				self.feature_connections[i] = torch.sparse_coo_tensor(self.feature_connections[i].indices(), self.feature_connections[i].values(), size=expanded_size, dtype=array_type)
+		load_c = self.feature_connections.shape[3]
+		if new_c > load_c:
+			expanded_size = (self.feature_connections.shape[0], self.feature_connections.shape[1], self.feature_connections.shape[2], new_c, self.feature_connections.shape[4])
+			self.feature_connections = torch.sparse_coo_tensor(self.feature_connections.indices(), self.feature_connections.values(), size=expanded_size, dtype=array_type)
 		
 	def expand_feature_arrays(self, new_f):
-		load_f = self.feature_connections[0].shape[0]  # or self.feature_connections[0].shape[2]
+		load_f = self.feature_connections.shape[2]  # or self.feature_connections.shape[4]
 		if new_f > load_f:
-			for i in range(array_number_of_properties):
-				# Expand feature_connections along dimensions 2 and 4
-				self.feature_connections[i] = self.feature_connections[i].coalesce()
-				expanded_size_connections = (new_f, self.feature_connections[i].shape[1], new_f)
-				self.feature_connections[i] = torch.sparse_coo_tensor(self.feature_connections[i].indices(), self.feature_connections[i].values(), size=expanded_size_connections, dtype=array_type)
-
-				if lowMem:
-					expanded_size_neurons = (new_f,)
-					self.feature_neurons[i] = self.feature_neurons[i].coalesce()
-					self.feature_neurons[i] = torch.sparse_coo_tensor(self.feature_neurons[i].indices(), self.feature_neurons[i].values(), size=expanded_size_neurons, dtype=array_type)
+			# Expand feature_connections along dimensions 2 and 4
+			self.feature_connections = self.feature_connections.coalesce()
+			expanded_size_connections = (self.feature_connections.shape[0], self.feature_connections.shape[1], new_f, self.feature_connections.shape[3], new_f)
+			self.feature_connections = torch.sparse_coo_tensor(self.feature_connections.indices(), self.feature_connections.values(), size=expanded_size_connections, dtype=array_type)
+	
+			if lowMem:
+				expanded_size_neurons = (self.feature_neurons.shape[0], self.feature_neurons.shape[1], new_f)
+				self.feature_neurons = self.feature_neurons.coalesce()
+				self.feature_neurons = torch.sparse_coo_tensor(self.feature_neurons.indices(), self.feature_neurons.values(), size=expanded_size_neurons, dtype=array_type)
 
 			for feature_index in range(load_f, new_f):
 				feature_word = concept_features_list[feature_index]
@@ -596,12 +584,12 @@ class ObservedColumn:
 		if(performRedundantCoalesce):
 			self.feature_connections = self.feature_connections.coalesce()
 			print("self.feature_connections = ", self.feature_connections)
-		save_tensor_list(self.feature_connections, observed_columns_dir, f"{self.concept_index}_feature_connections")
+		torch.save(self.feature_connections, os.path.join(observed_columns_dir, f"{self.concept_index}_feature_connections.pt"))
 		if lowMem:
 			if(performRedundantCoalesce):
 				self.feature_neurons = self.feature_neurons.coalesce()
 				print("self.feature_neurons = ", self.feature_neurons)
-			save_tensor_list(self.feature_neurons, observed_columns_dir, f"{self.concept_index}_feature_neurons")
+			torch.save(self.feature_neurons, os.path.join(observed_columns_dir, f"{self.concept_index}_feature_neurons.pt"))
 
 	@classmethod
 	def load_from_disk(cls, concept_index, lemma, i):
@@ -616,9 +604,9 @@ class ObservedColumn:
 		instance.feature_index_to_word = data['feature_index_to_word']
 		instance.next_feature_index = data['next_feature_index']
 		# Load the tensors
-		instance.feature_connections = load_tensor_list(observed_columns_dir, f"{concept_index}_feature_connections")
+		instance.feature_connections = torch.load(os.path.join(observed_columns_dir, f"{concept_index}_feature_connections.pt"))
 		if lowMem:
-			instance.feature_neurons = load_tensor_list(observed_columns_dir, f"{concept_index}_feature_neurons")
+			instance.feature_neurons = torch.load(os.path.join(observed_columns_dir, f"{concept_index}_feature_neurons.pt"))
 		return instance
 		
 # Define the SequenceObservedColumnsInferencePrediction class
@@ -631,14 +619,11 @@ class SequenceObservedColumnsInferencePrediction:
 		
 		self.cs2 = len(concept_columns_dict)
 		self.fs2 = len(concept_features_dict)
-		
-		self.feature_connections = [None]*array_number_of_properties
-		
-		for i in range(array_number_of_properties):
-			feature_connections_list = []
-			for observed_column in observed_columns_sequence_word_index_dict.values():
-				feature_connections_list.append(observed_column.feature_connections[i])
-			self.feature_connections[i] = torch.stack(feature_connections_list, dim=0)
+			
+		feature_connections_list = []
+		for observed_column in observed_columns_sequence_word_index_dict.values():
+			 feature_connections_list.append(observed_column.feature_connections)
+		self.feature_connections = torch.stack(feature_connections_list, dim=2)
 
 # Define the SequenceObservedColumns class
 class SequenceObservedColumns:
@@ -680,12 +665,9 @@ class SequenceObservedColumns:
 				self.index_to_concept_name[idx] = lemma
 				self.observed_columns_dict2[idx] = observed_column
 			self.concept_indices_in_sequence_observed_tensor = torch.tensor(self.concept_indices_in_observed_list, dtype=torch.long)
-		
-		#temporary SequenceObservedColumns/ObservedColumns array conversion variables;
-		self.feature_neuron_changes = [[None for _ in range(self.cs)] for _ in range(array_number_of_properties)]
-		self.feature_neurons_original = [None]*array_number_of_properties
-		self.feature_connections_original = [None]*array_number_of_properties
-		
+				
+		self.feature_neuron_changes = [None]*self.cs
+			
 		# Collect all feature words from observed columns
 		self.words = words
 		self.lemmas = lemmas
@@ -706,7 +688,7 @@ class SequenceObservedColumns:
 		# Initialize arrays
 		self.feature_neurons = self.initialiseFeatureNeuronsSequence(self.cs, self.fs)
 		self.feature_connections = self.initialiseFeatureConnectionsSequence(self.cs, self.fs)
-		
+
 		# Populate arrays with data from observed_columns_dict
 		if(sequenceObservedColumnsMatchSequenceWords):
 			self.populate_arrays(words, lemmas, self.sequence_observed_columns_dict)
@@ -759,123 +741,125 @@ class SequenceObservedColumns:
 				
 	@staticmethod
 	def initialiseFeatureNeuronsSequence(cs, fs):
-		feature_neurons = torch.zeros(array_number_of_properties, cs, fs, dtype=array_type)
+		feature_neurons = torch.zeros(array_number_of_properties, array_number_of_segments, cs, fs, dtype=array_type)
 		return feature_neurons
 
 	@staticmethod
 	def initialiseFeatureConnectionsSequence(cs, fs):
-		feature_connections = torch.zeros(array_number_of_properties, cs, fs, cs, fs, dtype=array_type)
+		feature_connections = torch.zeros(array_number_of_properties, array_number_of_segments, cs, fs, cs, fs, dtype=array_type)
 		return feature_connections
 	
 	def populate_arrays(self, words, lemmas, sequence_observed_columns_dict):
 		#print("\n\n\n\n\npopulate_arrays:")
 		
-		for i in range(array_number_of_properties):
+		# Collect indices and data for feature neurons
+		c_idx_list = []
+		f_idx_list = []
+		feature_list_indices = []
+		feature_list_values = []
 
-			# Collect indices and data for feature neurons
-			c_idx_list = []
-			f_idx_list = []
-			feature_list_indices = []
-			feature_list_values = []
+		if(not lowMem):
+			global global_feature_neurons
+					
+		for c_idx, observed_column in sequence_observed_columns_dict.items():
+			feature_indices_in_observed, f_idx_tensor = self.getObservedColumnFeatureIndices()
 
-			if(not lowMem):
-				global global_feature_neurons
+			num_features = len(f_idx_tensor)
 
-			for c_idx, observed_column in sequence_observed_columns_dict.items():
-				feature_indices_in_observed, f_idx_tensor = self.getObservedColumnFeatureIndices()
+			c_idx_list.append(torch.full((num_features,), c_idx, dtype=torch.long))
+			f_idx_list.append(f_idx_tensor)
 
-				num_features = len(f_idx_tensor)
+			if lowMem:
+				feature_neurons = observed_column.feature_neurons.coalesce()
+			else:
+				feature_neurons = slice_sparse_tensor(global_feature_neurons, 2, observed_column.concept_index)	
+			
+			# Get indices and values from sparse tensor
+			indices = feature_neurons.indices()
+			values = feature_neurons.values()
+			
+			filter_feature_indices = torch.nonzero(indices[2].unsqueeze(1) == feature_indices_in_observed, as_tuple=True)
+			filtered_indices = indices[:, filter_feature_indices[0]]
+			filtered_f_idx_tensor = f_idx_tensor[filter_feature_indices[1]]
+			filtered_values = values[filter_feature_indices[0]]
+			# Adjust indices
+			filtered_indices[0] = filtered_indices[0]  # properties
+			filtered_indices[1] = filtered_indices[1]  # types
+			filtered_indices[2] = filtered_f_idx_tensor
+			filtered_indices = torch.cat([filtered_indices[0:2], torch.full_like(filtered_indices[2:3], c_idx), filtered_indices[2:3]], dim=0)	#insert dim3 for c_idx
+			feature_list_indices.append(filtered_indices)
+			feature_list_values.append(filtered_values)
+	   
+		# Combine indices and values
+		if feature_list_indices:
+			combined_indices = torch.cat(feature_list_indices, dim=1)
+			combined_values = torch.cat(feature_list_values, dim=0)
+			# Create sparse tensor
+			self.feature_neurons = torch.sparse_coo_tensor(combined_indices, combined_values, size=self.feature_neurons.size(), dtype=array_type).to_dense()
+			self.feature_neurons_original = self.feature_neurons.clone()
 
-				c_idx_list.append(torch.full((num_features,), c_idx, dtype=torch.long))
-				f_idx_list.append(f_idx_tensor)
+		# Now handle connections
+		connection_indices_list = []
+		connection_values_list = []
+		
+		for c_idx, observed_column in sequence_observed_columns_dict.items():
+			feature_indices_in_observed, f_idx_tensor = self.getObservedColumnFeatureIndices()
 
-				if lowMem:
-					feature_neurons = observed_column.feature_neurons[i].coalesce()
-				else:
-					feature_neurons = slice_sparse_tensor(global_feature_neurons[i], 0, observed_column.concept_index)	
+			# Get indices and values from sparse tensor
+			feature_connections = observed_column.feature_connections.coalesce()
+			indices = feature_connections.indices()
+			values = feature_connections.values()
 
-				# Get indices and values from sparse tensor
-				indices = feature_neurons.indices()
-				values = feature_neurons.values()
+			for other_c_idx, other_observed_column in sequence_observed_columns_dict.items():
+				other_feature_indices_in_observed, other_f_idx_tensor = self.getObservedColumnFeatureIndices()
+				other_concept_index = other_observed_column.concept_index
+				#print("\tother_concept_index = ", other_concept_index)
 
-				filter_feature_indices = torch.nonzero(indices[0].unsqueeze(1) == feature_indices_in_observed, as_tuple=True)
+				# Create meshgrid of feature indices
+				feature_idx_obs_mesh, other_feature_idx_obs_mesh = torch.meshgrid(feature_indices_in_observed, other_feature_indices_in_observed, indexing='ij')
+				f_idx_mesh, other_f_idx_mesh = torch.meshgrid(f_idx_tensor, other_f_idx_tensor, indexing='ij')
+
+				# Flatten the meshgrid indices
+				feature_idx_obs_flat = feature_idx_obs_mesh.reshape(-1)
+				other_feature_idx_obs_flat = other_feature_idx_obs_mesh.reshape(-1)
+				f_idx_flat = f_idx_mesh.reshape(-1)
+				other_f_idx_flat = other_f_idx_mesh.reshape(-1)
+				
+				# Filter indices for the desired features and concepts
+				other_concept_index_expanded = torch.full(feature_idx_obs_flat.size(), fill_value=other_concept_index, dtype=torch.long)
+				#print("feature_idx_obs_flat.shape = ", feature_idx_obs_flat.shape)
+				filter_feature_indices2 = indices[2].unsqueeze(1) == feature_idx_obs_flat		
+				filter_feature_indices3 = indices[3].unsqueeze(1) == other_concept_index_expanded
+				filter_feature_indices4 = indices[4].unsqueeze(1) == other_feature_idx_obs_flat
+				combined_condition = filter_feature_indices2 & filter_feature_indices3 & filter_feature_indices4
+				filter_feature_indices = torch.nonzero(combined_condition, as_tuple=True)
 				filtered_indices = indices[:, filter_feature_indices[0]]
-				filtered_f_idx_tensor = f_idx_tensor[filter_feature_indices[1]]
 				filtered_values = values[filter_feature_indices[0]]
+				filtered_f_idx_tensor = f_idx_flat[filter_feature_indices[1]]
+				filtered_other_f_idx_tensor = other_f_idx_flat[filter_feature_indices[1]]
+						
+				# Create tensors for concept indices
+				c_idx_flat = torch.full_like(f_idx_flat, c_idx, dtype=torch.long)
+				other_c_idx_flat = torch.full_like(other_f_idx_flat, other_c_idx, dtype=torch.long)
+				filtered_other_c_idx_flat = other_c_idx_flat[filter_feature_indices[1]]
+				
 				# Adjust indices
-				filtered_indices[0] = filtered_f_idx_tensor
-				filtered_indices = torch.cat((torch.full_like(filtered_indices[0:1], c_idx), filtered_indices[0:1]), dim=0)	#insert dim0 for c_idx
-				feature_list_indices.append(filtered_indices)
-				feature_list_values.append(filtered_values)
+				filtered_indices[0] = filtered_indices[0]  # properties
+				filtered_indices[1] = filtered_indices[1]  # types
+				filtered_indices[2] = filtered_f_idx_tensor
+				filtered_indices[3] = filtered_other_c_idx_flat
+				filtered_indices[4] = filtered_other_f_idx_tensor
+				filtered_indices = torch.cat([filtered_indices[0:2], torch.full_like(filtered_indices[2:3], c_idx), filtered_indices[2:]], dim=0)	#insert dim3 for c_idx
+				connection_indices_list.append(filtered_indices)
+				connection_values_list.append(filtered_values)
 
-			# Combine indices and values
-			if feature_list_indices:
-				combined_indices = torch.cat(feature_list_indices, dim=1)
-				combined_values = torch.cat(feature_list_values, dim=0)
-				# Create sparse tensor
-				self.feature_neurons[i] = torch.sparse_coo_tensor(combined_indices, combined_values, size=self.feature_neurons[i].size(), dtype=array_type).to_dense()
-				self.feature_neurons_original[i] = self.feature_neurons[i].clone()
-
-			# Now handle connections
-			connection_indices_list = []
-			connection_values_list = []
-
-			for c_idx, observed_column in sequence_observed_columns_dict.items():
-				feature_indices_in_observed, f_idx_tensor = self.getObservedColumnFeatureIndices()
-
-				# Get indices and values from sparse tensor
-				feature_connections = observed_column.feature_connections[i].coalesce()
-				indices = feature_connections.indices()
-				values = feature_connections.values()
-
-				for other_c_idx, other_observed_column in sequence_observed_columns_dict.items():
-					other_feature_indices_in_observed, other_f_idx_tensor = self.getObservedColumnFeatureIndices()
-					other_concept_index = other_observed_column.concept_index
-					#print("\tother_concept_index = ", other_concept_index)
-
-					# Create meshgrid of feature indices
-					feature_idx_obs_mesh, other_feature_idx_obs_mesh = torch.meshgrid(feature_indices_in_observed, other_feature_indices_in_observed, indexing='ij')
-					f_idx_mesh, other_f_idx_mesh = torch.meshgrid(f_idx_tensor, other_f_idx_tensor, indexing='ij')
-
-					# Flatten the meshgrid indices
-					feature_idx_obs_flat = feature_idx_obs_mesh.reshape(-1)
-					other_feature_idx_obs_flat = other_feature_idx_obs_mesh.reshape(-1)
-					f_idx_flat = f_idx_mesh.reshape(-1)
-					other_f_idx_flat = other_f_idx_mesh.reshape(-1)
-
-					# Filter indices for the desired features and concepts
-					other_concept_index_expanded = torch.full(feature_idx_obs_flat.size(), fill_value=other_concept_index, dtype=torch.long)
-					#print("feature_idx_obs_flat.shape = ", feature_idx_obs_flat.shape)
-					filter_feature_indices0 = indices[0].unsqueeze(1) == feature_idx_obs_flat		
-					filter_feature_indices1 = indices[1].unsqueeze(1) == other_concept_index_expanded
-					filter_feature_indices2 = indices[2].unsqueeze(1) == other_feature_idx_obs_flat
-					combined_condition = filter_feature_indices0 & filter_feature_indices1 & filter_feature_indices2
-					filter_feature_indices = torch.nonzero(combined_condition, as_tuple=True)
-					filtered_indices = indices[:, filter_feature_indices[0]]
-					filtered_values = values[filter_feature_indices[0]]
-					filtered_f_idx_tensor = f_idx_flat[filter_feature_indices[1]]
-					filtered_other_f_idx_tensor = other_f_idx_flat[filter_feature_indices[1]]
-
-					# Create tensors for concept indices
-					c_idx_flat = torch.full_like(f_idx_flat, c_idx, dtype=torch.long)
-					other_c_idx_flat = torch.full_like(other_f_idx_flat, other_c_idx, dtype=torch.long)
-					filtered_other_c_idx_flat = other_c_idx_flat[filter_feature_indices[1]]
-
-					# Adjust indices
-					filtered_indices[0] = filtered_f_idx_tensor
-					filtered_indices[1] = filtered_other_c_idx_flat
-					filtered_indices[2] = filtered_other_f_idx_tensor
-					filtered_indices = torch.cat([torch.full_like(filtered_indices[0:1], c_idx), filtered_indices[0:]], dim=0)	#insert dim0 for c_idx
-					connection_indices_list.append(filtered_indices)
-					connection_values_list.append(filtered_values)
-
-			# Combine indices and values
-			if connection_indices_list:
-				combined_indices = torch.cat(connection_indices_list, dim=1)
-				combined_values = torch.cat(connection_values_list, dim=0)
-				# Create sparse tensor
-				self.feature_connections[i] = torch.sparse_coo_tensor(combined_indices, combined_values, size=self.feature_connections[i].size(), dtype=array_type).to_dense()
-				self.feature_connections_original[i] = self.feature_connections[i].clone()
+		# Combine indices and values
+		if connection_indices_list:
+			combined_indices = torch.cat(connection_indices_list, dim=1)
+			combined_values = torch.cat(connection_values_list, dim=0)
+			# Create sparse tensor
+			self.feature_connections = torch.sparse_coo_tensor(combined_indices, combined_values, size=self.feature_connections.size(), dtype=array_type).to_dense()
+			self.feature_connections_original = self.feature_connections.clone()
 			
 	def update_observed_columns_wrapper(self):
 		if(sequenceObservedColumnsMatchSequenceWords):
@@ -889,88 +873,87 @@ class SequenceObservedColumns:
 		
 		if(not lowMem):
 			global global_feature_neurons
+			
+		feature_neurons = self.feature_neurons - self.feature_neurons_original	#convert to changes
+		feature_connections = self.feature_connections - self.feature_connections_original	#convert to changes
 		
-		for i in range(array_number_of_properties):
-			feature_neurons = self.feature_neurons[i] - self.feature_neurons_original[i]	#convert to changes
-			feature_connections = self.feature_connections[i] - self.feature_connections_original[i]	#convert to changes
+		feature_neurons = feature_neurons.to_sparse()
+		feature_connections = feature_connections.to_sparse()
+		if(performRedundantCoalesce):
+			feature_neurons = feature_neurons.coalesce()
+			feature_connections = feature_connections.coalesce()		
 
-			feature_neurons = feature_neurons.to_sparse()
-			feature_connections = feature_connections.to_sparse()
-			if(performRedundantCoalesce):
-				feature_neurons = feature_neurons.coalesce()
-				feature_connections = feature_connections.coalesce()		
+		for c_idx, observed_column in sequence_observed_columns_dict.items():
+			feature_indices_in_observed, f_idx_tensor = self.getObservedColumnFeatureIndices()
+			concept_index = observed_column.concept_index
 
+			if lowMem:
+				observed_column.feature_neurons = observed_column.feature_neurons.coalesce()
+			else:
+				#temporarily store slices of the global_feature_neurons array in the observed_columns (used by update_observed_columns only)
+				observed_column.feature_neurons = slice_sparse_tensor(global_feature_neurons, 2, concept_index)	
+			
+			# feature neurons;
+			# Use advanced indexing to get values from feature_neurons
+			indices = feature_neurons.indices()
+			values = feature_neurons.values()
+			#convert indices from SequenceObservedColumns neuronFeatures array indices to ObservedColumns neuronFeatures array indices			
+			# Filter indices
+			mask = (indices[2] == c_idx) & torch.isin(indices[3], f_idx_tensor)
+			filtered_indices = indices[:, mask]
+			filtered_values = values[mask]
+			# Adjust indices for observed_column
+			filtered_indices[2] = filtered_indices[3]  # feature indices	#concept dim is removed from filtered_indices (as it has already been selected out)
+			filtered_indices = filtered_indices[0:3]
+			#convert indices from sequence observed columns format back to observed columns format
+			if(sequenceObservedColumnsUseSequenceFeaturesOnly):
+				filtered_indices[2] = feature_indices_in_observed[filtered_indices[2]]	#convert feature indices from sequence observed columns format back to observed columns format
+			# Update observed_column's feature_neurons
+			if lowMem:
+				observed_column.feature_neurons = observed_column.feature_neurons + torch.sparse_coo_tensor(filtered_indices, filtered_values, size=observed_column.feature_neurons.size(), dtype=array_type)
+				observed_column.feature_neurons = observed_column.feature_neurons.coalesce()
+				observed_column.feature_neurons.values().clamp_(min=0)
+			else:
+				self.feature_neuron_changes[c_idx] = torch.sparse_coo_tensor(filtered_indices, filtered_values, size=observed_column.feature_neurons.size(), dtype=array_type)
+			
+			# feature connections;
+			indices = feature_connections.indices()
+			values = feature_connections.values()
+			# Filter indices
+			mask = (indices[2] == c_idx)
+			filtered_indices = indices[:, mask]
+			filtered_values = values[mask]
+			# Adjust indices for observed_column
+			filtered_indices[2] = filtered_indices[3]  # feature indices	#concept dim is removed from filtered_indices (as it has already been selected out)
+			filtered_indices[3] = filtered_indices[4]  # concept indices
+			filtered_indices[4] = filtered_indices[5]  # feature indices
+			filtered_indices = filtered_indices[0:5]
+			#convert indices from sequence observed columns format back to observed columns format
+			filtered_indices[3] = self.concept_indices_in_sequence_observed_tensor[filtered_indices[3]]	#convert concept indices from sequence observed columns format back to observed columns format
+			if(sequenceObservedColumnsUseSequenceFeaturesOnly):
+				filtered_indices[2] = feature_indices_in_observed[filtered_indices[2]]	#convert feature indices from sequence observed columns format back to observed columns format
+				filtered_indices[4] = feature_indices_in_observed[filtered_indices[4]]	#convert feature indices from sequence observed columns format back to observed columns format
+			# Update observed_column's feature_connections
+			observed_column.feature_connections = observed_column.feature_connections + torch.sparse_coo_tensor(filtered_indices, filtered_values, size=observed_column.feature_connections.size(), dtype=array_type)
+			observed_column.feature_connections = observed_column.feature_connections.coalesce()
+			observed_column.feature_connections.values().clamp_(min=0)
+	
+		if not lowMem:
+			observed_column_feature_neurons_dict = {}
 			for c_idx, observed_column in sequence_observed_columns_dict.items():
-				feature_indices_in_observed, f_idx_tensor = self.getObservedColumnFeatureIndices()
 				concept_index = observed_column.concept_index
-
-				if lowMem:
-					observed_column.feature_neurons[i] = observed_column.feature_neurons[i].coalesce()
-				else:
-					#temporarily store slices of the global_feature_neurons array in the observed_columns (used by update_observed_columns only)
-					observed_column.feature_neurons[i] = slice_sparse_tensor(global_feature_neurons[i], 0, concept_index)	
-
-				# feature neurons;
-				# Use advanced indexing to get values from feature_neurons
-				indices = feature_neurons.indices()
-				values = feature_neurons.values()
-				#convert indices from SequenceObservedColumns neuronFeatures array indices to ObservedColumns neuronFeatures array indices			
-				# Filter indices
-				mask = (indices[0] == c_idx) & torch.isin(indices[1], f_idx_tensor)
-				filtered_indices = indices[:, mask]
-				filtered_values = values[mask]
-				# Adjust indices for observed_column
-				filtered_indices[0] = filtered_indices[1]  # feature indices	#concept dim is removed from filtered_indices (as it has already been selected out)
-				filtered_indices = filtered_indices[0:1]
-				#convert indices from sequence observed columns format back to observed columns format
-				if(sequenceObservedColumnsUseSequenceFeaturesOnly):
-					filtered_indices[0] = feature_indices_in_observed[filtered_indices[0]]	#convert feature indices from sequence observed columns format back to observed columns format
-				# Update observed_column's feature_neurons
-				if lowMem:
-					observed_column.feature_neurons[i] = observed_column.feature_neurons[i] + torch.sparse_coo_tensor(filtered_indices, filtered_values, size=observed_column.feature_neurons[i].size(), dtype=array_type)
-					observed_column.feature_neurons[i] = observed_column.feature_neurons[i].coalesce()
-					observed_column.feature_neurons[i].values().clamp_(min=0)
-				else:
-					self.feature_neuron_changes[i][c_idx] = torch.sparse_coo_tensor(filtered_indices, filtered_values, size=observed_column.feature_neurons[i].size(), dtype=array_type)
-
-				# feature connections;
-				indices = feature_connections.indices()
-				values = feature_connections.values()
-				# Filter indices
-				mask = (indices[0] == c_idx)
-				filtered_indices = indices[:, mask]
-				filtered_values = values[mask]
-				# Adjust indices for observed_column
-				filtered_indices[0] = filtered_indices[1]  # feature indices	#concept dim is removed from filtered_indices (as it has already been selected out)
-				filtered_indices[1] = filtered_indices[2]  # concept indices
-				filtered_indices[2] = filtered_indices[3]  # feature indices
-				filtered_indices = filtered_indices[0:3]
-				#convert indices from sequence observed columns format back to observed columns format
-				filtered_indices[1] = self.concept_indices_in_sequence_observed_tensor[filtered_indices[1]]	#convert concept indices from sequence observed columns format back to observed columns format
-				if(sequenceObservedColumnsUseSequenceFeaturesOnly):
-					filtered_indices[0] = feature_indices_in_observed[filtered_indices[0]]	#convert feature indices from sequence observed columns format back to observed columns format
-					filtered_indices[2] = feature_indices_in_observed[filtered_indices[2]]	#convert feature indices from sequence observed columns format back to observed columns format
-				# Update observed_column's feature_connections
-				observed_column.feature_connections[i] = observed_column.feature_connections[i] + torch.sparse_coo_tensor(filtered_indices, filtered_values, size=observed_column.feature_connections[i].size(), dtype=array_type)
-				observed_column.feature_connections[i] = observed_column.feature_connections[i].coalesce()
-				observed_column.feature_connections[i].values().clamp_(min=0)
-
-			if not lowMem:
-				observed_column_feature_neurons_dict = {}
-				for c_idx, observed_column in sequence_observed_columns_dict.items():
-					concept_index = observed_column.concept_index
-					observed_column_feature_neurons_dict[concept_index] = self.feature_neuron_changes[i][c_idx]
-				global_feature_neurons[i] = merge_tensor_slices_sum(global_feature_neurons[i], observed_column_feature_neurons_dict, 0)
+				observed_column_feature_neurons_dict[concept_index] = self.feature_neuron_changes[c_idx]
+			global_feature_neurons = merge_tensor_slices_sum(global_feature_neurons, observed_column_feature_neurons_dict, 2)
 		
 	
 # Initialize global feature neuron arrays if lowMem is disabled
 if not lowMem:
 	def initialiseFeatureNeuronsGlobal(c, f):
-		feature_neurons = createEmptySparseTensor((c, f))
+		feature_neurons = createEmptySparseTensor((array_number_of_properties, array_number_of_segments, c, f))
 		return feature_neurons
 		
 	if os.path.exists(global_feature_neurons_file):
-		global_feature_neurons = load_tensor_list(databaseFolder, global_feature_neurons_file)
+		global_feature_neurons = torch.load(global_feature_neurons_file)
 	else:
 		global_feature_neurons = initialiseFeatureNeuronsGlobal(c, f)
 		#print("initialiseFeatureNeuronsGlobal: global_feature_neurons = ", global_feature_neurons)
@@ -1055,8 +1038,8 @@ def process_sentence(sentenceIndex, doc, lastSentenceInPrompt):
 			'''
 			if(useActivationDecrement):
 				#decrement activation after each train interval; not currently used
-				global_feature_neurons[array_index_properties_activation] -= activationDecrementPerPredictedSentence
-				global_feature_neurons[array_index_properties_activation] = torch.clamp(global_feature_neurons[array_index_properties_activation], min=0)
+				global_feature_neurons[array_index_properties_activation, array_index_segment_first] -= activationDecrementPerPredictedSentence
+				global_feature_neurons[array_index_properties_activation, array_index_segment_first] = torch.clamp(global_feature_neurons[array_index_properties_activation, array_index_segment_first], min=0)
 			'''
 			
 	# Break if we've reached the maximum number of sentences
@@ -1092,13 +1075,12 @@ def first_pass(doc):
 		if not lowMem:
 			# Expand global feature neuron arrays
 			global global_feature_neurons
-			for i in range(array_number_of_properties):
-				if global_feature_neurons[i].shape[0] < c:
-					new_shape = (c, global_feature_neurons[i].shape[1])
-					if(performRedundantCoalesce):
-						global_feature_neurons[i] = global_feature_neurons[i].coalesce()
-					global_feature_neurons[i] = torch.sparse_coo_tensor(global_feature_neurons[i]._indices(), global_feature_neurons[i]._values(), size=new_shape, dtype=array_type)
-
+			if global_feature_neurons.shape[2] < c:
+				new_shape = (global_feature_neurons.shape[0], global_feature_neurons.shape[1], c, global_feature_neurons.shape[3])
+				if(performRedundantCoalesce):
+					global_feature_neurons = global_feature_neurons.coalesce()
+				global_feature_neurons = torch.sparse_coo_tensor(global_feature_neurons._indices(), global_feature_neurons._values(), size=new_shape, dtype=array_type)
+				
 	return concepts_found, words, lemmas, pos_tags
 
 def addConceptToConceptColumnsDict(lemma, concepts_found, new_concepts_added):
@@ -1166,12 +1148,11 @@ def detect_new_features(words, lemmas, pos_tags):
 	# Now, expand arrays accordingly
 	if not lowMem:
 		global global_feature_neurons
-		for i in range(array_number_of_properties):
-			if f > global_feature_neurons[i].shape[1]:
-				extra_cols = f - global_feature_neurons[i].shape[1]
-				new_shape = (global_feature_neurons[i].shape[0], f)
-				global_feature_neurons[i] = global_feature_neurons[i].coalesce()
-				global_feature_neurons[i] = torch.sparse_coo_tensor(global_feature_neurons[i].indices(), global_feature_neurons[i].values(), size=new_shape, dtype=array_type)
+		if f > global_feature_neurons.shape[3]:
+			extra_cols = f - global_feature_neurons.shape[3]
+			new_shape = (global_feature_neurons.shape[0], global_feature_neurons.shape[1], global_feature_neurons.shape[2], f)
+			global_feature_neurons = global_feature_neurons.coalesce()
+			global_feature_neurons = torch.sparse_coo_tensor(global_feature_neurons.indices(), global_feature_neurons.values(), size=new_shape, dtype=array_type)
 
 def process_feature_detection(j, word_j, pos_tags):
 	"""
@@ -1236,8 +1217,8 @@ def process_concept_words_inference(sequence_observed_columns, doc, doc_seed, do
 	print("global_feature_neurons_dense = ", global_feature_neurons_dense)
 	'''
 	
-	global_feature_neurons_activation = global_feature_neurons[array_index_properties_activation]
-	
+	global_feature_neurons_activation = slice_sparse_tensor(global_feature_neurons, 0, array_index_properties_activation)
+
 	#identify first activated column(s) in prediction phase:
 	concept_columns_indices = None #not currently used (target connection neurons have already been activated)
 	concept_columns_feature_indices = None	#not currently used (target connection neurons have already been activated)
@@ -1289,15 +1270,22 @@ def process_column_inference_prediction(observed_columns_dict, wordPredictionInd
 			global_feature_neurons_activation -= activationDecrementPerPredictedColumn
 			global_feature_neurons_activation.values().clamp_(min=0)
 		if(deactivateNeuronsUponPrediction):
-			indices_to_update = torch.stack([concept_columns_indices, concept_columns_feature_indices.squeeze(dim=0)], dim=0)
+			indices_to_update_list = []
+			for segment_index in range(array_number_of_segments):
+				number_features_predicted = concept_columns_indices.shape[0]
+				index_to_update = torch.stack([torch.tensor([segment_index]*number_features_predicted), concept_columns_indices, concept_columns_feature_indices.squeeze(dim=0)], dim=0)
+				indices_to_update_list.append(index_to_update)
+			indices_to_update = torch.stack(indices_to_update_list, dim=0).squeeze(dim=2)
 			global_feature_neurons_activation = modify_sparse_tensor(global_feature_neurons_activation, indices_to_update, 0)
 			#global_feature_neurons_activation[concept_columns_indices, concept_columns_feature_indices] = 0	
 	else:
 		#activation targets have already been activated
 		sequence_observed_columns_prediction = SequenceObservedColumnsDraw(observed_columns_dict)
 		
+	global_feature_neurons_activation_all_segments = torch.sum(global_feature_neurons_activation, dim=0)	#sum across all segments 	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
+
 	#topk column selection;
-	concept_columns_activation = torch.sum(global_feature_neurons_activation, dim=1)	#sum across all feature activations in columns
+	concept_columns_activation = torch.sum(global_feature_neurons_activation_all_segments, dim=1)	#sum across all feature activations in columns
 	concept_columns_activation = concept_columns_activation.to_dense()	#convert to dense tensor (required for topk)
 	if(kcDynamic):
 		concept_columns_activation = concept_columns_activation[concept_columns_activation > kcActivationThreshold]	#select kcMax columns above threshold
@@ -1309,11 +1297,10 @@ def process_column_inference_prediction(observed_columns_dict, wordPredictionInd
 
 	#top feature selection;
 	if(kc==1):
-		topk_concept_columns_activation = slice_sparse_tensor(global_feature_neurons_activation, 0, concept_columns_activation_topk_concepts.indices[0]).unsqueeze(0)
+		topk_concept_columns_activation = slice_sparse_tensor(global_feature_neurons_activation_all_segments, 0, concept_columns_activation_topk_concepts.indices[0]).unsqueeze(0)	#select topk concept indices
 	else:
-		topk_concept_columns_activation = slice_sparse_tensor_multi(global_feature_neurons_activation, 0, concept_columns_activation_topk_concepts.indices)
+		topk_concept_columns_activation = slice_sparse_tensor_multi(global_feature_neurons_activation_all_segments, 0, concept_columns_activation_topk_concepts.indices)	#select topk concept indices
 	topk_concept_columns_activation = topk_concept_columns_activation.to_dense()
-	#topk_concept_columns_activation = global_feature_neurons_activation[concept_columns_activation_topk_concepts.indices, :]
 	topk_concept_columns_activation_topk_features = torch.topk(topk_concept_columns_activation, kf, dim=1)
 
 	#print("concept_columns_activation_topk_concepts.values = ", concept_columns_activation_topk_concepts.values)	
@@ -1351,13 +1338,17 @@ def process_column_inference_prediction(observed_columns_dict, wordPredictionInd
 def process_features_active_predict_single(sequence_observed_columns, concept_columns_indices, concept_columns_feature_indices):
 	global global_feature_neurons_activation
 	
-	feature_neurons_active = slice_sparse_tensor(global_feature_neurons_activation, 0, concept_columns_indices.squeeze())
-	feature_neurons_active = slice_sparse_tensor(feature_neurons_active, 0, concept_columns_feature_indices.squeeze())
+	feature_neurons_active = slice_sparse_tensor(global_feature_neurons_activation, 0, array_index_segment_internal_column)	 		#select last (most proximal) segment activation	#TODO: checkthis
+	feature_neurons_active = slice_sparse_tensor(feature_neurons_active, 0, concept_columns_indices.squeeze().item())	#select columns
+	feature_neurons_active = slice_sparse_tensor(feature_neurons_active, 0, concept_columns_feature_indices.squeeze().squeeze().item())	#select features
+	#print("feature_neurons_active = ", feature_neurons_active)
 	
 	#target neuron activation dependence on connection strength;
-	feature_connections = sequence_observed_columns.feature_connections[array_index_properties_strength]
-	feature_connections = slice_sparse_tensor(feature_connections, 0, 0)	#sequence concept index dimension (not used)
-	feature_connections = slice_sparse_tensor(feature_connections, 0, concept_columns_feature_indices.squeeze())
+	#print("feature_neurons_active.shape = ", feature_neurons_active.shape)
+	feature_connections = slice_sparse_tensor(sequence_observed_columns.feature_connections, 0, array_index_properties_strength)
+	feature_connections = slice_sparse_tensor(feature_connections, 1, 0)	#sequence concept index dimension (not used)
+	feature_connections = slice_sparse_tensor(feature_connections, 1, concept_columns_feature_indices.squeeze())
+	#print("feature_connections.shape = ", feature_connections.shape)
 	feature_neurons_target_activation = feature_neurons_active * feature_connections
 	
 	#update the activations of the target nodes;
@@ -1367,13 +1358,14 @@ def process_features_active_predict_single(sequence_observed_columns, concept_co
 def process_features_active_predict(sequence_observed_columns, concept_columns_indices, concept_columns_feature_indices):
 	global global_feature_neurons_activation
 	
-	feature_neurons_active = slice_sparse_tensor_multi(global_feature_neurons_activation, 0, concept_columns_indices)
-	feature_neurons_active = slice_sparse_tensor_multi(feature_neurons_active, 0, concept_columns_feature_indices)
+	feature_neurons_active = slice_sparse_tensor(global_feature_neurons_activation, 0, array_index_segment_internal_column)	 		#select last (most proximal) segment activation	#TODO: checkthis
+	feature_neurons_active = slice_sparse_tensor_multi(global_feature_neurons_activation, 0, concept_columns_indices)	#select columns
+	feature_neurons_active = slice_sparse_tensor_multi(feature_neurons_active, 0, concept_columns_feature_indices)	#select features
 	
 	#target neuron activation dependence on connection strength;
-	feature_connections = sequence_observed_columns.feature_connections[array_index_properties_strength]
-	feature_connections = slice_sparse_tensor(feature_connections, 0, 0)	#sequence concept index dimension (not used)
-	feature_connections = slice_sparse_tensor_multi(feature_connections, 0, concept_columns_feature_indices)
+	feature_connections = slice_sparse_tensor(sequence_observed_columns.feature_connections, 0, array_index_properties_strength)
+	feature_connections = slice_sparse_tensor(feature_connections, 1, 0)	#sequence concept index dimension (not used)
+	feature_connections = slice_sparse_tensor_multi(feature_connections, 1, concept_columns_feature_indices)
 	feature_neurons_target_activation = feature_neurons_active * feature_connections
 	
 	#update the activations of the target nodes;
@@ -1448,7 +1440,7 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 	
 	cs = sequence_observed_columns.cs #!sequenceObservedColumnsMatchSequenceWords: will be less than len(concept_indices) if there are multiple instances of a concept in a sequence
 	fs = sequence_observed_columns.fs  #sequenceObservedColumnsUseSequenceFeaturesOnly+sequenceObservedColumnsMatchSequenceWords: len(doc), sequenceObservedColumnsUseSequenceFeaturesOnly+!sequenceObservedColumnsMatchSequenceWords: number of feature neurons in sentence, !sequenceObservedColumnsUseSequenceFeaturesOnly: number of feature neurons in column
-	feature_neurons_active = torch.zeros((cs, fs), dtype=array_type)
+	feature_neurons_active = torch.zeros((array_number_of_segments, cs, fs), dtype=array_type)
 	feature_neurons_word_order = torch.arange(fs).unsqueeze(0).repeat(cs, 1)
 	torch.zeros((cs, fs), dtype=torch.long)
 	columns_word_order = torch.zeros((cs), dtype=torch.long)
@@ -1457,7 +1449,8 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 		sequence_concept_index_mask = torch.ones((cs, fs), dtype=array_type)	#ensure to ignore concept feature neurons from other columns
 	else:
 		sequence_concept_index_mask = None
-		
+	feature_neurons_segment_mask = torch.zeros((cs, array_number_of_segments), dtype=array_type)
+	
 	concept_indices_list = concept_indices.tolist()
 	#convert start/end indices to active features arrays
 	for i, sequence_concept_word_index in enumerate(concept_indices_list):
@@ -1465,9 +1458,15 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 			sequence_concept_index = i
 		else:
 			concept_lemma = lemmas[concept_indices[i]]
-			sequence_concept_index = sequence_observed_columns.concept_name_to_index[concept_lemma]
+			sequence_concept_index = sequence_observed_columns.concept_name_to_index[concept_lemma] 
+		
+		number_of_segments = min(array_number_of_segments-1, i)
+		feature_neurons_segment_mask[sequence_concept_index, :] = torch.cat([torch.zeros(array_number_of_segments-number_of_segments), torch.ones(number_of_segments)], dim=0)
+		minSequentialSegmentIndex = min(0, array_number_of_segments-sequence_concept_index-1)
+		activeSequentialSegments = torch.arange(minSequentialSegmentIndex, array_number_of_segments, 1)
+		
 		if(sequenceObservedColumnsUseSequenceFeaturesOnly and sequenceObservedColumnsMatchSequenceWords):
-			feature_neurons_active[sequence_concept_index, start_indices[sequence_concept_index]:end_indices[sequence_concept_index]] = 1
+			feature_neurons_active[activeSequentialSegments, sequence_concept_index, start_indices[sequence_concept_index]:end_indices[sequence_concept_index]] = 1
 			columns_word_order[sequence_concept_index] = sequence_concept_index
 			sequence_concept_index_mask[:, sequence_concept_word_index] = 0	#ignore concept feature neurons from other columns
 			sequence_concept_index_mask[sequence_concept_index, sequence_concept_word_index] = 1
@@ -1487,32 +1486,34 @@ def process_features(start_indices, end_indices, doc, words, lemmas, pos_tags, s
 						sequence_feature_index = sequence_observed_columns.feature_word_to_index[variableConceptNeuronFeatureName]
 					else:
 						sequence_feature_index = sequence_observed_columns.feature_word_to_index[feature_lemma]
-					feature_neurons_active[sequence_concept_index, sequence_feature_index] = 1
+					feature_neurons_active[activeSequentialSegments, sequence_concept_index, sequence_feature_index] = 1
 					feature_neurons_word_order[sequence_concept_index, sequence_feature_index] = j
 				elif(feature_word in sequence_observed_columns.feature_word_to_index):
 					sequence_feature_index = sequence_observed_columns.feature_word_to_index[feature_word]
-					feature_neurons_active[sequence_concept_index, sequence_feature_index] = 1
+					feature_neurons_active[activeSequentialSegments, sequence_concept_index, sequence_feature_index] = 1
 					feature_neurons_word_order[sequence_concept_index, sequence_feature_index] = j
 				feature_neurons_pos[sequence_concept_index, sequence_feature_index] = feature_pos
+	
+	feature_neurons_segment_mask = feature_neurons_segment_mask.swapdims(0, 1)
 	if(train):
-		process_features_active_train(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos)
+		process_features_active_train(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos, feature_neurons_segment_mask)
 	else:
 		process_features_active_seed(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos, num_seed_tokens, numberConceptsInSeed)
 
 #first dim cs1 pertains to every concept node in sequence
-def process_features_active_train(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos):
+def process_features_active_train(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos, feature_neurons_segment_mask):
 	feature_neurons_inactive = 1 - feature_neurons_active
 		
 	# Update feature neurons in sequence_observed_columns
-	sequence_observed_columns.feature_neurons[array_index_properties_strength, :, :] += feature_neurons_active
-	sequence_observed_columns.feature_neurons[array_index_properties_permanence, :, :] += feature_neurons_active*z1	#orig = feature_neurons_active*(sequence_observed_columns.feature_neurons[array_index_properties_permanence] ** 2) + feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_permanence]
-	#sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :] += feature_neurons_active*j1	#update the activations of the target not source nodes
-	sequence_observed_columns.feature_neurons[array_index_properties_time, :, :] = feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_time] + feature_neurons_active*sentence_count
-	sequence_observed_columns.feature_neurons[array_index_properties_pos, :, :] = feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_pos] + feature_neurons_active*feature_neurons_pos
+	sequence_observed_columns.feature_neurons[array_index_properties_strength, :, :, :] += feature_neurons_active
+	sequence_observed_columns.feature_neurons[array_index_properties_permanence, :, :, :] += feature_neurons_active*z1	#orig = feature_neurons_active*(sequence_observed_columns.feature_neurons[array_index_properties_permanence] ** 2) + feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_permanence]
+	#sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :, :] += feature_neurons_active*j1	#update the activations of the target not source nodes
+	sequence_observed_columns.feature_neurons[array_index_properties_time, :, :, :] = feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_time] + feature_neurons_active*sentence_count
+	sequence_observed_columns.feature_neurons[array_index_properties_pos, :, :, :] = feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_pos] + feature_neurons_active*feature_neurons_pos
 
-	feature_connections_active = createFeatureConnectionsActive(feature_neurons_active, cs, fs, columns_word_order, feature_neurons_word_order)
+	feature_connections_active, feature_connections_segment_mask = createFeatureConnectionsActive(feature_neurons_active[array_index_segment_internal_column], cs, fs, columns_word_order, feature_neurons_word_order)
 	
-	feature_connections_pos = feature_neurons_pos.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
+	feature_connections_pos = feature_neurons_pos.view(1, cs, fs, 1, 1).expand(array_number_of_segments, cs, fs, cs, fs)
 
 	feature_connections_inactive = 1 - feature_connections_active
 
@@ -1520,25 +1521,29 @@ def process_features_active_train(sequence_observed_columns, feature_neurons_act
 	feature_neurons_word_order_1d = feature_neurons_word_order.flatten()
 	feature_connections_distances = torch.abs(feature_neurons_word_order_1d.unsqueeze(1) - feature_neurons_word_order_1d).reshape(cs, fs, cs, fs)
 	feature_connections_proximity = 1/(feature_connections_distances + 1) * 10
+	feature_connections_proximity.unsqueeze(0)	#add SANI segment dimension
 	feature_connections_strength_update = feature_connections_active*feature_connections_proximity
 	#print("feature_connections_strength_update = ", feature_connections_strength_update)
 
 	if(increaseColumnInternalConnectionsStrength):
-		cs_indices_1 = torch.arange(cs).view(cs, 1, 1, 1).expand(cs, fs, cs, fs)  # First cs dimension
-		cs_indices_2 = torch.arange(cs).view(1, 1, cs, 1).expand(cs, fs, cs, fs)  # Second cs dimension
+		cs_indices_1 = torch.arange(cs).view(1, cs, 1, 1, 1).expand(array_number_of_segments, cs, fs, cs, fs)  # First cs dimension
+		cs_indices_2 = torch.arange(cs).view(1, 1, 1, cs, 1).expand(array_number_of_segments, cs, fs, cs, fs)  # Second cs dimension
 		column_internal_connections_mask = (cs_indices_1 == cs_indices_2)
 		column_internal_connections_mask_off = torch.logical_not(column_internal_connections_mask)
 		feature_connections_strength_update = column_internal_connections_mask.float()*feature_connections_strength_update*increaseColumnInternalConnectionsStrengthModifier + column_internal_connections_mask_off.float()*feature_connections_strength_update
 
-	sequence_observed_columns.feature_connections[array_index_properties_strength, :, :, :, :] += feature_connections_strength_update
-	sequence_observed_columns.feature_connections[array_index_properties_permanence, :, :, :, :] += feature_connections_active*z1	#orig = feature_connections_active*(sequence_observed_columns.feature_connections[array_index_properties_permanence] ** 2) + feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_permanence]
-	#sequence_observed_columns.feature_connections[array_index_properties_activation, :, :, :, :] += feature_connections_active*j1	#connection activations are not currently used
-	sequence_observed_columns.feature_connections[array_index_properties_time, :, :, :, :] = feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_time] +  feature_connections_active*sentence_count
-	sequence_observed_columns.feature_connections[array_index_properties_pos, :, :, :, :] = feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_pos] + feature_connections_active*feature_connections_pos
+	#print("feature_connections_active[array_index_segment_first] = ", feature_connections_active[array_index_segment_first])
+	#print("feature_connections_active[array_index_segment_internal_column] = ", feature_connections_active[array_index_segment_internal_column])
+	
+	sequence_observed_columns.feature_connections[array_index_properties_strength, :, :, :, :, :] += feature_connections_strength_update
+	sequence_observed_columns.feature_connections[array_index_properties_permanence, :, :, :, :, :] += feature_connections_active*z1	#orig = feature_connections_active*(sequence_observed_columns.feature_connections[array_index_properties_permanence] ** 2) + feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_permanence]
+	#sequence_observed_columns.feature_connections[array_index_properties_activation, :, :, :, :, :] += feature_connections_active*j1	#connection activations are not currently used
+	sequence_observed_columns.feature_connections[array_index_properties_time, :, :, :, :, :] = feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_time] + feature_connections_active*sentence_count
+	sequence_observed_columns.feature_connections[array_index_properties_pos, :, :, :, :, :] = feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_pos] + feature_connections_active*feature_connections_pos
 
 	#decrease permanence;
 	if(decreasePermanenceOfInactiveFeatureNeuronsAndConnections):
-		decrease_permanence_active(sequence_observed_columns, feature_neurons_active, feature_neurons_inactive, sequence_concept_index_mask)
+		decrease_permanence_active(sequence_observed_columns, feature_neurons_active[array_index_segment_internal_column], feature_neurons_inactive[array_index_segment_internal_column], sequence_concept_index_mask, feature_neurons_segment_mask, feature_connections_segment_mask)
 	
 #first dim cs1 pertains to every concept node in sequence
 def process_features_active_seed(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos, num_seed_tokens, numberConceptsInSeed):
@@ -1548,15 +1553,16 @@ def process_features_active_seed(sequence_observed_columns, feature_neurons_acti
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 		global global_feature_neurons
 		cs2 = c
-		feature_connections_active = feature_neurons_word_order.view(cs, fs, 1, 1).expand(cs, fs, cs2, fs2)
+		feature_connections_active = torch.ones(array_number_of_segments, cs, fs, cs2, fs2)	#TODO: assign segment dimension
 		print("feature_connections_active.shape = ", feature_connections_active.shape)
 	else:
 		cs2 = cs
-		feature_connections_active = createFeatureConnectionsActive(feature_neurons_active, cs, fs, columns_word_order, feature_neurons_word_order)
+		feature_connections_active, feature_connections_segment_mask = createFeatureConnectionsActive(feature_neurons_active[array_index_segment_internal_column], cs, fs, columns_word_order, feature_neurons_word_order)
 	
 	firstWordIndexPredictPhase = num_seed_tokens
 	feature_neurons_word_order_expanded_1 = feature_neurons_word_order.view(cs, fs, 1, 1).expand(cs, fs, cs2, fs2)  # For the first node
 	word_order_mask = feature_neurons_word_order_expanded_1 < firstWordIndexPredictPhase
+	word_order_mask = word_order_mask.unsqueeze(0).expand(array_number_of_segments, cs, fs, cs2, fs2)
 	feature_connections_active = feature_connections_active * word_order_mask
 	
 	#print("sequence_observed_columns.feature_connections[array_index_properties_strength] = ", sequence_observed_columns.feature_connections[array_index_properties_strength])
@@ -1566,26 +1572,31 @@ def process_features_active_seed(sequence_observed_columns, feature_neurons_acti
 	#print("feature_connections_activation_update = ", feature_connections_activation_update)
 	
 	#update the activations of the target nodes;
-	feature_neurons_target_activation = torch.sum(feature_connections_activation_update, dim=(0, 1))
+	print("feature_connections_activation_update.shape = ", feature_connections_activation_update.shape)
+	feature_connections_activation_update = torch.sum(feature_connections_activation_update, dim=(0))	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
+	feature_neurons_target_activation = torch.sum(feature_connections_activation_update, dim=(0, 1))	
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-		global_feature_neurons[array_index_properties_activation] += feature_neurons_target_activation*j1
+		global_feature_neurons[array_index_properties_activation, :, :, :] += feature_neurons_target_activation*j1
 	else:
-		sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :] += feature_neurons_target_activation*j1
-		#print("sequence_observed_columns.feature_neurons[array_index_properties_activation = ", sequence_observed_columns.feature_neurons[array_index_properties_activation])
+		print("sequence_observed_columns.feature_neurons[array_index_properties_activation].shape = ", sequence_observed_columns.feature_neurons[array_index_properties_activation].shape)
+		print("feature_neurons_target_activation.shape = ", feature_neurons_target_activation.shape)
+		sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :, :] += feature_neurons_target_activation*j1
 		#will only activate target neurons in sequence_observed_columns (not suitable for inference seed/prediction phase)
 
 	if(deactivateNeuronsUponPrediction):
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 			for sequence_concept_index, concept_index in enumerate(sequence_observed_columns.concept_indices_in_observed_list):
-				global_feature_neurons[array_index_properties_activation][concept_index] *= feature_neurons_inactive[sequence_concept_index]	#TODO: FIX THIS for sparse tensors
+				global_feature_neurons[array_index_properties_activation, :, concept_index, :] *= feature_neurons_inactive[:, sequence_concept_index]	#TODO: assign segment dimension
 		else:
 			feature_neurons_source_mask = feature_neurons_word_order < num_seed_tokens
+			feature_neurons_source_mask.unsqueeze(0).expand(array_number_of_segments, cs, fs)
 			feature_neurons_active_source = torch.logical_and(feature_neurons_source_mask, feature_neurons_active > 0)
 			feature_neurons_inactive_source = torch.logical_not(feature_neurons_active_source).float()
-			sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :] *= feature_neurons_inactive_source
+			sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :, :] *= feature_neurons_inactive_source
 
 
 def createFeatureConnectionsActive(feature_neurons_active, cs, fs, columns_word_order, feature_neurons_word_order):
+
 	feature_neurons_active_1d = feature_neurons_active.view(cs*fs)
 	feature_connections_active = torch.matmul(feature_neurons_active_1d.unsqueeze(1), feature_neurons_active_1d.unsqueeze(0)).view(cs, fs, cs, fs)
 
@@ -1612,10 +1623,27 @@ def createFeatureConnectionsActive(feature_neurons_active, cs, fs, columns_word_
 	fs_indices_2 = torch.arange(fs).view(1, 1, 1, fs).expand(cs, fs, cs, fs)  # Second fs dimension
 	identity_mask = (cs_indices_1 != cs_indices_2) | (fs_indices_1 != fs_indices_2)
 	feature_connections_active = feature_connections_active * identity_mask
+
+	feature_connections_active, feature_connections_segment_mask = assign_feature_connections_to_target_segments(feature_connections_active, cs, fs)
 	
-	return feature_connections_active
+	return feature_connections_active, feature_connections_segment_mask
+
+def assign_feature_connections_to_target_segments(feature_connections_active, cs, fs):
+
+	#arrange active connections according to target neuron sequential segment index
+	concept_neurons_concept_order_1d = torch.arange(cs)
+	concept_neurons_distances = torch.abs(concept_neurons_concept_order_1d.unsqueeze(1) - concept_neurons_concept_order_1d).reshape(cs, cs)
+	connections_segment_index = array_number_of_segments-concept_neurons_distances-1
+	connections_segment_index = torch.clamp(connections_segment_index, min=0)
+	
+	feature_connections_segment_mask = torch.zeros((array_number_of_segments, cs, cs), dtype=torch.bool)
+	feature_connections_segment_mask = feature_connections_segment_mask.scatter_(0, connections_segment_index.unsqueeze(0), True)
+	feature_connections_segment_mask = feature_connections_segment_mask.view(array_number_of_segments, cs, 1, cs, 1).expand(array_number_of_segments, cs, fs, cs, fs)
+	feature_connections_active = feature_connections_segment_mask * feature_connections_active.unsqueeze(0)
+	
+	return feature_connections_active, feature_connections_segment_mask
 		
-def decrease_permanence_active(sequence_observed_columns, feature_neurons_active, feature_neurons_inactive, sequence_concept_index_mask):
+def decrease_permanence_active(sequence_observed_columns, feature_neurons_active, feature_neurons_inactive, sequence_concept_index_mask, feature_neurons_segment_mask, feature_connections_segment_mask):
 
 	if(sequenceObservedColumnsMatchSequenceWords):
 		feature_neurons_inactive = feature_neurons_inactive*sequence_concept_index_mask	#when decreasing a value based on inactivation, ignore duplicate feature column neurons in the sequence
@@ -1624,7 +1652,8 @@ def decrease_permanence_active(sequence_observed_columns, feature_neurons_active
 	fs = sequence_observed_columns.fs 
 	
 	# Decrease permanence for feature neurons not activated
-	sequence_observed_columns.feature_neurons[array_index_properties_permanence, :, :] -= feature_neurons_inactive*z2
+	feature_neurons_decrease = feature_neurons_inactive.unsqueeze(0)*z2 * feature_neurons_segment_mask.unsqueeze(2)
+	sequence_observed_columns.feature_neurons[array_index_properties_permanence, :, :, :] -= feature_neurons_decrease
 	sequence_observed_columns.feature_neurons[array_index_properties_permanence] = torch.clamp(sequence_observed_columns.feature_neurons[array_index_properties_permanence], min=0)
 
 	feature_neurons_all = torch.ones((cs, fs), dtype=array_type)
@@ -1634,12 +1663,14 @@ def decrease_permanence_active(sequence_observed_columns, feature_neurons_active
 	 
 	# Decrease permanence of connections from inactive feature neurons in column
 	feature_connections_decrease1 = torch.matmul(feature_neurons_inactive_1d.unsqueeze(1), feature_neurons_all_1d.unsqueeze(0)).view(cs, fs, cs, fs)
-	sequence_observed_columns.feature_connections[array_index_properties_permanence, :, :, :, :] -= feature_connections_decrease1
+	feature_connections_decrease1 = feature_connections_decrease1.unsqueeze(0)*feature_connections_segment_mask
+	sequence_observed_columns.feature_connections[array_index_properties_permanence, :, :, :, :, :] -= feature_connections_decrease1
 	sequence_observed_columns.feature_connections[array_index_properties_permanence] = torch.clamp(sequence_observed_columns.feature_connections[array_index_properties_permanence], min=0)
 	
 	# Decrease permanence of inactive connections for activated features in column 
 	feature_connections_decrease2 = torch.matmul(feature_neurons_active_1d.unsqueeze(1), feature_neurons_inactive_1d.unsqueeze(0)).view(cs, fs, cs, fs)
-	sequence_observed_columns.feature_connections[array_index_properties_permanence, :, :, :, :] -= feature_connections_decrease2
+	feature_connections_decrease2 = feature_connections_decrease2.unsqueeze(0)*feature_connections_segment_mask
+	sequence_observed_columns.feature_connections[array_index_properties_permanence, :, :, :, :, :] -= feature_connections_decrease2
 	sequence_observed_columns.feature_connections[array_index_properties_permanence] = torch.clamp(sequence_observed_columns.feature_connections[array_index_properties_permanence], min=0)
  
 	#current limitation; will not deactivate neurons or remove their strength if their permanence goes to zero
@@ -1674,18 +1705,15 @@ def visualize_graph(sequence_observed_columns):
 			feature_word_to_index = sequence_observed_columns.feature_word_to_index
 			y_offset = 1 + 1	#reserve space at bottom of column for feature concept neuron (as it will not appear first in sequence_observed_columns.feature_word_to_index, only observed_column.feature_word_to_index)
 			c_idx = sequence_observed_columns.concept_name_to_index[lemma]
-			feature_neurons = sequence_observed_columns.feature_neurons[:, c_idx]
+			feature_neurons = sequence_observed_columns.feature_neurons[:, :, c_idx]
 		else:
 			feature_word_to_index = observed_column.feature_word_to_index
 			y_offset = 1
 			if lowMem:
 				feature_neurons = observed_column.feature_neurons
 			else:
-				feature_neurons = []
-				for i in range(array_number_of_properties):
-					feature_neurons_element = slice_sparse_tensor(global_feature_neurons[i], 0, concept_index)
-					feature_neurons.append(feature_neurons_element)
-				#feature_neurons = global_feature_neurons[:, concept_index]	#operation not supported for sparse tensors
+				feature_neurons = slice_sparse_tensor(global_feature_neurons, 2, concept_index)
+				#feature_neurons = global_feature_neurons[:, :, concept_index]	#operation not supported for sparse tensors
 					
 		# Draw feature neurons
 		for feature_word, feature_index_in_observed_column in feature_word_to_index.items():
@@ -1707,17 +1735,15 @@ def visualize_graph(sequence_observed_columns):
 		
 			featurePresent = False
 			featureActive = False
-			#print("feature_neurons[array_index_properties_strength, feature_index_in_observed_column] = ", feature_neurons[array_index_properties_strength, feature_index_in_observed_column])
-			#print("feature_neurons[array_index_properties_permanence, feature_index_in_observed_column] = ", feature_neurons[array_index_properties_permanence, feature_index_in_observed_column])
-			if(feature_neurons[array_index_properties_strength][feature_index_in_observed_column] > 0 and feature_neurons[array_index_properties_permanence][feature_index_in_observed_column] > 0):
+			if(feature_neurons[array_index_properties_strength, array_index_segment_internal_column, feature_index_in_observed_column] > 0 and feature_neurons[array_index_properties_permanence, array_index_segment_internal_column, feature_index_in_observed_column] > 0):
 				featurePresent = True
-			if(feature_neurons[array_index_properties_activation][feature_index_in_observed_column] > 0):
+			if(feature_neurons[array_index_properties_activation, array_index_segment_internal_column, feature_index_in_observed_column] > 0):
 				featureActive = True
 				
 			if(featurePresent):
 				if(drawRelationTypes):
 					if not conceptNeuronFeature:
-						neuron_color = generateFeatureNeuronColour(feature_neurons[array_index_properties_pos][feature_index_in_observed_column], feature_word)
+						neuron_color = generateFeatureNeuronColour(feature_neurons[array_index_properties_pos, array_index_segment_internal_column, feature_index_in_observed_column], feature_word)
 				elif(featureActive):
 					if(conceptNeuronFeature):
 						neuron_color = 'lightskyblue'
@@ -1725,7 +1751,7 @@ def visualize_graph(sequence_observed_columns):
 						neuron_color = 'cyan'
 						
 				if(debugDrawNeuronStrengths):
-					neuron_name = createNeuronLabelWithStrength(neuron_name, feature_neurons[array_index_properties_activation][feature_index_in_observed_column])
+					neuron_name = createNeuronLabelWithStrength(neuron_name, feature_neurons[array_index_properties_activation, array_index_segment_internal_column, feature_index_in_observed_column])
 
 				feature_node = f"{lemma}_{feature_word}_{f_idx}"
 				if(randomiseColumnFeatureXposition and not conceptNeuronFeature):
@@ -1756,12 +1782,13 @@ def visualize_graph(sequence_observed_columns):
 			feature_word_to_index = sequence_observed_columns.feature_word_to_index
 			other_feature_word_to_index = sequence_observed_columns.feature_word_to_index
 			c_idx = sequence_observed_columns.concept_name_to_index[lemma]
-			feature_connections = sequence_observed_columns.feature_connections[:, c_idx]
+			feature_connections = sequence_observed_columns.feature_connections[:, :, c_idx]
 		else:
 			feature_word_to_index = observed_column.feature_word_to_index
 			other_feature_word_to_index = observed_column.feature_word_to_index
 			c_idx = concept_columns_dict[lemma]
 			feature_connections = observed_column.feature_connections
+		feature_connections = torch.sum(feature_connections, dim=1)	#sum along sequential segment index (draw connections to all segments)
 	
 		# Internal connections (yellow)
 		for feature_word, feature_index_in_observed_column in feature_word_to_index.items():
@@ -1775,11 +1802,11 @@ def visualize_graph(sequence_observed_columns):
 							other_f_idx = feature_word_to_index[other_feature_word]
 							
 							featurePresent = False
-							if(feature_connections[array_index_properties_strength][f_idx, c_idx, other_f_idx] > 0 and feature_connections[array_index_properties_permanence][f_idx, c_idx, other_f_idx] > 0):
+							if(feature_connections[array_index_properties_strength, f_idx, c_idx, other_f_idx] > 0 and feature_connections[array_index_properties_permanence, f_idx, c_idx, other_f_idx] > 0):
 								featurePresent = True
 								
 							if(drawRelationTypes):
-								connection_color = generateFeatureNeuronColour(feature_connections[array_index_properties_pos][f_idx, c_idx, other_f_idx], feature_word, internal_connection=True)
+								connection_color = generateFeatureNeuronColour(feature_connections[array_index_properties_pos, f_idx, c_idx, other_f_idx], feature_word, internal_connection=True)
 							else:
 								connection_color = 'yellow'
 								
@@ -1813,15 +1840,14 @@ def visualize_graph(sequence_observed_columns):
 					
 							featurePresent = False
 							if(externalConnection):
-								if(feature_connections[array_index_properties_strength][f_idx, other_c_idx, other_f_idx] > 0 and feature_connections[array_index_properties_permanence][f_idx, other_c_idx, other_f_idx] > 0):
+								#print("feature_connections[array_index_properties_strength, f_idx, other_c_idx, other_f_idx] = ", feature_connections[array_index_properties_strength, f_idx, other_c_idx, other_f_idx])
+								#print("feature_connections[array_index_properties_permanence, f_idx, other_c_idx, other_f_idx] = ", feature_connections[array_index_properties_permanence, f_idx, other_c_idx, other_f_idx])
+								if(feature_connections[array_index_properties_strength, f_idx, other_c_idx, other_f_idx] > 0 and feature_connections[array_index_properties_permanence, f_idx, other_c_idx, other_f_idx] > 0):
 									featurePresent = True
 									#print("\tfeaturePresent")
 
 							if(drawRelationTypes):
-								if(drawSequenceObservedColumns):
-									connection_color = generateFeatureNeuronColour(sequence_observed_columns.feature_connections[array_index_properties_pos][c_idx, f_idx, other_c_idx, other_f_idx], feature_word, internal_connection=False)
-								else:
-									connection_color = generateFeatureNeuronColour(observed_column.feature_connections[array_index_properties_pos][f_idx, other_c_idx, other_f_idx], feature_word, internal_connection=False)
+								connection_color = generateFeatureNeuronColour(feature_connections[array_index_properties_pos, f_idx, other_c_idx, other_f_idx], feature_word, internal_connection=False)
 							else:
 								connection_color = 'orange'
 								
@@ -1849,7 +1875,7 @@ def save_data(observed_columns_dict, concept_features_dict):
 		global global_feature_neurons
 		if(performRedundantCoalesce):
 			global_feature_neurons = global_feature_neurons.coalesce()
-		save_tensor_list(global_feature_neurons, databaseFolder, global_feature_neurons_file)
+		torch.save(global_feature_neurons, global_feature_neurons_file)
 
 	# Save concept columns dictionary to disk
 	with open(concept_columns_dict_file, 'wb') as f_out:
@@ -1858,21 +1884,6 @@ def save_data(observed_columns_dict, concept_features_dict):
 	# Save concept features dictionary to disk
 	with open(concept_features_dict_file, 'wb') as f_out:
 		pickle.dump(concept_features_dict, f_out)
-
-def save_tensor_list(tensor_list, folder_name, file_name):
-	for i in range(array_number_of_properties):
-		tensor = tensor_list[i]
-		array_properties_string = "_property" + str(i)
-		torch.save(tensor, os.path.join(folder_name, file_name+array_properties_string+pytorch_tensor_file_extension))
-
-def load_tensor_list(folder_name, file_name):
-	tensor_list = []
-	for i in range(array_number_of_properties):
-		array_properties_string = "_property" + str(i)
-		tensor = torch.load(os.path.join(folder_name, file_name+array_properties_string+pytorch_tensor_file_extension))
-		tensor_list.append(tensor)
-	return tensor_list
-
 
 # Load the Wikipedia dataset using Hugging Face datasets
 dataset = load_dataset('wikipedia', '20220301.en', split='train', streaming=True)
