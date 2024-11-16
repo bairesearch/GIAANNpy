@@ -1,0 +1,4 @@
+DOING//do:
+
+v1c1a:
+A hybrid GNN AI should separate the predictive network from the database network. The database network is easily modified upon encountering new information, enabling continuous learning (low energy/compute). The database network is trained using a target sequence (ground truth) and non-backpropagation algorithm. The predictive network is trained to generate next token predictions based on the database network along with the target sequence (ground truth). The AI is then capable of generating next token predictions based on a seed sequence (prompt) and its current revision of the database network. It learns to reason across/from the database network to generate its predictions. The database network could be made amenable to existing LLM architectures (eg transformer) by structuring/storing its contents in permutation invariant assemblies.
