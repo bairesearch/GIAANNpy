@@ -1,4 +1,4 @@
-"""GIAANNproto1b.py
+"""GIAANNproto1c.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024 Baxter AI (baxterai.com)
@@ -23,7 +23,7 @@ pip install benepar
 
 # Usage:
 source activate pytorchsenv
-python GIAANNproto1b.py
+python GIAANNproto1c.py
 
 # Description:
 GIA ANN proto
