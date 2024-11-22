@@ -31,7 +31,7 @@ pip install benepar
 ### Execution
 ```
 source activate pytorchsenv
-python3 GIAANNproto1c.py
+python3 GIAANNproto_main.py
 ```
 
 ### References

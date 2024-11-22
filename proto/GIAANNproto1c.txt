@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1c1a;
+o1 preview prompt 1c2a;
 
 v1b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -82,10 +82,11 @@ MANUAL; - Initialise all feature neuron and feature connection tensors to zero (
 MANUAL; - patch populate_arrays self.feature_connections generation from sparse tensors.
 MANUAL; - Convert feature neuron/connections tensor redundant type dimension into SANI (sequentially activated neuronal input) segment dimension.
 
-v1c1a:
+v1c2a:
 MANUAL; - Create a hybrid GNN AI that comprises a database network (the abstract biological neural neural network defined previously) and a predictive network. The database network is easily modified upon encountering new information, enabling continuous learning (low energy/compute). The database network is trained using a target sequence (ground truth) and non-backpropagation algorithm. The predictive network is trained to generate next token predictions based on the database network along with the target sequence (ground truth). The AI is then capable of generating next token predictions based on a seed sequence (prompt) and its current revision of the database network. It learns to reason across/from the database network to generate its predictions. The database network is made amenable to existing LLM architectures (transformer/MLP) by structuring/storing its contents in permutation invariant assemblies.
 /MANUAL; - restore option not useSANI (set array_number_of_segments = 1). add option inferencePredictiveNetwork. Create class NextWordPredictionMLPmodel. Extract predictMostActiveFeature/selectMostActiveFeature from process_column_inference_prediction.
-
+MANUAL; - extract GIAANNproto_databaseNetworkDraw.py GIAANNproto_databaseNetworkFiles.py GIAANNproto_databaseNetwork.py GIAANNproto_databaseNetworkTrain.py GIAANNproto_globalDefs.py GIAANNproto_predictiveNetworkMLP.py GIAANNproto_predictiveNetwork.py GIAANNproto_predictiveNetworkTransformer.py GIAANNproto_main.py GIAANNproto_sparseTensors.py 
+MANUAL; - patch process_features:!(sequenceObservedColumnsUseSequenceFeaturesOnly and sequenceObservedColumnsMatchSequenceWords):!useSANI: set feature_neurons_active[0, sequence_concept_index, sequence_feature_index] = 1
 
 ---
 Alternate predictive network model (transformer);
@@ -94,8 +95,8 @@ Alternate predictive network model (transformer);
 - The different states of column features (strength, permanence, activation, time, pos, etc) are read into different attention heads.
 - The predictive network reads the column feature connections from the database network (not just the column feature neurons). The predictive network transformer attention query key pairs are modified in different attention heads based on the database network connection state between them (strength, permanence, activation, time, pos, etc).
 - The predictive network transformer supports cross-processing between attention heads.
-- The number of tokens in predictive network transformer matches the number of columns in the database network. When a token is predicted the activation levels of the database network are modified. An activation trace is stored across sentences, to enable long range reference resolution. The transformer learns to ignore currently actuated neurons as likely next word predictions, as they have recently been predicted. To derive the predicted token given current transformer state, apply an MLP over the entire set of columns in the last layer of the transformer. 
-- Feature neurons include concept neurons (the precise distribution of features differentiates input token embeddings).
-- the transformer layers can still be trained without a final version of the database network.
+- The number of tokens in predictive network transformer matches the number of columns in the database network. When a token is predicted the activation levels of the database network are modified. An activation trace is stored across sentences, to enable long range reference resolution. The transformer learns to ignore currently activated neurons as likely next word predictions, as they have recently been predicted. To derive the predicted token given current transformer state, apply an MLP over the entire set of columns in the last layer of the transformer.
+- The precise distribution of features differentiates input token embeddings.
+- The transformer layers can still be trained without a final version of the database network.
 - The database network comprises a global feature neuron array of shape c * f * p, where c is the number of columns, f is the number of features, and p is the number of properties. Each column in the database network has a feature connection array of shape f * p * c * f * p.
 - The predictive network is a custom transformer that always predicts a single word (column and feature) based on the state of every input token in a permutation invariant sequence of length c. The predicted word is the index of max value within a probability distribution of size c * f. The transformer has no positional encodings (complete permutation invariance). Every input token is defined as a f * p array, where f is the number of input features and p is the number of properties per feature. The input layer X of the transformer is thus defined as a c * f * p array. The p dimension of the input layer is used to generate p attention heads in the input layer. The keys (K) and queries (Q) of the input layer are of the same shape as the input layer X (c * f * p), but are not used by the transformer. Instead the K*Q output of the input layer is read directly from the feature connections database network (c * f * p * c * f * p). The values (V) of the input layer is generated using the standard implementation (V = W_v * X, where W_v is of shape f*f). Each hidden layer of the transformer uses a standard transformer implementation, with a standard hidden dimension size (f_hidden) and number of attention heads (p_hidden).
