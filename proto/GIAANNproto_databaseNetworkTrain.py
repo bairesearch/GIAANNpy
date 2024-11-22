@@ -485,7 +485,7 @@ def process_features_active_seed(sequence_observed_columns, feature_neurons_acti
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 		cs2 = sequence_observed_columns.databaseNetworkObject.c
 		feature_connections_active = pt.ones(array_number_of_segments, cs, fs, cs2, fs2)	#TODO: assign segment dimension
-		print("feature_connections_active.shape = ", feature_connections_active.shape)
+		#print("feature_connections_active.shape = ", feature_connections_active.shape)
 	else:
 		cs2 = cs
 		feature_connections_active, feature_connections_segment_mask = createFeatureConnectionsActive(feature_neurons_active[array_index_segment_internal_column], cs, fs, columns_word_order, feature_neurons_word_order)
@@ -496,21 +496,15 @@ def process_features_active_seed(sequence_observed_columns, feature_neurons_acti
 	word_order_mask = word_order_mask.unsqueeze(0).expand(array_number_of_segments, cs, fs, cs2, fs2)
 	feature_connections_active = feature_connections_active * word_order_mask
 	
-	#print("sequence_observed_columns.feature_connections[array_index_properties_strength] = ", sequence_observed_columns.feature_connections[array_index_properties_strength])
-
 	#target neuron activation dependence on connection strength;
 	feature_connections_activation_update = feature_connections_active * sequence_observed_columns.feature_connections[array_index_properties_strength]
-	#print("feature_connections_activation_update = ", feature_connections_activation_update)
 	
 	#update the activations of the target nodes;
-	print("feature_connections_activation_update.shape = ", feature_connections_activation_update.shape)
 	feature_connections_activation_update = pt.sum(feature_connections_activation_update, dim=(0))	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
 	feature_neurons_target_activation = pt.sum(feature_connections_activation_update, dim=(0, 1))	
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 		sequence_observed_columns.databaseNetworkObject.global_feature_neurons[array_index_properties_activation, :, :, :] += feature_neurons_target_activation*j1
 	else:
-		print("sequence_observed_columns.feature_neurons[array_index_properties_activation].shape = ", sequence_observed_columns.feature_neurons[array_index_properties_activation].shape)
-		print("feature_neurons_target_activation.shape = ", feature_neurons_target_activation.shape)
 		sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :, :] += feature_neurons_target_activation*j1
 		#will only activate target neurons in sequence_observed_columns (not suitable for inference seed/prediction phase)
 

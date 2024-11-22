@@ -18,8 +18,8 @@ GIA ANN proto predictive Network MLP
 """
 
 import torch as pt
-import pt.nn as nn
-import pt.optim as optim
+import torch.nn as nn
+import torch.optim as optim
 
 
 from GIAANNproto_globalDefs import *
@@ -50,25 +50,26 @@ class NextWordPredictionMLPmodel(nn.Module):
 		return out
 
 def nextWordPredictionMLPcreate(databaseNetworkObject):
-	global nextWordPredictionModel, criterion, optimizer, batch_size
+	global model, criterion, optimizer, batch_size
 
-	nextWordPredictionModel = NextWordPredictionMLPmodel(databaseNetworkObject)
-	nextWordPredictionModel.train()  # set model to training mode
+	model = NextWordPredictionMLPmodel(databaseNetworkObject)
+	model.train()  # set model to training mode
 
 	if(multipleTargets):
 		criterion = nn.BCEWithLogitsLoss()
 	else:
 		criterion = nn.MSELoss()
-	optimizer = optim.Adam(nextWordPredictionModel.parameters(), lr=0.0005)
+	optimizer = optim.Adam(model.parameters(), lr=0.0005)
 	batch_size = 1
 	
-def nextWordPredictionMLPtrainStep(model, inputs, targets, optimizer, criterion):
+def nextWordPredictionMLPtrainStep(global_feature_neurons_activation, targets):
+	global model, criterion, optimizer, batch_size
+	
+	global_feature_neurons_activation = global_feature_neurons_activation.unsqueeze(0)	#add batch dim
+	targets = targets.unsqueeze(0)	#add batch dim
 
-	inputs.unsqueeze(0)	#add batch dim
-	targets.unsqueeze(0)	#add batch dim
-
-	inputs = inputs.to_dense()
-	outputs = model(inputs)  # Outputs shape: (batch_size, c, f)
+	global_feature_neurons_activation = global_feature_neurons_activation.to_dense()
+	outputs = model(global_feature_neurons_activation)  # Outputs shape: (batch_size, c, f)
 
 	loss = criterion(outputs, targets)
 
@@ -78,6 +79,10 @@ def nextWordPredictionMLPtrainStep(model, inputs, targets, optimizer, criterion)
 
 	loss_value = loss.item()
 	print("loss_value = ", loss_value)
+
+	return getTopkPredictions(outputs)
+
+def getTopkPredictions(outputs):
 
 	with pt.no_grad():
 
@@ -102,7 +107,7 @@ def nextWordPredictionMLPtrainStep(model, inputs, targets, optimizer, criterion)
 
 	concept_columns_indices_next = concept_columns_indices_next[0]	#select first sample of batch
 	concept_columns_feature_indices_next = concept_columns_feature_indices_next[0]	#select first sample of batch
-
+		
 	return concept_columns_indices_next, concept_columns_feature_indices_next
 
 

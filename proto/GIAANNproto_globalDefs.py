@@ -29,6 +29,9 @@ useSANI = False
 useInference = False  # useInference mode
 if(useInference):
 	inferencePredictiveNetwork = False	#use MLP to predict next token
+	if(inferencePredictiveNetwork):
+		inferencePredictiveNetworkModelMLP = False
+		inferencePredictiveNetworkModelTransformer = True
 	inferenceSeedTargetActivationsGlobalFeatureArrays = False
 	lowMem = False		#mandatory
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):

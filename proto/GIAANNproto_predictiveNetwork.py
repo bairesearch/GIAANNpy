@@ -23,7 +23,10 @@ from GIAANNproto_globalDefs import *
 import GIAANNproto_databaseNetwork
 import GIAANNproto_databaseNetworkTrain
 if(inferencePredictiveNetwork):
-	import GIAANNproto_predictiveNetworkMLP
+	if(inferencePredictiveNetworkModelMLP):
+		import GIAANNproto_predictiveNetworkMLP
+	elif(inferencePredictiveNetworkModelTransformer):
+		import GIAANNproto_predictiveNetworkTransformer
 import GIAANNproto_databaseNetworkDraw
 import GIAANNproto_sparseTensors
 
@@ -68,6 +71,9 @@ def process_concept_words_inference(sequence_observed_columns, sentenceIndex, do
 	concept_indices_seed = pt.nonzero(concept_mask_seed).squeeze(1)
 	numberConceptsInSeed = concept_indices_seed.shape[0]
 	
+	if(inferencePredictiveNetwork and inferencePredictiveNetworkModelTransformer):
+		GIAANNproto_databaseNetwork.generate_global_feature_connections(sequence_observed_columns.databaseNetworkObject)
+		
 	#seed network;
 	words, lemmas, pos_tags= getLemmas(doc)
 	GIAANNproto_databaseNetworkTrain.process_concept_words(sequence_observed_columns, sentenceIndex, doc, words, lemmas, pos_tags, train=False, num_seed_tokens=num_seed_tokens, numberConceptsInSeed=numberConceptsInSeed)
@@ -79,8 +85,11 @@ def process_concept_words_inference(sequence_observed_columns, sentenceIndex, do
 	GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns)
 	
 	if(inferencePredictiveNetwork):
-		nextWordPredictionMLPcreate(sequence_observed_columns.databaseNetworkObject)
-	
+		if(inferencePredictiveNetworkModelMLP):
+			GIAANNproto_predictiveNetworkMLP.nextWordPredictionMLPcreate(sequence_observed_columns.databaseNetworkObject)
+		elif(inferencePredictiveNetworkModelTransformer):
+			GIAANNproto_predictiveNetworkTransformer.nextWordPredictionTransformerCreate(sequence_observed_columns.databaseNetworkObject)
+
 	'''
 	global_feature_neurons_dense = sequence_observed_columns.databaseNetworkObject.global_feature_neurons.to_dense()
 	print("global_feature_neurons_dense = ", global_feature_neurons_dense)
@@ -100,7 +109,7 @@ def process_concept_words_inference(sequence_observed_columns, sentenceIndex, do
 		featurePredictionTargetMatch, concept_columns_indices, concept_columns_feature_indices = process_column_inference_prediction(sequence_observed_columns.databaseNetworkObject, observed_columns_dict, wordPredictionIndex, sequenceWordIndex, words_doc, lemmas_doc, concept_columns_indices, concept_columns_feature_indices, concept_mask, sequence_observed_columns.columns_index_sequence_word_index_dict)
 		
 
-							
+
 def process_column_inference_prediction(databaseNetworkObject, observed_columns_dict, wordPredictionIndex, sequenceWordIndex, words_doc, lemmas_doc, concept_columns_indices, concept_columns_feature_indices, concept_mask, columns_index_sequence_word_index_dict):
 	
 	#print(f"process_column_inference_prediction: {wordPredictionIndex}; concept_columns_indices = ", concept_columns_indices)
@@ -188,10 +197,10 @@ def predictMostActiveFeature(databaseNetworkObject, words_doc, lemmas_doc, wordP
 	#generate targets;
 	if(concept_mask[sequenceWordIndex]):
 		lemma = lemmas_doc[sequenceWordIndex]
-		targetFeatureIndex = concept_columns_dict[lemma]
+		targetFeatureIndex = databaseNetworkObject.concept_columns_dict[lemma]
 	else:
 		word = words_doc[sequenceWordIndex]
-		targetFeatureIndex = concept_features_dict[word]
+		targetFeatureIndex = databaseNetworkObject.concept_features_dict[word]
 	doc_len = concept_mask.shape[0]
 	foundFeature = False
 	foundNextColumnIndex = False
@@ -218,9 +227,13 @@ def predictMostActiveFeature(databaseNetworkObject, words_doc, lemmas_doc, wordP
 	#print("targetFeatureIndex = ", targetFeatureIndex)
 	#print("targets = ", targets)
 	
-	concept_columns_indices_next, concept_columns_feature_indices_next = nextWordPredictionMLPtrainStep(nextWordPredictionModel, databaseNetworkObject.global_feature_neurons_activation, targets, optimizer, criterion)
+	if(inferencePredictiveNetworkModelMLP):
+		concept_columns_indices_next, concept_columns_feature_indices_next = GIAANNproto_predictiveNetworkMLP.nextWordPredictionMLPtrainStep(databaseNetworkObject.global_feature_neurons_activation, targets)
+	elif(inferencePredictiveNetworkModelTransformer):
+		concept_columns_indices_next, concept_columns_feature_indices_next = GIAANNproto_predictiveNetworkTransformer.nextWordPredictionTransformerTrainStep(databaseNetworkObject.global_feature_neurons, databaseNetworkObject.global_feature_connections, targets)
 
 	return concept_columns_indices_next, concept_columns_feature_indices_next, kc
+
 
 def selectMostActiveFeature(global_feature_neurons_activation):
 

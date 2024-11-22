@@ -196,4 +196,14 @@ def load_or_create_observed_column(databaseNetworkObject, concept_index, lemma, 
 		observed_column.expand_feature_arrays(databaseNetworkObject.f)
 	return observed_column
 
-
+def generate_global_feature_connections(databaseNetworkObject):
+	concept_columns_list = []
+	for i, (lemma, concept_index) in enumerate(databaseNetworkObject.concept_columns_dict.items()):
+		concept_column = load_or_create_observed_column(databaseNetworkObject, concept_index, lemma, i)
+		concept_columns_list.append(concept_column)
+	global_feature_connections_list = []
+	for concept_column in concept_columns_list:
+		global_feature_connections_list.append(concept_column.feature_connections)
+	databaseNetworkObject.global_feature_connections = pt.stack(global_feature_connections_list, dim=2)
+	print("1 databaseNetworkObject.global_feature_connections.shape = ", databaseNetworkObject.global_feature_connections.shape)
+	
