@@ -73,7 +73,8 @@ debugConceptFeaturesOccurFirstInSubsequence = False #Constrain column feature de
 debugConnectColumnsToNextColumnsInSequenceOnly = False
 debugDrawNeuronStrengths = False
 if(useInference):
-	debugConceptFeaturesOccurFirstInSubsequence = True	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
+	if(not inferencePredictiveNetwork):
+		debugConceptFeaturesOccurFirstInSubsequence = True	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
 	debugDrawNeuronStrengths = True
 debugReloadGlobalFeatureNeuronsEverySentence = False
 

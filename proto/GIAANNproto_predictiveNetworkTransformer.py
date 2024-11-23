@@ -53,7 +53,6 @@ def nextWordPredictionTransformerTrainStep(global_feature_neurons, database_feat
 	targets = targets.unsqueeze(0)	#add batch dim
 
 	global_feature_neurons = global_feature_neurons.to_dense()
-	database_feature_connections = database_feature_connections.to_dense()
 	outputs = model(global_feature_neurons, database_feature_connections)  # Outputs shape: (batch_size, c, f)
 
 	loss = criterion(outputs, targets)
@@ -138,6 +137,8 @@ class CustomAttentionLayer(nn.Module):
 				# Then, sum over target feature dimension (to features)
 				attention_scores = KQ_summed_over_from_f.sum(dim=2)  # Shape: (c, c)
 
+				attention_scores = attention_scores.to_dense()
+				
 				# Apply softmax to get attention weights
 				attention_weights = F.softmax(attention_scores, dim=-1)  # Shape: (c, c)
 

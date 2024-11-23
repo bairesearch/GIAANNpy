@@ -112,7 +112,7 @@ def process_column_inference_prediction(databaseNetworkObject, observed_columns_
 	
 	#print(f"process_column_inference_prediction: {wordPredictionIndex}; concept_columns_indices = ", concept_columns_indices)
 
-	global_feature_neurons_activation = GIAANNproto_sparseTensors.slice_sparse_tensor(databaseNetworkObject.global_feature_neurons, 0, array_index_properties_activation)
+	global_feature_neurons_activation = databaseNetworkObject.global_feature_neurons[array_index_properties_activation]
 
 	if(wordPredictionIndex > 0):
 		# Refresh the observed columns dictionary for each new sequence
@@ -254,7 +254,7 @@ def selectMostActiveFeature(global_feature_neurons_activation):
 
 	#top feature selection;
 	if(kc==1):
-		topk_concept_columns_activation = GIAANNproto_sparseTensors.slice_sparse_tensor(global_feature_neurons_activation_all_segments, 0, concept_columns_activation_topk_concepts.indices[0]).unsqueeze(0)	#select topk concept indices
+		topk_concept_columns_activation = global_feature_neurons_activation_all_segments[concept_columns_activation_topk_concepts.indices[0]].unsqueeze(0)	#select topk concept indices
 	else:
 		topk_concept_columns_activation = GIAANNproto_sparseTensors.slice_sparse_tensor_multi(global_feature_neurons_activation_all_segments, 0, concept_columns_activation_topk_concepts.indices)	#select topk concept indices
 	topk_concept_columns_activation = topk_concept_columns_activation.to_dense()
@@ -278,14 +278,14 @@ def selectMostActiveFeature(global_feature_neurons_activation):
 #first dim cs1 restricted to a single token
 def process_features_active_predict_single(global_feature_neurons_activation, sequence_observed_columns_prediction, concept_columns_indices, concept_columns_feature_indices):
 	
-	feature_neurons_active = GIAANNproto_sparseTensors.slice_sparse_tensor(global_feature_neurons_activation, 0, array_index_segment_internal_column)	 		#select last (most proximal) segment activation	#TODO: checkthis
-	feature_neurons_active = GIAANNproto_sparseTensors.slice_sparse_tensor(feature_neurons_active, 0, concept_columns_indices.squeeze().item())	#select columns
-	feature_neurons_active = GIAANNproto_sparseTensors.slice_sparse_tensor(feature_neurons_active, 0, concept_columns_feature_indices.squeeze().squeeze().item())	#select features
+	feature_neurons_active = global_feature_neurons_activation[array_index_segment_internal_column] 		#select last (most proximal) segment activation	#TODO: checkthis
+	feature_neurons_active = feature_neurons_active[concept_columns_indices.squeeze().item()]	#select columns
+	feature_neurons_active = feature_neurons_active[concept_columns_feature_indices.squeeze().squeeze().item()]	#select features
 	#print("feature_neurons_active = ", feature_neurons_active)
 	
 	#target neuron activation dependence on connection strength;
 	#print("feature_neurons_active.shape = ", feature_neurons_active.shape)
-	feature_connections = GIAANNproto_sparseTensors.slice_sparse_tensor(sequence_observed_columns_prediction.feature_connections, 0, array_index_properties_strength)
+	feature_connections = sequence_observed_columns_prediction.feature_connections[array_index_properties_strength]
 	feature_connections = GIAANNproto_sparseTensors.slice_sparse_tensor(feature_connections, 1, 0)	#sequence concept index dimension (not used)
 	feature_connections = GIAANNproto_sparseTensors.slice_sparse_tensor(feature_connections, 1, concept_columns_feature_indices.squeeze())
 	#print("feature_connections.shape = ", feature_connections.shape)
@@ -298,12 +298,12 @@ def process_features_active_predict_single(global_feature_neurons_activation, se
 #first dim cs1 restricted to a single token (or candiate set of tokens).
 def process_features_active_predict(global_feature_neurons_activation, sequence_observed_columns_prediction, concept_columns_indices, concept_columns_feature_indices):
 	
-	feature_neurons_active = GIAANNproto_sparseTensors.slice_sparse_tensor(global_feature_neurons_activation, 0, array_index_segment_internal_column)	 		#select last (most proximal) segment activation	#TODO: checkthis
-	feature_neurons_active = GIAANNproto_sparseTensors.slice_sparse_tensor_multi(feature_neurons_active, 0, concept_columns_indices)	#select columns
-	feature_neurons_active = GIAANNproto_sparseTensors.slice_sparse_tensor_multi(feature_neurons_active, 0, concept_columns_feature_indices)	#select features
+	feature_neurons_active = global_feature_neurons_activation[array_index_segment_internal_column]		#select last (most proximal) segment activation	#TODO: checkthis
+	feature_neurons_active = feature_neurons_active[concept_columns_indices]	#select columns
+	feature_neurons_active = feature_neurons_active[concept_columns_feature_indices]	#select features
 	
 	#target neuron activation dependence on connection strength;
-	feature_connections = GIAANNproto_sparseTensors.slice_sparse_tensor(sequence_observed_columns_prediction.feature_connections, 0, array_index_properties_strength)
+	feature_connections = sequence_observed_columns_prediction.feature_connections[array_index_properties_strength]
 	feature_connections = GIAANNproto_sparseTensors.slice_sparse_tensor(feature_connections, 1, 0)	#sequence concept index dimension (not used)
 	feature_connections = GIAANNproto_sparseTensors.slice_sparse_tensor_multi(feature_connections, 1, concept_columns_feature_indices)
 	feature_neurons_target_activation = feature_neurons_active * feature_connections
