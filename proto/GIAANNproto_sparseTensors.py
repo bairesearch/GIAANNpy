@@ -186,45 +186,66 @@ def slice_sparse_tensor(sparse_tensor, slice_dim, slice_index):
 
 	return new_sparse_tensor
 
-'''
-def slice_sparse_tensor(sparse_tensor, slice_dim, slice_index):
-	"""
-	Slices a PyTorch sparse tensor along a specified dimension at a given index.
+def addSparseTensorToFirstDimIndex(A, B, index):
 
-	Args:
-		sparse_tensor (pt.sparse.FloatTensor): The input sparse tensor.
-		slice_dim (int): The dimension along which to slice.
-		slice_index (int): The index at which to slice.
+	# Assume A is a sparse 4D tensor and B is a sparse 3D tensor
+	A_indices = A._indices()
+	A_values = A._values()
 
-	Returns:
-		pt.sparse.FloatTensor: The sliced sparse tensor.
-	"""
-	sparse_tensor = sparse_tensor.coalesce()
+	# Step 1: Create a mask for entries where the first dimension index is index
+	mask = (A_indices[0] == index)
 
-	# Step 1: Extract indices and values
-	indices = sparse_tensor._indices()  # Shape: (ndim, nnz)
-	values = sparse_tensor._values()	# Shape: (nnz, ...)
+	# Step 2: Extract indices and values for A[index]
+	A_index_indices = A_indices[1:, mask]
+	A_index_values = A_values[mask]
 
-	# Step 2: Create a mask for entries where indices match slice_index at slice_dim
-	mask = (indices[slice_dim, :] == slice_index)
+	# Step 3: Create sparse tensor A[index]
+	A_index = pt.sparse_coo_tensor(A_index_indices, A_index_values, size=B.shape)
 
-	# Step 3: Filter indices and values using the mask
-	filtered_indices = indices[:, mask]
-	filtered_values = values[mask]
+	# Step 4: Perform the addition A[index] + B
+	C = A_index + B
 
-	# Step 4: Remove the slice_dim from indices using boolean indexing
-	keep_dims = pt.arange(indices.size(0)) != slice_dim
-	new_indices = filtered_indices[keep_dims, :]
+	# Step 5: Adjust indices to include the first dimension index index
+	C_indices = pt.cat([pt.full((1, C._indices().shape[1]), index, dtype=pt.long), C._indices()], dim=0)
+	C_values = C._values()
 
-	# Step 5: Adjust the size of the new sparse tensor
-	new_size = list(sparse_tensor.size())
-	del new_size[slice_dim]
-	new_size = tuple(new_size)
+	# Step 6: Remove old entries and add new entries to A
+	A_remaining_indices = A_indices[:, ~mask]
+	A_remaining_values = A_values[~mask]
+	A_new_indices = pt.cat([A_remaining_indices, C_indices], dim=1)
+	A_new_values = pt.cat([A_remaining_values, C_values], dim=0)
 
-	# Step 6: Create the new sparse tensor
-	new_sparse_tensor = pt.sparse_coo_tensor(new_indices, filtered_values, size=new_size)
-	# Remove the following line if coalesce is unnecessary
-	new_sparse_tensor = new_sparse_tensor.coalesce()
+	# Step 7: Update A
+	A = pt.sparse_coo_tensor(A_new_indices, A_new_values, size=A.size())
+	
+	return A
 
-	return new_sparse_tensor
-'''
+def replaceAllSparseTensorElementsAtFirstDimIndex(A, B, index):
+
+	# Get indices and values of A
+	A_indices = A._indices()
+	A_values = A._values()
+
+	# Create a mask to filter out entries where the first index is index
+	mask = A_indices[0] != index
+
+	# Keep only the entries where the first index is not index
+	A_indices_filtered = A_indices[:, mask]
+	A_values_filtered = A_values[mask]
+
+	# Get indices and values of B
+	B_indices = B._indices()
+	B_values = B._values()
+
+	# Adjust B's indices to align with A's dimensions by prepending a row of index's
+	B_indices_adjusted = pt.cat((pt.full((1, B_indices.size(1)), index, dtype=pt.long, device=B.device), B_indices), dim=0)
+
+	# Concatenate the filtered A indices/values with the adjusted B indices/values
+	new_indices = pt.cat((A_indices_filtered, B_indices_adjusted), dim=1)
+	new_values = pt.cat((A_values_filtered, B_values), dim=0)
+
+	# Create a new sparse tensor with the updated indices and values
+	A_new = pt.sparse_coo_tensor(new_indices, new_values, size=A.size(), device=A.device)
+	
+	return A_new
+
