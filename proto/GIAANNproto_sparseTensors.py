@@ -25,6 +25,17 @@ def createEmptySparseTensor(shape):
 	sparse_zero_tensor = pt.sparse_coo_tensor(indices=pt.empty((len(shape), 0), dtype=pt.long), values=pt.empty(0), size=shape)
 	return sparse_zero_tensor
 
+def subtract_value_from_sparse_tensor_values(sparse_tensor, value):
+	sparse_tensor = add_value_to_sparse_tensor_values(sparse_tensor, -value)
+	sparse_tensor.values().clamp_(min=0)
+	return sparse_tensor
+	
+def add_value_to_sparse_tensor_values(sparse_tensor, value):
+	sparse_tensor = sparse_tensor.coalesce()
+	sparse_tensor = pt.sparse_coo_tensor(sparse_tensor.indices(), sparse_tensor.values() + value, sparse_tensor.size())
+	sparse_tensor = sparse_tensor.coalesce()
+	return sparse_tensor
+
 def modify_sparse_tensor(sparse_tensor, indices_to_update, new_value):
 	sparse_tensor = sparse_tensor.coalesce()
 	

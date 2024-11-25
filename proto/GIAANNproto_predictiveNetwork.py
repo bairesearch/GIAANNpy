@@ -140,8 +140,7 @@ def process_column_inference_prediction(databaseNetworkObject, observed_columns_
 		#decrement activations;
 		if(useActivationDecrement):
 			#decrement activation after each prediction interval
-			global_feature_neurons_activation -= activationDecrementPerPredictedColumn
-			global_feature_neurons_activation.values().clamp_(min=0)
+			global_feature_neurons_activation = GIAANNproto_sparseTensors.subtract_value_from_sparse_tensor_values(global_feature_neurons_activation, activationDecrementPerPredictedColumn)
 		if(deactivateNeuronsUponPrediction):
 			if(useSANI):
 				indices_to_update_list = []

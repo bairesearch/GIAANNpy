@@ -97,7 +97,14 @@ if usePOS:
 
 inference_prompt_file = databaseFolder + 'inference_prompt.txt'
 if(useInference):
-	deactivateNeuronsUponPrediction = True
+	deactivateNeuronsUponPrediction = False
+	useActivationDecrement = False
+	if(inferencePredictiveNetwork):
+		useActivationDecrement = True
+	else:
+		deactivateNeuronsUponPrediction = True
+	#activationDecrementPerPredictedSentence = 0.1	#not currently used
+	activationDecrementPerPredictedColumn = 0.1	#0.05	#CHECKTHIS
 
 	num_seed_tokens = 5	#number of seed tokens in last sentence of inference prompt (remaining tokens will be prediction tokens)
 	num_prediction_tokens = 10	#number of words to predict after network seed
@@ -118,16 +125,11 @@ if(useInference):
 		if(kcDynamic):
 			kcActivationThreshold = 3.0	#total column activation threshold	#minimum required to select topk
 		kf = 1
-		activationDecrementPerPredictedColumn = 0.01
 	
 	assert not lowMem, "useInference: global feature neuron lists are required" 
 	assert useSaveData,  "useInference: useSaveData is required" 
 
-useActivationDecrement = False
-if not lowMem:
-	useActivationDecrement = False
-activationDecrementPerPredictedSentence = 0.1
-	
+
 
 
 # Paths for saving data
