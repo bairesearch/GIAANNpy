@@ -32,6 +32,8 @@ if(useInference):
 	if(inferencePredictiveNetwork):
 		inferencePredictiveNetworkModelMLP = False
 		inferencePredictiveNetworkModelTransformer = True
+		if(inferencePredictiveNetworkModelTransformer):
+			transformerUseInputConnections = False	#incomplete #requires connection activation properties or multiplication by source activations
 	inferenceSeedTargetActivationsGlobalFeatureArrays = False
 	lowMem = False		#mandatory
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
@@ -50,6 +52,7 @@ else:
 	drawRelationTypes = True	#draw feature neuron and connection relation types in different colours
 	drawNetworkDuringTrain = True	#default: True
 
+	 
 decreasePermanenceOfInactiveFeatureNeuronsAndConnections = True	#default: True
 performRedundantCoalesce = False	#additional redundant coalesce operations
 

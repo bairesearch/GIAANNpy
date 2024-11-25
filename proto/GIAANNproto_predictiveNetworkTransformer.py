@@ -31,12 +31,11 @@ from GIAANNproto_globalDefs import *
 def nextWordPredictionTransformerCreate(databaseNetworkObject):
 	global model, criterion, optimizer, batch_size
 
-	f_hidden = 64  # Hidden dimension size
 	num_layers = 3  # Number of transformer layers
 
 	# Instantiate the model
 	#NextWordPredictionTransformerModel
-	model = CustomTransformer(databaseNetworkObject.p, databaseNetworkObject.s, databaseNetworkObject.c, databaseNetworkObject.f, f_hidden, num_layers)
+	model = CustomTransformer(databaseNetworkObject.p, databaseNetworkObject.s, databaseNetworkObject.c, databaseNetworkObject.f, num_layers)
 	model.train()  # set model to training mode
 
 	if(multipleTargets):
@@ -95,9 +94,9 @@ def getTopkPredictions(outputs):
 	return concept_columns_indices_next, concept_columns_feature_indices_next
 
 
-class CustomAttentionLayer(nn.Module):
+class InputAttentionLayer(nn.Module):
 	def __init__(self, p, s, c, f):
-		super(CustomAttentionLayer, self).__init__()
+		super(InputAttentionLayer, self).__init__()
 		self.p = p  # Number of properties per feature
 		self.s = s  # Number of input segments
 		self.c = c  # Number of columns (sequence length)
@@ -162,24 +161,23 @@ class CustomAttentionLayer(nn.Module):
 
 
 class CustomTransformer(nn.Module):
-	def __init__(self, p, s, c, f, f_hidden, num_layers):
+	def __init__(self, p, s, c, f, num_layers):
 		super(CustomTransformer, self).__init__()
 		self.p = p
 		self.s = s
 		self.c = c
 		self.f = f
-		self.f_hidden = f_hidden
 		self.p_hidden = p*s
 		self.num_layers = num_layers
+		self.embedding_dim = self.p * self.s * self.f	#embedding dimension includes concatenation of all heads
+		self.f_mlp = self.embedding_dim*4
 		
-		# Compute the embedding dimension as the concatenation of all heads
-		self.embedding_dim = self.p * self.s * self.f
-
-		# Custom attention layer for the input layer
-		self.custom_attention_layer = CustomAttentionLayer(p, s, c, f)
+		if(transformerUseInputConnections):
+			# Custom attention layer for the input layer
+			self.input_attention_layer = InputAttentionLayer(p, s, c, f)
 
 		# Transformer encoder layers for the hidden layers
-		encoder_layer = nn.TransformerEncoderLayer(d_model=self.embedding_dim, nhead=self.p_hidden, dim_feedforward=f_hidden)
+		encoder_layer = nn.TransformerEncoderLayer(d_model=self.embedding_dim, nhead=self.p_hidden, dim_feedforward=self.f_mlp)
 		self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
 		# MLP for deriving the predicted token
@@ -190,12 +188,16 @@ class CustomTransformer(nn.Module):
 		# database_feature_connections shape: (p, s, c, f, c, f)
 		batch_size = X.size(0)
 
-		# Apply the custom attention layer
-		attention_outputs = self.custom_attention_layer(X, database_feature_connections)
-		# attention_outputs shape: (sequence_length, batch_size, embedding_dim)
-
+		if(transformerUseInputConnections):
+			# Apply the custom attention layer
+			embedding = self.input_attention_layer(X, database_feature_connections)
+			# attention_outputs shape: (sequence_length, batch_size, embedding_dim)
+		else:
+			embedding = X.permute(3, 0, 1, 2, 4).contiguous()  # Shape: (c, batch_size, p, s, f)
+			embedding = embedding.view(self.c, batch_size, self.p * self.s * self.f)
+		
 		# Pass through the transformer encoder
-		transformer_output = self.transformer_encoder(attention_outputs)
+		transformer_output = self.transformer_encoder(embedding)
 		# transformer_output shape: (sequence_length, batch_size, embedding_dim)
 
 		# Use the output from the last sequence position
