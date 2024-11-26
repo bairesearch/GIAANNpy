@@ -501,7 +501,7 @@ def process_features_active_seed(sequence_observed_columns, feature_neurons_acti
 	
 	#update the activations of the target nodes;
 	feature_connections_activation_update = pt.sum(feature_connections_activation_update, dim=(0))	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
-	feature_neurons_target_activation = pt.sum(feature_connections_activation_update, dim=(0, 1))	
+	feature_neurons_target_activation = pt.sum(feature_connections_activation_update, dim=(0, 1))		#sum over source c and f dimensions
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 		sequence_observed_columns.databaseNetworkObject.global_feature_neurons[array_index_properties_activation, :, :, :] += feature_neurons_target_activation*j1
 	else:

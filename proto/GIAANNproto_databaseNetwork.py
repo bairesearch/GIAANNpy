@@ -34,6 +34,7 @@ class DatabaseNetworkClass():
 		self.concept_features_dict = concept_features_dict
 		self.concept_features_list = concept_features_list
 		self.global_feature_neurons = global_feature_neurons
+		self.global_feature_connections = None #transformerUseInputConnections: initialised during prediction phase
 		
 # Initialize global feature neuron arrays if lowMem is disabled
 if not lowMem:
@@ -205,5 +206,5 @@ def generate_global_feature_connections(databaseNetworkObject):
 	for concept_column in concept_columns_list:
 		global_feature_connections_list.append(concept_column.feature_connections)
 	databaseNetworkObject.global_feature_connections = pt.stack(global_feature_connections_list, dim=2)
-	print("1 databaseNetworkObject.global_feature_connections.shape = ", databaseNetworkObject.global_feature_connections.shape)
-	
+	print("generate_global_feature_connections: databaseNetworkObject.global_feature_connections.shape = ", databaseNetworkObject.global_feature_connections.shape)
+

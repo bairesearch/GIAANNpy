@@ -29,11 +29,12 @@ useSANI = False
 useInference = False  # useInference mode
 if(useInference):
 	inferencePredictiveNetwork = False	#use MLP to predict next token
+	transformerUseInputConnections = False	#initialise (dependent var)
 	if(inferencePredictiveNetwork):
 		inferencePredictiveNetworkModelMLP = False
 		inferencePredictiveNetworkModelTransformer = True
 		if(inferencePredictiveNetworkModelTransformer):
-			transformerUseInputConnections = False	#incomplete #requires connection activation properties or multiplication by source activations
+			transformerUseInputConnections = False	#incomplete	#optional
 	inferenceSeedTargetActivationsGlobalFeatureArrays = False
 	lowMem = False		#mandatory
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
@@ -105,6 +106,7 @@ if(useInference):
 		deactivateNeuronsUponPrediction = True
 	#activationDecrementPerPredictedSentence = 0.1	#not currently used
 	activationDecrementPerPredictedColumn = 0.1	#0.05	#CHECKTHIS
+	activationDecrementPerConnection = 0.1	#CHECKTHIS
 
 	num_seed_tokens = 5	#number of seed tokens in last sentence of inference prompt (remaining tokens will be prediction tokens)
 	num_prediction_tokens = 10	#number of words to predict after network seed

@@ -260,3 +260,164 @@ def replaceAllSparseTensorElementsAtFirstDimIndex(A, B, index):
 	
 	return A_new
 
+def sparse_assign(A, B, *indices):
+	"""
+	Assigns sparse tensor B into sparse tensor A at positions specified by indices.
+
+	Args:
+		A (pt.sparse.Tensor): The target sparse tensor.
+		B (pt.sparse.Tensor): The sparse tensor to assign into A.
+		*indices: An arbitrary number of indices (int, slice, or 1D tensor).
+
+	Returns:
+		pt.sparse.Tensor: The updated sparse tensor.
+	"""
+	# Ensure A and B are sparse tensors
+	if not A.is_sparse or not B.is_sparse:
+		raise ValueError("Both A and B must be sparse tensors.")
+
+	# Convert indices to a list for easier manipulation
+	indices_list = list(indices)
+
+	# Validate the number of indices
+	if len(indices_list) > A.ndim:
+		raise IndexError("Too many indices for tensor of dimension {}".format(A.ndim))
+
+	# Pad indices with empty slices if fewer indices are provided
+	if len(indices_list) < A.ndim:
+		indices_list.extend([slice(None)] * (A.ndim - len(indices_list)))
+
+	# Process indices to compute the new positions for B's indices in A
+	new_indices = []
+	for dim, idx in enumerate(indices_list):
+		if isinstance(idx, int):
+			# If idx is an integer, add it to B's indices in this dimension
+			new_idx = B.indices()[dim] + idx
+		elif isinstance(idx, slice):
+			# If idx is a slice, calculate the start index
+			start = idx.start or 0
+			new_idx = B.indices()[dim] + start
+		elif pt.is_tensor(idx):
+			# If idx is a tensor of indices, index into it using B's indices
+			idx = idx.to(B.indices().device)
+			new_idx = idx[B.indices()[dim]]
+		else:
+			raise TypeError("Invalid index type: {}".format(type(idx)))
+		new_indices.append(new_idx)
+
+	# Stack the new indices
+	new_indices = pt.stack(new_indices)
+
+	# Concatenate A's and B's indices and values
+	combined_indices = pt.cat([A.indices(), new_indices], dim=1)
+	combined_values = pt.cat([A.values(), B.values()], dim=0)
+
+	# Create a new sparse tensor with the combined indices and values
+	new_A = pt.sparse_coo_tensor(combined_indices, combined_values, size=A.shape, dtype=A.dtype, device=A.device)
+
+	# Coalesce the tensor to sum duplicate indices
+	new_A = new_A.coalesce()
+
+	return new_A
+
+def expand_sparse_tensor(tensor, q, y, new_dim_size=None):
+	"""
+	Inserts a new dimension at position q in the sparse tensor's indices,
+	setting the indices in that dimension to y.
+
+	Args:
+		tensor (pt.Tensor): Input x-dimensional sparse tensor.
+		q (int): Position to insert the new dimension (0 \u2264 q \u2264 x).
+		y (int): Index in the new dimension to set.
+		new_dim_size (int, optional): Size of the new dimension. If None,
+			it defaults to y + 1.
+
+	Returns:
+		pt.Tensor: New sparse tensor with x+1 dimensions.
+	"""
+	if not tensor.is_sparse:
+		raise ValueError("Input tensor must be a sparse tensor.")
+
+	indices = tensor.indices()  # Shape: (x, nnz)
+	values = tensor.values()	# Shape: (nnz,)
+
+	x, nnz = indices.shape
+
+	# Create a row with the new indices set to y
+	y_row = pt.full(
+		(1, nnz), y, dtype=indices.dtype, device=indices.device
+	)
+
+	# Insert the new dimension at position q
+	new_indices = pt.cat((indices[:q], y_row, indices[q:]), dim=0)
+
+	# Determine the new size
+	original_size = list(tensor.size())
+
+	if new_dim_size is None:
+		if y >= 0:
+			new_dim_size = y + 1
+		else:
+			raise ValueError(
+				"Negative index y requires specifying new_dim_size."
+			)
+
+	if y >= new_dim_size or y < -new_dim_size:
+		raise ValueError(
+			f"Index y={y} is out of bounds for dimension of size {new_dim_size}"
+		)
+
+	new_size = original_size[:q] + [new_dim_size] + original_size[q:]
+
+	# Create the new sparse tensor
+	new_tensor = pt.sparse_coo_tensor(new_indices, values, size=new_size)
+
+	return new_tensor
+
+def expand_sparse_tensor_multi(tensor, q, y, new_dim_size=None):
+	"""
+	Inserts a new dimension at position q in the sparse tensor's indices,
+	setting the indices in that dimension to y (list or tensor of indices).
+
+	Args:
+		tensor (pt.Tensor): Input x-dimensional sparse tensor.
+		q (int): Position to insert the new dimension (0 \u2264 q \u2264 x).
+		y (list or pt.Tensor): Indices in the new dimension to set, length nnz.
+		new_dim_size (int, optional): Size of the new dimension. If None,
+			it defaults to max(y) + 1.
+
+	Returns:
+		pt.Tensor: New sparse tensor with x+1 dimensions.
+	"""
+	if not tensor.is_sparse:
+		raise ValueError("Input tensor must be a sparse tensor.")
+
+	indices = tensor.indices()  # Shape: (x, nnz)
+	values = tensor.values()	# Shape: (nnz,)
+
+	x, nnz = indices.shape
+
+	# Convert y to a tensor if it's a list
+	y = pt.tensor(y, dtype=indices.dtype, device=indices.device).view(1, nnz)
+
+	if y.shape[1] != nnz:
+		raise ValueError(f"Length of y ({y.shape[1]}) must be equal to number of non-zero elements (nnz={nnz}).")
+
+	# Insert the new dimension at position q
+	new_indices = pt.cat((indices[:q], y, indices[q:]), dim=0)
+
+	# Determine the new size
+	original_size = list(tensor.size())
+
+	if new_dim_size is None:
+		new_dim_size = int(y.max().item()) + 1
+
+	if y.min().item() < -new_dim_size or y.max().item() >= new_dim_size:
+		raise ValueError(f"Indices in y are out of bounds for dimension of size {new_dim_size}.")
+
+	new_size = original_size[:q] + [new_dim_size] + original_size[q:]
+
+	# Create the new sparse tensor
+	new_tensor = pt.sparse_coo_tensor(new_indices, values, size=new_size)
+
+	return new_tensor

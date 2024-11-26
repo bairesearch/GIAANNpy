@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1c3f;
+o1 preview prompt 1c3g;
 
 v1b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -82,7 +82,7 @@ MANUAL; - Initialise all feature neuron and feature connection tensors to zero (
 MANUAL; - patch populate_arrays self.feature_connections generation from sparse tensors.
 MANUAL; - Convert feature neuron/connections tensor redundant type dimension into SANI (sequentially activated neuronal input) segment dimension.
 
-v1c3f:
+v1c3g:
 MANUAL; - Create a hybrid GNN AI that comprises a database network (the abstract biological neural neural network defined previously) and a predictive network. The database network is easily modified upon encountering new information, enabling continuous learning (low energy/compute). The database network is trained using a target sequence (ground truth) and non-backpropagation algorithm. The predictive network is trained to generate next token predictions based on the database network along with the target sequence (ground truth). The AI is then capable of generating next token predictions based on a seed sequence (prompt) and its current revision of the database network. It learns to reason across/from the database network to generate its predictions. The database network is made amenable to existing LLM architectures (transformer/MLP) by structuring/storing its contents in permutation invariant assemblies.
 /MANUAL; - restore option not useSANI (set array_number_of_segments = 1). add option inferencePredictiveNetwork. Create class NextWordPredictionMLPmodel. Extract predictMostActiveFeature/selectMostActiveFeature from process_column_inference_prediction.
 MANUAL; - extract GIAANNproto_databaseNetworkDraw.py GIAANNproto_databaseNetworkFiles.py GIAANNproto_databaseNetwork.py GIAANNproto_databaseNetworkTrain.py GIAANNproto_globalDefs.py GIAANNproto_predictiveNetworkMLP.py GIAANNproto_predictiveNetwork.py GIAANNproto_predictiveNetworkTransformer.py GIAANNproto_main.py GIAANNproto_sparseTensors.py 
@@ -102,4 +102,5 @@ MANUAL; - Remove databaseNetworkObject.global_feature_neurons_activation.
 MANUAL; - Update nextWordPredictionTransformerTrainStep: do not convert to database_feature_connections.to_dense(). Replace all slice_sparse_tensor(sparse_tensor, slice_dim=0, slice_index) operations with standard pytorch indexing; sparse_tensor[slice_index].
 MANUAL; - Extract option transformerUseInputConnections. Set self.f_mlp = self.embedding_dim*4.
 MANUAL; - Update inferencePredictiveNetwork: enable useActivationDecrement and disable deactivateNeuronsUponPrediction.
-MANUAL; - Update inferencePredictiveNetworkModelTransformer:transformerUseInputConnections - add a residual connection over the input layer.
+MANUAL; - Update inferencePredictiveNetworkModelTransformer:transformerUseInputConnections - add a residual connection over the input layer. 
+MANUAL; - Update process_column_inference_prediction/process_features_active_predict_*:transformerUseInputConnections - create and update global_feature_connections_activation. Patch process_column_inference_prediction; set global_feature_neurons_activation, global_feature_connections_activation = process_features_active_predict_*().

@@ -71,7 +71,7 @@ def process_concept_words_inference(sequence_observed_columns, sentenceIndex, do
 	concept_indices_seed = pt.nonzero(concept_mask_seed).squeeze(1)
 	numberConceptsInSeed = concept_indices_seed.shape[0]
 	
-	if(inferencePredictiveNetwork and inferencePredictiveNetworkModelTransformer):
+	if(transformerUseInputConnections):
 		GIAANNproto_databaseNetwork.generate_global_feature_connections(sequence_observed_columns.databaseNetworkObject)
 		
 	#seed network;
@@ -113,7 +113,11 @@ def process_column_inference_prediction(databaseNetworkObject, observed_columns_
 	#print(f"process_column_inference_prediction: {wordPredictionIndex}; concept_columns_indices = ", concept_columns_indices)
 
 	global_feature_neurons_activation = databaseNetworkObject.global_feature_neurons[array_index_properties_activation]
-
+	if(transformerUseInputConnections):
+		global_feature_connections_activation = databaseNetworkObject.global_feature_connections[array_index_properties_activation]
+	else:
+		global_feature_connections_activation = None
+		
 	if(wordPredictionIndex > 0):
 		# Refresh the observed columns dictionary for each new sequence
 		observed_columns_sequence_candidate_index_dict = {}  # key: sequence candidate index, value: ObservedColumn	#used to populate sequence feature connection arrays based on observed columns (i does not correspond to sequence word index as assumed by observed_columns_sequence_word_index_dict)
@@ -133,14 +137,17 @@ def process_column_inference_prediction(databaseNetworkObject, observed_columns_
 			observed_columns_sequence_candidate_index_dict[i] = observed_column
 		sequence_observed_columns_prediction = SequenceObservedColumnsInferencePrediction(databaseNetworkObject, words, lemmas, observed_columns_dict, observed_columns_sequence_candidate_index_dict)
 		
-		#process features (activate global target neurons);
-		#process_features_active_predict(global_feature_neurons_activation, sequence_observed_columns_prediction, concept_columns_indices, concept_columns_feature_indices)
-		process_features_active_predict_single(global_feature_neurons_activation, sequence_observed_columns_prediction, concept_columns_indices, concept_columns_feature_indices)
-
 		#decrement activations;
 		if(useActivationDecrement):
 			#decrement activation after each prediction interval
 			global_feature_neurons_activation = GIAANNproto_sparseTensors.subtract_value_from_sparse_tensor_values(global_feature_neurons_activation, activationDecrementPerPredictedColumn)
+			if(transformerUseInputConnections):
+				global_feature_connections_activation = GIAANNproto_sparseTensors.subtract_value_from_sparse_tensor_values(global_feature_connections_activation, activationDecrementPerConnection)
+		
+		#process features (activate global target neurons);
+		#global_feature_neurons_activation, global_feature_connections_activation = process_features_active_predict_multi(databaseNetworkObject, global_feature_connections_activation, global_feature_neurons_activation, sequence_observed_columns_prediction, concept_columns_indices, concept_columns_feature_indices)
+		global_feature_neurons_activation, global_feature_connections_activation = process_features_active_predict_single(databaseNetworkObject, global_feature_connections_activation, global_feature_neurons_activation, sequence_observed_columns_prediction, concept_columns_indices, concept_columns_feature_indices)
+
 		if(deactivateNeuronsUponPrediction):
 			if(useSANI):
 				indices_to_update_list = []
@@ -158,6 +165,9 @@ def process_column_inference_prediction(databaseNetworkObject, observed_columns_
 				#global_feature_neurons_activation[segment_indices, concept_columns_indices, concept_columns_feature_indices] = 0
 
 		databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.global_feature_neurons, global_feature_neurons_activation, array_index_properties_activation)
+		if(transformerUseInputConnections):
+			databaseNetworkObject.global_feature_connections = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.global_feature_connections, global_feature_connections_activation, array_index_properties_activation)
+
 	else:
 		#activation targets have already been activated
 		sequence_observed_columns_prediction = SequenceObservedColumnsDraw(databaseNetworkObject, observed_columns_dict)
@@ -275,7 +285,7 @@ def selectMostActiveFeature(global_feature_neurons_activation):
 
 
 #first dim cs1 restricted to a single token
-def process_features_active_predict_single(global_feature_neurons_activation, sequence_observed_columns_prediction, concept_columns_indices, concept_columns_feature_indices):
+def process_features_active_predict_single(databaseNetworkObject, global_feature_connections_activation, global_feature_neurons_activation, sequence_observed_columns_prediction, concept_columns_indices, concept_columns_feature_indices):
 	
 	feature_neurons_active = global_feature_neurons_activation[array_index_segment_internal_column] 		#select last (most proximal) segment activation	#TODO: checkthis
 	feature_neurons_active = feature_neurons_active[concept_columns_indices.squeeze().item()]	#select columns
@@ -292,10 +302,16 @@ def process_features_active_predict_single(global_feature_neurons_activation, se
 	
 	#update the activations of the target nodes;
 	global_feature_neurons_activation += feature_neurons_target_activation*j1
-	return global_feature_neurons_activation
+	
+	if(transformerUseInputConnections):
+		feature_neurons_target_activation = GIAANNproto_sparseTensors.expand_sparse_tensor(feature_neurons_target_activation, 1, concept_columns_indices.squeeze(), new_dim_size=databaseNetworkObject.c)
+		feature_neurons_target_activation = GIAANNproto_sparseTensors.expand_sparse_tensor(feature_neurons_target_activation, 2, concept_columns_feature_indices.squeeze(), new_dim_size=databaseNetworkObject.f)
+		global_feature_connections_activation = global_feature_connections_activation + feature_neurons_target_activation
+
+	return global_feature_neurons_activation, global_feature_connections_activation
 		
-#first dim cs1 restricted to a single token (or candiate set of tokens).
-def process_features_active_predict(global_feature_neurons_activation, sequence_observed_columns_prediction, concept_columns_indices, concept_columns_feature_indices):
+#first dim cs1 restricted to a candiate set of tokens.
+def process_features_active_predict_multi(databaseNetworkObject, global_feature_connections_activation, global_feature_neurons_activation, sequence_observed_columns_prediction, concept_columns_indices, concept_columns_feature_indices):
 	
 	feature_neurons_active = global_feature_neurons_activation[array_index_segment_internal_column]		#select last (most proximal) segment activation	#TODO: checkthis
 	feature_neurons_active = feature_neurons_active[concept_columns_indices]	#select columns
@@ -306,10 +322,16 @@ def process_features_active_predict(global_feature_neurons_activation, sequence_
 	feature_connections = GIAANNproto_sparseTensors.slice_sparse_tensor(feature_connections, 1, 0)	#sequence concept index dimension (not used)
 	feature_connections = GIAANNproto_sparseTensors.slice_sparse_tensor_multi(feature_connections, 1, concept_columns_feature_indices)
 	feature_neurons_target_activation = feature_neurons_active * feature_connections
-	
+
 	#update the activations of the target nodes;
 	global_feature_neurons_activation += feature_neurons_target_activation*j1
-	return global_feature_neurons_activation
+	
+	if(transformerUseInputConnections):
+		feature_neurons_target_activation = GIAANNproto_sparseTensors.expand_sparse_tensor_multi(feature_neurons_target_activation, 1, concept_columns_indices, new_dim_size=databaseNetworkObject.c)
+		feature_neurons_target_activation = GIAANNproto_sparseTensors.expand_sparse_tensor_multi(feature_neurons_target_activation, 2, concept_columns_feature_indices, new_dim_size=databaseNetworkObject.f)
+		global_feature_connections_activation = global_feature_connections_activation + feature_neurons_target_activation
+
+	return global_feature_neurons_activation, global_feature_connections_activation
 	
 
 def getLemmas(doc):
