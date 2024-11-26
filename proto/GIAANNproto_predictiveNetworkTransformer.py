@@ -188,13 +188,14 @@ class CustomTransformer(nn.Module):
 		# database_feature_connections shape: (p, s, c, f, c, f)
 		batch_size = X.size(0)
 
+		embedding = X.permute(3, 0, 1, 2, 4).contiguous()  # Shape: (c, batch_size, p, s, f)
+		embedding = embedding.view(self.c, batch_size, self.p * self.s * self.f)
+			
 		if(transformerUseInputConnections):
 			# Apply the custom attention layer
-			embedding = self.input_attention_layer(X, database_feature_connections)
+			input_attention_output = self.input_attention_layer(X, database_feature_connections)
 			# attention_outputs shape: (sequence_length, batch_size, embedding_dim)
-		else:
-			embedding = X.permute(3, 0, 1, 2, 4).contiguous()  # Shape: (c, batch_size, p, s, f)
-			embedding = embedding.view(self.c, batch_size, self.p * self.s * self.f)
+			embedding = (embedding + input_attention_output) / 2.0	#residual connection from X
 		
 		# Pass through the transformer encoder
 		transformer_output = self.transformer_encoder(embedding)
