@@ -28,7 +28,9 @@ if(useGPU):
 useSANI = False
 useInference = False  # useInference mode
 if(useInference):
-	inferencePredictiveNetwork = False	#use MLP to predict next token
+	inferencePredictiveNetwork = False	#use MLP to predict next token	#orig:False
+	incrementallySeedNetwork = False	#default:True	#orig:False	#incomplete
+	useNeuronFeaturePropertiesTimeDuringInference = False	#default:False	#orig:False	#not yet implemented
 	transformerUseInputConnections = False	#initialise (dependent var)
 	if(inferencePredictiveNetwork):
 		inferencePredictiveNetworkModelMLP = False
@@ -102,12 +104,17 @@ if(useInference):
 	useActivationDecrement = False
 	if(inferencePredictiveNetwork):
 		useActivationDecrement = True
+		if(useActivationDecrement):
+			useActivationDecrementNonlinear = True
 	else:
 		deactivateNeuronsUponPrediction = True
-	#activationDecrementPerPredictedSentence = 0.1	#not currently used
-	activationDecrementPerPredictedColumn = 0.1	#0.05	#CHECKTHIS
-	activationDecrementPerConnection = 0.1	#CHECKTHIS
-
+	activationDecrementPerPredictedToken = 0.1	#0.05	#CHECKTHIS
+	if(incrementallySeedNetwork):
+		activationDecrementSeed = activationDecrementPerPredictedToken
+	else:
+		activationDecrementPerPredictedSentence = 0.5
+		activationDecrementSeed = activationDecrementPerPredictedSentence
+				
 	num_seed_tokens = 5	#number of seed tokens in last sentence of inference prompt (remaining tokens will be prediction tokens)
 	num_prediction_tokens = 10	#number of words to predict after network seed
 

@@ -134,14 +134,6 @@ def process_sentence(sentenceIndex, doc, lastSentenceInPrompt):
 			if(useSaveData):
 				GIAANNproto_databaseNetworkFiles.save_data(databaseNetworkObject, observed_columns_dict)
 			
-			'''
-			if(useActivationDecrement):
-				#decrement activation after each train interval; not currently used
-				global_feature_neurons_activation = databaseNetworkObject.global_feature_neurons[array_index_properties_activation]
-				global_feature_neurons_activation = GIAANNproto_sparseTensors.subtract_value_from_sparse_tensor_values(global_feature_neurons_activation, activationDecrementPerPredictedSentence)
-				databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.global_feature_neurons, global_feature_neurons_activation, array_index_properties_activation)
-			'''
-			
 	# Break if we've reached the maximum number of sentences
 	sentence_count += 1
 		

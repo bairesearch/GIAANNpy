@@ -54,7 +54,17 @@ if not drawSequenceObservedColumns:
 		def __init__(self, databaseNetworkObject, observed_columns_dict):
 			self.databaseNetworkObject = databaseNetworkObject
 			self.observed_columns_dict = observed_columns_dict
-			
+
+def seed_network(sequence_observed_columns, sentenceIndex, doc, first_seed_token_index, num_seed_tokens, numberConceptsInSeed):
+	words, lemmas, pos_tags = getLemmas(doc)
+	GIAANNproto_databaseNetworkTrain.process_concept_words(sequence_observed_columns, sentenceIndex, doc, words, lemmas, pos_tags, train=False, first_seed_token_index=first_seed_token_index, num_seed_tokens=num_seed_tokens, numberConceptsInSeed=numberConceptsInSeed)
+
+	if(useActivationDecrement):
+		if(not inferenceSeedTargetActivationsGlobalFeatureArrays):
+			global_feature_neurons_activation = sequence_observed_columns.databaseNetworkObject.global_feature_neurons[array_index_properties_activation]
+			global_feature_neurons_activation = GIAANNproto_databaseNetworkTrain.decrementActivation(global_feature_neurons_activation, activationDecrementSeed)
+			sequence_observed_columns.databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequence_observed_columns.databaseNetworkObject.global_feature_neurons, global_feature_neurons_activation, array_index_properties_activation)
+
 def process_concept_words_inference(sequence_observed_columns, sentenceIndex, doc, doc_seed, doc_predict, num_seed_tokens, num_prediction_tokens):
 
 	print("process_concept_words_inference:")
@@ -75,12 +85,14 @@ def process_concept_words_inference(sequence_observed_columns, sentenceIndex, do
 		GIAANNproto_databaseNetwork.generate_global_feature_connections(sequence_observed_columns.databaseNetworkObject)
 		
 	#seed network;
-	words, lemmas, pos_tags= getLemmas(doc)
-	GIAANNproto_databaseNetworkTrain.process_concept_words(sequence_observed_columns, sentenceIndex, doc, words, lemmas, pos_tags, train=False, num_seed_tokens=num_seed_tokens, numberConceptsInSeed=numberConceptsInSeed)
-	
-	if(not inferenceSeedTargetActivationsGlobalFeatureArrays):
-		# Update observed columns from sequence observed columns
-		sequence_observed_columns.update_observed_columns_wrapper()	#convert sequence observed columns feature neuron arrays back to global feature neuron arrays
+	if(incrementallySeedNetwork):
+		for seed_token_index in range(num_seed_tokens):
+			seed_network(sequence_observed_columns, sentenceIndex, doc, seed_token_index, num_seed_tokens, numberConceptsInSeed)
+	else:
+		seed_network(sequence_observed_columns, sentenceIndex, doc, 0, num_seed_tokens, numberConceptsInSeed)
+
+	# Update observed columns from sequence observed columns
+	sequence_observed_columns.update_observed_columns_wrapper()	#convert sequence observed columns feature neuron arrays back to global feature neuron arrays
 
 	GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns)
 	
@@ -140,10 +152,10 @@ def process_column_inference_prediction(databaseNetworkObject, observed_columns_
 		#decrement activations;
 		if(useActivationDecrement):
 			#decrement activation after each prediction interval
-			global_feature_neurons_activation = GIAANNproto_sparseTensors.subtract_value_from_sparse_tensor_values(global_feature_neurons_activation, activationDecrementPerPredictedColumn)
+			global_feature_neurons_activation = GIAANNproto_databaseNetworkTrain.decrementActivation(global_feature_neurons_activation, activationDecrementPerPredictedToken)
 			if(transformerUseInputConnections):
-				global_feature_connections_activation = GIAANNproto_sparseTensors.subtract_value_from_sparse_tensor_values(global_feature_connections_activation, activationDecrementPerConnection)
-		
+				global_feature_connections_activation = GIAANNproto_databaseNetworkTrain.decrementActivation(global_feature_connections_activation, activationDecrementPerPredictedToken)
+				
 		#process features (activate global target neurons);
 		#global_feature_neurons_activation, global_feature_connections_activation = process_features_active_predict_multi(databaseNetworkObject, global_feature_connections_activation, global_feature_neurons_activation, sequence_observed_columns_prediction, concept_columns_indices, concept_columns_feature_indices)
 		global_feature_neurons_activation, global_feature_connections_activation = process_features_active_predict_single(databaseNetworkObject, global_feature_connections_activation, global_feature_neurons_activation, sequence_observed_columns_prediction, concept_columns_indices, concept_columns_feature_indices)
@@ -349,6 +361,4 @@ def getLemmas(doc):
 	
 	return words, lemmas, pos_tags
 	
-	
-
 

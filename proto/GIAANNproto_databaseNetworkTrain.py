@@ -339,7 +339,7 @@ class SequenceObservedColumns:
 
 
 
-def process_concept_words(sequence_observed_columns, sentenceIndex, doc, words, lemmas, pos_tags, train=True, num_seed_tokens=None, numberConceptsInSeed=None):
+def process_concept_words(sequence_observed_columns, sentenceIndex, doc, words, lemmas, pos_tags, train=True, first_seed_token_index=None, num_seed_tokens=None, numberConceptsInSeed=None):
 	"""
 	For every concept word (lemma) in the sequence, identify every feature neuron in that column that occurs q words before or after the concept word in the sequence, including the concept neuron. This function has been parallelized using PyTorch array operations.
 	"""
@@ -396,11 +396,11 @@ def process_concept_words(sequence_observed_columns, sentenceIndex, doc, words, 
 			start_indices = (concept_indices - q).clamp(min=0)
 			end_indices = (concept_indices + q + 1).clamp(max=len(doc))
 
-	process_features(sequence_observed_columns, sentenceIndex, start_indices, end_indices, doc, words, lemmas, pos_tags, concept_indices, train, num_seed_tokens, numberConceptsInSeed)
+	process_features(sequence_observed_columns, sentenceIndex, start_indices, end_indices, doc, words, lemmas, pos_tags, concept_indices, train, first_seed_token_index, num_seed_tokens, numberConceptsInSeed)
 	
 	return concept_indices, start_indices, end_indices
 	
-def process_features(sequence_observed_columns, sentenceIndex, start_indices, end_indices, doc, words, lemmas, pos_tags, concept_indices, train, num_seed_tokens=None, numberConceptsInSeed=None):
+def process_features(sequence_observed_columns, sentenceIndex, start_indices, end_indices, doc, words, lemmas, pos_tags, concept_indices, train, first_seed_token_index=None, num_seed_tokens=None, numberConceptsInSeed=None):
 	numberConceptsInSequence = concept_indices.shape[0]
 	
 	cs = sequence_observed_columns.cs #!sequenceObservedColumnsMatchSequenceWords: will be less than len(concept_indices) if there are multiple instances of a concept in a sequence
@@ -475,10 +475,11 @@ def process_features(sequence_observed_columns, sentenceIndex, start_indices, en
 	if(train):
 		process_features_active_train(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos, feature_neurons_segment_mask, sentenceIndex)
 	else:
-		process_features_active_seed(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos, num_seed_tokens, numberConceptsInSeed)
+		process_features_active_seed(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos, first_seed_token_index, num_seed_tokens, numberConceptsInSeed)
+
 
 #first dim cs1 pertains to every concept node in sequence
-def process_features_active_seed(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos, num_seed_tokens, numberConceptsInSeed):
+def process_features_active_seed(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos, first_seed_token_index, num_seed_tokens, numberConceptsInSeed):
 	feature_neurons_inactive = 1 - feature_neurons_active
 	
 	fs2 = fs
@@ -490,9 +491,9 @@ def process_features_active_seed(sequence_observed_columns, feature_neurons_acti
 		cs2 = cs
 		feature_connections_active, feature_connections_segment_mask = createFeatureConnectionsActive(feature_neurons_active[array_index_segment_internal_column], cs, fs, columns_word_order, feature_neurons_word_order)
 	
-	firstWordIndexPredictPhase = num_seed_tokens
+	firstWordIndexPredictPhase = first_seed_token_index+num_seed_tokens
 	feature_neurons_word_order_expanded_1 = feature_neurons_word_order.view(cs, fs, 1, 1).expand(cs, fs, cs2, fs2)  # For the first node
-	word_order_mask = feature_neurons_word_order_expanded_1 < firstWordIndexPredictPhase
+	word_order_mask = pt.logical_and(feature_neurons_word_order_expanded_1 >= first_seed_token_index, feature_neurons_word_order_expanded_1 < firstWordIndexPredictPhase)
 	word_order_mask = word_order_mask.unsqueeze(0).expand(array_number_of_segments, cs, fs, cs2, fs2)
 	feature_connections_active = feature_connections_active * word_order_mask
 	
@@ -503,21 +504,33 @@ def process_features_active_seed(sequence_observed_columns, feature_neurons_acti
 	feature_connections_activation_update = pt.sum(feature_connections_activation_update, dim=(0))	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
 	feature_neurons_target_activation = pt.sum(feature_connections_activation_update, dim=(0, 1))		#sum over source c and f dimensions
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-		sequence_observed_columns.databaseNetworkObject.global_feature_neurons[array_index_properties_activation, :, :, :] += feature_neurons_target_activation*j1
+		global_feature_neurons_activation = sequence_observed_columns.databaseNetworkObject.global_feature_neurons[array_index_properties_activation]
+		global_feature_neurons_activation = global_feature_neurons_activation + feature_neurons_target_activation*j1
 	else:
 		sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :, :] += feature_neurons_target_activation*j1
 		#will only activate target neurons in sequence_observed_columns (not suitable for inference seed/prediction phase)
 
+	if(useActivationDecrement):
+		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
+			global_feature_neurons_activation = GIAANNproto_predictiveNetwork.decrementActivation(global_feature_neurons_activation, activationDecrementSeed)
+		else:
+			sequence_observed_columns.feature_neurons[array_index_properties_activation] = decrementActivationDense(sequence_observed_columns.feature_neurons[array_index_properties_activation], activationDecrementSeed)
+					
 	if(deactivateNeuronsUponPrediction):
+		'''
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 			for sequence_concept_index, concept_index in enumerate(sequence_observed_columns.concept_indices_in_observed_list):
-				sequence_observed_columns.databaseNetworkObject.global_feature_neurons[array_index_properties_activation, :, concept_index, :] *= feature_neurons_inactive[:, sequence_concept_index]	#TODO: assign segment dimension
+				global_feature_neurons_activation[:, concept_index, :] *= feature_neurons_inactive[:, sequence_concept_index]	#TODO: assign segment dimension
 		else:
-			feature_neurons_source_mask = feature_neurons_word_order < num_seed_tokens
-			feature_neurons_source_mask.unsqueeze(0).expand(array_number_of_segments, cs, fs)
-			feature_neurons_active_source = pt.logical_and(feature_neurons_source_mask, feature_neurons_active > 0)
-			feature_neurons_inactive_source = pt.logical_not(feature_neurons_active_source).float()
-			sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :, :] *= feature_neurons_inactive_source
+		'''
+		feature_neurons_source_mask = pt.logical_and(feature_neurons_word_order >= first_seed_token_index, feature_neurons_word_order < firstWordIndexPredictPhase)
+		feature_neurons_source_mask.unsqueeze(0).expand(array_number_of_segments, cs, fs)
+		feature_neurons_active_source = pt.logical_and(feature_neurons_source_mask, feature_neurons_active > 0)
+		feature_neurons_inactive_source = pt.logical_not(feature_neurons_active_source).float()
+		sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :, :] *= feature_neurons_inactive_source
+
+	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
+		sequence_observed_columns.databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequence_observed_columns.databaseNetworkObject.global_feature_neurons, global_feature_neurons_activation, array_index_properties_activation)
 
 
 #first dim cs1 pertains to every concept node in sequence
@@ -528,7 +541,8 @@ def process_features_active_train(sequence_observed_columns, feature_neurons_act
 	sequence_observed_columns.feature_neurons[array_index_properties_strength, :, :, :] += feature_neurons_active
 	sequence_observed_columns.feature_neurons[array_index_properties_permanence, :, :, :] += feature_neurons_active*z1	#orig = feature_neurons_active*(sequence_observed_columns.feature_neurons[array_index_properties_permanence] ** 2) + feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_permanence]
 	#sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :, :] += feature_neurons_active*j1	#update the activations of the target not source nodes
-	sequence_observed_columns.feature_neurons[array_index_properties_time, :, :, :] = feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_time] + feature_neurons_active*sentenceIndex
+	if(useInference and not useNeuronFeaturePropertiesTimeDuringInference):
+		sequence_observed_columns.feature_neurons[array_index_properties_time, :, :, :] = feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_time] + feature_neurons_active*sentenceIndex
 	sequence_observed_columns.feature_neurons[array_index_properties_pos, :, :, :] = feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_pos] + feature_neurons_active*feature_neurons_pos
 
 	feature_connections_active, feature_connections_segment_mask = createFeatureConnectionsActive(feature_neurons_active[array_index_segment_internal_column], cs, fs, columns_word_order, feature_neurons_word_order)
@@ -558,7 +572,8 @@ def process_features_active_train(sequence_observed_columns, feature_neurons_act
 	sequence_observed_columns.feature_connections[array_index_properties_strength, :, :, :, :, :] += feature_connections_strength_update
 	sequence_observed_columns.feature_connections[array_index_properties_permanence, :, :, :, :, :] += feature_connections_active*z1	#orig = feature_connections_active*(sequence_observed_columns.feature_connections[array_index_properties_permanence] ** 2) + feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_permanence]
 	#sequence_observed_columns.feature_connections[array_index_properties_activation, :, :, :, :, :] += feature_connections_active*j1	#connection activations are not currently used
-	sequence_observed_columns.feature_connections[array_index_properties_time, :, :, :, :, :] = feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_time] + feature_connections_active*sentenceIndex
+	if(useInference and not useNeuronFeaturePropertiesTimeDuringInference):
+		sequence_observed_columns.feature_connections[array_index_properties_time, :, :, :, :, :] = feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_time] + feature_connections_active*sentenceIndex
 	sequence_observed_columns.feature_connections[array_index_properties_pos, :, :, :, :, :] = feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_pos] + feature_connections_active*feature_connections_pos
 
 	#decrease permanence;
@@ -648,5 +663,21 @@ def decrease_permanence_active(sequence_observed_columns, feature_neurons_active
 	sequence_observed_columns.feature_connections[array_index_properties_permanence] = pt.clamp(sequence_observed_columns.feature_connections[array_index_properties_permanence], min=0)
  
 	#current limitation; will not deactivate neurons or remove their strength if their permanence goes to zero
+
+
+def decrementActivationDense(feature_neurons_activation, activationDecrement):
+	if(useActivationDecrementNonlinear):
+		feature_neurons_activation = feature_neurons_activation * (1-activationDecrement)
+	else:
+		feature_neurons_activation = feature_neurons_activation - activationDecrementPerPredictedSentence
+	return feature_neurons_activation
+
+
+def decrementActivation(feature_neurons_activation, activationDecrement):
+	if(useActivationDecrementNonlinear):
+		feature_neurons_activation = feature_neurons_activation * (1-activationDecrement)
+	else:
+		feature_neurons_activation = GIAANNproto_sparseTensors.subtract_value_from_sparse_tensor_values(feature_neurons_activation, activationDecrementPerPredictedSentence)
+	return feature_neurons_activation
 
 
