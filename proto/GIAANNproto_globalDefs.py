@@ -18,11 +18,6 @@ GIA ANN proto global Defs
 """
 
 import torch as pt
-
-useGPU = True
-if(useGPU):
-	if pt.cuda.is_available():
-		pt.set_default_device(pt.device("cuda"))
 	
 # Set boolean variables as per specification
 useSANI = False
@@ -200,7 +195,11 @@ variableConceptNeuronFeatureName = "variableConceptNeuronFeature"
 feature_index_concept_neuron = 0
 
 
-
+useGPU = True
+if(useGPU):
+	if pt.cuda.is_available():
+		pt.set_default_device(pt.device("cuda"))
+		
 if useDedicatedFeatureLists:
 	nltk.download('punkt')
 	nltk.download('wordnet')

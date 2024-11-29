@@ -168,7 +168,8 @@ def process_column_inference_prediction(databaseNetworkObject, observed_columns_
 				#global_feature_neurons_activation[concept_columns_indices, concept_columns_feature_indices] = 0	
 			else:
 				segment_indices = pt.zeros_like(concept_columns_indices)
-				indices_to_update = pt.stack([segment_indices, concept_columns_indices, concept_columns_feature_indices.squeeze(dim=0)], dim=0)
+				#indices_to_update = pt.stack([segment_indices, concept_columns_indices, concept_columns_feature_indices.squeeze(dim=0)], dim=0)
+				indices_to_update = pt.tensor([segment_indices.item(), concept_columns_indices.item(), concept_columns_feature_indices.squeeze(dim=0).item()]).unsqueeze(0)
 				global_feature_neurons_activation = GIAANNproto_sparseTensors.modify_sparse_tensor(global_feature_neurons_activation, indices_to_update, 0)
 				#global_feature_neurons_activation[segment_indices, concept_columns_indices, concept_columns_feature_indices] = 0
 

@@ -40,14 +40,14 @@ def modify_sparse_tensor(sparse_tensor, indices_to_update, new_value):
 	sparse_tensor = sparse_tensor.coalesce()
 	
 	# Transpose indices_to_update to match dimensions
-	indices_to_update = indices_to_update.t()  # Shape: (3, N)
+	indices_to_update = indices_to_update.t()  # Shape: (batch_size, N)
 	
 	# Get sparse tensor indices
-	sparse_indices = sparse_tensor.indices()   # Shape: (3, nnz)
+	sparse_indices = sparse_tensor.indices()   # Shape: (batch_size, nnz)
 	
 	# Expand dimensions to enable broadcasting
-	sparse_indices_expanded = sparse_indices.unsqueeze(2)	   # Shape: (3, nnz, 1)
-	indices_to_update_expanded = indices_to_update.unsqueeze(1) # Shape: (3, 1, N)
+	sparse_indices_expanded = sparse_indices.unsqueeze(2)	   # Shape: (batch_size, nnz, 1)
+	indices_to_update_expanded = indices_to_update.unsqueeze(1) # Shape: (batch_size, 1, N)
 	
 	# Compare indices
 	matches = (sparse_indices_expanded == indices_to_update_expanded).all(dim=0)  # Shape: (nnz, N)
