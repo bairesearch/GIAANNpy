@@ -489,14 +489,10 @@ def process_features_active_seed(sequence_observed_columns, feature_neurons_acti
 		#print("feature_connections_active.shape = ", feature_connections_active.shape)
 	else:
 		cs2 = cs
-		feature_connections_active, feature_connections_segment_mask = createFeatureConnectionsActive(feature_neurons_active[array_index_segment_internal_column], cs, fs, columns_word_order, feature_neurons_word_order)
+		feature_connections_active, feature_connections_segment_mask = createFeatureConnectionsActiveTrain(feature_neurons_active[array_index_segment_internal_column], cs, fs, columns_word_order, feature_neurons_word_order)
 	
-	firstWordIndexPredictPhase = first_seed_token_index+num_seed_tokens
-	feature_neurons_word_order_expanded_1 = feature_neurons_word_order.view(cs, fs, 1, 1).expand(cs, fs, cs2, fs2)  # For the first node
-	word_order_mask = pt.logical_and(feature_neurons_word_order_expanded_1 >= first_seed_token_index, feature_neurons_word_order_expanded_1 < firstWordIndexPredictPhase)
-	word_order_mask = word_order_mask.unsqueeze(0).expand(array_number_of_segments, cs, fs, cs2, fs2)
-	feature_connections_active = feature_connections_active * word_order_mask
-	
+	feature_connections_active = createFeatureConnectionsActiveSeed(feature_connections_active, cs, fs, cs2, fs2, columns_word_order, feature_neurons_word_order, first_seed_token_index, num_seed_tokens)
+
 	#target neuron activation dependence on connection strength;
 	feature_connections_activation_update = feature_connections_active * sequence_observed_columns.feature_connections[array_index_properties_strength]
 	
@@ -510,6 +506,8 @@ def process_features_active_seed(sequence_observed_columns, feature_neurons_acti
 		sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :, :] += feature_neurons_target_activation*j1
 		#will only activate target neurons in sequence_observed_columns (not suitable for inference seed/prediction phase)
 
+	#print("feature_neurons_target_activation = ", feature_neurons_target_activation)
+	
 	if(useActivationDecrement):
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 			global_feature_neurons_activation = GIAANNproto_predictiveNetwork.decrementActivation(global_feature_neurons_activation, activationDecrementSeed)
@@ -523,16 +521,43 @@ def process_features_active_seed(sequence_observed_columns, feature_neurons_acti
 				global_feature_neurons_activation[:, concept_index, :] *= feature_neurons_inactive[:, sequence_concept_index]	#TODO: assign segment dimension
 		else:
 		'''
-		feature_neurons_source_mask = pt.logical_and(feature_neurons_word_order >= first_seed_token_index, feature_neurons_word_order < firstWordIndexPredictPhase)
-		feature_neurons_source_mask.unsqueeze(0).expand(array_number_of_segments, cs, fs)
-		feature_neurons_active_source = pt.logical_and(feature_neurons_source_mask, feature_neurons_active > 0)
+		firstWordIndexPredictPhase = first_seed_token_index+num_seed_tokens
+		word_order_mask = pt.logical_and(feature_neurons_word_order >= first_seed_token_index, feature_neurons_word_order < firstWordIndexPredictPhase)
+		columns_word_order_expanded_1 = columns_word_order.view(cs, 1).expand(cs, fs)
+		columns_word_order_mask = pt.logical_and(columns_word_order_expanded_1 >= first_seed_token_index, columns_word_order_expanded_1 < firstWordIndexPredictPhase)
+		
+		word_order_mask = pt.logical_and(word_order_mask, columns_word_order_mask)
+		word_order_mask = word_order_mask.unsqueeze(0).expand(array_number_of_segments, cs, fs)
+		feature_neurons_active_source = pt.logical_and(word_order_mask, feature_neurons_active > 0)
 		feature_neurons_inactive_source = pt.logical_not(feature_neurons_active_source).float()
 		sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :, :] *= feature_neurons_inactive_source
 
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 		sequence_observed_columns.databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequence_observed_columns.databaseNetworkObject.global_feature_neurons, global_feature_neurons_activation, array_index_properties_activation)
 
+def createFeatureConnectionsActiveSeed(feature_connections_active, cs, fs, cs2, fs2, columns_word_order, feature_neurons_word_order, first_seed_token_index, num_seed_tokens):
 
+	firstWordIndexPredictPhase = first_seed_token_index+num_seed_tokens
+		
+	if(feature_neurons_word_order is not None):	
+		feature_neurons_word_order_expanded_1 = feature_neurons_word_order.view(cs, fs, 1, 1).expand(cs, fs, cs2, fs2)  # For the first node
+		word_order_mask = pt.logical_and(feature_neurons_word_order_expanded_1 >= first_seed_token_index, feature_neurons_word_order_expanded_1 < firstWordIndexPredictPhase)
+		word_order_mask = word_order_mask.unsqueeze(0).expand(array_number_of_segments, cs, fs, cs2, fs2)
+		feature_connections_active = feature_connections_active * word_order_mask
+	if(columns_word_order is not None):
+		columns_word_order_expanded_1 = columns_word_order.view(cs, 1, 1, 1).expand(cs, fs, cs2, fs2)  # For the first node's cs index
+		columns_word_order_mask = pt.logical_and(columns_word_order_expanded_1 >= first_seed_token_index, columns_word_order_expanded_1 < firstWordIndexPredictPhase)
+		feature_connections_active = feature_connections_active * columns_word_order_mask
+	
+	#word_order_mask_unexpanded = pt.logical_and(feature_neurons_word_order >= first_seed_token_index, feature_neurons_word_order < firstWordIndexPredictPhase)
+	#print("feature_neurons_word_order = ", feature_neurons_word_order)
+	#print("word_order_mask_unexpanded = ", word_order_mask_unexpanded)
+	#print("feature_neurons_active = ", feature_neurons_active)
+	#print("feature_connections_active = ", feature_connections_active)
+	
+	return feature_connections_active
+	
+	
 #first dim cs1 pertains to every concept node in sequence
 def process_features_active_train(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos, feature_neurons_segment_mask, sentenceIndex):
 	feature_neurons_inactive = 1 - feature_neurons_active
@@ -545,7 +570,7 @@ def process_features_active_train(sequence_observed_columns, feature_neurons_act
 		sequence_observed_columns.feature_neurons[array_index_properties_time, :, :, :] = feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_time] + feature_neurons_active*sentenceIndex
 	sequence_observed_columns.feature_neurons[array_index_properties_pos, :, :, :] = feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_pos] + feature_neurons_active*feature_neurons_pos
 
-	feature_connections_active, feature_connections_segment_mask = createFeatureConnectionsActive(feature_neurons_active[array_index_segment_internal_column], cs, fs, columns_word_order, feature_neurons_word_order)
+	feature_connections_active, feature_connections_segment_mask = createFeatureConnectionsActiveTrain(feature_neurons_active[array_index_segment_internal_column], cs, fs, columns_word_order, feature_neurons_word_order)
 	
 	feature_connections_pos = feature_neurons_pos.view(1, cs, fs, 1, 1).expand(array_number_of_segments, cs, fs, cs, fs)
 
@@ -581,7 +606,7 @@ def process_features_active_train(sequence_observed_columns, feature_neurons_act
 		decrease_permanence_active(sequence_observed_columns, feature_neurons_active[array_index_segment_internal_column], feature_neurons_inactive[array_index_segment_internal_column], sequence_concept_index_mask, feature_neurons_segment_mask, feature_connections_segment_mask)
 	
 
-def createFeatureConnectionsActive(feature_neurons_active, cs, fs, columns_word_order, feature_neurons_word_order):
+def createFeatureConnectionsActiveTrain(feature_neurons_active, cs, fs, columns_word_order, feature_neurons_word_order):
 
 	feature_neurons_active_1d = feature_neurons_active.view(cs*fs)
 	feature_connections_active = pt.matmul(feature_neurons_active_1d.unsqueeze(1), feature_neurons_active_1d.unsqueeze(0)).view(cs, fs, cs, fs)

@@ -107,6 +107,7 @@ if(useInference):
 		if(useActivationDecrement):
 			useActivationDecrementNonlinear = True
 	else:
+		#pass
 		deactivateNeuronsUponPrediction = True
 	activationDecrementPerPredictedToken = 0.1	#0.05	#CHECKTHIS
 	if(incrementallySeedNetwork):

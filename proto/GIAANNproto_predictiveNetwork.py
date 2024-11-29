@@ -87,7 +87,7 @@ def process_concept_words_inference(sequence_observed_columns, sentenceIndex, do
 	#seed network;
 	if(incrementallySeedNetwork):
 		for seed_token_index in range(num_seed_tokens):
-			seed_network(sequence_observed_columns, sentenceIndex, doc, seed_token_index, num_seed_tokens, numberConceptsInSeed)
+			seed_network(sequence_observed_columns, sentenceIndex, doc, seed_token_index, 1, numberConceptsInSeed)
 	else:
 		seed_network(sequence_observed_columns, sentenceIndex, doc, 0, num_seed_tokens, numberConceptsInSeed)
 
