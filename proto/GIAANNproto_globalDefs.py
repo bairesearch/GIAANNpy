@@ -29,7 +29,7 @@ useSANI = False
 useInference = False  # useInference mode
 if(useInference):
 	inferencePredictiveNetwork = False	#use MLP to predict next token	#orig:False
-	incrementallySeedNetwork = False	#default:True	#orig:False	#incomplete
+	incrementallySeedNetwork = True	#default:True	#orig:False
 	useNeuronFeaturePropertiesTimeDuringInference = False	#default:False	#orig:False	#not yet implemented
 	transformerUseInputConnections = False	#initialise (dependent var)
 	if(inferencePredictiveNetwork):

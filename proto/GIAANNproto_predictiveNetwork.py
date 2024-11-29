@@ -55,9 +55,9 @@ if not drawSequenceObservedColumns:
 			self.databaseNetworkObject = databaseNetworkObject
 			self.observed_columns_dict = observed_columns_dict
 
-def seed_network(sequence_observed_columns, sentenceIndex, doc, first_seed_token_index, num_seed_tokens, numberConceptsInSeed):
+def seed_network(sequence_observed_columns, sentenceIndex, doc, first_seed_token_index, num_seed_tokens):
 	words, lemmas, pos_tags = getLemmas(doc)
-	GIAANNproto_databaseNetworkTrain.process_concept_words(sequence_observed_columns, sentenceIndex, doc, words, lemmas, pos_tags, train=False, first_seed_token_index=first_seed_token_index, num_seed_tokens=num_seed_tokens, numberConceptsInSeed=numberConceptsInSeed)
+	GIAANNproto_databaseNetworkTrain.process_concept_words(sequence_observed_columns, sentenceIndex, doc, words, lemmas, pos_tags, train=False, first_seed_token_index=first_seed_token_index, num_seed_tokens=num_seed_tokens)
 
 	if(useActivationDecrement):
 		if(not inferenceSeedTargetActivationsGlobalFeatureArrays):
@@ -75,11 +75,6 @@ def process_concept_words_inference(sequence_observed_columns, sentenceIndex, do
 	concept_mask = pt.tensor([i in sequence_observed_columns.columns_index_sequence_word_index_dict for i in range(len(lemmas_doc))], dtype=pt.bool)
 	concept_indices = pt.nonzero(concept_mask).squeeze(1)
 	numberConcepts = concept_indices.shape[0]
-
-	words_seed, lemmas_seed, pos_tags_seed = getLemmas(doc_seed)
-	concept_mask_seed = pt.tensor([i in sequence_observed_columns.columns_index_sequence_word_index_dict for i in range(len(lemmas_seed))], dtype=pt.bool)
-	concept_indices_seed = pt.nonzero(concept_mask_seed).squeeze(1)
-	numberConceptsInSeed = concept_indices_seed.shape[0]
 	
 	if(transformerUseInputConnections):
 		GIAANNproto_databaseNetwork.generate_global_feature_connections(sequence_observed_columns.databaseNetworkObject)
@@ -87,9 +82,9 @@ def process_concept_words_inference(sequence_observed_columns, sentenceIndex, do
 	#seed network;
 	if(incrementallySeedNetwork):
 		for seed_token_index in range(num_seed_tokens):
-			seed_network(sequence_observed_columns, sentenceIndex, doc, seed_token_index, 1, numberConceptsInSeed)
+			seed_network(sequence_observed_columns, sentenceIndex, doc, seed_token_index, 1)
 	else:
-		seed_network(sequence_observed_columns, sentenceIndex, doc, 0, num_seed_tokens, numberConceptsInSeed)
+		seed_network(sequence_observed_columns, sentenceIndex, doc, 0, num_seed_tokens)
 
 	# Update observed columns from sequence observed columns
 	sequence_observed_columns.update_observed_columns_wrapper()	#convert sequence observed columns feature neuron arrays back to global feature neuron arrays
