@@ -86,8 +86,9 @@ def process_concept_words_inference(sequence_observed_columns, sentenceIndex, do
 	else:
 		seed_network(sequence_observed_columns, sentenceIndex, doc, 0, num_seed_tokens)
 
-	# Update observed columns from sequence observed columns
-	sequence_observed_columns.update_observed_columns_wrapper()	#convert sequence observed columns feature neuron arrays back to global feature neuron arrays
+	if(not inferenceSeedTargetActivationsGlobalFeatureArrays):
+		# Update observed columns from sequence observed columns
+		sequence_observed_columns.update_observed_columns_wrapper()	#convert sequence observed columns feature neuron arrays back to global feature neuron arrays
 
 	GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns)
 	

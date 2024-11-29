@@ -37,7 +37,10 @@ if(useInference):
 		inferencePredictiveNetworkModelTransformer = True
 		if(inferencePredictiveNetworkModelTransformer):
 			transformerUseInputConnections = False	#incomplete	#optional
-	inferenceSeedTargetActivationsGlobalFeatureArrays = False
+	if(incrementallySeedNetwork):
+		inferenceSeedTargetActivationsGlobalFeatureArrays = False	#optional	#orig:False
+	else:
+		inferenceSeedTargetActivationsGlobalFeatureArrays = False	#not supported
 	lowMem = False		#mandatory
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 		sequenceObservedColumnsUseSequenceFeaturesOnly = False	#mandatory	#global feature arrays are directly written to during inference seed phase
@@ -218,3 +221,7 @@ if useDedicatedFeatureLists:
 	
 	non_nouns = all_words - nouns
 	max_num_non_nouns = len(non_nouns)
+
+def printe(str):
+	print(str)
+	exite
