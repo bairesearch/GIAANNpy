@@ -64,6 +64,11 @@ def seed_network(sequence_observed_columns, sentenceIndex, doc, first_seed_token
 			global_feature_neurons_activation = sequence_observed_columns.databaseNetworkObject.global_feature_neurons[array_index_properties_activation]
 			global_feature_neurons_activation = GIAANNproto_databaseNetworkTrain.decrementActivation(global_feature_neurons_activation, activationDecrementSeed)
 			sequence_observed_columns.databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequence_observed_columns.databaseNetworkObject.global_feature_neurons, global_feature_neurons_activation, array_index_properties_activation)
+	
+	if(drawNetworkDuringPredict):
+		#FUTURE: convert global_feature_neurons_activation back to global_feature_neurons for draw
+		GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns, save=drawNetworkDuringPredictSave, fileName=drawNetworkDuringPredictSaveFilenamePrepend+str(first_seed_token_index))
+
 
 def process_concept_words_inference(sequence_observed_columns, sentenceIndex, doc, doc_seed, doc_predict, num_seed_tokens, num_prediction_tokens):
 
@@ -90,8 +95,6 @@ def process_concept_words_inference(sequence_observed_columns, sentenceIndex, do
 		# Update observed columns from sequence observed columns
 		sequence_observed_columns.update_observed_columns_wrapper()	#convert sequence observed columns feature neuron arrays back to global feature neuron arrays
 
-	GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns)
-	
 	if(inferencePredictiveNetwork):
 		if(inferencePredictiveNetworkModelMLP):
 			GIAANNproto_predictiveNetworkMLP.nextWordPredictionMLPcreate(sequence_observed_columns.databaseNetworkObject)
@@ -205,8 +208,9 @@ def process_column_inference_prediction(databaseNetworkObject, observed_columns_
 		if(targetWord == predictedWord):
 			featurePredictionTargetMatch = True
 			
-	#FUTURE: convert global_feature_neurons_activation back to global_feature_neurons for draw
-	GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns_prediction)
+	if(drawNetworkDuringPredict):
+		#FUTURE: convert global_feature_neurons_activation back to global_feature_neurons for draw
+		GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns_prediction, save=drawNetworkDuringPredictSave, fileName=drawNetworkDuringPredictSaveFilenamePrepend+str(wordPredictionIndex))
 	
 	return featurePredictionTargetMatch, concept_columns_indices_next, concept_columns_feature_indices_next
 	

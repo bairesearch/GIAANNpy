@@ -126,13 +126,13 @@ def process_sentence(sentenceIndex, doc, lastSentenceInPrompt):
 			# Update observed columns from sequence observed columns
 			sequence_observed_columns.update_observed_columns_wrapper()
 
-			if(drawNetworkDuringTrain):
-				# Visualize the complete graph every time a new sentence is parsed by the application.
-				GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns)
-
 			# Save observed columns to disk
 			if(useSaveData):
 				GIAANNproto_databaseNetworkFiles.save_data(databaseNetworkObject, observed_columns_dict)
+				
+			if(drawNetworkDuringTrain):
+				# Visualize the complete graph every time a new sentence is parsed by the application.
+				GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+str(sentenceIndex))
 			
 	# Break if we've reached the maximum number of sentences
 	sentence_count += 1

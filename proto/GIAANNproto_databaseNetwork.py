@@ -208,3 +208,9 @@ def generate_global_feature_connections(databaseNetworkObject):
 	databaseNetworkObject.global_feature_connections = pt.stack(global_feature_connections_list, dim=2)
 	print("generate_global_feature_connections: databaseNetworkObject.global_feature_connections.shape = ", databaseNetworkObject.global_feature_connections.shape)
 
+def load_all_columns(databaseNetworkObject):
+	observed_columns_dict = {}
+	for i, (lemma, concept_index) in enumerate(databaseNetworkObject.concept_columns_dict.items()):
+		concept_column = load_or_create_observed_column(databaseNetworkObject, concept_index, lemma, i)
+		observed_columns_dict[lemma] = concept_column
+	return observed_columns_dict

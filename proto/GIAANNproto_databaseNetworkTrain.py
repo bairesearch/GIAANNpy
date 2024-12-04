@@ -555,7 +555,7 @@ def process_features_active_seed(sequence_observed_columns, feature_neurons_acti
 	
 	if(useActivationDecrement):
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-			global_feature_neurons_activation = GIAANNproto_predictiveNetwork.decrementActivation(global_feature_neurons_activation, activationDecrementSeed)
+			global_feature_neurons_activation = decrementActivation(global_feature_neurons_activation, activationDecrementSeed)
 		else:
 			sequence_observed_columns.feature_neurons[array_index_properties_activation] = decrementActivationDense(sequence_observed_columns.feature_neurons[array_index_properties_activation], activationDecrementSeed)
 					

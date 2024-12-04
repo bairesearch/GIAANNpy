@@ -23,7 +23,7 @@ import random
 import GIAANNproto_sparseTensors
 
 from GIAANNproto_globalDefs import *
-
+import GIAANNproto_databaseNetwork
 
 if(drawRelationTypes):
 	relation_type_concept_pos1 = 'NOUN'
@@ -110,10 +110,15 @@ def floatToString(value):
 	return result
 		
 		
-def visualize_graph(sequence_observed_columns):
+def visualize_graph(sequence_observed_columns, save=False, fileName=None):
 	databaseNetworkObject = sequence_observed_columns.databaseNetworkObject
 	G.clear()
 
+	if(drawAllColumns):
+		observed_columns_dict = GIAANNproto_databaseNetwork.load_all_columns(databaseNetworkObject)
+	else:
+		observed_columns_dict = sequence_observed_columns.observed_columns_dict
+	
 	if not lowMem:
 		global global_feature_neurons
 		if(performRedundantCoalesce):
@@ -122,7 +127,7 @@ def visualize_graph(sequence_observed_columns):
 	# Draw concept columns
 	pos_dict = {}
 	x_offset = 0
-	for lemma, observed_column in sequence_observed_columns.observed_columns_dict.items():
+	for lemma, observed_column in observed_columns_dict.items():
 		concept_index = observed_column.concept_index
 		
 		if(performRedundantCoalesce):
@@ -200,7 +205,7 @@ def visualize_graph(sequence_observed_columns):
 		x_offset += 2  # Adjust x_offset for the next column
 
 	# Draw connections
-	for lemma, observed_column in sequence_observed_columns.observed_columns_dict.items():
+	for lemma, observed_column in observed_columns_dict.items():
 	
 		if(performRedundantCoalesce):
 			observed_column.feature_connections = observed_column.feature_connections.coalesce()
@@ -245,7 +250,7 @@ def visualize_graph(sequence_observed_columns):
 		for feature_word, feature_index_in_observed_column in feature_word_to_index.items():
 			source_node = f"{lemma}_{feature_word}_{feature_index_in_observed_column}"
 			if G.has_node(source_node):
-				for other_lemma, other_observed_column in sequence_observed_columns.observed_columns_dict.items():
+				for other_lemma, other_observed_column in observed_columns_dict.items():
 					if(drawSequenceObservedColumns):
 						other_feature_word_to_index = sequence_observed_columns.feature_word_to_index
 					else:
@@ -288,7 +293,27 @@ def visualize_graph(sequence_observed_columns):
 	edge_colors = [data['color'] for u, v, data in G.edges(data=True)]
 	labels = nx.get_node_attributes(G, 'label')
 
+	if(save):
+		highResolutionFigure = True
+	else:
+		highResolutionFigure = False
+	if(highResolutionFigure):
+		displayFigDPI = 100
+		saveFigDPI = 300	#approx HD	#depth per inch
+		saveFigSize = (16,9)	#(9,9)	#in inches
+		figureWidth = 1920
+		figureHeight = 1080
+		plt.gcf().set_size_inches(figureWidth / displayFigDPI, figureHeight / displayFigDPI)
+
 	# Draw the graph
 	nx.draw(G, pos, with_labels=True, labels=labels, arrows=True, node_color=colors, edge_color=edge_colors, node_size=500, font_size=8)
 	plt.axis('off')  # Hide the axes
-	plt.show()
+	
+	if(save):
+		if(highResolutionFigure):
+			plt.savefig(fileName, dpi=saveFigDPI)
+		else:
+			plt.savefig(fileName)
+		plt.clf()	
+	else:
+		plt.show()
