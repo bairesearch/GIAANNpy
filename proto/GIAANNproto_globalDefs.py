@@ -53,7 +53,7 @@ if(useInference):
 	drawNetworkDuringInferenceSave = False
 	drawNetworkDuringInferenceSaveFilenamePrepend = "GIAANNproto1cSequenceObservedColumnsPredictionTokenIndex"
 else:
-	lowMem = True		 #optional
+	lowMem = False		 #optional
 	sequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
 	sequenceObservedColumnsMatchSequenceWords = True	#optional	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sentence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
 	drawSequenceObservedColumns = False	#optional	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !sequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns	#optional (will affect which network changes can be visualised)
@@ -206,12 +206,26 @@ if not lowMem:
 variableConceptNeuronFeatureName = "variableConceptNeuronFeature"
 feature_index_concept_neuron = 0
 
+def printe(str):
+	print(str)
+	exite
 
-useGPU = True
-if(useGPU):
+useGPUdense = True
+useGPUsparse = False
+if(useGPUdense):
 	if pt.cuda.is_available():
-		pt.set_default_device(pt.device("cuda"))
-		
+		deviceDense = pt.device("cuda")
+		pt.set_default_device(deviceDense)
+	else:
+		printe("useGPUdense and !pt.cuda.is_available")
+if(useGPUsparse):
+	if(pt.cuda.is_available()):
+		deviceSparse = pt.device("cuda")
+	else:
+		printe("useGPUsparse and !pt.cuda.is_available")
+else:
+	deviceSparse = pt.device("cpu")
+
 if useDedicatedFeatureLists:
 	nltk.download('punkt')
 	nltk.download('wordnet')
@@ -233,6 +247,4 @@ if useDedicatedFeatureLists:
 	non_nouns = all_words - nouns
 	max_num_non_nouns = len(non_nouns)
 
-def printe(str):
-	print(str)
-	exite
+

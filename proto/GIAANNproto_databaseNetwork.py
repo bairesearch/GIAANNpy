@@ -146,7 +146,7 @@ class ObservedColumn:
 			load_c = self.feature_connections[i].shape[2]
 			if new_c > load_c:
 				expanded_size = (self.feature_connections[i].shape[0], self.feature_connections[i].shape[1], new_c, self.feature_connections[i].shape[3])
-				self.feature_connections[i] = pt.sparse_coo_tensor(self.feature_connections[i].indices(), self.feature_connections[i].values(), size=expanded_size, dtype=array_type)
+				self.feature_connections[i] = pt.sparse_coo_tensor(self.feature_connections[i].indices(), self.feature_connections[i].values(), size=expanded_size, dtype=array_type, device=deviceSparse)
 
 	def expand_feature_arrays(self, new_f):
 		load_f = self.feature_connections[0].shape[1]  # or self.feature_connections[0].shape[2]
@@ -155,12 +155,12 @@ class ObservedColumn:
 				# Expand feature_connections along dimensions 2 and 4
 				self.feature_connections[i] = self.feature_connections[i].coalesce()
 				expanded_size_connections = (self.feature_connections[i].shape[0], new_f, self.feature_connections[i].shape[2], new_f)
-				self.feature_connections[i] = pt.sparse_coo_tensor(self.feature_connections[i].indices(), self.feature_connections[i].values(), size=expanded_size_connections, dtype=array_type)
+				self.feature_connections[i] = pt.sparse_coo_tensor(self.feature_connections[i].indices(), self.feature_connections[i].values(), size=expanded_size_connections, dtype=array_type, device=deviceSparse)
 
 				if lowMem:
 					expanded_size_neurons = (self.feature_neurons[i].shape[0], new_f)
 					self.feature_neurons[i] = self.feature_neurons[i].coalesce()
-					self.feature_neurons[i] = pt.sparse_coo_tensor(self.feature_neurons[i].indices(), self.feature_neurons[i].values(), size=expanded_size_neurons, dtype=array_type)
+					self.feature_neurons[i] = pt.sparse_coo_tensor(self.feature_neurons[i].indices(), self.feature_neurons[i].values(), size=expanded_size_neurons, dtype=array_type, device=deviceSparse)
 
 			for feature_index in range(load_f, new_f):
 				feature_word = self.databaseNetworkObject.concept_features_list[feature_index]
@@ -212,7 +212,9 @@ def generate_global_feature_connections(databaseNetworkObject):
 		global_feature_connections_list = []
 		for concept_column in concept_columns_list:
 			global_feature_connections_list.append(concept_column.feature_connections[i])
+			print("2 concept_column.feature_connections[i].device = ", concept_column.feature_connections[i].device)
 		databaseNetworkObject.global_feature_connections[i] = pt.stack(global_feature_connections_list, dim=1)
+		print("generate_global_feature_connections: databaseNetworkObject.global_feature_connections[i].shape = ", databaseNetworkObject.global_feature_connections[i].shape)
 
 def load_all_columns(databaseNetworkObject):
 	observed_columns_dict = {}

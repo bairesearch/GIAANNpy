@@ -24,7 +24,7 @@ from GIAANNproto_globalDefs import *
 def createEmptySparseTensor(array_number_of_properties, shape):
 	sparse_tensor_list = []
 	for i in range(array_number_of_properties):
-		sparse_tensor = pt.sparse_coo_tensor(indices=pt.empty((len(shape), 0), dtype=pt.long), values=pt.empty(0), size=shape)
+		sparse_tensor = pt.sparse_coo_tensor(indices=pt.empty((len(shape), 0), dtype=pt.long), values=pt.empty(0), size=shape, device=deviceSparse)
 		sparse_tensor_list.append(sparse_tensor)
 	return sparse_tensor_list
 
@@ -35,11 +35,13 @@ def subtract_value_from_sparse_tensor_values(sparse_tensor, value):
 	
 def add_value_to_sparse_tensor_values(sparse_tensor, value):
 	sparse_tensor = sparse_tensor.coalesce()
-	sparse_tensor = pt.sparse_coo_tensor(sparse_tensor.indices(), sparse_tensor.values() + value, sparse_tensor.size())
+	sparse_tensor = pt.sparse_coo_tensor(sparse_tensor.indices(), sparse_tensor.values() + value, sparse_tensor.size(), device=deviceSparse)
 	sparse_tensor = sparse_tensor.coalesce()
 	return sparse_tensor
 
 def modify_sparse_tensor(sparse_tensor, indices_to_update, new_value):
+	indices_to_update = indices_to_update.to(sparse_tensor.device)
+	
 	sparse_tensor = sparse_tensor.coalesce()
 	
 	# Transpose indices_to_update to match dimensions
@@ -77,7 +79,7 @@ def merge_tensor_slices_sum(original_sparse_tensor, sparse_slices, d):
 	for index, tensor_slice in sparse_slices.items():
 		# Create the index tensor for dimension 'd'
 		num_nonzero = tensor_slice._indices().size(1)
-		d_indices = pt.full((1, num_nonzero), index, dtype=tensor_slice._indices().dtype)
+		d_indices = pt.full((1, num_nonzero), index, dtype=tensor_slice._indices().dtype, device=deviceSparse)
 
 		# Build the new indices by inserting d_indices at position 'd'
 		slice_indices = tensor_slice._indices()
@@ -97,7 +99,7 @@ def merge_tensor_slices_sum(original_sparse_tensor, sparse_slices, d):
 	final_size = original_sparse_tensor.size()
 
 	# Create the updated sparse tensor and coalesce to handle duplicates
-	merged_sparse_tensor = pt.sparse_coo_tensor(final_indices, final_values, size=final_size)
+	merged_sparse_tensor = pt.sparse_coo_tensor(final_indices, final_values, size=final_size, device=deviceSparse)
 
 	merged_sparse_tensor = merged_sparse_tensor.coalesce()
 	merged_sparse_tensor.values().clamp_(min=0)
@@ -156,7 +158,7 @@ def slice_sparse_tensor_multi(sparse_tensor, slice_dim, slice_indices):
 	new_size[slice_dim] = len(slice_indices)
 
 	# Create the new sparse tensor
-	new_sparse_tensor = pt.sparse_coo_tensor(selected_indices, selected_values, size=new_size)
+	new_sparse_tensor = pt.sparse_coo_tensor(selected_indices, selected_values, size=new_size, device=deviceSparse)
 
 	return new_sparse_tensor
 	
@@ -195,7 +197,7 @@ def slice_sparse_tensor(sparse_tensor, slice_dim, slice_index):
 	new_size = original_size[:slice_dim] + original_size[slice_dim+1:]
 
 	# Step 6: Create the new sparse tensor
-	new_sparse_tensor = pt.sparse_coo_tensor(new_indices, filtered_values, size=new_size)
+	new_sparse_tensor = pt.sparse_coo_tensor(new_indices, filtered_values, size=new_size, device=deviceSparse)
 	new_sparse_tensor = new_sparse_tensor.coalesce()  # Ensure the tensor is in canonical form
 
 	return new_sparse_tensor
@@ -214,7 +216,7 @@ def addSparseTensorToFirstDimIndex(A, B, index):
 	A_index_values = A_values[mask]
 
 	# Step 3: Create sparse tensor A[index]
-	A_index = pt.sparse_coo_tensor(A_index_indices, A_index_values, size=B.shape)
+	A_index = pt.sparse_coo_tensor(A_index_indices, A_index_values, size=B.shape, device=deviceSparse)
 
 	# Step 4: Perform the addition A[index] + B
 	C = A_index + B
@@ -230,7 +232,7 @@ def addSparseTensorToFirstDimIndex(A, B, index):
 	A_new_values = pt.cat([A_remaining_values, C_values], dim=0)
 
 	# Step 7: Update A
-	A = pt.sparse_coo_tensor(A_new_indices, A_new_values, size=A.size())
+	A = pt.sparse_coo_tensor(A_new_indices, A_new_values, size=A.size(), device=deviceSparse)
 	
 	return A
 
@@ -259,7 +261,7 @@ def replaceAllSparseTensorElementsAtFirstDimIndex(A, B, index):
 	new_values = pt.cat((A_values_filtered, B_values), dim=0)
 
 	# Create a new sparse tensor with the updated indices and values
-	A_new = pt.sparse_coo_tensor(new_indices, new_values, size=A.size(), device=A.device)
+	A_new = pt.sparse_coo_tensor(new_indices, new_values, size=A.size(), device=deviceSparse)
 	
 	return A_new
 
@@ -316,7 +318,7 @@ def sparse_assign(A, B, *indices):
 	combined_values = pt.cat([A.values(), B.values()], dim=0)
 
 	# Create a new sparse tensor with the combined indices and values
-	new_A = pt.sparse_coo_tensor(combined_indices, combined_values, size=A.shape, dtype=A.dtype, device=A.device)
+	new_A = pt.sparse_coo_tensor(combined_indices, combined_values, size=A.shape, dtype=A.dtype, device=deviceSparse)
 
 	# Coalesce the tensor to sum duplicate indices
 	new_A = new_A.coalesce()
@@ -347,9 +349,7 @@ def expand_sparse_tensor(tensor, q, y, new_dim_size=None):
 	x, nnz = indices.shape
 
 	# Create a row with the new indices set to y
-	y_row = pt.full(
-		(1, nnz), y, dtype=indices.dtype, device=indices.device
-	)
+	y_row = pt.full((1, nnz), y, dtype=indices.dtype, device=indices.device)
 
 	# Insert the new dimension at position q
 	new_indices = pt.cat((indices[:q], y_row, indices[q:]), dim=0)
@@ -361,19 +361,15 @@ def expand_sparse_tensor(tensor, q, y, new_dim_size=None):
 		if y >= 0:
 			new_dim_size = y + 1
 		else:
-			raise ValueError(
-				"Negative index y requires specifying new_dim_size."
-			)
+			raise ValueError("Negative index y requires specifying new_dim_size.")
 
 	if y >= new_dim_size or y < -new_dim_size:
-		raise ValueError(
-			f"Index y={y} is out of bounds for dimension of size {new_dim_size}"
-		)
+		raise ValueError(f"Index y={y} is out of bounds for dimension of size {new_dim_size}")
 
 	new_size = original_size[:q] + [new_dim_size] + original_size[q:]
 
 	# Create the new sparse tensor
-	new_tensor = pt.sparse_coo_tensor(new_indices, values, size=new_size)
+	new_tensor = pt.sparse_coo_tensor(new_indices, values, size=new_size, device=deviceSparse)
 
 	return new_tensor
 
@@ -421,6 +417,6 @@ def expand_sparse_tensor_multi(tensor, q, y, new_dim_size=None):
 	new_size = original_size[:q] + [new_dim_size] + original_size[q:]
 
 	# Create the new sparse tensor
-	new_tensor = pt.sparse_coo_tensor(new_indices, values, size=new_size)
+	new_tensor = pt.sparse_coo_tensor(new_indices, values, size=new_size, device=deviceSparse)
 
 	return new_tensor
