@@ -27,11 +27,13 @@ if(useInference):
 	incrementallySeedNetwork = True	#default:True	#orig:False
 	useNeuronFeaturePropertiesTimeDuringInference = False	#default:False	#orig:False	#not yet implemented
 	transformerUseInputConnections = False	#initialise (dependent var)
+	transformerUseInputAllProperties = False	#initialise (dependent var)
 	if(inferencePredictiveNetwork):
 		inferencePredictiveNetworkModelMLP = False
 		inferencePredictiveNetworkModelTransformer = True
 		if(inferencePredictiveNetworkModelTransformer):
 			transformerUseInputConnections = False	#incomplete	#optional
+			transformerUseInputAllProperties = True
 	if(incrementallySeedNetwork):
 		inferenceSeedTargetActivationsGlobalFeatureArrays = False	#optional	#orig:False
 	else:
@@ -46,9 +48,10 @@ if(useInference):
 	drawAllColumns = False	#mandatory
 	drawRelationTypes = False	#False: draw activation status
 	drawNetworkDuringTrain = False
-	drawNetworkDuringPredict = True
-	drawNetworkDuringPredictSave = False
-	drawNetworkDuringPredictSaveFilenamePrepend = "GIAANNproto1cSequenceObservedColumnsPredictionTokenIndex"
+	drawNetworkDuringInferenceSeed = False
+	drawNetworkDuringInferencePredict = True
+	drawNetworkDuringInferenceSave = False
+	drawNetworkDuringInferenceSaveFilenamePrepend = "GIAANNproto1cSequenceObservedColumnsPredictionTokenIndex"
 else:
 	lowMem = True		 #optional
 	sequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
@@ -58,7 +61,7 @@ else:
 	if(drawAllColumns):
 		assert not sequenceObservedColumnsUseSequenceFeaturesOnly
 	drawRelationTypes = True	#draw feature neuron and connection relation types in different colours
-	drawNetworkDuringTrain = False	#default: True
+	drawNetworkDuringTrain = True	#default: True
 	drawNetworkDuringTrainSave = False
 	drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSentenceIndex"
 
@@ -152,6 +155,7 @@ if(useInference):
 concept_columns_dict_file = databaseFolder + 'concept_columns_dict.pkl'
 concept_features_dict_file = databaseFolder + 'concept_features_dict.pkl'
 observed_columns_dir = databaseFolder + 'observed_columns'
+pytorch_tensor_file_extension = ".pt"
 
 #common array indices
 array_index_properties_strength = 0
@@ -160,6 +164,7 @@ array_index_properties_activation = 2
 array_index_properties_time = 3
 array_index_properties_pos = 4
 array_number_of_properties = 5
+array_properties_list = [array_index_properties_strength, array_index_properties_permanence, array_index_properties_activation, array_index_properties_time, array_index_properties_pos]
 array_index_segment_first = 0
 if(useSANI):
 	array_number_of_segments = 10	#max number of SANI segments per sequence (= max number of concept columns per sequence)
@@ -196,8 +201,7 @@ max_sentences_train = 100000000  # Adjust as needed
 	
 
 if not lowMem:
-	global_feature_neurons_file = databaseFolder + 'global_feature_neurons.pt'
-
+	global_feature_neurons_file = 'global_feature_neurons'
 
 variableConceptNeuronFeatureName = "variableConceptNeuronFeature"
 feature_index_concept_neuron = 0

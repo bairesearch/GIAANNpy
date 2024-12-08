@@ -43,11 +43,12 @@ class SequenceObservedColumnsInferencePrediction:
 		self.cs2 = len(databaseNetworkObject.concept_columns_dict)
 		self.fs2 = len(databaseNetworkObject.concept_features_dict)
 			
-		feature_connections_list = []
-		for observed_column in observed_columns_sequence_word_index_dict.values():
-			 feature_connections_list.append(observed_column.feature_connections)
-		self.feature_connections = pt.stack(feature_connections_list, dim=2)
-		
+		self.feature_connections = [None]*array_number_of_properties
+		for i in range(array_number_of_properties):
+			feature_connections_list = []
+			for observed_column in observed_columns_sequence_word_index_dict.values():
+				feature_connections_list.append(observed_column.feature_connections[i])
+			self.feature_connections[i] = pt.stack(feature_connections_list, dim=0)
 
 if not drawSequenceObservedColumns:
 	class SequenceObservedColumnsDraw:
@@ -56,18 +57,23 @@ if not drawSequenceObservedColumns:
 			self.observed_columns_dict = observed_columns_dict
 
 def seed_network(sequence_observed_columns, sentenceIndex, doc, first_seed_token_index, num_seed_tokens):
+
 	words, lemmas, pos_tags = getLemmas(doc)
+	if(incrementallySeedNetwork):
+		print("\t seed_network: seed_token_index = ", first_seed_token_index, ", word = ", words[first_seed_token_index])
+	else:
+		print("\t seed_network: first_seed_token_index = ", first_seed_token_index, ", words = ", words[first_seed_token_index:num_seed_tokens])	
 	GIAANNproto_databaseNetworkTrain.process_concept_words(sequence_observed_columns, sentenceIndex, doc, words, lemmas, pos_tags, train=False, first_seed_token_index=first_seed_token_index, num_seed_tokens=num_seed_tokens)
 
 	if(useActivationDecrement):
 		if(not inferenceSeedTargetActivationsGlobalFeatureArrays):
 			global_feature_neurons_activation = sequence_observed_columns.databaseNetworkObject.global_feature_neurons[array_index_properties_activation]
 			global_feature_neurons_activation = GIAANNproto_databaseNetworkTrain.decrementActivation(global_feature_neurons_activation, activationDecrementSeed)
-			sequence_observed_columns.databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequence_observed_columns.databaseNetworkObject.global_feature_neurons, global_feature_neurons_activation, array_index_properties_activation)
+			sequence_observed_columns.databaseNetworkObject.global_feature_neurons[array_index_properties_activation] = global_feature_neurons_activation
 	
-	if(drawNetworkDuringPredict):
+	if(drawNetworkDuringInferenceSeed):
 		#FUTURE: convert global_feature_neurons_activation back to global_feature_neurons for draw
-		GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns, save=drawNetworkDuringPredictSave, fileName=drawNetworkDuringPredictSaveFilenamePrepend+str(first_seed_token_index))
+		GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(first_seed_token_index))
 
 
 def process_concept_words_inference(sequence_observed_columns, sentenceIndex, doc, doc_seed, doc_predict, num_seed_tokens, num_prediction_tokens):
@@ -176,10 +182,9 @@ def process_column_inference_prediction(databaseNetworkObject, observed_columns_
 				global_feature_neurons_activation = GIAANNproto_sparseTensors.modify_sparse_tensor(global_feature_neurons_activation, indices_to_update, 0)
 				#global_feature_neurons_activation[segment_indices, concept_columns_indices, concept_columns_feature_indices] = 0
 
-		databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.global_feature_neurons, global_feature_neurons_activation, array_index_properties_activation)
+		databaseNetworkObject.global_feature_neurons[array_index_properties_activation] = global_feature_neurons_activation
 		if(transformerUseInputConnections):
-			databaseNetworkObject.global_feature_connections = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.global_feature_connections, global_feature_connections_activation, array_index_properties_activation)
-
+			databaseNetworkObject.global_feature_connections[array_index_properties_activation] = global_feature_connections_activation
 	else:
 		#activation targets have already been activated
 		sequence_observed_columns_prediction = SequenceObservedColumnsDraw(databaseNetworkObject, observed_columns_dict)
@@ -208,9 +213,9 @@ def process_column_inference_prediction(databaseNetworkObject, observed_columns_
 		if(targetWord == predictedWord):
 			featurePredictionTargetMatch = True
 			
-	if(drawNetworkDuringPredict):
+	if(drawNetworkDuringInferencePredict):
 		#FUTURE: convert global_feature_neurons_activation back to global_feature_neurons for draw
-		GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns_prediction, save=drawNetworkDuringPredictSave, fileName=drawNetworkDuringPredictSaveFilenamePrepend+str(wordPredictionIndex))
+		GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns_prediction, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(wordPredictionIndex))
 	
 	return featurePredictionTargetMatch, concept_columns_indices_next, concept_columns_feature_indices_next
 	

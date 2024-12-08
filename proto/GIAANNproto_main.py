@@ -166,11 +166,12 @@ def first_pass(doc):
 	if new_concepts_added:
 		if not lowMem:
 			# Expand global feature neuron arrays
-			if databaseNetworkObject.global_feature_neurons.shape[2] < databaseNetworkObject.c:
-				new_shape = (databaseNetworkObject.global_feature_neurons.shape[0], databaseNetworkObject.global_feature_neurons.shape[1], databaseNetworkObject.c, databaseNetworkObject.global_feature_neurons.shape[3])
-				if(performRedundantCoalesce):
-					databaseNetworkObject.global_feature_neurons = databaseNetworkObject.global_feature_neurons.coalesce()
-				databaseNetworkObject.global_feature_neurons = pt.sparse_coo_tensor(databaseNetworkObject.global_feature_neurons._indices(), databaseNetworkObject.global_feature_neurons._values(), size=new_shape, dtype=array_type)
+			for i in range(array_number_of_properties):
+				if databaseNetworkObject.global_feature_neurons[i].shape[1] < databaseNetworkObject.c:
+					new_shape = (databaseNetworkObject.global_feature_neurons[i].shape[0], databaseNetworkObject.c, databaseNetworkObject.global_feature_neurons[i].shape[2])
+					if(performRedundantCoalesce):
+						databaseNetworkObject.global_feature_neurons[i] = databaseNetworkObject.global_feature_neurons[i].coalesce()
+					databaseNetworkObject.global_feature_neurons[i] = pt.sparse_coo_tensor(databaseNetworkObject.global_feature_neurons[i]._indices(), databaseNetworkObject.global_feature_neurons[i]._values(), size=new_shape, dtype=array_type)
 				
 	return concepts_found, words, lemmas, pos_tags
 
@@ -212,11 +213,12 @@ def detect_new_features(databaseNetworkObject, words, lemmas, pos_tags):
 
 	# Now, expand arrays accordingly
 	if not lowMem:
-		if databaseNetworkObject.f > databaseNetworkObject.global_feature_neurons.shape[3]:
-			extra_cols = databaseNetworkObject.f - databaseNetworkObject.global_feature_neurons.shape[3]
-			new_shape = (databaseNetworkObject.global_feature_neurons.shape[0], databaseNetworkObject.global_feature_neurons.shape[1], databaseNetworkObject.global_feature_neurons.shape[2], databaseNetworkObject.f)
-			databaseNetworkObject.global_feature_neurons = databaseNetworkObject.global_feature_neurons.coalesce()
-			databaseNetworkObject.global_feature_neurons = pt.sparse_coo_tensor(databaseNetworkObject.global_feature_neurons.indices(), databaseNetworkObject.global_feature_neurons.values(), size=new_shape, dtype=array_type)
+		for i in range(array_number_of_properties):
+			if databaseNetworkObject.f > databaseNetworkObject.global_feature_neurons[i].shape[2]:
+				extra_cols = databaseNetworkObject.f - databaseNetworkObject.global_feature_neurons[i].shape[2]
+				new_shape = (databaseNetworkObject.global_feature_neurons[i].shape[0], databaseNetworkObject.global_feature_neurons[i].shape[1], databaseNetworkObject.f)
+				databaseNetworkObject.global_feature_neurons[i] = databaseNetworkObject.global_feature_neurons[i].coalesce()
+				databaseNetworkObject.global_feature_neurons[i] = pt.sparse_coo_tensor(databaseNetworkObject.global_feature_neurons[i].indices(), databaseNetworkObject.global_feature_neurons[i].values(), size=new_shape, dtype=array_type)
 
 def process_feature_detection(databaseNetworkObject, j, word_j, pos_tags):
 	"""

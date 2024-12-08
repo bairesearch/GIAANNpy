@@ -39,7 +39,7 @@ def loadDictFile(dictFileName):
 	return dictionary
 
 def loadFeatureNeuronsGlobalFile():
-	global_feature_neurons = pt.load(global_feature_neurons_file)
+	global_feature_neurons = load_tensor_list(databaseFolder, global_feature_neurons_file)
 	return global_feature_neurons
 	
 def save_data(databaseNetworkObject, observed_columns_dict):
@@ -51,7 +51,7 @@ def save_data(databaseNetworkObject, observed_columns_dict):
 	if not lowMem:
 		if(performRedundantCoalesce):
 			databaseNetworkObject.global_feature_neurons = databaseNetworkObject.global_feature_neurons.coalesce()
-		pt.save(databaseNetworkObject.global_feature_neurons, global_feature_neurons_file)
+		save_tensor_list(databaseNetworkObject.global_feature_neurons, databaseFolder, global_feature_neurons_file)
 
 	# Save concept columns dictionary to disk
 	with open(concept_columns_dict_file, 'wb') as f_out:
@@ -79,12 +79,12 @@ def observed_column_save_to_disk(self):
 	if(performRedundantCoalesce):
 		self.feature_connections = self.feature_connections.coalesce()
 		print("self.feature_connections = ", self.feature_connections)
-	pt.save(self.feature_connections, os.path.join(observed_columns_dir, f"{self.concept_index}_feature_connections.pt"))
+	save_tensor_list(self.feature_connections, observed_columns_dir, f"{self.concept_index}_feature_connections")
 	if lowMem:
 		if(performRedundantCoalesce):
 			self.feature_neurons = self.feature_neurons.coalesce()
 			print("self.feature_neurons = ", self.feature_neurons)
-		pt.save(self.feature_neurons, os.path.join(observed_columns_dir, f"{self.concept_index}_feature_neurons.pt"))
+		save_tensor_list(self.feature_neurons, observed_columns_dir, f"{self.concept_index}_feature_neurons")
 
 def observed_column_load_from_disk(cls, databaseNetworkObject, concept_index, lemma, i):
 	"""
@@ -98,8 +98,21 @@ def observed_column_load_from_disk(cls, databaseNetworkObject, concept_index, le
 	instance.feature_index_to_word = data['feature_index_to_word']
 	instance.next_feature_index = data['next_feature_index']
 	# Load the tensors
-	instance.feature_connections = pt.load(os.path.join(observed_columns_dir, f"{concept_index}_feature_connections.pt"))
+	instance.feature_connections = load_tensor_list(observed_columns_dir, f"{concept_index}_feature_connections")
 	if lowMem:
-		instance.feature_neurons = pt.load(os.path.join(observed_columns_dir, f"{concept_index}_feature_neurons.pt"))
+		instance.feature_neurons = load_tensor_list(observed_columns_dir, f"{concept_index}_feature_neurons")
 	return instance
 
+def save_tensor_list(tensor_list, folder_name, file_name):
+	for i in range(array_number_of_properties):
+		tensor = tensor_list[i]
+		array_properties_string = "_property" + str(i)
+		pt.save(tensor, os.path.join(folder_name, file_name+array_properties_string+pytorch_tensor_file_extension))
+
+def load_tensor_list(folder_name, file_name):
+	tensor_list = []
+	for i in range(array_number_of_properties):
+		array_properties_string = "_property" + str(i)
+		tensor = pt.load(os.path.join(folder_name, file_name+array_properties_string+pytorch_tensor_file_extension))
+		tensor_list.append(tensor)
+	return tensor_list

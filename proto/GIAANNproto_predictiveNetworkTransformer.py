@@ -35,7 +35,12 @@ def nextWordPredictionTransformerCreate(databaseNetworkObject):
 
 	# Instantiate the model
 	#NextWordPredictionTransformerModel
-	model = CustomTransformer(databaseNetworkObject.p, databaseNetworkObject.s, databaseNetworkObject.c, databaseNetworkObject.f, num_layers)
+	if(transformerUseInputAllProperties):
+		p = databaseNetworkObject.p
+	else:
+		p = 1
+	
+	model = CustomTransformer(p, databaseNetworkObject.s, databaseNetworkObject.c, databaseNetworkObject.f, num_layers)
 	model.train()  # set model to training mode
 
 	if(multipleTargets):
@@ -47,6 +52,15 @@ def nextWordPredictionTransformerCreate(databaseNetworkObject):
 	
 def nextWordPredictionTransformerTrainStep(global_feature_neurons, database_feature_connections, targets):
 	global model, criterion, optimizer, batch_size
+	
+	if(transformerUseInputAllProperties):
+		global_feature_neurons = pt.stack(global_feature_neurons, dim=0)
+		if(transformerUseInputConnections):
+			database_feature_connections = pt.stack(database_feature_connections, dim=0)
+	else:
+		global_feature_neurons = global_feature_neurons[array_index_properties_activation]
+		if(transformerUseInputConnections):
+			database_feature_connections = database_feature_connections[array_index_properties_activation]
 	
 	global_feature_neurons = global_feature_neurons.unsqueeze(0)	#add batch dim (not used)
 	targets = targets.unsqueeze(0)	#add batch dim
