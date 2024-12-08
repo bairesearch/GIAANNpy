@@ -173,7 +173,9 @@ class SequenceObservedColumns:
 					feature_neurons = observed_column.feature_neurons[i].coalesce()
 				else:
 					feature_neurons = GIAANNproto_sparseTensors.slice_sparse_tensor(self.databaseNetworkObject.global_feature_neurons[i], 1, observed_column.concept_index)
-
+				if(useGPUdense and not useGPUsparse):
+					feature_neurons = feature_neurons.to(deviceDense)
+						
 				# Get indices and values from sparse tensor
 				indices = feature_neurons.indices()
 				values = feature_neurons.values()
@@ -194,7 +196,7 @@ class SequenceObservedColumns:
 				combined_indices = pt.cat(feature_list_indices, dim=1)
 				combined_values = pt.cat(feature_list_values, dim=0)
 				# Create sparse tensor
-				self.feature_neurons[i] = pt.sparse_coo_tensor(combined_indices, combined_values, size=self.feature_neurons[i].size(), dtype=array_type).to_dense()
+				self.feature_neurons[i] = pt.sparse_coo_tensor(combined_indices, combined_values, size=self.feature_neurons[i].size(), dtype=array_type, device=deviceDense).to_dense()
 				self.feature_neurons_original[i] = self.feature_neurons[i].clone()
 
 			# Now handle connections
@@ -206,9 +208,11 @@ class SequenceObservedColumns:
 
 				# Get indices and values from sparse tensor
 				feature_connections = observed_column.feature_connections[i].coalesce()
+				if(not useGPUsparse):
+					feature_connections = feature_connections.to(deviceDense)
 				indices = feature_connections.indices()
 				values = feature_connections.values()
-
+					
 				for other_c_idx, other_observed_column in sequence_observed_columns_dict.items():
 					other_feature_indices_in_observed, other_f_idx_tensor = self.getObservedColumnFeatureIndices()
 					other_concept_index = other_observed_column.concept_index
@@ -256,7 +260,7 @@ class SequenceObservedColumns:
 				combined_indices = pt.cat(connection_indices_list, dim=1)
 				combined_values = pt.cat(connection_values_list, dim=0)
 				# Create sparse tensor
-				self.feature_connections[i] = pt.sparse_coo_tensor(combined_indices, combined_values, size=self.feature_connections[i].size(), dtype=array_type).to_dense()
+				self.feature_connections[i] = pt.sparse_coo_tensor(combined_indices, combined_values, size=self.feature_connections[i].size(), dtype=array_type, device=deviceDense).to_dense()
 				self.feature_connections_original[i] = self.feature_connections[i].clone()
 			
 	def update_observed_columns_wrapper(self):
@@ -306,11 +310,11 @@ class SequenceObservedColumns:
 					filtered_indices[1] = feature_indices_in_observed[filtered_indices[1]]	#convert feature indices from sequence observed columns format back to observed columns format
 				# Update observed_column's feature_neurons
 				if lowMem:
-					observed_column.feature_neurons[i] = observed_column.feature_neurons[i] + pt.sparse_coo_tensor(filtered_indices, filtered_values, size=observed_column.feature_neurons[i].size(), dtype=array_type)
+					observed_column.feature_neurons[i] = observed_column.feature_neurons[i] + pt.sparse_coo_tensor(filtered_indices, filtered_values, size=observed_column.feature_neurons[i].size(), dtype=array_type, device=deviceSparse)
 					observed_column.feature_neurons[i] = observed_column.feature_neurons[i].coalesce()
 					observed_column.feature_neurons[i].values().clamp_(min=0)
 				else:
-					self.feature_neuron_changes[i][c_idx] = pt.sparse_coo_tensor(filtered_indices, filtered_values, size=observed_column.feature_neurons[i].size(), dtype=array_type)
+					self.feature_neuron_changes[i][c_idx] = pt.sparse_coo_tensor(filtered_indices, filtered_values, size=observed_column.feature_neurons[i].size(), dtype=array_type, device=deviceSparse)
 
 				# feature connections;
 				indices = feature_connections.indices()
@@ -330,7 +334,7 @@ class SequenceObservedColumns:
 					filtered_indices[1] = feature_indices_in_observed[filtered_indices[1]]	#convert feature indices from sequence observed columns format back to observed columns format
 					filtered_indices[3] = feature_indices_in_observed[filtered_indices[3]]	#convert feature indices from sequence observed columns format back to observed columns format
 				# Update observed_column's feature_connections
-				observed_column.feature_connections[i] = observed_column.feature_connections[i] + pt.sparse_coo_tensor(filtered_indices, filtered_values, size=observed_column.feature_connections[i].size(), dtype=array_type)
+				observed_column.feature_connections[i] = observed_column.feature_connections[i] + pt.sparse_coo_tensor(filtered_indices, filtered_values, size=observed_column.feature_connections[i].size(), dtype=array_type, device=deviceSparse)
 				observed_column.feature_connections[i] = observed_column.feature_connections[i].coalesce()
 				observed_column.feature_connections[i].values().clamp_(min=0)
 

@@ -171,7 +171,7 @@ def first_pass(doc):
 					new_shape = (databaseNetworkObject.global_feature_neurons[i].shape[0], databaseNetworkObject.c, databaseNetworkObject.global_feature_neurons[i].shape[2])
 					if(performRedundantCoalesce):
 						databaseNetworkObject.global_feature_neurons[i] = databaseNetworkObject.global_feature_neurons[i].coalesce()
-					databaseNetworkObject.global_feature_neurons[i] = pt.sparse_coo_tensor(databaseNetworkObject.global_feature_neurons[i]._indices(), databaseNetworkObject.global_feature_neurons[i]._values(), size=new_shape, dtype=array_type)
+					databaseNetworkObject.global_feature_neurons[i] = pt.sparse_coo_tensor(databaseNetworkObject.global_feature_neurons[i]._indices(), databaseNetworkObject.global_feature_neurons[i]._values(), size=new_shape, dtype=array_type, device=deviceSparse)
 				
 	return concepts_found, words, lemmas, pos_tags
 
@@ -218,7 +218,7 @@ def detect_new_features(databaseNetworkObject, words, lemmas, pos_tags):
 				extra_cols = databaseNetworkObject.f - databaseNetworkObject.global_feature_neurons[i].shape[2]
 				new_shape = (databaseNetworkObject.global_feature_neurons[i].shape[0], databaseNetworkObject.global_feature_neurons[i].shape[1], databaseNetworkObject.f)
 				databaseNetworkObject.global_feature_neurons[i] = databaseNetworkObject.global_feature_neurons[i].coalesce()
-				databaseNetworkObject.global_feature_neurons[i] = pt.sparse_coo_tensor(databaseNetworkObject.global_feature_neurons[i].indices(), databaseNetworkObject.global_feature_neurons[i].values(), size=new_shape, dtype=array_type)
+				databaseNetworkObject.global_feature_neurons[i] = pt.sparse_coo_tensor(databaseNetworkObject.global_feature_neurons[i].indices(), databaseNetworkObject.global_feature_neurons[i].values(), size=new_shape, dtype=array_type, device=deviceSparse)
 
 def process_feature_detection(databaseNetworkObject, j, word_j, pos_tags):
 	"""

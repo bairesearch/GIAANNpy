@@ -113,6 +113,7 @@ def load_tensor_list(folder_name, file_name):
 	tensor_list = []
 	for i in range(array_number_of_properties):
 		array_properties_string = "_property" + str(i)
-		tensor = pt.load(os.path.join(folder_name, file_name+array_properties_string+pytorch_tensor_file_extension))
+		tensor = pt.load(os.path.join(folder_name, file_name+array_properties_string+pytorch_tensor_file_extension))	#does not work: , map_location=deviceSparse
+		tensor = tensor.to(deviceSparse)
 		tensor_list.append(tensor)
 	return tensor_list

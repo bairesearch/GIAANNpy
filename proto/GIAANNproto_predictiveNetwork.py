@@ -314,6 +314,8 @@ def process_features_active_predict_single(databaseNetworkObject, global_feature
 	#print("feature_neurons_active.shape = ", feature_neurons_active.shape)
 	feature_connections = sequence_observed_columns_prediction.feature_connections[array_index_properties_strength]
 	feature_connections = GIAANNproto_sparseTensors.slice_sparse_tensor(feature_connections, 1, 0)	#sequence concept index dimension (not used)
+	if(inferencePredictiveNetwork and not useGPUsparse):
+		concept_columns_feature_indices = concept_columns_feature_indices.to(deviceSparse)
 	feature_connections = GIAANNproto_sparseTensors.slice_sparse_tensor(feature_connections, 1, concept_columns_feature_indices.squeeze())
 	#print("feature_connections.shape = ", feature_connections.shape)
 	feature_neurons_target_activation = feature_neurons_active * feature_connections
@@ -324,6 +326,7 @@ def process_features_active_predict_single(databaseNetworkObject, global_feature
 	if(transformerUseInputConnections):
 		feature_neurons_target_activation = GIAANNproto_sparseTensors.expand_sparse_tensor(feature_neurons_target_activation, 1, concept_columns_indices.squeeze(), new_dim_size=databaseNetworkObject.c)
 		feature_neurons_target_activation = GIAANNproto_sparseTensors.expand_sparse_tensor(feature_neurons_target_activation, 2, concept_columns_feature_indices.squeeze(), new_dim_size=databaseNetworkObject.f)
+		print("global_feature_connections_activation.device = ", global_feature_connections_activation.device)
 		global_feature_connections_activation = global_feature_connections_activation + feature_neurons_target_activation
 
 	return global_feature_neurons_activation, global_feature_connections_activation
@@ -338,6 +341,8 @@ def process_features_active_predict_multi(databaseNetworkObject, global_feature_
 	#target neuron activation dependence on connection strength;
 	feature_connections = sequence_observed_columns_prediction.feature_connections[array_index_properties_strength]
 	feature_connections = GIAANNproto_sparseTensors.slice_sparse_tensor(feature_connections, 1, 0)	#sequence concept index dimension (not used)
+	if(inferencePredictiveNetwork and not useGPUsparse):
+		concept_columns_feature_indices = concept_columns_feature_indices.to(deviceSparse)
 	feature_connections = GIAANNproto_sparseTensors.slice_sparse_tensor_multi(feature_connections, 1, concept_columns_feature_indices)
 	feature_neurons_target_activation = feature_neurons_active * feature_connections
 

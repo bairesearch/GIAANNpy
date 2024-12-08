@@ -69,6 +69,9 @@ def nextWordPredictionMLPtrainStep(global_feature_neurons_activation, targets):
 	targets = targets.unsqueeze(0)	#add batch dim
 
 	global_feature_neurons_activation = global_feature_neurons_activation.to_dense()
+	if(useGPUdense and not useGPUsparse):
+		global_feature_neurons_activation = global_feature_neurons_activation.to(deviceDense)
+	
 	outputs = model(global_feature_neurons_activation)  # Outputs shape: (batch_size, c, f)
 
 	loss = criterion(outputs, targets)
