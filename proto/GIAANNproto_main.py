@@ -64,14 +64,15 @@ def process_prompt():
 	global sentence_count
 	with open(inference_prompt_file, 'r', encoding='utf-8') as file:
 		text = file.read()
-	process_article(text)
+	articleIndex = 0
+	process_article(text, articleIndex)
 	
 def process_dataset(dataset):
 	global sentence_count
-	for article in dataset:
-		process_article(article['text'])
+	for articleIndex, article in enumerate(dataset):
+		process_article(article['text'], articleIndex)
 
-def process_article(text):
+def process_article(text, articleIndex):
 	global sentence_count
 	#sentences = sent_tokenize(text)
 	sentences = nlp(text)
@@ -80,11 +81,11 @@ def process_article(text):
 		lastSentenceInPrompt = False
 		if(useInference and sentenceIndex == numberOfSentences-1):
 			lastSentenceInPrompt = True
-		process_sentence(sentenceIndex, sentence, lastSentenceInPrompt)
+		process_sentence(articleIndex, sentenceIndex, sentence, lastSentenceInPrompt)
 		if sentence_count == max_sentences_train:
 			exit(0)
 			
-def process_sentence(sentenceIndex, doc, lastSentenceInPrompt):
+def process_sentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
 	global sentence_count
 	
 	if(debugReloadGlobalFeatureNeuronsEverySentence):
@@ -92,7 +93,7 @@ def process_sentence(sentenceIndex, doc, lastSentenceInPrompt):
 		if(not lowMem):
 			databaseNetworkObject.global_feature_neurons = GIAANNproto_databaseNetwork.initialiseFeatureNeuronsGlobal(databaseNetworkObject.c, databaseNetworkObject.f)
 
-	print(f"Processing sentence: {sentenceIndex} {doc.text}")
+	print(f"Processing article: {articleIndex}, sentence: {sentenceIndex} {doc.text}")
 
 	# Refresh the observed columns dictionary for each new sequence
 	observed_columns_dict = {}  # key: lemma, value: ObservedColumn

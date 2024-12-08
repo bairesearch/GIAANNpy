@@ -51,14 +51,14 @@ if(useInference):
 	drawNetworkDuringPredictSaveFilenamePrepend = "GIAANNproto1cSequenceObservedColumnsPredictionTokenIndex"
 else:
 	lowMem = True		 #optional
-	sequenceObservedColumnsUseSequenceFeaturesOnly = False	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
+	sequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
 	sequenceObservedColumnsMatchSequenceWords = True	#optional	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sentence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
 	drawSequenceObservedColumns = False	#optional	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !sequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns	#optional (will affect which network changes can be visualised)
 	drawAllColumns = False	#optional	#draw all columns in network (only used for automated visualisation; drawNetworkDuringTrainSave)	#requires !drawSequenceObservedColumns
 	if(drawAllColumns):
 		assert not sequenceObservedColumnsUseSequenceFeaturesOnly
 	drawRelationTypes = True	#draw feature neuron and connection relation types in different colours
-	drawNetworkDuringTrain = True	#default: True
+	drawNetworkDuringTrain = False	#default: True
 	drawNetworkDuringTrainSave = False
 	drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSentenceIndex"
 
@@ -191,7 +191,7 @@ j1 = 5   # Activation trace duration
 
 # For the purpose of the example, process a limited number of sentences
 sentence_count = 0
-max_sentences_train = 1000  # Adjust as needed
+max_sentences_train = 100000000  # Adjust as needed
 
 	
 
