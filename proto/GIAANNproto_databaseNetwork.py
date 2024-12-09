@@ -39,7 +39,7 @@ class DatabaseNetworkClass():
 # Initialize global feature neuron arrays if lowMem is disabled
 if not lowMem:
 	def initialiseFeatureNeuronsGlobal(c, f):
-		global_feature_neurons = GIAANNproto_sparseTensors.createEmptySparseTensor(array_number_of_properties, (array_number_of_segments, c, f))
+		global_feature_neurons = GIAANNproto_sparseTensors.createEmptySparseTensor((array_number_of_properties, array_number_of_segments, c, f))
 		return global_feature_neurons
 		
 	def loadFeatureNeuronsGlobal(c, f):
@@ -108,9 +108,6 @@ class ObservedColumn:
 		if lowMem:
 			# If lowMem is enabled, the observed columns contain a list of arrays (pytorch) of f feature neurons, where f is the maximum number of feature neurons per column.
 			self.feature_neurons = self.initialiseFeatureNeurons(databaseNetworkObject.f)
-		else:
-			#temporary SequenceObservedColumns/ObservedColumns array conversion variables;
-			self.feature_neurons = [None]*array_number_of_properties
 
 		# Map from feature words to indices in feature neurons
 		self.feature_word_to_index = {}  # Maps feature words to indices
@@ -123,7 +120,7 @@ class ObservedColumn:
 			
 		# Store all connections for each source column in a list of integer feature connection arrays, each of size f * c * f, where c is the length of the dictionary of columns, and f is the maximum number of feature neurons.
 		self.feature_connections = self.initialiseFeatureConnections(databaseNetworkObject.c, databaseNetworkObject.f) 
-		
+
 		self.next_feature_index = 0
 		for feature_index in range(1, databaseNetworkObject.f, 1):
 			feature_word = databaseNetworkObject.concept_features_list[feature_index]
@@ -133,34 +130,32 @@ class ObservedColumn:
 					
 	@staticmethod
 	def initialiseFeatureNeurons(f):
-		feature_neurons = GIAANNproto_sparseTensors.createEmptySparseTensor(array_number_of_properties, (array_number_of_segments, f))
+		feature_neurons = GIAANNproto_sparseTensors.createEmptySparseTensor((array_number_of_properties, array_number_of_segments, f))
 		return feature_neurons
 
 	@staticmethod
 	def initialiseFeatureConnections(c, f):
-		feature_connections = GIAANNproto_sparseTensors.createEmptySparseTensor(array_number_of_properties, (array_number_of_segments, f, c, f))
+		feature_connections = GIAANNproto_sparseTensors.createEmptySparseTensor((array_number_of_properties, array_number_of_segments, f, c, f))
 		return feature_connections
 	
 	def resize_concept_arrays(self, new_c):
-		for i in range(array_number_of_properties):
-			load_c = self.feature_connections[i].shape[2]
-			if new_c > load_c:
-				expanded_size = (self.feature_connections[i].shape[0], self.feature_connections[i].shape[1], new_c, self.feature_connections[i].shape[3])
-				self.feature_connections[i] = pt.sparse_coo_tensor(self.feature_connections[i].indices(), self.feature_connections[i].values(), size=expanded_size, dtype=array_type, device=deviceSparse)
-
+		load_c = self.feature_connections.shape[3]
+		if new_c > load_c:
+			expanded_size = (self.feature_connections.shape[0], self.feature_connections.shape[1], self.feature_connections.shape[2], new_c, self.feature_connections.shape[4])
+			self.feature_connections = pt.sparse_coo_tensor(self.feature_connections.indices(), self.feature_connections.values(), size=expanded_size, dtype=array_type, device=deviceSparse)
+		
 	def expand_feature_arrays(self, new_f):
-		load_f = self.feature_connections[0].shape[1]  # or self.feature_connections[0].shape[2]
+		load_f = self.feature_connections.shape[2]  # or self.feature_connections.shape[4]
 		if new_f > load_f:
-			for i in range(array_number_of_properties):
-				# Expand feature_connections along dimensions 2 and 4
-				self.feature_connections[i] = self.feature_connections[i].coalesce()
-				expanded_size_connections = (self.feature_connections[i].shape[0], new_f, self.feature_connections[i].shape[2], new_f)
-				self.feature_connections[i] = pt.sparse_coo_tensor(self.feature_connections[i].indices(), self.feature_connections[i].values(), size=expanded_size_connections, dtype=array_type, device=deviceSparse)
-
-				if lowMem:
-					expanded_size_neurons = (self.feature_neurons[i].shape[0], new_f)
-					self.feature_neurons[i] = self.feature_neurons[i].coalesce()
-					self.feature_neurons[i] = pt.sparse_coo_tensor(self.feature_neurons[i].indices(), self.feature_neurons[i].values(), size=expanded_size_neurons, dtype=array_type, device=deviceSparse)
+			# Expand feature_connections along dimensions 2 and 4
+			self.feature_connections = self.feature_connections.coalesce()
+			expanded_size_connections = (self.feature_connections.shape[0], self.feature_connections.shape[1], new_f, self.feature_connections.shape[3], new_f)
+			self.feature_connections = pt.sparse_coo_tensor(self.feature_connections.indices(), self.feature_connections.values(), size=expanded_size_connections, dtype=array_type, device=deviceSparse)
+	
+			if lowMem:
+				expanded_size_neurons = (self.feature_neurons.shape[0], self.feature_neurons.shape[1], new_f)
+				self.feature_neurons = self.feature_neurons.coalesce()
+				self.feature_neurons = pt.sparse_coo_tensor(self.feature_neurons.indices(), self.feature_neurons.values(), size=expanded_size_neurons, dtype=array_type, device=deviceSparse)
 
 			for feature_index in range(load_f, new_f):
 				feature_word = self.databaseNetworkObject.concept_features_list[feature_index]
@@ -207,14 +202,11 @@ def generate_global_feature_connections(databaseNetworkObject):
 	for i, (lemma, concept_index) in enumerate(databaseNetworkObject.concept_columns_dict.items()):
 		concept_column = load_or_create_observed_column(databaseNetworkObject, concept_index, lemma, i)
 		concept_columns_list.append(concept_column)
-	databaseNetworkObject.global_feature_connections = [None]*array_number_of_properties	#operation for hybrid dense/sparse tensors
-	for i in range(array_number_of_properties):
-		global_feature_connections_list = []
-		for concept_column in concept_columns_list:
-			global_feature_connections_list.append(concept_column.feature_connections[i])
-			print("2 concept_column.feature_connections[i].device = ", concept_column.feature_connections[i].device)
-		databaseNetworkObject.global_feature_connections[i] = pt.stack(global_feature_connections_list, dim=1)
-		print("generate_global_feature_connections: databaseNetworkObject.global_feature_connections[i].shape = ", databaseNetworkObject.global_feature_connections[i].shape)
+	global_feature_connections_list = []
+	for concept_column in concept_columns_list:
+		global_feature_connections_list.append(concept_column.feature_connections)
+	databaseNetworkObject.global_feature_connections = pt.stack(global_feature_connections_list, dim=2)
+	print("generate_global_feature_connections: databaseNetworkObject.global_feature_connections.shape = ", databaseNetworkObject.global_feature_connections.shape)
 
 def load_all_columns(databaseNetworkObject):
 	observed_columns_dict = {}

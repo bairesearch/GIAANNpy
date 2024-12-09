@@ -21,12 +21,9 @@ import torch as pt
 
 from GIAANNproto_globalDefs import *
 
-def createEmptySparseTensor(array_number_of_properties, shape):
-	sparse_tensor_list = []
-	for i in range(array_number_of_properties):
-		sparse_tensor = pt.sparse_coo_tensor(indices=pt.empty((len(shape), 0), dtype=pt.long), values=pt.empty(0), size=shape, device=deviceSparse)
-		sparse_tensor_list.append(sparse_tensor)
-	return sparse_tensor_list
+def createEmptySparseTensor(shape):
+	sparse_zero_tensor = pt.sparse_coo_tensor(indices=pt.empty((len(shape), 0), dtype=pt.long), values=pt.empty(0), size=shape, device=deviceSparse)
+	return sparse_zero_tensor
 
 def subtract_value_from_sparse_tensor_values(sparse_tensor, value):
 	sparse_tensor = add_value_to_sparse_tensor_values(sparse_tensor, -value)
@@ -38,7 +35,7 @@ def add_value_to_sparse_tensor_values(sparse_tensor, value):
 	sparse_tensor = pt.sparse_coo_tensor(sparse_tensor.indices(), sparse_tensor.values() + value, sparse_tensor.size(), device=deviceSparse)
 	sparse_tensor = sparse_tensor.coalesce()
 	return sparse_tensor
-
+	
 def modify_sparse_tensor(sparse_tensor, indices_to_update, new_value):
 	indices_to_update = indices_to_update.to(sparse_tensor.device)
 	

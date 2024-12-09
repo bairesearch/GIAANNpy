@@ -145,12 +145,9 @@ def visualize_graph(sequence_observed_columns, save=False, fileName=None):
 			if lowMem:
 				feature_neurons = observed_column.feature_neurons
 			else:
-				#feature_neurons = GIAANNproto_sparseTensors.slice_sparse_tensor(databaseNetworkObject.global_feature_neurons, 2, concept_index)	#operation for sparse tensors
-				#feature_neurons = databaseNetworkObject.global_feature_neurons[:, :, concept_index]	#operation for dense tensors
-				feature_neurons = [None]*array_number_of_properties	#operation for hybrid dense/sparse tensors
-				for i in range(array_number_of_properties):
-					feature_neurons[i] = GIAANNproto_sparseTensors.slice_sparse_tensor(databaseNetworkObject.global_feature_neurons[i], 1, concept_index)
-				
+				feature_neurons = GIAANNproto_sparseTensors.slice_sparse_tensor(databaseNetworkObject.global_feature_neurons, 2, concept_index)
+				#feature_neurons = databaseNetworkObject.global_feature_neurons[:, :, concept_index]	#operation not supported for sparse tensors
+					
 		# Draw feature neurons
 		for feature_word, feature_index_in_observed_column in feature_word_to_index.items():
 			conceptNeuronFeature = False
@@ -171,15 +168,15 @@ def visualize_graph(sequence_observed_columns, save=False, fileName=None):
 		
 			featurePresent = False
 			featureActive = False
-			if(feature_neurons[array_index_properties_strength][array_index_segment_internal_column, feature_index_in_observed_column] > 0 and feature_neurons[array_index_properties_permanence][array_index_segment_internal_column, feature_index_in_observed_column] > 0):
+			if(feature_neurons[array_index_properties_strength, array_index_segment_internal_column, feature_index_in_observed_column] > 0 and feature_neurons[array_index_properties_permanence, array_index_segment_internal_column, feature_index_in_observed_column] > 0):
 				featurePresent = True
-			if(feature_neurons[array_index_properties_activation][array_index_segment_internal_column, feature_index_in_observed_column] > 0):
+			if(feature_neurons[array_index_properties_activation, array_index_segment_internal_column, feature_index_in_observed_column] > 0):
 				featureActive = True
 				
 			if(featurePresent):
 				if(drawRelationTypes):
 					if not conceptNeuronFeature:
-						neuron_color = generateFeatureNeuronColour(databaseNetworkObject, feature_neurons[array_index_properties_pos][array_index_segment_internal_column, feature_index_in_observed_column], feature_word)
+						neuron_color = generateFeatureNeuronColour(databaseNetworkObject, feature_neurons[array_index_properties_pos, array_index_segment_internal_column, feature_index_in_observed_column], feature_word)
 				elif(featureActive):
 					if(conceptNeuronFeature):
 						neuron_color = 'lightskyblue'
@@ -187,7 +184,7 @@ def visualize_graph(sequence_observed_columns, save=False, fileName=None):
 						neuron_color = 'cyan'
 						
 				if(debugDrawNeuronStrengths):
-					neuron_name = createNeuronLabelWithStrength(neuron_name, feature_neurons[array_index_properties_activation][array_index_segment_internal_column, feature_index_in_observed_column])
+					neuron_name = createNeuronLabelWithStrength(neuron_name, feature_neurons[array_index_properties_activation, array_index_segment_internal_column, feature_index_in_observed_column])
 
 				feature_node = f"{lemma}_{feature_word}_{f_idx}"
 				if(randomiseColumnFeatureXposition and not conceptNeuronFeature):
@@ -219,15 +216,12 @@ def visualize_graph(sequence_observed_columns, save=False, fileName=None):
 			other_feature_word_to_index = sequence_observed_columns.feature_word_to_index
 			c_idx = sequence_observed_columns.concept_name_to_index[lemma]
 			feature_connections = sequence_observed_columns.feature_connections[:, :, c_idx]
-			feature_connections = pt.sum(feature_connections, dim=1)	#sum along sequential segment index (draw connections to all segments)
 		else:
 			feature_word_to_index = observed_column.feature_word_to_index
 			other_feature_word_to_index = observed_column.feature_word_to_index
 			c_idx = databaseNetworkObject.concept_columns_dict[lemma]
-			#feature_connections = observed_column.feature_connections
-			feature_connections = [None]*array_number_of_properties	#sum along sequential segment index (draw connections to all segments)
-			for i in range(array_number_of_properties):
-				feature_connections[i] = pt.sum(observed_column.feature_connections[i], dim=0)
+			feature_connections = observed_column.feature_connections
+		feature_connections = pt.sum(feature_connections, dim=1)	#sum along sequential segment index (draw connections to all segments)
 	
 		# Internal connections (yellow)
 		for feature_word, feature_index_in_observed_column in feature_word_to_index.items():
@@ -241,11 +235,11 @@ def visualize_graph(sequence_observed_columns, save=False, fileName=None):
 							other_f_idx = feature_word_to_index[other_feature_word]
 							
 							featurePresent = False
-							if(feature_connections[array_index_properties_strength][f_idx, c_idx, other_f_idx] > 0 and feature_connections[array_index_properties_permanence][f_idx, c_idx, other_f_idx] > 0):
+							if(feature_connections[array_index_properties_strength, f_idx, c_idx, other_f_idx] > 0 and feature_connections[array_index_properties_permanence, f_idx, c_idx, other_f_idx] > 0):
 								featurePresent = True
 								
 							if(drawRelationTypes):
-								connection_color = generateFeatureNeuronColour(databaseNetworkObject, feature_connections[array_index_properties_pos][f_idx, c_idx, other_f_idx], feature_word, internal_connection=True)
+								connection_color = generateFeatureNeuronColour(databaseNetworkObject, feature_connections[array_index_properties_pos, f_idx, c_idx, other_f_idx], feature_word, internal_connection=True)
 							else:
 								connection_color = 'yellow'
 								
@@ -279,12 +273,14 @@ def visualize_graph(sequence_observed_columns, save=False, fileName=None):
 					
 							featurePresent = False
 							if(externalConnection):
-								if(feature_connections[array_index_properties_strength][f_idx, other_c_idx, other_f_idx] > 0 and feature_connections[array_index_properties_permanence][f_idx, other_c_idx, other_f_idx] > 0):
+								#print("feature_connections[array_index_properties_strength, f_idx, other_c_idx, other_f_idx] = ", feature_connections[array_index_properties_strength, f_idx, other_c_idx, other_f_idx])
+								#print("feature_connections[array_index_properties_permanence, f_idx, other_c_idx, other_f_idx] = ", feature_connections[array_index_properties_permanence, f_idx, other_c_idx, other_f_idx])
+								if(feature_connections[array_index_properties_strength, f_idx, other_c_idx, other_f_idx] > 0 and feature_connections[array_index_properties_permanence, f_idx, other_c_idx, other_f_idx] > 0):
 									featurePresent = True
 									#print("\tfeaturePresent")
 
 							if(drawRelationTypes):
-								connection_color = generateFeatureNeuronColour(databaseNetworkObject, feature_connections[array_index_properties_pos][f_idx, other_c_idx, other_f_idx], feature_word, internal_connection=False)
+								connection_color = generateFeatureNeuronColour(databaseNetworkObject, feature_connections[array_index_properties_pos, f_idx, other_c_idx, other_f_idx], feature_word, internal_connection=False)
 							else:
 								connection_color = 'orange'
 								
