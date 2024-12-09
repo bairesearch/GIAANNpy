@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1c8a;
+o1 preview prompt 1c8b;
 
 v1b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -78,11 +78,11 @@ MANUAL; - Start option inferenceSeedTargetActivationsGlobalFeatureArrays - activ
 MANUAL; - Make sequenceObservedColumnsUseSequenceFeaturesOnly independent of sequenceObservedColumnsMatchSequenceWords.
 MANUAL; - Add databaseFolder. Set torch default device to GPU. 
 MANUAL; - Initialise all feature neuron and feature connection tensors to zero (only set z1 permanence when first assigning a neuron/connection).
-/MANUAL; - Convert the global feature_neurons arrays and the ObservedColumns class feature_neurons and feature_connections arrays from dense to sparse tensors.
+/MANUAL; - [reverted] Convert the global feature_neurons arrays and the ObservedColumns class feature_neurons and feature_connections arrays from dense to sparse tensors.
 MANUAL; - patch populate_arrays self.feature_connections generation from sparse tensors.
 MANUAL; - Convert feature neuron/connections tensor redundant type dimension into SANI (sequentially activated neuronal input) segment dimension.
 
-v1c8a:
+v1c8b:
 MANUAL; - Create a hybrid GNN AI that comprises a database network (the abstract biological neural neural network defined previously) and a predictive network. The database network is easily modified upon encountering new information, enabling continuous learning (low energy/compute). The database network is trained using a target sequence (ground truth) and non-backpropagation algorithm. The predictive network is trained to generate next token predictions based on the database network along with the target sequence (ground truth). The AI is then capable of generating next token predictions based on a seed sequence (prompt) and its current revision of the database network. It learns to reason across/from the database network to generate its predictions. The database network is made amenable to existing LLM architectures (transformer/MLP) by structuring/storing its contents in permutation invariant assemblies.
 /MANUAL; - restore option not useSANI (set array_number_of_segments = 1). add option inferencePredictiveNetwork. Create class NextWordPredictionMLPmodel. Extract predictMostActiveFeature/selectMostActiveFeature from process_column_inference_prediction.
 MANUAL; - extract GIAANNproto_databaseNetworkDraw.py GIAANNproto_databaseNetworkFiles.py GIAANNproto_databaseNetwork.py GIAANNproto_databaseNetworkTrain.py GIAANNproto_globalDefs.py GIAANNproto_predictiveNetworkMLP.py GIAANNproto_predictiveNetwork.py GIAANNproto_predictiveNetworkTransformer.py GIAANNproto_main.py GIAANNproto_sparseTensors.py 
@@ -120,4 +120,4 @@ MANUAL; - add option drawAllColumns for network visualisation generation across 
 MANUAL; - Print article and sentence indices in command line.
 MANUAL; - Convert global and ObservedColumns feature neuron/connections tensors into lists of sparse tensors; convert properties dimension to python list.
 MANUAL; - Extract options useGPUsparse/useGPUdense from useGPU for sparse/dense tensors respectively.
-
+MANUAL; - Add maxSentenceLength.

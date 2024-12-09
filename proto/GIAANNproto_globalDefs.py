@@ -18,7 +18,13 @@ GIA ANN proto global Defs
 """
 
 import torch as pt
-	
+
+#RAM availability vars;
+useGPUdense = True
+useGPUsparse = False
+maxSentenceLength = 100	#10000	#100
+databaseFolder = "" #default: ""
+
 # Set boolean variables as per specification
 useSANI = False
 useInference = False  # useInference mode
@@ -76,7 +82,6 @@ useSaveData = True	#save data is required to allow consecutive sentence training
 usePOS = True		 # usePOS mode	#mandatory
 useParallelProcessing = True	#mandatory (else restore original code pre-GIAANNproto1b3a)
 randomiseColumnFeatureXposition = True	#shuffle x position of column internal features such that their connections can be better visualised
-databaseFolder = "" #default: ""
 
 increaseColumnInternalConnectionsStrength = True #Increase column internal connections strength
 if(increaseColumnInternalConnectionsStrength):
@@ -210,8 +215,6 @@ def printe(str):
 	print(str)
 	exite
 
-useGPUdense = True
-useGPUsparse = False
 if(useGPUdense):
 	if pt.cuda.is_available():
 		deviceDense = pt.device("cuda")

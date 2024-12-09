@@ -81,7 +81,8 @@ def process_article(text, articleIndex):
 		lastSentenceInPrompt = False
 		if(useInference and sentenceIndex == numberOfSentences-1):
 			lastSentenceInPrompt = True
-		process_sentence(articleIndex, sentenceIndex, sentence, lastSentenceInPrompt)
+		if(len(sentence) <= maxSentenceLength):
+			process_sentence(articleIndex, sentenceIndex, sentence, lastSentenceInPrompt)
 		if sentence_count == max_sentences_train:
 			exit(0)
 			
