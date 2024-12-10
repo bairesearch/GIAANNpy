@@ -150,15 +150,14 @@ class SequenceObservedColumns:
 	def populate_arrays(self, words, lemmas, sequence_observed_columns_dict):
 		#print("\n\n\n\n\npopulate_arrays:")
 		
-		# Collect indices and data for feature neurons
+		# Optimized code for collecting indices and data for feature neurons
 		c_idx_list = []
 		f_idx_list = []
 		feature_list_indices = []
 		feature_list_values = []
-					
+
 		for c_idx, observed_column in sequence_observed_columns_dict.items():
 			feature_indices_in_observed, f_idx_tensor = self.getObservedColumnFeatureIndices()
-
 			num_features = len(f_idx_tensor)
 
 			c_idx_list.append(pt.full((num_features,), c_idx, dtype=pt.long))
@@ -167,110 +166,165 @@ class SequenceObservedColumns:
 			if lowMem:
 				feature_neurons = observed_column.feature_neurons.coalesce()
 			else:
-				feature_neurons = GIAANNproto_sparseTensors.slice_sparse_tensor(self.databaseNetworkObject.global_feature_neurons, 2, observed_column.concept_index)	
-			if(useGPUdense and not useGPUsparse):
+				# Slice the global_feature_neurons as before
+				feature_neurons = GIAANNproto_sparseTensors.slice_sparse_tensor(
+					self.databaseNetworkObject.global_feature_neurons, 2, observed_column.concept_index
+				)
+
+			if (useGPUdense and not useGPUsparse):
 				feature_neurons = feature_neurons.to(deviceDense)
-					
-			# Get indices and values from sparse tensor
-			indices = feature_neurons.indices()
+
+			indices = feature_neurons.indices()  # [3, n_entries] for a 3D sparse tensor: (property, type, feature_idx)
 			values = feature_neurons.values()
-			
-			filter_feature_indices = pt.nonzero(indices[2].unsqueeze(1) == feature_indices_in_observed, as_tuple=True)
-			filtered_indices = indices[:, filter_feature_indices[0]]
-			filtered_f_idx_tensor = f_idx_tensor[filter_feature_indices[1]]
-			filtered_values = values[filter_feature_indices[0]]
-			# Adjust indices
-			filtered_indices[0] = filtered_indices[0]  # properties
-			filtered_indices[1] = filtered_indices[1]  # types
-			filtered_indices[2] = filtered_f_idx_tensor
-			filtered_indices = pt.cat([filtered_indices[0:2], pt.full_like(filtered_indices[2:3], c_idx), filtered_indices[2:3]], dim=0)	#insert dim3 for c_idx
-			
-			if(not useGPUsparse):
+
+			# Ensure that feature_indices_in_observed is sorted if not already
+			feature_indices_in_observed_sorted, f_idx_sort_idx = pt.sort(feature_indices_in_observed)
+			f_idx_tensor_sorted = f_idx_tensor[f_idx_sort_idx]
+
+			# Instead of expanding and comparing, directly check membership
+			mask = pt.isin(indices[2], feature_indices_in_observed_sorted)
+
+			# Filter indices and values by mask
+			filtered_indices = indices[:, mask]
+			filtered_values = values[mask]
+
+			if filtered_indices.size(1) > 0:
+				# We need to find the corresponding f_idx for each filtered feature_idx.
+				# Use searchsorted on the sorted feature_indices_in_observed
+				positions = pt.searchsorted(feature_indices_in_observed_sorted, filtered_indices[2])
+				filtered_f_idx_tensor = f_idx_tensor_sorted[positions]
+			else:
+				# If no matches, just create empty tensors that match the expected shape.
+				filtered_f_idx_tensor = pt.empty((0,), dtype=f_idx_tensor.dtype, device=f_idx_tensor.device)
+
+			# Adjust indices as in original code:
+			# Original: filtered_indices = cat([filtered_indices[0:2], full_like(..., c_idx), filtered_indices[2:3]])
+			# filtered_indices has shape [3, *], we insert a dimension for c_idx after the first two rows:
+			# The final dimension order is: property, type, c_idx, feature_idx
+			# Before insertion: filtered_indices = [property, type, feature_idx]
+			# After insertion:  filtered_indices = [property, type, c_idx, feature_idx]
+			if filtered_indices.size(1) > 0:
+				filtered_indices[2] = filtered_f_idx_tensor
+			# Insert c_idx row
+			c_idx_col = pt.full((1, filtered_indices.size(1)), c_idx, dtype=pt.long, device=filtered_indices.device)
+			filtered_indices = pt.cat([filtered_indices[0:2], c_idx_col, filtered_indices[2:3]], dim=0)
+
+			if not useGPUsparse:
 				filtered_indices = filtered_indices.to(deviceSparse)
 				filtered_values = filtered_values.to(deviceSparse)
-					
+
 			feature_list_indices.append(filtered_indices)
 			feature_list_values.append(filtered_values)
-	   
-		# Combine indices and values
+
+		# Combine results
 		if feature_list_indices:
 			combined_indices = pt.cat(feature_list_indices, dim=1)
 			combined_values = pt.cat(feature_list_values, dim=0)
-			# Create sparse tensor
-			self.feature_neurons = pt.sparse_coo_tensor(combined_indices, combined_values, size=self.feature_neurons.size(), dtype=array_type, device=deviceDense).to_dense()
+			# Convert to dense as per original code, though consider keeping sparse for memory savings
+			self.feature_neurons = pt.sparse_coo_tensor(
+				combined_indices, combined_values,
+				size=self.feature_neurons.size(),
+				dtype=array_type,
+				device=deviceDense
+			).to_dense()
 			self.feature_neurons_original = self.feature_neurons.clone()
 
 		# Now handle connections
 		connection_indices_list = []
 		connection_values_list = []
-		
+
 		for c_idx, observed_column in sequence_observed_columns_dict.items():
 			feature_indices_in_observed, f_idx_tensor = self.getObservedColumnFeatureIndices()
 
-			# Get indices and values from sparse tensor
+			# Get indices and values from the sparse tensor
 			feature_connections = observed_column.feature_connections.coalesce()
-			if(not useGPUsparse):
+			if not useGPUsparse:
 				feature_connections = feature_connections.to(deviceDense)
-				
-			indices = feature_connections.indices()
-			values = feature_connections.values()
 
+			indices = feature_connections.indices()  # shape [5, n_entries]
+			values = feature_connections.values()	# shape [n_entries]
+
+			# Sort feature_indices_in_observed and f_idx_tensor together if not already sorted
+			feature_indices_in_observed_sorted, f_idx_sort_idx = pt.sort(feature_indices_in_observed)
+			f_idx_tensor_sorted = f_idx_tensor[f_idx_sort_idx]
+
+			# For each other column
 			for other_c_idx, other_observed_column in sequence_observed_columns_dict.items():
 				other_feature_indices_in_observed, other_f_idx_tensor = self.getObservedColumnFeatureIndices()
 				other_concept_index = other_observed_column.concept_index
-				#print("\tother_concept_index = ", other_concept_index)
 
-				# Create meshgrid of feature indices
-				feature_idx_obs_mesh, other_feature_idx_obs_mesh = pt.meshgrid(feature_indices_in_observed, other_feature_indices_in_observed, indexing='ij')
-				f_idx_mesh, other_f_idx_mesh = pt.meshgrid(f_idx_tensor, other_f_idx_tensor, indexing='ij')
+				# Sort other_feature_indices_in_observed and other_f_idx_tensor if not sorted
+				other_feature_indices_in_observed_sorted, other_f_idx_sort_idx = pt.sort(other_feature_indices_in_observed)
+				other_f_idx_tensor_sorted = other_f_idx_tensor[other_f_idx_sort_idx]
 
-				# Flatten the meshgrid indices
-				feature_idx_obs_flat = feature_idx_obs_mesh.reshape(-1)
-				other_feature_idx_obs_flat = other_feature_idx_obs_mesh.reshape(-1)
-				f_idx_flat = f_idx_mesh.reshape(-1)
-				other_f_idx_flat = other_f_idx_mesh.reshape(-1)
-				
-				# Filter indices for the desired features and concepts
-				other_concept_index_expanded = pt.full(feature_idx_obs_flat.size(), fill_value=other_concept_index, dtype=pt.long)
-				#print("feature_idx_obs_flat.shape = ", feature_idx_obs_flat.shape)
-				filter_feature_indices2 = indices[2].unsqueeze(1) == feature_idx_obs_flat		
-				filter_feature_indices3 = indices[3].unsqueeze(1) == other_concept_index_expanded
-				filter_feature_indices4 = indices[4].unsqueeze(1) == other_feature_idx_obs_flat
-				combined_condition = filter_feature_indices2 & filter_feature_indices3 & filter_feature_indices4
-				filter_feature_indices = pt.nonzero(combined_condition, as_tuple=True)
-				filtered_indices = indices[:, filter_feature_indices[0]]
-				filtered_values = values[filter_feature_indices[0]]
-				filtered_f_idx_tensor = f_idx_flat[filter_feature_indices[1]]
-				filtered_other_f_idx_tensor = other_f_idx_flat[filter_feature_indices[1]]
-						
-				# Create tensors for concept indices
-				c_idx_flat = pt.full_like(f_idx_flat, c_idx, dtype=pt.long)
-				other_c_idx_flat = pt.full_like(other_f_idx_flat, other_c_idx, dtype=pt.long)
-				filtered_other_c_idx_flat = other_c_idx_flat[filter_feature_indices[1]]
-				
-				# Adjust indices
-				filtered_indices[0] = filtered_indices[0]  # properties
-				filtered_indices[1] = filtered_indices[1]  # types
-				filtered_indices[2] = filtered_f_idx_tensor
-				filtered_indices[3] = filtered_other_c_idx_flat
-				filtered_indices[4] = filtered_other_f_idx_tensor
-				filtered_indices = pt.cat([filtered_indices[0:2], pt.full_like(filtered_indices[2:3], c_idx), filtered_indices[2:]], dim=0)	#insert dim3 for c_idx
-				
-				if(not useGPUsparse):
+				# Create boolean masks directly:
+				mask_concept = (indices[3] == other_concept_index)
+				mask_f2 = pt.isin(indices[2], feature_indices_in_observed_sorted)
+				mask_f4 = pt.isin(indices[4], other_feature_indices_in_observed_sorted)
+
+				combined_mask = mask_concept & mask_f2 & mask_f4
+
+				# Filter indices and values
+				filtered_indices = indices[:, combined_mask]
+				filtered_values = values[combined_mask]
+
+				# If we got no matches, filtered_indices and filtered_values will be empty.
+				# We do NOT continue here; we proceed to create and append empty results as per the original requirement.
+
+				if filtered_indices.numel() > 0:
+					# Map indices[2] back to f_idx_tensor
+					f_idx_positions = pt.searchsorted(feature_indices_in_observed_sorted, filtered_indices[2])
+					mapped_f_idx = f_idx_tensor_sorted[f_idx_positions]
+
+					# Map indices[4] back to other_f_idx_tensor
+					other_f_idx_positions = pt.searchsorted(other_feature_indices_in_observed_sorted, filtered_indices[4])
+					mapped_other_f_idx = other_f_idx_tensor_sorted[other_f_idx_positions]
+
+					# Adjust indices:
+					# After filtering, we have:
+					#   filtered_indices = [property, type, feature_idx, concept_idx, other_feature_idx]
+					# We want to replace concept_idx with other_c_idx and feature_idx with mapped_f_idx, other_feature_idx with mapped_other_f_idx.
+					filtered_indices[2] = mapped_f_idx
+					filtered_indices[3] = other_c_idx
+					filtered_indices[4] = mapped_other_f_idx
+				else:
+					# Even if empty, we need to maintain correct shape to append
+					# filtered_indices has shape [5,0], we need to insert c_idx at dimension 3 (as done in original code)
+					# That means adding a row. For empty, we can just do that as well.
+					pass
+
+				# Insert c_idx at dimension 3 as per the original code.
+				# Original code inserts at dim=0 after first two rows:
+				# filtered_indices = cat([filtered_indices[0:2], c_idx_row, filtered_indices[2:]], dim=0)
+				# If filtered_indices is empty, this will still produce a properly shaped empty tensor.
+				c_idx_col = pt.full((1, filtered_indices.size(1)), c_idx, dtype=pt.long, device=filtered_indices.device)
+				filtered_indices = pt.cat([filtered_indices[0:2], c_idx_col, filtered_indices[2:]], dim=0)
+
+				# Move back to sparse device if needed
+				if not useGPUsparse:
 					filtered_indices = filtered_indices.to(deviceSparse)
 					filtered_values = filtered_values.to(deviceSparse)
-									
+
 				connection_indices_list.append(filtered_indices)
 				connection_values_list.append(filtered_values)
 
-		# Combine indices and values
+		# Combine results
 		if connection_indices_list:
+			# pt.cat of empty tensors is safe if they are consistently sized (e.g., [5,0])
 			combined_indices = pt.cat(connection_indices_list, dim=1)
 			combined_values = pt.cat(connection_values_list, dim=0)
-			# Create sparse tensor
-			self.feature_connections = pt.sparse_coo_tensor(combined_indices, combined_values, size=self.feature_connections.size(), dtype=array_type, device=deviceDense).to_dense()
+
+			# Create dense tensor
+			# Consider if you can keep it sparse to save memory:
+			self.feature_connections = pt.sparse_coo_tensor(
+				combined_indices, combined_values,
+				size=self.feature_connections.size(),
+				dtype=array_type, 
+				device=deviceDense
+			).to_dense()
 			self.feature_connections_original = self.feature_connections.clone()
-			
+
+	
 	def update_observed_columns_wrapper(self):
 		if(sequenceObservedColumnsMatchSequenceWords):
 			#for multiple instances of concept in sequence, need to take the sum of the changes between the existing and modified arrays for each instance of a same concept in the sequence

@@ -250,4 +250,6 @@ if useDedicatedFeatureLists:
 	non_nouns = all_words - nouns
 	max_num_non_nouns = len(non_nouns)
 
+def get_tensor_size_in_mb(tensor):
+	return tensor.element_size() * tensor.nelement() / (1024 ** 2)
 

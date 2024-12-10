@@ -96,6 +96,9 @@ def process_sentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
 
 	print(f"Processing article: {articleIndex}, sentence: {sentenceIndex} {doc.text}")
 
+	databaseNetworkObject.articleIndexDebug = articleIndex
+	databaseNetworkObject.sentenceIndexDebug = sentenceIndex
+	
 	# Refresh the observed columns dictionary for each new sequence
 	observed_columns_dict = {}  # key: lemma, value: ObservedColumn
 	observed_columns_sequence_word_index_dict = {}  # key: sequence word index, value: ObservedColumn
