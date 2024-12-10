@@ -158,20 +158,20 @@ class SequenceObservedColumns:
 					
 		for c_idx, observed_column in sequence_observed_columns_dict.items():
 			feature_indices_in_observed, f_idx_tensor = self.getObservedColumnFeatureIndices()
-
+			if(not useGPUsparse):
+				feature_indices_in_observed = feature_indices_in_observed.to(deviceSparse)
+				f_idx_tensor = f_idx_tensor.to(deviceSparse)
+				
 			num_features = len(f_idx_tensor)
 
-			c_idx_list.append(pt.full((num_features,), c_idx, dtype=pt.long))
+			c_idx_list.append(pt.full((num_features,), c_idx, dtype=pt.long, device=deviceSparse))
 			f_idx_list.append(f_idx_tensor)
 
 			if lowMem:
 				feature_neurons = observed_column.feature_neurons.coalesce()
 			else:
 				feature_neurons = GIAANNproto_sparseTensors.slice_sparse_tensor(self.databaseNetworkObject.global_feature_neurons, 2, observed_column.concept_index)	
-
-			if(useGPUdense and not useGPUsparse):
-				feature_neurons = feature_neurons.to(deviceDense)
-					
+	
 			# Get indices and values from sparse tensor
 			indices = feature_neurons.indices()
 			values = feature_neurons.values()
@@ -184,7 +184,7 @@ class SequenceObservedColumns:
 			filtered_indices[0] = filtered_indices[0]  # properties
 			filtered_indices[1] = filtered_indices[1]  # types
 			filtered_indices[2] = filtered_f_idx_tensor
-			filtered_indices = pt.cat([filtered_indices[0:2], pt.full_like(filtered_indices[2:3], c_idx), filtered_indices[2:3]], dim=0)	#insert dim3 for c_idx
+			filtered_indices = pt.cat([filtered_indices[0:2], pt.full_like(filtered_indices[2:3], c_idx, device=deviceSparse), filtered_indices[2:3]], dim=0)	#insert dim3 for c_idx
 			feature_list_indices.append(filtered_indices)
 			feature_list_values.append(filtered_values)
 	   
@@ -193,7 +193,7 @@ class SequenceObservedColumns:
 			combined_indices = pt.cat(feature_list_indices, dim=1)
 			combined_values = pt.cat(feature_list_values, dim=0)
 			# Create sparse tensor
-			self.feature_neurons = pt.sparse_coo_tensor(combined_indices, combined_values, size=self.feature_neurons.size(), dtype=array_type, device=deviceDense).to_dense()
+			self.feature_neurons = pt.sparse_coo_tensor(combined_indices, combined_values, size=self.feature_neurons.size(), dtype=array_type, device=deviceSparse).to_dense().to(deviceDense)
 			self.feature_neurons_original = self.feature_neurons.clone()
 
 		# Now handle connections
@@ -202,16 +202,21 @@ class SequenceObservedColumns:
 		
 		for c_idx, observed_column in sequence_observed_columns_dict.items():
 			feature_indices_in_observed, f_idx_tensor = self.getObservedColumnFeatureIndices()
-
+			if(not useGPUsparse):
+				feature_indices_in_observed = feature_indices_in_observed.to(deviceSparse)
+				f_idx_tensor = f_idx_tensor.to(deviceSparse)
+				
 			# Get indices and values from sparse tensor
 			feature_connections = observed_column.feature_connections.coalesce()
-			if(not useGPUsparse):
-				feature_connections = feature_connections.to(deviceDense)
 			indices = feature_connections.indices()
 			values = feature_connections.values()
 
 			for other_c_idx, other_observed_column in sequence_observed_columns_dict.items():
 				other_feature_indices_in_observed, other_f_idx_tensor = self.getObservedColumnFeatureIndices()
+				if(not useGPUsparse):
+					other_feature_indices_in_observed = other_feature_indices_in_observed.to(deviceSparse)
+					other_f_idx_tensor = other_f_idx_tensor.to(deviceSparse)
+					
 				other_concept_index = other_observed_column.concept_index
 				#print("\tother_concept_index = ", other_concept_index)
 
@@ -226,7 +231,7 @@ class SequenceObservedColumns:
 				other_f_idx_flat = other_f_idx_mesh.reshape(-1)
 				
 				# Filter indices for the desired features and concepts
-				other_concept_index_expanded = pt.full(feature_idx_obs_flat.size(), fill_value=other_concept_index, dtype=pt.long)
+				other_concept_index_expanded = pt.full(feature_idx_obs_flat.size(), fill_value=other_concept_index, dtype=pt.long, device=deviceSparse)
 				#print("feature_idx_obs_flat.shape = ", feature_idx_obs_flat.shape)
 				filter_feature_indices2 = indices[2].unsqueeze(1) == feature_idx_obs_flat		
 				filter_feature_indices3 = indices[3].unsqueeze(1) == other_concept_index_expanded
@@ -239,8 +244,8 @@ class SequenceObservedColumns:
 				filtered_other_f_idx_tensor = other_f_idx_flat[filter_feature_indices[1]]
 						
 				# Create tensors for concept indices
-				c_idx_flat = pt.full_like(f_idx_flat, c_idx, dtype=pt.long)
-				other_c_idx_flat = pt.full_like(other_f_idx_flat, other_c_idx, dtype=pt.long)
+				c_idx_flat = pt.full_like(f_idx_flat, c_idx, dtype=pt.long, device=deviceSparse)
+				other_c_idx_flat = pt.full_like(other_f_idx_flat, other_c_idx, dtype=pt.long, device=deviceSparse)
 				filtered_other_c_idx_flat = other_c_idx_flat[filter_feature_indices[1]]
 				
 				# Adjust indices
@@ -249,7 +254,7 @@ class SequenceObservedColumns:
 				filtered_indices[2] = filtered_f_idx_tensor
 				filtered_indices[3] = filtered_other_c_idx_flat
 				filtered_indices[4] = filtered_other_f_idx_tensor
-				filtered_indices = pt.cat([filtered_indices[0:2], pt.full_like(filtered_indices[2:3], c_idx), filtered_indices[2:]], dim=0)	#insert dim3 for c_idx
+				filtered_indices = pt.cat([filtered_indices[0:2], pt.full_like(filtered_indices[2:3], c_idx, device=deviceSparse), filtered_indices[2:]], dim=0)	#insert dim3 for c_idx
 				connection_indices_list.append(filtered_indices)
 				connection_values_list.append(filtered_values)
 
@@ -258,7 +263,7 @@ class SequenceObservedColumns:
 			combined_indices = pt.cat(connection_indices_list, dim=1)
 			combined_values = pt.cat(connection_values_list, dim=0)
 			# Create sparse tensor
-			self.feature_connections = pt.sparse_coo_tensor(combined_indices, combined_values, size=self.feature_connections.size(), dtype=array_type, device=deviceDense).to_dense()
+			self.feature_connections = pt.sparse_coo_tensor(combined_indices, combined_values, size=self.feature_connections.size(), dtype=array_type, device=deviceSparse).to_dense().to(deviceDense)
 			self.feature_connections_original = self.feature_connections.clone()
 			
 	def update_observed_columns_wrapper(self):
