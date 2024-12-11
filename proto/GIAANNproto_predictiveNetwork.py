@@ -214,7 +214,7 @@ def process_column_inference_prediction(databaseNetworkObject, observed_columns_
 			
 	if(drawNetworkDuringInferencePredict):
 		#FUTURE: convert global_feature_neurons_activation back to global_feature_neurons for draw
-		GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns_prediction, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(wordPredictionIndex))
+		GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns_prediction, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(sequenceWordIndex))
 	
 	return featurePredictionTargetMatch, concept_columns_indices_next, concept_columns_feature_indices_next
 	

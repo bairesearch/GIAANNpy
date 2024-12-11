@@ -101,7 +101,7 @@ if(drawRelationTypes):
 G = nx.DiGraph()
 
 
-def createNeuronLabelWithStrength(name, strength):
+def createNeuronLabelWithActivation(name, strength):
 	label = name + "\n" + floatToString(strength)
 	return label
 	
@@ -183,8 +183,8 @@ def visualize_graph(sequence_observed_columns, save=False, fileName=None):
 					else:
 						neuron_color = 'cyan'
 						
-				if(debugDrawNeuronStrengths):
-					neuron_name = createNeuronLabelWithStrength(neuron_name, feature_neurons[array_index_properties_activation, array_index_segment_internal_column, feature_index_in_observed_column])
+				if(debugDrawNeuronActivations):
+					neuron_name = createNeuronLabelWithActivation(neuron_name, feature_neurons[array_index_properties_activation, array_index_segment_internal_column, feature_index_in_observed_column])
 
 				feature_node = f"{lemma}_{feature_word}_{f_idx}"
 				if(randomiseColumnFeatureXposition and not conceptNeuronFeature):

@@ -43,7 +43,7 @@ if not lowMem:
 		return global_feature_neurons
 		
 	def loadFeatureNeuronsGlobal(c, f):
-		if GIAANNproto_databaseNetworkFiles.pathExists(global_feature_neurons_file):
+		if GIAANNproto_databaseNetworkFiles.pathExists(global_feature_neurons_file+pytorch_tensor_file_extension):
 			global_feature_neurons = GIAANNproto_databaseNetworkFiles.loadFeatureNeuronsGlobalFile()
 		else:
 			global_feature_neurons = initialiseFeatureNeuronsGlobal(c, f)

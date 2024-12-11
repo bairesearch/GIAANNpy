@@ -20,10 +20,11 @@ GIA ANN proto global Defs
 import torch as pt
 
 #RAM availability vars;
-useGPUdense = True
-useGPUsparse = False
-maxSentenceLength = 100	#10000	#100
+useGPUdense = True	#default: True
+useGPUsparse = False	#default: False	#orig: True
+maxSentenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM availability during train (with sequenceObservedColumnsUseSequenceFeaturesOnly only limited amount of data is ever loaded to GPU during train)
 databaseFolder = "" #default: ""
+max_sentences_train = 100000000 #default: 100000000	#orig: 1000  # Adjust as needed (eg lower max_sentences_train before independent useInference execution)
 
 # Set boolean variables as per specification
 useSANI = False
@@ -54,12 +55,12 @@ if(useInference):
 	drawAllColumns = False	#mandatory
 	drawRelationTypes = False	#False: draw activation status
 	drawNetworkDuringTrain = False
+	drawNetworkDuringTrainSave = False
 	drawNetworkDuringInferenceSeed = False
-	drawNetworkDuringInferencePredict = True
+	drawNetworkDuringInferencePredict = False
 	drawNetworkDuringInferenceSave = False
-	drawNetworkDuringInferenceSaveFilenamePrepend = "GIAANNproto1cSequenceObservedColumnsPredictionTokenIndex"
 else:
-	lowMem = True		 #optional
+	lowMem = False		 #default: False	#orig: True	#required to be False for inference compatibility	#optional
 	sequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
 	sequenceObservedColumnsMatchSequenceWords = True	#optional	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sentence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
 	drawSequenceObservedColumns = False	#optional	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !sequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns	#optional (will affect which network changes can be visualised)
@@ -69,9 +70,11 @@ else:
 	drawRelationTypes = True	#draw feature neuron and connection relation types in different colours
 	drawNetworkDuringTrain = True	#default: True
 	drawNetworkDuringTrainSave = False
-	drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSentenceIndex"
 
-decreasePermanenceOfInactiveFeatureNeuronsAndConnections = True	#default: True
+drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSentenceIndex"
+drawNetworkDuringInferenceSaveFilenamePrepend = "GIAANNproto1cSequenceObservedColumnsInferenceTokenIndex"
+
+decreasePermanenceOfInactiveFeatureNeuronsAndConnections = False	#default: True
 performRedundantCoalesce = False	#additional redundant coalesce operations
 
 if(sequenceObservedColumnsMatchSequenceWords):
@@ -91,11 +94,11 @@ if(increaseColumnInternalConnectionsStrength):
 debugSmallDataset = False
 debugConceptFeaturesOccurFirstInSubsequence = False #Constrain column feature detection to be after concept feature detection
 debugConnectColumnsToNextColumnsInSequenceOnly = False
-debugDrawNeuronStrengths = False
+debugDrawNeuronActivations = False
 if(useInference):
 	if(not inferencePredictiveNetwork):
-		debugConceptFeaturesOccurFirstInSubsequence = True	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
-	debugDrawNeuronStrengths = True
+		debugConceptFeaturesOccurFirstInSubsequence = False #orig: True	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
+	debugDrawNeuronActivations = True
 debugReloadGlobalFeatureNeuronsEverySentence = False
 
 useDedicatedFeatureLists = False
@@ -201,7 +204,6 @@ j1 = 5   # Activation trace duration
 
 # For the purpose of the example, process a limited number of sentences
 sentence_count = 0
-max_sentences_train = 100000000  # Adjust as needed
 
 	
 
