@@ -75,7 +75,12 @@ drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSentenc
 drawNetworkDuringInferenceSaveFilenamePrepend = "GIAANNproto1cSequenceObservedColumnsInferenceTokenIndex"
 
 #algorithm preferences;
-normaliseColumnFeatureSelectionByNumberConnections = False  	#default: False		#cannot select one column over another if column activations are perfectly normalised with respect to each other	#see HFconnectionMatrixAlgorithmNormalise
+normaliseColumnSelectionByFeatureConnections = False  	#default: False		#cannot select one column over another if column activations are perfectly normalised with respect to each other	#see HFconnectionMatrixAlgorithmNormalise
+if(normaliseColumnSelectionByFeatureConnections):
+	normaliseColumnSelectionByFeatureConnectionsStrength = False	#else normalise column selection by number connections
+normaliseFeatureSelectionByFeatureConnections = False	#default: False
+if(normaliseFeatureSelectionByFeatureConnections):
+	normaliseFeatureSelectionByFeatureConnectionsStrength = True	#mandatory
 normaliseConnectionStrengthWrtContextLength = True	#default: True
 decreasePermanenceOfInactiveFeatureNeuronsAndConnections = False	#default: True
 

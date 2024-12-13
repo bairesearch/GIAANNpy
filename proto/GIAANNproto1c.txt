@@ -128,4 +128,5 @@ MANUAL; - Update populate_arrays:!useGPUsparse - execute dense tensor creation o
 MANUAL; - disable useInference:debugConceptFeaturesOccurFirstInSubsequence
 MANUAL; - set !useInference:lowMem=False - independent useInference execution currently requires training with global feature neuron arrays
 MANUAL; - patch GIAANNproto_databaseNetwork:loadFeatureNeuronsGlobal - if GIAANNproto_databaseNetworkFiles.pathExists(global_feature_neurons_file+pytorch_tensor_file_extension): 
-MANUAL; - add option normaliseColumnFeatureSelectionByNumberConnections. Extract option normaliseConnectionStrengthWrtContextLength.
+MANUAL; - add option normaliseColumnSelectionByFeatureConnections. Extract option normaliseConnectionStrengthWrtContextLength.
+MANUAL; - add option normaliseFeatureSelectionByFeatureConnections.

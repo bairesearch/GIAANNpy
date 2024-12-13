@@ -267,18 +267,17 @@ def predictMostActiveFeature(global_feature_neurons_activation, databaseNetworkO
 def selectMostActiveFeature(global_feature_neurons_activation, global_feature_neurons_strength):
 
 	global_feature_neurons_activation_all_segments = pt.sum(global_feature_neurons_activation, dim=0)	#sum across all segments 	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
+	global_feature_neurons_strength_all_segments = pt.sum(global_feature_neurons_strength, dim=0)	#sum across all segments 	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
 
 	#topk column selection;
 	concept_columns_activation = pt.sum(global_feature_neurons_activation_all_segments, dim=1)	#sum across all feature activations in columns
 	concept_columns_activation = concept_columns_activation.to_dense()	#convert to dense tensor (required for topk)
-	
-	if(normaliseColumnFeatureSelectionByNumberConnections):
-		global_feature_neurons_strength_all_segments = pt.sum(global_feature_neurons_strength, dim=0)	#sum across all segments 	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
+	if(normaliseColumnSelectionByFeatureConnections):
 		concept_columns_activation_total_connections = pt.sum(global_feature_neurons_strength_all_segments, dim=1)	#sum across all feature activations in columns
 		concept_columns_activation_total_connections = concept_columns_activation_total_connections.to_dense()
-		concept_columns_activation_total_connections = (concept_columns_activation_total_connections > 0).float()
+		if(not normaliseColumnSelectionByFeatureConnectionsStrength):
+			concept_columns_activation_total_connections = (concept_columns_activation_total_connections > 0).float()
 		concept_columns_activation = concept_columns_activation / concept_columns_activation_total_connections
-		
 	if(kcDynamic):
 		concept_columns_activation = concept_columns_activation[concept_columns_activation > kcActivationThreshold]	#select kcMax columns above threshold
 	concept_columns_activation_topk_concepts = pt.topk(concept_columns_activation, kcMax)
@@ -293,6 +292,15 @@ def selectMostActiveFeature(global_feature_neurons_activation, global_feature_ne
 	else:
 		topk_concept_columns_activation = GIAANNproto_sparseTensors.slice_sparse_tensor_multi(global_feature_neurons_activation_all_segments, 0, concept_columns_activation_topk_concepts.indices)	#select topk concept indices
 	topk_concept_columns_activation = topk_concept_columns_activation.to_dense()
+	if(normaliseFeatureSelectionByFeatureConnections):
+		if(kc==1):
+			topk_concept_columns_strength = global_feature_neurons_strength_all_segments[concept_columns_activation_topk_concepts.indices[0]].unsqueeze(0)	#select topk concept indices
+		else:
+			topk_concept_columns_strength = GIAANNproto_sparseTensors.slice_sparse_tensor_multi(global_feature_neurons_strength_all_segments, 0, concept_columns_activation_topk_concepts.indices)	#select topk concept indices
+		topk_concept_columns_strength = topk_concept_columns_strength.to_dense()
+		if(not normaliseFeatureSelectionByFeatureConnectionsStrength):
+			topk_concept_columns_strength = (topk_concept_columns_strength > 0).float()
+		topk_concept_columns_activation = topk_concept_columns_activation / topk_concept_columns_strength
 	topk_concept_columns_activation_topk_features = pt.topk(topk_concept_columns_activation, kf, dim=1)
 
 	#print("concept_columns_activation_topk_concepts.values = ", concept_columns_activation_topk_concepts.values)	
