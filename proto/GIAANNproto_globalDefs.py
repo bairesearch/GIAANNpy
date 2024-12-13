@@ -24,7 +24,7 @@ useGPUdense = True	#default: True
 useGPUsparse = False	#default: False	#orig: True
 maxSentenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM availability during train (with sequenceObservedColumnsUseSequenceFeaturesOnly only limited amount of data is ever loaded to GPU during train)
 databaseFolder = "" #default: ""
-max_sentences_train = 100000000 #default: 100000000	#orig: 1000  # Adjust as needed (eg lower max_sentences_train before independent useInference execution)
+max_sentences_train = 1000 #default: 100000000	#orig: 1000  # Adjust as needed (eg lower max_sentences_train before independent useInference execution)
 
 # Set boolean variables as per specification
 useSANI = False
@@ -74,7 +74,11 @@ else:
 drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSentenceIndex"
 drawNetworkDuringInferenceSaveFilenamePrepend = "GIAANNproto1cSequenceObservedColumnsInferenceTokenIndex"
 
+#algorithm preferences;
+normaliseColumnFeatureSelectionByNumberConnections = False  	#default: False		#cannot select one column over another if column activations are perfectly normalised with respect to each other	#see HFconnectionMatrixAlgorithmNormalise
+normaliseConnectionStrengthWrtContextLength = True	#default: True
 decreasePermanenceOfInactiveFeatureNeuronsAndConnections = False	#default: True
+
 performRedundantCoalesce = False	#additional redundant coalesce operations
 
 if(sequenceObservedColumnsMatchSequenceWords):

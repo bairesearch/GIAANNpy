@@ -128,6 +128,7 @@ def process_column_inference_prediction(databaseNetworkObject, observed_columns_
 	#print(f"process_column_inference_prediction: {wordPredictionIndex}; concept_columns_indices = ", concept_columns_indices)
 
 	global_feature_neurons_activation = databaseNetworkObject.global_feature_neurons[array_index_properties_activation]
+	global_feature_neurons_strength = databaseNetworkObject.global_feature_neurons[array_index_properties_strength]
 	if(transformerUseInputConnections):
 		global_feature_connections_activation = databaseNetworkObject.global_feature_connections[array_index_properties_activation]
 	else:
@@ -191,7 +192,7 @@ def process_column_inference_prediction(databaseNetworkObject, observed_columns_
 	if(inferencePredictiveNetwork):
 		concept_columns_indices_next, concept_columns_feature_indices_next, kc = predictMostActiveFeature(global_feature_neurons_activation, databaseNetworkObject, words_doc, lemmas_doc, wordPredictionIndex, sequenceWordIndex, concept_mask, columns_index_sequence_word_index_dict)	
 	else:
-		concept_columns_indices_next, concept_columns_feature_indices_next, kc = selectMostActiveFeature(global_feature_neurons_activation)
+		concept_columns_indices_next, concept_columns_feature_indices_next, kc = selectMostActiveFeature(global_feature_neurons_activation, global_feature_neurons_strength)
 	
 	#print("concept_columns_indices_next = ", concept_columns_indices_next)
 	#print("concept_columns_feature_indices_next = ", concept_columns_feature_indices_next)
@@ -263,13 +264,21 @@ def predictMostActiveFeature(global_feature_neurons_activation, databaseNetworkO
 	return concept_columns_indices_next, concept_columns_feature_indices_next, kc
 
 
-def selectMostActiveFeature(global_feature_neurons_activation):
+def selectMostActiveFeature(global_feature_neurons_activation, global_feature_neurons_strength):
 
 	global_feature_neurons_activation_all_segments = pt.sum(global_feature_neurons_activation, dim=0)	#sum across all segments 	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
 
 	#topk column selection;
 	concept_columns_activation = pt.sum(global_feature_neurons_activation_all_segments, dim=1)	#sum across all feature activations in columns
 	concept_columns_activation = concept_columns_activation.to_dense()	#convert to dense tensor (required for topk)
+	
+	if(normaliseColumnFeatureSelectionByNumberConnections):
+		global_feature_neurons_strength_all_segments = pt.sum(global_feature_neurons_strength, dim=0)	#sum across all segments 	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
+		concept_columns_activation_total_connections = pt.sum(global_feature_neurons_strength_all_segments, dim=1)	#sum across all feature activations in columns
+		concept_columns_activation_total_connections = concept_columns_activation_total_connections.to_dense()
+		concept_columns_activation_total_connections = (concept_columns_activation_total_connections > 0).float()
+		concept_columns_activation = concept_columns_activation / concept_columns_activation_total_connections
+		
 	if(kcDynamic):
 		concept_columns_activation = concept_columns_activation[concept_columns_activation > kcActivationThreshold]	#select kcMax columns above threshold
 	concept_columns_activation_topk_concepts = pt.topk(concept_columns_activation, kcMax)

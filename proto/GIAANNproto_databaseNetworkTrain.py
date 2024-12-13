@@ -167,9 +167,7 @@ class SequenceObservedColumns:
 				feature_neurons = observed_column.feature_neurons.coalesce()
 			else:
 				# Slice the global_feature_neurons as before
-				feature_neurons = GIAANNproto_sparseTensors.slice_sparse_tensor(
-					self.databaseNetworkObject.global_feature_neurons, 2, observed_column.concept_index
-				)
+				feature_neurons = GIAANNproto_sparseTensors.slice_sparse_tensor(self.databaseNetworkObject.global_feature_neurons, 2, observed_column.concept_index)
 
 			if (useGPUdense and not useGPUsparse):
 				feature_neurons = feature_neurons.to(deviceDense)
@@ -221,12 +219,7 @@ class SequenceObservedColumns:
 			combined_indices = pt.cat(feature_list_indices, dim=1)
 			combined_values = pt.cat(feature_list_values, dim=0)
 			# Convert to dense as per original code, though consider keeping sparse for memory savings
-			self.feature_neurons = pt.sparse_coo_tensor(
-				combined_indices, combined_values,
-				size=self.feature_neurons.size(),
-				dtype=array_type,
-				device=deviceDense
-			).to_dense()
+			self.feature_neurons = pt.sparse_coo_tensor(combined_indices, combined_values, size=self.feature_neurons.size(), dtype=array_type, device=deviceDense).to_dense()
 			self.feature_neurons_original = self.feature_neurons.clone()
 
 		# Now handle connections
@@ -684,13 +677,16 @@ def process_features_active_train(sequence_observed_columns, feature_neurons_act
 
 	feature_connections_inactive = 1 - feature_connections_active
 
-	#prefer closer than further target neurons when strengthening connections (and activating target neurons) in sentence;
-	feature_neurons_word_order_1d = feature_neurons_word_order.flatten()
-	feature_connections_distances = pt.abs(feature_neurons_word_order_1d.unsqueeze(1) - feature_neurons_word_order_1d).reshape(cs, fs, cs, fs)
-	feature_connections_proximity = 1/(feature_connections_distances + 1) * 10
-	feature_connections_proximity.unsqueeze(0)	#add SANI segment dimension
-	feature_connections_strength_update = feature_connections_active*feature_connections_proximity
-	#print("feature_connections_strength_update = ", feature_connections_strength_update)
+	if(normaliseConnectionStrengthWrtContextLength):
+		#prefer closer than further target neurons when strengthening connections (and activating target neurons) in sentence;
+		feature_neurons_word_order_1d = feature_neurons_word_order.flatten()
+		feature_connections_distances = pt.abs(feature_neurons_word_order_1d.unsqueeze(1) - feature_neurons_word_order_1d).reshape(cs, fs, cs, fs)
+		feature_connections_proximity = 1/(feature_connections_distances + 1) * 10
+		feature_connections_proximity.unsqueeze(0)	#add SANI segment dimension
+		feature_connections_strength_update = feature_connections_active*feature_connections_proximity
+		#print("feature_connections_strength_update = ", feature_connections_strength_update)
+	else:
+		feature_connections_strength_update = feature_connections_active
 
 	if(increaseColumnInternalConnectionsStrength):
 		cs_indices_1 = pt.arange(cs).view(1, cs, 1, 1, 1).expand(array_number_of_segments, cs, fs, cs, fs)  # First cs dimension
