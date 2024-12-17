@@ -50,7 +50,7 @@ def nextWordPredictionTransformerTrainStep(global_feature_neurons, database_feat
 	
 	global_feature_neurons = global_feature_neurons.unsqueeze(0)	#add batch dim (not used)
 	targets = targets.unsqueeze(0)	#add batch dim
-
+	
 	global_feature_neurons = global_feature_neurons.to_dense()
 	if(useGPUdense and not useGPUsparse):
 		global_feature_neurons = global_feature_neurons.to(deviceDense)
@@ -150,13 +150,13 @@ class InputAttentionLayer(nn.Module):
 				attention_weights = attention_weights.unsqueeze(0).expand(batch_size, -1, -1)  # Shape: (batch_size, c, c)
 
 				# Apply attention weights to V_head
-				attention_output = torch.bmm(attention_weights, V_head)  # Shape: (batch_size, c, f)
+				attention_output = pt.bmm(attention_weights, V_head)  # Shape: (batch_size, c, f)
 
 				attention_outputs.append(attention_output)
 
 		# Concatenate attention outputs from all heads along the embedding dimension
 		# attention_outputs is a list of tensors with shape (batch_size, c, f)
-		attention_outputs = torch.cat(attention_outputs, dim=2)  # Shape: (batch_size, c, p*s*f)
+		attention_outputs = pt.cat(attention_outputs, dim=2)  # Shape: (batch_size, c, p*s*f)
 
 		# Permute to match transformer input requirements
 		# Transformer expects input of shape (sequence_length, batch_size, embedding_dim)
@@ -225,4 +225,24 @@ class CustomTransformer(nn.Module):
 
 		return probabilities  # Shape: (batch_size, c, f)
 
+def save_model(path, filename="model.pt"):
+    # Ensure directory exists
+    os.makedirs(path, exist_ok=True)
+    
+    # Construct full filepath
+    filepath = os.path.join(path, filename)
+    
+    # Save the model state_dict
+    pt.save(model.state_dict(), filepath)
+    return filepath
+
+
+def load_model(filepath, map_location=None):
+    # Load state_dict from file
+    state_dict = pt.load(filepath, map_location=map_location)
+    
+    # Load the state_dict into the model
+    model.load_state_dict(state_dict)
+    
+    return model
 

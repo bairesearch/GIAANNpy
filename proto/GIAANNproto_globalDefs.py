@@ -31,11 +31,15 @@ useSANI = False
 useInference = False  # useInference mode
 if(useInference):
 	inferencePredictiveNetwork = False	#use MLP to predict next token	#orig:False
+	trainPredictionNetworkAllSentences = False	#support predictive network training on every sentence in corpus.
 	incrementallySeedNetwork = True	#default:True	#orig:False
 	useNeuronFeaturePropertiesTimeDuringInference = False	#default:False	#orig:False	#not yet implemented
 	transformerUseInputConnections = False	#initialise (dependent var)
 	transformerUseInputAllProperties = False	#initialise (dependent var)
 	if(inferencePredictiveNetwork):
+		savePredictiveNetwork = False
+		if(trainPredictionNetworkAllSentences):
+			savePredictiveNetwork = True
 		inferencePredictiveNetworkModelMLP = False
 		inferencePredictiveNetworkModelTransformer = True
 		if(inferencePredictiveNetworkModelTransformer):
@@ -105,8 +109,7 @@ debugConceptFeaturesOccurFirstInSubsequence = False #Constrain column feature de
 debugConnectColumnsToNextColumnsInSequenceOnly = False
 debugDrawNeuronActivations = False
 if(useInference):
-	if(not inferencePredictiveNetwork):
-		debugConceptFeaturesOccurFirstInSubsequence = False #orig: True	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
+	debugConceptFeaturesOccurFirstInSubsequence = False #orig: True	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
 	debugDrawNeuronActivations = True
 debugReloadGlobalFeatureNeuronsEverySentence = False
 
@@ -141,18 +144,26 @@ if(useInference):
 	else:
 		activationDecrementPerPredictedSentence = 0.5
 		activationDecrementSeed = activationDecrementPerPredictedSentence
-				
-	num_seed_tokens = 5	#number of seed tokens in last sentence of inference prompt (remaining tokens will be prediction tokens)
-	num_prediction_tokens = 10	#number of words to predict after network seed
+	
+	if(trainPredictionNetworkAllSentences):
+		num_seed_tokens = 0
+		num_prediction_tokens = None	#sentence length
+	else:
+		num_seed_tokens = 5	#number of seed tokens in last sentence of inference prompt (remaining tokens will be prediction tokens)
+		num_prediction_tokens = 10	#number of words to predict after network seed
 
 	if(inferencePredictiveNetwork):
-		kc = 1	#number of topk columns to predict
-		kf = 1	#number of topk features to predict
-		
-		#if kc>1 or kf>1:
-		if debugConceptFeaturesOccurFirstInSubsequence:
+		if(debugConceptFeaturesOccurFirstInSubsequence):
+			kc = 1	#number of topk columns to predict
+			#trainPredictionNetworkAllSentences currently requires debugConceptFeaturesOccurFirstInSubsequence:!multipleTargets if kc == 1"
 			multipleTargets = False
 		else:
+			kc = 2	#number of topk columns to predict	#it is unknown which exact column a token belongs to (unless it corresponds to a concept feature/noun)
+			multipleTargets = True
+		kf = 1	#number of topk features to predict
+		if trainPredictionNetworkAllSentences:
+			assert kf==1
+		if kf>1:
 			multipleTargets = True
 	else:
 		#TODO: train hyperparameters
@@ -173,6 +184,8 @@ concept_columns_dict_file = databaseFolder + 'concept_columns_dict.pkl'
 concept_features_dict_file = databaseFolder + 'concept_features_dict.pkl'
 observed_columns_dir = databaseFolder + 'observed_columns'
 pytorch_tensor_file_extension = ".pt"
+predictive_network_folder = "."
+predictive_network_file_name = "model.pt"
 
 #common array indices
 array_index_properties_strength = 0

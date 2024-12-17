@@ -214,3 +214,40 @@ def load_all_columns(databaseNetworkObject):
 		concept_column = load_or_create_observed_column(databaseNetworkObject, concept_index, lemma, i)
 		observed_columns_dict[lemma] = concept_column
 	return observed_columns_dict
+
+def getTokenConceptFeatureIndexForSequenceConceptIndex(sequence_observed_columns, words_doc, concept_mask, sequence_concept_index, sequenceWordIndex):
+	concept_index = sequence_observed_columns.sequence_observed_columns_dict[sequence_concept_index].concept_index
+	if(concept_mask[sequenceWordIndex]):
+		feature_index = feature_index_concept_neuron
+	else:
+		feature_index = sequence_observed_columns.feature_word_to_index[words_doc[sequenceWordIndex]]
+	return concept_index, feature_index
+		
+def getTokenConceptFeatureIndex(sequence_observed_columns, words_doc, lemmas_doc, concept_mask, sequenceWordIndex):
+	databaseNetworkObject = sequence_observed_columns.databaseNetworkObject
+	columns_index_sequence_word_index_dict = sequence_observed_columns.columns_index_sequence_word_index_dict
+	
+	if(concept_mask[sequenceWordIndex]):
+		lemma = lemmas_doc[sequenceWordIndex]
+		targetFeatureIndex = databaseNetworkObject.concept_columns_dict[lemma]
+	else:
+		word = words_doc[sequenceWordIndex]
+		targetFeatureIndex = databaseNetworkObject.concept_features_dict[word]
+	doc_len = concept_mask.shape[0]
+	foundFeature = False
+	foundNextColumnIndex = False
+	previousColumnIndex = 0
+	nextColumnIndex = 0
+	for i in range(doc_len):
+		if(foundFeature):
+			if(not foundNextColumnIndex):
+				if(concept_mask[i] != 0):
+					nextColumnIndex = columns_index_sequence_word_index_dict[i]
+					foundNextColumnIndex = True
+		else:
+			if(concept_mask[i] != 0):
+				previousColumnIndex = columns_index_sequence_word_index_dict[i]
+		if(i == sequenceWordIndex):
+			foundFeature = True
+	
+	return foundNextColumnIndex, previousColumnIndex, nextColumnIndex, targetFeatureIndex

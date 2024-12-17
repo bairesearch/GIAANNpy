@@ -417,3 +417,34 @@ def expand_sparse_tensor_multi(tensor, q, y, new_dim_size=None):
 	new_tensor = pt.sparse_coo_tensor(new_indices, values, size=new_size, device=deviceSparse)
 
 	return new_tensor
+
+def addElementValueToSparseTensor(sp_tensor, dimensions, v):
+
+	# Example setup: create a sparse len(dimensions) dimensional tensor
+	# sp_tensor is a sparse_coo_tensor with shape [dimensions]
+	# Make sure sp_tensor is in COO format (coalesce it if necessary)
+	sp_tensor = sp_tensor.coalesce()
+
+	indices = sp_tensor._indices()  # Shape: [len(dimensions), nnz]
+	values = sp_tensor._values()	# Shape: [nnz]
+
+	target_index = pt.tensor(dimensions, dtype=pt.long, device=sp_tensor.device).unsqueeze(1)  # shape [len(dimensions), 1]
+
+	# Check if this index already exists in the sparse tensor
+	mask = (indices == target_index).all(dim=0)  # Boolean mask indicating where the match occurs
+
+	if mask.any():
+		# The element already exists.
+		# 'mask.nonzero()' will return the coordinates of True elements in 'mask'.
+		# Since we expect only one match, 'mask.nonzero()' should return exactly one index.
+		idx = mask.nonzero().item()  # Extract that single index (this defines idx)
+		values[idx] += v
+	else:
+		# The element does not exist; we need to add it.
+		new_indices = pt.cat([indices, target_index], dim=1)
+		new_values = pt.cat([values, pt.tensor([v], dtype=values.dtype, device=values.device)])
+
+		# Recreate the sparse tensor with the new index and value
+		sp_tensor = pt.sparse_coo_tensor(new_indices, new_values, sp_tensor.shape, device=sp_tensor.device).coalesce()
+
+	return sp_tensor

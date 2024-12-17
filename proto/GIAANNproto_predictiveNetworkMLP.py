@@ -113,6 +113,25 @@ def getTopkPredictions(outputs):
 		
 	return concept_columns_indices_next, concept_columns_feature_indices_next
 
+def save_model(model, path, filename="model.pt"):
+    # Ensure directory exists
+    os.makedirs(path, exist_ok=True)
+    
+    # Construct full filepath
+    filepath = os.path.join(path, filename)
+    
+    # Save the model state_dict
+    pt.save(model.state_dict(), filepath)
+    return filepath
 
+
+def load_model(model, filepath, map_location=None):
+    # Load state_dict from file
+    state_dict = pt.load(filepath, map_location=map_location)
+    
+    # Load the state_dict into the model
+    model.load_state_dict(state_dict)
+    
+    return model
 
 
