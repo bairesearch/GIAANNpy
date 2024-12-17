@@ -215,6 +215,7 @@ def load_all_columns(databaseNetworkObject):
 		observed_columns_dict[lemma] = concept_column
 	return observed_columns_dict
 
+'''
 def getTokenConceptFeatureIndexForSequenceConceptIndex(sequence_observed_columns, words_doc, concept_mask, sequence_concept_index, sequenceWordIndex):
 	concept_index = sequence_observed_columns.sequence_observed_columns_dict[sequence_concept_index].concept_index
 	if(concept_mask[sequenceWordIndex]):
@@ -222,7 +223,24 @@ def getTokenConceptFeatureIndexForSequenceConceptIndex(sequence_observed_columns
 	else:
 		feature_index = sequence_observed_columns.feature_word_to_index[words_doc[sequenceWordIndex]]
 	return concept_index, feature_index
-		
+'''
+
+def getTokenConceptFeatureIndexTensor(sequence_observed_columns, words_doc, lemmas_doc, concept_mask, sequenceWordIndex, kcMax):
+	foundNextColumnIndex, previousColumnIndex, nextColumnIndex, targetFeatureIndex = getTokenConceptFeatureIndex(sequence_observed_columns, words_doc, lemmas_doc, concept_mask, sequenceWordIndex)
+
+	if(kcMax == 1 or not foundNextColumnIndex):
+		concept_columns_indices = pt.tensor(previousColumnIndex).unsqueeze(0)
+		concept_columns_feature_indices = pt.tensor(targetFeatureIndex).unsqueeze(0).unsqueeze(0)
+		multiple_sources = False
+	elif(kcMax == 2 and foundNextColumnIndex): 
+		concept_columns_indices = pt.tensor([previousColumnIndex, nextColumnIndex])
+		concept_columns_feature_indices = pt.stack([pt.tensor(targetFeatureIndex).unsqueeze(0), pt.tensor(targetFeatureIndex).unsqueeze(0)], dim=0)
+		multiple_sources = True
+	else:
+		printe("getTokenConceptFeatureIndexTensor currently requires kcMax == 1 or 2; corresponding to the number of target columns per token; check debugConceptFeaturesOccurFirstInSubsequence/multipleTargets")
+
+	return multiple_sources, previousColumnIndex, nextColumnIndex, targetFeatureIndex, concept_columns_indices, concept_columns_feature_indices
+
 def getTokenConceptFeatureIndex(sequence_observed_columns, words_doc, lemmas_doc, concept_mask, sequenceWordIndex):
 	databaseNetworkObject = sequence_observed_columns.databaseNetworkObject
 	columns_index_sequence_word_index_dict = sequence_observed_columns.columns_index_sequence_word_index_dict

@@ -109,7 +109,7 @@ debugConceptFeaturesOccurFirstInSubsequence = False #Constrain column feature de
 debugConnectColumnsToNextColumnsInSequenceOnly = False
 debugDrawNeuronActivations = False
 if(useInference):
-	debugConceptFeaturesOccurFirstInSubsequence = False #orig: True	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
+	debugConceptFeaturesOccurFirstInSubsequence = False #default: False	#orig: True	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
 	debugDrawNeuronActivations = True
 debugReloadGlobalFeatureNeuronsEverySentence = False
 
@@ -154,11 +154,11 @@ if(useInference):
 
 	if(inferencePredictiveNetwork):
 		if(debugConceptFeaturesOccurFirstInSubsequence):
-			kc = 1	#number of topk columns to predict
-			#trainPredictionNetworkAllSentences currently requires debugConceptFeaturesOccurFirstInSubsequence:!multipleTargets if kc == 1"
+			kcNetwork = 1	#number of topk columns to predict
+			#trainPredictionNetworkAllSentences currently requires debugConceptFeaturesOccurFirstInSubsequence:!multipleTargets if kcNetwork == 1"
 			multipleTargets = False
 		else:
-			kc = 2	#number of topk columns to predict	#it is unknown which exact column a token belongs to (unless it corresponds to a concept feature/noun)
+			kcNetwork = 2	#number of topk columns to predict	#it is unknown which exact column a token belongs to (unless it corresponds to a concept feature/noun)
 			multipleTargets = True
 		kf = 1	#number of topk features to predict
 		if trainPredictionNetworkAllSentences:

@@ -79,9 +79,9 @@ def getTopkPredictions(outputs):
 			probs = outputs
 
 		column_probs = probs.mean(dim=2)  # Shape: (batch_size, c)
-		_, concept_columns_indices_next = pt.topk(column_probs, kc, dim=1)
+		_, concept_columns_indices_next = pt.topk(column_probs, kcNetwork, dim=1)
 
-		# For each of the top kc columns, compute top kf features
+		# For each of the top kcNetwork columns, compute top kf features
 		top_kf_indices = []
 		for column_idx in concept_columns_indices_next:
 			column_data = probs[:, column_idx, :]  # Shape: (batch_size, f)
@@ -89,7 +89,7 @@ def getTopkPredictions(outputs):
 			topk_feature_probs, topk_feature_indices = pt.topk(feature_probs, kf)  # Shapes: (kf,), (kf,)
 			top_kf_indices.append(topk_feature_indices)
 
-		concept_columns_feature_indices_next = pt.stack(top_kf_indices)  # Shape: (batch_size, kc, kf)
+		concept_columns_feature_indices_next = pt.stack(top_kf_indices)  # Shape: (batch_size, kcNetwork, kf)
 
 	concept_columns_indices_next = concept_columns_indices_next[0]	#select first sample of batch
 	concept_columns_feature_indices_next = concept_columns_feature_indices_next[0]	#select first sample of batch
