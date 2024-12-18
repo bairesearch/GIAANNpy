@@ -54,6 +54,8 @@ def nextWordPredictionTransformerTrainStep(global_feature_neurons, database_feat
 	global_feature_neurons = global_feature_neurons.to_dense()
 	if(useGPUdense and not useGPUsparse):
 		global_feature_neurons = global_feature_neurons.to(deviceDense)
+	#print("global_feature_neurons = ", global_feature_neurons)
+	#print("global_feature_neurons.shape = ", global_feature_neurons.shape)
 		
 	outputs = model(global_feature_neurons, database_feature_connections)  # Outputs shape: (batch_size, c, f)
 

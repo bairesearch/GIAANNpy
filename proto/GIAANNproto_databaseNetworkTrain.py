@@ -400,7 +400,12 @@ class SequenceObservedColumns:
 			self.databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.merge_tensor_slices_sum(self.databaseNetworkObject.global_feature_neurons, observed_column_feature_neurons_dict, 2)
 
 
-
+def createConceptMask(sequence_observed_columns, lemmas):
+	concept_mask = pt.tensor([i in sequence_observed_columns.columns_index_sequence_word_index_dict for i in range(len(lemmas))], dtype=pt.bool)
+	concept_indices = pt.nonzero(concept_mask).squeeze(1)
+	numberConcepts = concept_indices.shape[0]
+	return concept_mask, concept_indices, numberConcepts
+	
 def process_concept_words(sequence_observed_columns, sentenceIndex, doc, words, lemmas, pos_tags, train=True, first_seed_token_index=None, num_seed_tokens=None):
 	"""
 	For every concept word (lemma) in the sequence, identify every feature neuron in that column that occurs q words before or after the concept word in the sequence, including the concept neuron. This function has been parallelized using PyTorch array operations.
@@ -410,13 +415,9 @@ def process_concept_words(sequence_observed_columns, sentenceIndex, doc, words, 
 		q = 5  # Fixed window size when not using POS tags
 
 	# Identify all concept word indices
-	#print("\n\nsequence_observed_columns.columns_index_sequence_word_index_dict = ", sequence_observed_columns.columns_index_sequence_word_index_dict)
-	concept_mask = pt.tensor([i in sequence_observed_columns.columns_index_sequence_word_index_dict for i in range(len(lemmas))], dtype=pt.bool)
-	concept_indices = pt.nonzero(concept_mask).squeeze(1)
-	
+	concept_mask, concept_indices, numberConceptsInSequence = createConceptMask(sequence_observed_columns, lemmas)
 	#concept_indices may be slightly longer than number of unique columns in sequence, if there are multiple instances of the same concept/noun lemma in the sequence
 	
-	numberConceptsInSequence = concept_indices.shape[0]	#concept_indices.numel()	
 	if numberConceptsInSequence == 0:
 		return  # No concept words to process
 
@@ -666,7 +667,7 @@ def process_features_active_train(sequence_observed_columns, feature_neurons_act
 	# Update feature neurons in sequence_observed_columns
 	sequence_observed_columns.feature_neurons[array_index_properties_strength, :, :, :] += feature_neurons_active
 	sequence_observed_columns.feature_neurons[array_index_properties_permanence, :, :, :] += feature_neurons_active*z1	#orig = feature_neurons_active*(sequence_observed_columns.feature_neurons[array_index_properties_permanence] ** 2) + feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_permanence]
-	#sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :, :] += feature_neurons_active*j1	#update the activations of the target not source nodes
+	sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :, :] = 0 #+= feature_neurons_active*j1	#update the activations of the target not source nodes
 	if(useInference and not useNeuronFeaturePropertiesTimeDuringInference):
 		sequence_observed_columns.feature_neurons[array_index_properties_time, :, :, :] = feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_time] + feature_neurons_active*sentenceIndex
 	sequence_observed_columns.feature_neurons[array_index_properties_pos, :, :, :] = feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_pos] + feature_neurons_active*feature_neurons_pos
@@ -700,7 +701,7 @@ def process_features_active_train(sequence_observed_columns, feature_neurons_act
 	
 	sequence_observed_columns.feature_connections[array_index_properties_strength, :, :, :, :, :] += feature_connections_strength_update
 	sequence_observed_columns.feature_connections[array_index_properties_permanence, :, :, :, :, :] += feature_connections_active*z1	#orig = feature_connections_active*(sequence_observed_columns.feature_connections[array_index_properties_permanence] ** 2) + feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_permanence]
-	#sequence_observed_columns.feature_connections[array_index_properties_activation, :, :, :, :, :] += feature_connections_active*j1	#connection activations are not currently used
+	sequence_observed_columns.feature_connections[array_index_properties_activation, :, :, :, :, :] = 0	#+= feature_connections_active*j1	#connection activations are not currently used
 	if(useInference and not useNeuronFeaturePropertiesTimeDuringInference):
 		sequence_observed_columns.feature_connections[array_index_properties_time, :, :, :, :, :] = feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_time] + feature_connections_active*sentenceIndex
 	sequence_observed_columns.feature_connections[array_index_properties_pos, :, :, :, :, :] = feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_pos] + feature_connections_active*feature_connections_pos

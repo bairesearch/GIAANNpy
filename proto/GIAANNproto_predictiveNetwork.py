@@ -94,9 +94,7 @@ def process_concept_words_inference(sequence_observed_columns, sentenceIndex, do
 	sequenceWordIndex = 0
 	
 	words_doc, lemmas_doc, pos_tags_doc = getLemmas(doc)
-	concept_mask = pt.tensor([i in sequence_observed_columns.columns_index_sequence_word_index_dict for i in range(len(lemmas_doc))], dtype=pt.bool)
-	concept_indices = pt.nonzero(concept_mask).squeeze(1)
-	numberConcepts = concept_indices.shape[0]
+	concept_mask, concept_indices, numberConcepts = GIAANNproto_databaseNetworkTrain.createConceptMask(sequence_observed_columns, lemmas_doc)
 	
 	if(transformerUseInputConnections):
 		GIAANNproto_databaseNetwork.generate_global_feature_connections(sequence_observed_columns.databaseNetworkObject)
@@ -133,17 +131,17 @@ def process_column_inference_prediction(sequence_observed_columns, observed_colu
 	
 	databaseNetworkObject = sequence_observed_columns.databaseNetworkObject
 	
-	#print(f"process_column_inference_prediction: {wordPredictionIndex}; concept_columns_indices = ", concept_columns_indices)
+	#print(f"process_column_inference_prediction: {sequenceWordIndex}; concept_columns_indices = ", concept_columns_indices)
 
 	if(trainPredictionNetworkAllSentences):
-		if(wordPredictionIndex != 1):	#already activated first seed token column feature
-			#activate source token (incremental seed during train)
-			for concept_index in range(concept_columns_indices.shape[0]):
-				seedTokenConceptIndex = concept_columns_indices[concept_index].item()
-				seedTokenFeatureIndex = concept_columns_feature_indices[concept_index].squeeze().item()
-				dimensions = [array_index_properties_activation, array_index_segment_first, seedTokenConceptIndex, seedTokenFeatureIndex]
-				sequence_observed_columns.databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.addElementValueToSparseTensor(sequence_observed_columns.databaseNetworkObject.global_feature_neurons, dimensions, j1)
-
+		#activate source token (incremental seed during train)
+			#if(wordPredictionIndex == 1) will reactivate first seed token column feature (as it was not saved during wordPredictionIndex==0)
+		for concept_index in range(concept_columns_indices.shape[0]):
+			seedTokenConceptIndex = concept_columns_indices[concept_index].item()
+			seedTokenFeatureIndex = concept_columns_feature_indices[concept_index].squeeze().item()
+			dimensions = [array_index_properties_activation, array_index_segment_first, seedTokenConceptIndex, seedTokenFeatureIndex]
+			sequence_observed_columns.databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.addElementValueToSparseTensor(sequence_observed_columns.databaseNetworkObject.global_feature_neurons, dimensions, j1)
+			
 	global_feature_neurons_activation = databaseNetworkObject.global_feature_neurons[array_index_properties_activation]
 	global_feature_neurons_strength = databaseNetworkObject.global_feature_neurons[array_index_properties_strength]
 	if(transformerUseInputConnections):
@@ -249,11 +247,6 @@ def predictMostActiveFeature(sequence_observed_columns, global_feature_neurons_a
 	if(multiple_sources):
 		targets[nextColumnIndex, targetFeatureIndex] = 1
 	
-	#print("previousColumnIndex = ", previousColumnIndex)
-	#print("nextColumnIndex = ", nextColumnIndex)
-	#print("targetFeatureIndex = ", targetFeatureIndex)
-	#print("targets.shape = ", targets.shape)
-	
 	if(inferencePredictiveNetworkModelMLP):
 		concept_columns_indices_next, concept_columns_feature_indices_next = GIAANNproto_predictiveNetworkMLP.nextWordPredictionMLPtrainStep(global_feature_neurons_activation, targets)
 	elif(inferencePredictiveNetworkModelTransformer):
@@ -318,17 +311,8 @@ def selectMostActiveFeature(global_feature_neurons_activation, global_feature_ne
 		topk_concept_columns_activation = topk_concept_columns_activation / topk_concept_columns_strength
 	topk_concept_columns_activation_topk_features = pt.topk(topk_concept_columns_activation, kf, dim=1)
 
-	#print("concept_columns_activation_topk_concepts.values = ", concept_columns_activation_topk_concepts.values)	
-	#print("concept_columns_activation_topk_concepts.indices = ", concept_columns_activation_topk_concepts.indices)	
-	
-	#print("topk_concept_columns_activation_topk_features.values = ", topk_concept_columns_activation_topk_features.values)	
-	#print("topk_concept_columns_activation_topk_features.indices = ", topk_concept_columns_activation_topk_features.indices)	
-
 	concept_columns_indices_next = concept_columns_activation_topk_concepts.indices
 	concept_columns_feature_indices_next = topk_concept_columns_activation_topk_features.indices
-	
-	#print("concept_columns_indices_next = ", concept_columns_indices_next)
-	#print("concept_columns_feature_indices_next = ", concept_columns_feature_indices_next)
 	
 	if(kc > 1 or kf > 1):
 		multiple_sources = True

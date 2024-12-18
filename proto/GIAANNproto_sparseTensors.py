@@ -443,8 +443,6 @@ def addElementValueToSparseTensor(sp_tensor, dimensions, v):
 		# The element does not exist; we need to add it.
 		new_indices = pt.cat([indices, target_index], dim=1)
 		new_values = pt.cat([values, pt.tensor([v], dtype=values.dtype, device=values.device)])
-
-		# Recreate the sparse tensor with the new index and value
 		sp_tensor = pt.sparse_coo_tensor(new_indices, new_values, sp_tensor.shape, device=sp_tensor.device).coalesce()
 
 	return sp_tensor
