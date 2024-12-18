@@ -34,7 +34,6 @@ GIA ANN proto main
 import torch as pt
 import spacy
 from datasets import load_dataset
-pt.set_printoptions(threshold=float('inf'))
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_sparseTensors
@@ -54,7 +53,7 @@ databaseNetworkObject.nlp = nlp	#used by pos_string_to_pos_int
 
 def main():
 	GIAANNproto_databaseNetworkFiles.initialiseDatabaseFiles()
-	if(useInference and inferencePredictiveNetwork):
+	if(useInference and inferencePredictiveNetwork and trainPredictionNetworkAllSentences):
 		GIAANNproto_predictiveNetwork.initialisePredictiveNetwork(databaseNetworkObject)
 
 	# Start processing the dataset
@@ -63,7 +62,7 @@ def main():
 	else:
 		process_dataset(dataset)
 		
-	if(useInference and inferencePredictiveNetwork and savePredictiveNetwork):
+	if(useInference and inferencePredictiveNetwork and trainPredictionNetworkAllSentences and savePredictiveNetwork):
 		GIAANNproto_predictiveNetwork.savePredictiveNetwork()
 
 def process_prompt():

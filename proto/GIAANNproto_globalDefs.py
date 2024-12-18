@@ -39,12 +39,18 @@ if(useInference):
 	if(inferencePredictiveNetwork):
 		savePredictiveNetwork = False
 		if(trainPredictionNetworkAllSentences):
+			#incrementallySeedNetwork = True	#not supported (uses custom incremental seeding implementation)
 			savePredictiveNetwork = True
+			useNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False	#next token predictions are being used to activate the next column features (rather than prediction targets)
+		else:
+			useNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True
 		inferencePredictiveNetworkModelMLP = False
 		inferencePredictiveNetworkModelTransformer = True
 		if(inferencePredictiveNetworkModelTransformer):
 			transformerUseInputConnections = False	#incomplete	#optional
 			transformerUseInputAllProperties = True
+	else:
+		useNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True #currently mandatory (only implementation available)
 	if(incrementallySeedNetwork):
 		inferenceSeedTargetActivationsGlobalFeatureArrays = False	#optional	#orig:False
 	else:
@@ -112,6 +118,7 @@ if(useInference):
 	debugConceptFeaturesOccurFirstInSubsequence = False #default: False	#orig: True	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
 	debugDrawNeuronActivations = True
 debugReloadGlobalFeatureNeuronsEverySentence = False
+debugInferencePredictionActivationAccumulation = False	#exponential runaway of activations negatively affects predictionNetwork loss optimisation (go to nan)	#TODO #see useNextTokenPredictionsOrTargetsToActivateNextColumnFeatures for comparison
 
 useDedicatedFeatureLists = False
 #if usePOS and not lowMem:
@@ -277,3 +284,11 @@ if useDedicatedFeatureLists:
 def get_tensor_size_in_mb(tensor):
 	return tensor.element_size() * tensor.nelement() / (1024 ** 2)
 
+useLovelyTensors = True
+if(useLovelyTensors):
+	import lovely_tensors as lt
+	lt.monkey_patch()
+else:
+	#pt.set_printoptions(threshold=float('inf'))
+	pt.set_printoptions(profile="full")
+	

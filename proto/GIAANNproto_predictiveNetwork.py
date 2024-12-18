@@ -112,7 +112,10 @@ def process_concept_words_inference(sequence_observed_columns, sentenceIndex, do
 		if(not inferenceSeedTargetActivationsGlobalFeatureArrays):
 			# Update observed columns from sequence observed columns
 			sequence_observed_columns.update_observed_columns_wrapper()	#convert sequence observed columns feature neuron arrays back to global feature neuron arrays
-
+		
+		if(inferencePredictiveNetwork):
+			initialisePredictiveNetwork(sequence_observed_columns.databaseNetworkObject)
+		
 	#identify first activated column(s) in prediction phase:
 	if(inferencePredictiveNetwork):
 		kcMax = kcNetwork
@@ -134,13 +137,14 @@ def process_column_inference_prediction(sequence_observed_columns, observed_colu
 	#print(f"process_column_inference_prediction: {sequenceWordIndex}; concept_columns_indices = ", concept_columns_indices)
 
 	if(trainPredictionNetworkAllSentences):
-		#activate source token (incremental seed during train)
-			#if(wordPredictionIndex == 1) will reactivate first seed token column feature (as it was not saved during wordPredictionIndex==0)
-		for concept_index in range(concept_columns_indices.shape[0]):
-			seedTokenConceptIndex = concept_columns_indices[concept_index].item()
-			seedTokenFeatureIndex = concept_columns_feature_indices[concept_index].squeeze().item()
-			dimensions = [array_index_properties_activation, array_index_segment_first, seedTokenConceptIndex, seedTokenFeatureIndex]
-			sequence_observed_columns.databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.addElementValueToSparseTensor(sequence_observed_columns.databaseNetworkObject.global_feature_neurons, dimensions, j1)
+		if(wordPredictionIndex==0 or not useNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+			#activate source token (incremental seed during train)
+				#if(wordPredictionIndex == 1) will reactivate first seed token column feature (as it was not saved during wordPredictionIndex==0)
+			for concept_index in range(concept_columns_indices.shape[0]):
+				seedTokenConceptIndex = concept_columns_indices[concept_index].item()
+				seedTokenFeatureIndex = concept_columns_feature_indices[concept_index].squeeze().item()
+				dimensions = [array_index_properties_activation, array_index_segment_first, seedTokenConceptIndex, seedTokenFeatureIndex]
+				sequence_observed_columns.databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.addElementValueToSparseTensor(sequence_observed_columns.databaseNetworkObject.global_feature_neurons, dimensions, j1)
 			
 	global_feature_neurons_activation = databaseNetworkObject.global_feature_neurons[array_index_properties_activation]
 	global_feature_neurons_strength = databaseNetworkObject.global_feature_neurons[array_index_properties_strength]
@@ -205,7 +209,11 @@ def process_column_inference_prediction(sequence_observed_columns, observed_colu
 	else:
 		#activation targets have already been activated
 		sequence_observed_columns_prediction = SequenceObservedColumnsDraw(databaseNetworkObject, observed_columns_dict)
-		
+	
+	if(debugInferencePredictionActivationAccumulation):
+		global_feature_neurons_temp = databaseNetworkObject.global_feature_neurons.to_dense()
+		print("global_feature_neurons_temp = ", global_feature_neurons_temp)
+
 	if(inferencePredictiveNetwork):
 		concept_columns_indices_next, concept_columns_feature_indices_next, multiple_sources, kc = predictMostActiveFeature(sequence_observed_columns, global_feature_neurons_activation, databaseNetworkObject, words_doc, lemmas_doc, wordPredictionIndex, sequenceWordIndex, concept_mask)	
 	else:
@@ -246,29 +254,28 @@ def predictMostActiveFeature(sequence_observed_columns, global_feature_neurons_a
 	targets[previousColumnIndex, targetFeatureIndex] = 1
 	if(multiple_sources):
 		targets[nextColumnIndex, targetFeatureIndex] = 1
-	
+
 	if(inferencePredictiveNetworkModelMLP):
 		concept_columns_indices_next, concept_columns_feature_indices_next = GIAANNproto_predictiveNetworkMLP.nextWordPredictionMLPtrainStep(global_feature_neurons_activation, targets)
 	elif(inferencePredictiveNetworkModelTransformer):
 		concept_columns_indices_next, concept_columns_feature_indices_next = GIAANNproto_predictiveNetworkTransformer.nextWordPredictionTransformerTrainStep(databaseNetworkObject.global_feature_neurons, databaseNetworkObject.global_feature_connections, targets)
 
-	if(trainPredictionNetworkAllSentences):
-		#while exclusively training predictive network; use targets rather than next token predictions when activating database network
-		concept_columns_indices_next = concept_columns_indices_prev
-		concept_columns_feature_indices_next = concept_columns_feature_indices_prev
-	
-		if(multiple_sources):
-			kc = 2
-		else:
-			kc = 1
-		assert kf==1
-	else:
+	if(useNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		kc = kcNetwork
 		if(kc == 1 and kf == 1):
 			multiple_sources = False
 		else:
 			multiple_sources = True
-			
+	else:
+		#while exclusively training predictive network; use targets rather than next token predictions when activating database network
+		concept_columns_indices_next = concept_columns_indices_prev
+		concept_columns_feature_indices_next = concept_columns_feature_indices_prev
+		if(multiple_sources):
+			kc = 2
+		else:
+			kc = 1
+		assert kf==1
+		
 	return concept_columns_indices_next, concept_columns_feature_indices_next, multiple_sources, kc
 
 
