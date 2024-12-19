@@ -185,22 +185,25 @@ def process_column_inference_prediction(sequence_observed_columns, observed_colu
 		else:
 			global_feature_neurons_activation, global_feature_connections_activation = process_features_active_predict_single(databaseNetworkObject, global_feature_neurons_activation, global_feature_connections_activation, sequence_observed_columns_prediction, concept_columns_indices, concept_columns_feature_indices)
 
-		if(inferenceDeactivateNeuronsUponPrediction):
-			if(useSANI):
-				indices_to_update_list = []
-				for segment_index in range(array_number_of_segments):
-					number_features_predicted = concept_columns_indices.shape[0]
-					index_to_update = pt.stack([pt.tensor([segment_index]*number_features_predicted), concept_columns_indices, concept_columns_feature_indices.squeeze(dim=0)], dim=0)
-					indices_to_update_list.append(index_to_update)
-				indices_to_update = pt.stack(indices_to_update_list, dim=0).squeeze(dim=2)
-				global_feature_neurons_activation = GIAANNproto_sparseTensors.modify_sparse_tensor(global_feature_neurons_activation, indices_to_update, 0)
-				#global_feature_neurons_activation[concept_columns_indices, concept_columns_feature_indices] = 0	
-			else:
-				segment_indices = pt.zeros_like(concept_columns_indices)
-				#indices_to_update = pt.stack([segment_indices, concept_columns_indices, concept_columns_feature_indices.squeeze(dim=0)], dim=0)
-				indices_to_update = pt.tensor([segment_indices.item(), concept_columns_indices.item(), concept_columns_feature_indices.squeeze(dim=0).item()]).unsqueeze(0)
-				global_feature_neurons_activation = GIAANNproto_sparseTensors.modify_sparse_tensor(global_feature_neurons_activation, indices_to_update, 0)
-				#global_feature_neurons_activation[segment_indices, concept_columns_indices, concept_columns_feature_indices] = 0
+		if(inferenceDeactivateNeuronsUponPrediction or inferenceInvertNeuronActivationUponPrediction):
+			indices_to_update_list = []
+			for conceptIndex in range(concept_columns_indices.shape[0]):
+				concept_columns_indices_source = concept_columns_indices[conceptIndex]
+				concept_columns_feature_indices_source = concept_columns_feature_indices[conceptIndex].squeeze(dim=0)
+				if(useSANI):
+					for segment_index in range(array_number_of_segments):
+						index_to_update = pt.stack([pt.tensor(segment_index, device=concept_columns_indices_source.device), concept_columns_indices_source, concept_columns_feature_indices_source], dim=0)
+						indices_to_update_list.append(index_to_update)
+				else:
+					indices_to_update = pt.stack([pt.tensor(array_index_segment_first, device=concept_columns_indices_source.device), concept_columns_indices_source, concept_columns_feature_indices_source], dim=0)
+					indices_to_update_list.append(indices_to_update)
+			indices_to_update = pt.stack(indices_to_update_list, dim=0)
+			if(inferenceDeactivateNeuronsUponPrediction):
+				modifier = 0
+			elif(inferenceInvertNeuronActivationUponPrediction):
+				modifier = inferenceInvertNeuronActivationUponPredictionLevel
+			global_feature_neurons_activation = GIAANNproto_sparseTensors.modify_sparse_tensor(global_feature_neurons_activation, indices_to_update, modifier, multiply=inferenceInvertNeuronActivationUponPrediction)
+			#global_feature_neurons_activation[concept_columns_indices, concept_columns_feature_indices] = 0	
 
 		databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.global_feature_neurons, global_feature_neurons_activation, array_index_properties_activation)
 		if(transformerUseInputConnections):
@@ -219,9 +222,7 @@ def process_column_inference_prediction(sequence_observed_columns, observed_colu
 	else:
 		concept_columns_indices_next, concept_columns_feature_indices_next, multiple_sources, kc = selectMostActiveFeature(global_feature_neurons_activation, global_feature_neurons_strength)
 	
-	if(inferenceTrainPredictionNetworkAllSentences):
-		featurePredictionTargetMatch = None
-	else:
+	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		#print("concept_columns_indices_next = ", concept_columns_indices_next)
 		#print("concept_columns_feature_indices_next = ", concept_columns_feature_indices_next)
 
@@ -244,9 +245,11 @@ def process_column_inference_prediction(sequence_observed_columns, observed_colu
 		if(drawNetworkDuringInferencePredict):
 			#FUTURE: convert global_feature_neurons_activation back to global_feature_neurons for draw
 			GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns_prediction, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(sequenceWordIndex))
-		
-	return featurePredictionTargetMatch, concept_columns_indices_next, concept_columns_feature_indices_next, multiple_sources
+	else:
+		featurePredictionTargetMatch = False
 	
+	return featurePredictionTargetMatch, concept_columns_indices_next, concept_columns_feature_indices_next, multiple_sources
+
 def predictMostActiveFeature(sequence_observed_columns, global_feature_neurons_activation, databaseNetworkObject, words_doc, lemmas_doc, wordPredictionIndex, sequenceWordIndex, concept_mask):		
 	#generate targets;
 	multiple_sources, previousColumnIndex, nextColumnIndex, targetFeatureIndex, concept_columns_indices_prev, concept_columns_feature_indices_prev = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequence_observed_columns, words_doc, lemmas_doc, concept_mask, sequenceWordIndex, kcNetwork)

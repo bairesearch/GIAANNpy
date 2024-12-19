@@ -24,7 +24,7 @@ useGPUdense = True	#default: True
 useGPUsparse = False	#default: False	#orig: True
 maxSentenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM availability during train (with trainSequenceObservedColumnsUseSequenceFeaturesOnly only limited amount of data is ever loaded to GPU during train)
 databaseFolder = "" #default: ""
-max_sentences_train = 11 #default: 100000000	#orig: 1000  # Adjust as needed (eg lower max_sentences_train before independent useInference execution)
+max_sentences_train = 1000 #default: 100000000	#orig: 1000  # Adjust as needed (eg lower max_sentences_train before independent useInference execution)
 
 # Set boolean variables as per specification
 useSANI = False
@@ -138,16 +138,19 @@ if usePOS:
 
 inference_prompt_file = databaseFolder + 'inference_prompt.txt'
 if(useInference):
-	inferenceDeactivateNeuronsUponPrediction = False
-	inferenceDecrementActivations = False
 	if(inferencePredictiveNetwork):
+		inferenceInvertNeuronActivationUponPrediction = True	#default: True	#orig: False	#set activations of previously activated neurons to negative - refractory period preventing consecutive feature reactivation and facilitating prediction based on past predictions
+		inferenceDeactivateNeuronsUponPrediction = False #do not use inferenceDeactivateNeuronsUponPrediction as the predictive network needs a temporarily consistent trace of the activations in the network
 		#if(not inferenceActivationFunction):	#do not decrement activations if they are decremented every time the activation function is applied
 		inferenceDecrementActivations = True
 		if(inferenceDecrementActivations):
 			inferenceDecrementActivationsNonlinear = True
-		#do not use inferenceDeactivateNeuronsUponPrediction as the predictive network needs a temporarily consistent trace of the activations in the network
+		if(inferenceInvertNeuronActivationUponPrediction):
+			inferenceInvertNeuronActivationUponPredictionLevel = -0.1	#orig: -1.0	#	#default: -0.1; inferenceInvertNeuronActivationUponPrediction inversion also significantly decreases activation level by a factor of approx 10x (ie 0.1), enabling reactivation after only a few feature predictions (by positive addition). inferenceDecrementActivations decrement will continue to be applied non-linearly (inferenceDecrementActivationsNonlinear) to negative activations thereby retaining their negative activation until they are predicted again (making them positive).
 	else:
+		inferenceInvertNeuronActivationUponPrediction = False
 		inferenceDeactivateNeuronsUponPrediction = True
+		inferenceDecrementActivations = False
 	activationDecrementPerPredictedToken = 0.1	#0.05	#CHECKTHIS
 	if(inferenceIncrementallySeedNetwork):
 		activationDecrementSeed = activationDecrementPerPredictedToken

@@ -36,7 +36,7 @@ def add_value_to_sparse_tensor_values(sparse_tensor, value):
 	sparse_tensor = sparse_tensor.coalesce()
 	return sparse_tensor
 	
-def modify_sparse_tensor(sparse_tensor, indices_to_update, new_value):
+def modify_sparse_tensor(sparse_tensor, indices_to_update, new_value, multiply=False):
 	indices_to_update = indices_to_update.to(sparse_tensor.device)
 	
 	sparse_tensor = sparse_tensor.coalesce()
@@ -58,7 +58,10 @@ def modify_sparse_tensor(sparse_tensor, indices_to_update, new_value):
 	match_mask = matches.any(dim=1)  # Shape: (nnz,)
 	
 	# Update the values at the matched indices
-	sparse_tensor.values()[match_mask] = new_value
+	if(multiply):
+		sparse_tensor.values()[match_mask] *= new_value
+	else:	#replace
+		sparse_tensor.values()[match_mask] = new_value
 	
 	return sparse_tensor
 
