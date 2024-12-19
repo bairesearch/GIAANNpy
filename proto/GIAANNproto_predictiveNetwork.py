@@ -30,7 +30,7 @@ if(inferencePredictiveNetwork):
 import GIAANNproto_databaseNetworkDraw
 import GIAANNproto_sparseTensors
 
-def savePredictiveNetwork():
+def inferenceSavePredictiveNetwork():
 	if(inferencePredictiveNetworkModelMLP):
 		GIAANNproto_predictiveNetworkMLP.save_model(predictive_network_folder, predictive_network_file_name)
 	elif(inferencePredictiveNetworkModelTransformer):
@@ -70,13 +70,13 @@ if not drawSequenceObservedColumns:
 
 def seed_network(sequence_observed_columns, sentenceIndex, doc, first_seed_token_index, num_seed_tokens):
 	words, lemmas, pos_tags = getLemmas(doc)
-	if(incrementallySeedNetwork):
+	if(inferenceIncrementallySeedNetwork):
 		print("\t seed_network: seed_token_index = ", first_seed_token_index, ", word = ", words[first_seed_token_index])
 	else:
 		print("\t seed_network: first_seed_token_index = ", first_seed_token_index, ", words = ", words[first_seed_token_index:num_seed_tokens])
 	GIAANNproto_databaseNetworkTrain.process_concept_words(sequence_observed_columns, sentenceIndex, doc, words, lemmas, pos_tags, train=False, first_seed_token_index=first_seed_token_index, num_seed_tokens=num_seed_tokens)
 
-	if(useActivationDecrement):
+	if(inferenceDecrementActivations):
 		if(not inferenceSeedTargetActivationsGlobalFeatureArrays):
 			global_feature_neurons_activation = sequence_observed_columns.databaseNetworkObject.global_feature_neurons[array_index_properties_activation]
 			global_feature_neurons_activation = GIAANNproto_databaseNetworkTrain.decrementActivation(global_feature_neurons_activation, activationDecrementSeed)
@@ -99,11 +99,11 @@ def process_concept_words_inference(sequence_observed_columns, sentenceIndex, do
 	if(transformerUseInputConnections):
 		GIAANNproto_databaseNetwork.generate_global_feature_connections(sequence_observed_columns.databaseNetworkObject)
 	
-	if(trainPredictionNetworkAllSentences):
+	if(inferenceTrainPredictionNetworkAllSentences):
 		num_prediction_tokens = len(doc_predict)
 	else:
 		#seed network;
-		if(incrementallySeedNetwork):
+		if(inferenceIncrementallySeedNetwork):
 			for seed_token_index in range(num_seed_tokens):
 				seed_network(sequence_observed_columns, sentenceIndex, doc, seed_token_index, 1)
 		else:
@@ -136,8 +136,8 @@ def process_column_inference_prediction(sequence_observed_columns, observed_colu
 	
 	#print(f"process_column_inference_prediction: {sequenceWordIndex}; concept_columns_indices = ", concept_columns_indices)
 
-	if(trainPredictionNetworkAllSentences):
-		if(wordPredictionIndex==0 or not useNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+	if(inferenceTrainPredictionNetworkAllSentences):
+		if(wordPredictionIndex==0 or not inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 			#activate source token (incremental seed during train)
 				#if(wordPredictionIndex == 1) will reactivate first seed token column feature (as it was not saved during wordPredictionIndex==0)
 			for concept_index in range(concept_columns_indices.shape[0]):
@@ -173,7 +173,7 @@ def process_column_inference_prediction(sequence_observed_columns, observed_colu
 		sequence_observed_columns_prediction = SequenceObservedColumnsInferencePrediction(databaseNetworkObject, words, lemmas, observed_columns_dict, observed_columns_sequence_candidate_index_dict)
 		
 		#decrement activations;
-		if(useActivationDecrement):
+		if(inferenceDecrementActivations):
 			#decrement activation after each prediction interval
 			global_feature_neurons_activation = GIAANNproto_databaseNetworkTrain.decrementActivation(global_feature_neurons_activation, activationDecrementPerPredictedToken)
 			if(transformerUseInputConnections):
@@ -185,7 +185,7 @@ def process_column_inference_prediction(sequence_observed_columns, observed_colu
 		else:
 			global_feature_neurons_activation, global_feature_connections_activation = process_features_active_predict_single(databaseNetworkObject, global_feature_neurons_activation, global_feature_connections_activation, sequence_observed_columns_prediction, concept_columns_indices, concept_columns_feature_indices)
 
-		if(deactivateNeuronsUponPrediction):
+		if(inferenceDeactivateNeuronsUponPrediction):
 			if(useSANI):
 				indices_to_update_list = []
 				for segment_index in range(array_number_of_segments):
@@ -219,7 +219,7 @@ def process_column_inference_prediction(sequence_observed_columns, observed_colu
 	else:
 		concept_columns_indices_next, concept_columns_feature_indices_next, multiple_sources, kc = selectMostActiveFeature(global_feature_neurons_activation, global_feature_neurons_strength)
 	
-	if(trainPredictionNetworkAllSentences):
+	if(inferenceTrainPredictionNetworkAllSentences):
 		featurePredictionTargetMatch = None
 	else:
 		#print("concept_columns_indices_next = ", concept_columns_indices_next)
@@ -260,7 +260,7 @@ def predictMostActiveFeature(sequence_observed_columns, global_feature_neurons_a
 	elif(inferencePredictiveNetworkModelTransformer):
 		concept_columns_indices_next, concept_columns_feature_indices_next = GIAANNproto_predictiveNetworkTransformer.nextWordPredictionTransformerTrainStep(databaseNetworkObject.global_feature_neurons, databaseNetworkObject.global_feature_connections, targets)
 
-	if(useNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		kc = kcNetwork
 		if(kc == 1 and kf == 1):
 			multiple_sources = False
@@ -287,10 +287,10 @@ def selectMostActiveFeature(global_feature_neurons_activation, global_feature_ne
 	#topk column selection;
 	concept_columns_activation = pt.sum(global_feature_neurons_activation_all_segments, dim=1)	#sum across all feature activations in columns
 	concept_columns_activation = concept_columns_activation.to_dense()	#convert to dense tensor (required for topk)
-	if(normaliseColumnSelectionByFeatureConnections):
+	if(inferenceNormaliseColumnSelectionByFeatureConnections):
 		concept_columns_activation_total_connections = pt.sum(global_feature_neurons_strength_all_segments, dim=1)	#sum across all feature activations in columns
 		concept_columns_activation_total_connections = concept_columns_activation_total_connections.to_dense()
-		if(not normaliseColumnSelectionByFeatureConnectionsStrength):
+		if(not inferenceNormaliseColumnSelectionByFeatureConnectionsStrength):
 			concept_columns_activation_total_connections = (concept_columns_activation_total_connections > 0).float()
 		concept_columns_activation = concept_columns_activation / concept_columns_activation_total_connections
 	if(kcDynamic):
@@ -307,13 +307,13 @@ def selectMostActiveFeature(global_feature_neurons_activation, global_feature_ne
 	else:
 		topk_concept_columns_activation = GIAANNproto_sparseTensors.slice_sparse_tensor_multi(global_feature_neurons_activation_all_segments, 0, concept_columns_activation_topk_concepts.indices)	#select topk concept indices
 	topk_concept_columns_activation = topk_concept_columns_activation.to_dense()
-	if(normaliseFeatureSelectionByFeatureConnections):
+	if(inferenceNormaliseFeatureSelectionByFeatureConnections):
 		if(kc==1):
 			topk_concept_columns_strength = global_feature_neurons_strength_all_segments[concept_columns_activation_topk_concepts.indices[0]].unsqueeze(0)	#select topk concept indices
 		else:
 			topk_concept_columns_strength = GIAANNproto_sparseTensors.slice_sparse_tensor_multi(global_feature_neurons_strength_all_segments, 0, concept_columns_activation_topk_concepts.indices)	#select topk concept indices
 		topk_concept_columns_strength = topk_concept_columns_strength.to_dense()
-		if(not normaliseFeatureSelectionByFeatureConnectionsStrength):
+		if(not inferenceNormaliseFeatureSelectionByFeatureConnectionsStrength):
 			topk_concept_columns_strength = (topk_concept_columns_strength > 0).float()
 		topk_concept_columns_activation = topk_concept_columns_activation / topk_concept_columns_strength
 	topk_concept_columns_activation_topk_features = pt.topk(topk_concept_columns_activation, kf, dim=1)
@@ -346,9 +346,14 @@ def process_features_active_predict_single(databaseNetworkObject, global_feature
 	feature_connections = GIAANNproto_sparseTensors.slice_sparse_tensor(feature_connections, 1, concept_columns_feature_indices.squeeze())
 	#print("feature_connections.shape = ", feature_connections.shape)
 	feature_neurons_target_activation = feature_neurons_active * feature_connections
-	
+
+	if(inferenceActivationFunction):
+		feature_neurons_target_activation = GIAANNproto_databaseNetworkTrain.activation_function(feature_neurons_target_activation)
+	else:
+		feature_neurons_target_activation = feature_neurons_target_activation*j1
+		
 	#update the activations of the target nodes;
-	global_feature_neurons_activation += feature_neurons_target_activation*j1
+	global_feature_neurons_activation += feature_neurons_target_activation
 	
 	if(transformerUseInputConnections):
 		feature_neurons_target_activation = GIAANNproto_sparseTensors.expand_sparse_tensor(feature_neurons_target_activation, 1, concept_columns_indices.squeeze(), new_dim_size=databaseNetworkObject.c)
@@ -383,5 +388,4 @@ def getLemmas(doc):
 		pos_tags.append(pos)
 	
 	return words, lemmas, pos_tags
-	
 
