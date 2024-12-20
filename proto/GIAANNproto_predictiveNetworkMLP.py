@@ -15,7 +15,7 @@ see GIAANNproto_main.py
 # Description:
 GIA ANN proto predictive Network MLP
 
-FUTURE: requires pytorch implementation for sparse tensors.
+FUTURE: consider pytorch implementation for sparse tensors.
 
 """
 

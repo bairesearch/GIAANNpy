@@ -253,15 +253,24 @@ def process_column_inference_prediction(sequence_observed_columns, observed_colu
 def predictMostActiveFeature(sequence_observed_columns, global_feature_neurons_activation, databaseNetworkObject, words_doc, lemmas_doc, wordPredictionIndex, sequenceWordIndex, concept_mask):		
 	#generate targets;
 	multiple_sources, previousColumnIndex, nextColumnIndex, targetFeatureIndex, concept_columns_indices_prev, concept_columns_feature_indices_prev = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequence_observed_columns, words_doc, lemmas_doc, concept_mask, sequenceWordIndex, kcNetwork)
-	targets = pt.zeros(databaseNetworkObject.c, databaseNetworkObject.f)
-	targets[previousColumnIndex, targetFeatureIndex] = 1
-	if(multiple_sources):
-		targets[nextColumnIndex, targetFeatureIndex] = 1
+	
+	if(inferencePredictiveNetworkModelTransformer):
+		targets_c = pt.zeros(databaseNetworkObject.c)
+		targets_f = pt.zeros(databaseNetworkObject.f)
+		targets_c[previousColumnIndex] = 1
+		targets_f[targetFeatureIndex] = 1
+		if(multiple_sources):
+			targets_c[nextColumnIndex] = 1	
+	elif(inferencePredictiveNetworkModelMLP):
+		targets = pt.zeros(databaseNetworkObject.c, databaseNetworkObject.f)
+		targets[previousColumnIndex, targetFeatureIndex] = 1
+		if(multiple_sources):
+			targets[nextColumnIndex, targetFeatureIndex] = 1
 
 	if(inferencePredictiveNetworkModelMLP):
 		concept_columns_indices_next, concept_columns_feature_indices_next = GIAANNproto_predictiveNetworkMLP.nextWordPredictionMLPtrainStep(global_feature_neurons_activation, targets)
 	elif(inferencePredictiveNetworkModelTransformer):
-		concept_columns_indices_next, concept_columns_feature_indices_next = GIAANNproto_predictiveNetworkTransformer.nextWordPredictionTransformerTrainStep(databaseNetworkObject.global_feature_neurons, databaseNetworkObject.global_feature_connections, targets)
+		concept_columns_indices_next, concept_columns_feature_indices_next = GIAANNproto_predictiveNetworkTransformer.nextWordPredictionTransformerTrainStep(databaseNetworkObject.global_feature_neurons, databaseNetworkObject.global_feature_connections, targets_c, targets_f)
 
 	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		kc = kcNetwork

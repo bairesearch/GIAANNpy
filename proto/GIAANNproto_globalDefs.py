@@ -22,10 +22,10 @@ import torch as pt
 #RAM availability vars;
 useGPUdense = True	#default: True
 useGPUsparse = False	#default: False	#orig: True
-useGPUpredictiveNetworkModel = False	#default: False #orig: True	#use GPU to train transformer/MLP predictive network model	#FUTURE: requires transformer/MLP pytorch implementation for sparse tensors
+useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/MLP predictive network model
 maxSentenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM availability during train (with trainSequenceObservedColumnsUseSequenceFeaturesOnly only limited amount of data is ever loaded to GPU during train)
 databaseFolder = "" #default: ""
-max_sentences_train = 1000 #default: 100000000	#orig: 1000  # Adjust as needed (eg lower max_sentences_train before independent useInference execution)
+max_sentences_train = 100 #default: 100000000	#orig: 1000  # Adjust as needed (eg lower max_sentences_train before independent useInference execution)
 
 # Set boolean variables as per specification
 useSANI = False
