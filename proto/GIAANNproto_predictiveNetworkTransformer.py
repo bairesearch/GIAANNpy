@@ -15,6 +15,7 @@ see GIAANNproto_main.py
 # Description:
 GIA ANN proto predictive Network Transformer
 
+FUTURE: requires pytorch implementation for sparse tensors.
 
 """
 
@@ -36,6 +37,7 @@ def nextWordPredictionTransformerCreate(databaseNetworkObject):
 	# Instantiate the model
 	#NextWordPredictionTransformerModel
 	model = CustomTransformer(databaseNetworkObject.p, databaseNetworkObject.s, databaseNetworkObject.c, databaseNetworkObject.f, num_layers)
+	model = model.to(devicePredictiveNetworkModel)
 	model.train()  # set model to training mode
 
 	if(multipleTargets):
@@ -48,12 +50,13 @@ def nextWordPredictionTransformerCreate(databaseNetworkObject):
 def nextWordPredictionTransformerTrainStep(global_feature_neurons, database_feature_connections, targets):
 	global model, criterion, optimizer, batch_size
 	
-	global_feature_neurons = global_feature_neurons.unsqueeze(0)	#add batch dim (not used)
 	targets = targets.unsqueeze(0)	#add batch dim
+	targets = targets.to(devicePredictiveNetworkModel)
 	
+	global_feature_neurons = global_feature_neurons.unsqueeze(0)	#add batch dim (not used)
+	global_feature_neurons = global_feature_neurons.to(devicePredictiveNetworkModel)
 	global_feature_neurons = global_feature_neurons.to_dense()
-	if(useGPUdense and not useGPUsparse):
-		global_feature_neurons = global_feature_neurons.to(deviceDense)
+	
 	#print("global_feature_neurons = ", global_feature_neurons)
 	#print("global_feature_neurons.shape = ", global_feature_neurons.shape)
 		
@@ -108,7 +111,7 @@ class InputAttentionLayer(nn.Module):
 		self.f = f  # Number of input features
 
 		# Linear layer for V (values), applied over the feature dimension
-		self.W_v = nn.Linear(f, f, bias=False)
+		self.W_v = nn.Linear(f, f, bias=False, device=devicePredictiveNetworkModel)
 
 	def forward(self, X, database_feature_connections):
 		# X shape: (batch_size, p, s, c, f)
@@ -184,11 +187,13 @@ class CustomTransformer(nn.Module):
 			self.input_attention_layer = InputAttentionLayer(p, s, c, f)
 
 		# Transformer encoder layers for the hidden layers
-		encoder_layer = nn.TransformerEncoderLayer(d_model=self.embedding_dim, nhead=self.p_hidden, dim_feedforward=self.f_mlp)
+		encoder_layer = nn.TransformerEncoderLayer(d_model=self.embedding_dim, nhead=self.p_hidden, dim_feedforward=self.f_mlp, device=devicePredictiveNetworkModel)
 		self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
 		# MLP for deriving the predicted token
-		self.fc = nn.Linear(self.embedding_dim, c * f)
+		print("self.embedding_dim = ", self.embedding_dim)
+		print("c * f = ", c * f)
+		self.fc = nn.Linear(self.embedding_dim, c * f, device=devicePredictiveNetworkModel)
 
 	def forward(self, X, database_feature_connections):
 		# X shape: (batch_size, p, s, c, f)

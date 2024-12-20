@@ -15,6 +15,8 @@ see GIAANNproto_main.py
 # Description:
 GIA ANN proto predictive Network MLP
 
+FUTURE: requires pytorch implementation for sparse tensors.
+
 """
 
 import torch as pt
@@ -37,9 +39,9 @@ class NextWordPredictionMLPmodel(nn.Module):
 		hidden_size_multiplier = 2	#TODO: requires testing
 		hidden_size = (input_size+output_size) * hidden_size_multiplier
 
-		self.fc1 = nn.Linear(input_size, hidden_size)
-		self.relu = nn.ReLU()
-		self.fc2 = nn.Linear(hidden_size, output_size)
+		self.fc1 = nn.Linear(input_size, hidden_size, device=devicePredictiveNetworkModel)
+		self.relu = nn.ReLU(device=devicePredictiveNetworkModel)
+		self.fc2 = nn.Linear(hidden_size, output_size, device=devicePredictiveNetworkModel)
 
 	def forward(self, x):
 		x = x.view(x.size(0), -1)	#Flatten the input: (batch_size, c, f) -> (batch_size, c*f)
@@ -53,6 +55,7 @@ def nextWordPredictionMLPcreate(databaseNetworkObject):
 	global model, criterion, optimizer, batch_size
 
 	model = NextWordPredictionMLPmodel(databaseNetworkObject)
+	model = model.to(devicePredictiveNetworkModel)
 	model.train()  # set model to training mode
 
 	if(multipleTargets):
@@ -65,12 +68,12 @@ def nextWordPredictionMLPcreate(databaseNetworkObject):
 def nextWordPredictionMLPtrainStep(global_feature_neurons_activation, targets):
 	global model, criterion, optimizer, batch_size
 	
-	global_feature_neurons_activation = global_feature_neurons_activation.unsqueeze(0)	#add batch dim
 	targets = targets.unsqueeze(0)	#add batch dim
+	targets = targets.to(devicePredictiveNetworkModel)
 
+	global_feature_neurons_activation = global_feature_neurons_activation.unsqueeze(0)	#add batch dim	
+	global_feature_neurons_activation = global_feature_neurons_activation.to(devicePredictiveNetworkModel)
 	global_feature_neurons_activation = global_feature_neurons_activation.to_dense()
-	if(useGPUdense and not useGPUsparse):
-		global_feature_neurons_activation = global_feature_neurons_activation.to(deviceDense)
 		
 	outputs = model(global_feature_neurons_activation)  # Outputs shape: (batch_size, c, f)
 
