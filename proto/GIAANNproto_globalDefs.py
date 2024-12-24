@@ -25,7 +25,8 @@ useGPUsparse = False	#default: False	#orig: True
 useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/MLP predictive network model
 maxSentenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM availability during train (with trainSequenceObservedColumnsUseSequenceFeaturesOnly only limited amount of data is ever loaded to GPU during train)
 databaseFolder = "" #default: ""
-max_sentences_train = 100 #default: 100000000	#orig: 1000  # Adjust as needed (eg lower max_sentences_train before independent useInference execution)
+max_sentences_train = 100	#500 #default: 100000000	#orig: 1000  # Adjust as needed (eg lower max_sentences_train before independent useInference execution)
+inferenceTrainPredictionNetworkNumberEpochs = 1	#default: 1
 
 # Set boolean variables as per specification
 useSANI = False
@@ -38,12 +39,14 @@ if(useInference):
 	inferenceActivationFunction = True	#default:False	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	transformerUseInputConnections = False	#initialise (dependent var)
 	transformerUseInputAllProperties = False	#initialise (dependent var)
+	printPredictionsDuringInferencePredict = True	#default: True
 	if(inferencePredictiveNetwork):
 		inferenceSavePredictiveNetwork = False
 		if(inferenceTrainPredictionNetworkAllSentences):
 			#inferenceIncrementallySeedNetwork = True	#not supported (uses custom incremental seeding implementation)
 			inferenceSavePredictiveNetwork = True
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False	#next token predictions are used to activate the next column features (rather than prediction targets)
+			inferenceTrainPredictionNetworkNumberEpochs = 1	#10	#number of epochs to train predictive network
 		else:
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True
 		inferencePredictiveNetworkModelMLP = False
@@ -168,11 +171,13 @@ if(useInference):
 
 	if(inferencePredictiveNetwork):
 		if(debugConceptFeaturesOccurFirstInSubsequence):
-			kcNetwork = 1	#number of topk columns to predict
+			kcNetwork = 1	#number of topk columns to target
+			kcPred = 1 	#number of topk columns to predict
 			#inferenceTrainPredictionNetworkAllSentences currently requires debugConceptFeaturesOccurFirstInSubsequence:!multipleTargets if kcNetwork == 1"
 			multipleTargets = False
 		else:
-			kcNetwork = 2	#number of topk columns to predict	#it is unknown which exact column a token belongs to (unless it corresponds to a concept feature/noun)
+			kcNetwork = 2	#number of topk columns to target	#it is unknown which exact column a token belongs to (unless it corresponds to a concept feature/noun)
+			kcPred = 1 	#number of topk columns to predict
 			multipleTargets = True
 		kf = 1	#number of topk features to predict
 		if inferenceTrainPredictionNetworkAllSentences:
@@ -239,10 +244,6 @@ if(inferenceActivationFunction):
 	j1 = 1
 else:
 	j1 = 5   # Activation trace duration
-
-
-# For the purpose of the example, process a limited number of sentences
-sentence_count = 0
 
 	
 

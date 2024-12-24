@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1c15b;
+o1 preview prompt 1c16a;
 
 v1b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -140,3 +140,4 @@ MANUAL; - rename increaseColumnInternalConnectionsStrength*/normaliseConnectionS
 MANUAL; - add option inferenceInvertNeuronActivationUponPrediction - set activations of previously activated neurons to negative - refractory period preventing consecutive feature reactivation and facilitating prediction based on past predictions. Update process_column_inference_prediction:inferenceDeactivateNeuronsUponPrediction.
 MANUAL; - add option useGPUpredictiveNetworkModel - use GPU to train transformer/MLP predictive network model.
 MANUAL; - update inferencePredictiveNetworkModelTransformer - independently predict c/f (rather than producing a single c*f matrix, produce an independent c and f matrix).
+MANUAL; - update process_column_inference_prediction to always print predictions if printPredictionsDuringInferencePredict. Update getTopkPredictionsC to predict topk kcPred columns.

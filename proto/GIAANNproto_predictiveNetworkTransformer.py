@@ -33,7 +33,11 @@ def nextWordPredictionTransformerCreate(databaseNetworkObject):
 	global model, criterion_c, criterion_f, optimizer, batch_size
 
 	num_layers = 3  # Number of transformer layers
-
+	
+	print("nextWordPredictionTransformerCreate:")
+	print("databaseNetworkObject.c = ", databaseNetworkObject.c)
+	print("databaseNetworkObject.f = ", databaseNetworkObject.f)
+	
 	# Instantiate the model
 	#NextWordPredictionTransformerModel
 	model = CustomTransformer(databaseNetworkObject.p, databaseNetworkObject.s, databaseNetworkObject.c, databaseNetworkObject.f, num_layers)
@@ -60,7 +64,7 @@ def nextWordPredictionTransformerTrainStep(global_feature_neurons, database_feat
 	global_feature_neurons = global_feature_neurons.to(devicePredictiveNetworkModel)
 	global_feature_neurons = global_feature_neurons.to_dense()
 	
-	#print("global_feature_neurons = ", global_feature_neurons)
+	#print("global_feature_neurons.shape = ", global_feature_neurons.shape)
 	#print("global_feature_neurons.shape = ", global_feature_neurons.shape)
 		
 	outputs_c, outputs_f = model(global_feature_neurons, database_feature_connections)  # Outputs shape: (batch_size, c, f)
@@ -89,7 +93,7 @@ def getTopkPredictionsC(outputs_c):
 		else:
 			probs_c = F.softmax(outputs_c, dim=-1)
 		
-		topk_values_c, topk_indices_c = pt.topk(probs_c, kcNetwork, dim=1)
+		topk_values_c, topk_indices_c = pt.topk(probs_c, kcPred, dim=1)
 	
 	topk_c = topk_indices_c[0]  # Assuming batch_size=1
 	return topk_c
@@ -104,6 +108,7 @@ def getTopkPredictionsF(outputs_f):
 		topk_values_f, topk_indices_f = pt.topk(probs_f, kf, dim=1)
 	
 	topk_f = topk_indices_f[0]  # Assuming batch_size=1
+	topk_f = topk_f.unsqueeze(-1)	#assume kf=1
 	return topk_f
 	
 class InputAttentionLayer(nn.Module):

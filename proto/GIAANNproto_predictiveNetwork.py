@@ -218,21 +218,18 @@ def process_column_inference_prediction(sequence_observed_columns, observed_colu
 		print("global_feature_neurons_temp = ", global_feature_neurons_temp)
 
 	if(inferencePredictiveNetwork):
-		concept_columns_indices_next, concept_columns_feature_indices_next, multiple_sources, kc = predictMostActiveFeature(sequence_observed_columns, global_feature_neurons_activation, databaseNetworkObject, words_doc, lemmas_doc, wordPredictionIndex, sequenceWordIndex, concept_mask)	
+		concept_columns_indices_next, concept_columns_feature_indices_next, multiple_sources, kc, concept_columns_indices_pred, concept_columns_feature_indices_pred = predictMostActiveFeature(sequence_observed_columns, global_feature_neurons_activation, databaseNetworkObject, words_doc, lemmas_doc, wordPredictionIndex, sequenceWordIndex, concept_mask)	
 	else:
-		concept_columns_indices_next, concept_columns_feature_indices_next, multiple_sources, kc = selectMostActiveFeature(global_feature_neurons_activation, global_feature_neurons_strength)
+		concept_columns_indices_next, concept_columns_feature_indices_next, multiple_sources, kc, concept_columns_indices_pred, concept_columns_feature_indices_pred = selectMostActiveFeature(global_feature_neurons_activation, global_feature_neurons_strength)
 	
-	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
-		#print("concept_columns_indices_next = ", concept_columns_indices_next)
-		#print("concept_columns_feature_indices_next = ", concept_columns_feature_indices_next)
-
+	featurePredictionTargetMatch = False
+	if(printPredictionsDuringInferencePredict):
 		#compare topk column/feature predictions to doc_predict (target words);
-		featurePredictionTargetMatch = False
 		#implementation limitation; only works with kf = 1;
-		for columnPredictionIndex in range(kc):	#or concept_columns_indices_next.shape[0]
-			columnIndex = concept_columns_indices_next[columnPredictionIndex]
+		for columnPredictionIndex in range(concept_columns_indices_pred.shape[0]):
+			columnIndex = concept_columns_indices_pred[columnPredictionIndex]
 			columnName = databaseNetworkObject.concept_columns_list[columnIndex]
-			observedColumnFeatureIndex = concept_columns_feature_indices_next[columnPredictionIndex, 0]
+			observedColumnFeatureIndex = concept_columns_feature_indices_pred[columnPredictionIndex, 0]
 			if(observedColumnFeatureIndex == feature_index_concept_neuron):
 				predictedWord = columnName
 			else:
@@ -241,13 +238,11 @@ def process_column_inference_prediction(sequence_observed_columns, observed_colu
 			print("\t columnName = ", columnName, ", sequenceWordIndex = ", sequenceWordIndex, ", wordPredictionIndex = ", wordPredictionIndex, ", targetWord = ", targetWord, ", predictedWord = ", predictedWord)
 			if(targetWord == predictedWord):
 				featurePredictionTargetMatch = True
-
-		if(drawNetworkDuringInferencePredict):
-			#FUTURE: convert global_feature_neurons_activation back to global_feature_neurons for draw
-			GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns_prediction, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(sequenceWordIndex))
-	else:
-		featurePredictionTargetMatch = False
 	
+	if(drawNetworkDuringInferencePredict):
+		#FUTURE: convert global_feature_neurons_activation back to global_feature_neurons for draw
+		GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns_prediction, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(sequenceWordIndex))
+
 	return featurePredictionTargetMatch, concept_columns_indices_next, concept_columns_feature_indices_next, multiple_sources
 
 def predictMostActiveFeature(sequence_observed_columns, global_feature_neurons_activation, databaseNetworkObject, words_doc, lemmas_doc, wordPredictionIndex, sequenceWordIndex, concept_mask):		
@@ -268,11 +263,13 @@ def predictMostActiveFeature(sequence_observed_columns, global_feature_neurons_a
 			targets[nextColumnIndex, targetFeatureIndex] = 1
 
 	if(inferencePredictiveNetworkModelMLP):
-		concept_columns_indices_next, concept_columns_feature_indices_next = GIAANNproto_predictiveNetworkMLP.nextWordPredictionMLPtrainStep(global_feature_neurons_activation, targets)
+		concept_columns_indices_pred, concept_columns_feature_indices_pred = GIAANNproto_predictiveNetworkMLP.nextWordPredictionMLPtrainStep(global_feature_neurons_activation, targets)
 	elif(inferencePredictiveNetworkModelTransformer):
-		concept_columns_indices_next, concept_columns_feature_indices_next = GIAANNproto_predictiveNetworkTransformer.nextWordPredictionTransformerTrainStep(databaseNetworkObject.global_feature_neurons, databaseNetworkObject.global_feature_connections, targets_c, targets_f)
+		concept_columns_indices_pred, concept_columns_feature_indices_pred = GIAANNproto_predictiveNetworkTransformer.nextWordPredictionTransformerTrainStep(databaseNetworkObject.global_feature_neurons, databaseNetworkObject.global_feature_connections, targets_c, targets_f)
 
 	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+		concept_columns_indices_next = concept_columns_indices_pred
+		concept_columns_feature_indices_next = concept_columns_feature_indices_pred
 		kc = kcNetwork
 		if(kc == 1 and kf == 1):
 			multiple_sources = False
@@ -288,7 +285,7 @@ def predictMostActiveFeature(sequence_observed_columns, global_feature_neurons_a
 			kc = 1
 		assert kf==1
 		
-	return concept_columns_indices_next, concept_columns_feature_indices_next, multiple_sources, kc
+	return concept_columns_indices_next, concept_columns_feature_indices_next, multiple_sources, kc, concept_columns_indices_pred, concept_columns_feature_indices_pred
 
 
 def selectMostActiveFeature(global_feature_neurons_activation, global_feature_neurons_strength):
@@ -338,7 +335,7 @@ def selectMostActiveFeature(global_feature_neurons_activation, global_feature_ne
 	else:
 		multiple_sources = False
 		
-	return concept_columns_indices_next, concept_columns_feature_indices_next, multiple_sources, kc
+	return concept_columns_indices_next, concept_columns_feature_indices_next, multiple_sources, kc, concept_columns_indices_next, concept_columns_feature_indices_next
 
 
 #first dim cs1 restricted to a single token

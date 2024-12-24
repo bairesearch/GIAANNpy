@@ -52,33 +52,36 @@ databaseNetworkObject = GIAANNproto_databaseNetwork.initialiseDatabaseNetwork()
 databaseNetworkObject.nlp = nlp	#used by pos_string_to_pos_int
 
 def main():
+	global sentence_count
 	GIAANNproto_databaseNetworkFiles.initialiseDatabaseFiles()
 	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictionNetworkAllSentences):
 		GIAANNproto_predictiveNetwork.initialisePredictiveNetwork(databaseNetworkObject)
 
-	# Start processing the dataset
-	if((useInference and not inferenceTrainPredictionNetworkAllSentences) or debugSmallDataset):
-		process_prompt()
-	else:
-		process_dataset(dataset)
+	for epochIndex in range(inferenceTrainPredictionNetworkNumberEpochs):
+		print("\nepochIndex = ", epochIndex)
+		# Start processing the dataset
+		sentence_count = 0
+		if((useInference and not inferenceTrainPredictionNetworkAllSentences) or debugSmallDataset):
+			process_prompt()
+		else:
+			process_dataset(dataset)
 		
 	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictionNetworkAllSentences and inferenceSavePredictiveNetwork):
 		GIAANNproto_predictiveNetwork.inferenceSavePredictiveNetwork()
 
 def process_prompt():
-	global sentence_count
 	with open(inference_prompt_file, 'r', encoding='utf-8') as file:
 		text = file.read()
 	articleIndex = 0
 	process_article(text, articleIndex)
 	
 def process_dataset(dataset):
-	global sentence_count
 	for articleIndex, article in enumerate(dataset):
 		process_article(article['text'], articleIndex)
+		if sentence_count == max_sentences_train:
+			break
 
 def process_article(text, articleIndex):
-	global sentence_count
 	#sentences = sent_tokenize(text)
 	sentences = nlp(text)
 	numberOfSentences = len(list(sentences.sents))
@@ -90,7 +93,7 @@ def process_article(text, articleIndex):
 		if(len(sentence) <= maxSentenceLength):
 			process_sentence(articleIndex, sentenceIndex, sentence, lastSentenceInPrompt)
 		if sentence_count == max_sentences_train:
-			exit(0)
+			break
 			
 def process_sentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
 	global sentence_count
