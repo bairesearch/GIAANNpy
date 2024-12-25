@@ -672,7 +672,9 @@ def process_features_active_train(sequence_observed_columns, feature_neurons_act
 	sequence_observed_columns.feature_neurons[array_index_properties_strength, :, :, :] += feature_neurons_active
 	sequence_observed_columns.feature_neurons[array_index_properties_permanence, :, :, :] += feature_neurons_active*z1	#orig = feature_neurons_active*(sequence_observed_columns.feature_neurons[array_index_properties_permanence] ** 2) + feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_permanence]
 	sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :, :] = 0 #+= feature_neurons_active*j1	#update the activations of the target not source nodes
-	if(useInference and not inferenceUseNeuronFeaturePropertiesTime):
+	if(inferenceUseNeuronFeaturePropertiesTime):
+		sequence_observed_columns.feature_neurons[array_index_properties_time, :, :, :] = 0
+	else:
 		sequence_observed_columns.feature_neurons[array_index_properties_time, :, :, :] = feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_time] + feature_neurons_active*sentenceIndex
 	sequence_observed_columns.feature_neurons[array_index_properties_pos, :, :, :] = feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_pos] + feature_neurons_active*feature_neurons_pos
 
@@ -706,7 +708,9 @@ def process_features_active_train(sequence_observed_columns, feature_neurons_act
 	sequence_observed_columns.feature_connections[array_index_properties_strength, :, :, :, :, :] += feature_connections_strength_update
 	sequence_observed_columns.feature_connections[array_index_properties_permanence, :, :, :, :, :] += feature_connections_active*z1	#orig = feature_connections_active*(sequence_observed_columns.feature_connections[array_index_properties_permanence] ** 2) + feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_permanence]
 	sequence_observed_columns.feature_connections[array_index_properties_activation, :, :, :, :, :] = 0	#+= feature_connections_active*j1	#connection activations are not currently used
-	if(useInference and not inferenceUseNeuronFeaturePropertiesTime):
+	if(inferenceUseNeuronFeaturePropertiesTime):
+		sequence_observed_columns.feature_connections[array_index_properties_time, :, :, :, :, :] = 0
+	else:
 		sequence_observed_columns.feature_connections[array_index_properties_time, :, :, :, :, :] = feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_time] + feature_connections_active*sentenceIndex
 	sequence_observed_columns.feature_connections[array_index_properties_pos, :, :, :, :, :] = feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_pos] + feature_connections_active*feature_connections_pos
 

@@ -75,6 +75,7 @@ if(useInference):
 	drawNetworkDuringInferencePredict = False
 	drawNetworkDuringInferenceSave = False
 else:
+	inferenceUseNeuronFeaturePropertiesTime = False
 	lowMem = False		 #default: False	#orig: True	#currently required to be False for inference compatibility	#optional
 	trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
 	trainSequenceObservedColumnsMatchSequenceWords = True	#optional	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sentence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
