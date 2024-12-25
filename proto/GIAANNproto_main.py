@@ -56,6 +56,7 @@ def main():
 	GIAANNproto_databaseNetworkFiles.initialiseDatabaseFiles()
 	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictionNetworkAllSentences):
 		GIAANNproto_predictiveNetwork.initialisePredictiveNetwork(databaseNetworkObject)
+		GIAANNproto_databaseNetwork.backupGlobalArrays(databaseNetworkObject)
 
 	for epochIndex in range(inferenceTrainPredictionNetworkNumberEpochs):
 		print("\nepochIndex = ", epochIndex)
@@ -102,7 +103,9 @@ def process_sentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
 		initialiseDatabaseNetwork()
 		if(not lowMem):
 			databaseNetworkObject.global_feature_neurons = GIAANNproto_databaseNetwork.initialiseFeatureNeuronsGlobal(databaseNetworkObject.c, databaseNetworkObject.f)
-
+	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictionNetworkAllSentences):
+		GIAANNproto_databaseNetwork.restoreGlobalArrays(databaseNetworkObject)	#restore global arrays (reset activation and time etc properties between sentences)
+		
 	print(f"Processing article: {articleIndex}, sentence: {sentenceIndex} {doc.text}")
 
 	databaseNetworkObject.articleIndexDebug = articleIndex
@@ -130,7 +133,10 @@ def process_sentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
 		# Create the sequence observed columns object
 		sequence_observed_columns = GIAANNproto_databaseNetworkTrain.SequenceObservedColumns(databaseNetworkObject, words, lemmas, observed_columns_dict, observed_columns_sequence_word_index_dict)
 
-		if(not lastSentenceInPrompt):
+		if(useInference and (inferenceTrainPredictionNetworkAllSentences or lastSentenceInPrompt)):
+			# Process each concept word in the sequence (predict)
+			GIAANNproto_predictiveNetwork.process_concept_words_inference(sequence_observed_columns, sentence_count, doc, doc_seed, doc_predict, num_seed_tokens, num_prediction_tokens)
+		else:
 			# Process each concept word in the sequence (train)
 			GIAANNproto_databaseNetworkTrain.process_concept_words(sequence_observed_columns, sentence_count, doc, words, lemmas, pos_tags)
 
@@ -145,10 +151,6 @@ def process_sentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
 				# Visualize the complete graph every time a new sentence is parsed by the application.
 				GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+str(sentenceIndex))
 
-		if(useInference and (inferenceTrainPredictionNetworkAllSentences or lastSentenceInPrompt)):
-			# Process each concept word in the sequence (predict)
-			GIAANNproto_predictiveNetwork.process_concept_words_inference(sequence_observed_columns, sentence_count, doc, doc_seed, doc_predict, num_seed_tokens, num_prediction_tokens)
-			
 	# Break if we've reached the maximum number of sentences
 	sentence_count += 1
 		

@@ -35,7 +35,18 @@ class DatabaseNetworkClass():
 		self.concept_features_list = concept_features_list
 		self.global_feature_neurons = global_feature_neurons
 		self.global_feature_connections = None #transformerUseInputConnections: initialised during prediction phase
+
+def backupGlobalArrays(databaseNetworkObject):
+	databaseNetworkObject.global_feature_neurons_backup = databaseNetworkObject.global_feature_neurons.clone()
+	if(databaseNetworkObject.global_feature_connections is not None):
+		databaseNetworkObject.global_feature_connections_backup = databaseNetworkObject.global_feature_connections.clone()
+	else:
+		databaseNetworkObject.global_feature_connections_backup = None
 		
+def restoreGlobalArrays(databaseNetworkObject):
+	databaseNetworkObject.global_feature_neurons = databaseNetworkObject.global_feature_neurons_backup
+	databaseNetworkObject.global_feature_connections = databaseNetworkObject.global_feature_connections_backup
+
 # Initialize global feature neuron arrays if lowMem is disabled
 if not lowMem:
 	def initialiseFeatureNeuronsGlobal(c, f):

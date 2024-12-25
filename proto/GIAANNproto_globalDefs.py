@@ -46,7 +46,7 @@ if(useInference):
 			#inferenceIncrementallySeedNetwork = True	#not supported (uses custom incremental seeding implementation)
 			inferenceSavePredictiveNetwork = True
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False	#next token predictions are used to activate the next column features (rather than prediction targets)
-			inferenceTrainPredictionNetworkNumberEpochs = 10	#default: 1	#10	#number of epochs to train predictive network
+			inferenceTrainPredictionNetworkNumberEpochs = 1	#default: 1	#10	#number of epochs to train predictive network
 		else:
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True
 		inferencePredictiveNetworkModelMLP = False

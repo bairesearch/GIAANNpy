@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1c16b;
+o1 preview prompt 1c16c;
 
 v1b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -142,3 +142,4 @@ MANUAL; - add option useGPUpredictiveNetworkModel - use GPU to train transformer
 MANUAL; - update inferencePredictiveNetworkModelTransformer - independently predict c/f (rather than producing a single c*f matrix, produce an independent c and f matrix).
 MANUAL; - update process_column_inference_prediction to always print predictions if printPredictionsDuringInferencePredict. Update getTopkPredictionsC to predict topk kcPred columns.
 MANUAL; - Add option inferenceUseNeuronFeaturePropertiesTime - assign last activation time during inference. Disable inferenceInvertNeuronActivationUponPrediction.
+MANUAL; - update inferenceTrainPredictionNetworkAllSentences implementation - do not train database network (expect pretrain).
