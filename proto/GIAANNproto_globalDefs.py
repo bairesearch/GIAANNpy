@@ -25,7 +25,7 @@ useGPUsparse = False	#default: False	#orig: True
 useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/MLP predictive network model
 maxSentenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM availability during train (with trainSequenceObservedColumnsUseSequenceFeaturesOnly only limited amount of data is ever loaded to GPU during train)
 databaseFolder = "" #default: ""
-max_sentences_train = 100	#500 #default: 100000000	#orig: 1000  # Adjust as needed (eg lower max_sentences_train before independent useInference execution)
+max_sentences_train = 100	#500 #default: 100000000	  # Adjust as needed (eg lower max_sentences_train before independent useInference execution)
 inferenceTrainPredictionNetworkNumberEpochs = 1	#default: 1
 
 # Set boolean variables as per specification
@@ -46,6 +46,10 @@ if(useInference):
 			#inferenceIncrementallySeedNetwork = True	#not supported (uses custom incremental seeding implementation)
 			inferenceSavePredictiveNetwork = True
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False	#next token predictions are used to activate the next column features (rather than prediction targets)
+			if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+				inferenceTrainPredictionNetworkBurstAllTargetsInSequence = False	#default: False	#orig: False
+			else:
+				inferenceTrainPredictionNetworkBurstAllTargetsInSequence = False	#default: False	#orig: True
 			inferenceTrainPredictionNetworkNumberEpochs = 1	#default: 1	#10	#number of epochs to train predictive network
 		else:
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True

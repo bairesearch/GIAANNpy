@@ -145,7 +145,8 @@ def process_column_inference_prediction(sequence_observed_columns, sentenceIndex
 		global_feature_connections_activation = None
 
 	if(inferenceTrainPredictionNetworkAllSentences):
-		if(wordPredictionIndex==0 or not inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+		#burst the initial seed in the sequence
+		if(wordPredictionIndex==0 or inferenceTrainPredictionNetworkBurstAllTargetsInSequence):
 			#activate source token (incremental seed during train)
 				#if(wordPredictionIndex == 1) will reactivate first seed token column feature (as it was not saved during wordPredictionIndex==0)
 			for concept_index in range(concept_columns_indices.shape[0]):
