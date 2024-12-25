@@ -35,7 +35,8 @@ def add_value_to_sparse_tensor_values(sparse_tensor, value):
 	sparse_tensor = pt.sparse_coo_tensor(sparse_tensor.indices(), sparse_tensor.values() + value, sparse_tensor.size(), device=deviceSparse)
 	sparse_tensor = sparse_tensor.coalesce()
 	return sparse_tensor
-	
+
+#replace or multiply element(s) at index with/by new_value
 def modify_sparse_tensor(sparse_tensor, indices_to_update, new_value, multiply=False):
 	indices_to_update = indices_to_update.to(sparse_tensor.device)
 	

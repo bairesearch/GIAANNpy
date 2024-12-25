@@ -35,7 +35,7 @@ if(useInference):
 	inferencePredictiveNetwork = False	#use MLP to predict next token	#orig:False
 	inferenceTrainPredictionNetworkAllSentences = False	#support predictive network training on every sentence in corpus.
 	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False
-	inferenceUseNeuronFeaturePropertiesTime = False	#default:False	#orig:False	#not yet implemented	#FUTURE; else use during train
+	inferenceUseNeuronFeaturePropertiesTime = False	#default:False	#orig:False		#FUTURE; else can use during train
 	inferenceActivationFunction = True	#default:False	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	transformerUseInputConnections = False	#initialise (dependent var)
 	transformerUseInputAllProperties = False	#initialise (dependent var)
@@ -46,7 +46,7 @@ if(useInference):
 			#inferenceIncrementallySeedNetwork = True	#not supported (uses custom incremental seeding implementation)
 			inferenceSavePredictiveNetwork = True
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False	#next token predictions are used to activate the next column features (rather than prediction targets)
-			inferenceTrainPredictionNetworkNumberEpochs = 1	#10	#number of epochs to train predictive network
+			inferenceTrainPredictionNetworkNumberEpochs = 10	#default: 1	#10	#number of epochs to train predictive network
 		else:
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True
 		inferencePredictiveNetworkModelMLP = False
@@ -143,14 +143,16 @@ if usePOS:
 inference_prompt_file = databaseFolder + 'inference_prompt.txt'
 if(useInference):
 	if(inferencePredictiveNetwork):
-		inferenceInvertNeuronActivationUponPrediction = True	#default: True	#orig: False	#set activations of previously activated neurons to negative - refractory period preventing consecutive feature reactivation and facilitating prediction based on past predictions
-		inferenceDeactivateNeuronsUponPrediction = False #do not use inferenceDeactivateNeuronsUponPrediction as the predictive network needs a temporarily consistent trace of the activations in the network
+		inferenceInvertNeuronActivationUponPrediction = False	#orig: False	#set activations of previously activated neurons to negative - refractory period preventing consecutive feature reactivation and facilitating prediction based on past predictions
 		#if(not inferenceActivationFunction):	#do not decrement activations if they are decremented every time the activation function is applied
 		inferenceDecrementActivations = True
 		if(inferenceDecrementActivations):
 			inferenceDecrementActivationsNonlinear = True
 		if(inferenceInvertNeuronActivationUponPrediction):
 			inferenceInvertNeuronActivationUponPredictionLevel = -0.1	#orig: -1.0	#	#default: -0.1; inferenceInvertNeuronActivationUponPrediction inversion also significantly decreases activation level by a factor of approx 10x (ie 0.1), enabling reactivation after only a few feature predictions (by positive addition). inferenceDecrementActivations decrement will continue to be applied non-linearly (inferenceDecrementActivationsNonlinear) to negative activations thereby retaining their negative activation until they are predicted again (making them positive).
+			inferenceDeactivateNeuronsUponPrediction = False #do not use inferenceDeactivateNeuronsUponPrediction as the predictive network needs a temporarily consistent trace of the activations in the network		
+		else:
+			inferenceDeactivateNeuronsUponPrediction = True
 	else:
 		inferenceInvertNeuronActivationUponPrediction = False
 		inferenceDeactivateNeuronsUponPrediction = True

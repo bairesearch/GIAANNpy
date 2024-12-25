@@ -127,10 +127,10 @@ def process_concept_words_inference(sequence_observed_columns, sentenceIndex, do
 	#predict next tokens;
 	for wordPredictionIndex in range(num_prediction_tokens):
 		sequenceWordIndex = num_seed_tokens + wordPredictionIndex
-		featurePredictionTargetMatch, concept_columns_indices, concept_columns_feature_indices, multiple_sources = process_column_inference_prediction(sequence_observed_columns, observed_columns_dict, wordPredictionIndex, sequenceWordIndex, words_doc, lemmas_doc, concept_columns_indices, concept_columns_feature_indices, concept_mask, multiple_sources)
+		featurePredictionTargetMatch, concept_columns_indices, concept_columns_feature_indices, multiple_sources = process_column_inference_prediction(sequence_observed_columns, sentenceIndex, observed_columns_dict, wordPredictionIndex, sequenceWordIndex, words_doc, lemmas_doc, concept_columns_indices, concept_columns_feature_indices, concept_mask, multiple_sources)
 		
 
-def process_column_inference_prediction(sequence_observed_columns, observed_columns_dict, wordPredictionIndex, sequenceWordIndex, words_doc, lemmas_doc, concept_columns_indices, concept_columns_feature_indices, concept_mask, multiple_sources):
+def process_column_inference_prediction(sequence_observed_columns, sentenceIndex, observed_columns_dict, wordPredictionIndex, sequenceWordIndex, words_doc, lemmas_doc, concept_columns_indices, concept_columns_feature_indices, concept_mask, multiple_sources):
 	
 	databaseNetworkObject = sequence_observed_columns.databaseNetworkObject
 	
@@ -148,6 +148,7 @@ def process_column_inference_prediction(sequence_observed_columns, observed_colu
 			
 	global_feature_neurons_activation = databaseNetworkObject.global_feature_neurons[array_index_properties_activation]
 	global_feature_neurons_strength = databaseNetworkObject.global_feature_neurons[array_index_properties_strength]
+	global_feature_neurons_time = databaseNetworkObject.global_feature_neurons[array_index_properties_time]
 	if(transformerUseInputConnections):
 		global_feature_connections_activation = databaseNetworkObject.global_feature_connections[array_index_properties_activation]
 	else:
@@ -203,12 +204,17 @@ def process_column_inference_prediction(sequence_observed_columns, observed_colu
 			elif(inferenceInvertNeuronActivationUponPrediction):
 				modifier = inferenceInvertNeuronActivationUponPredictionLevel
 			global_feature_neurons_activation = GIAANNproto_sparseTensors.modify_sparse_tensor(global_feature_neurons_activation, indices_to_update, modifier, multiply=inferenceInvertNeuronActivationUponPrediction)
+			if(inferenceUseNeuronFeaturePropertiesTime):
+				previousActivationTime = sentenceIndex-1	#higher: neuron was more recently activated
+				global_feature_neurons_time = GIAANNproto_sparseTensors.modify_sparse_tensor(global_feature_neurons_time, indices_to_update, previousActivationTime)
+
 			#global_feature_neurons_activation[concept_columns_indices, concept_columns_feature_indices] = 0	
 
 		databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.global_feature_neurons, global_feature_neurons_activation, array_index_properties_activation)
 		if(transformerUseInputConnections):
 			databaseNetworkObject.global_feature_connections = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.global_feature_connections, global_feature_connections_activation, array_index_properties_activation)
-
+		if(inferenceUseNeuronFeaturePropertiesTime):
+			databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.global_feature_neurons, global_feature_neurons_time, array_index_properties_time)
 	else:
 		#activation targets have already been activated
 		sequence_observed_columns_prediction = SequenceObservedColumnsDraw(databaseNetworkObject, observed_columns_dict)
