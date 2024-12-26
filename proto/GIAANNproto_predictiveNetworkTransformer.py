@@ -27,11 +27,11 @@ import torch.nn.functional as F
 import os
 
 from GIAANNproto_globalDefs import *
-
+import GIAANNproto_predictiveNetworkOperations
 	
 
 def nextWordPredictionTransformerCreate(databaseNetworkObject):
-	global model, criterion_c, criterion_f, optimizer, batch_size
+	global model, criterion, criterion_c, criterion_f, optimizer, batch_size
 
 	num_layers = 3  # Number of transformer layers
 	
@@ -45,21 +45,30 @@ def nextWordPredictionTransformerCreate(databaseNetworkObject):
 	model = model.to(devicePredictiveNetworkModel)
 	model.train()  # set model to training mode
 
-	if multipleTargets:
-		criterion_c = nn.BCEWithLogitsLoss()
-		criterion_f = nn.BCEWithLogitsLoss()
+	if(inferencePredictiveNetworkIndependentFCpredictions):
+		if multipleTargets:
+			criterion_c = nn.BCEWithLogitsLoss()
+			criterion_f = nn.BCEWithLogitsLoss()
+		else:
+			criterion_c = nn.CrossEntropyLoss()
+			criterion_f = nn.CrossEntropyLoss()
 	else:
-		criterion_c = nn.CrossEntropyLoss()
-		criterion_f = nn.CrossEntropyLoss()
-			
+		if(multipleTargets):
+			criterion = nn.BCEWithLogitsLoss()
+		else:
+			criterion = nn.MSELoss()
+	
 	optimizer = optim.Adam(model.parameters(), lr=inferencePredictiveNetworkLearningRate)
 	batch_size = 1
 	
-def nextWordPredictionTransformerTrainStep(global_feature_neurons, database_feature_connections, targets_c, targets_f):
-	global model, criterion_c, criterion_f, optimizer, batch_size
+def nextWordPredictionTransformerTrainStep(global_feature_neurons, database_feature_connections, targets, targets_c, targets_f):
+	global model, criterion, criterion_c, criterion_f, optimizer, batch_size
 	
-	targets_c = targets_c.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
-	targets_f = targets_f.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
+	if(inferencePredictiveNetworkIndependentFCpredictions):
+		targets_c = targets_c.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
+		targets_f = targets_f.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
+	else:
+		targets = targets.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
 	
 	global_feature_neurons = global_feature_neurons.unsqueeze(0)	#add batch dim (not used)
 	global_feature_neurons = global_feature_neurons.to(devicePredictiveNetworkModel)
@@ -68,49 +77,31 @@ def nextWordPredictionTransformerTrainStep(global_feature_neurons, database_feat
 	#print("global_feature_neurons.shape = ", global_feature_neurons.shape)
 	#print("global_feature_neurons.shape = ", global_feature_neurons.shape)
 		
-	outputs_c, outputs_f = model(global_feature_neurons, database_feature_connections)  # Outputs shape: (batch_size, c, f)
 
-	loss_c = criterion_c(outputs_c, targets_c)
-	loss_f = criterion_f(outputs_f, targets_f)
-	loss = loss_c + loss_f  # Combine losses
-	
+	if(inferencePredictiveNetworkIndependentFCpredictions):
+		outputs_c, outputs_f = model(global_feature_neurons, database_feature_connections)  # Outputs shape: (batch_size, c, f)
+		loss_c = criterion_c(outputs_c, targets_c)
+		loss_f = criterion_f(outputs_f, targets_f)
+		loss = loss_c + loss_f  # Combine losses
+	else:
+		outputs = model(global_feature_neurons, database_feature_connections)  # Outputs shape: (batch_size, c, f)
+		loss = criterion(outputs, targets)
+
 	optimizer.zero_grad()
 	loss.backward()
 	optimizer.step()
 
 	loss_value = loss.item()
 	print("loss_value = ", loss_value)
-
-	topk_c = getTopkPredictionsC(outputs_c)
-	topk_f = getTopkPredictionsF(outputs_f)
 	
-	return topk_c, topk_f
+	if(inferencePredictiveNetworkIndependentFCpredictions):
+		topk_c = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsC(outputs_c)
+		topk_f = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsF(outputs_f)
+		return topk_c, topk_f
+	else:
+		topk = GIAANNproto_predictiveNetworkOperations.getTopkPredictions(outputs)
+		return topk
 	
-
-def getTopkPredictionsC(outputs_c):
-	with pt.no_grad():
-		if multipleTargets:
-			probs_c = pt.sigmoid(outputs_c)
-		else:
-			probs_c = F.softmax(outputs_c, dim=-1)
-		
-		topk_values_c, topk_indices_c = pt.topk(probs_c, kcPred, dim=1)
-	
-	topk_c = topk_indices_c[0]  # Assuming batch_size=1
-	return topk_c
-	
-def getTopkPredictionsF(outputs_f):
-	with pt.no_grad():
-		if multipleTargets:
-			probs_f = pt.sigmoid(outputs_f)
-		else:
-			probs_f = F.softmax(outputs_f, dim=-1)
-		
-		topk_values_f, topk_indices_f = pt.topk(probs_f, kf, dim=1)
-	
-	topk_f = topk_indices_f[0]  # Assuming batch_size=1
-	topk_f = topk_f.unsqueeze(-1)	#assume kf=1
-	return topk_f
 	
 class InputAttentionLayer(nn.Module):
 	def __init__(self, p, s, c, f):
@@ -204,9 +195,12 @@ class CustomTransformer(nn.Module):
 			self.initialise_encoder_weights_near_zero()
 
 		# MLP for deriving the predicted token
-		self.fc_c = nn.Linear(self.embedding_dim, self.c, device=devicePredictiveNetworkModel)
-		self.fc_f = nn.Linear(self.embedding_dim, self.f, device=devicePredictiveNetworkModel)
-
+		if(inferencePredictiveNetworkIndependentFCpredictions):
+			self.fc_c = nn.Linear(self.embedding_dim, self.c, device=devicePredictiveNetworkModel)
+			self.fc_f = nn.Linear(self.embedding_dim, self.f, device=devicePredictiveNetworkModel)
+		else:
+			self.fc = nn.Linear(self.embedding_dim, c * f, device=devicePredictiveNetworkModel)
+		
 	def forward(self, X, database_feature_connections):
 		# X shape: (batch_size, p, s, c, f)
 		# database_feature_connections shape: (p, s, c, f, c, f)
@@ -228,20 +222,36 @@ class CustomTransformer(nn.Module):
 		# Use the output from the last sequence position
 		final_output = transformer_output[-1]  # Shape: (batch_size, embedding_dim)
 
-		# Apply the separate MLPs to derive logits for c and f
-		logits_c = self.fc_c(final_output)  # Shape: (batch_size, c)
-		logits_f = self.fc_f(final_output)  # Shape: (batch_size, f)
-
-		if multipleTargets:
-			probabilities_c = logits_c
-			probabilities_f = logits_f
+		if(inferencePredictiveNetworkIndependentFCpredictions):
+			# Apply the separate MLPs to derive logits for c and f
+			logits_c = self.fc_c(final_output)  # Shape: (batch_size, c)
+			logits_f = self.fc_f(final_output)  # Shape: (batch_size, f)
+			return logits_c, logits_f  # Two separate outputs	 # Shape: (batch_size, c), Shape: (batch_size, f)
+			'''
+			if multipleTargets:
+				probabilities_c = logits_c
+				probabilities_f = logits_f
+			else:
+				probabilities_c = F.softmax(logits_c, dim=-1)  # Shape: (batch_size, c)
+				probabilities_f = F.softmax(logits_f, dim=-1)  # Shape: (batch_size, f)
+			return probabilities_c, probabilities_f  # Two separate outputs	 # Shape: (batch_size, c), Shape: (batch_size, f)
+			'''
 		else:
-			# Apply softmax to get probabilities
-			probabilities_c = F.softmax(logits_c, dim=-1)  # Shape: (batch_size, c)
-			probabilities_f = F.softmax(logits_f, dim=-1)  # Shape: (batch_size, f)
-
-		return probabilities_c, probabilities_f  # Two separate outputs	 # Shape: (batch_size, c), Shape: (batch_size, f)
-
+			# Apply the MLP to derive the logits
+			logits = self.fc(final_output)  # Shape: (batch_size, c * f)
+			logits = logits.view(batch_size, self.c, self.f)
+			return logits  # Shape: (batch_size, c, f)
+			'''
+			if(multipleTargets):
+				probabilities = logits
+			else:
+				#Apply softmax to get probabilities over (c, f)
+				logits_flat = logits.view(batch_size, -1)  # Shape: (batch_size, c * f)
+				probabilities_flat = F.softmax(logits_flat, dim=-1)
+				probabilities = probabilities_flat.view(batch_size, self.c, self.f)  # Shape: (batch_size, c, f)
+			return probabilities  # Shape: (batch_size, c, f)
+			'''
+		
 	def initialise_encoder_weights_near_zero(self, init_std = 1e-5):
 		# 3. Initialize each layer to be near-identity.
 		for layer in self.transformer_encoder.layers:

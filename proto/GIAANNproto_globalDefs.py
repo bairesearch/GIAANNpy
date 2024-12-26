@@ -25,31 +25,32 @@ useGPUsparse = False	#default: False	#orig: True
 useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/MLP predictive network model
 maxSentenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM availability during train (with trainSequenceObservedColumnsUseSequenceFeaturesOnly only limited amount of data is ever loaded to GPU during train)
 databaseFolder = "" #default: ""
-max_sentences = 10	#500 #default: 100000000	  # Adjust as needed (eg lower max_sentences before independent useInference execution)	#max sentences for train or inference
-inferenceTrainPredictionNetworkNumberEpochs = 1	#default: 1
+max_sentences = 100	#debug: 10, 500 	#default: 100000000	  #adjust as needed (eg lower max_sentences during train before independent inferenceTrainPredictiveNetworkAllSentences execution)	#max sentences for train or inference
+numberEpochs = 1	#default: 1
 
 # Set boolean variables as per specification
-useSANI = False
+useSANI = False	#sequentially activated neuronal input (divide dendrites into segments)
 useInference = False  # useInference mode
 if(useInference):
 	inferencePredictiveNetwork = False	#use MLP to predict next token	#orig:False
-	inferenceTrainPredictionNetworkAllSentences = False	#support predictive network training on every sentence in corpus.	#precondition: expects database network to have been completely trained (with !useInference on all sentences)
+	inferenceTrainPredictiveNetworkAllSentences = False	#support predictive network training on every sentence in corpus.	#precondition: expects database network to have been completely trained (with !useInference on all sentences)
 	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False	#incremental seeding is used to match the inference prediction phase algorithm (for consistency in activation method)
 	inferenceUseNeuronFeaturePropertiesTime = False	#default:False	#orig:False		#FUTURE; else can use during train
-	inferenceActivationFunction = True	#default:False	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
+	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	transformerUseInputConnections = False	#initialise (dependent var)
 	transformerUseInputAllProperties = False	#initialise (dependent var)
 	printPredictionsDuringInferencePredict = True	#default: True
 	if(inferencePredictiveNetwork):
-		inferenceSavePredictiveNetwork = False
-		if(inferenceTrainPredictionNetworkAllSentences):
-			inferenceSavePredictiveNetwork = True
-			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False	#next token predictions are used to activate the next column features (rather than prediction targets)
-			inferenceTrainPredictionNetworkNumberEpochs = 1000	#default: 1	#10	#number of epochs to train predictive network
-		else:
-			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True
 		inferencePredictiveNetworkModelMLP = False
 		inferencePredictiveNetworkModelTransformer = True
+		inferenceSavePredictiveNetwork = False
+		inferencePredictiveNetworkIndependentFCpredictions = True	#required for large database network (else may require output MLP of shape c*f * c*f)
+		if(inferenceTrainPredictiveNetworkAllSentences):
+			inferenceSavePredictiveNetwork = True
+			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False	#next token predictions are used to activate the next column features (rather than prediction targets)
+			numberEpochs = 1000	#default: 1	#10	#debug: 1000	#number of epochs to train predictive network
+		else:
+			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True
 		if(inferencePredictiveNetworkModelMLP):
 			inferencePredictiveNetworkLearningRate = 0.0005	#default: 0.0005
 		elif(inferencePredictiveNetworkModelTransformer):
@@ -190,13 +191,13 @@ if(useInference):
 	if(inferencePredictiveNetwork):
 		if(debugConceptFeaturesOccurFirstInSubsequence):
 			kcPred = 1 	#number of topk columns to predict	#mandatory: 1
-			#inferenceTrainPredictionNetworkAllSentences currently requires debugConceptFeaturesOccurFirstInSubsequence:!multipleTargets if kcNetwork == 1"
+			#inferenceTrainPredictiveNetworkAllSentences currently requires debugConceptFeaturesOccurFirstInSubsequence:!multipleTargets if kcNetwork == 1"
 			multipleTargets = False
 		else:
 			kcPred = 1 	#number of topk columns to predict
 			multipleTargets = True
 		kf = 1	#number of topk features to predict
-		if inferenceTrainPredictionNetworkAllSentences:
+		if inferenceTrainPredictiveNetworkAllSentences:
 			assert kf==1
 		if kf>1:
 			multipleTargets = True

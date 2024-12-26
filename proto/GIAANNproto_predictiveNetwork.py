@@ -113,7 +113,7 @@ def process_concept_words_inference(sequence_observed_columns, sentenceIndex, do
 	else:
 		num_prediction_tokens = len(doc_predict)	#set num_prediction_tokens (dynamic) 
 	
-	if(inferencePredictiveNetwork and not inferenceTrainPredictionNetworkAllSentences):
+	if(inferencePredictiveNetwork and not inferenceTrainPredictiveNetworkAllSentences):
 		initialisePredictiveNetwork(sequence_observed_columns.databaseNetworkObject)
 			
 	#identify first activated column(s) in prediction phase:
@@ -260,23 +260,26 @@ def predictMostActiveFeature(sequence_observed_columns, global_feature_neurons_a
 	#generate targets;
 	multiple_sources, previousColumnIndex, nextColumnIndex, targetFeatureIndex, concept_columns_indices_prev, concept_columns_feature_indices_prev = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequence_observed_columns, words_doc, lemmas_doc, concept_mask, sequenceWordIndex, kcNetwork)
 	
-	if(inferencePredictiveNetworkModelTransformer):
+	if(inferencePredictiveNetworkIndependentFCpredictions):
+		targets = None
 		targets_c = pt.zeros(databaseNetworkObject.c)
 		targets_f = pt.zeros(databaseNetworkObject.f)
 		targets_c[previousColumnIndex] = 1
 		targets_f[targetFeatureIndex] = 1
 		if(multiple_sources):
 			targets_c[nextColumnIndex] = 1	
-	elif(inferencePredictiveNetworkModelMLP):
+	else:
 		targets = pt.zeros(databaseNetworkObject.c, databaseNetworkObject.f)
 		targets[previousColumnIndex, targetFeatureIndex] = 1
 		if(multiple_sources):
 			targets[nextColumnIndex, targetFeatureIndex] = 1
-
+		targets_c = None
+		targets_f = None
+		
 	if(inferencePredictiveNetworkModelMLP):
-		concept_columns_indices_pred, concept_columns_feature_indices_pred = GIAANNproto_predictiveNetworkMLP.nextWordPredictionMLPtrainStep(global_feature_neurons_activation, targets)
+		concept_columns_indices_pred, concept_columns_feature_indices_pred = GIAANNproto_predictiveNetworkMLP.nextWordPredictionMLPtrainStep(global_feature_neurons_activation, targets, targets_c, targets_f)
 	elif(inferencePredictiveNetworkModelTransformer):
-		concept_columns_indices_pred, concept_columns_feature_indices_pred = GIAANNproto_predictiveNetworkTransformer.nextWordPredictionTransformerTrainStep(databaseNetworkObject.global_feature_neurons, databaseNetworkObject.global_feature_connections, targets_c, targets_f)
+		concept_columns_indices_pred, concept_columns_feature_indices_pred = GIAANNproto_predictiveNetworkTransformer.nextWordPredictionTransformerTrainStep(databaseNetworkObject.global_feature_neurons, databaseNetworkObject.global_feature_connections, targets, targets_c, targets_f)
 
 	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		concept_columns_indices_next = concept_columns_indices_pred

@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1c18a;
+o1 preview prompt 1c18b;
 
 v1b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -148,3 +148,4 @@ MANUAL; - add option !inferenceTrainPredictionNetworkBurstAllTargetsInSequence; 
 MANUAL; - generalise option inferenceTrainPredictionNetworkBurstAllTargetsInSequence to inferenceBurstAllPredictionsOrTargetsInSequence.
 MANUAL; - extract option inferenceSeedNetwork. patch process_column_inference_prediction - if(sequenceWordIndex==0 or inferenceBurstAllPredictionsOrTargetsInSequence):.
 MANUAL; - add option inferencePredictiveNetworkInitialiseWeightsNearZero - help predictive model to learn faster (rely exclusively on input activation levels at start of training).
+MANUAL; - add option inferencePredictiveNetworkIndependentFCpredictions. patch GIAANNproto_predictiveNetworkTransformer/MLP - do not apply softmax before nn.CrossEntropyLoss()/nn.MSELoss(). extract GIAANNproto_predictiveNetworkOperations. rename inferenceTrainPredictionNetworkAllSentences/inferenceTrainPredictionNetworkNumberEpochs to inferenceTrainPredictiveNetworkAllSentences/numberEpochs.

@@ -54,20 +54,20 @@ databaseNetworkObject.nlp = nlp	#used by pos_string_to_pos_int
 def main():
 	global sentence_count
 	GIAANNproto_databaseNetworkFiles.initialiseDatabaseFiles()
-	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictionNetworkAllSentences):
+	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSentences):
 		GIAANNproto_predictiveNetwork.initialisePredictiveNetwork(databaseNetworkObject)
 		GIAANNproto_databaseNetwork.backupGlobalArrays(databaseNetworkObject)
 
-	for epochIndex in range(inferenceTrainPredictionNetworkNumberEpochs):
+	for epochIndex in range(numberEpochs):
 		print("\nepochIndex = ", epochIndex)
 		# Start processing the dataset
 		sentence_count = 0
-		if((useInference and not inferenceTrainPredictionNetworkAllSentences) or debugSmallDataset):
+		if((useInference and not inferenceTrainPredictiveNetworkAllSentences) or debugSmallDataset):
 			process_prompt()
 		else:
 			process_dataset(dataset)
 		
-	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictionNetworkAllSentences and inferenceSavePredictiveNetwork):
+	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSentences and inferenceSavePredictiveNetwork):
 		GIAANNproto_predictiveNetwork.inferenceSavePredictiveNetwork()
 
 def process_prompt():
@@ -88,7 +88,7 @@ def process_article(text, articleIndex):
 	numberOfSentences = len(list(sentences.sents))
 	for sentenceIndex, sentence in enumerate(sentences.sents):
 		lastSentenceInPrompt = False
-		if(useInference and not inferenceTrainPredictionNetworkAllSentences):
+		if(useInference and not inferenceTrainPredictiveNetworkAllSentences):
 			if(sentenceIndex == numberOfSentences-1):
 				lastSentenceInPrompt = True
 		if(len(sentence) <= maxSentenceLength):
@@ -103,7 +103,7 @@ def process_sentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
 		initialiseDatabaseNetwork()
 		if(not lowMem):
 			databaseNetworkObject.global_feature_neurons = GIAANNproto_databaseNetwork.initialiseFeatureNeuronsGlobal(databaseNetworkObject.c, databaseNetworkObject.f)
-	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictionNetworkAllSentences):
+	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSentences):
 		GIAANNproto_databaseNetwork.restoreGlobalArrays(databaseNetworkObject)	#restore global arrays (reset activation and time etc properties between sentences)
 		
 	print(f"Processing article: {articleIndex}, sentence: {sentenceIndex} {doc.text}")
@@ -115,7 +115,7 @@ def process_sentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
 	observed_columns_dict = {}  # key: lemma, value: ObservedColumn
 	observed_columns_sequence_word_index_dict = {}  # key: sequence word index, value: ObservedColumn
 	
-	if(useInference and (inferenceTrainPredictionNetworkAllSentences or lastSentenceInPrompt)):
+	if(useInference and (inferenceTrainPredictiveNetworkAllSentences or lastSentenceInPrompt)):
 		doc_seed = doc[0:num_seed_tokens]	#prompt
 		doc_predict = doc[num_seed_tokens:]
 
@@ -133,7 +133,7 @@ def process_sentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
 		# Create the sequence observed columns object
 		sequence_observed_columns = GIAANNproto_databaseNetworkTrain.SequenceObservedColumns(databaseNetworkObject, words, lemmas, observed_columns_dict, observed_columns_sequence_word_index_dict)
 
-		if(useInference and (inferenceTrainPredictionNetworkAllSentences or lastSentenceInPrompt)):
+		if(useInference and (inferenceTrainPredictiveNetworkAllSentences or lastSentenceInPrompt)):
 			# Process each concept word in the sequence (predict)
 			GIAANNproto_predictiveNetwork.process_concept_words_inference(sequence_observed_columns, sentence_count, doc, doc_seed, doc_predict, num_seed_tokens, num_prediction_tokens)
 		else:
