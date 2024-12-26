@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1c17c;
+o1 preview prompt 1c18a;
 
 v1b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -147,3 +147,4 @@ MANUAL; - update process_features_active_train - if inferenceUseNeuronFeaturePro
 MANUAL; - add option !inferenceTrainPredictionNetworkBurstAllTargetsInSequence; disable bursting of all targets during training of predictive network (only burst the initial seed in the sequence).
 MANUAL; - generalise option inferenceTrainPredictionNetworkBurstAllTargetsInSequence to inferenceBurstAllPredictionsOrTargetsInSequence.
 MANUAL; - extract option inferenceSeedNetwork. patch process_column_inference_prediction - if(sequenceWordIndex==0 or inferenceBurstAllPredictionsOrTargetsInSequence):.
+MANUAL; - add option inferencePredictiveNetworkInitialiseWeightsNearZero - help predictive model to learn faster (rely exclusively on input activation levels at start of training).

@@ -62,7 +62,7 @@ def nextWordPredictionMLPcreate(databaseNetworkObject):
 		criterion = nn.BCEWithLogitsLoss()
 	else:
 		criterion = nn.MSELoss()
-	optimizer = optim.Adam(model.parameters(), lr=0.0005)
+	optimizer = optim.Adam(model.parameters(), lr=inferencePredictiveNetworkLearningRate)
 	batch_size = 1
 	
 def nextWordPredictionMLPtrainStep(global_feature_neurons_activation, targets):

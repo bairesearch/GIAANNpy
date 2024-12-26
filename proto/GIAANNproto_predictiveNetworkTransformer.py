@@ -52,7 +52,7 @@ def nextWordPredictionTransformerCreate(databaseNetworkObject):
 		criterion_c = nn.CrossEntropyLoss()
 		criterion_f = nn.CrossEntropyLoss()
 			
-	optimizer = optim.Adam(model.parameters(), lr=0.0005)
+	optimizer = optim.Adam(model.parameters(), lr=inferencePredictiveNetworkLearningRate)
 	batch_size = 1
 	
 def nextWordPredictionTransformerTrainStep(global_feature_neurons, database_feature_connections, targets_c, targets_f):
@@ -199,6 +199,9 @@ class CustomTransformer(nn.Module):
 		# Transformer encoder layers for the hidden layers
 		encoder_layer = nn.TransformerEncoderLayer(d_model=self.embedding_dim, nhead=self.p_hidden, dim_feedforward=self.f_mlp, device=devicePredictiveNetworkModel)
 		self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+		if(inferencePredictiveNetworkInitialiseWeightsNearZero):
+			#self.initialise_encoder_weights_zero()	#debug only
+			self.initialise_encoder_weights_near_zero()
 
 		# MLP for deriving the predicted token
 		self.fc_c = nn.Linear(self.embedding_dim, self.c, device=devicePredictiveNetworkModel)
@@ -239,6 +242,51 @@ class CustomTransformer(nn.Module):
 
 		return probabilities_c, probabilities_f  # Two separate outputs	 # Shape: (batch_size, c), Shape: (batch_size, f)
 
+	def initialise_encoder_weights_near_zero(self, init_std = 1e-5):
+		# 3. Initialize each layer to be near-identity.
+		for layer in self.transformer_encoder.layers:
+			# --- Multi-head attention ---
+			# Small random initialization instead of exact zeros
+			nn.init.normal_(layer.self_attn.in_proj_weight, mean=0.0, std=init_std)
+			nn.init.zeros_(layer.self_attn.in_proj_bias)
+			nn.init.normal_(layer.self_attn.out_proj.weight, mean=0.0, std=init_std)
+			nn.init.zeros_(layer.self_attn.out_proj.bias)
+
+			# --- Feedforward sub-layer ---
+			nn.init.normal_(layer.linear1.weight, mean=0.0, std=init_std)
+			nn.init.zeros_(layer.linear1.bias)
+			nn.init.normal_(layer.linear2.weight, mean=0.0, std=init_std)
+			nn.init.zeros_(layer.linear2.bias)
+
+			# --- LayerNorm parameters ---
+			# Keep scale=1.0 and bias=0.0 so LN doesn't shift/scale significantly
+			nn.init.ones_(layer.norm1.weight)
+			nn.init.zeros_(layer.norm1.bias)
+			nn.init.ones_(layer.norm2.weight)
+			nn.init.zeros_(layer.norm2.bias)
+
+	def initialise_encoder_weights_zero(self):
+		# 3. Initialize each layer to be near-identity.
+		for layer in self.transformer_encoder.layers:
+			# --- Multi-head attention ---
+			nn.init.zeros_(layer.self_attn.in_proj_weight)   # Q/K/V weights
+			nn.init.zeros_(layer.self_attn.in_proj_bias)     
+			nn.init.zeros_(layer.self_attn.out_proj.weight)  # Output projection
+			nn.init.zeros_(layer.self_attn.out_proj.bias)
+
+			# --- Feedforward sub-layer ---
+			nn.init.zeros_(layer.linear1.weight)
+			nn.init.zeros_(layer.linear1.bias)
+			nn.init.zeros_(layer.linear2.weight)
+			nn.init.zeros_(layer.linear2.bias)
+
+			# --- LayerNorm parameters ---
+			# Keep default LN scale=1.0 and bias=0.0 for minimal shift/scale
+			nn.init.ones_(layer.norm1.weight)
+			nn.init.zeros_(layer.norm1.bias)
+			nn.init.ones_(layer.norm2.weight)
+
+			
 def save_model(path, filename="model.pt"):
     # Ensure directory exists
     os.makedirs(path, exist_ok=True)
