@@ -195,11 +195,16 @@ class CustomTransformer(nn.Module):
 			self.initialise_encoder_weights_near_zero()
 
 		# MLP for deriving the predicted token
-		if(inferencePredictiveNetworkIndependentFCpredictions):
-			self.fc_c = nn.Linear(self.embedding_dim, self.c, device=devicePredictiveNetworkModel)
-			self.fc_f = nn.Linear(self.embedding_dim, self.f, device=devicePredictiveNetworkModel)
+		if(transformerOutputLayerUseEveryColumn):
+			final_dim = c * self.embedding_dim
 		else:
-			self.fc = nn.Linear(self.embedding_dim, c * f, device=devicePredictiveNetworkModel)
+			final_dim = self.embedding_dim
+			
+		if(inferencePredictiveNetworkIndependentFCpredictions):
+			self.fc_c = nn.Linear(final_dim, self.c, device=devicePredictiveNetworkModel)
+			self.fc_f = nn.Linear(final_dim, self.f, device=devicePredictiveNetworkModel)
+		else:
+			self.fc = nn.Linear(final_dim, c * f, device=devicePredictiveNetworkModel)
 		
 	def forward(self, X, database_feature_connections):
 		# X shape: (batch_size, p, s, c, f)
@@ -220,7 +225,10 @@ class CustomTransformer(nn.Module):
 		# transformer_output shape: (sequence_length, batch_size, embedding_dim)
 
 		# Use the output from the last sequence position
-		final_output = transformer_output[-1]  # Shape: (batch_size, embedding_dim)
+		if(transformerOutputLayerUseEveryColumn):
+			final_output = transformer_output.view(batch_size, self.c * self.embedding_dim)	# Shape: (batch_size, c*embedding_dim)
+		else:
+			final_output = transformer_output[-1]  # Shape: (batch_size, embedding_dim)
 
 		if(inferencePredictiveNetworkIndependentFCpredictions):
 			# Apply the separate MLPs to derive logits for c and f

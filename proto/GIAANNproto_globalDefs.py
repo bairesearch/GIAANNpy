@@ -58,6 +58,7 @@ if(useInference):
 			transformerUseInputConnections = False	#incomplete	#optional
 			transformerUseInputAllProperties = True
 			inferencePredictiveNetworkInitialiseWeightsNearZero = True	#help predictive model to learn faster (rely exclusively on input activation levels at start of training)
+			transformerOutputLayerUseEveryColumn = True	#default: True	#orig: False	#whether the output layer uses features from every column (or just the final column in the sequence)
 	else:
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default:True #currently mandatory (only implementation available)	#False is only for debug
 	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
