@@ -296,7 +296,10 @@ def visualize_graph(sequence_observed_columns, save=False, fileName=None):
 	if(save):
 		highResolutionFigure = True
 	else:
-		highResolutionFigure = False
+		if(drawHighResolutionFigure):
+			highResolutionFigure = True
+		else:
+			highResolutionFigure = False
 	if(highResolutionFigure):
 		displayFigDPI = 100
 		saveFigDPI = 300	#approx HD	#depth per inch

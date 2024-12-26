@@ -25,7 +25,7 @@ useGPUsparse = False	#default: False	#orig: True
 useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/MLP predictive network model
 maxSentenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM availability during train (with trainSequenceObservedColumnsUseSequenceFeaturesOnly only limited amount of data is ever loaded to GPU during train)
 databaseFolder = "" #default: ""
-max_sentences_train = 100	#500 #default: 100000000	  # Adjust as needed (eg lower max_sentences_train before independent useInference execution)
+max_sentences = 100	#500 #default: 100000000	  # Adjust as needed (eg lower max_sentences before independent useInference execution)	#max sentences for train or inference
 inferenceTrainPredictionNetworkNumberEpochs = 1	#default: 1
 
 # Set boolean variables as per specification
@@ -46,11 +46,7 @@ if(useInference):
 			#inferenceIncrementallySeedNetwork = True	#not supported (uses custom incremental seeding implementation)
 			inferenceSavePredictiveNetwork = True
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False	#next token predictions are used to activate the next column features (rather than prediction targets)
-			if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
-				inferenceTrainPredictionNetworkBurstAllTargetsInSequence = False	#default: False	#orig: False
-			else:
-				inferenceTrainPredictionNetworkBurstAllTargetsInSequence = False	#default: False	#orig: True
-			inferenceTrainPredictionNetworkNumberEpochs = 1	#default: 1	#10	#number of epochs to train predictive network
+			inferenceTrainPredictionNetworkNumberEpochs = 1000	#default: 1	#10	#number of epochs to train predictive network
 		else:
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True
 		inferencePredictiveNetworkModelMLP = False
@@ -60,6 +56,10 @@ if(useInference):
 			transformerUseInputAllProperties = True
 	else:
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True #currently mandatory (only implementation available)
+	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+		inferenceBurstAllPredictionsOrTargetsInSequence = False	#default: False	#orig: False
+	else:
+		inferenceBurstAllPredictionsOrTargetsInSequence = True	#default: True	#orig: True
 	if(inferenceIncrementallySeedNetwork):
 		inferenceSeedTargetActivationsGlobalFeatureArrays = False	#optional	#orig:False
 	else:
@@ -76,7 +76,7 @@ if(useInference):
 	drawNetworkDuringTrain = False
 	drawNetworkDuringTrainSave = False
 	drawNetworkDuringInferenceSeed = False
-	drawNetworkDuringInferencePredict = False
+	drawNetworkDuringInferencePredict = False	#can set True during debug
 	drawNetworkDuringInferenceSave = False
 else:
 	inferenceUseNeuronFeaturePropertiesTime = False
@@ -94,6 +94,7 @@ else:
 	
 drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSentenceIndex"
 drawNetworkDuringInferenceSaveFilenamePrepend = "GIAANNproto1cSequenceObservedColumnsInferenceTokenIndex"
+drawHighResolutionFigure = True	#required for inference debug
 
 #algorithm preferences;
 inferenceNormaliseColumnSelectionByFeatureConnections = False  	#default: False		#cannot select one column over another if column activations are perfectly normalised with respect to each other	#see HFconnectionMatrixAlgorithmNormalise
@@ -211,7 +212,7 @@ concept_features_dict_file = databaseFolder + 'concept_features_dict.pkl'
 observed_columns_dir = databaseFolder + 'observed_columns'
 pytorch_tensor_file_extension = ".pt"
 predictive_network_folder = "."
-predictive_network_file_name = "model.pt"
+predictive_network_file_name = "predictive_network_model.pt"
 
 #common array indices
 array_index_properties_strength = 0
@@ -316,4 +317,13 @@ if(useLovelyTensors):
 else:
 	pass
 	#pt.set_printoptions(profile="full")	#pt.set_printoptions(threshold=float('inf'))
+
+def compareSparseArrayDiff(array1, array2):
+	return compareDenseArrayDiff(array1.coalesce().values(), array2.coalesce().values())
+
+def compareDenseArrayDiff(array1, array2):
+	difference = array1 != array2
+	indices = pt.nonzero(difference, as_tuple=False)
+	print("Indices of differences:")
+	print(indices)
 	

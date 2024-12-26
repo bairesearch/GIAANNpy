@@ -37,6 +37,7 @@ def add_value_to_sparse_tensor_values(sparse_tensor, value):
 	return sparse_tensor
 
 #replace or multiply element(s) at index with/by new_value
+#preconditions: if replace (ie !multiply), assume that the sparse array contains non-zero values at indices_to_update
 def modify_sparse_tensor(sparse_tensor, indices_to_update, new_value, multiply=False):
 	indices_to_update = indices_to_update.to(sparse_tensor.device)
 	
@@ -63,7 +64,7 @@ def modify_sparse_tensor(sparse_tensor, indices_to_update, new_value, multiply=F
 		sparse_tensor.values()[match_mask] *= new_value
 	else:	#replace
 		sparse_tensor.values()[match_mask] = new_value
-	
+		
 	return sparse_tensor
 
 	

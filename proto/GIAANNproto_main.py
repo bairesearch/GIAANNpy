@@ -79,7 +79,7 @@ def process_prompt():
 def process_dataset(dataset):
 	for articleIndex, article in enumerate(dataset):
 		process_article(article['text'], articleIndex)
-		if sentence_count == max_sentences_train:
+		if sentence_count == max_sentences:
 			break
 
 def process_article(text, articleIndex):
@@ -93,7 +93,7 @@ def process_article(text, articleIndex):
 				lastSentenceInPrompt = True
 		if(len(sentence) <= maxSentenceLength):
 			process_sentence(articleIndex, sentenceIndex, sentence, lastSentenceInPrompt)
-		if sentence_count == max_sentences_train:
+		if sentence_count == max_sentences:
 			break
 			
 def process_sentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
