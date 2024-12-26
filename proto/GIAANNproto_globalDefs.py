@@ -34,7 +34,7 @@ useInference = False  # useInference mode
 if(useInference):
 	inferencePredictiveNetwork = False	#use MLP to predict next token	#orig:False
 	inferenceTrainPredictionNetworkAllSentences = False	#support predictive network training on every sentence in corpus.
-	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False
+	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False	#incremental seeding is used to match the inference prediction phase algorithm (for consistency in activation method)
 	inferenceUseNeuronFeaturePropertiesTime = False	#default:False	#orig:False		#FUTURE; else can use during train
 	inferenceActivationFunction = True	#default:False	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	transformerUseInputConnections = False	#initialise (dependent var)
@@ -43,7 +43,6 @@ if(useInference):
 	if(inferencePredictiveNetwork):
 		inferenceSavePredictiveNetwork = False
 		if(inferenceTrainPredictionNetworkAllSentences):
-			#inferenceIncrementallySeedNetwork = True	#not supported (uses custom incremental seeding implementation)
 			inferenceSavePredictiveNetwork = True
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False	#next token predictions are used to activate the next column features (rather than prediction targets)
 			inferenceTrainPredictionNetworkNumberEpochs = 1000	#default: 1	#10	#number of epochs to train predictive network
@@ -55,10 +54,12 @@ if(useInference):
 			transformerUseInputConnections = False	#incomplete	#optional
 			transformerUseInputAllProperties = True
 	else:
-		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True #currently mandatory (only implementation available)
+		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default:True #currently mandatory (only implementation available)	#False is only for debug
 	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+		inferenceSeedNetwork = True	#default: True
 		inferenceBurstAllPredictionsOrTargetsInSequence = False	#default: False	#orig: False
 	else:
+		inferenceSeedNetwork = False	#default: False	#True is only for debug
 		inferenceBurstAllPredictionsOrTargetsInSequence = True	#default: True	#orig: True
 	if(inferenceIncrementallySeedNetwork):
 		inferenceSeedTargetActivationsGlobalFeatureArrays = False	#optional	#orig:False
@@ -76,8 +77,8 @@ if(useInference):
 	drawNetworkDuringTrain = False
 	drawNetworkDuringTrainSave = False
 	drawNetworkDuringInferenceSeed = False
-	drawNetworkDuringInferencePredict = False	#can set True during debug
-	drawNetworkDuringInferenceSave = False
+	drawNetworkDuringInferencePredict = False	#True is only for debug
+	drawNetworkDuringInferenceSave = False	#True is only for debug
 else:
 	inferenceUseNeuronFeaturePropertiesTime = False
 	lowMem = False		 #default: False	#orig: True	#currently required to be False for inference compatibility	#optional
@@ -149,9 +150,9 @@ if usePOS:
 inference_prompt_file = databaseFolder + 'inference_prompt.txt'
 if(useInference):
 	if(inferencePredictiveNetwork):
-		inferenceInvertNeuronActivationUponPrediction = False	#orig: False	#set activations of previously activated neurons to negative - refractory period preventing consecutive feature reactivation and facilitating prediction based on past predictions
+		inferenceInvertNeuronActivationUponPrediction = False	#default: True	#orig: False	#set activations of previously activated neurons to negative - refractory period preventing consecutive feature reactivation and facilitating prediction based on past predictions
 		#if(not inferenceActivationFunction):	#do not decrement activations if they are decremented every time the activation function is applied
-		inferenceDecrementActivations = True
+		inferenceDecrementActivations = True	#default: True	#False is only for debug
 		if(inferenceDecrementActivations):
 			inferenceDecrementActivationsNonlinear = True
 		if(inferenceInvertNeuronActivationUponPrediction):
@@ -170,21 +171,24 @@ if(useInference):
 		activationDecrementPerPredictedSentence = 0.5
 		activationDecrementSeed = activationDecrementPerPredictedSentence
 	
-	if(inferenceTrainPredictionNetworkAllSentences):
-		num_seed_tokens = 0
-		num_prediction_tokens = None	#sentence length
-	else:
+	if(inferenceSeedNetwork):
 		num_seed_tokens = 5	#number of seed tokens in last sentence of inference prompt (remaining tokens will be prediction tokens)
 		num_prediction_tokens = 10	#number of words to predict after network seed
-
+	else:
+		num_seed_tokens = 0
+		num_prediction_tokens = None	#sentence length
+	
+	if(debugConceptFeaturesOccurFirstInSubsequence):
+		kcNetwork = 1	#number of topk columns to target
+	else:
+		kcNetwork = 2	#number of topk columns to target	#it is unknown which exact column a token belongs to (unless it corresponds to a concept feature/noun)
+			
 	if(inferencePredictiveNetwork):
 		if(debugConceptFeaturesOccurFirstInSubsequence):
-			kcNetwork = 1	#number of topk columns to target
-			kcPred = 1 	#number of topk columns to predict
+			kcPred = 1 	#number of topk columns to predict	#mandatory: 1
 			#inferenceTrainPredictionNetworkAllSentences currently requires debugConceptFeaturesOccurFirstInSubsequence:!multipleTargets if kcNetwork == 1"
 			multipleTargets = False
 		else:
-			kcNetwork = 2	#number of topk columns to target	#it is unknown which exact column a token belongs to (unless it corresponds to a concept feature/noun)
 			kcPred = 1 	#number of topk columns to predict
 			multipleTargets = True
 		kf = 1	#number of topk features to predict

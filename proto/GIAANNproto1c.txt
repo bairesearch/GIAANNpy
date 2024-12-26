@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1c17b;
+o1 preview prompt 1c17c;
 
 v1b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -146,3 +146,4 @@ MANUAL; - update inferenceTrainPredictionNetworkAllSentences implementation - do
 MANUAL; - update process_features_active_train - if inferenceUseNeuronFeaturePropertiesTime: initialise array_index_properties_time to 0.
 MANUAL; - add option !inferenceTrainPredictionNetworkBurstAllTargetsInSequence; disable bursting of all targets during training of predictive network (only burst the initial seed in the sequence).
 MANUAL; - generalise option inferenceTrainPredictionNetworkBurstAllTargetsInSequence to inferenceBurstAllPredictionsOrTargetsInSequence.
+MANUAL; - extract option inferenceSeedNetwork. patch process_column_inference_prediction - if(sequenceWordIndex==0 or inferenceBurstAllPredictionsOrTargetsInSequence):.
