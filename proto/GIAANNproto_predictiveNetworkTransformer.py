@@ -33,7 +33,7 @@ import GIAANNproto_predictiveNetworkOperations
 def nextWordPredictionTransformerCreate(databaseNetworkObject):
 	global model, criterion, criterion_c, criterion_f, optimizer, batch_size
 
-	num_layers = 3  # Number of transformer layers
+	num_layers = 1  #default: 3 # Number of transformer layers
 	
 	print("nextWordPredictionTransformerCreate:")
 	print("databaseNetworkObject.c = ", databaseNetworkObject.c)
@@ -121,23 +121,33 @@ class InputAttentionLayer(nn.Module):
 		batch_size = X.size(0)
 
 		# Reshape X to apply W_v over the last dimension (f)
-		X_reshaped = X.view(batch_size, self.p * self.s * self.c, self.f)
-		V = self.W_v(X_reshaped)  # Shape: (batch_size, p*s*c, f)
-
-		# Reshape V back to (batch_size, p, s, c, f)
-		V = V.view(batch_size, self.p, self.s, self.c, self.f)
-
+		if(inferencePredictiveNetworkUseInputAllProperties):
+			X_reshaped = X.view(batch_size, self.p * self.s * self.c, self.f)
+			V = self.W_v(X_reshaped)  # Shape: (batch_size, p*s*c, f)
+			V = V.view(batch_size, self.p, self.s, self.c, self.f)	# Reshape V back to (batch_size, p, s, c, f)
+			p_max = self.p
+		else:
+			X_reshaped = X.view(batch_size, self.s * self.c, self.f)
+			V = self.W_v(X_reshaped)  # Shape: (batch_size, s*c, f)
+			V = V.view(batch_size, self.s, self.c, self.f)	# Reshape V back to (batch_size, p, s, c, f)
+			p_max = 1
+		
 		attention_outputs = []
 
 		# Iterate over each attention head (total of p * s heads)
-		for p_idx in range(self.p):
+		for p_idx in range(p_max):
 			for s_idx in range(self.s):
 				# Extract V for the current head
-				V_head = V[:, p_idx, s_idx, :, :]  # Shape: (batch_size, c, f)
-
-				# Extract the corresponding attention scores from database_feature_connections
-				# KQ_head shape: (c, f, c, f)
-				KQ_head = database_feature_connections[p_idx, s_idx]  # Shape: (c, f, c, f)
+				if(inferencePredictiveNetworkUseInputAllProperties):
+					V_head = V[:, p_idx, s_idx, :, :]  # Shape: (batch_size, c, f)
+					# Extract the corresponding attention scores from database_feature_connections
+					# KQ_head shape: (c, f, c, f)
+					KQ_head = database_feature_connections[p_idx, s_idx]  # Shape: (c, f, c, f)
+				else:
+					V_head = V[:, s_idx, :, :]  # Shape: (batch_size, c, f)
+					# Extract the corresponding attention scores from database_feature_connections
+					# KQ_head shape: (c, f, c, f)
+					KQ_head = database_feature_connections[s_idx]  # Shape: (c, f, c, f)
 
 				# Sum over the feature dimensions to obtain attention weights between columns
 				# First, sum over source feature dimension (from features)
@@ -178,9 +188,13 @@ class CustomTransformer(nn.Module):
 		self.s = s
 		self.c = c
 		self.f = f
-		self.p_hidden = p*s
 		self.num_layers = num_layers
-		self.embedding_dim = self.p * self.s * self.f	#embedding dimension includes concatenation of all heads
+		if(inferencePredictiveNetworkUseInputAllProperties):
+			self.p_hidden = p*s
+			self.embedding_dim = self.p * self.s * self.f	#embedding dimension includes concatenation of all heads
+		else:
+			self.p_hidden = s
+			self.embedding_dim = self.s * self.f	#embedding dimension includes concatenation of all heads
 		self.f_mlp = self.embedding_dim*4
 		
 		if(transformerUseInputConnections):
@@ -211,8 +225,12 @@ class CustomTransformer(nn.Module):
 		# database_feature_connections shape: (p, s, c, f, c, f)
 		batch_size = X.size(0)
 
-		embedding = X.permute(3, 0, 1, 2, 4).contiguous()  # Shape: (c, batch_size, p, s, f)
-		embedding = embedding.view(self.c, batch_size, self.p * self.s * self.f)
+		if(inferencePredictiveNetworkUseInputAllProperties):
+			embedding = X.permute(3, 0, 1, 2, 4).contiguous()  # Shape: (c, batch_size, p, s, f)
+			embedding = embedding.view(self.c, batch_size, self.p * self.s * self.f)
+		else:
+			embedding = X.permute(2, 0, 1, 3).contiguous()  # Shape: (c, batch_size, s, f)
+			embedding = embedding.view(self.c, batch_size, self.s * self.f)
 			
 		if(transformerUseInputConnections):
 			# Apply the custom attention layer

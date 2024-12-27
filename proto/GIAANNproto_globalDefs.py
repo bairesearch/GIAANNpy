@@ -32,17 +32,17 @@ numberEpochs = 1	#default: 1
 useSANI = False	#sequentially activated neuronal input (divide dendrites into segments)
 useInference = False  # useInference mode
 if(useInference):
-	inferencePredictiveNetwork = False	#use MLP to predict next token	#orig:False
-	inferenceTrainPredictiveNetworkAllSentences = False	#support predictive network training on every sentence in corpus.	#precondition: expects database network to have been completely trained (with !useInference on all sentences)
-	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False	#incremental seeding is used to match the inference prediction phase algorithm (for consistency in activation method)
-	inferenceUseNeuronFeaturePropertiesTime = False	#default:False	#orig:False		#FUTURE; else can use during train
+	inferencePredictiveNetwork = True	#use MLP to predict next token	#orig:False
+	inferenceTrainPredictiveNetworkAllSentences = True	#support predictive network training on every sentence in corpus.	#precondition: expects database network to have been completely trained (with !useInference on all sentences)
+	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False	#incremental seeding is used to match the inference prediction phase algorithm (for consistency in activation method)	#requires inferenceSeedNetwork
+	inferenceUseNeuronFeaturePropertiesTime = True	#default:False	#orig:False		#FUTURE; else can use during train
 	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	transformerUseInputConnections = False	#initialise (dependent var)
-	transformerUseInputAllProperties = False	#initialise (dependent var)
+	inferencePredictiveNetworkUseInputAllProperties = True	#default: True
 	printPredictionsDuringInferencePredict = True	#default: True
 	if(inferencePredictiveNetwork):
-		inferencePredictiveNetworkModelMLP = False
-		inferencePredictiveNetworkModelTransformer = True
+		inferencePredictiveNetworkModelMLP = True
+		inferencePredictiveNetworkModelTransformer = False
 		inferenceSavePredictiveNetwork = False
 		inferencePredictiveNetworkIndependentFCpredictions = True	#required for large database network (else may require output MLP of shape c*f * c*f)
 		if(inferenceTrainPredictiveNetworkAllSentences):
@@ -56,7 +56,6 @@ if(useInference):
 		elif(inferencePredictiveNetworkModelTransformer):
 			inferencePredictiveNetworkLearningRate = 0.0005	#default: 0.0005	0.005
 			transformerUseInputConnections = False	#incomplete	#optional
-			transformerUseInputAllProperties = True
 			inferencePredictiveNetworkInitialiseWeightsNearZero = True	#help predictive model to learn faster (rely exclusively on input activation levels at start of training)
 			transformerOutputLayerUseEveryColumn = True	#default: True	#orig: False	#whether the output layer uses features from every column (or just the final column in the sequence)
 	else:
@@ -67,15 +66,15 @@ if(useInference):
 	else:
 		inferenceSeedNetwork = False	#default: False	#True is only for debug
 		inferenceBurstAllPredictionsOrTargetsInSequence = True	#default: True	#orig: True
-	if(inferenceIncrementallySeedNetwork):
-		inferenceSeedTargetActivationsGlobalFeatureArrays = False	#optional	#orig:False
-	else:
-		inferenceSeedTargetActivationsGlobalFeatureArrays = False	#not supported
+	trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised	#if used during seed phase will bias prediction towards target sentence words
+	if(inferenceSeedNetwork):
+		if(inferenceIncrementallySeedNetwork):
+			inferenceSeedTargetActivationsGlobalFeatureArrays = False	#optional	#default:True	#orig:False	
+		else:
+			inferenceSeedTargetActivationsGlobalFeatureArrays = False	#not supported
+		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
+			trainSequenceObservedColumnsUseSequenceFeaturesOnly = False	#mandatory	#global feature arrays are directly written to during inference seed phase
 	lowMem = False		#mandatory
-	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-		trainSequenceObservedColumnsUseSequenceFeaturesOnly = False	#mandatory	#global feature arrays are directly written to during inference seed phase
-	else:
-		trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised	#during seed phase only (will bias prediction towards target sentence words)
 	trainSequenceObservedColumnsMatchSequenceWords = True	#optional	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sentence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
 	drawSequenceObservedColumns = False	#mandatory
 	drawAllColumns = False	#mandatory
@@ -171,11 +170,12 @@ if(useInference):
 		inferenceDeactivateNeuronsUponPrediction = True
 		inferenceDecrementActivations = False
 	activationDecrementPerPredictedToken = 0.1	#0.05	#CHECKTHIS
-	if(inferenceIncrementallySeedNetwork):
-		activationDecrementSeed = activationDecrementPerPredictedToken
-	else:
-		activationDecrementPerPredictedSentence = 0.5
-		activationDecrementSeed = activationDecrementPerPredictedSentence
+	activationDecrementPerPredictedSentence = 0.5
+	if(inferenceSeedNetwork):
+		if(inferenceIncrementallySeedNetwork):
+			activationDecrementSeed = activationDecrementPerPredictedToken
+		else:
+			activationDecrementSeed = activationDecrementPerPredictedSentence
 	
 	if(inferenceSeedNetwork):
 		num_seed_tokens = 5	#number of seed tokens in last sentence of inference prompt (remaining tokens will be prediction tokens)

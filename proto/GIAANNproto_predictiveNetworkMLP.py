@@ -50,7 +50,7 @@ def nextWordPredictionMLPcreate(databaseNetworkObject):
 	optimizer = optim.Adam(model.parameters(), lr=inferencePredictiveNetworkLearningRate)
 	batch_size = 1
 
-def nextWordPredictionMLPtrainStep(global_feature_neurons_activation, targets, targets_c, targets_f):
+def nextWordPredictionMLPtrainStep(global_feature_neurons, targets, targets_c, targets_f):
 	global model, criterion, optimizer, batch_size
 	
 	if(inferencePredictiveNetworkIndependentFCpredictions):
@@ -59,17 +59,17 @@ def nextWordPredictionMLPtrainStep(global_feature_neurons_activation, targets, t
 	else:
 		targets = targets.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
 
-	global_feature_neurons_activation = global_feature_neurons_activation.unsqueeze(0)	#add batch dim	
-	global_feature_neurons_activation = global_feature_neurons_activation.to(devicePredictiveNetworkModel)
-	global_feature_neurons_activation = global_feature_neurons_activation.to_dense()
+	global_feature_neurons = global_feature_neurons.unsqueeze(0)	#add batch dim	
+	global_feature_neurons = global_feature_neurons.to(devicePredictiveNetworkModel)
+	global_feature_neurons = global_feature_neurons.to_dense()
 	
 	if(inferencePredictiveNetworkIndependentFCpredictions):
-		outputs_c, outputs_f = model(global_feature_neurons_activation) # Outputs shape: (batch_size, c, f)
+		outputs_c, outputs_f = model(global_feature_neurons) # Outputs shape: (batch_size, c, f)
 		loss_c = criterion_c(outputs_c, targets_c)
 		loss_f = criterion_f(outputs_f, targets_f)
 		loss = loss_c + loss_f  # Combine losses
 	else:	
-		outputs = model(global_feature_neurons_activation)  # Outputs shape: (batch_size, c, f)
+		outputs = model(global_feature_neurons)  # Outputs shape: (batch_size, c, f)
 		loss = criterion(outputs, targets)
 
 	optimizer.zero_grad()
@@ -94,11 +94,15 @@ class NextWordPredictionMLPmodel(nn.Module):
 		self.c = databaseNetworkObject.c
 		self.f = databaseNetworkObject.f
 		self.p = databaseNetworkObject.p
-
-		input_size = databaseNetworkObject.s * databaseNetworkObject.c * databaseNetworkObject.f #* databaseNetworkObject.p
+		
+		if(inferencePredictiveNetworkUseInputAllProperties):
+			input_size = databaseNetworkObject.s * databaseNetworkObject.c * databaseNetworkObject.f * databaseNetworkObject.p
+			hidden_size_multiplier = 1	#default: 1	#TODO: requires testing
+		else:
+			input_size = databaseNetworkObject.s * databaseNetworkObject.c * databaseNetworkObject.f
+			hidden_size_multiplier = 2	#default: 2	#TODO: requires testing
 		output_size = databaseNetworkObject.c * databaseNetworkObject.f
-		hidden_size_multiplier = 2	#TODO: requires testing
-		hidden_size = (input_size+output_size) * hidden_size_multiplier
+		hidden_size = input_size * hidden_size_multiplier
 
 		self.fc1 = nn.Linear(input_size, hidden_size, device=devicePredictiveNetworkModel)
 		self.relu = nn.ReLU()
