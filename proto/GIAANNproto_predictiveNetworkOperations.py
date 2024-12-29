@@ -26,30 +26,30 @@ from GIAANNproto_globalDefs import *
 	
 
 if(inferencePredictiveNetworkIndependentFCpredictions):
-	def getTopkPredictionsC(outputs_c):
+	def getTopkPredictionsC(outputsC):
 		with pt.no_grad():
 			if multipleTargets:
-				probs_c = pt.sigmoid(outputs_c)
+				probsC = pt.sigmoid(outputsC)
 			else:
-				probs_c = F.softmax(outputs_c, dim=-1)
+				probsC = F.softmax(outputsC, dim=-1)
 
-			topk_values_c, topk_indices_c = pt.topk(probs_c, kcPred, dim=1)
+			topkValuesC, topkIndicesC = pt.topk(probsC, kcPred, dim=1)
 
-		topk_c = topk_indices_c[0]  # Assuming batch_size=1
-		return topk_c
+		topkC = topkIndicesC[0]  # Assuming batch_size=1
+		return topkC
 
-	def getTopkPredictionsF(outputs_f):
+	def getTopkPredictionsF(outputsF):
 		with pt.no_grad():
 			if multipleTargets:
-				probs_f = pt.sigmoid(outputs_f)
+				probsF = pt.sigmoid(outputsF)
 			else:
-				probs_f = F.softmax(outputs_f, dim=-1)
+				probsF = F.softmax(outputsF, dim=-1)
 
-			topk_values_f, topk_indices_f = pt.topk(probs_f, kf, dim=1)
+			topkValuesF, topkIndicesF = pt.topk(probsF, kf, dim=1)
 
-		topk_f = topk_indices_f[0]  # Assuming batch_size=1
-		topk_f = topk_f.unsqueeze(-1)	#assume kf=1
-		return topk_f
+		topkF = topkIndicesF[0]  # Assuming batch_size=1
+		topkF = topkF.unsqueeze(-1)	#assume kf=1
+		return topkF
 else:
 	def getTopkPredictions(outputs):
 		with pt.no_grad():
@@ -59,19 +59,19 @@ else:
 			else:
 				probs = outputs
 
-			column_probs = probs.mean(dim=2)  # Shape: (batch_size, c)
-			_, concept_columns_indices_next = pt.topk(column_probs, kcNetwork, dim=1)
+			columnProbs = probs.mean(dim=2)  # Shape: (batch_size, c)
+			_, conceptColumnsIndicesNext = pt.topk(columnProbs, kcNetwork, dim=1)
 
 			# For each of the top kcNetwork columns, compute top kf features
-			top_kf_indices = []
-			for column_idx in concept_columns_indices_next:
-				column_data = probs[:, column_idx, :]  # Shape: (batch_size, f)
-				feature_probs = column_data.mean(dim=0)  # Shape: (f,)
-				topk_feature_probs, topk_feature_indices = pt.topk(feature_probs, kf)  # Shapes: (kf,), (kf,)
-				top_kf_indices.append(topk_feature_indices)
+			topKfIndices = []
+			for columnIdx in conceptColumnsIndicesNext:
+				columnData = probs[:, columnIdx, :]  # Shape: (batch_size, f)
+				featureProbs = columnData.mean(dim=0)  # Shape: (f,)
+				topkFeatureProbs, topkFeatureIndices = pt.topk(featureProbs, kf)  # Shapes: (kf,), (kf,)
+				topKfIndices.append(topkFeatureIndices)
 
-			concept_columns_feature_indices_next = pt.stack(top_kf_indices)  # Shape: (batch_size, kcNetwork, kf)
+			conceptColumnsFeatureIndicesNext = pt.stack(topKfIndices)  # Shape: (batch_size, kcNetwork, kf)
 
-		concept_columns_indices_next = concept_columns_indices_next[0]	#select first sample of batch
-		concept_columns_feature_indices_next = concept_columns_feature_indices_next[0]	#select first sample of batch
-		return concept_columns_indices_next, concept_columns_feature_indices_next
+		conceptColumnsIndicesNext = conceptColumnsIndicesNext[0]	#select first sample of batch
+		conceptColumnsFeatureIndicesNext = conceptColumnsFeatureIndicesNext[0]	#select first sample of batch
+		return conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext

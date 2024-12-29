@@ -1,4 +1,4 @@
-find observed_columns -mindepth 1 -delete
-rm concept_features_dict.pkl concept_columns_dict*.pkl global_feature_neurons*.pt observed_columns/*
-rm predictive_network_model.pt
+find observedColumns -mindepth 1 -delete
+rm conceptFeaturesDict.pkl conceptColumnsDict*.pkl globalFeatureNeurons*.pt observedColumns/*
+rm predictiveNetworkModel.pt
 rm GIAANNproto*.png

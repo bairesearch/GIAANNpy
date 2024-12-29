@@ -31,9 +31,9 @@ import GIAANNproto_predictiveNetworkOperations
 	
 
 def nextWordPredictionTransformerCreate(databaseNetworkObject):
-	global model, criterion, criterion_c, criterion_f, optimizer, batch_size
+	global model, criterion, criterionC, criterionF, optimizer, batchSize
 
-	num_layers = 1  #default: 3 # Number of transformer layers
+	numLayers = 1  #default: 3 # Number of transformer layers
 	
 	print("nextWordPredictionTransformerCreate:")
 	print("databaseNetworkObject.c = ", databaseNetworkObject.c)
@@ -41,17 +41,17 @@ def nextWordPredictionTransformerCreate(databaseNetworkObject):
 	
 	# Instantiate the model
 	#NextWordPredictionTransformerModel
-	model = CustomTransformer(databaseNetworkObject.p, databaseNetworkObject.s, databaseNetworkObject.c, databaseNetworkObject.f, num_layers)
+	model = CustomTransformer(databaseNetworkObject.p, databaseNetworkObject.s, databaseNetworkObject.c, databaseNetworkObject.f, numLayers)
 	model = model.to(devicePredictiveNetworkModel)
 	model.train()  # set model to training mode
 
 	if(inferencePredictiveNetworkIndependentFCpredictions):
 		if multipleTargets:
-			criterion_c = nn.BCEWithLogitsLoss()
-			criterion_f = nn.BCEWithLogitsLoss()
+			criterionC = nn.BCEWithLogitsLoss()
+			criterionF = nn.BCEWithLogitsLoss()
 		else:
-			criterion_c = nn.CrossEntropyLoss()
-			criterion_f = nn.CrossEntropyLoss()
+			criterionC = nn.CrossEntropyLoss()
+			criterionF = nn.CrossEntropyLoss()
 	else:
 		if(multipleTargets):
 			criterion = nn.BCEWithLogitsLoss()
@@ -59,45 +59,46 @@ def nextWordPredictionTransformerCreate(databaseNetworkObject):
 			criterion = nn.MSELoss()
 	
 	optimizer = optim.Adam(model.parameters(), lr=inferencePredictiveNetworkLearningRate)
-	batch_size = 1
+	batchSize = 1
 	
-def nextWordPredictionTransformerTrainStep(global_feature_neurons, database_feature_connections, targets, targets_c, targets_f):
-	global model, criterion, criterion_c, criterion_f, optimizer, batch_size
+
+def nextWordPredictionTransformerTrainStep(globalFeatureNeurons, databaseFeatureConnections, targets, targetsC, targetsF):
+	global model, criterion, criterionC, criterionF, optimizer, batchSize
 	
 	if(inferencePredictiveNetworkIndependentFCpredictions):
-		targets_c = targets_c.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
-		targets_f = targets_f.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
+		targetsC = targetsC.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
+		targetsF = targetsF.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
 	else:
 		targets = targets.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
 	
-	global_feature_neurons = global_feature_neurons.unsqueeze(0)	#add batch dim (not used)
-	global_feature_neurons = global_feature_neurons.to(devicePredictiveNetworkModel)
-	global_feature_neurons = global_feature_neurons.to_dense()
+	globalFeatureNeurons = globalFeatureNeurons.unsqueeze(0)	#add batch dim (not used)
+	globalFeatureNeurons = globalFeatureNeurons.to(devicePredictiveNetworkModel)
+	globalFeatureNeurons = globalFeatureNeurons.to_dense()
 	
-	#print("global_feature_neurons.shape = ", global_feature_neurons.shape)
-	#print("global_feature_neurons.shape = ", global_feature_neurons.shape)
+	#print("globalFeatureNeurons.shape = ", globalFeatureNeurons.shape)
+	#print("globalFeatureNeurons.shape = ", globalFeatureNeurons.shape)
 		
 
 	if(inferencePredictiveNetworkIndependentFCpredictions):
-		outputs_c, outputs_f = model(global_feature_neurons, database_feature_connections)  # Outputs shape: (batch_size, c, f)
-		loss_c = criterion_c(outputs_c, targets_c)
-		loss_f = criterion_f(outputs_f, targets_f)
-		loss = loss_c + loss_f  # Combine losses
+		outputsC, outputsF = model(globalFeatureNeurons, databaseFeatureConnections)  # Outputs shape: (batch_size, c, f)
+		lossC = criterionC(outputsC, targetsC)
+		lossF = criterionF(outputsF, targetsF)
+		loss = lossC + lossF  # Combine losses
 	else:
-		outputs = model(global_feature_neurons, database_feature_connections)  # Outputs shape: (batch_size, c, f)
+		outputs = model(globalFeatureNeurons, databaseFeatureConnections)  # Outputs shape: (batch_size, c, f)
 		loss = criterion(outputs, targets)
 
 	optimizer.zero_grad()
 	loss.backward()
 	optimizer.step()
 
-	loss_value = loss.item()
-	print("loss_value = ", loss_value)
+	lossValue = loss.item()
+	print("loss_value = ", lossValue)
 	
 	if(inferencePredictiveNetworkIndependentFCpredictions):
-		topk_c = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsC(outputs_c)
-		topk_f = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsF(outputs_f)
-		return topk_c, topk_f
+		topkC = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsC(outputsC)
+		topkF = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsF(outputsF)
+		return topkC, topkF
 	else:
 		topk = GIAANNproto_predictiveNetworkOperations.getTopkPredictions(outputs)
 		return topk
@@ -112,202 +113,200 @@ class InputAttentionLayer(nn.Module):
 		self.f = f  # Number of input features
 
 		# Linear layer for V (values), applied over the feature dimension
-		self.W_v = nn.Linear(f, f, bias=False, device=devicePredictiveNetworkModel)
+		self.wV = nn.Linear(f, f, bias=False, device=devicePredictiveNetworkModel)
 
-	def forward(self, X, database_feature_connections):
+	def forward(self, X, databaseFeatureConnections):
 		# X shape: (batch_size, p, s, c, f)
-		# database_feature_connections shape: (p, s, c, f, c, f)
+		# databaseFeatureConnections shape: (p, s, c, f, c, f)
 
-		batch_size = X.size(0)
+		batchSize = X.size(0)
 
-		# Reshape X to apply W_v over the last dimension (f)
+		# Reshape X to apply wV over the last dimension (f)
 		if(inferencePredictiveNetworkUseInputAllProperties):
-			X_reshaped = X.view(batch_size, self.p * self.s * self.c, self.f)
-			V = self.W_v(X_reshaped)  # Shape: (batch_size, p*s*c, f)
-			V = V.view(batch_size, self.p, self.s, self.c, self.f)	# Reshape V back to (batch_size, p, s, c, f)
-			p_max = self.p
+			xReshaped = X.view(batchSize, self.p * self.s * self.c, self.f)
+			v = self.wV(xReshaped)  # Shape: (batch_size, p*s*c, f)
+			v = v.view(batchSize, self.p, self.s, self.c, self.f)	# Reshape v back to (batch_size, p, s, c, f)
+			pMax = self.p
 		else:
-			X_reshaped = X.view(batch_size, self.s * self.c, self.f)
-			V = self.W_v(X_reshaped)  # Shape: (batch_size, s*c, f)
-			V = V.view(batch_size, self.s, self.c, self.f)	# Reshape V back to (batch_size, p, s, c, f)
-			p_max = 1
+			xReshaped = X.view(batchSize, self.s * self.c, self.f)
+			v = self.wV(xReshaped)  # Shape: (batch_size, s*c, f)
+			v = v.view(batchSize, self.s, self.c, self.f)	# Reshape v back to (batch_size, p, s, c, f)
+			pMax = 1
 		
-		attention_outputs = []
+		attentionOutputs = []
 
 		# Iterate over each attention head (total of p * s heads)
-		for p_idx in range(p_max):
-			for s_idx in range(self.s):
-				# Extract V for the current head
+		for pIdx in range(pMax):
+			for sIdx in range(self.s):
+				# Extract v for the current head
 				if(inferencePredictiveNetworkUseInputAllProperties):
-					V_head = V[:, p_idx, s_idx, :, :]  # Shape: (batch_size, c, f)
-					# Extract the corresponding attention scores from database_feature_connections
-					# KQ_head shape: (c, f, c, f)
-					KQ_head = database_feature_connections[p_idx, s_idx]  # Shape: (c, f, c, f)
+					vHead = v[:, pIdx, sIdx, :, :]  # Shape: (batch_size, c, f)
+					# Extract the corresponding attention scores from databaseFeatureConnections
+					# kqHead shape: (c, f, c, f)
+					kqHead = databaseFeatureConnections[pIdx, sIdx]  # Shape: (c, f, c, f)
 				else:
-					V_head = V[:, s_idx, :, :]  # Shape: (batch_size, c, f)
-					# Extract the corresponding attention scores from database_feature_connections
-					# KQ_head shape: (c, f, c, f)
-					KQ_head = database_feature_connections[s_idx]  # Shape: (c, f, c, f)
+					vHead = v[:, sIdx, :, :]  # Shape: (batch_size, c, f)
+					# Extract the corresponding attention scores from databaseFeatureConnections
+					# kqHead shape: (c, f, c, f)
+					kqHead = databaseFeatureConnections[sIdx]  # Shape: (c, f, c, f)
 
 				# Sum over the feature dimensions to obtain attention weights between columns
 				# First, sum over source feature dimension (from features)
-				KQ_summed_over_from_f = KQ_head.sum(dim=1)  # Shape: (c, c, f)
+				kqSummedOverFromF = kqHead.sum(dim=1)  # Shape: (c, c, f)
 				# Then, sum over target feature dimension (to features)
-				attention_scores = KQ_summed_over_from_f.sum(dim=2)  # Shape: (c, c)
+				attentionScores = kqSummedOverFromF.sum(dim=2)  # Shape: (c, c)
 
-				attention_scores = attention_scores.to_dense()
+				attentionScores = attentionScores.to_dense()
 				if(useGPUdense and not useGPUsparse):
-					attention_scores = attention_scores.to(deviceDense)
+					attentionScores = attentionScores.to(deviceDense)
 					
 				# Apply softmax to get attention weights
-				attention_weights = F.softmax(attention_scores, dim=-1)  # Shape: (c, c)
+				attentionWeights = F.softmax(attentionScores, dim=-1)  # Shape: (c, c)
 
-				# Expand attention_weights to match batch size
-				attention_weights = attention_weights.unsqueeze(0).expand(batch_size, -1, -1)  # Shape: (batch_size, c, c)
+				# Expand attentionWeights to match batch size
+				attentionWeights = attentionWeights.unsqueeze(0).expand(batchSize, -1, -1)  # Shape: (batch_size, c, c)
 
-				# Apply attention weights to V_head
-				attention_output = pt.bmm(attention_weights, V_head)  # Shape: (batch_size, c, f)
+				# Apply attention weights to vHead
+				attentionOutput = pt.bmm(attentionWeights, vHead)  # Shape: (batch_size, c, f)
 
-				attention_outputs.append(attention_output)
+				attentionOutputs.append(attentionOutput)
 
 		# Concatenate attention outputs from all heads along the embedding dimension
-		# attention_outputs is a list of tensors with shape (batch_size, c, f)
-		attention_outputs = pt.cat(attention_outputs, dim=2)  # Shape: (batch_size, c, p*s*f)
+		# attentionOutputs is a list of tensors with shape (batch_size, c, f)
+		attentionOutputs = pt.cat(attentionOutputs, dim=2)  # Shape: (batch_size, c, p*s*f)
 
 		# Permute to match transformer input requirements
 		# Transformer expects input of shape (sequence_length, batch_size, embedding_dim)
-		attention_outputs = attention_outputs.permute(1, 0, 2).contiguous()  # Shape: (c, batch_size, p*s*f)
+		attentionOutputs = attentionOutputs.permute(1, 0, 2).contiguous()  # Shape: (c, batch_size, p*s*f)
 
-		return attention_outputs  # Shape: (sequence_length, batch_size, embedding_dim)
+		return attentionOutputs  # Shape: (sequence_length, batch_size, embedding_dim)
 
 
 class CustomTransformer(nn.Module):
-	def __init__(self, p, s, c, f, num_layers):
+	def __init__(self, p, s, c, f, numLayers):
 		super(CustomTransformer, self).__init__()
 		self.p = p
 		self.s = s
 		self.c = c
 		self.f = f
-		self.num_layers = num_layers
+		self.numLayers = numLayers
 		if(inferencePredictiveNetworkUseInputAllProperties):
-			self.p_hidden = p*s
-			self.embedding_dim = self.p * self.s * self.f	#embedding dimension includes concatenation of all heads
+			self.pHidden = p*s
+			self.embeddingDim = self.p * self.s * self.f	#embedding dimension includes concatenation of all heads
 		else:
-			self.p_hidden = s
-			self.embedding_dim = self.s * self.f	#embedding dimension includes concatenation of all heads
-		self.f_mlp = self.embedding_dim*4
+			self.pHidden = s
+			self.embeddingDim = self.s * self.f	#embedding dimension includes concatenation of all heads
+		self.fMlp = self.embeddingDim*4
 		
 		if(transformerUseInputConnections):
 			# Custom attention layer for the input layer
-			self.input_attention_layer = InputAttentionLayer(p, s, c, f)
+			self.inputAttentionLayer = InputAttentionLayer(p, s, c, f)
 
 		# Transformer encoder layers for the hidden layers
-		encoder_layer = nn.TransformerEncoderLayer(d_model=self.embedding_dim, nhead=self.p_hidden, dim_feedforward=self.f_mlp, device=devicePredictiveNetworkModel)
-		self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+		encoderLayer = nn.TransformerEncoderLayer(d_model=self.embeddingDim, nhead=self.pHidden, dim_feedforward=self.fMlp, device=devicePredictiveNetworkModel)
+		self.transformerEncoder = nn.TransformerEncoder(encoderLayer, num_layers=numLayers)
 		if(inferencePredictiveNetworkInitialiseWeightsNearZero):
-			#self.initialise_encoder_weights_zero()	#debug only
-			self.initialise_encoder_weights_near_zero()
+			#self.initialiseEncoderWeightsZero()	#debug only
+			self.initialiseEncoderWeightsNearZero()
 
 		# MLP for deriving the predicted token
 		if(transformerOutputLayerUseEveryColumn):
-			final_dim = c * self.embedding_dim
+			finalDim = c * self.embeddingDim
 		else:
-			final_dim = self.embedding_dim
+			finalDim = self.embeddingDim
 			
 		if(inferencePredictiveNetworkIndependentFCpredictions):
-			self.fc_c = nn.Linear(final_dim, self.c, device=devicePredictiveNetworkModel)
-			self.fc_f = nn.Linear(final_dim, self.f, device=devicePredictiveNetworkModel)
+			self.fcC = nn.Linear(finalDim, self.c, device=devicePredictiveNetworkModel)
+			self.fcF = nn.Linear(finalDim, self.f, device=devicePredictiveNetworkModel)
 		else:
-			self.fc = nn.Linear(final_dim, c * f, device=devicePredictiveNetworkModel)
+			self.fc = nn.Linear(finalDim, c * f, device=devicePredictiveNetworkModel)
 		
-	def forward(self, X, database_feature_connections):
+	def forward(self, X, databaseFeatureConnections):
 		# X shape: (batch_size, p, s, c, f)
-		# database_feature_connections shape: (p, s, c, f, c, f)
-		batch_size = X.size(0)
+		# databaseFeatureConnections shape: (p, s, c, f, c, f)
+		batchSize = X.size(0)
 
 		if(inferencePredictiveNetworkUseInputAllProperties):
 			embedding = X.permute(3, 0, 1, 2, 4).contiguous()  # Shape: (c, batch_size, p, s, f)
-			embedding = embedding.view(self.c, batch_size, self.p * self.s * self.f)
+			embedding = embedding.view(self.c, batchSize, self.p * self.s * self.f)
 		else:
 			embedding = X.permute(2, 0, 1, 3).contiguous()  # Shape: (c, batch_size, s, f)
-			embedding = embedding.view(self.c, batch_size, self.s * self.f)
+			embedding = embedding.view(self.c, batchSize, self.s * self.f)
 			
 		if(transformerUseInputConnections):
 			# Apply the custom attention layer
-			input_attention_output = self.input_attention_layer(X, database_feature_connections)
-			# attention_outputs shape: (sequence_length, batch_size, embedding_dim)
-			embedding = (embedding + input_attention_output) / 2.0	#residual connection from X
+			inputAttentionOutput = self.inputAttentionLayer(X, databaseFeatureConnections)
+			# attentionOutputs shape: (sequence_length, batch_size, embedding_dim)
+			embedding = (embedding + inputAttentionOutput) / 2.0	#residual connection from X
 		
 		# Pass through the transformer encoder
-		transformer_output = self.transformer_encoder(embedding)
-		# transformer_output shape: (sequence_length, batch_size, embedding_dim)
+		transformerOutput = self.transformerEncoder(embedding)
+		# transformerOutput shape: (sequence_length, batch_size, embedding_dim)
 
 		# Use the output from the last sequence position
 		if(transformerOutputLayerUseEveryColumn):
-			final_output = transformer_output.view(batch_size, self.c * self.embedding_dim)	# Shape: (batch_size, c*embedding_dim)
+			finalOutput = transformerOutput.view(batchSize, self.c * self.embeddingDim)	# Shape: (batch_size, c*embeddingDim)
 		else:
-			final_output = transformer_output[-1]  # Shape: (batch_size, embedding_dim)
+			finalOutput = transformerOutput[-1]  # Shape: (batch_size, embeddingDim)
 
 		if(inferencePredictiveNetworkIndependentFCpredictions):
 			# Apply the separate MLPs to derive logits for c and f
-			logits_c = self.fc_c(final_output)  # Shape: (batch_size, c)
-			logits_f = self.fc_f(final_output)  # Shape: (batch_size, f)
-			return logits_c, logits_f  # Two separate outputs	 # Shape: (batch_size, c), Shape: (batch_size, f)
+			logitsC = self.fcC(finalOutput)  # Shape: (batch_size, c)
+			logitsF = self.fcF(finalOutput)  # Shape: (batch_size, f)
+			return logitsC, logitsF  # Two separate outputs
 			'''
 			if multipleTargets:
-				probabilities_c = logits_c
-				probabilities_f = logits_f
+				probabilitiesC = logitsC
+				probabilitiesF = logitsF
 			else:
-				probabilities_c = F.softmax(logits_c, dim=-1)  # Shape: (batch_size, c)
-				probabilities_f = F.softmax(logits_f, dim=-1)  # Shape: (batch_size, f)
-			return probabilities_c, probabilities_f  # Two separate outputs	 # Shape: (batch_size, c), Shape: (batch_size, f)
+				probabilitiesC = F.softmax(logitsC, dim=-1)  # Shape: (batch_size, c)
+				probabilitiesF = F.softmax(logitsF, dim=-1)  # Shape: (batch_size, f)
+			return probabilitiesC, probabilitiesF  # Two separate outputs
 			'''
 		else:
 			# Apply the MLP to derive the logits
-			logits = self.fc(final_output)  # Shape: (batch_size, c * f)
-			logits = logits.view(batch_size, self.c, self.f)
+			logits = self.fc(finalOutput)  # Shape: (batch_size, c * f)
+			logits = logits.view(batchSize, self.c, self.f)
 			return logits  # Shape: (batch_size, c, f)
 			'''
 			if(multipleTargets):
 				probabilities = logits
 			else:
 				#Apply softmax to get probabilities over (c, f)
-				logits_flat = logits.view(batch_size, -1)  # Shape: (batch_size, c * f)
-				probabilities_flat = F.softmax(logits_flat, dim=-1)
-				probabilities = probabilities_flat.view(batch_size, self.c, self.f)  # Shape: (batch_size, c, f)
+				logitsFlat = logits.view(batchSize, -1)  # Shape: (batch_size, c * f)
+				probabilitiesFlat = F.softmax(logitsFlat, dim=-1)
+				probabilities = probabilitiesFlat.view(batchSize, self.c, self.f)
 			return probabilities  # Shape: (batch_size, c, f)
 			'''
 		
-	def initialise_encoder_weights_near_zero(self, init_std = 1e-5):
+	def initialiseEncoderWeightsNearZero(self, initStd = 1e-5):
 		# 3. Initialize each layer to be near-identity.
-		for layer in self.transformer_encoder.layers:
+		for layer in self.transformerEncoder.layers:
 			# --- Multi-head attention ---
-			# Small random initialization instead of exact zeros
-			nn.init.normal_(layer.self_attn.in_proj_weight, mean=0.0, std=init_std)
+			nn.init.normal_(layer.self_attn.in_proj_weight, mean=0.0, std=initStd)
 			nn.init.zeros_(layer.self_attn.in_proj_bias)
-			nn.init.normal_(layer.self_attn.out_proj.weight, mean=0.0, std=init_std)
+			nn.init.normal_(layer.self_attn.out_proj.weight, mean=0.0, std=initStd)
 			nn.init.zeros_(layer.self_attn.out_proj.bias)
 
 			# --- Feedforward sub-layer ---
-			nn.init.normal_(layer.linear1.weight, mean=0.0, std=init_std)
+			nn.init.normal_(layer.linear1.weight, mean=0.0, std=initStd)
 			nn.init.zeros_(layer.linear1.bias)
-			nn.init.normal_(layer.linear2.weight, mean=0.0, std=init_std)
+			nn.init.normal_(layer.linear2.weight, mean=0.0, std=initStd)
 			nn.init.zeros_(layer.linear2.bias)
 
 			# --- LayerNorm parameters ---
-			# Keep scale=1.0 and bias=0.0 so LN doesn't shift/scale significantly
 			nn.init.ones_(layer.norm1.weight)
 			nn.init.zeros_(layer.norm1.bias)
 			nn.init.ones_(layer.norm2.weight)
 			nn.init.zeros_(layer.norm2.bias)
 
-	def initialise_encoder_weights_zero(self):
+	def initialiseEncoderWeightsZero(self):
 		# 3. Initialize each layer to be near-identity.
-		for layer in self.transformer_encoder.layers:
+		for layer in self.transformerEncoder.layers:
 			# --- Multi-head attention ---
-			nn.init.zeros_(layer.self_attn.in_proj_weight)   # Q/K/V weights
-			nn.init.zeros_(layer.self_attn.in_proj_bias)     
-			nn.init.zeros_(layer.self_attn.out_proj.weight)  # Output projection
+			nn.init.zeros_(layer.self_attn.in_proj_weight)
+			nn.init.zeros_(layer.self_attn.in_proj_bias)
+			nn.init.zeros_(layer.self_attn.out_proj.weight)
 			nn.init.zeros_(layer.self_attn.out_proj.bias)
 
 			# --- Feedforward sub-layer ---
@@ -317,30 +316,28 @@ class CustomTransformer(nn.Module):
 			nn.init.zeros_(layer.linear2.bias)
 
 			# --- LayerNorm parameters ---
-			# Keep default LN scale=1.0 and bias=0.0 for minimal shift/scale
 			nn.init.ones_(layer.norm1.weight)
 			nn.init.zeros_(layer.norm1.bias)
 			nn.init.ones_(layer.norm2.weight)
 
 			
-def save_model(path, filename="model.pt"):
-    # Ensure directory exists
-    os.makedirs(path, exist_ok=True)
-    
-    # Construct full filepath
-    filepath = os.path.join(path, filename)
-    
-    # Save the model state_dict
-    pt.save(model.state_dict(), filepath)
-    return filepath
+def saveModel(path, fileName="model.pt"):
+	# Ensure directory exists
+	os.makedirs(path, exist_ok=True)
+	
+	# Construct full filepath
+	filePath = os.path.join(path, fileName)
+	
+	# Save the model state_dict
+	pt.save(model.state_dict(), filePath)
+	return filePath
 
 
-def load_model(filepath, map_location=None):
-    # Load state_dict from file
-    state_dict = pt.load(filepath, map_location=map_location)
-    
-    # Load the state_dict into the model
-    model.load_state_dict(state_dict)
-    
-    return model
-
+def loadModel(filePath, mapLocation=None):
+	# Load state_dict from file
+	stateDict = pt.load(filePath, map_location=mapLocation)
+	
+	# Load the state_dict into the model
+	model.load_state_dict(stateDict)
+	
+	return model

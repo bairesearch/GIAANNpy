@@ -25,7 +25,7 @@ useGPUsparse = False	#default: False	#orig: True
 useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/MLP predictive network model
 maxSentenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM availability during train (with trainSequenceObservedColumnsUseSequenceFeaturesOnly only limited amount of data is ever loaded to GPU during train)
 databaseFolder = "" #default: ""
-max_sentences = 100	#debug: 10, 500 	#default: 100000000	  #adjust as needed (eg lower max_sentences during train before independent inferenceTrainPredictiveNetworkAllSentences execution)	#max sentences for train or inference
+maxSentences = 10	#debug: 10, 500 	#default: 100000000	  #adjust as needed (eg lower max_sentences during train before independent inferenceTrainPredictiveNetworkAllSentences execution)	#max sentences for train or inference
 numberEpochs = 1	#default: 1
 
 # Set boolean variables as per specification
@@ -128,7 +128,7 @@ if(trainIncreaseColumnInternalConnectionsStrength):
  	trainIncreaseColumnInternalConnectionsStrengthModifier = 10.0
 	
 #debug vars;
-debugSmallDataset = False
+debugSmallDataset = False	#required if huggingface Wikipedia dataset is offline
 debugConceptFeaturesOccurFirstInSubsequence = False #Constrain column feature detection to be after concept feature detection
 debugConnectColumnsToNextColumnsInSequenceOnly = False
 debugDrawNeuronActivations = False
@@ -152,7 +152,7 @@ if usePOS:
 
 #if usePOS: same word can have different pos making it classed as an instance feature or concept feature
 
-inference_prompt_file = databaseFolder + 'inference_prompt.txt'
+inferencePromptFile = databaseFolder + 'inference_prompt.txt'
 if(useInference):
 	if(inferencePredictiveNetwork):
 		inferenceInvertNeuronActivationUponPrediction = False	#default: True	#orig: False	#set activations of previously activated neurons to negative - refractory period preventing consecutive feature reactivation and facilitating prediction based on past predictions
@@ -178,11 +178,11 @@ if(useInference):
 			activationDecrementSeed = activationDecrementPerPredictedSentence
 	
 	if(inferenceSeedNetwork):
-		num_seed_tokens = 5	#number of seed tokens in last sentence of inference prompt (remaining tokens will be prediction tokens)
-		num_prediction_tokens = 10	#number of words to predict after network seed
+		numSeedTokens = 5	#number of seed tokens in last sentence of inference prompt (remaining tokens will be prediction tokens)
+		numPredictionTokens = 10	#number of words to predict after network seed
 	else:
-		num_seed_tokens = 0
-		num_prediction_tokens = None	#sentence length
+		numSeedTokens = 0
+		numPredictionTokens = None	#sentence length
 	
 	if(debugConceptFeaturesOccurFirstInSubsequence):
 		kcNetwork = 1	#number of topk columns to target
@@ -217,41 +217,41 @@ if(useInference):
 
 
 # Paths for saving data
-concept_columns_dict_file = databaseFolder + 'concept_columns_dict.pkl'
-concept_features_dict_file = databaseFolder + 'concept_features_dict.pkl'
-observed_columns_dir = databaseFolder + 'observed_columns'
-pytorch_tensor_file_extension = ".pt"
-predictive_network_folder = "."
-predictive_network_file_name = "predictive_network_model.pt"
+conceptColumnsDictFile = databaseFolder + 'conceptColumnsDict.pkl'
+conceptFeaturesDictFile = databaseFolder + 'conceptFeaturesDict.pkl'
+observedColumnsDir = databaseFolder + 'observedColumns'
+pytorchTensorFileExtension = ".pt"
+predictiveNetworkFolder = "."
+predictiveNetworkFileName = "predictiveNetworkModel.pt"
 
 #common array indices
-array_index_properties_strength = 0
-array_index_properties_permanence = 1
-array_index_properties_activation = 2
-array_index_properties_time = 3
-array_index_properties_pos = 4
-array_number_of_properties = 5
-array_properties_list = [array_index_properties_strength, array_index_properties_permanence, array_index_properties_activation, array_index_properties_time, array_index_properties_pos]
-array_index_segment_first = 0
+arrayIndexPropertiesStrength = 0
+arrayIndexPropertiesPermanence = 1
+arrayIndexPropertiesActivation = 2
+arrayIndexPropertiesTime = 3
+arrayIndexPropertiesPos = 4
+arrayNumberOfProperties = 5
+arrayPropertiesList = [arrayIndexPropertiesStrength, arrayIndexPropertiesPermanence, arrayIndexPropertiesActivation, arrayIndexPropertiesTime, arrayIndexPropertiesPos]
+arrayIndexSegmentFirst = 0
 if(useSANI):
-	array_number_of_segments = 10	#max number of SANI segments per sequence (= max number of concept columns per sequence)
+	arrayNumberOfSegments = 10	#max number of SANI segments per sequence (= max number of concept columns per sequence)
 else:
-	array_number_of_segments = 1
-array_index_segment_internal_column = array_number_of_segments-1
-array_type = pt.float32	#pt.long	#pt.float32
+	arrayNumberOfSegments = 1
+arrayIndexSegmentInternalColumn = arrayNumberOfSegments-1
+arrayType = pt.float32	#pt.long	#pt.float32
 
 # Define POS tag sets for nouns and non-nouns
-noun_pos_tags = {'NOUN', 'PROPN'}
-non_noun_pos_tags = {'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X'}
+nounPosTags = {'NOUN', 'PROPN'}
+nonNounPosTags = {'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X'}
 
-def pos_int_to_pos_string(nlp, pos_int):
-	if pos_int in nlp.vocab.strings:
-		return nlp.vocab[pos_int].text
+def posIntToPosString(nlp, posInt):
+	if posInt in nlp.vocab.strings:
+		return nlp.vocab[posInt].text
 	else:
 		return ''
 		
-def pos_string_to_pos_int(nlp, pos_string):
-	return nlp.vocab.strings[pos_string]
+def posStringToPosInt(nlp, posString):
+	return nlp.vocab.strings[posString]
 		
 
 	
@@ -266,10 +266,10 @@ else:
 	
 
 if not lowMem:
-	global_feature_neurons_file = 'global_feature_neurons'
+	globalFeatureNeuronsFile = 'globalFeatureNeurons'
 
 variableConceptNeuronFeatureName = "variableConceptNeuronFeature"
-feature_index_concept_neuron = 0
+featureIndexConceptNeuron = 0
 
 def printe(str):
 	print(str)
@@ -309,15 +309,15 @@ if useDedicatedFeatureLists:
 		for lemma in synset.lemma_names():
 			nouns.add(lemma.lower())
 	
-	all_words = set()
+	allWords = set()
 	for synset in wn.all_synsets():
 		for lemma in synset.lemma_names():
-			all_words.add(lemma.lower())
+			allWords.add(lemma.lower())
 	
-	non_nouns = all_words - nouns
-	max_num_non_nouns = len(non_nouns)
+	nonNouns = allWords - nouns
+	maxNumNonNouns = len(nonNouns)
 
-def get_tensor_size_in_mb(tensor):
+def getTensorSizeInMB(tensor):
 	return tensor.element_size() * tensor.nelement() / (1024 ** 2)
 
 useLovelyTensors = False
@@ -336,4 +336,3 @@ def compareDenseArrayDiff(array1, array2):
 	indices = pt.nonzero(difference, as_tuple=False)
 	print("Indices of differences:")
 	print(indices)
-	

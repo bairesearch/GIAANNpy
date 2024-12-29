@@ -25,7 +25,7 @@ from GIAANNproto_globalDefs import *
 
 
 def initialiseDatabaseFiles():
-	os.makedirs(observed_columns_dir, exist_ok=True)
+	os.makedirs(observedColumnsDir, exist_ok=True)
 
 def pathExists(pathName):
 	if(os.path.exists(pathName)):
@@ -34,79 +34,79 @@ def pathExists(pathName):
 		return False
 	
 def loadDictFile(dictFileName):
-	with open(dictFileName, 'rb') as f_in:
-		dictionary = pickle.load(f_in)
+	with open(dictFileName, 'rb') as fIn:
+		dictionary = pickle.load(fIn)
 	return dictionary
 
 def loadFeatureNeuronsGlobalFile():
-	global_feature_neurons = load_tensor(databaseFolder, global_feature_neurons_file)
-	return global_feature_neurons
+	globalFeatureNeurons = loadTensor(databaseFolder, globalFeatureNeuronsFile)
+	return globalFeatureNeurons
 	
-def save_data(databaseNetworkObject, observed_columns_dict):
+def saveData(databaseNetworkObject, observedColumnsDict):
 	# Save observed columns to disk
-	for observed_column in observed_columns_dict.values():
-		observed_column.save_to_disk()
+	for observedColumn in observedColumnsDict.values():
+		observedColumn.saveToDisk()
 
 	# Save global feature neuron arrays if not lowMem
 	if not lowMem:
 		if(performRedundantCoalesce):
-			databaseNetworkObject.global_feature_neurons = databaseNetworkObject.global_feature_neurons.coalesce()
-		save_tensor(databaseNetworkObject.global_feature_neurons, databaseFolder, global_feature_neurons_file)
+			databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons.coalesce()
+		saveTensor(databaseNetworkObject.globalFeatureNeurons, databaseFolder, globalFeatureNeuronsFile)
 
 	# Save concept columns dictionary to disk
-	with open(concept_columns_dict_file, 'wb') as f_out:
-		pickle.dump(databaseNetworkObject.concept_columns_dict, f_out)
+	with open(conceptColumnsDictFile, 'wb') as fOut:
+		pickle.dump(databaseNetworkObject.conceptColumnsDict, fOut)
 
 	# Save concept features dictionary to disk
-	with open(concept_features_dict_file, 'wb') as f_out:
-		pickle.dump(databaseNetworkObject.concept_features_dict, f_out)
+	with open(conceptFeaturesDictFile, 'wb') as fOut:
+		pickle.dump(databaseNetworkObject.conceptFeaturesDict, fOut)
 
 
-def observed_column_save_to_disk(self):
+def observedColumnSaveToDisk(self):
 	"""
 	Save the observed column data to disk.
 	"""
 	data = {
-		'concept_index': self.concept_index,
-		'feature_word_to_index': self.feature_word_to_index,
-		'feature_index_to_word': self.feature_index_to_word,
-		'next_feature_index': self.next_feature_index
+		'conceptIndex': self.conceptIndex,
+		'featureWordToIndex': self.featureWordToIndex,
+		'featureIndexToWord': self.featureIndexToWord,
+		'nextFeatureIndex': self.nextFeatureIndex
 	}
 	# Save the data dictionary using pickle
-	with open(os.path.join(observed_columns_dir, f"{self.concept_index}_data.pkl"), 'wb') as f:
+	with open(os.path.join(observedColumnsDir, f"{self.conceptIndex}_data.pkl"), 'wb') as f:
 		pickle.dump(data, f)
 	# Save the tensors using pt.save
 	if(performRedundantCoalesce):
-		self.feature_connections = self.feature_connections.coalesce()
-		print("self.feature_connections = ", self.feature_connections)
-	save_tensor(self.feature_connections, observed_columns_dir, f"{self.concept_index}_feature_connections")
+		self.featureConnections = self.featureConnections.coalesce()
+		print("self.featureConnections = ", self.featureConnections)
+	saveTensor(self.featureConnections, observedColumnsDir, f"{self.conceptIndex}_featureConnections")
 	if lowMem:
 		if(performRedundantCoalesce):
-			self.feature_neurons = self.feature_neurons.coalesce()
-			print("self.feature_neurons = ", self.feature_neurons)
-		save_tensor(self.feature_neurons, observed_columns_dir, f"{self.concept_index}_feature_neurons")
+			self.featureNeurons = self.featureNeurons.coalesce()
+			print("self.featureNeurons = ", self.featureNeurons)
+		saveTensor(self.featureNeurons, observedColumnsDir, f"{self.conceptIndex}_featureNeurons")
 
-def observed_column_load_from_disk(cls, databaseNetworkObject, concept_index, lemma, i):
+def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i):
 	"""
 	Load the observed column data from disk.
 	"""
 	# Load the data dictionary
-	with open(os.path.join(observed_columns_dir, f"{concept_index}_data.pkl"), 'rb') as f:
+	with open(os.path.join(observedColumnsDir, f"{conceptIndex}_data.pkl"), 'rb') as f:
 		data = pickle.load(f)
-	instance = cls(databaseNetworkObject, concept_index, lemma, i)
-	instance.feature_word_to_index = data['feature_word_to_index']
-	instance.feature_index_to_word = data['feature_index_to_word']
-	instance.next_feature_index = data['next_feature_index']
+	instance = cls(databaseNetworkObject, conceptIndex, lemma, i)
+	instance.featureWordToIndex = data['featureWordToIndex']
+	instance.featureIndexToWord = data['featureIndexToWord']
+	instance.nextFeatureIndex = data['nextFeatureIndex']
 	# Load the tensors
-	instance.feature_connections = load_tensor(observed_columns_dir, f"{concept_index}_feature_connections")
+	instance.featureConnections = loadTensor(observedColumnsDir, f"{conceptIndex}_featureConnections")
 	if lowMem:
-		instance.feature_neurons = load_tensor(observed_columns_dir, f"{concept_index}_feature_neurons")
+		instance.featureNeurons = loadTensor(observedColumnsDir, f"{conceptIndex}_featureNeurons")
 	return instance
 
-def save_tensor(tensor, folder_name, file_name):
-	pt.save(tensor, os.path.join(folder_name, file_name+pytorch_tensor_file_extension))
+def saveTensor(tensor, folderName, fileName):
+	pt.save(tensor, os.path.join(folderName, fileName+pytorchTensorFileExtension))
 
-def load_tensor(folder_name, file_name):
-	tensor = pt.load(os.path.join(folder_name, file_name+pytorch_tensor_file_extension))	#does not work: , map_location=deviceSparse
+def loadTensor(folderName, fileName):
+	tensor = pt.load(os.path.join(folderName, fileName+pytorchTensorFileExtension))	#does not work: , map_location=deviceSparse
 	tensor = tensor.to(deviceSparse)
 	return tensor

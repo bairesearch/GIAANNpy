@@ -49,10 +49,10 @@ if(useInference):
 nlp = spacy.load('en_core_web_sm')
 
 databaseNetworkObject = GIAANNproto_databaseNetwork.initialiseDatabaseNetwork()
-databaseNetworkObject.nlp = nlp	#used by pos_string_to_pos_int
+databaseNetworkObject.nlp = nlp	#used by posStringToPosInt
 
 def main():
-	global sentence_count
+	global sentenceCount
 	GIAANNproto_databaseNetworkFiles.initialiseDatabaseFiles()
 	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSentences):
 		GIAANNproto_predictiveNetwork.initialisePredictiveNetwork(databaseNetworkObject)
@@ -61,28 +61,28 @@ def main():
 	for epochIndex in range(numberEpochs):
 		print("\nepochIndex = ", epochIndex)
 		# Start processing the dataset
-		sentence_count = 0
+		sentenceCount = 0
 		if((useInference and not inferenceTrainPredictiveNetworkAllSentences) or debugSmallDataset):
-			process_prompt()
+			processPrompt()
 		else:
-			process_dataset(dataset)
+			processDataset(dataset)
 		
 	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSentences and inferenceSavePredictiveNetwork):
 		GIAANNproto_predictiveNetwork.inferenceSavePredictiveNetwork()
 
-def process_prompt():
-	with open(inference_prompt_file, 'r', encoding='utf-8') as file:
+def processPrompt():
+	with open(inferencePromptFile, 'r', encoding='utf-8') as file:
 		text = file.read()
 	articleIndex = 0
-	process_article(text, articleIndex)
+	processArticle(text, articleIndex)
 	
-def process_dataset(dataset):
+def processDataset(dataset):
 	for articleIndex, article in enumerate(dataset):
-		process_article(article['text'], articleIndex)
-		if sentence_count == max_sentences:
+		processArticle(article['text'], articleIndex)
+		if sentenceCount == maxSentences:
 			break
 
-def process_article(text, articleIndex):
+def processArticle(text, articleIndex):
 	#sentences = sent_tokenize(text)
 	sentences = nlp(text)
 	numberOfSentences = len(list(sentences.sents))
@@ -92,17 +92,17 @@ def process_article(text, articleIndex):
 			if(sentenceIndex == numberOfSentences-1):
 				lastSentenceInPrompt = True
 		if(len(sentence) <= maxSentenceLength):
-			process_sentence(articleIndex, sentenceIndex, sentence, lastSentenceInPrompt)
-		if sentence_count == max_sentences:
+			processSentence(articleIndex, sentenceIndex, sentence, lastSentenceInPrompt)
+		if sentenceCount == maxSentences:
 			break
 			
-def process_sentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
-	global sentence_count
+def processSentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
+	global sentenceCount
 	
 	if(debugReloadGlobalFeatureNeuronsEverySentence):
 		initialiseDatabaseNetwork()
 		if(not lowMem):
-			databaseNetworkObject.global_feature_neurons = GIAANNproto_databaseNetwork.initialiseFeatureNeuronsGlobal(databaseNetworkObject.c, databaseNetworkObject.f)
+			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_databaseNetwork.initialiseFeatureNeuronsGlobal(databaseNetworkObject.c, databaseNetworkObject.f)
 	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSentences):
 		GIAANNproto_databaseNetwork.restoreGlobalArrays(databaseNetworkObject)	#restore global arrays (reset activation and time etc properties between sentences)
 		
@@ -112,54 +112,54 @@ def process_sentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
 	databaseNetworkObject.sentenceIndexDebug = sentenceIndex
 	
 	# Refresh the observed columns dictionary for each new sequence
-	observed_columns_dict = {}  # key: lemma, value: ObservedColumn
-	observed_columns_sequence_word_index_dict = {}  # key: sequence word index, value: ObservedColumn
+	observedColumnsDict = {}  # key: lemma, value: ObservedColumn
+	observedColumnsSequenceWordIndexDict = {}  # key: sequence word index, value: ObservedColumn
 	
 	if(useInference and (inferenceTrainPredictiveNetworkAllSentences or lastSentenceInPrompt)):
-		doc_seed = doc[0:num_seed_tokens]	#prompt
-		doc_predict = doc[num_seed_tokens:]
+		docSeed = doc[0:numSeedTokens]	#prompt
+		docPredict = doc[numSeedTokens:]
 
 	# First pass: Extract words, lemmas, POS tags, and update concept_columns_dict and c
-	concepts_found, words, lemmas, pos_tags = first_pass(doc)
+	conceptsFound, words, lemmas, posTags = firstPass(doc)
 	
-	if(concepts_found):
+	if(conceptsFound):
 		# When usePOS is enabled, detect all possible new features in the sequence
 		if not (useDedicatedFeatureLists):
-			detect_new_features(databaseNetworkObject, words, lemmas, pos_tags)
+			detectNewFeatures(databaseNetworkObject, words, lemmas, posTags)
 
 		# Second pass: Create observed_columns_dict
-		observed_columns_dict, observed_columns_sequence_word_index_dict = second_pass(databaseNetworkObject, lemmas, pos_tags)
+		observedColumnsDict, observedColumnsSequenceWordIndexDict = secondPass(databaseNetworkObject, lemmas, posTags)
 
 		# Create the sequence observed columns object
-		sequence_observed_columns = GIAANNproto_databaseNetworkTrain.SequenceObservedColumns(databaseNetworkObject, words, lemmas, observed_columns_dict, observed_columns_sequence_word_index_dict)
+		sequenceObservedColumns = GIAANNproto_databaseNetworkTrain.SequenceObservedColumns(databaseNetworkObject, words, lemmas, observedColumnsDict, observedColumnsSequenceWordIndexDict)
 
 		if(useInference and (inferenceTrainPredictiveNetworkAllSentences or lastSentenceInPrompt)):
 			# Process each concept word in the sequence (predict)
-			GIAANNproto_predictiveNetwork.process_concept_words_inference(sequence_observed_columns, sentence_count, doc, doc_seed, doc_predict, num_seed_tokens, num_prediction_tokens)
+			GIAANNproto_predictiveNetwork.processConceptWordsInference(sequenceObservedColumns, sentenceCount, doc, docSeed, docPredict, numSeedTokens, numPredictionTokens)
 		else:
 			# Process each concept word in the sequence (train)
-			GIAANNproto_databaseNetworkTrain.process_concept_words(sequence_observed_columns, sentence_count, doc, words, lemmas, pos_tags)
+			GIAANNproto_databaseNetworkTrain.processConceptWords(sequenceObservedColumns, sentenceCount, doc, words, lemmas, posTags)
 
 			# Update observed columns from sequence observed columns
-			sequence_observed_columns.update_observed_columns_wrapper()
+			sequenceObservedColumns.updateObservedColumnsWrapper()
 
 			# Save observed columns to disk
 			if(useSaveData):
-				GIAANNproto_databaseNetworkFiles.save_data(databaseNetworkObject, observed_columns_dict)
+				GIAANNproto_databaseNetworkFiles.saveData(databaseNetworkObject, observedColumnsDict)
 				
 			if(drawNetworkDuringTrain):
 				# Visualize the complete graph every time a new sentence is parsed by the application.
-				GIAANNproto_databaseNetworkDraw.visualize_graph(sequence_observed_columns, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+str(sentenceIndex))
+				GIAANNproto_databaseNetworkDraw.visualizeGraph(sequenceObservedColumns, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+str(sentenceIndex))
 
 	# Break if we've reached the maximum number of sentences
-	sentence_count += 1
+	sentenceCount += 1
 		
-def first_pass(doc):
+def firstPass(doc):
 	words = []
 	lemmas = []
-	pos_tags = []
-	new_concepts_added = False
-	concepts_found = False
+	posTags = []
+	newConceptsAdded = False
+	conceptsFound = False
 	
 	for token in doc:
 		word = token.text.lower()
@@ -167,88 +167,88 @@ def first_pass(doc):
 		pos = token.pos_  # Part-of-speech tag
 
 		if usePOS:
-			if pos in noun_pos_tags:
+			if pos in nounPosTags:
 				# Only assign unique concept columns for nouns
-				concepts_found, new_concepts_added = GIAANNproto_databaseNetwork.addConceptToConceptColumnsDict(databaseNetworkObject, lemma, concepts_found, new_concepts_added)
+				conceptsFound, newConceptsAdded = GIAANNproto_databaseNetwork.addConceptToConceptColumnsDict(databaseNetworkObject, lemma, conceptsFound, newConceptsAdded)
 		else:
 			# When usePOS is disabled, assign concept columns for every new lemma encountered
-			concepts_found, new_concepts_added = GIAANNproto_databaseNetwork.addConceptToConceptColumnsDict(databaseNetworkObject, lemma, concepts_found, new_concepts_added)
+			conceptsFound, newConceptsAdded = GIAANNproto_databaseNetwork.addConceptToConceptColumnsDict(databaseNetworkObject, lemma, conceptsFound, newConceptsAdded)
 
 		words.append(word)
 		lemmas.append(lemma)
-		pos_tags.append(pos)
+		posTags.append(pos)
 
 	# If new concept columns have been added, expand arrays as needed
-	if new_concepts_added:
+	if newConceptsAdded:
 		if not lowMem:
 			# Expand global feature neuron arrays
-			if databaseNetworkObject.global_feature_neurons.shape[2] < databaseNetworkObject.c:
-				new_shape = (databaseNetworkObject.global_feature_neurons.shape[0], databaseNetworkObject.global_feature_neurons.shape[1], databaseNetworkObject.c, databaseNetworkObject.global_feature_neurons.shape[3])
+			if databaseNetworkObject.globalFeatureNeurons.shape[2] < databaseNetworkObject.c:
+				newShape = (databaseNetworkObject.globalFeatureNeurons.shape[0], databaseNetworkObject.globalFeatureNeurons.shape[1], databaseNetworkObject.c, databaseNetworkObject.globalFeatureNeurons.shape[3])
 				if(performRedundantCoalesce):
-					databaseNetworkObject.global_feature_neurons = databaseNetworkObject.global_feature_neurons.coalesce()
-				databaseNetworkObject.global_feature_neurons = pt.sparse_coo_tensor(databaseNetworkObject.global_feature_neurons._indices(), databaseNetworkObject.global_feature_neurons._values(), size=new_shape, dtype=array_type, device=deviceSparse)
+					databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons.coalesce()
+				databaseNetworkObject.globalFeatureNeurons = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeurons._indices(), databaseNetworkObject.globalFeatureNeurons._values(), size=newShape, dtype=arrayType, device=deviceSparse)
 				
-	return concepts_found, words, lemmas, pos_tags
+	return conceptsFound, words, lemmas, posTags
 
 				
-def second_pass(databaseNetworkObject, lemmas, pos_tags):
-	observed_columns_dict = {}
-	observed_columns_sequence_word_index_dict = {}
+def secondPass(databaseNetworkObject, lemmas, posTags):
+	observedColumnsDict = {}
+	observedColumnsSequenceWordIndexDict = {}
 	for i, lemma in enumerate(lemmas):
-		pos = pos_tags[i]
+		pos = posTags[i]
 		if usePOS:
-			if pos in noun_pos_tags:
-				concept_index = databaseNetworkObject.concept_columns_dict[lemma]
+			if pos in nounPosTags:
+				conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
 				# Load observed column from disk or create new one
-				observed_column = GIAANNproto_databaseNetwork.load_or_create_observed_column(databaseNetworkObject, concept_index, lemma, i)
-				observed_columns_dict[lemma] = observed_column
-				observed_columns_sequence_word_index_dict[i] = observed_column
+				observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
+				observedColumnsDict[lemma] = observedColumn
+				observedColumnsSequenceWordIndexDict[i] = observedColumn
 		else:
-			concept_index = databaseNetworkObject.concept_columns_dict[lemma]
+			conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
 			# Load observed column from disk or create new one
-			observed_column = GIAANNproto_databaseNetwork.load_or_create_observed_column(databaseNetworkObject, concept_index, lemma, i)
-			observed_columns_dict[lemma] = observed_column
-			observed_columns_sequence_word_index_dict[i] = observed_column
-	return observed_columns_dict, observed_columns_sequence_word_index_dict
+			observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
+			observedColumnsDict[lemma] = observedColumn
+			observedColumnsSequenceWordIndexDict[i] = observedColumn
+	return observedColumnsDict, observedColumnsSequenceWordIndexDict
 
 
-def detect_new_features(databaseNetworkObject, words, lemmas, pos_tags):
+def detectNewFeatures(databaseNetworkObject, words, lemmas, posTags):
 	"""
 	When usePOS mode is enabled, detect all possible new features in the sequence
 	by searching for all new non-nouns in the sequence.
 	"""
 
-	num_new_features = 0
-	for j, (word_j, pos_j) in enumerate(zip(words, pos_tags)):
-		if(process_feature_detection(databaseNetworkObject, j, word_j, pos_tags)):
-			num_new_features += 1
+	numNewFeatures = 0
+	for j, (wordJ, posJ) in enumerate(zip(words, posTags)):
+		if(processFeatureDetection(databaseNetworkObject, j, wordJ, posTags)):
+			numNewFeatures += 1
 
 	# After processing all features, update f
-	databaseNetworkObject.f += num_new_features
+	databaseNetworkObject.f += numNewFeatures
 
 	# Now, expand arrays accordingly
 	if not lowMem:
-		if databaseNetworkObject.f > databaseNetworkObject.global_feature_neurons.shape[3]:
-			extra_cols = databaseNetworkObject.f - databaseNetworkObject.global_feature_neurons.shape[3]
-			new_shape = (databaseNetworkObject.global_feature_neurons.shape[0], databaseNetworkObject.global_feature_neurons.shape[1], databaseNetworkObject.global_feature_neurons.shape[2], databaseNetworkObject.f)
-			databaseNetworkObject.global_feature_neurons = databaseNetworkObject.global_feature_neurons.coalesce()
-			databaseNetworkObject.global_feature_neurons = pt.sparse_coo_tensor(databaseNetworkObject.global_feature_neurons.indices(), databaseNetworkObject.global_feature_neurons.values(), size=new_shape, dtype=array_type, device=deviceSparse)
+		if databaseNetworkObject.f > databaseNetworkObject.globalFeatureNeurons.shape[3]:
+			extraCols = databaseNetworkObject.f - databaseNetworkObject.globalFeatureNeurons.shape[3]
+			newShape = (databaseNetworkObject.globalFeatureNeurons.shape[0], databaseNetworkObject.globalFeatureNeurons.shape[1], databaseNetworkObject.globalFeatureNeurons.shape[2], databaseNetworkObject.f)
+			databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons.coalesce()
+			databaseNetworkObject.globalFeatureNeurons = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeurons.indices(), databaseNetworkObject.globalFeatureNeurons.values(), size=newShape, dtype=arrayType, device=deviceSparse)
 
-def process_feature_detection(databaseNetworkObject, j, word_j, pos_tags):
+def processFeatureDetection(databaseNetworkObject, j, wordJ, posTags):
 	"""
 	Helper function to detect new features prior to processing concept words.
 	"""
 	
-	pos_j = pos_tags[j]
-	feature_word = word_j.lower()
+	posJ = posTags[j]
+	featureWord = wordJ.lower()
 	
 	if usePOS:
-		if pos_j in noun_pos_tags:
+		if posJ in nounPosTags:
 			return False  # Skip nouns as features
 
-	if feature_word not in databaseNetworkObject.concept_features_dict:
-		databaseNetworkObject.concept_features_dict[feature_word] = len(databaseNetworkObject.concept_features_dict)
-		databaseNetworkObject.concept_features_list.append(feature_word)
+	if featureWord not in databaseNetworkObject.conceptFeaturesDict:
+		databaseNetworkObject.conceptFeaturesDict[featureWord] = len(databaseNetworkObject.conceptFeaturesDict)
+		databaseNetworkObject.conceptFeaturesList.append(featureWord)
 		return True
 	else:
 		return False
@@ -260,4 +260,3 @@ dataset = load_dataset('wikipedia', '20220301.en', split='train', streaming=True
 
 if __name__ == "__main__":
 	main()
-	

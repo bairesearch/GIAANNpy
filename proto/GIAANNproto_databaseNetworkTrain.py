@@ -27,110 +27,110 @@ class SequenceObservedColumns:
 	"""
 	Contains sequence observed columns object arrays which stack a feature subset of the observed columns object arrays for the current sequence.
 	"""
-	def __init__(self, databaseNetworkObject, words, lemmas, observed_columns_dict, observed_columns_sequence_word_index_dict):
+	def __init__(self, databaseNetworkObject, words, lemmas, observedColumnsDict, observedColumnsSequenceWordIndexDict):
 		#note cs may be slightly longer than number of unique columns in the sequence, if there are multiple instances of the same concept/noun lemma in the sequence
 	
 		self.databaseNetworkObject = databaseNetworkObject
-		self.observed_columns_dict = observed_columns_dict	# key: lemma, value: ObservedColumn
-		self.observed_columns_sequence_word_index_dict = observed_columns_sequence_word_index_dict	# key: sequence word index, value: ObservedColumn
+		self.observedColumnsDict = observedColumnsDict	# key: lemma, value: ObservedColumn
+		self.observedColumnsSequenceWordIndexDict = observedColumnsSequenceWordIndexDict	# key: sequence word index, value: ObservedColumn
 
 		if(trainSequenceObservedColumnsMatchSequenceWords):
-			self.cs = len(observed_columns_sequence_word_index_dict)
+			self.cs = len(observedColumnsSequenceWordIndexDict)
 
-			self.columns_index_sequence_word_index_dict = {}	#key: sequence word index, value: concept_index
-			self.sequence_observed_columns_dict = {}	#key: sequence_concept_index, value: observed_column 
-			self.concept_indices_in_observed_list = []	#value: concept index
-			for sequence_concept_index, (sequence_word_index, observed_column) in enumerate(self.observed_columns_sequence_word_index_dict.items()):
-				self.columns_index_sequence_word_index_dict[sequence_word_index] = observed_column.concept_index
-				self.sequence_observed_columns_dict[sequence_concept_index] = observed_column
-				self.concept_indices_in_observed_list.append(observed_column.concept_index)
-			self.concept_indices_in_sequence_observed_tensor = pt.tensor(self.concept_indices_in_observed_list, dtype=pt.long)
+			self.columnsIndexSequenceWordIndexDict = {}	#key: sequence word index, value: conceptIndex
+			self.sequenceObservedColumnsDict = {}	#key: sequenceConceptIndex, value: observedColumn 
+			self.conceptIndicesInObservedList = []	#value: concept index
+			for sequenceConceptIndex, (sequenceWordIndex, observedColumn) in enumerate(self.observedColumnsSequenceWordIndexDict.items()):
+				self.columnsIndexSequenceWordIndexDict[sequenceWordIndex] = observedColumn.conceptIndex
+				self.sequenceObservedColumnsDict[sequenceConceptIndex] = observedColumn
+				self.conceptIndicesInObservedList.append(observedColumn.conceptIndex)
+			self.conceptIndicesInSequenceObservedTensor = pt.tensor(self.conceptIndicesInObservedList, dtype=pt.long)
 		else:
-			self.cs = len(observed_columns_dict) 
+			self.cs = len(observedColumnsDict) 
 
-			self.columns_index_sequence_word_index_dict = {}	#key: sequence word index, value: concept_index
-			for idx, (sequence_word_index, observed_column) in enumerate(observed_columns_sequence_word_index_dict.items()):
-				self.columns_index_sequence_word_index_dict[sequence_word_index] = observed_column.concept_index
+			self.columnsIndexSequenceWordIndexDict = {}	#key: sequence word index, value: conceptIndex
+			for idx, (sequenceWordIndex, observedColumn) in enumerate(observedColumnsSequenceWordIndexDict.items()):
+				self.columnsIndexSequenceWordIndexDict[sequenceWordIndex] = observedColumn.conceptIndex
 
 			# Map from concept names to indices in sequence arrays
-			self.concept_indices_in_observed_list = []
-			self.concept_name_to_index = {}	# key: lemma, value: sequence_concept_index
-			self.index_to_concept_name = {}	# key: sequence_concept_index, value: lemma
-			self.observed_columns_dict2 = {}	# key: sequence_concept_index, value: ObservedColumn
-			for idx, (lemma, observed_column) in enumerate(observed_columns_dict.items()):
-				self.concept_indices_in_observed_list.append(observed_column.concept_index)
-				self.concept_name_to_index[lemma] = idx
-				self.index_to_concept_name[idx] = lemma
-				self.observed_columns_dict2[idx] = observed_column
-			self.concept_indices_in_sequence_observed_tensor = pt.tensor(self.concept_indices_in_observed_list, dtype=pt.long)
+			self.conceptIndicesInObservedList = []
+			self.conceptNameToIndex = {}	# key: lemma, value: sequenceConceptIndex
+			self.indexToConceptName = {}	# key: sequenceConceptIndex, value: lemma
+			self.observedColumnsDict2 = {}	# key: sequenceConceptIndex, value: ObservedColumn
+			for idx, (lemma, observedColumn) in enumerate(observedColumnsDict.items()):
+				self.conceptIndicesInObservedList.append(observedColumn.conceptIndex)
+				self.conceptNameToIndex[lemma] = idx
+				self.indexToConceptName[idx] = lemma
+				self.observedColumnsDict2[idx] = observedColumn
+			self.conceptIndicesInSequenceObservedTensor = pt.tensor(self.conceptIndicesInObservedList, dtype=pt.long)
 				
-		self.feature_neuron_changes = [None]*self.cs
+		self.featureNeuronChanges = [None]*self.cs
 			
 		# Collect all feature words from observed columns
 		self.words = words
 		self.lemmas = lemmas
-		#identify feature indices from complete ObservedColumns.featureNeurons or globalFeatureNeurons feature lists currently stored in SequenceObservedColumns.feature_neurons	#required for useInference
-		observed_column = list(observed_columns_dict.values())[0]	#all features (including words) are identical per observed column
-		self.feature_words, self.feature_indices_in_observed_tensor, self.f_idx_tensor = self.identifyObservedColumnFeatureWords(words, lemmas, observed_column)
+		#identify feature indices from complete ObservedColumns.featureNeurons or globalFeatureNeurons feature lists currently stored in SequenceObservedColumns.featureNeurons	#required for useInference
+		observedColumn = list(observedColumnsDict.values())[0]	#all features (including words) are identical per observed column
+		self.featureWords, self.featureIndicesInObservedTensor, self.fIdxTensor = self.identifyObservedColumnFeatureWords(words, lemmas, observedColumn)
 
 		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-			self.fs = self.feature_indices_in_observed_tensor.shape[0]
+			self.fs = self.featureIndicesInObservedTensor.shape[0]
 		else:
-			self.fs = len(self.feature_words)
-		self.feature_word_to_index = {}
-		self.index_to_feature_word = {}
-		for idx, feature_word in enumerate(self.feature_words):
-			self.feature_word_to_index[feature_word] = idx
-			self.index_to_feature_word[idx] = feature_word
+			self.fs = len(self.featureWords)
+		self.featureWordToIndex = {}
+		self.indexToFeatureWord = {}
+		for idx, featureWord in enumerate(self.featureWords):
+			self.featureWordToIndex[featureWord] = idx
+			self.indexToFeatureWord[idx] = featureWord
 
 		# Initialize arrays
-		self.feature_neurons = self.initialiseFeatureNeuronsSequence(self.cs, self.fs)
-		self.feature_connections = self.initialiseFeatureConnectionsSequence(self.cs, self.fs)
+		self.featureNeurons = self.initialiseFeatureNeuronsSequence(self.cs, self.fs)
+		self.featureConnections = self.initialiseFeatureConnectionsSequence(self.cs, self.fs)
 
-		# Populate arrays with data from observed_columns_dict
+		# Populate arrays with data from observedColumnsDict
 		if(trainSequenceObservedColumnsMatchSequenceWords):
-			self.populate_arrays(words, lemmas, self.sequence_observed_columns_dict)
+			self.populateArrays(words, lemmas, self.sequenceObservedColumnsDict)
 		else:
-			self.populate_arrays(words, lemmas, self.observed_columns_dict2)
+			self.populateArrays(words, lemmas, self.observedColumnsDict2)
 
 			
-	def identifyObservedColumnFeatureWords(self, words, lemmas, observed_column):
+	def identifyObservedColumnFeatureWords(self, words, lemmas, observedColumn):
 		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-			feature_words = []
-			feature_indices_in_observed = []
+			featureWords = []
+			featureIndicesInObserved = []
 			#print("\nidentifyObservedColumnFeatureWords: words = ", len(words))
 			for wordIndex, (word, lemma) in enumerate(zip(words, lemmas)):
-				feature_word = word
-				feature_lemma = lemma
-				if(useDedicatedConceptNames and wordIndex in self.observed_columns_sequence_word_index_dict):	
+				featureWord = word
+				featureLemma = lemma
+				if(useDedicatedConceptNames and wordIndex in self.observedColumnsSequenceWordIndexDict):	
 					if(useDedicatedConceptNames2):
-						#only provide 1 observed_column to identifyObservedColumnFeatureWords (therefore this condition will only be triggered once when when feature_lemma == observed_column.concept_name of some arbitrary concept column. Once triggered a singular artificial variableConceptNeuronFeatureName will be added)
-						feature_words.append(variableConceptNeuronFeatureName)
-					feature_indices_in_observed.append(feature_index_concept_neuron)
-					#print("concept node found = ", feature_lemma)
-				elif(feature_word in observed_column.feature_word_to_index):
-					feature_words.append(feature_word)
-					feature_indices_in_observed.append(observed_column.feature_word_to_index[feature_word])
+						#only provide 1 observedColumn to identifyObservedColumnFeatureWords (therefore this condition will only be triggered once when when featureLemma == observedColumn.conceptName of some arbitrary concept column. Once triggered a singular artificial variableConceptNeuronFeatureName will be added)
+						featureWords.append(variableConceptNeuronFeatureName)
+					featureIndicesInObserved.append(featureIndexConceptNeuron)
+					#print("concept node found = ", featureLemma)
+				elif(featureWord in observedColumn.featureWordToIndex):
+					featureWords.append(featureWord)
+					featureIndicesInObserved.append(observedColumn.featureWordToIndex[featureWord])
 			if(not trainSequenceObservedColumnsMatchSequenceWords):
-				feature_indices_in_observed = self.removeDuplicates(feature_indices_in_observed)
-				feature_words = self.removeDuplicates(feature_words)
-			feature_indices_in_observed_tensor = pt.tensor(feature_indices_in_observed, dtype=pt.long)
+				featureIndicesInObserved = self.removeDuplicates(featureIndicesInObserved)
+				featureWords = self.removeDuplicates(featureWords)
+			featureIndicesInObservedTensor = pt.tensor(featureIndicesInObserved, dtype=pt.long)
 		else:
-			feature_words = observed_column.feature_word_to_index.keys()
-			feature_indices_in_observed_tensor = pt.tensor(list(observed_column.feature_word_to_index.values()), dtype=pt.long)
+			featureWords = observedColumn.featureWordToIndex.keys()
+			featureIndicesInObservedTensor = pt.tensor(list(observedColumn.featureWordToIndex.values()), dtype=pt.long)
 		
 		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly and trainSequenceObservedColumnsMatchSequenceWords):
-			f_idx_tensor = pt.arange(len(feature_words), dtype=pt.long)
+			fIdxTensor = pt.arange(len(featureWords), dtype=pt.long)
 		else:
-			feature_word_to_index = {}
-			for idx, feature_word in enumerate(feature_words):
-				feature_word_to_index[feature_word] = idx
-			f_idx_tensor = pt.tensor([feature_word_to_index[fw] for fw in feature_words], dtype=pt.long)
+			featureWordToIndex = {}
+			for idx, featureWord in enumerate(featureWords):
+				featureWordToIndex[featureWord] = idx
+			fIdxTensor = pt.tensor([featureWordToIndex[fw] for fw in featureWords], dtype=pt.long)
 		
-		return feature_words, feature_indices_in_observed_tensor, f_idx_tensor
+		return featureWords, featureIndicesInObservedTensor, fIdxTensor
 		
 	def getObservedColumnFeatureIndices(self):
-		return self.feature_indices_in_observed_tensor, self.f_idx_tensor
+		return self.featureIndicesInObservedTensor, self.fIdxTensor
 	
 	def removeDuplicates(self, lst):
 		#python requires ordered sets
@@ -139,274 +139,255 @@ class SequenceObservedColumns:
 				
 	@staticmethod
 	def initialiseFeatureNeuronsSequence(cs, fs):
-		feature_neurons = pt.zeros(array_number_of_properties, array_number_of_segments, cs, fs, dtype=array_type)
-		return feature_neurons
+		featureNeurons = pt.zeros(arrayNumberOfProperties, arrayNumberOfSegments, cs, fs, dtype=arrayType)
+		return featureNeurons
 
 	@staticmethod
 	def initialiseFeatureConnectionsSequence(cs, fs):
-		feature_connections = pt.zeros(array_number_of_properties, array_number_of_segments, cs, fs, cs, fs, dtype=array_type)
-		return feature_connections
+		featureConnections = pt.zeros(arrayNumberOfProperties, arrayNumberOfSegments, cs, fs, cs, fs, dtype=arrayType)
+		return featureConnections
 	
-	def populate_arrays(self, words, lemmas, sequence_observed_columns_dict):
+	def populateArrays(self, words, lemmas, sequenceObservedColumnsDict):
 		#print("\n\n\n\n\npopulate_arrays:")
 		
 		# Optimized code for collecting indices and data for feature neurons
-		c_idx_list = []
-		f_idx_list = []
-		feature_list_indices = []
-		feature_list_values = []
+		cIdxList = []
+		fIdxList = []
+		featureListIndices = []
+		featureListValues = []
 
-		for c_idx, observed_column in sequence_observed_columns_dict.items():
-			feature_indices_in_observed, f_idx_tensor = self.getObservedColumnFeatureIndices()
-			num_features = len(f_idx_tensor)
+		for cIdx, observedColumn in sequenceObservedColumnsDict.items():
+			featureIndicesInObserved, fIdxTensor = self.getObservedColumnFeatureIndices()
+			numFeatures = len(fIdxTensor)
 
-			c_idx_list.append(pt.full((num_features,), c_idx, dtype=pt.long))
-			f_idx_list.append(f_idx_tensor)
+			cIdxList.append(pt.full((numFeatures,), cIdx, dtype=pt.long))
+			fIdxList.append(fIdxTensor)
 
 			if lowMem:
-				feature_neurons = observed_column.feature_neurons.coalesce()
+				featureNeurons = observedColumn.featureNeurons.coalesce()
 			else:
-				# Slice the global_feature_neurons as before
-				feature_neurons = GIAANNproto_sparseTensors.slice_sparse_tensor(self.databaseNetworkObject.global_feature_neurons, 2, observed_column.concept_index)
+				# Slice the globalFeatureNeurons as before
+				featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(self.databaseNetworkObject.globalFeatureNeurons, 2, observedColumn.conceptIndex)
 
 			if (useGPUdense and not useGPUsparse):
-				feature_neurons = feature_neurons.to(deviceDense)
+				featureNeurons = featureNeurons.to(deviceDense)
 
-			indices = feature_neurons.indices()  # [3, n_entries] for a 3D sparse tensor: (property, type, feature_idx)
-			values = feature_neurons.values()
+			indices = featureNeurons.indices()  # [3, n_entries] for a 3D sparse tensor: (property, type, feature_idx)
+			values = featureNeurons.values()
 
-			# Ensure that feature_indices_in_observed is sorted if not already
-			feature_indices_in_observed_sorted, f_idx_sort_idx = pt.sort(feature_indices_in_observed)
-			f_idx_tensor_sorted = f_idx_tensor[f_idx_sort_idx]
+			# Ensure that featureIndicesInObserved is sorted if not already
+			featureIndicesInObservedSorted, fIdxSortIdx = pt.sort(featureIndicesInObserved)
+			fIdxTensorSorted = fIdxTensor[fIdxSortIdx]
 
 			# Instead of expanding and comparing, directly check membership
-			mask = pt.isin(indices[2], feature_indices_in_observed_sorted)
+			mask = pt.isin(indices[2], featureIndicesInObservedSorted)
 
 			# Filter indices and values by mask
-			filtered_indices = indices[:, mask]
-			filtered_values = values[mask]
+			filteredIndices = indices[:, mask]
+			filteredValues = values[mask]
 
-			if filtered_indices.size(1) > 0:
+			if filteredIndices.size(1) > 0:
 				# We need to find the corresponding f_idx for each filtered feature_idx.
-				# Use searchsorted on the sorted feature_indices_in_observed
-				positions = pt.searchsorted(feature_indices_in_observed_sorted, filtered_indices[2])
-				filtered_f_idx_tensor = f_idx_tensor_sorted[positions]
+				# Use searchsorted on the sorted featureIndicesInObserved
+				positions = pt.searchsorted(featureIndicesInObservedSorted, filteredIndices[2])
+				filteredFIdxTensor = fIdxTensorSorted[positions]
 			else:
 				# If no matches, just create empty tensors that match the expected shape.
-				filtered_f_idx_tensor = pt.empty((0,), dtype=f_idx_tensor.dtype, device=f_idx_tensor.device)
+				filteredFIdxTensor = pt.empty((0,), dtype=fIdxTensor.dtype, device=fIdxTensor.device)
 
 			# Adjust indices as in original code:
 			# Original: filtered_indices = cat([filtered_indices[0:2], full_like(..., c_idx), filtered_indices[2:3]])
-			# filtered_indices has shape [3, *], we insert a dimension for c_idx after the first two rows:
-			# The final dimension order is: property, type, c_idx, feature_idx
-			# Before insertion: filtered_indices = [property, type, feature_idx]
-			# After insertion:  filtered_indices = [property, type, c_idx, feature_idx]
-			if filtered_indices.size(1) > 0:
-				filtered_indices[2] = filtered_f_idx_tensor
-			# Insert c_idx row
-			c_idx_col = pt.full((1, filtered_indices.size(1)), c_idx, dtype=pt.long, device=filtered_indices.device)
-			filtered_indices = pt.cat([filtered_indices[0:2], c_idx_col, filtered_indices[2:3]], dim=0)
+			# filteredIndices has shape [3, *], we insert a dimension for cIdx after the first two rows:
+			# The final dimension order is: property, type, cIdx, feature_idx
+			# Before insertion: filteredIndices = [property, type, feature_idx]
+			# After insertion:  filteredIndices = [property, type, cIdx, feature_idx]
+			if filteredIndices.size(1) > 0:
+				filteredIndices[2] = filteredFIdxTensor
+			# Insert cIdx row
+			cIdxCol = pt.full((1, filteredIndices.size(1)), cIdx, dtype=pt.long, device=filteredIndices.device)
+			filteredIndices = pt.cat([filteredIndices[0:2], cIdxCol, filteredIndices[2:3]], dim=0)
 
 			if not useGPUsparse:
-				filtered_indices = filtered_indices.to(deviceSparse)
-				filtered_values = filtered_values.to(deviceSparse)
+				filteredIndices = filteredIndices.to(deviceSparse)
+				filteredValues = filteredValues.to(deviceSparse)
 
-			feature_list_indices.append(filtered_indices)
-			feature_list_values.append(filtered_values)
+			featureListIndices.append(filteredIndices)
+			featureListValues.append(filteredValues)
 
 		# Combine results
-		if feature_list_indices:
-			combined_indices = pt.cat(feature_list_indices, dim=1)
-			combined_values = pt.cat(feature_list_values, dim=0)
+		if featureListIndices:
+			combinedIndices = pt.cat(featureListIndices, dim=1)
+			combinedValues = pt.cat(featureListValues, dim=0)
 			# Convert to dense as per original code, though consider keeping sparse for memory savings
-			self.feature_neurons = pt.sparse_coo_tensor(combined_indices, combined_values, size=self.feature_neurons.size(), dtype=array_type, device=deviceDense).to_dense()
-			self.feature_neurons_original = self.feature_neurons.clone()
+			self.featureNeurons = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=self.featureNeurons.size(), dtype=arrayType, device=deviceDense).to_dense()
+			self.featureNeuronsOriginal = self.featureNeurons.clone()
 
 		# Now handle connections
-		connection_indices_list = []
-		connection_values_list = []
+		connectionIndicesList = []
+		connectionValuesList = []
 
-		for c_idx, observed_column in sequence_observed_columns_dict.items():
-			feature_indices_in_observed, f_idx_tensor = self.getObservedColumnFeatureIndices()
+		for cIdx, observedColumn in sequenceObservedColumnsDict.items():
+			featureIndicesInObserved, fIdxTensor = self.getObservedColumnFeatureIndices()
 
 			# Get indices and values from the sparse tensor
-			feature_connections = observed_column.feature_connections.coalesce()
+			featureConnections = observedColumn.featureConnections.coalesce()
 			if not useGPUsparse:
-				feature_connections = feature_connections.to(deviceDense)
+				featureConnections = featureConnections.to(deviceDense)
 
-			indices = feature_connections.indices()  # shape [5, n_entries]
-			values = feature_connections.values()	# shape [n_entries]
+			indices = featureConnections.indices()  # shape [5, n_entries]
+			values = featureConnections.values()	# shape [n_entries]
 
-			# Sort feature_indices_in_observed and f_idx_tensor together if not already sorted
-			feature_indices_in_observed_sorted, f_idx_sort_idx = pt.sort(feature_indices_in_observed)
-			f_idx_tensor_sorted = f_idx_tensor[f_idx_sort_idx]
+			# Sort featureIndicesInObserved and fIdxTensor together if not already sorted
+			featureIndicesInObservedSorted, fIdxSortIdx = pt.sort(featureIndicesInObserved)
+			fIdxTensorSorted = fIdxTensor[fIdxSortIdx]
 
 			# For each other column
-			for other_c_idx, other_observed_column in sequence_observed_columns_dict.items():
-				other_feature_indices_in_observed, other_f_idx_tensor = self.getObservedColumnFeatureIndices()
-				other_concept_index = other_observed_column.concept_index
+			for otherCIdx, otherObservedColumn in sequenceObservedColumnsDict.items():
+				otherFeatureIndicesInObserved, otherFIdxTensor = self.getObservedColumnFeatureIndices()
+				otherConceptIndex = otherObservedColumn.conceptIndex
 
-				# Sort other_feature_indices_in_observed and other_f_idx_tensor if not sorted
-				other_feature_indices_in_observed_sorted, other_f_idx_sort_idx = pt.sort(other_feature_indices_in_observed)
-				other_f_idx_tensor_sorted = other_f_idx_tensor[other_f_idx_sort_idx]
+				# Sort otherFeatureIndicesInObserved and otherFIdxTensor if not sorted
+				otherFeatureIndicesInObservedSorted, otherFIdxSortIdx = pt.sort(otherFeatureIndicesInObserved)
+				otherFIdxTensorSorted = otherFIdxTensor[otherFIdxSortIdx]
 
 				# Create boolean masks directly:
-				mask_concept = (indices[3] == other_concept_index)
-				mask_f2 = pt.isin(indices[2], feature_indices_in_observed_sorted)
-				mask_f4 = pt.isin(indices[4], other_feature_indices_in_observed_sorted)
+				maskConcept = (indices[3] == otherConceptIndex)
+				maskF2 = pt.isin(indices[2], featureIndicesInObservedSorted)
+				maskF4 = pt.isin(indices[4], otherFeatureIndicesInObservedSorted)
 
-				combined_mask = mask_concept & mask_f2 & mask_f4
+				combinedMask = maskConcept & maskF2 & maskF4
 
 				# Filter indices and values
-				filtered_indices = indices[:, combined_mask]
-				filtered_values = values[combined_mask]
+				filteredIndices = indices[:, combinedMask]
+				filteredValues = values[combinedMask]
 
-				# If we got no matches, filtered_indices and filtered_values will be empty.
+				# If we got no matches, filteredIndices and filteredValues will be empty.
 				# We do NOT continue here; we proceed to create and append empty results as per the original requirement.
 
-				if filtered_indices.numel() > 0:
-					# Map indices[2] back to f_idx_tensor
-					f_idx_positions = pt.searchsorted(feature_indices_in_observed_sorted, filtered_indices[2])
-					mapped_f_idx = f_idx_tensor_sorted[f_idx_positions]
+				if filteredIndices.numel() > 0:
+					# Map indices[2] back to fIdxTensor
+					fIdxPositions = pt.searchsorted(featureIndicesInObservedSorted, filteredIndices[2])
+					mappedFIdx = fIdxTensorSorted[fIdxPositions]
 
-					# Map indices[4] back to other_f_idx_tensor
-					other_f_idx_positions = pt.searchsorted(other_feature_indices_in_observed_sorted, filtered_indices[4])
-					mapped_other_f_idx = other_f_idx_tensor_sorted[other_f_idx_positions]
+					# Map indices[4] back to otherFIdxTensor
+					otherFIdxPositions = pt.searchsorted(otherFeatureIndicesInObservedSorted, filteredIndices[4])
+					mappedOtherFIdx = otherFIdxTensorSorted[otherFIdxPositions]
 
 					# Adjust indices:
 					# After filtering, we have:
-					#   filtered_indices = [property, type, feature_idx, concept_idx, other_feature_idx]
-					# We want to replace concept_idx with other_c_idx and feature_idx with mapped_f_idx, other_feature_idx with mapped_other_f_idx.
-					filtered_indices[2] = mapped_f_idx
-					filtered_indices[3] = other_c_idx
-					filtered_indices[4] = mapped_other_f_idx
+					#   filteredIndices = [property, type, feature_idx, concept_idx, other_feature_idx]
+					# We want to replace concept_idx with otherCIdx and feature_idx with mappedFIdx, other_feature_idx with mappedOtherFIdx.
+					filteredIndices[2] = mappedFIdx
+					filteredIndices[3] = otherCIdx
+					filteredIndices[4] = mappedOtherFIdx
 				else:
 					# Even if empty, we need to maintain correct shape to append
-					# filtered_indices has shape [5,0], we need to insert c_idx at dimension 3 (as done in original code)
-					# That means adding a row. For empty, we can just do that as well.
 					pass
 
-				# Insert c_idx at dimension 3 as per the original code.
-				# Original code inserts at dim=0 after first two rows:
-				# filtered_indices = cat([filtered_indices[0:2], c_idx_row, filtered_indices[2:]], dim=0)
-				# If filtered_indices is empty, this will still produce a properly shaped empty tensor.
-				c_idx_col = pt.full((1, filtered_indices.size(1)), c_idx, dtype=pt.long, device=filtered_indices.device)
-				filtered_indices = pt.cat([filtered_indices[0:2], c_idx_col, filtered_indices[2:]], dim=0)
+				# Insert cIdx at dimension 3 as per the original code.
+				cIdxCol = pt.full((1, filteredIndices.size(1)), cIdx, dtype=pt.long, device=filteredIndices.device)
+				filteredIndices = pt.cat([filteredIndices[0:2], cIdxCol, filteredIndices[2:]], dim=0)
 
-				# Move back to sparse device if needed
 				if not useGPUsparse:
-					filtered_indices = filtered_indices.to(deviceSparse)
-					filtered_values = filtered_values.to(deviceSparse)
+					filteredIndices = filteredIndices.to(deviceSparse)
+					filteredValues = filteredValues.to(deviceSparse)
 
-				connection_indices_list.append(filtered_indices)
-				connection_values_list.append(filtered_values)
+				connectionIndicesList.append(filteredIndices)
+				connectionValuesList.append(filteredValues)
 
 		# Combine results
-		if connection_indices_list:
-			# pt.cat of empty tensors is safe if they are consistently sized (e.g., [5,0])
-			combined_indices = pt.cat(connection_indices_list, dim=1)
-			combined_values = pt.cat(connection_values_list, dim=0)
+		if connectionIndicesList:
+			combinedIndices = pt.cat(connectionIndicesList, dim=1)
+			combinedValues = pt.cat(connectionValuesList, dim=0)
 
-			# Create dense tensor
-			# Consider if you can keep it sparse to save memory:
-			self.feature_connections = pt.sparse_coo_tensor(
-				combined_indices, combined_values,
-				size=self.feature_connections.size(),
-				dtype=array_type, 
+			self.featureConnections = pt.sparse_coo_tensor(
+				combinedIndices, combinedValues,
+				size=self.featureConnections.size(),
+				dtype=arrayType, 
 				device=deviceDense
 			).to_dense()
-			self.feature_connections_original = self.feature_connections.clone()
+			self.featureConnectionsOriginal = self.featureConnections.clone()
 
 	
-	def update_observed_columns_wrapper(self):
+	def updateObservedColumnsWrapper(self):
 		if(trainSequenceObservedColumnsMatchSequenceWords):
 			#for multiple instances of concept in sequence, need to take the sum of the changes between the existing and modified arrays for each instance of a same concept in the sequence
-			self.update_observed_columns(self.sequence_observed_columns_dict, mode="default")
+			self.updateObservedColumns(self.sequenceObservedColumnsDict, mode="default")
 		else:
-			self.update_observed_columns(self.observed_columns_dict2, mode="default")
+			self.updateObservedColumns(self.observedColumnsDict2, mode="default")
 			
-	def update_observed_columns(self, sequence_observed_columns_dict, mode):
+	def updateObservedColumns(self, sequenceObservedColumnsDict, mode):
 		# Update observed columns with data from sequence arrays
 			
-		feature_neurons = self.feature_neurons - self.feature_neurons_original	#convert to changes
-		feature_connections = self.feature_connections - self.feature_connections_original	#convert to changes
+		featureNeurons = self.featureNeurons - self.featureNeuronsOriginal	#convert to changes
+		featureConnections = self.featureConnections - self.featureConnectionsOriginal	#convert to changes
 		
-		feature_neurons = feature_neurons.to_sparse()
-		feature_connections = feature_connections.to_sparse()
+		featureNeurons = featureNeurons.to_sparse()
+		featureConnections = featureConnections.to_sparse()
 		if(performRedundantCoalesce):
-			feature_neurons = feature_neurons.coalesce()
-			feature_connections = feature_connections.coalesce()		
+			featureNeurons = featureNeurons.coalesce()
+			featureConnections = featureConnections.coalesce()		
 
-		for c_idx, observed_column in sequence_observed_columns_dict.items():
-			feature_indices_in_observed, f_idx_tensor = self.getObservedColumnFeatureIndices()
-			concept_index = observed_column.concept_index
+		for cIdx, observedColumn in sequenceObservedColumnsDict.items():
+			featureIndicesInObserved, fIdxTensor = self.getObservedColumnFeatureIndices()
+			conceptIndex = observedColumn.conceptIndex
 
 			if lowMem:
-				observed_column.feature_neurons = observed_column.feature_neurons.coalesce()
+				observedColumn.featureNeurons = observedColumn.featureNeurons.coalesce()
 			else:
-				#temporarily store slices of the global_feature_neurons array in the observed_columns (used by update_observed_columns only)
-				observed_column.feature_neurons = GIAANNproto_sparseTensors.slice_sparse_tensor(self.databaseNetworkObject.global_feature_neurons, 2, concept_index)	
+				#temporarily store slices of the globalFeatureNeurons array in the observed_columns (used by update_observed_columns only)
+				observedColumn.featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(self.databaseNetworkObject.globalFeatureNeurons, 2, conceptIndex)	
 			
 			# feature neurons;
-			# Use advanced indexing to get values from feature_neurons
-			indices = feature_neurons.indices()
-			values = feature_neurons.values()
-			#convert indices from SequenceObservedColumns neuronFeatures array indices to ObservedColumns neuronFeatures array indices			
-			# Filter indices
-			mask = (indices[2] == c_idx) & pt.isin(indices[3], f_idx_tensor)
-			filtered_indices = indices[:, mask]
-			filtered_values = values[mask]
-			# Adjust indices for observed_column
-			filtered_indices[2] = filtered_indices[3]  # feature indices	#concept dim is removed from filtered_indices (as it has already been selected out)
-			filtered_indices = filtered_indices[0:3]
-			#convert indices from sequence observed columns format back to observed columns format
+			indices = featureNeurons.indices()
+			values = featureNeurons.values()
+			mask = (indices[2] == cIdx) & pt.isin(indices[3], fIdxTensor)
+			filteredIndices = indices[:, mask]
+			filteredValues = values[mask]
+			filteredIndices[2] = filteredIndices[3]
+			filteredIndices = filteredIndices[0:3]
 			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-				filtered_indices[2] = feature_indices_in_observed[filtered_indices[2]]	#convert feature indices from sequence observed columns format back to observed columns format
-			# Update observed_column's feature_neurons
+				filteredIndices[2] = featureIndicesInObserved[filteredIndices[2]]
 			if lowMem:
-				observed_column.feature_neurons = observed_column.feature_neurons + pt.sparse_coo_tensor(filtered_indices, filtered_values, size=observed_column.feature_neurons.size(), dtype=array_type, device=deviceSparse)
-				observed_column.feature_neurons = observed_column.feature_neurons.coalesce()
-				observed_column.feature_neurons.values().clamp_(min=0)
+				observedColumn.featureNeurons = observedColumn.featureNeurons + pt.sparse_coo_tensor(filteredIndices, filteredValues, size=observedColumn.featureNeurons.size(), dtype=arrayType, device=deviceSparse)
+				observedColumn.featureNeurons = observedColumn.featureNeurons.coalesce()
+				observedColumn.featureNeurons.values().clamp_(min=0)
 			else:
-				self.feature_neuron_changes[c_idx] = pt.sparse_coo_tensor(filtered_indices, filtered_values, size=observed_column.feature_neurons.size(), dtype=array_type, device=deviceSparse)
+				self.featureNeuronChanges[cIdx] = pt.sparse_coo_tensor(filteredIndices, filteredValues, size=observedColumn.featureNeurons.size(), dtype=arrayType, device=deviceSparse)
 			
 			# feature connections;
-			indices = feature_connections.indices()
-			values = feature_connections.values()
-			# Filter indices
-			mask = (indices[2] == c_idx)
-			filtered_indices = indices[:, mask]
-			filtered_values = values[mask]
-			# Adjust indices for observed_column
-			filtered_indices[2] = filtered_indices[3]  # feature indices	#concept dim is removed from filtered_indices (as it has already been selected out)
-			filtered_indices[3] = filtered_indices[4]  # concept indices
-			filtered_indices[4] = filtered_indices[5]  # feature indices
-			filtered_indices = filtered_indices[0:5]
-			#convert indices from sequence observed columns format back to observed columns format
-			filtered_indices[3] = self.concept_indices_in_sequence_observed_tensor[filtered_indices[3]]	#convert concept indices from sequence observed columns format back to observed columns format
+			indices = featureConnections.indices()
+			values = featureConnections.values()
+			mask = (indices[2] == cIdx)
+			filteredIndices = indices[:, mask]
+			filteredValues = values[mask]
+			filteredIndices[2] = filteredIndices[3]
+			filteredIndices[3] = filteredIndices[4]
+			filteredIndices[4] = filteredIndices[5]
+			filteredIndices = filteredIndices[0:5]
+			filteredIndices[3] = self.conceptIndicesInSequenceObservedTensor[filteredIndices[3]]
 			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-				filtered_indices[2] = feature_indices_in_observed[filtered_indices[2]]	#convert feature indices from sequence observed columns format back to observed columns format
-				filtered_indices[4] = feature_indices_in_observed[filtered_indices[4]]	#convert feature indices from sequence observed columns format back to observed columns format
-			# Update observed_column's feature_connections
-			observed_column.feature_connections = observed_column.feature_connections + pt.sparse_coo_tensor(filtered_indices, filtered_values, size=observed_column.feature_connections.size(), dtype=array_type, device=deviceSparse)
-			observed_column.feature_connections = observed_column.feature_connections.coalesce()
-			observed_column.feature_connections.values().clamp_(min=0)
+				filteredIndices[2] = featureIndicesInObserved[filteredIndices[2]]
+				filteredIndices[4] = featureIndicesInObserved[filteredIndices[4]]
+			observedColumn.featureConnections = observedColumn.featureConnections + pt.sparse_coo_tensor(filteredIndices, filteredValues, size=observedColumn.featureConnections.size(), dtype=arrayType, device=deviceSparse)
+			observedColumn.featureConnections = observedColumn.featureConnections.coalesce()
+			observedColumn.featureConnections.values().clamp_(min=0)
 	
 		if not lowMem:
-			observed_column_feature_neurons_dict = {}
-			for c_idx, observed_column in sequence_observed_columns_dict.items():
-				concept_index = observed_column.concept_index
-				observed_column_feature_neurons_dict[concept_index] = self.feature_neuron_changes[c_idx]
-			self.databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.merge_tensor_slices_sum(self.databaseNetworkObject.global_feature_neurons, observed_column_feature_neurons_dict, 2)
+			observedColumnFeatureNeuronsDict = {}
+			for cIdx, observedColumn in sequenceObservedColumnsDict.items():
+				conceptIndex = observedColumn.conceptIndex
+				observedColumnFeatureNeuronsDict[conceptIndex] = self.featureNeuronChanges[cIdx]
+			self.databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.mergeTensorSlicesSum(self.databaseNetworkObject.globalFeatureNeurons, observedColumnFeatureNeuronsDict, 2)
 
 
-def createConceptMask(sequence_observed_columns, lemmas):
-	concept_mask = pt.tensor([i in sequence_observed_columns.columns_index_sequence_word_index_dict for i in range(len(lemmas))], dtype=pt.bool)
-	concept_indices = pt.nonzero(concept_mask).squeeze(1)
-	numberConcepts = concept_indices.shape[0]
-	return concept_mask, concept_indices, numberConcepts
+def createConceptMask(sequenceObservedColumns, lemmas):
+	conceptMask = pt.tensor([i in sequenceObservedColumns.columnsIndexSequenceWordIndexDict for i in range(len(lemmas))], dtype=pt.bool)
+	conceptIndices = pt.nonzero(conceptMask).squeeze(1)
+	numberConcepts = conceptIndices.shape[0]
+	return conceptMask, conceptIndices, numberConcepts
 	
-def process_concept_words(sequence_observed_columns, sentenceIndex, doc, words, lemmas, pos_tags, train=True, first_seed_token_index=None, num_seed_tokens=None):
+def processConceptWords(sequenceObservedColumns, sentenceIndex, doc, words, lemmas, posTags, train=True, firstSeedTokenIndex=None, numSeedTokens=None):
 	"""
 	For every concept word (lemma) in the sequence, identify every feature neuron in that column that occurs q words before or after the concept word in the sequence, including the concept neuron. This function has been parallelized using PyTorch array operations.
 	"""
@@ -415,412 +396,387 @@ def process_concept_words(sequence_observed_columns, sentenceIndex, doc, words, 
 		q = 5  # Fixed window size when not using POS tags
 
 	# Identify all concept word indices
-	concept_mask, concept_indices, numberConceptsInSequence = createConceptMask(sequence_observed_columns, lemmas)
-	#concept_indices may be slightly longer than number of unique columns in sequence, if there are multiple instances of the same concept/noun lemma in the sequence
+	conceptMask, conceptIndices, numberConceptsInSequence = createConceptMask(sequenceObservedColumns, lemmas)
+	#conceptIndices may be slightly longer than number of unique columns in sequence, if there are multiple instances of the same concept/noun lemma in the sequence
 	
 	if numberConceptsInSequence == 0:
 		return  # No concept words to process
 
 	if usePOS:
-		# Sort concept_indices
-		concept_indices_sorted = concept_indices.sort().values
+		# Sort conceptIndices
+		conceptIndicesSorted = conceptIndices.sort().values
 		
 		# Find previous concept indices for each concept index
-		prev_concept_positions = pt.searchsorted(concept_indices_sorted, concept_indices, right=False) - 1
-		prev_concept_exists = prev_concept_positions >= 0
-		prev_concept_positions = prev_concept_positions.clamp(min=0)
-		prev_concept_indices = pt.where(prev_concept_exists, concept_indices_sorted[prev_concept_positions], pt.zeros_like(concept_indices))
-		dist_to_prev_concept = pt.where(prev_concept_exists, concept_indices - prev_concept_indices, concept_indices+1) #If no previous concept, distance is the index itself
+		prevConceptPositions = pt.searchsorted(conceptIndicesSorted, conceptIndices, right=False) - 1
+		prevConceptExists = prevConceptPositions >= 0
+		prevConceptPositions = prevConceptPositions.clamp(min=0)
+		prevConceptIndices = pt.where(prevConceptExists, conceptIndicesSorted[prevConceptPositions], pt.zeros_like(conceptIndices))
+		distToPrevConcept = pt.where(prevConceptExists, conceptIndices - prevConceptIndices, conceptIndices+1) #If no previous concept, distance is the index itself
 		
 		# Find next concept indices for each concept index
-		next_concept_positions = pt.searchsorted(concept_indices_sorted, concept_indices, right=True)
-		next_concept_exists = next_concept_positions < len(concept_indices)
-		next_concept_positions = next_concept_positions.clamp(max=len(next_concept_positions)-1)
-		next_concept_indices = pt.where(next_concept_exists, concept_indices_sorted[next_concept_positions], pt.full_like(concept_indices, len(doc)))	# If no next concept, set to len(doc)
-		dist_to_next_concept = pt.where(next_concept_exists, next_concept_indices - concept_indices, len(doc) - concept_indices)	# Distance to end if no next concept
+		nextConceptPositions = pt.searchsorted(conceptIndicesSorted, conceptIndices, right=True)
+		nextConceptExists = nextConceptPositions < len(conceptIndices)
+		nextConceptPositions = nextConceptPositions.clamp(max=len(nextConceptPositions)-1)
+		nextConceptIndices = pt.where(nextConceptExists, conceptIndicesSorted[nextConceptPositions], pt.full_like(conceptIndices, len(doc)))
+		distToNextConcept = pt.where(nextConceptExists, nextConceptIndices - conceptIndices, len(doc) - conceptIndices)
 	else:
 		q = 5
-		dist_to_prev_concept = pt.full((concept_indices.size(0),), q, dtype=pt.long)
-		dist_to_next_concept = pt.full((concept_indices.size(0),), q, dtype=pt.long)
+		distToPrevConcept = pt.full((conceptIndices.size(0),), q, dtype=pt.long)
+		distToNextConcept = pt.full((conceptIndices.size(0),), q, dtype=pt.long)
 
 	# Calculate start and end indices for each concept word
 	if(debugConceptFeaturesOccurFirstInSubsequence):
 		if usePOS:
-			start_indices = (concept_indices).clamp(min=0)
-			end_indices = (concept_indices + dist_to_next_concept).clamp(max=len(doc))
+			startIndices = (conceptIndices).clamp(min=0)
+			endIndices = (conceptIndices + distToNextConcept).clamp(max=len(doc))
 		else:
-			start_indices = (concept_indices).clamp(min=0)
-			end_indices = (concept_indices + q + 1).clamp(max=len(doc))	
+			startIndices = (conceptIndices).clamp(min=0)
+			endIndices = (conceptIndices + q + 1).clamp(max=len(doc))	
 	else:
 		if usePOS:
-			start_indices = (concept_indices - dist_to_prev_concept + 1).clamp(min=0)
-			end_indices = (concept_indices + dist_to_next_concept).clamp(max=len(doc))
+			startIndices = (conceptIndices - distToPrevConcept + 1).clamp(min=0)
+			endIndices = (conceptIndices + distToNextConcept).clamp(max=len(doc))
 		else:
-			start_indices = (concept_indices - q).clamp(min=0)
-			end_indices = (concept_indices + q + 1).clamp(max=len(doc))
+			startIndices = (conceptIndices - q).clamp(min=0)
+			endIndices = (conceptIndices + q + 1).clamp(max=len(doc))
 
-	process_features(sequence_observed_columns, sentenceIndex, start_indices, end_indices, doc, words, lemmas, pos_tags, concept_indices, train, first_seed_token_index, num_seed_tokens)
+	processFeatures(sequenceObservedColumns, sentenceIndex, startIndices, endIndices, doc, words, lemmas, posTags, conceptIndices, train, firstSeedTokenIndex, numSeedTokens)
 	
-	return concept_indices, start_indices, end_indices
+	return conceptIndices, startIndices, endIndices
 
-def process_features(sequence_observed_columns, sentenceIndex, start_indices, end_indices, doc, words, lemmas, pos_tags, concept_indices, train, first_seed_token_index=None, num_seed_tokens=None):
-	numberConceptsInSequence = concept_indices.shape[0]
+def processFeatures(sequenceObservedColumns, sentenceIndex, startIndices, endIndices, doc, words, lemmas, posTags, conceptIndices, train, firstSeedTokenIndex=None, numSeedTokens=None):
+	numberConceptsInSequence = conceptIndices.shape[0]
 	
-	cs = sequence_observed_columns.cs #!trainSequenceObservedColumnsMatchSequenceWords: will be less than len(concept_indices) if there are multiple instances of a concept in a sequence
-	fs = sequence_observed_columns.fs  #trainSequenceObservedColumnsUseSequenceFeaturesOnly+trainSequenceObservedColumnsMatchSequenceWords: len(doc), trainSequenceObservedColumnsUseSequenceFeaturesOnly+!trainSequenceObservedColumnsMatchSequenceWords: number of feature neurons in sentence, !trainSequenceObservedColumnsUseSequenceFeaturesOnly: number of feature neurons in column
-	feature_neurons_active = pt.zeros((array_number_of_segments, cs, fs), dtype=array_type)
-	feature_neurons_word_order = pt.arange(fs).unsqueeze(0).repeat(cs, 1)
+	cs = sequenceObservedColumns.cs
+	fs = sequenceObservedColumns.fs
+	featureNeuronsActive = pt.zeros((arrayNumberOfSegments, cs, fs), dtype=arrayType)
+	featureNeuronsWordOrder = pt.arange(fs).unsqueeze(0).repeat(cs, 1)
 	pt.zeros((cs, fs), dtype=pt.long)
-	columns_word_order = pt.zeros((cs), dtype=pt.long)
-	feature_neurons_pos = pt.zeros((cs, fs), dtype=array_type)
+	columnsWordOrder = pt.zeros((cs), dtype=pt.long)
+	featureNeuronsPos = pt.zeros((cs, fs), dtype=arrayType)
 	if(trainSequenceObservedColumnsMatchSequenceWords):
-		sequence_concept_index_mask = pt.ones((cs, fs), dtype=array_type)	#ensure to ignore concept feature neurons from other columns
+		sequenceConceptIndexMask = pt.ones((cs, fs), dtype=arrayType)
 	else:
-		sequence_concept_index_mask = None
+		sequenceConceptIndexMask = None
 	if(useSANI):
-		feature_neurons_segment_mask = pt.zeros((cs, array_number_of_segments), dtype=array_type)
+		featureNeuronsSegmentMask = pt.zeros((cs, arrayNumberOfSegments), dtype=arrayType)
 	else:
-		feature_neurons_segment_mask = pt.ones((cs, array_number_of_segments), dtype=array_type)
+		featureNeuronsSegmentMask = pt.ones((cs, arrayNumberOfSegments), dtype=arrayType)
 	
-	concept_indices_list = concept_indices.tolist()
-	#convert start/end indices to active features arrays
-	for i, sequence_concept_word_index in enumerate(concept_indices_list):
+	conceptIndicesList = conceptIndices.tolist()
+	for i, sequenceConceptWordIndex in enumerate(conceptIndicesList):
 		if(trainSequenceObservedColumnsMatchSequenceWords):
-			sequence_concept_index = i
+			sequenceConceptIndex = i
 		else:
-			concept_lemma = lemmas[sequence_concept_word_index]	# lemmas[concept_indices[i]]
-			sequence_concept_index = sequence_observed_columns.concept_name_to_index[concept_lemma] 
+			conceptLemma = lemmas[sequenceConceptWordIndex]
+			sequenceConceptIndex = sequenceObservedColumns.conceptNameToIndex[conceptLemma] 
 				
 		if(useSANI):
-			number_of_segments = min(array_number_of_segments-1, i)
-			feature_neurons_segment_mask[sequence_concept_index, :] = pt.cat([pt.zeros(array_number_of_segments-number_of_segments), pt.ones(number_of_segments)], dim=0)
-			minSequentialSegmentIndex = min(0, array_number_of_segments-sequence_concept_index-1)
-			activeSequentialSegments = pt.arange(minSequentialSegmentIndex, array_number_of_segments, 1)
+			numberOfSegments = min(arrayNumberOfSegments-1, i)
+			featureNeuronsSegmentMask[sequenceConceptIndex, :] = pt.cat([pt.zeros(arrayNumberOfSegments-numberOfSegments), pt.ones(numberOfSegments)], dim=0)
+			minSequentialSegmentIndex = min(0, arrayNumberOfSegments-sequenceConceptIndex-1)
+			activeSequentialSegments = pt.arange(minSequentialSegmentIndex, arrayNumberOfSegments, 1)
 		
 		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly and trainSequenceObservedColumnsMatchSequenceWords):
 			if(useSANI):
-				feature_neurons_active[activeSequentialSegments, sequence_concept_index, start_indices[sequence_concept_index]:end_indices[sequence_concept_index]] = 1
+				featureNeuronsActive[activeSequentialSegments, sequenceConceptIndex, startIndices[sequenceConceptIndex]:endIndices[sequenceConceptIndex]] = 1
 			else:
-				feature_neurons_active[0, sequence_concept_index, start_indices[sequence_concept_index]:end_indices[sequence_concept_index]] = 1
-			columns_word_order[sequence_concept_index] = sequence_concept_index
-			sequence_concept_index_mask[:, sequence_concept_word_index] = 0	#ignore concept feature neurons from other columns
-			sequence_concept_index_mask[sequence_concept_index, sequence_concept_word_index] = 1
-			for j in range(start_indices[sequence_concept_index], end_indices[sequence_concept_index]):
-				feature_pos = pos_string_to_pos_int(sequence_observed_columns.databaseNetworkObject.nlp, pos_tags[j])
-				feature_neurons_pos[sequence_concept_index, j] = feature_pos
-				feature_neurons_word_order[sequence_concept_index, j] = j
+				featureNeuronsActive[0, sequenceConceptIndex, startIndices[sequenceConceptIndex]:endIndices[sequenceConceptIndex]] = 1
+			columnsWordOrder[sequenceConceptIndex] = sequenceConceptIndex
+			sequenceConceptIndexMask[:, sequenceConceptWordIndex] = 0
+			sequenceConceptIndexMask[sequenceConceptIndex, sequenceConceptWordIndex] = 1
+			for j in range(startIndices[sequenceConceptIndex], endIndices[sequenceConceptIndex]):
+				featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, posTags[j])
+				featureNeuronsPos[sequenceConceptIndex, j] = featurePos
+				featureNeuronsWordOrder[sequenceConceptIndex, j] = j
 		else:
-			for j in range(start_indices[i], end_indices[i]):	#sequence word index
-				feature_word = words[j].lower()
-				feature_lemma = lemmas[j]
-				feature_pos = pos_string_to_pos_int(sequence_observed_columns.databaseNetworkObject.nlp, pos_tags[j])
-				if(j in sequence_observed_columns.columns_index_sequence_word_index_dict):	#test is required for concept neurons
-					sequence_concept_word_index = j
-					columns_word_order[sequence_concept_index] = sequence_concept_index	#alternatively use sequence_concept_word_index; not robust in either case - there may be less concept columns than concepts referenced in sequence (if multiple references to the same column). trainSequenceObservedColumnsMatchSequenceWords overcomes this limitation.
+			for j in range(startIndices[i], endIndices[i]):
+				featureWord = words[j].lower()
+				featureLemma = lemmas[j]
+				featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, posTags[j])
+				if(j in sequenceObservedColumns.columnsIndexSequenceWordIndexDict):
+					sequenceConceptWordIndex = j
+					columnsWordOrder[sequenceConceptIndex] = sequenceConceptIndex
 					if(useDedicatedConceptNames2):
-						sequence_feature_index = sequence_observed_columns.feature_word_to_index[variableConceptNeuronFeatureName]
+						sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[variableConceptNeuronFeatureName]
 					else:
-						sequence_feature_index = sequence_observed_columns.feature_word_to_index[feature_lemma]
+						sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[featureLemma]
 					if(useSANI):
-						feature_neurons_active[activeSequentialSegments, sequence_concept_index, sequence_feature_index] = 1
+						featureNeuronsActive[activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
 					else:
-						feature_neurons_active[0, sequence_concept_index, sequence_feature_index] = 1
-				elif(feature_word in sequence_observed_columns.feature_word_to_index):
-					sequence_feature_index = sequence_observed_columns.feature_word_to_index[feature_word]
+						featureNeuronsActive[0, sequenceConceptIndex, sequenceFeatureIndex] = 1
+				elif(featureWord in sequenceObservedColumns.featureWordToIndex):
+					sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[featureWord]
 					if(useSANI):
-						feature_neurons_active[activeSequentialSegments, sequence_concept_index, sequence_feature_index] = 1
+						featureNeuronsActive[activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
 					else:
-						feature_neurons_active[0, sequence_concept_index, sequence_feature_index] = 1
-				feature_neurons_word_order[sequence_concept_index, sequence_feature_index] = j
-				feature_neurons_pos[sequence_concept_index, sequence_feature_index] = feature_pos
+						featureNeuronsActive[0, sequenceConceptIndex, sequenceFeatureIndex] = 1
+				featureNeuronsWordOrder[sequenceConceptIndex, sequenceFeatureIndex] = j
+				featureNeuronsPos[sequenceConceptIndex, sequenceFeatureIndex] = featurePos
 	
-	feature_neurons_segment_mask = feature_neurons_segment_mask.swapdims(0, 1)
+	featureNeuronsSegmentMask = featureNeuronsSegmentMask.swapdims(0, 1)
 	
 	if(train):
-		process_features_active_train(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos, feature_neurons_segment_mask, sentenceIndex)
+		processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sentenceIndex)
 	else:
-		first_seed_concept_index, num_seed_concepts, first_seed_feature_index = identify_seed_indices(sequence_observed_columns, sentenceIndex, start_indices, end_indices, doc, words, lemmas, pos_tags, concept_indices, first_seed_token_index, num_seed_tokens)
-		process_features_active_seed(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos, first_seed_token_index, num_seed_tokens, first_seed_concept_index, num_seed_concepts, first_seed_feature_index)
+		firstSeedConceptIndex, numSeedConcepts, firstSeedFeatureIndex = identifySeedIndices(sequenceObservedColumns, sentenceIndex, startIndices, endIndices, doc, words, lemmas, posTags, conceptIndices, firstSeedTokenIndex, numSeedTokens)
+		processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, firstSeedTokenIndex, numSeedTokens, firstSeedConceptIndex, numSeedConcepts, firstSeedFeatureIndex)
 
-def identify_seed_indices(sequence_observed_columns, sentenceIndex, start_indices, end_indices, doc, words, lemmas, pos_tags, concept_indices, first_seed_token_index, num_seed_tokens):
-	first_seed_concept_index = None
-	num_seed_concepts = None
-	found_first_seed_concept = False
+def identifySeedIndices(sequenceObservedColumns, sentenceIndex, startIndices, endIndices, doc, words, lemmas, posTags, conceptIndices, firstSeedTokenIndex, numSeedTokens):
+	firstSeedConceptIndex = None
+	numSeedConcepts = None
+	foundFirstSeedConcept = False
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-		feature_word = words[first_seed_token_index]
-		if(useDedicatedConceptNames and first_seed_token_index in sequence_observed_columns.observed_columns_sequence_word_index_dict):	
-			first_seed_feature_index = feature_index_concept_neuron
-		elif(feature_word in sequence_observed_columns.feature_word_to_index):
-			first_seed_feature_word = words[first_seed_token_index]
-			first_seed_feature_index = sequence_observed_columns.databaseNetworkObject.concept_features_dict[first_seed_feature_word]
+		featureWord = words[firstSeedTokenIndex]
+		if(useDedicatedConceptNames and firstSeedTokenIndex in sequenceObservedColumns.observedColumnsSequenceWordIndexDict):	
+			firstSeedFeatureIndex = featureIndexConceptNeuron
+		elif(featureWord in sequenceObservedColumns.featureWordToIndex):
+			firstSeedFeatureWord = words[firstSeedTokenIndex]
+			firstSeedFeatureIndex = sequenceObservedColumns.databaseNetworkObject.conceptFeaturesDict[firstSeedFeatureWord]
 	else:
-		first_seed_feature_index = None
+		firstSeedFeatureIndex = None
 
-	concept_indices_list = concept_indices.tolist()
-	for i, sequence_concept_word_index in enumerate(concept_indices_list):
+	conceptIndicesList = conceptIndices.tolist()
+	for i, sequenceConceptWordIndex in enumerate(conceptIndicesList):
 		if(trainSequenceObservedColumnsMatchSequenceWords):
-			sequence_concept_index = i
+			sequenceConceptIndex = i
 		else:
-			concept_lemma = lemmas[sequence_concept_word_index]	# lemmas[concept_indices[i]]
-			sequence_concept_index = sequence_observed_columns.concept_name_to_index[concept_lemma] 
+			conceptLemma = lemmas[sequenceConceptWordIndex]
+			sequenceConceptIndex = sequenceObservedColumns.conceptNameToIndex[conceptLemma] 
 
-		lastWordIndexSeedPhase = first_seed_token_index+num_seed_tokens-1
-		if(not found_first_seed_concept):
-			if(first_seed_token_index >= start_indices[sequence_concept_index] and first_seed_token_index < end_indices[sequence_concept_index]):
-				found_first_seed_concept = True
-				first_seed_concept_index = sequence_concept_index
+		lastWordIndexSeedPhase = firstSeedTokenIndex+numSeedTokens-1
+		if(not foundFirstSeedConcept):
+			if(firstSeedTokenIndex >= startIndices[sequenceConceptIndex] and firstSeedTokenIndex < endIndices[sequenceConceptIndex]):
+				foundFirstSeedConcept = True
+				firstSeedConceptIndex = sequenceConceptIndex
 				if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-					observed_column = sequence_observed_columns.observed_columns_sequence_word_index_dict[sequence_concept_word_index]
-					sequence_observed_columns.feature_connections = observed_column.feature_connections	#uses global arrays only	#shape: array_number_of_properties, array_number_of_segments, f, c, f
-		if(found_first_seed_concept):
-			if(lastWordIndexSeedPhase >= start_indices[sequence_concept_index] and lastWordIndexSeedPhase < end_indices[sequence_concept_index]):
-				last_seed_concept_index = sequence_concept_index
-				num_seed_concepts = last_seed_concept_index-first_seed_concept_index+1
+					observedColumn = sequenceObservedColumns.observedColumnsSequenceWordIndexDict[sequenceConceptWordIndex]
+					sequenceObservedColumns.featureConnections = observedColumn.featureConnections
+		if(foundFirstSeedConcept):
+			if(lastWordIndexSeedPhase >= startIndices[sequenceConceptIndex] and lastWordIndexSeedPhase < endIndices[sequenceConceptIndex]):
+				lastSeedConceptIndex = sequenceConceptIndex
+				numSeedConcepts = lastSeedConceptIndex-firstSeedConceptIndex+1
 					
-	return first_seed_concept_index, num_seed_concepts, first_seed_feature_index
+	return firstSeedConceptIndex, numSeedConcepts, firstSeedFeatureIndex
 	
 #first dim cs1 pertains to every concept node in sequence
-def process_features_active_seed(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos, first_seed_token_index, num_seed_tokens, first_seed_concept_index, num_seed_concepts, first_seed_feature_index):
-	feature_neurons_inactive = 1 - feature_neurons_active
+def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, firstSeedTokenIndex, numSeedTokens, firstSeedConceptIndex, numSeedConcepts, firstSeedFeatureIndex):
+	featureNeuronsInactive = 1 - featureNeuronsActive
 	
 	fs2 = fs
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-		cs2 = sequence_observed_columns.databaseNetworkObject.c
-		feature_connections_active = pt.ones(cs, fs, cs2, fs2)
-		#print("feature_connections_active.shape = ", feature_connections_active.shape)
+		cs2 = sequenceObservedColumns.databaseNetworkObject.c
+		featureConnectionsActive = pt.ones(cs, fs, cs2, fs2)
 	else:
 		cs2 = cs
-		feature_connections_active, feature_connections_segment_mask = createFeatureConnectionsActiveTrain(feature_neurons_active[array_index_segment_internal_column], cs, fs, columns_word_order, feature_neurons_word_order)
+		featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[arrayIndexSegmentInternalColumn], cs, fs, columnsWordOrder, featureNeuronsWordOrder)
 
-	firstWordIndexPredictPhase = first_seed_token_index+num_seed_tokens
-	firstConceptIndexPredictPhase = first_seed_concept_index+num_seed_concepts
-	feature_connections_active = createFeatureConnectionsActiveSeed(feature_connections_active, cs, fs, cs2, fs2, columns_word_order, feature_neurons_word_order, first_seed_token_index, firstWordIndexPredictPhase, first_seed_concept_index, firstConceptIndexPredictPhase)
+	firstWordIndexPredictPhase = firstSeedTokenIndex+numSeedTokens
+	firstConceptIndexPredictPhase = firstSeedConceptIndex+numSeedConcepts
+	featureConnectionsActive = createFeatureConnectionsActiveSeed(featureConnectionsActive, cs, fs, cs2, fs2, columnsWordOrder, featureNeuronsWordOrder, firstSeedTokenIndex, firstWordIndexPredictPhase, firstSeedConceptIndex, firstConceptIndexPredictPhase)
 
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-		feature_connections_active = feature_connections_active[:, first_seed_concept_index]
-		
-	#target neuron activation dependence on connection strength;
-	feature_connections_activation_update = feature_connections_active * sequence_observed_columns.feature_connections[array_index_properties_strength]
+		featureConnectionsActivationUpdate = featureConnectionsActive[:, firstSeedConceptIndex] * sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength]
+	else:
+		featureConnectionsActivationUpdate = featureConnectionsActive * sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength]
 	
-	#update the activations of the target nodes;
-	#feature_connections_activation_update = pt.sum(feature_connections_activation_update, dim=(0))	#sum over segment dim	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-		feature_neurons_target_activation = pt.sum(feature_connections_activation_update, dim=(1))		#sum over f dimensions
+		featureNeuronsTargetActivation = pt.sum(featureConnectionsActivationUpdate, dim=(1))
 	else:
-		feature_neurons_target_activation = pt.sum(feature_connections_activation_update, dim=(1, 2))		#sum over source c and f dimensions
+		featureNeuronsTargetActivation = pt.sum(featureConnectionsActivationUpdate, dim=(1, 2))
 	if(inferenceActivationFunction):
-		feature_neurons_target_activation = activation_function(feature_neurons_target_activation)
+		featureNeuronsTargetActivation = activationFunction(featureNeuronsTargetActivation)
 	else:
-		feature_neurons_target_activation = feature_neurons_target_activation*j1
+		featureNeuronsTargetActivation = featureNeuronsTargetActivation*j1
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-		global_feature_neurons_activation = sequence_observed_columns.databaseNetworkObject.global_feature_neurons[array_index_properties_activation]
-		global_feature_neurons_activation = global_feature_neurons_activation + feature_neurons_target_activation
-		#print("global_feature_neurons_activation = ", global_feature_neurons_activation)
+		globalFeatureNeuronsActivation = sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivation]
+		globalFeatureNeuronsActivation = globalFeatureNeuronsActivation + featureNeuronsTargetActivation
 	else:
-		sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :, :] += feature_neurons_target_activation
-		#will only activate target neurons in sequence_observed_columns (not suitable for inference seed/prediction phase)
+		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation, :, :, :] += featureNeuronsTargetActivation
 	
 	if(inferenceDecrementActivations):
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-			global_feature_neurons_activation = decrementActivation(global_feature_neurons_activation, activationDecrementSeed)
+			globalFeatureNeuronsActivation = decrementActivation(globalFeatureNeuronsActivation, activationDecrementSeed)
 		else:
-			sequence_observed_columns.feature_neurons[array_index_properties_activation] = decrementActivationDense(sequence_observed_columns.feature_neurons[array_index_properties_activation], activationDecrementSeed)
+			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation] = decrementActivationDense(sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation], activationDecrementSeed)
 					
 	if(inferenceDeactivateNeuronsUponPrediction):
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 			if(useSANI):
-				printe("process_features_active_seed error: inferenceDeactivateNeuronsUponPrediction:inferenceSeedTargetActivationsGlobalFeatureArrays:useSANI is not yet implemented")
+				printe("processFeaturesActiveSeed error: inferenceDeactivateNeuronsUponPrediction:inferenceSeedTargetActivationsGlobalFeatureArrays:useSANI is not yet implemented")
 			else:
-				indices_to_update = pt.tensor([0, first_seed_concept_index, first_seed_feature_index]).unsqueeze(0)	#first SANI dim, source concept dim, source feature dim 
-				global_feature_neurons_activation = global_feature_neurons_activation.coalesce()
-				global_feature_neurons_activation = GIAANNproto_sparseTensors.modify_sparse_tensor(global_feature_neurons_activation, indices_to_update, 0)
+				indicesToUpdate = pt.tensor([0, firstSeedConceptIndex, firstSeedFeatureIndex]).unsqueeze(0)
+				globalFeatureNeuronsActivation = globalFeatureNeuronsActivation.coalesce()
+				globalFeatureNeuronsActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsActivation, indicesToUpdate, 0)
 		else:
-			word_order_mask = pt.logical_and(feature_neurons_word_order >= first_seed_token_index, feature_neurons_word_order < firstWordIndexPredictPhase)
-			columns_word_order_expanded_1 = columns_word_order.view(cs, 1).expand(cs, fs)
-			columns_word_order_mask = pt.logical_and(columns_word_order_expanded_1 >= first_seed_concept_index, columns_word_order_expanded_1 < firstConceptIndexPredictPhase)
+			wordOrderMask = pt.logical_and(featureNeuronsWordOrder >= firstSeedTokenIndex, featureNeuronsWordOrder < firstWordIndexPredictPhase)
+			columnsWordOrderExpanded1 = columnsWordOrder.view(cs, 1).expand(cs, fs)
+			columnsWordOrderMask = pt.logical_and(columnsWordOrderExpanded1 >= firstSeedConceptIndex, columnsWordOrderExpanded1 < firstConceptIndexPredictPhase)
 
-			word_order_mask = pt.logical_and(word_order_mask, columns_word_order_mask)
-			word_order_mask = word_order_mask.unsqueeze(0).expand(array_number_of_segments, cs, fs)
-			feature_neurons_active_source = pt.logical_and(word_order_mask, feature_neurons_active > 0)
-			feature_neurons_inactive_source = pt.logical_not(feature_neurons_active_source).float()
-			sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :, :] *= feature_neurons_inactive_source
+			wordOrderMask = pt.logical_and(wordOrderMask, columnsWordOrderMask)
+			wordOrderMask = wordOrderMask.unsqueeze(0).expand(arrayNumberOfSegments, cs, fs)
+			featureNeuronsActiveSource = pt.logical_and(wordOrderMask, featureNeuronsActive > 0)
+			featureNeuronsInactiveSource = pt.logical_not(featureNeuronsActiveSource).float()
+			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation, :, :, :] *= featureNeuronsInactiveSource
 
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-		sequence_observed_columns.databaseNetworkObject.global_feature_neurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequence_observed_columns.databaseNetworkObject.global_feature_neurons, global_feature_neurons_activation, array_index_properties_activation)
+		sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivation)
 
-def createFeatureConnectionsActiveSeed(feature_connections_active, cs, fs, cs2, fs2, columns_word_order, feature_neurons_word_order, first_seed_token_index, firstWordIndexPredictPhase, first_seed_concept_index, firstConceptIndexPredictPhase):
+def createFeatureConnectionsActiveSeed(featureConnectionsActive, cs, fs, cs2, fs2, columnsWordOrder, featureNeuronsWordOrder, firstSeedTokenIndex, firstWordIndexPredictPhase, firstSeedConceptIndex, firstConceptIndexPredictPhase):
 	
-	if(feature_neurons_word_order is not None):	
-		feature_neurons_word_order_expanded_1 = feature_neurons_word_order.view(cs, fs, 1, 1).expand(cs, fs, cs2, fs2)  # For the first node
-		word_order_mask = pt.logical_and(feature_neurons_word_order_expanded_1 >= first_seed_token_index, feature_neurons_word_order_expanded_1 < firstWordIndexPredictPhase)
-		feature_connections_active = feature_connections_active * word_order_mask.unsqueeze(0)
-	if(columns_word_order is not None):
-		columns_word_order_expanded_1 = columns_word_order.view(cs, 1, 1, 1).expand(cs, fs, cs2, fs2)  # For the first node's cs index
-		columns_word_order_mask = pt.logical_and(columns_word_order_expanded_1 >= first_seed_concept_index, columns_word_order_expanded_1 < firstConceptIndexPredictPhase)
-		feature_connections_active = feature_connections_active * columns_word_order_mask.unsqueeze(0)
+	if(featureNeuronsWordOrder is not None):	
+		featureNeuronsWordOrderExpanded1 = featureNeuronsWordOrder.view(cs, fs, 1, 1).expand(cs, fs, cs2, fs2)
+		wordOrderMask = pt.logical_and(featureNeuronsWordOrderExpanded1 >= firstSeedTokenIndex, featureNeuronsWordOrderExpanded1 < firstWordIndexPredictPhase)
+		featureConnectionsActive = featureConnectionsActive * wordOrderMask.unsqueeze(0)
+	if(columnsWordOrder is not None):
+		columnsWordOrderExpanded1 = columnsWordOrder.view(cs, 1, 1, 1).expand(cs, fs, cs2, fs2)
+		columnsWordOrderMask = pt.logical_and(columnsWordOrderExpanded1 >= firstSeedConceptIndex, columnsWordOrderExpanded1 < firstConceptIndexPredictPhase)
+		featureConnectionsActive = featureConnectionsActive * columnsWordOrderMask.unsqueeze(0)
 	
-	#feature_connections_active = feature_connections_active.unsqueeze(0).expand(array_number_of_segments, cs, fs, cs2, fs2)
-
-	return feature_connections_active
+	return featureConnectionsActive
 	
 	
 #first dim cs1 pertains to every concept node in sequence
-def process_features_active_train(sequence_observed_columns, feature_neurons_active, cs, fs, sequence_concept_index_mask, columns_word_order, feature_neurons_word_order, feature_neurons_pos, feature_neurons_segment_mask, sentenceIndex):
-	feature_neurons_inactive = 1 - feature_neurons_active
+def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sentenceIndex):
+	featureNeuronsInactive = 1 - featureNeuronsActive
 		
-	# Update feature neurons in sequence_observed_columns
-	sequence_observed_columns.feature_neurons[array_index_properties_strength, :, :, :] += feature_neurons_active
-	sequence_observed_columns.feature_neurons[array_index_properties_permanence, :, :, :] += feature_neurons_active*z1	#orig = feature_neurons_active*(sequence_observed_columns.feature_neurons[array_index_properties_permanence] ** 2) + feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_permanence]
-	sequence_observed_columns.feature_neurons[array_index_properties_activation, :, :, :] = 0 #+= feature_neurons_active*j1	#update the activations of the target not source nodes
+	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesStrength, :, :, :] += featureNeuronsActive
+	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPermanence, :, :, :] += featureNeuronsActive*z1
+	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation, :, :, :] = 0
 	if(inferenceUseNeuronFeaturePropertiesTime):
-		sequence_observed_columns.feature_neurons[array_index_properties_time, :, :, :] = 0
+		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTime, :, :, :] = 0
 	else:
-		sequence_observed_columns.feature_neurons[array_index_properties_time, :, :, :] = feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_time] + feature_neurons_active*sentenceIndex
-	sequence_observed_columns.feature_neurons[array_index_properties_pos, :, :, :] = feature_neurons_inactive*sequence_observed_columns.feature_neurons[array_index_properties_pos] + feature_neurons_active*feature_neurons_pos
+		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTime, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTime] + featureNeuronsActive*sentenceIndex
+	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPos, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPos] + featureNeuronsActive*featureNeuronsPos
 
-	feature_connections_active, feature_connections_segment_mask = createFeatureConnectionsActiveTrain(feature_neurons_active[array_index_segment_internal_column], cs, fs, columns_word_order, feature_neurons_word_order)
+	featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[arrayIndexSegmentInternalColumn], cs, fs, columnsWordOrder, featureNeuronsWordOrder)
 	
-	feature_connections_pos = feature_neurons_pos.view(1, cs, fs, 1, 1).expand(array_number_of_segments, cs, fs, cs, fs)
+	featureConnectionsPos = featureNeuronsPos.view(1, cs, fs, 1, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
 
-	feature_connections_inactive = 1 - feature_connections_active
+	featureConnectionsInactive = 1 - featureConnectionsActive
 
 	if(trainNormaliseConnectionStrengthWrtContextLength):
-		#prefer closer than further target neurons when strengthening connections (and activating target neurons) in sentence;
-		feature_neurons_word_order_1d = feature_neurons_word_order.flatten()
-		feature_connections_distances = pt.abs(feature_neurons_word_order_1d.unsqueeze(1) - feature_neurons_word_order_1d).reshape(cs, fs, cs, fs)
-		feature_connections_proximity = 1/(feature_connections_distances + 1) * 10
-		feature_connections_proximity.unsqueeze(0)	#add SANI segment dimension
-		feature_connections_strength_update = feature_connections_active*feature_connections_proximity
-		#print("feature_connections_strength_update = ", feature_connections_strength_update)
+		featureNeuronsWordOrder1d = featureNeuronsWordOrder.flatten()
+		featureConnectionsDistances = pt.abs(featureNeuronsWordOrder1d.unsqueeze(1) - featureNeuronsWordOrder1d).reshape(cs, fs, cs, fs)
+		featureConnectionsProximity = 1/(featureConnectionsDistances + 1) * 10
+		featureConnectionsProximity.unsqueeze(0)
+		featureConnectionsStrengthUpdate = featureConnectionsActive*featureConnectionsProximity
 	else:
-		feature_connections_strength_update = feature_connections_active
+		featureConnectionsStrengthUpdate = featureConnectionsActive
 
 	if(trainIncreaseColumnInternalConnectionsStrength):
-		cs_indices_1 = pt.arange(cs).view(1, cs, 1, 1, 1).expand(array_number_of_segments, cs, fs, cs, fs)  # First cs dimension
-		cs_indices_2 = pt.arange(cs).view(1, 1, 1, cs, 1).expand(array_number_of_segments, cs, fs, cs, fs)  # Second cs dimension
-		column_internal_connections_mask = (cs_indices_1 == cs_indices_2)
-		column_internal_connections_mask_off = pt.logical_not(column_internal_connections_mask)
-		feature_connections_strength_update = column_internal_connections_mask.float()*feature_connections_strength_update*trainIncreaseColumnInternalConnectionsStrengthModifier + column_internal_connections_mask_off.float()*feature_connections_strength_update
+		csIndices1 = pt.arange(cs).view(1, cs, 1, 1, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
+		csIndices2 = pt.arange(cs).view(1, 1, 1, cs, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
+		columnInternalConnectionsMask = (csIndices1 == csIndices2)
+		columnInternalConnectionsMaskOff = pt.logical_not(columnInternalConnectionsMask)
+		featureConnectionsStrengthUpdate = columnInternalConnectionsMask.float()*featureConnectionsStrengthUpdate*trainIncreaseColumnInternalConnectionsStrengthModifier + columnInternalConnectionsMaskOff.float()*featureConnectionsStrengthUpdate
 
-	#print("feature_connections_active[array_index_segment_first] = ", feature_connections_active[array_index_segment_first])
-	#print("feature_connections_active[array_index_segment_internal_column] = ", feature_connections_active[array_index_segment_internal_column])
-	
-	sequence_observed_columns.feature_connections[array_index_properties_strength, :, :, :, :, :] += feature_connections_strength_update
-	sequence_observed_columns.feature_connections[array_index_properties_permanence, :, :, :, :, :] += feature_connections_active*z1	#orig = feature_connections_active*(sequence_observed_columns.feature_connections[array_index_properties_permanence] ** 2) + feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_permanence]
-	sequence_observed_columns.feature_connections[array_index_properties_activation, :, :, :, :, :] = 0	#+= feature_connections_active*j1	#connection activations are not currently used
+	sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength, :, :, :, :, :] += featureConnectionsStrengthUpdate
+	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanence, :, :, :, :, :] += featureConnectionsActive*z1
+	sequenceObservedColumns.featureConnections[arrayIndexPropertiesActivation, :, :, :, :, :] = 0
 	if(inferenceUseNeuronFeaturePropertiesTime):
-		sequence_observed_columns.feature_connections[array_index_properties_time, :, :, :, :, :] = 0
+		sequenceObservedColumns.featureConnections[arrayIndexPropertiesTime, :, :, :, :, :] = 0
 	else:
-		sequence_observed_columns.feature_connections[array_index_properties_time, :, :, :, :, :] = feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_time] + feature_connections_active*sentenceIndex
-	sequence_observed_columns.feature_connections[array_index_properties_pos, :, :, :, :, :] = feature_connections_inactive*sequence_observed_columns.feature_connections[array_index_properties_pos] + feature_connections_active*feature_connections_pos
+		sequenceObservedColumns.featureConnections[arrayIndexPropertiesTime, :, :, :, :, :] = featureConnectionsInactive*sequenceObservedColumns.featureConnections[arrayIndexPropertiesTime] + featureConnectionsActive*sentenceIndex
+	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPos, :, :, :, :, :] = featureConnectionsInactive*sequenceObservedColumns.featureConnections[arrayIndexPropertiesPos] + featureConnectionsActive*featureConnectionsPos
 
-	#decrease permanence;
 	if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections):
-		decrease_permanence_active(sequence_observed_columns, feature_neurons_active[array_index_segment_internal_column], feature_neurons_inactive[array_index_segment_internal_column], sequence_concept_index_mask, feature_neurons_segment_mask, feature_connections_segment_mask)
+		decreasePermanenceActive(sequenceObservedColumns, featureNeuronsActive[arrayIndexSegmentInternalColumn], featureNeuronsInactive[arrayIndexSegmentInternalColumn], sequenceConceptIndexMask, featureNeuronsSegmentMask, featureConnectionsSegmentMask)
 	
 
-def createFeatureConnectionsActiveTrain(feature_neurons_active, cs, fs, columns_word_order, feature_neurons_word_order):
+def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder):
 
-	feature_neurons_active_1d = feature_neurons_active.view(cs*fs)
-	feature_connections_active = pt.matmul(feature_neurons_active_1d.unsqueeze(1), feature_neurons_active_1d.unsqueeze(0)).view(cs, fs, cs, fs)
+	featureNeuronsActive1d = featureNeuronsActive.view(cs*fs)
+	featureConnectionsActive = pt.matmul(featureNeuronsActive1d.unsqueeze(1), featureNeuronsActive1d.unsqueeze(0)).view(cs, fs, cs, fs)
 
-	if(feature_neurons_word_order is not None):
-		#ensure word order is maintained (between connection source/target) for internal and external feature connections;
-		feature_neurons_word_order_expanded_1 = feature_neurons_word_order.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)  # For the first node
-		feature_neurons_word_order_expanded_2 = feature_neurons_word_order.view(1, 1, cs, fs).expand(cs, fs, cs, fs)  # For the second node
-		word_order_mask = feature_neurons_word_order_expanded_2 > feature_neurons_word_order_expanded_1
-		feature_connections_active = feature_connections_active * word_order_mask
-	if(columns_word_order is not None):
-		#ensure word order is maintained for connections between columns (does not support multiple same concepts in same sentence);
-		columns_word_order_expanded_1 = columns_word_order.view(cs, 1, 1, 1).expand(cs, fs, cs, fs)  # For the first node's cs index
-		columns_word_order_expanded_2 = columns_word_order.view(1, 1, cs, 1).expand(cs, fs, cs, fs)  # For the second node's cs index
+	if(featureNeuronsWordOrder is not None):
+		featureNeuronsWordOrderExpanded1 = featureNeuronsWordOrder.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
+		featureNeuronsWordOrderExpanded2 = featureNeuronsWordOrder.view(1, 1, cs, fs).expand(cs, fs, cs, fs)
+		wordOrderMask = featureNeuronsWordOrderExpanded2 > featureNeuronsWordOrderExpanded1
+		featureConnectionsActive = featureConnectionsActive * wordOrderMask
+	if(columnsWordOrder is not None):
+		columnsWordOrderExpanded1 = columnsWordOrder.view(cs, 1, 1, 1).expand(cs, fs, cs, fs)
+		columnsWordOrderExpanded2 = columnsWordOrder.view(1, 1, cs, 1).expand(cs, fs, cs, fs)
 		if(debugConnectColumnsToNextColumnsInSequenceOnly):
-			columns_word_order_mask = pt.logical_and(columns_word_order_expanded_2 >= columns_word_order_expanded_1, columns_word_order_expanded_2 <= columns_word_order_expanded_1+1)
+			columnsWordOrderMask = pt.logical_and(columnsWordOrderExpanded2 >= columnsWordOrderExpanded1, columnsWordOrderExpanded2 <= columnsWordOrderExpanded1+1)
 		else:
-			columns_word_order_mask = columns_word_order_expanded_2 >= columns_word_order_expanded_1
-		feature_connections_active = feature_connections_active * columns_word_order_mask
+			columnsWordOrderMask = columnsWordOrderExpanded2 >= columnsWordOrderExpanded1
+		featureConnectionsActive = featureConnectionsActive * columnsWordOrderMask
 	
-	#ensure identical feature nodes are not connected together;
-	cs_indices_1 = pt.arange(cs).view(cs, 1, 1, 1).expand(cs, fs, cs, fs)  # First cs dimension
-	cs_indices_2 = pt.arange(cs).view(1, 1, cs, 1).expand(cs, fs, cs, fs)  # Second cs dimension
-	fs_indices_1 = pt.arange(fs).view(1, fs, 1, 1).expand(cs, fs, cs, fs)  # First fs dimension
-	fs_indices_2 = pt.arange(fs).view(1, 1, 1, fs).expand(cs, fs, cs, fs)  # Second fs dimension
-	identity_mask = (cs_indices_1 != cs_indices_2) | (fs_indices_1 != fs_indices_2)
-	feature_connections_active = feature_connections_active * identity_mask
+	csIndices1 = pt.arange(cs).view(cs, 1, 1, 1).expand(cs, fs, cs, fs)
+	csIndices2 = pt.arange(cs).view(1, 1, cs, 1).expand(cs, fs, cs, fs)
+	fsIndices1 = pt.arange(fs).view(1, fs, 1, 1).expand(cs, fs, cs, fs)
+	fsIndices2 = pt.arange(fs).view(1, 1, 1, fs).expand(cs, fs, cs, fs)
+	identityMask = (csIndices1 != csIndices2) | (fsIndices1 != fsIndices2)
+	featureConnectionsActive = featureConnectionsActive * identityMask
 
 	if(useSANI):
-		feature_connections_active, feature_connections_segment_mask = assign_feature_connections_to_target_segments(feature_connections_active, cs, fs)
+		featureConnectionsActive, featureConnectionsSegmentMask = assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs)
 	else:
-		feature_connections_active = feature_connections_active.unsqueeze(0)
-		feature_connections_segment_mask = pt.ones_like(feature_connections_active)
+		featureConnectionsActive = featureConnectionsActive.unsqueeze(0)
+		featureConnectionsSegmentMask = pt.ones_like(featureConnectionsActive)
 	
-	return feature_connections_active, feature_connections_segment_mask
+	return featureConnectionsActive, featureConnectionsSegmentMask
 
-def assign_feature_connections_to_target_segments(feature_connections_active, cs, fs):
+def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs):
 
-	#arrange active connections according to target neuron sequential segment index
-	concept_neurons_concept_order_1d = pt.arange(cs)
-	concept_neurons_distances = pt.abs(concept_neurons_concept_order_1d.unsqueeze(1) - concept_neurons_concept_order_1d).reshape(cs, cs)
-	connections_segment_index = array_number_of_segments-concept_neurons_distances-1
-	connections_segment_index = pt.clamp(connections_segment_index, min=0)
+	conceptNeuronsConceptOrder1d = pt.arange(cs)
+	conceptNeuronsDistances = pt.abs(conceptNeuronsConceptOrder1d.unsqueeze(1) - conceptNeuronsConceptOrder1d).reshape(cs, cs)
+	connectionsSegmentIndex = arrayNumberOfSegments-conceptNeuronsDistances-1
+	connectionsSegmentIndex = pt.clamp(connectionsSegmentIndex, min=0)
 	
-	feature_connections_segment_mask = pt.zeros((array_number_of_segments, cs, cs), dtype=pt.bool)
-	feature_connections_segment_mask = feature_connections_segment_mask.scatter_(0, connections_segment_index.unsqueeze(0), True)
-	feature_connections_segment_mask = feature_connections_segment_mask.view(array_number_of_segments, cs, 1, cs, 1).expand(array_number_of_segments, cs, fs, cs, fs)
-	feature_connections_active = feature_connections_segment_mask * feature_connections_active.unsqueeze(0)
+	featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, cs), dtype=pt.bool)
+	featureConnectionsSegmentMask = featureConnectionsSegmentMask.scatter_(0, connectionsSegmentIndex.unsqueeze(0), True)
+	featureConnectionsSegmentMask = featureConnectionsSegmentMask.view(arrayNumberOfSegments, cs, 1, cs, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
+	featureConnectionsActive = featureConnectionsSegmentMask * featureConnectionsActive.unsqueeze(0)
 	
-	return feature_connections_active, feature_connections_segment_mask
+	return featureConnectionsActive, featureConnectionsSegmentMask
 		
-def decrease_permanence_active(sequence_observed_columns, feature_neurons_active, feature_neurons_inactive, sequence_concept_index_mask, feature_neurons_segment_mask, feature_connections_segment_mask):
+def decreasePermanenceActive(sequenceObservedColumns, featureNeuronsActive, featureNeuronsInactive, sequenceConceptIndexMask, featureNeuronsSegmentMask, featureConnectionsSegmentMask):
 
 	if(trainSequenceObservedColumnsMatchSequenceWords):
-		feature_neurons_inactive = feature_neurons_inactive*sequence_concept_index_mask	#when decreasing a value based on inactivation, ignore duplicate feature column neurons in the sequence
+		featureNeuronsInactive = featureNeuronsInactive*sequenceConceptIndexMask
 	
-	cs = sequence_observed_columns.cs
-	fs = sequence_observed_columns.fs 
+	cs = sequenceObservedColumns.cs
+	fs = sequenceObservedColumns.fs 
 	
-	# Decrease permanence for feature neurons not activated
-	feature_neurons_decrease = feature_neurons_inactive.unsqueeze(0)*z2 * feature_neurons_segment_mask.unsqueeze(2)
-	sequence_observed_columns.feature_neurons[array_index_properties_permanence, :, :, :] -= feature_neurons_decrease
-	sequence_observed_columns.feature_neurons[array_index_properties_permanence] = pt.clamp(sequence_observed_columns.feature_neurons[array_index_properties_permanence], min=0)
+	featureNeuronsDecrease = featureNeuronsInactive.unsqueeze(0)*z2 * featureNeuronsSegmentMask.unsqueeze(2)
+	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPermanence, :, :, :] -= featureNeuronsDecrease
+	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPermanence] = pt.clamp(sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPermanence], min=0)
 
-	feature_neurons_all = pt.ones((cs, fs), dtype=array_type)
-	feature_neurons_all_1d = feature_neurons_all.view(cs*fs)
-	feature_neurons_active_1d = feature_neurons_active.view(cs*fs)
-	feature_neurons_inactive_1d = feature_neurons_inactive.view(cs*fs)
+	featureNeuronsAll = pt.ones((cs, fs), dtype=arrayType)
+	featureNeuronsAll1d = featureNeuronsAll.view(cs*fs)
+	featureNeuronsActive1d = featureNeuronsActive.view(cs*fs)
+	featureNeuronsInactive1d = featureNeuronsInactive.view(cs*fs)
 	 
-	# Decrease permanence of connections from inactive feature neurons in column
-	feature_connections_decrease1 = pt.matmul(feature_neurons_inactive_1d.unsqueeze(1), feature_neurons_all_1d.unsqueeze(0)).view(cs, fs, cs, fs)
-	feature_connections_decrease1 = feature_connections_decrease1.unsqueeze(0)*feature_connections_segment_mask
-	sequence_observed_columns.feature_connections[array_index_properties_permanence, :, :, :, :, :] -= feature_connections_decrease1
-	sequence_observed_columns.feature_connections[array_index_properties_permanence] = pt.clamp(sequence_observed_columns.feature_connections[array_index_properties_permanence], min=0)
+	featureConnectionsDecrease1 = pt.matmul(featureNeuronsInactive1d.unsqueeze(1), featureNeuronsAll1d.unsqueeze(0)).view(cs, fs, cs, fs)
+	featureConnectionsDecrease1 = featureConnectionsDecrease1.unsqueeze(0)*featureConnectionsSegmentMask
+	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanence, :, :, :, :, :] -= featureConnectionsDecrease1
+	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanence] = pt.clamp(sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanence], min=0)
 	
-	# Decrease permanence of inactive connections for activated features in column 
-	feature_connections_decrease2 = pt.matmul(feature_neurons_active_1d.unsqueeze(1), feature_neurons_inactive_1d.unsqueeze(0)).view(cs, fs, cs, fs)
-	feature_connections_decrease2 = feature_connections_decrease2.unsqueeze(0)*feature_connections_segment_mask
-	sequence_observed_columns.feature_connections[array_index_properties_permanence, :, :, :, :, :] -= feature_connections_decrease2
-	sequence_observed_columns.feature_connections[array_index_properties_permanence] = pt.clamp(sequence_observed_columns.feature_connections[array_index_properties_permanence], min=0)
+	featureConnectionsDecrease2 = pt.matmul(featureNeuronsActive1d.unsqueeze(1), featureNeuronsInactive1d.unsqueeze(0)).view(cs, fs, cs, fs)
+	featureConnectionsDecrease2 = featureConnectionsDecrease2.unsqueeze(0)*featureConnectionsSegmentMask
+	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanence, :, :, :, :, :] -= featureConnectionsDecrease2
+	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanence] = pt.clamp(sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanence], min=0)
  
-	#current limitation; will not deactivate neurons or remove their strength if their permanence goes to zero
 
-
-def decrementActivationDense(feature_neurons_activation, activationDecrement):
+def decrementActivationDense(featureNeuronsActivation, activationDecrement):
 	if(inferenceDecrementActivationsNonlinear):
-		feature_neurons_activation = feature_neurons_activation * (1-activationDecrement)
+		featureNeuronsActivation = featureNeuronsActivation * (1-activationDecrement)
 	else:
-		feature_neurons_activation = feature_neurons_activation - activationDecrementPerPredictedSentence
-	return feature_neurons_activation
+		featureNeuronsActivation = featureNeuronsActivation - activationDecrementPerPredictedSentence
+	return featureNeuronsActivation
 
 
-def decrementActivation(feature_neurons_activation, activationDecrement):
+def decrementActivation(featureNeuronsActivation, activationDecrement):
 	if(inferenceDecrementActivationsNonlinear):
-		feature_neurons_activation = feature_neurons_activation * (1-activationDecrement)
+		featureNeuronsActivation = featureNeuronsActivation * (1-activationDecrement)
 	else:
-		feature_neurons_activation = GIAANNproto_sparseTensors.subtract_value_from_sparse_tensor_values(feature_neurons_activation, activationDecrementPerPredictedSentence)
-	return feature_neurons_activation
+		featureNeuronsActivation = GIAANNproto_sparseTensors.subtractValueFromSparseTensorValues(featureNeuronsActivation, activationDecrementPerPredictedSentence)
+	return featureNeuronsActivation
 
 
-def activation_function(x):
+def activationFunction(x):
 	'''
 	A non-linear activation function similar to a sigmoid that outputs from 0 to +1, but the slope of the function goes to 0 at approx 50 instead of 5. 
 	The function outputs 0 when the input is 0. All input will be positive. 
@@ -828,13 +784,13 @@ def activation_function(x):
 	if x.is_sparse:
 		indices = x._indices()
 		values = x._values()
-		transformed_values = hybrid_activation(values)
-		z = pt.sparse_coo_tensor(indices, transformed_values, x.size(), device=x.device)
+		transformedValues = hybridActivation(values)
+		z = pt.sparse_coo_tensor(indices, transformedValues, x.size(), device=x.device)
 	else:
-		z = hybrid_activation(x)
+		z = hybridActivation(x)
 	return z
 
-def hybrid_activation(x, scale=100.0):
+def hybridActivation(x, scale=100.0):
 	#print("x = ", x)
 	f = (pt.sigmoid(x / scale) - 0.5 ) * 2.0
 	#print("f = ", f)

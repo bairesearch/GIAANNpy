@@ -28,7 +28,7 @@ from GIAANNproto_globalDefs import *
 import GIAANNproto_predictiveNetworkOperations
 
 def nextWordPredictionMLPcreate(databaseNetworkObject):
-	global model, criterion, criterion_c, criterion_f, optimizer, batch_size
+	global model, criterion, criterionC, criterionF, optimizer, batchSize
 
 	model = NextWordPredictionMLPmodel(databaseNetworkObject)
 	model = model.to(devicePredictiveNetworkModel)
@@ -36,11 +36,11 @@ def nextWordPredictionMLPcreate(databaseNetworkObject):
 
 	if(inferencePredictiveNetworkIndependentFCpredictions):
 		if(multipleTargets):
-			criterion_c = nn.BCEWithLogitsLoss()
-			criterion_f = nn.BCEWithLogitsLoss()
+			criterionC = nn.BCEWithLogitsLoss()
+			criterionF = nn.BCEWithLogitsLoss()
 		else:
-			criterion_c = nn.MSELoss()
-			criterion_f = nn.MSELoss()
+			criterionC = nn.MSELoss()
+			criterionF = nn.MSELoss()
 	else:
 		if(multipleTargets):
 			criterion = nn.BCEWithLogitsLoss()
@@ -48,41 +48,41 @@ def nextWordPredictionMLPcreate(databaseNetworkObject):
 			criterion = nn.MSELoss()
 			
 	optimizer = optim.Adam(model.parameters(), lr=inferencePredictiveNetworkLearningRate)
-	batch_size = 1
+	batchSize = 1
 
-def nextWordPredictionMLPtrainStep(global_feature_neurons, targets, targets_c, targets_f):
-	global model, criterion, optimizer, batch_size
+def nextWordPredictionMLPtrainStep(globalFeatureNeurons, targets, targetsC, targetsF):
+	global model, criterion, optimizer, batchSize
 	
 	if(inferencePredictiveNetworkIndependentFCpredictions):
-		targets_c = targets_c.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
-		targets_f = targets_f.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
+		targetsC = targetsC.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
+		targetsF = targetsF.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
 	else:
 		targets = targets.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
 
-	global_feature_neurons = global_feature_neurons.unsqueeze(0)	#add batch dim	
-	global_feature_neurons = global_feature_neurons.to(devicePredictiveNetworkModel)
-	global_feature_neurons = global_feature_neurons.to_dense()
+	globalFeatureNeurons = globalFeatureNeurons.unsqueeze(0)	#add batch dim	
+	globalFeatureNeurons = globalFeatureNeurons.to(devicePredictiveNetworkModel)
+	globalFeatureNeurons = globalFeatureNeurons.to_dense()
 	
 	if(inferencePredictiveNetworkIndependentFCpredictions):
-		outputs_c, outputs_f = model(global_feature_neurons) # Outputs shape: (batch_size, c, f)
-		loss_c = criterion_c(outputs_c, targets_c)
-		loss_f = criterion_f(outputs_f, targets_f)
-		loss = loss_c + loss_f  # Combine losses
+		outputsC, outputsF = model(globalFeatureNeurons) # Outputs shape: (batchSize, c, f)
+		lossC = criterionC(outputsC, targetsC)
+		lossF = criterionF(outputsF, targetsF)
+		loss = lossC + lossF  # Combine losses
 	else:	
-		outputs = model(global_feature_neurons)  # Outputs shape: (batch_size, c, f)
+		outputs = model(globalFeatureNeurons)  # Outputs shape: (batchSize, c, f)
 		loss = criterion(outputs, targets)
 
 	optimizer.zero_grad()
 	loss.backward()
 	optimizer.step()
 
-	loss_value = loss.item()
-	print("loss_value = ", loss_value)
+	lossValue = loss.item()
+	print("loss_value = ", lossValue)
 
 	if(inferencePredictiveNetworkIndependentFCpredictions):
-		topk_c = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsC(outputs_c)
-		topk_f = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsF(outputs_f)
-		return topk_c, topk_f
+		topkC = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsC(outputsC)
+		topkF = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsF(outputsF)
+		return topkC, topkF
 	else:
 		topk = GIAANNproto_predictiveNetworkOperations.getTopkPredictions(outputs)
 		return topk
@@ -96,58 +96,56 @@ class NextWordPredictionMLPmodel(nn.Module):
 		self.p = databaseNetworkObject.p
 		
 		if(inferencePredictiveNetworkUseInputAllProperties):
-			input_size = databaseNetworkObject.s * databaseNetworkObject.c * databaseNetworkObject.f * databaseNetworkObject.p
-			hidden_size_multiplier = 1	#default: 1	#TODO: requires testing
+			inputSize = databaseNetworkObject.s * databaseNetworkObject.c * databaseNetworkObject.f * databaseNetworkObject.p
+			hiddenSizeMultiplier = 1	#default: 1	#TODO: requires testing
 		else:
-			input_size = databaseNetworkObject.s * databaseNetworkObject.c * databaseNetworkObject.f
-			hidden_size_multiplier = 2	#default: 2	#TODO: requires testing
-		output_size = databaseNetworkObject.c * databaseNetworkObject.f
-		hidden_size = input_size * hidden_size_multiplier
+			inputSize = databaseNetworkObject.s * databaseNetworkObject.c * databaseNetworkObject.f
+			hiddenSizeMultiplier = 2	#default: 2	#TODO: requires testing
+		outputSize = databaseNetworkObject.c * databaseNetworkObject.f
+		hiddenSize = inputSize * hiddenSizeMultiplier
 
-		self.fc1 = nn.Linear(input_size, hidden_size, device=devicePredictiveNetworkModel)
+		self.fc1 = nn.Linear(inputSize, hiddenSize, device=devicePredictiveNetworkModel)
 		self.relu = nn.ReLU()
 		if(inferencePredictiveNetworkIndependentFCpredictions):
-			self.fc_c = nn.Linear(hidden_size, self.c, device=devicePredictiveNetworkModel)
-			self.fc_f = nn.Linear(hidden_size, self.f, device=devicePredictiveNetworkModel)
+			self.fcC = nn.Linear(hiddenSize, self.c, device=devicePredictiveNetworkModel)
+			self.fcF = nn.Linear(hiddenSize, self.f, device=devicePredictiveNetworkModel)
 		else:
-			self.fc2 = nn.Linear(hidden_size, output_size, device=devicePredictiveNetworkModel)
+			self.fc2 = nn.Linear(hiddenSize, outputSize, device=devicePredictiveNetworkModel)
 	
 	def forward(self, x):
-		x = x.view(x.size(0), -1)	#Flatten the input: (batch_size, c, f) -> (batch_size, c*f)
+		x = x.view(x.size(0), -1)	#Flatten the input: (batchSize, c, f) -> (batchSize, c*f)
 		out = self.fc1(x)
 		out = self.relu(out)
 		if(inferencePredictiveNetworkIndependentFCpredictions):
-			out_c = self.fc_c(out)  # Shape: (batch_size, c)
-			out_f = self.fc_f(out)  # Shape: (batch_size, f)
-			out_c = out_c.view(batch_size, self.c)
-			out_f = out_f.view(batch_size, self.f)
-			return out_c, out_f
+			outC = self.fcC(out)  # Shape: (batchSize, c)
+			outF = self.fcF(out)  # Shape: (batchSize, f)
+			outC = outC.view(batchSize, self.c)
+			outF = outF.view(batchSize, self.f)
+			return outC, outF
 		else:
-			out = self.fc2(out)	#Output shape: (batch_size, c*f)
-			out = out.view(batch_size, self.c, self.f)
+			out = self.fc2(out)	#Output shape: (batchSize, c*f)
+			out = out.view(batchSize, self.c, self.f)
 			return out
 
 
 
-def save_model(model, path, filename="model.pt"):
-    # Ensure directory exists
-    os.makedirs(path, exist_ok=True)
-    
-    # Construct full filepath
-    filepath = os.path.join(path, filename)
-    
-    # Save the model state_dict
-    pt.save(model.state_dict(), filepath)
-    return filepath
+def saveModel(model, path, filename="model.pt"):
+	# Ensure directory exists
+	os.makedirs(path, exist_ok=True)
+	
+	# Construct full filepath
+	filepath = os.path.join(path, filename)
+	
+	# Save the model state_dict
+	pt.save(model.state_dict(), filepath)
+	return filepath
 
 
-def load_model(model, filepath, map_location=None):
-    # Load state_dict from file
-    state_dict = pt.load(filepath, map_location=map_location)
-    
-    # Load the state_dict into the model
-    model.load_state_dict(state_dict)
-    
-    return model
-
-
+def loadModel(model, filepath, map_location=None):
+	# Load state_dict from file
+	stateDict = pt.load(filepath, map_location=map_location)
+	
+	# Load the state_dict into the model
+	model.load_state_dict(stateDict)
+	
+	return model
