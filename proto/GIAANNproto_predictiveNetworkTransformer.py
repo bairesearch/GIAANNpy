@@ -74,11 +74,10 @@ def nextWordPredictionTransformerTrainStep(globalFeatureNeurons, databaseFeature
 	globalFeatureNeurons = globalFeatureNeurons.unsqueeze(0)	#add batch dim (not used)
 	globalFeatureNeurons = globalFeatureNeurons.to(devicePredictiveNetworkModel)
 	globalFeatureNeurons = globalFeatureNeurons.to_dense()
-	
-	#print("globalFeatureNeurons.shape = ", globalFeatureNeurons.shape)
-	#print("globalFeatureNeurons.shape = ", globalFeatureNeurons.shape)
-		
 
+	if(inferencePredictiveNetworkNormaliseInputs and useGPUpredictiveNetworkModel):
+		globalFeatureNeurons = GIAANNproto_predictiveNetworkOperations.normaliseDenseTensor(globalFeatureNeurons)
+	
 	if(inferencePredictiveNetworkIndependentFCpredictions):
 		outputsC, outputsF = model(globalFeatureNeurons, databaseFeatureConnections)  # Outputs shape: (batch_size, c, f)
 		lossC = criterionC(outputsC, targetsC)

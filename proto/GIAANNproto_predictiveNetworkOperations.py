@@ -25,6 +25,43 @@ import torch.optim as optim
 from GIAANNproto_globalDefs import *
 	
 
+def normaliseSparseTensor(sparseTensor, independentInputChannels):
+	#normalise from 0 to 1
+	if(independentInputChannels):
+		normalisedSparseTensorList = []
+		for propertyIndex in range(arrayNumberOfProperties):
+			sparseTensorProperty = sparseTensor[propertyIndex]
+			sparseTensorProperty = sparseTensorProperty.coalesce()
+			values = sparseTensorProperty.values()
+			if values.numel() > 0: 
+				minVals = values.min()
+				maxVals = values.max()
+				normalisedValues = (values - minVals) / (maxVals - minVals + 1e-8)
+				normalisedSparseTensorProperty = pt.sparse_coo_tensor(sparseTensorProperty.indices(), normalisedValues, sparseTensorProperty.size(), device=sparseTensor.device)
+			else:
+				normalisedSparseTensorProperty = sparseTensorProperty
+			normalisedSparseTensorList.append(normalisedSparseTensorProperty)
+		normalisedSparseTensor = pt.stack(normalisedSparseTensorList, dim=0)
+	else:
+		sparseTensor = sparseTensor.coalesce()
+		values = sparseTensor.values()
+		if values.numel() > 0: 
+			minVals = values.min()
+			maxVals = values.max()
+			normalisedValues = (values - minVals) / (maxVals - minVals + 1e-8)
+			normalisedSparseTensor = pt.sparse_coo_tensor(sparseTensor.indices(), normalisedValues, sparseTensor.size(), device=sparseTensor.device)
+		else:
+			normalisedSparseTensor = sparseTensor
+	return normalisedSparseTensor
+
+def normaliseDenseTensor(tensor, dim=1):
+	#normalise from 0 to 1
+	reduce_dims = [d for d in range(tensor.ndim) if d > dim]
+	minVals = tensor.amin(dim=reduce_dims, keepdim=True)
+	maxVals = tensor.amax(dim=reduce_dims, keepdim=True)
+	normalisedTensor = (tensor - minVals) / (maxVals - minVals + 1e-8)
+	return normalisedTensor
+	
 if(inferencePredictiveNetworkIndependentFCpredictions):
 	def getTopkPredictionsC(outputsC):
 		with pt.no_grad():

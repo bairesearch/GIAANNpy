@@ -63,6 +63,9 @@ def nextWordPredictionMLPtrainStep(globalFeatureNeurons, targets, targetsC, targ
 	globalFeatureNeurons = globalFeatureNeurons.to(devicePredictiveNetworkModel)
 	globalFeatureNeurons = globalFeatureNeurons.to_dense()
 	
+	if(inferencePredictiveNetworkNormaliseInputs and useGPUpredictiveNetworkModel):
+		globalFeatureNeurons = GIAANNproto_predictiveNetworkOperations.normaliseDenseTensor(globalFeatureNeurons)
+	
 	if(inferencePredictiveNetworkIndependentFCpredictions):
 		outputsC, outputsF = model(globalFeatureNeurons) # Outputs shape: (batchSize, c, f)
 		lossC = criterionC(outputsC, targetsC)

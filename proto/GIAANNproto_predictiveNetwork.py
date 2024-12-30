@@ -27,6 +27,7 @@ if(inferencePredictiveNetwork):
 		import GIAANNproto_predictiveNetworkMLP
 	elif(inferencePredictiveNetworkModelTransformer):
 		import GIAANNproto_predictiveNetworkTransformer
+	import GIAANNproto_predictiveNetworkOperations
 import GIAANNproto_databaseNetworkDraw
 import GIAANNproto_sparseTensors
 
@@ -285,6 +286,12 @@ def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wor
 		globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivation]
 		if(transformerUseInputConnections):
 			globalFeatureConnections = databaseNetworkObject.globalFeatureConnections[arrayIndexPropertiesActivation]
+	
+	if(inferencePredictiveNetworkNormaliseInputs):
+		if(not useGPUpredictiveNetworkModel):
+			globalFeatureNeurons = GIAANNproto_predictiveNetworkOperations.normaliseSparseTensor(globalFeatureNeurons, inferencePredictiveNetworkUseInputAllProperties)
+		if(transformerUseInputConnections):	#globalFeatureConnections are currently retained on CPU
+			globalFeatureConnections = GIAANNproto_predictiveNetworkOperations.normaliseSparseTensor(globalFeatureConnections, inferencePredictiveNetworkUseInputAllProperties)
 			
 	if(inferencePredictiveNetworkModelMLP):
 		conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = GIAANNproto_predictiveNetworkMLP.nextWordPredictionMLPtrainStep(globalFeatureNeurons, targets, targetsC, targetsF)

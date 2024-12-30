@@ -35,7 +35,7 @@ if(useInference):
 	inferencePredictiveNetwork = True	#use MLP to predict next token	#orig:False
 	inferenceTrainPredictiveNetworkAllSentences = True	#support predictive network training on every sentence in corpus.	#precondition: expects database network to have been completely trained (with !useInference on all sentences)
 	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False	#incremental seeding is used to match the inference prediction phase algorithm (for consistency in activation method)	#requires inferenceSeedNetwork
-	inferenceUseNeuronFeaturePropertiesTime = False	#default:False	#orig:False		#FUTURE; else can use during train
+	inferenceUseNeuronFeaturePropertiesTime = True	#default:True	#orig:False		#FUTURE; else can use during train	#requires inferencePredictiveNetworkUseInputAllProperties
 	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	transformerUseInputConnections = False	#initialise (dependent var)
 	printPredictionsDuringInferencePredict = True	#default: True
@@ -44,6 +44,7 @@ if(useInference):
 		inferencePredictiveNetworkModelTransformer = False
 		inferenceSavePredictiveNetwork = False
 		inferencePredictiveNetworkIndependentFCpredictions = True	#required for large database network (else may require output MLP of shape c*f * c*f)
+		inferencePredictiveNetworkNormaliseInputs = True
 		if(inferenceTrainPredictiveNetworkAllSentences):
 			inferenceSavePredictiveNetwork = True
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False	#next token predictions are used to activate the next column features (rather than prediction targets)
@@ -52,10 +53,10 @@ if(useInference):
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True
 		if(inferencePredictiveNetworkModelMLP):
 			inferencePredictiveNetworkLearningRate = 0.0005	#default: 0.0005
-			inferencePredictiveNetworkUseInputAllProperties = False
+			inferencePredictiveNetworkUseInputAllProperties = False	#default: False
 		elif(inferencePredictiveNetworkModelTransformer):
 			inferencePredictiveNetworkLearningRate = 0.0005	#default: 0.0005	0.005
-			inferencePredictiveNetworkUseInputAllProperties = False
+			inferencePredictiveNetworkUseInputAllProperties = True	#default: True
 			transformerUseInputConnections = False	#incomplete	#optional
 			inferencePredictiveNetworkInitialiseWeightsNearZero = True	#help predictive model to learn faster (rely exclusively on input activation levels at start of training)
 			transformerOutputLayerUseEveryColumn = True	#default: True	#orig: False	#whether the output layer uses features from every column (or just the final column in the sequence)
@@ -86,7 +87,7 @@ if(useInference):
 	drawNetworkDuringInferencePredict = False	#True is only for debug
 	drawNetworkDuringInferenceSave = False	#True is only for debug
 else:
-	inferenceUseNeuronFeaturePropertiesTime = False
+	inferenceUseNeuronFeaturePropertiesTime = True	#required to initialise time part of inferencePredictiveNetworkUseInputAllProperties to 0
 	lowMem = False		 #default: False	#orig: True	#currently required to be False for inference compatibility	#optional
 	trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
 	trainSequenceObservedColumnsMatchSequenceWords = True	#optional	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sentence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
