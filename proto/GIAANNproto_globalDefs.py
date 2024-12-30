@@ -35,10 +35,9 @@ if(useInference):
 	inferencePredictiveNetwork = True	#use MLP to predict next token	#orig:False
 	inferenceTrainPredictiveNetworkAllSentences = True	#support predictive network training on every sentence in corpus.	#precondition: expects database network to have been completely trained (with !useInference on all sentences)
 	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False	#incremental seeding is used to match the inference prediction phase algorithm (for consistency in activation method)	#requires inferenceSeedNetwork
-	inferenceUseNeuronFeaturePropertiesTime = True	#default:False	#orig:False		#FUTURE; else can use during train
+	inferenceUseNeuronFeaturePropertiesTime = False	#default:False	#orig:False		#FUTURE; else can use during train
 	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	transformerUseInputConnections = False	#initialise (dependent var)
-	inferencePredictiveNetworkUseInputAllProperties = True	#default: True
 	printPredictionsDuringInferencePredict = True	#default: True
 	if(inferencePredictiveNetwork):
 		inferencePredictiveNetworkModelMLP = True
@@ -53,8 +52,10 @@ if(useInference):
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True
 		if(inferencePredictiveNetworkModelMLP):
 			inferencePredictiveNetworkLearningRate = 0.0005	#default: 0.0005
+			inferencePredictiveNetworkUseInputAllProperties = False
 		elif(inferencePredictiveNetworkModelTransformer):
 			inferencePredictiveNetworkLearningRate = 0.0005	#default: 0.0005	0.005
+			inferencePredictiveNetworkUseInputAllProperties = False
 			transformerUseInputConnections = False	#incomplete	#optional
 			inferencePredictiveNetworkInitialiseWeightsNearZero = True	#help predictive model to learn faster (rely exclusively on input activation levels at start of training)
 			transformerOutputLayerUseEveryColumn = True	#default: True	#orig: False	#whether the output layer uses features from every column (or just the final column in the sequence)

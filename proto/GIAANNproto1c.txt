@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1c20a;
+o1 preview prompt 1c20b;
 
 v1b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -152,3 +152,4 @@ MANUAL; - add option inferencePredictiveNetworkIndependentFCpredictions. patch G
 MANUAL; - add option transformerOutputLayerUseEveryColumn.
 MANUAL; - add option inferencePredictiveNetworkUseInputAllProperties. patch inferencePredictiveNetworkModelTransformer:process_column_inference_prediction - apply initial seed burst to global arrays (before creation of global activation arrays).
 MANUAL; - normalise variable naming scheme (o1/manual) - replace all snake_case names with lower camel case names.
+MANUAL; - disable inferencePredictiveNetworkUseInputAllProperties.
