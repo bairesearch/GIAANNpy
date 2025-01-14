@@ -124,6 +124,8 @@ def sliceSparseTensorMulti(sparseTensor, sliceDim, sliceIndices):
 	"""
 	import torch
 
+	sparseTensor = sparseTensor.coalesce()
+	
 	# Ensure sliceIndices is a 1D tensor and sorted
 	sliceIndices = sliceIndices.view(-1).long()
 	sliceIndicesSorted, _ = pt.sort(sliceIndices)

@@ -23,26 +23,21 @@ from GIAANNproto_globalDefs import *
 import GIAANNproto_databaseNetwork
 import GIAANNproto_databaseNetworkTrain
 if(inferencePredictiveNetwork):
-	if(inferencePredictiveNetworkModelMLP):
-		import GIAANNproto_predictiveNetworkMLP
-	elif(inferencePredictiveNetworkModelTransformer):
-		import GIAANNproto_predictiveNetworkTransformer
+	if(inferencePredictiveNetworkModel=="ColumnMLP"):
+		import GIAANNproto_predictiveNetworkModelColumnMLP as GIAANNproto_predictiveNetworkModel
+	elif(inferencePredictiveNetworkModel=="MLP"):
+		import GIAANNproto_predictiveNetworkModelMLP as GIAANNproto_predictiveNetworkModel
+	elif(inferencePredictiveNetworkModel=="Transformer"):
+		import GIAANNproto_predictiveNetworkModelTransformer as GIAANNproto_predictiveNetworkModel
 	import GIAANNproto_predictiveNetworkOperations
 import GIAANNproto_databaseNetworkDraw
 import GIAANNproto_sparseTensors
 
 def inferenceSavePredictiveNetwork():
-	if(inferencePredictiveNetworkModelMLP):
-		GIAANNproto_predictiveNetworkMLP.saveModel(predictiveNetworkFolder, predictiveNetworkFileName)
-	elif(inferencePredictiveNetworkModelTransformer):
-		GIAANNproto_predictiveNetworkTransformer.saveModel(predictiveNetworkFolder, predictiveNetworkFileName)
+	GIAANNproto_predictiveNetworkModel.saveModel(predictiveNetworkFolder, predictiveNetworkFileName)
 
 def initialisePredictiveNetwork(databaseNetworkObject):
-	if(inferencePredictiveNetworkModelMLP):
-		GIAANNproto_predictiveNetworkMLP.nextWordPredictionMLPcreate(databaseNetworkObject)
-	elif(inferencePredictiveNetworkModelTransformer):
-		GIAANNproto_predictiveNetworkTransformer.nextWordPredictionTransformerCreate(databaseNetworkObject)
-
+	GIAANNproto_predictiveNetworkModel.nextWordPredictionModelCreate(databaseNetworkObject)
 
 # Define the SequenceObservedColumnsInferencePrediction class
 class SequenceObservedColumnsInferencePrediction:
@@ -183,6 +178,8 @@ def processColumnInferencePrediction(sequenceObservedColumns, sentenceIndex, obs
 			globalFeatureNeuronsActivation = GIAANNproto_databaseNetworkTrain.decrementActivation(globalFeatureNeuronsActivation, activationDecrementPerPredictedToken)
 			if(transformerUseInputConnections):
 				globalFeatureConnectionsActivation = GIAANNproto_databaseNetworkTrain.decrementActivation(globalFeatureConnectionsActivation, activationDecrementPerPredictedToken)
+			if(inferenceUseNeuronFeaturePropertiesTime):
+				globalFeatureNeuronsTime = GIAANNproto_databaseNetworkTrain.decrementActivation(globalFeatureNeuronsTime, inferenceUseNeuronFeaturePropertiesTimeDecrement)
 				
 		#process features (activate global target neurons);
 		if(multipleSources):
@@ -210,12 +207,8 @@ def processColumnInferencePrediction(sequenceObservedColumns, sentenceIndex, obs
 			globalFeatureNeuronsActivationOrig = globalFeatureNeuronsActivation
 			globalFeatureNeuronsActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsActivation, indicesToUpdate, modifier, multiply=inferenceInvertNeuronActivationUponPrediction)
 			if(inferenceUseNeuronFeaturePropertiesTime):
-				previousActivationTime = sentenceIndex-1	#higher: neuron was more recently activated
-				globalFeatureNeuronsTime = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsTime, indicesToUpdate, previousActivationTime)
-			#compareSparseArrayDiff(globalFeatureNeuronsActivationOrig, globalFeatureNeuronsActivation)
+				globalFeatureNeuronsTime = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsTime, indicesToUpdate, inferenceUseNeuronFeaturePropertiesTimeActivate)	#higher: neuron was more recently activated
 			
-			#globalFeatureNeuronsActivation[conceptColumnsIndices, conceptColumnsFeatureIndices] = 0	
-
 		databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivation)
 		if(transformerUseInputConnections):
 			databaseNetworkObject.globalFeatureConnections = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureConnections, globalFeatureConnectionsActivation, arrayIndexPropertiesActivation)
@@ -292,11 +285,13 @@ def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wor
 			globalFeatureNeurons = GIAANNproto_predictiveNetworkOperations.normaliseSparseTensor(globalFeatureNeurons, inferencePredictiveNetworkUseInputAllProperties)
 		if(transformerUseInputConnections):	#globalFeatureConnections are currently retained on CPU
 			globalFeatureConnections = GIAANNproto_predictiveNetworkOperations.normaliseSparseTensor(globalFeatureConnections, inferencePredictiveNetworkUseInputAllProperties)
-			
-	if(inferencePredictiveNetworkModelMLP):
-		conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = GIAANNproto_predictiveNetworkMLP.nextWordPredictionMLPtrainStep(globalFeatureNeurons, targets, targetsC, targetsF)
-	elif(inferencePredictiveNetworkModelTransformer):
-		conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = GIAANNproto_predictiveNetworkTransformer.nextWordPredictionTransformerTrainStep(globalFeatureNeurons, globalFeatureConnections, targets, targetsC, targetsF)
+
+	if(inferencePredictiveNetworkModel=="ColumnMLP"):
+		conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = GIAANNproto_predictiveNetworkModel.nextWordPredictionColumnMLPtrainStep(globalFeatureNeurons, targets, targetsC, targetsF)
+	elif(inferencePredictiveNetworkModel=="MLP"):
+		conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = GIAANNproto_predictiveNetworkModel.nextWordPredictionMLPtrainStep(globalFeatureNeurons, targets, targetsC, targetsF)
+	elif(inferencePredictiveNetworkModel=="Transformer"):
+		conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = GIAANNproto_predictiveNetworkModel.nextWordPredictionTransformerTrainStep(globalFeatureNeurons, globalFeatureConnections, targets, targetsC, targetsF)
 
 	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		conceptColumnsIndicesNext = conceptColumnsIndicesPred
@@ -320,7 +315,7 @@ def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wor
 		
 	return conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSources, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
 
-
+		
 def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsDoc, lemmasDoc, wordPredictionIndex, sequenceWordIndex, conceptMask):
 	#generate targets;
 	multipleSources, previousColumnIndex, nextColumnIndex, targetFeatureIndex, conceptColumnsIndicesPrev, conceptColumnsFeatureIndicesPrev = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsDoc, lemmasDoc, conceptMask, sequenceWordIndex, kcNetwork)

@@ -32,7 +32,7 @@ numberEpochs = 1	#default: 1
 useSANI = False	#sequentially activated neuronal input (divide dendrites into segments)
 useInference = False  # useInference mode
 if(useInference):
-	inferencePredictiveNetwork = True	#use MLP to predict next token	#orig:False
+	inferencePredictiveNetwork = False	#use MLP to predict next token	#orig:False
 	inferenceTrainPredictiveNetworkAllSentences = True	#support predictive network training on every sentence in corpus.	#precondition: expects database network to have been completely trained (with !useInference on all sentences)
 	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False	#incremental seeding is used to match the inference prediction phase algorithm (for consistency in activation method)	#requires inferenceSeedNetwork
 	inferenceUseNeuronFeaturePropertiesTime = True	#default:True	#orig:False		#FUTURE; else can use during train	#requires inferencePredictiveNetworkUseInputAllProperties
@@ -40,8 +40,9 @@ if(useInference):
 	transformerUseInputConnections = False	#initialise (dependent var)
 	printPredictionsDuringInferencePredict = True	#default: True
 	if(inferencePredictiveNetwork):
-		inferencePredictiveNetworkModelMLP = True
-		inferencePredictiveNetworkModelTransformer = False
+		inferencePredictiveNetworkModel = "ColumnMLP"
+		#inferencePredictiveNetworkModel = "MLP"
+		#inferencePredictiveNetworkModel = "Transformer"
 		inferenceSavePredictiveNetwork = False
 		inferencePredictiveNetworkIndependentFCpredictions = True	#required for large database network (else may require output MLP of shape c*f * c*f)
 		inferencePredictiveNetworkNormaliseInputs = True
@@ -51,10 +52,17 @@ if(useInference):
 			numberEpochs = 1000	#default: 1	#10	#debug: 1000	#number of epochs to train predictive network
 		else:
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True
-		if(inferencePredictiveNetworkModelMLP):
+		if(inferencePredictiveNetworkModel=="ColumnMLP"):
+			inferencePredictiveNetworkLearningRate = 0.0005	#default: 0.0005
+			inferencePredictiveNetworkModelFilterColumnsK = 10	#only consider top k columns for prediction (prefilter)
+			inferencePredictiveNetworkUseInputAllProperties = True	#default: True
+			inferencePredictiveNetworkIndependentFCpredictions = True	#currently required
+			numberOfHiddenLayers = 2
+		elif(inferencePredictiveNetworkModel=="MLP"):
 			inferencePredictiveNetworkLearningRate = 0.0005	#default: 0.0005
 			inferencePredictiveNetworkUseInputAllProperties = False	#default: False
-		elif(inferencePredictiveNetworkModelTransformer):
+			numberOfHiddenLayers = 1
+		elif(inferencePredictiveNetworkModel=="Transformer"):
 			inferencePredictiveNetworkLearningRate = 0.0005	#default: 0.0005	0.005
 			inferencePredictiveNetworkUseInputAllProperties = True	#default: True
 			transformerUseInputConnections = False	#incomplete	#optional
@@ -96,7 +104,7 @@ else:
 	if(drawAllColumns):
 		assert not trainSequenceObservedColumnsUseSequenceFeaturesOnly
 	drawRelationTypes = True	#draw feature neuron and connection relation types in different colours
-	drawNetworkDuringTrain = True	#default: True
+	drawNetworkDuringTrain = True	#default: True	#disable if intend to use useInference:inferenceTrainPredictiveNetworkAllSentences after train 
 	drawNetworkDuringTrainSave = False
 	inferenceActivationFunction = False
 	
@@ -167,6 +175,9 @@ if(useInference):
 			inferenceDeactivateNeuronsUponPrediction = False #do not use inferenceDeactivateNeuronsUponPrediction as the predictive network needs a temporarily consistent trace of the activations in the network		
 		else:
 			inferenceDeactivateNeuronsUponPrediction = True
+		if(inferenceUseNeuronFeaturePropertiesTime):
+			inferenceUseNeuronFeaturePropertiesTimeActivate = 100	#max tokens remembered in sequence	#time is not reinitialised upon feature selection (deactivation)
+			inferenceUseNeuronFeaturePropertiesTimeDecrement = -1
 	else:
 		inferenceInvertNeuronActivationUponPrediction = False
 		inferenceDeactivateNeuronsUponPrediction = True

@@ -1,4 +1,4 @@
-"""GIAANNproto_predictiveNetworkMLP.py
+"""GIAANNproto_predictiveNetworkModelMLP.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024 Baxter AI (baxterai.com)
@@ -27,7 +27,7 @@ import torch.optim as optim
 from GIAANNproto_globalDefs import *
 import GIAANNproto_predictiveNetworkOperations
 
-def nextWordPredictionMLPcreate(databaseNetworkObject):
+def nextWordPredictionModelCreate(databaseNetworkObject):
 	global model, criterion, criterionC, criterionF, optimizer, batchSize
 
 	model = NextWordPredictionMLPmodel(databaseNetworkObject)
@@ -59,15 +59,20 @@ def nextWordPredictionMLPtrainStep(globalFeatureNeurons, targets, targetsC, targ
 	else:
 		targets = targets.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
 
-	globalFeatureNeurons = globalFeatureNeurons.unsqueeze(0)	#add batch dim	
 	globalFeatureNeurons = globalFeatureNeurons.to(devicePredictiveNetworkModel)
-	globalFeatureNeurons = globalFeatureNeurons.to_dense()
-	
+	globalFeatureNeurons = globalFeatureNeurons.to_dense()	#shape: (p, s, c, f) or (s, c, f)
+
 	if(inferencePredictiveNetworkNormaliseInputs and useGPUpredictiveNetworkModel):
-		globalFeatureNeurons = GIAANNproto_predictiveNetworkOperations.normaliseDenseTensor(globalFeatureNeurons)
-	
+		globalFeatureNeurons = GIAANNproto_predictiveNetworkOperations.normaliseDenseTensor(globalFeatureNeurons, dim=0)
+		
+	if(inferencePredictiveNetworkUseInputAllProperties):
+		globalFeatureNeurons = globalFeatureNeurons.reshape(globalFeatureNeurons.shape[2], globalFeatureNeurons.shape[0]*globalFeatureNeurons.shape[1]*globalFeatureNeurons.shape[3])
+	else:
+		globalFeatureNeurons = globalFeatureNeurons.reshape(globalFeatureNeurons.shape[1], globalFeatureNeurons.shape[0]*globalFeatureNeurons.shape[2])
+	globalFeatureNeurons = globalFeatureNeurons.unsqueeze(0)	#shape: (batchSize, c, inputSize)
+
 	if(inferencePredictiveNetworkIndependentFCpredictions):
-		outputsC, outputsF = model(globalFeatureNeurons) # Outputs shape: (batchSize, c, f)
+		outputsC, outputsF = model(globalFeatureNeurons) # Outputs shape: (batchSize, c), (batchSize, f)
 		lossC = criterionC(outputsC, targetsC)
 		lossF = criterionF(outputsF, targetsF)
 		loss = lossC + lossF  # Combine losses
@@ -99,7 +104,7 @@ class NextWordPredictionMLPmodel(nn.Module):
 		self.p = databaseNetworkObject.p
 		
 		if(inferencePredictiveNetworkUseInputAllProperties):
-			inputSize = databaseNetworkObject.s * databaseNetworkObject.c * databaseNetworkObject.f * databaseNetworkObject.p
+			inputSize = databaseNetworkObject.p * databaseNetworkObject.s * databaseNetworkObject.c * databaseNetworkObject.f
 			hiddenSizeMultiplier = 1	#default: 1	#TODO: requires testing
 		else:
 			inputSize = databaseNetworkObject.s * databaseNetworkObject.c * databaseNetworkObject.f
@@ -107,26 +112,38 @@ class NextWordPredictionMLPmodel(nn.Module):
 		outputSize = databaseNetworkObject.c * databaseNetworkObject.f
 		hiddenSize = inputSize * hiddenSizeMultiplier
 
-		self.fc1 = nn.Linear(inputSize, hiddenSize, device=devicePredictiveNetworkModel)
-		self.relu = nn.ReLU()
+		linearList = []
+		for l in range(numberOfHiddenLayers):
+			if(l == 0):
+				linear = nn.Linear(inputSize, hiddenSize, device=devicePredictiveNetworkModel)
+				linearList.append(linear)
+			else:
+				linear = nn.Linear(hiddenSize, hiddenSize, device=devicePredictiveNetworkModel)
+				linearList.append(linear)
+			relu = nn.ReLU()
+			linearList.append(relu)
+		self.linear = nn.ModuleList(linearList)
+		
 		if(inferencePredictiveNetworkIndependentFCpredictions):
-			self.fcC = nn.Linear(hiddenSize, self.c, device=devicePredictiveNetworkModel)
-			self.fcF = nn.Linear(hiddenSize, self.f, device=devicePredictiveNetworkModel)
+			self.linearOutC = nn.Linear(hiddenSize, self.c, device=devicePredictiveNetworkModel)
+			self.linearOutF = nn.Linear(hiddenSize, self.f, device=devicePredictiveNetworkModel)
 		else:
-			self.fc2 = nn.Linear(hiddenSize, outputSize, device=devicePredictiveNetworkModel)
+			self.linearOut = nn.Linear(hiddenSize, outputSize, device=devicePredictiveNetworkModel)
 	
 	def forward(self, x):
 		x = x.view(x.size(0), -1)	#Flatten the input: (batchSize, c, f) -> (batchSize, c*f)
-		out = self.fc1(x)
-		out = self.relu(out)
+		out = x
+		for layerIndex, layer in enumerate(self.linear):
+			out = layer(out)  # Shape: (kcNetwork, hiddenSize)
+
 		if(inferencePredictiveNetworkIndependentFCpredictions):
-			outC = self.fcC(out)  # Shape: (batchSize, c)
-			outF = self.fcF(out)  # Shape: (batchSize, f)
+			outC = self.linearOutC(out)  # Shape: (batchSize, c)
+			outF = self.linearOutF(out)  # Shape: (batchSize, f)
 			outC = outC.view(batchSize, self.c)
 			outF = outF.view(batchSize, self.f)
 			return outC, outF
 		else:
-			out = self.fc2(out)	#Output shape: (batchSize, c*f)
+			out = self.linearOut(out)	#Output shape: (batchSize, c*f)
 			out = out.view(batchSize, self.c, self.f)
 			return out
 

@@ -1,4 +1,4 @@
-"""GIAANNproto_predictiveNetworkTransformer.py
+"""GIAANNproto_predictiveNetworkModelTransformer.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024 Baxter AI (baxterai.com)
@@ -30,7 +30,7 @@ from GIAANNproto_globalDefs import *
 import GIAANNproto_predictiveNetworkOperations
 	
 
-def nextWordPredictionTransformerCreate(databaseNetworkObject):
+def nextWordPredictionModelCreate(databaseNetworkObject):
 	global model, criterion, criterionC, criterionF, optimizer, batchSize
 
 	numLayers = 1  #default: 3 # Number of transformer layers

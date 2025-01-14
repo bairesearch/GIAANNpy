@@ -1,0 +1,222 @@
+"""GIAANNproto_predictiveNetworkModelColumnMLP.py
+
+# Author:
+Richard Bruce Baxter - Copyright (c) 2024 Baxter AI (baxterai.com)
+
+# License:
+MIT License
+
+# Installation:
+see GIAANNproto_main.py
+
+# Usage:
+see GIAANNproto_main.py
+
+# Description:
+GIA ANN proto predictive Network Column MLP
+
+FUTURE: consider pytorch implementation for sparse tensors.
+
+"""
+
+import torch as pt
+import torch.nn as nn
+import torch.optim as optim
+
+
+from GIAANNproto_globalDefs import *
+import GIAANNproto_predictiveNetworkOperations
+import GIAANNproto_sparseTensors
+
+def nextWordPredictionModelCreate(databaseNetworkObject):
+	global model, criterion, criterionC, criterionF, optimizer, batchSize
+
+	model = NextWordPredictionColumnMLPmodel(databaseNetworkObject)
+	model = model.to(devicePredictiveNetworkModel)
+	model.train()  # set model to training mode
+
+	if(inferencePredictiveNetworkIndependentFCpredictions):
+		if(multipleTargets):
+			criterionC = nn.BCEWithLogitsLoss()
+			criterionF = nn.BCEWithLogitsLoss()
+		else:
+			criterionC = nn.MSELoss()
+			criterionF = nn.MSELoss()
+	else:
+		if(multipleTargets):
+			criterion = nn.BCEWithLogitsLoss()
+		else:
+			criterion = nn.MSELoss()
+			
+	optimizer = optim.Adam(model.parameters(), lr=inferencePredictiveNetworkLearningRate)
+	batchSize = 1
+
+def nextWordPredictionColumnMLPtrainStep(globalFeatureNeurons, targets, targetsC, targetsF):
+	#globalFeatureNeurons shape: kcnetwork, f
+	#conceptColumnsActivationTopkConceptsIndices shape: kcnetwork
+	
+	global model, criterion, optimizer, batchSize
+	
+	globalFeatureNeurons, conceptColumnsActivationTopkConceptsIndices = selectMostActiveColumns(globalFeatureNeurons, inferencePredictiveNetworkModelFilterColumnsK)
+
+	if(inferencePredictiveNetworkIndependentFCpredictions):
+		targetsC = targetsC.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
+		targetsF = targetsF.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
+	else:
+		targets = targets.unsqueeze(0).to(devicePredictiveNetworkModel)	#add batch dim
+	
+	#assume batch dimension is c dimension	#shape
+	globalFeatureNeurons = globalFeatureNeurons.to(devicePredictiveNetworkModel)
+	globalFeatureNeurons = globalFeatureNeurons.to_dense()	#shape: (p, s, inferencePredictiveNetworkModelFilterColumnsK, f) or (s, inferencePredictiveNetworkModelFilterColumnsK, f)
+	conceptColumnsActivationTopkConceptsIndices = conceptColumnsActivationTopkConceptsIndices.to(devicePredictiveNetworkModel)
+	
+	if(inferencePredictiveNetworkNormaliseInputs and useGPUpredictiveNetworkModel):
+		globalFeatureNeurons = GIAANNproto_predictiveNetworkOperations.normaliseDenseTensor(globalFeatureNeurons, dim=0)
+		
+	if(inferencePredictiveNetworkUseInputAllProperties):
+		globalFeatureNeurons = globalFeatureNeurons.reshape(globalFeatureNeurons.shape[2], globalFeatureNeurons.shape[0]*globalFeatureNeurons.shape[1]*globalFeatureNeurons.shape[3])	#shape: (inferencePredictiveNetworkModelFilterColumnsK, inputSize)
+	else:
+		globalFeatureNeurons = globalFeatureNeurons.reshape(globalFeatureNeurons.shape[1], globalFeatureNeurons.shape[0]*globalFeatureNeurons.shape[2])	#shape: (inferencePredictiveNetworkModelFilterColumnsK, inputSize)
+	
+	if(inferencePredictiveNetworkIndependentFCpredictions):	
+		'''
+		outputsCtop, outputsF = model(globalFeatureNeurons) # shape: (1), (batchSize, f)
+		outputsC = pt.zeros(model.c)  # shape: (c)
+		outputsC[conceptColumnsActivationTopkConceptsIndices[outputsCtop]] = 1
+		'''
+		outputsCNetwork, outputsF = model(globalFeatureNeurons) # shape: (inferencePredictiveNetworkModelFilterColumnsK), (f)
+		outputsC = pt.zeros(model.c, device=devicePredictiveNetworkModel)  # shape: (c)
+		outputsC.scatter_(dim=0, index=conceptColumnsActivationTopkConceptsIndices, src=outputsCNetwork)
+
+		outputsC = outputsC.unsqueeze(0)	#add batch dim
+		outputsF = outputsF.unsqueeze(0)	#add batch dim
+		lossC = criterionC(outputsC, targetsC)
+		lossF = criterionF(outputsF, targetsF)
+		loss = lossC + lossF  # Combine losses
+	else:	
+		outputsNetwork = model(globalFeatureNeurons)  # shape: (kcnetwork, f)
+		outputs = pt.zeros((model.c, model.f), device=devicePredictiveNetworkModel)  # shape: (c, f)
+		outputs.scatter_(dim=0, index=conceptColumnsActivationTopkConceptsIndices.unsqueeze(1).expand(-1, modelf.f), src=outputsNetwork)
+		
+		loss = criterion(outputs, targets)
+	
+	optimizer.zero_grad()
+	loss.backward()
+	optimizer.step()
+
+	lossValue = loss.item()
+	print("loss_value = ", lossValue)
+
+	if(inferencePredictiveNetworkIndependentFCpredictions):
+		topkC = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsC(outputsC)
+		topkF = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsF(outputsF)
+		return topkC, topkF
+	else:
+		topk = GIAANNproto_predictiveNetworkOperations.getTopkPredictions(outputs)
+		return topk
+	
+class NextWordPredictionColumnMLPmodel(nn.Module):
+	def __init__(self, databaseNetworkObject):
+		super(NextWordPredictionColumnMLPmodel, self).__init__()
+		self.s = databaseNetworkObject.s
+		self.c = databaseNetworkObject.c
+		self.f = databaseNetworkObject.f
+		self.p = databaseNetworkObject.p
+		
+		print("databaseNetworkObject.f = ", databaseNetworkObject.f)
+		print("databaseNetworkObject.p = ", databaseNetworkObject.p)
+		
+		if(inferencePredictiveNetworkUseInputAllProperties):
+			inputSize = databaseNetworkObject.p * databaseNetworkObject.s * databaseNetworkObject.f
+			hiddenSizeMultiplier = 1	#default: 1	#TODO: requires testing
+		else:
+			inputSize = databaseNetworkObject.s * databaseNetworkObject.f
+			hiddenSizeMultiplier = 2	#default: 2	#TODO: requires testing
+		outputSize = databaseNetworkObject.f
+		hiddenSize = inputSize * hiddenSizeMultiplier
+		self.hiddenSize = hiddenSize
+		
+		linearList = []
+		for l in range(numberOfHiddenLayers):
+			if(l == 0):
+				linear = nn.Linear(inputSize, hiddenSize, device=devicePredictiveNetworkModel)
+				linearList.append(linear)
+			else:
+				linear = nn.Linear(hiddenSize, hiddenSize, device=devicePredictiveNetworkModel)
+				linearList.append(linear)
+			relu = nn.ReLU()
+			linearList.append(relu)
+		self.linear = nn.ModuleList(linearList)
+		
+		if(inferencePredictiveNetworkIndependentFCpredictions):
+			self.linearOutC = nn.Linear(inferencePredictiveNetworkModelFilterColumnsK*hiddenSize, inferencePredictiveNetworkModelFilterColumnsK, device=devicePredictiveNetworkModel)
+			self.linearOutF = nn.Linear(hiddenSize, self.f, device=devicePredictiveNetworkModel)
+		else:
+			self.linearOut = nn.Linear(hiddenSize, outputSize, device=devicePredictiveNetworkModel)
+		
+	def forward(self, x):
+		# x Shape: (inferencePredictiveNetworkModelFilterColumnsK, f)	#assume batch dimension is c dimension
+
+		out = x
+		for layerIndex, layer in enumerate(self.linear):
+			#print("layerIndex = ", layerIndex)
+			#print("out.shape = ", out.shape)
+			out = layer(out)  # Shape: (inferencePredictiveNetworkModelFilterColumnsK, hiddenSize)
+			
+		if(inferencePredictiveNetworkIndependentFCpredictions):
+			outCollapsed = out.reshape(inferencePredictiveNetworkModelFilterColumnsK*self.hiddenSize)
+			outC = self.linearOutC(outCollapsed)  # Shape: (inferencePredictiveNetworkModelFilterColumnsK)
+			
+			#outCtop = pt.argmax(out, dim=0)	#performs max across all columns
+			outCtop = pt.argmax(outC)
+			inF = out[outCtop]	# Shape: (hiddenSize)
+			outF = self.linearOutF(inF)  # Shape: (f)
+
+			return outC, outF
+			#return outCtop, outF
+		else:
+			out = self.linearOut(out)	#Output shape: (inferencePredictiveNetworkModelFilterColumnsK, f)
+			return out
+
+
+def saveModel(model, path, filename="model.pt"):
+	# Ensure directory exists
+	os.makedirs(path, exist_ok=True)
+	
+	# Construct full filepath
+	filepath = os.path.join(path, filename)
+	
+	# Save the model state_dict
+	pt.save(model.state_dict(), filepath)
+	return filepath
+
+
+def loadModel(model, filepath, map_location=None):
+	# Load state_dict from file
+	stateDict = pt.load(filepath, map_location=map_location)
+	
+	# Load the state_dict into the model
+	model.load_state_dict(stateDict)
+	
+	return model
+
+def selectMostActiveColumns(globalFeatureNeurons, kc):
+	if(inferencePredictiveNetworkUseInputAllProperties):
+		globalFeatureNeuronsActivation = globalFeatureNeurons[arrayIndexPropertiesActivation]
+		cDim = 2
+	else:
+		globalFeatureNeuronsActivation = globalFeatureNeurons
+		cDim = 1
+		
+	globalFeatureNeuronsActivationAllSegments = pt.sum(globalFeatureNeuronsActivation, dim=0)	#sum across all segments 	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
+
+	#topk column selection;
+	conceptColumnsActivation = pt.sum(globalFeatureNeuronsActivationAllSegments, dim=1)	#sum across all feature activations in columns
+	conceptColumnsActivation = conceptColumnsActivation.to_dense()	#convert to dense tensor (required for topk)
+	conceptColumnsActivationTopkConcepts = pt.topk(conceptColumnsActivation, kc)
+	conceptColumnsActivationTopkConceptsIndices = conceptColumnsActivationTopkConcepts.indices
+	
+	globalFeatureNeuronsFilteredColumns = GIAANNproto_sparseTensors.sliceSparseTensorMulti(globalFeatureNeurons, cDim, conceptColumnsActivationTopkConceptsIndices)	#select topk concept indices
+	
+	return globalFeatureNeuronsFilteredColumns, conceptColumnsActivationTopkConceptsIndices
+

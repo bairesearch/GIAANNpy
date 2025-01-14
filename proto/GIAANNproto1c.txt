@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1c21a;
+o1 preview prompt 1c22a;
 
 v1b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -154,3 +154,7 @@ MANUAL; - add option inferencePredictiveNetworkUseInputAllProperties. patch infe
 MANUAL; - normalise variable naming scheme (o1/manual) - replace all snake_case names with lower camel case names.
 MANUAL; - disable inferencePredictiveNetworkUseInputAllProperties.
 MANUAL; - add inferencePredictiveNetworkNormaliseInputs.
+MANUAL; - update inferenceUseNeuronFeaturePropertiesTime to set a max time inferenceUseNeuronFeaturePropertiesTimeActivate upon feature activation, and decrement by inferenceUseNeuronFeaturePropertiesTimeDecrement every sentence.
+MANUAL; - start GIAANNproto_predictiveNetworkModelColumnMLP to first filter topk columns by summed feature activation level, then apply the same MLP prediction algorithm to every column independently, before selecting final columns/features.
+MANUAL; - rename predictive network model fc to linear. rename GIAANNproto_predictiveNetworkMLP/Transformer to GIAANNproto_predictiveNetworkModelMLP/Transformer.
+MANUAL; - patch nextWordPredictionMLPtrainStep - explicitly reshape tensors before feeding to model. update nextWordPredictionMLPtrainStep - execute normaliseDenseTensor(globalFeatureNeurons, dim=0), before adding batch dim.
