@@ -35,7 +35,6 @@ if(useInference):
 	inferencePredictiveNetwork = False	#use MLP to predict next token	#orig:False
 	inferenceTrainPredictiveNetworkAllSentences = True	#support predictive network training on every sentence in corpus.	#precondition: expects database network to have been completely trained (with !useInference on all sentences)
 	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False	#incremental seeding is used to match the inference prediction phase algorithm (for consistency in activation method)	#requires inferenceSeedNetwork
-	inferenceUseNeuronFeaturePropertiesTime = True	#default:True	#orig:False		#FUTURE; else can use during train	#requires inferencePredictiveNetworkUseInputAllProperties
 	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	transformerUseInputConnections = False	#initialise (dependent var)
 	printPredictionsDuringInferencePredict = True	#default: True
@@ -46,6 +45,7 @@ if(useInference):
 		inferenceSavePredictiveNetwork = False
 		inferencePredictiveNetworkIndependentFCpredictions = True	#required for large database network (else may require output MLP of shape c*f * c*f)
 		inferencePredictiveNetworkNormaliseInputs = True
+		inferenceUseNeuronFeaturePropertiesTime = True	#default:True	#orig:False		#FUTURE; else can use during train	#requires inferencePredictiveNetworkUseInputAllProperties
 		if(inferenceTrainPredictiveNetworkAllSentences):
 			inferenceSavePredictiveNetwork = True
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False	#next token predictions are used to activate the next column features (rather than prediction targets)
@@ -69,6 +69,7 @@ if(useInference):
 			inferencePredictiveNetworkInitialiseWeightsNearZero = True	#help predictive model to learn faster (rely exclusively on input activation levels at start of training)
 			transformerOutputLayerUseEveryColumn = True	#default: True	#orig: False	#whether the output layer uses features from every column (or just the final column in the sequence)
 	else:
+		inferenceUseNeuronFeaturePropertiesTime = False
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default:True #currently mandatory (only implementation available)	#False is only for debug
 	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		inferenceSeedNetwork = True	#default: True
@@ -192,10 +193,8 @@ if(useInference):
 	
 	if(inferenceSeedNetwork):
 		numSeedTokens = 5	#number of seed tokens in last sentence of inference prompt (remaining tokens will be prediction tokens)
-		numPredictionTokens = 10	#number of words to predict after network seed
 	else:
 		numSeedTokens = 0
-		numPredictionTokens = None	#sentence length
 	
 	if(debugConceptFeaturesOccurFirstInSubsequence):
 		kcNetwork = 1	#number of topk columns to target

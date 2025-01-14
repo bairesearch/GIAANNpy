@@ -116,6 +116,9 @@ def processSentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
 	observedColumnsSequenceWordIndexDict = {}  # key: sequence word index, value: ObservedColumn
 	
 	if(useInference and (inferenceTrainPredictiveNetworkAllSentences or lastSentenceInPrompt)):
+		if(lastSentenceInPrompt):
+			if(numSeedTokens >= len(doc)):
+				return
 		docSeed = doc[0:numSeedTokens]	#prompt
 		docPredict = doc[numSeedTokens:]
 
@@ -135,7 +138,7 @@ def processSentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
 
 		if(useInference and (inferenceTrainPredictiveNetworkAllSentences or lastSentenceInPrompt)):
 			# Process each concept word in the sequence (predict)
-			GIAANNproto_predictiveNetwork.processConceptWordsInference(sequenceObservedColumns, sentenceCount, doc, docSeed, docPredict, numSeedTokens, numPredictionTokens)
+			GIAANNproto_predictiveNetwork.processConceptWordsInference(sequenceObservedColumns, sentenceCount, doc, docSeed, docPredict, numSeedTokens)
 		else:
 			# Process each concept word in the sequence (train)
 			GIAANNproto_databaseNetworkTrain.processConceptWords(sequenceObservedColumns, sentenceCount, doc, words, lemmas, posTags)

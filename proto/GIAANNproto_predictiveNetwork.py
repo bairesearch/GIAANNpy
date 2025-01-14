@@ -83,7 +83,7 @@ def seedNetwork(sequenceObservedColumns, sentenceIndex, doc, firstSeedTokenIndex
 		GIAANNproto_databaseNetworkDraw.visualize_graph(sequenceObservedColumns, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(firstSeedTokenIndex))
 
 
-def processConceptWordsInference(sequenceObservedColumns, sentenceIndex, doc, docSeed, docPredict, numSeedTokens, numPredictionTokens):
+def processConceptWordsInference(sequenceObservedColumns, sentenceIndex, doc, docSeed, docPredict, numSeedTokens):
 
 	print("processConceptWordsInference:")
 
@@ -106,8 +106,8 @@ def processConceptWordsInference(sequenceObservedColumns, sentenceIndex, doc, do
 		if(not inferenceSeedTargetActivationsGlobalFeatureArrays):
 			# Update observed columns from sequence observed columns
 			sequenceObservedColumns.updateObservedColumnsWrapper()	#convert sequence observed columns feature neuron arrays back to global feature neuron arrays
-	else:
-		numPredictionTokens = len(docPredict)	#set numPredictionTokens (dynamic) 
+	
+	numPredictionTokens = len(docPredict)	#set numPredictionTokens (dynamic)
 	
 	if(inferencePredictiveNetwork and not inferenceTrainPredictiveNetworkAllSentences):
 		initialisePredictiveNetwork(sequenceObservedColumns.databaseNetworkObject)
@@ -240,7 +240,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sentenceIndex, obs
 			else:
 				predictedWord = databaseNetworkObject.conceptFeaturesList[observedColumnFeatureIndex]
 			targetWord = wordsDoc[sequenceWordIndex]
-			print("\t columnName = ", columnName, ", sequenceWordIndex = ", sequenceWordIndex, ", wordPredictionIndex = ", wordPredictionIndex, ", targetWord = ", targetWord, ", predictedWord = ", predictedWord)
+			print("\t sequenceWordIndex = ", sequenceWordIndex, ", wordPredictionIndex = ", wordPredictionIndex, ", targetWord = ", targetWord, ", predictedWord = ", predictedWord, ", predicted columnName = ", columnName)
 			if(targetWord == predictedWord):
 				featurePredictionTargetMatch = True
 	
