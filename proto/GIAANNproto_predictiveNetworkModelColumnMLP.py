@@ -88,6 +88,9 @@ def nextWordPredictionColumnMLPtrainStep(globalFeatureNeurons, targets, targetsC
 		outputsC = pt.zeros(model.c, device=devicePredictiveNetworkModel)  # shape: (c)
 		outputsC.scatter_(dim=0, index=conceptColumnsActivationTopkConceptsIndices, src=outputsCNetwork)
 
+		#print("outputsC = ", outputsC)
+		#print("outputsF = ", outputsF)
+	
 		outputsC = outputsC.unsqueeze(0)	#add batch dim
 		outputsF = outputsF.unsqueeze(0)	#add batch dim
 		lossC = criterionC(outputsC, targetsC)
@@ -118,20 +121,21 @@ def nextWordPredictionColumnMLPtrainStep(globalFeatureNeurons, targets, targetsC
 class NextWordPredictionColumnMLPmodel(nn.Module):
 	def __init__(self, databaseNetworkObject):
 		super(NextWordPredictionColumnMLPmodel, self).__init__()
+		self.p = databaseNetworkObject.p
 		self.s = databaseNetworkObject.s
 		self.c = databaseNetworkObject.c
 		self.f = databaseNetworkObject.f
-		self.p = databaseNetworkObject.p
 		
-		print("databaseNetworkObject.f = ", databaseNetworkObject.f)
 		print("databaseNetworkObject.p = ", databaseNetworkObject.p)
+		print("databaseNetworkObject.c = ", databaseNetworkObject.c)
+		print("databaseNetworkObject.f = ", databaseNetworkObject.f)
 		
 		if(inferencePredictiveNetworkUseInputAllProperties):
 			inputSize = databaseNetworkObject.p * databaseNetworkObject.s * databaseNetworkObject.f
-			hiddenSizeMultiplier = 1	#default: 1	#TODO: requires testing
+			hiddenSizeMultiplier = 4	#default: 1	#TODO: requires testing
 		else:
 			inputSize = databaseNetworkObject.s * databaseNetworkObject.f
-			hiddenSizeMultiplier = 2	#default: 2	#TODO: requires testing
+			hiddenSizeMultiplier = 8	#default: 2	#TODO: requires testing
 		outputSize = databaseNetworkObject.f
 		hiddenSize = inputSize * hiddenSizeMultiplier
 		self.hiddenSize = hiddenSize
@@ -149,7 +153,8 @@ class NextWordPredictionColumnMLPmodel(nn.Module):
 		self.linear = nn.ModuleList(linearList)
 		
 		if(inferencePredictiveNetworkIndependentFCpredictions):
-			self.linearOutC = nn.Linear(inferencePredictiveNetworkModelFilterColumnsK*hiddenSize, inferencePredictiveNetworkModelFilterColumnsK, device=devicePredictiveNetworkModel)
+			#self.linearOutC = nn.Linear(inferencePredictiveNetworkModelFilterColumnsK*hiddenSize, inferencePredictiveNetworkModelFilterColumnsK, device=devicePredictiveNetworkModel)
+			self.linearOutC = nn.Linear(self.hiddenSize, 1, bias=True, device=devicePredictiveNetworkModel)	
 			self.linearOutF = nn.Linear(hiddenSize, self.f, device=devicePredictiveNetworkModel)
 		else:
 			self.linearOut = nn.Linear(hiddenSize, outputSize, device=devicePredictiveNetworkModel)
@@ -159,21 +164,17 @@ class NextWordPredictionColumnMLPmodel(nn.Module):
 
 		out = x
 		for layerIndex, layer in enumerate(self.linear):
-			#print("layerIndex = ", layerIndex)
-			#print("out.shape = ", out.shape)
 			out = layer(out)  # Shape: (inferencePredictiveNetworkModelFilterColumnsK, hiddenSize)
-			
+		
 		if(inferencePredictiveNetworkIndependentFCpredictions):
-			outCollapsed = out.reshape(inferencePredictiveNetworkModelFilterColumnsK*self.hiddenSize)
-			outC = self.linearOutC(outCollapsed)  # Shape: (inferencePredictiveNetworkModelFilterColumnsK)
+			scoresC = self.linearOutC(out).squeeze(-1)	# shape: (inferencePredictiveNetworkModelFilterColumnsK)
+			outC = pt.softmax(scoresC, dim=0)  # shape: (inferencePredictiveNetworkModelFilterColumnsK)
 			
-			#outCtop = pt.argmax(out, dim=0)	#performs max across all columns
-			outCtop = pt.argmax(outC)
-			inF = out[outCtop]	# Shape: (hiddenSize)
-			outF = self.linearOutF(inF)  # Shape: (f)
+			# Weighted combination of all columns
+			inF = (out * outC.unsqueeze(1)).sum(dim=0)         # shape: (hiddenSize)
+			outF = self.linearOutF(inF)            # shape: (f)
 
 			return outC, outF
-			#return outCtop, outF
 		else:
 			out = self.linearOut(out)	#Output shape: (inferencePredictiveNetworkModelFilterColumnsK, f)
 			return out

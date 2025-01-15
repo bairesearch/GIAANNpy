@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1c22b;
+o1 preview prompt 1c22c;
 
 v1b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -159,3 +159,4 @@ MANUAL; - start GIAANNproto_predictiveNetworkModelColumnMLP to first filter topk
 MANUAL; - rename predictive network model fc to linear. rename GIAANNproto_predictiveNetworkMLP/Transformer to GIAANNproto_predictiveNetworkModelMLP/Transformer.
 MANUAL; - patch nextWordPredictionMLPtrainStep - explicitly reshape tensors before feeding to model. update nextWordPredictionMLPtrainStep - execute normaliseDenseTensor(globalFeatureNeurons, dim=0), before adding batch dim.
 MANUAL; - patch useInference:!inferenceTrainPredictiveNetworkAllSentences - set numPredictionTokens dynamically. if numSeedTokens >= len(sentence), ignore sentence.
+/MANUAL; - replace GIAANNproto_predictiveNetworkModelColumnMLP argmax with softmax.

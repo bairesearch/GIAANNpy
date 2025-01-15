@@ -32,7 +32,7 @@ numberEpochs = 1	#default: 1
 useSANI = False	#sequentially activated neuronal input (divide dendrites into segments)
 useInference = False  # useInference mode
 if(useInference):
-	inferencePredictiveNetwork = False	#use MLP to predict next token	#orig:False
+	inferencePredictiveNetwork = True	#use MLP to predict next token	#orig:False
 	inferenceTrainPredictiveNetworkAllSentences = True	#support predictive network training on every sentence in corpus.	#precondition: expects database network to have been completely trained (with !useInference on all sentences)
 	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False	#incremental seeding is used to match the inference prediction phase algorithm (for consistency in activation method)	#requires inferenceSeedNetwork
 	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
@@ -54,10 +54,10 @@ if(useInference):
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True
 		if(inferencePredictiveNetworkModel=="ColumnMLP"):
 			inferencePredictiveNetworkLearningRate = 0.0005	#default: 0.0005
-			inferencePredictiveNetworkModelFilterColumnsK = 10	#only consider top k columns for prediction (prefilter)
+			inferencePredictiveNetworkModelFilterColumnsK = 50	#only consider top k columns for prediction (prefilter)
 			inferencePredictiveNetworkUseInputAllProperties = True	#default: True
 			inferencePredictiveNetworkIndependentFCpredictions = True	#currently required
-			numberOfHiddenLayers = 2
+			numberOfHiddenLayers = 1
 		elif(inferencePredictiveNetworkModel=="MLP"):
 			inferencePredictiveNetworkLearningRate = 0.0005	#default: 0.0005
 			inferencePredictiveNetworkUseInputAllProperties = False	#default: False
