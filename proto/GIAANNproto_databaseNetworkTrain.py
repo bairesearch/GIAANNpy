@@ -459,7 +459,7 @@ def processFeatures(sequenceObservedColumns, sentenceIndex, startIndices, endInd
 	else:
 		sequenceConceptIndexMask = None
 	if(useSANI):
-		featureNeuronsSegmentMask = pt.zeros((cs, arrayNumberOfSegments), dtype=arrayType)
+		featureNeuronsSegmentMask = pt.zeros((cs, arrayNumberOfSegments), dtype=arrayType)	#note this mask is for permanence updates (it assumes that the network has been constructed with forward column connections only)
 	else:
 		featureNeuronsSegmentMask = pt.ones((cs, arrayNumberOfSegments), dtype=arrayType)
 	
@@ -472,16 +472,15 @@ def processFeatures(sequenceObservedColumns, sentenceIndex, startIndices, endInd
 			sequenceConceptIndex = sequenceObservedColumns.conceptNameToIndex[conceptLemma] 
 				
 		if(useSANI):
-			numberOfSegments = min(arrayNumberOfSegments-1, i)
+			numberOfSegments = min(arrayNumberOfSegments, i+1)
 			featureNeuronsSegmentMask[sequenceConceptIndex, :] = pt.cat([pt.zeros(arrayNumberOfSegments-numberOfSegments), pt.ones(numberOfSegments)], dim=0)
-			minSequentialSegmentIndex = min(0, arrayNumberOfSegments-sequenceConceptIndex-1)
+			minSequentialSegmentIndex = max(0, arrayNumberOfSegments-sequenceConceptIndex-1)
 			activeSequentialSegments = pt.arange(minSequentialSegmentIndex, arrayNumberOfSegments, 1)
-		
 		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly and trainSequenceObservedColumnsMatchSequenceWords):
 			if(useSANI):
 				featureNeuronsActive[activeSequentialSegments, sequenceConceptIndex, startIndices[sequenceConceptIndex]:endIndices[sequenceConceptIndex]] = 1
 			else:
-				featureNeuronsActive[0, sequenceConceptIndex, startIndices[sequenceConceptIndex]:endIndices[sequenceConceptIndex]] = 1
+				featureNeuronsActive[arrayIndexSegmentFirst, sequenceConceptIndex, startIndices[sequenceConceptIndex]:endIndices[sequenceConceptIndex]] = 1
 			columnsWordOrder[sequenceConceptIndex] = sequenceConceptIndex
 			sequenceConceptIndexMask[:, sequenceConceptWordIndex] = 0
 			sequenceConceptIndexMask[sequenceConceptIndex, sequenceConceptWordIndex] = 1
@@ -504,17 +503,18 @@ def processFeatures(sequenceObservedColumns, sentenceIndex, startIndices, endInd
 					if(useSANI):
 						featureNeuronsActive[activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
 					else:
-						featureNeuronsActive[0, sequenceConceptIndex, sequenceFeatureIndex] = 1
+						featureNeuronsActive[arrayIndexSegmentFirst, sequenceConceptIndex, sequenceFeatureIndex] = 1
 				elif(featureWord in sequenceObservedColumns.featureWordToIndex):
 					sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[featureWord]
 					if(useSANI):
 						featureNeuronsActive[activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
 					else:
-						featureNeuronsActive[0, sequenceConceptIndex, sequenceFeatureIndex] = 1
+						featureNeuronsActive[arrayIndexSegmentFirst, sequenceConceptIndex, sequenceFeatureIndex] = 1
 				featureNeuronsWordOrder[sequenceConceptIndex, sequenceFeatureIndex] = j
 				featureNeuronsPos[sequenceConceptIndex, sequenceFeatureIndex] = featurePos
 	
-	featureNeuronsSegmentMask = featureNeuronsSegmentMask.swapdims(0, 1)
+	featureNeuronsSegmentMask = featureNeuronsSegmentMask.swapdims(0, 1)	#swap from dims [c, s] to [s, c] (in line with featureNeuronsActive)
+	#print("featureNeuronsSegmentMask = ", featureNeuronsSegmentMask)	
 	
 	if(train):
 		processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sentenceIndex)
@@ -728,6 +728,7 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs):
 	featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, cs), dtype=pt.bool)
 	featureConnectionsSegmentMask = featureConnectionsSegmentMask.scatter_(0, connectionsSegmentIndex.unsqueeze(0), True)
 	featureConnectionsSegmentMask = featureConnectionsSegmentMask.view(arrayNumberOfSegments, cs, 1, cs, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
+	
 	featureConnectionsActive = featureConnectionsSegmentMask * featureConnectionsActive.unsqueeze(0)
 	
 	return featureConnectionsActive, featureConnectionsSegmentMask

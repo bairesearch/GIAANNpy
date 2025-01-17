@@ -84,6 +84,8 @@ def processDataset(dataset):
 
 def processArticle(text, articleIndex):
 	#sentences = sent_tokenize(text)
+	if(ignoreNewlineCharacters):
+		text = text.replace('\n', ' ')
 	sentences = nlp(text)
 	numberOfSentences = len(list(sentences.sents))
 	for sentenceIndex, sentence in enumerate(sentences.sents):
@@ -169,7 +171,7 @@ def firstPass(doc):
 		word = token.text.lower()
 		lemma = token.lemma_.lower()
 		pos = token.pos_  # Part-of-speech tag
-
+		
 		if usePOS:
 			if pos in nounPosTags:
 				# Only assign unique concept columns for nouns

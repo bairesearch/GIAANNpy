@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1c22d;
+o1 preview prompt 1c23a;
 
 v1b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -162,3 +162,5 @@ MANUAL; - patch useInference:!inferenceTrainPredictiveNetworkAllSentences - set 
 /MANUAL; - replace GIAANNproto_predictiveNetworkModelColumnMLP argmax with softmax.
 MANUAL; - add option inferencePredictiveNetworkModelFilterColumnsKmax - update selectMostActiveColumns to filter columns by max column activation (sparse_rowwise_max) rather than sum column activation. 
 MANUAL; - add option inferenceRetainActivationsAcrossMultipleSentences - retain activations across sentences such that these can be used during training/inference.
+MANUAL; - patch processFeatures:activeSequentialSegments to ensure positive; set minSequentialSegmentIndex = max(0, arrayNumberOfSegments-sequenceConceptIndex-1). patch processFeatures:featureNeuronsSegmentMask to include all segments receiving forward connections; set numberOfSegments = min(arrayNumberOfSegments, i+1).
+MANUAL; - add ignoreNewlineCharacters - ignore new line characters (do not parse).
