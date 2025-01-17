@@ -1,7 +1,7 @@
 """GIAANNproto_sparseTensors.py
 
 # Author:
-Richard Bruce Baxter - Copyright (c) 2024 Baxter AI (baxterai.com)
+Richard Bruce Baxter - Copyright (c) 2024-2025 Baxter AI (baxterai.com)
 
 # License:
 MIT License
@@ -448,3 +448,28 @@ def addElementValueToSparseTensor(spTensor, dimensions, v):
 		spTensor = pt.sparse_coo_tensor(newIndices, newValues, spTensor.shape, device=spTensor.device).coalesce()
 
 	return spTensor
+
+def sparse_rowwise_max(x):
+	"""
+	Computes max over dim=1 (columns) for a 2D sparse COO tensor 'x'.
+	Returns a 1D tensor of size [x.size(0)] with the max values.
+	"""
+
+	# Make sure the tensor is in COO format and has unique indices
+	x = x.coalesce()
+
+	# Extract COO indices and values
+	indices = x._indices()  # shape: [2, nnz]
+	values  = x._values()   # shape: [nnz]
+
+	# Row indices (which row each non-zero belongs to)
+	row_idx = indices[0]
+
+	# Initialize output with -inf so we can do a max-reduction
+	out = pt.full((x.size(0),), float('-inf'), dtype=values.dtype, device=values.device)
+
+	# Use index_reduce_ (available in newer PyTorch versions) to compute max
+	out.index_reduce_(dim=0, index=row_idx, source=values, reduce="amax")
+
+	return out
+

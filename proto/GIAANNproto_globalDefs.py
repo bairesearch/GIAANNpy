@@ -1,7 +1,7 @@
 """GIAANNproto_globalDefs.py
 
 # Author:
-Richard Bruce Baxter - Copyright (c) 2024 Baxter AI (baxterai.com)
+Richard Bruce Baxter - Copyright (c) 2024-2025 Baxter AI (baxterai.com)
 
 # License:
 MIT License
@@ -47,6 +47,7 @@ if(useInference):
 		inferencePredictiveNetworkNormaliseInputs = True
 		inferenceUseNeuronFeaturePropertiesTime = True	#default:True	#orig:False		#FUTURE; else can use during train	#requires inferencePredictiveNetworkUseInputAllProperties
 		if(inferenceTrainPredictiveNetworkAllSentences):
+			inferenceRetainActivationsAcrossMultipleSentences = False	#default: False	#retain activations across sentences such that these can be used during training/inference
 			inferenceSavePredictiveNetwork = True
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False	#next token predictions are used to activate the next column features (rather than prediction targets)
 			numberEpochs = 1000	#default: 1	#10	#debug: 1000	#number of epochs to train predictive network
@@ -54,7 +55,9 @@ if(useInference):
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True
 		if(inferencePredictiveNetworkModel=="ColumnMLP"):
 			inferencePredictiveNetworkLearningRate = 0.0005	#default: 0.0005
-			inferencePredictiveNetworkModelFilterColumnsK = 50	#only consider top k columns for prediction (prefilter)
+			inferencePredictiveNetworkModelFilterColumnsK = max(5, maxSentences//10)	#max(5, maxSentences//10)	#heuristic: int(c/10)	#5	#10	#50		#only consider top k columns for prediction (prefilter)
+			print("inferencePredictiveNetworkModelFilterColumnsK = ", inferencePredictiveNetworkModelFilterColumnsK)
+			inferencePredictiveNetworkModelFilterColumnsKmax = True	#filter columns by max column activation rather than sum column activation.
 			inferencePredictiveNetworkUseInputAllProperties = True	#default: True
 			inferencePredictiveNetworkIndependentFCpredictions = True	#currently required
 			numberOfHiddenLayers = 1
@@ -177,7 +180,7 @@ if(useInference):
 		else:
 			inferenceDeactivateNeuronsUponPrediction = True
 		if(inferenceUseNeuronFeaturePropertiesTime):
-			inferenceUseNeuronFeaturePropertiesTimeActivate = 100	#max tokens remembered in sequence	#time is not reinitialised upon feature selection (deactivation)
+			inferenceUseNeuronFeaturePropertiesTimeActivate = 100	#default: 100 #max tokens remembered in sequence	#time is not reinitialised upon feature selection (deactivation)
 			inferenceUseNeuronFeaturePropertiesTimeDecrement = -1
 	else:
 		inferenceInvertNeuronActivationUponPrediction = False

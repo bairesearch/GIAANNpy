@@ -1,7 +1,7 @@
 """GIAANNproto_predictiveNetwork.py
 
 # Author:
-Richard Bruce Baxter - Copyright (c) 2024 Baxter AI (baxterai.com)
+Richard Bruce Baxter - Copyright (c) 2024-2025 Baxter AI (baxterai.com)
 
 # License:
 MIT License
@@ -117,7 +117,7 @@ def processConceptWordsInference(sequenceObservedColumns, sentenceIndex, doc, do
 		kcMax = kcNetwork
 	else:
 		kcMax = 1	#not used
-	multipleSources, previousColumnIndex, nextColumnIndex, targetFeatureIndex, conceptColumnsIndices, conceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsDoc, lemmasDoc, conceptMask, 0, kcMax)
+	multipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, conceptColumnsIndices, conceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsDoc, lemmasDoc, conceptMask, 0, kcMax)
 	observedColumnsDict = sequenceObservedColumns.observedColumnsDict  # key: lemma, value: ObservedColumn	#every observed column in inference (seed and prediction phases)
 	
 	#predict next tokens;
@@ -223,9 +223,9 @@ def processColumnInferencePrediction(sequenceObservedColumns, sentenceIndex, obs
 		print("globalFeatureNeuronsTemp = ", globalFeatureNeuronsTemp)
 
 	if(inferencePredictiveNetwork):
-		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSources, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wordsDoc, lemmasDoc, wordPredictionIndex, sequenceWordIndex, conceptMask)	
+		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wordsDoc, lemmasDoc, wordPredictionIndex, sequenceWordIndex, conceptMask)	
 	else:
-		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSources, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsDoc, lemmasDoc, wordPredictionIndex, sequenceWordIndex, conceptMask)
+		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsDoc, lemmasDoc, wordPredictionIndex, sequenceWordIndex, conceptMask)
 	
 	featurePredictionTargetMatch = False
 	if(printPredictionsDuringInferencePredict):
@@ -239,8 +239,15 @@ def processColumnInferencePrediction(sequenceObservedColumns, sentenceIndex, obs
 				predictedWord = columnName
 			else:
 				predictedWord = databaseNetworkObject.conceptFeaturesList[observedColumnFeatureIndex]
+			predictedColumnName = columnName
+			
 			targetWord = wordsDoc[sequenceWordIndex]
-			print("\t sequenceWordIndex = ", sequenceWordIndex, ", wordPredictionIndex = ", wordPredictionIndex, ", targetWord = ", targetWord, ", predictedWord = ", predictedWord, ", predicted columnName = ", columnName)
+			if(targetMultipleSources):
+				targetColumnName = databaseNetworkObject.conceptColumnsList[targetPreviousColumnIndex] + "/" + databaseNetworkObject.conceptColumnsList[targetNextColumnIndex]
+			else:
+				targetColumnName = databaseNetworkObject.conceptColumnsList[targetPreviousColumnIndex]
+			
+			print("\t sequenceWordIndex = ", sequenceWordIndex, ", wordPredictionIndex = ", wordPredictionIndex, ", targetWord = ", targetWord, ", predictedWord = ", predictedWord, ", targetColumn = ", targetColumnName, ", predictedColumn = ", predictedColumnName)
 			if(targetWord == predictedWord):
 				featurePredictionTargetMatch = True
 	
@@ -248,25 +255,25 @@ def processColumnInferencePrediction(sequenceObservedColumns, sentenceIndex, obs
 		#FUTURE: convert globalFeatureNeuronsActivation back to globalFeatureNeurons for draw
 		GIAANNproto_databaseNetworkDraw.visualize_graph(sequenceObservedColumnsPrediction, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(sequenceWordIndex))
 
-	return featurePredictionTargetMatch, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSources
+	return featurePredictionTargetMatch, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext
 
 def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wordsDoc, lemmasDoc, wordPredictionIndex, sequenceWordIndex, conceptMask):		
 	#generate targets;
-	multipleSources, previousColumnIndex, nextColumnIndex, targetFeatureIndex, conceptColumnsIndicesPrev, conceptColumnsFeatureIndicesPrev = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsDoc, lemmasDoc, conceptMask, sequenceWordIndex, kcNetwork)
+	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsDoc, lemmasDoc, conceptMask, sequenceWordIndex, kcNetwork)
 	
 	if(inferencePredictiveNetworkIndependentFCpredictions):
 		targets = None
 		targetsC = pt.zeros(databaseNetworkObject.c)
 		targetsF = pt.zeros(databaseNetworkObject.f)
-		targetsC[previousColumnIndex] = 1
+		targetsC[targetPreviousColumnIndex] = 1
 		targetsF[targetFeatureIndex] = 1
-		if(multipleSources):
-			targetsC[nextColumnIndex] = 1	
+		if(targetMultipleSources):
+			targetsC[targetNextColumnIndex] = 1	
 	else:
 		targets = pt.zeros(databaseNetworkObject.c, databaseNetworkObject.f)
-		targets[previousColumnIndex, targetFeatureIndex] = 1
-		if(multipleSources):
-			targets[nextColumnIndex, targetFeatureIndex] = 1
+		targets[targetPreviousColumnIndex, targetFeatureIndex] = 1
+		if(targetMultipleSources):
+			targets[targetNextColumnIndex, targetFeatureIndex] = 1
 		targetsC = None
 		targetsF = None
 	
@@ -303,22 +310,23 @@ def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wor
 			multipleSources = True
 	else:
 		#while exclusively training predictive network; use targets rather than next token predictions when activating database network
-		conceptColumnsIndicesNext = conceptColumnsIndicesPrev
-		conceptColumnsFeatureIndicesNext = conceptColumnsFeatureIndicesPrev
-		#print("conceptColumnsIndicesPrev = ", conceptColumnsIndicesPrev)
-		#print("conceptColumnsFeatureIndicesPrev = ", conceptColumnsFeatureIndicesPrev)
+		conceptColumnsIndicesNext = targetConceptColumnsIndices
+		conceptColumnsFeatureIndicesNext = targetConceptColumnsFeatureIndices
+		#print("targetConceptColumnsIndices = ", targetConceptColumnsIndices)
+		#print("targetConceptColumnsFeatureIndices = ", targetConceptColumnsFeatureIndices)
+		multipleSources = targetMultipleSources
 		if(multipleSources):
 			kc = 2
 		else:
 			kc = 1
 		assert kf==1
 		
-	return conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSources, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
+	return conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSources, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex
 
 		
 def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsDoc, lemmasDoc, wordPredictionIndex, sequenceWordIndex, conceptMask):
 	#generate targets;
-	multipleSources, previousColumnIndex, nextColumnIndex, targetFeatureIndex, conceptColumnsIndicesPrev, conceptColumnsFeatureIndicesPrev = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsDoc, lemmasDoc, conceptMask, sequenceWordIndex, kcNetwork)
+	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsDoc, lemmasDoc, conceptMask, sequenceWordIndex, kcNetwork)
 
 	globalFeatureNeuronsActivationAllSegments = pt.sum(globalFeatureNeuronsActivation, dim=0)	#sum across all segments 	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
 	globalFeatureNeuronsStrengthAllSegments = pt.sum(globalFeatureNeuronsStrength, dim=0)	#sum across all segments 	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
@@ -369,15 +377,16 @@ def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivat
 			multipleSources = False
 	else:
 		#while exclusively training predictive network; use targets rather than next token predictions when activating database network
-		conceptColumnsIndicesNext = conceptColumnsIndicesPrev
-		conceptColumnsFeatureIndicesNext = conceptColumnsFeatureIndicesPrev
+		conceptColumnsIndicesNext = targetConceptColumnsIndices
+		conceptColumnsFeatureIndicesNext = targetConceptColumnsFeatureIndices
+		multipleSources = targetMultipleSources
 		if(multipleSources):
 			kc = 2
 		else:
 			kc = 1
 		assert kf==1
 			
-	return conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSources, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
+	return conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSources, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex
 
 
 #first dim cs1 restricted to a single token

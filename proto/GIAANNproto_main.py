@@ -1,7 +1,7 @@
 """GIAANNproto_main.py
 
 # Author:
-Richard Bruce Baxter - Copyright (c) 2024 Baxter AI (baxterai.com)
+Richard Bruce Baxter - Copyright (c) 2024-2025 Baxter AI (baxterai.com)
 
 # License:
 MIT License
@@ -104,7 +104,8 @@ def processSentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
 		if(not lowMem):
 			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_databaseNetwork.initialiseFeatureNeuronsGlobal(databaseNetworkObject.c, databaseNetworkObject.f)
 	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSentences):
-		GIAANNproto_databaseNetwork.restoreGlobalArrays(databaseNetworkObject)	#restore global arrays (reset activation and time etc properties between sentences)
+		if(not inferenceRetainActivationsAcrossMultipleSentences or sentenceIndex==0):	#or (articleIndex==0 and sentenceIndex==0)
+			GIAANNproto_databaseNetwork.restoreGlobalArrays(databaseNetworkObject)	#restore global arrays (reset activation and time etc properties between inferencePredictiveNetworkTrainAcrossMultipleSentences:articles/sentences)
 		
 	print(f"Processing article: {articleIndex}, sentence: {sentenceIndex} {doc.text}")
 

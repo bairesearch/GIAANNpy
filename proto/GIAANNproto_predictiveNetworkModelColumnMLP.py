@@ -1,7 +1,7 @@
 """GIAANNproto_predictiveNetworkModelColumnMLP.py
 
 # Author:
-Richard Bruce Baxter - Copyright (c) 2024 Baxter AI (baxterai.com)
+Richard Bruce Baxter - Copyright (c) 2024-2025 Baxter AI (baxterai.com)
 
 # License:
 MIT License
@@ -127,6 +127,7 @@ class NextWordPredictionColumnMLPmodel(nn.Module):
 		self.f = databaseNetworkObject.f
 		
 		print("databaseNetworkObject.p = ", databaseNetworkObject.p)
+		print("databaseNetworkObject.s = ", databaseNetworkObject.s)
 		print("databaseNetworkObject.c = ", databaseNetworkObject.c)
 		print("databaseNetworkObject.f = ", databaseNetworkObject.f)
 		
@@ -212,7 +213,11 @@ def selectMostActiveColumns(globalFeatureNeurons, kc):
 	globalFeatureNeuronsActivationAllSegments = pt.sum(globalFeatureNeuronsActivation, dim=0)	#sum across all segments 	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
 
 	#topk column selection;
-	conceptColumnsActivation = pt.sum(globalFeatureNeuronsActivationAllSegments, dim=1)	#sum across all feature activations in columns
+	if(inferencePredictiveNetworkModelFilterColumnsKmax):
+		conceptColumnsActivation = GIAANNproto_sparseTensors.sparse_rowwise_max(globalFeatureNeuronsActivationAllSegments)
+		#conceptColumnsActivation = pt.max(globalFeatureNeuronsActivationAllSegments, dim=1)	#max of all feature activations in columns	#only supports dense tensors
+	else:
+		conceptColumnsActivation = pt.sum(globalFeatureNeuronsActivationAllSegments, dim=1)	#sum across all feature activations in columns
 	conceptColumnsActivation = conceptColumnsActivation.to_dense()	#convert to dense tensor (required for topk)
 	conceptColumnsActivationTopkConcepts = pt.topk(conceptColumnsActivation, kc)
 	conceptColumnsActivationTopkConceptsIndices = conceptColumnsActivationTopkConcepts.indices
@@ -220,4 +225,5 @@ def selectMostActiveColumns(globalFeatureNeurons, kc):
 	globalFeatureNeuronsFilteredColumns = GIAANNproto_sparseTensors.sliceSparseTensorMulti(globalFeatureNeurons, cDim, conceptColumnsActivationTopkConceptsIndices)	#select topk concept indices
 	
 	return globalFeatureNeuronsFilteredColumns, conceptColumnsActivationTopkConceptsIndices
+
 

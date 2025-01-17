@@ -1,7 +1,7 @@
 """GIAANNproto_databaseNetwork.py
 
 # Author:
-Richard Bruce Baxter - Copyright (c) 2024 Baxter AI (baxterai.com)
+Richard Bruce Baxter - Copyright (c) 2024-2025 Baxter AI (baxterai.com)
 
 # License:
 MIT License
@@ -234,20 +234,20 @@ def getTokenConceptFeatureIndexForSequenceConceptIndex(sequence_observed_columns
 '''
 
 def getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsDoc, lemmasDoc, conceptMask, sequenceWordIndex, kcMax):
-	foundNextColumnIndex, previousColumnIndex, nextColumnIndex, targetFeatureIndex = getTokenConceptFeatureIndex(sequenceObservedColumns, wordsDoc, lemmasDoc, conceptMask, sequenceWordIndex)
+	targetFoundNextColumnIndex, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = getTokenConceptFeatureIndex(sequenceObservedColumns, wordsDoc, lemmasDoc, conceptMask, sequenceWordIndex)
 
-	if(kcMax == 1 or not foundNextColumnIndex):
-		conceptColumnsIndices = pt.tensor(previousColumnIndex).unsqueeze(0)
-		conceptColumnsFeatureIndices = pt.tensor(targetFeatureIndex).unsqueeze(0).unsqueeze(0)
-		multipleSources = False
-	elif(kcMax == 2 and foundNextColumnIndex): 
-		conceptColumnsIndices = pt.tensor([previousColumnIndex, nextColumnIndex])
-		conceptColumnsFeatureIndices = pt.stack([pt.tensor(targetFeatureIndex).unsqueeze(0), pt.tensor(targetFeatureIndex).unsqueeze(0)], dim=0)
-		multipleSources = True
+	if(kcMax == 1 or not targetFoundNextColumnIndex):
+		targetConceptColumnsIndices = pt.tensor(targetPreviousColumnIndex).unsqueeze(0)
+		targetConceptColumnsFeatureIndices = pt.tensor(targetFeatureIndex).unsqueeze(0).unsqueeze(0)
+		targetMultipleSources = False
+	elif(kcMax == 2 and targetFoundNextColumnIndex): 
+		targetConceptColumnsIndices = pt.tensor([targetPreviousColumnIndex, targetNextColumnIndex])
+		targetConceptColumnsFeatureIndices = pt.stack([pt.tensor(targetFeatureIndex).unsqueeze(0), pt.tensor(targetFeatureIndex).unsqueeze(0)], dim=0)
+		targetMultipleSources = True
 	else:
 		printe("getTokenConceptFeatureIndexTensor currently requires kcMax == 1 or 2; corresponding to the number of target columns per token; check debugConceptFeaturesOccurFirstInSubsequence/multipleTargets")
 
-	return multipleSources, previousColumnIndex, nextColumnIndex, targetFeatureIndex, conceptColumnsIndices, conceptColumnsFeatureIndices
+	return targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices
 
 def getTokenConceptFeatureIndex(sequenceObservedColumns, wordsDoc, lemmasDoc, conceptMask, sequenceWordIndex):
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
@@ -261,19 +261,19 @@ def getTokenConceptFeatureIndex(sequenceObservedColumns, wordsDoc, lemmasDoc, co
 		targetFeatureIndex = databaseNetworkObject.conceptFeaturesDict[word]
 	docLen = conceptMask.shape[0]
 	foundFeature = False
-	foundNextColumnIndex = False
-	previousColumnIndex = 0
-	nextColumnIndex = 0
+	targetFoundNextColumnIndex = False
+	targetPreviousColumnIndex = 0
+	targetNextColumnIndex = 0
 	for i in range(docLen):
 		if(foundFeature):
-			if(not foundNextColumnIndex):
+			if(not targetFoundNextColumnIndex):
 				if(conceptMask[i] != 0):
-					nextColumnIndex = columnsIndexSequenceWordIndexDict[i]
-					foundNextColumnIndex = True
+					targetNextColumnIndex = columnsIndexSequenceWordIndexDict[i]
+					targetFoundNextColumnIndex = True
 		else:
 			if(conceptMask[i] != 0):
-				previousColumnIndex = columnsIndexSequenceWordIndexDict[i]
+				targetPreviousColumnIndex = columnsIndexSequenceWordIndexDict[i]
 		if(i == sequenceWordIndex):
 			foundFeature = True
 	
-	return foundNextColumnIndex, previousColumnIndex, nextColumnIndex, targetFeatureIndex
+	return targetFoundNextColumnIndex, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex
