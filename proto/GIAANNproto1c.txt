@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1c23a;
+o1 preview prompt 1c23b;
 
 v1b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -164,3 +164,4 @@ MANUAL; - add option inferencePredictiveNetworkModelFilterColumnsKmax - update s
 MANUAL; - add option inferenceRetainActivationsAcrossMultipleSentences - retain activations across sentences such that these can be used during training/inference.
 MANUAL; - patch processFeatures:activeSequentialSegments to ensure positive; set minSequentialSegmentIndex = max(0, arrayNumberOfSegments-sequenceConceptIndex-1). patch processFeatures:featureNeuronsSegmentMask to include all segments receiving forward connections; set numberOfSegments = min(arrayNumberOfSegments, i+1).
 MANUAL; - add ignoreNewlineCharacters - ignore new line characters (do not parse).
+MANUAL; - update processFeaturesActivePredictSingle for useSANI (sum activations across all segments). update processFeaturesActivePredictSingle/Multi to select conceptIndex column from sequenceObservedColumnsPrediction.featureConnections. extract processFeaturesActivePredict from processFeaturesActivePredictSingle.
