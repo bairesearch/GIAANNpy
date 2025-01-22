@@ -473,3 +473,40 @@ def sparse_rowwise_max(x):
 
 	return out
 
+def selectAindicesContainedInB(A, B):
+	# Suppose A and B are sparse tensors of the same shape.
+	# Make sure they are coalesced so .indices() and .values() behave nicely.
+	A = A.coalesce()
+	B = B.coalesce()
+
+	# Extract indices (shape: [ndim, nnz]) and values (shape: [nnz])
+	A_indices = A.indices()  # [dim, nnzA]
+	A_values  = A.values()   # [nnzA]
+	B_indices = B.indices()  # [dim, nnzB]
+
+	# Transpose the indices to shape [nnz, dim] for comparison
+	A_indices_t = A_indices.t()  # [nnzA, dim]
+	B_indices_t = B_indices.t()  # [nnzB, dim]
+
+	# Compare every index in A to every index in B using broadcasting:
+	#  1)  Expand A_indices_t to [nnzA, 1, dim]
+	#  2)  Expand B_indices_t to [1, nnzB, dim]
+	#  3)  Compare elementwise (==), giving [nnzA, nnzB, dim]
+	#  4)  Check all coordinates match with .all(dim=2), giving [nnzA, nnzB]
+	#  5)  Reduce along nnzB dimension with .any(dim=1), yielding [nnzA]
+	mask = (A_indices_t.unsqueeze(1) == B_indices_t.unsqueeze(0)).all(dim=2).any(dim=1)
+
+	# mask[i] = True if A_indices_t[i] is in B, else False
+
+	# Use the mask to pick out the "intersection" of A's indices
+	A_indices_in_B = A_indices[:, mask]
+	A_values_in_B  = A_values[mask]
+
+	# Build the new sparse tensor that contains only A's entries whose
+	# indices appear in B
+	A_intersect_B = pt.sparse_coo_tensor(A_indices_in_B,  A_values_in_B, size=A.shape, device=A.device)
+
+	# Now A_intersect_B has only those (index, value) pairs from A 
+	# whose indices are also present in B.
+	
+	return A_intersect_B

@@ -288,11 +288,13 @@ def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wor
 			globalFeatureConnections = databaseNetworkObject.globalFeatureConnections[arrayIndexPropertiesActivation]
 	
 	if(inferencePredictiveNetworkNormaliseInputs):
-		if(not useGPUpredictiveNetworkModel):
-			globalFeatureNeurons = GIAANNproto_predictiveNetworkOperations.normaliseSparseTensor(globalFeatureNeurons, inferencePredictiveNetworkUseInputAllProperties)
+		#if(not useGPUpredictiveNetworkModel and inferencePredictiveNetworkNormaliseDim==0):
+		#	globalFeatureNeurons = GIAANNproto_predictiveNetworkOperations.normaliseSparseTensor(globalFeatureNeurons, inferencePredictiveNetworkUseInputAllProperties)
 		if(transformerUseInputConnections):	#globalFeatureConnections are currently retained on CPU
 			globalFeatureConnections = GIAANNproto_predictiveNetworkOperations.normaliseSparseTensor(globalFeatureConnections, inferencePredictiveNetworkUseInputAllProperties)
-
+			if(inferencePredictiveNetworkNormaliseDim != 0):
+				print("predictMostActiveFeature warning: inferencePredictiveNetworkNormaliseDim>0 - can only normalise globalFeatureConnections along first dimension (properties)")
+				
 	if(inferencePredictiveNetworkModel=="ColumnMLP"):
 		conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = GIAANNproto_predictiveNetworkModel.nextWordPredictionColumnMLPtrainStep(globalFeatureNeurons, targets, targetsC, targetsF)
 	elif(inferencePredictiveNetworkModel=="MLP"):
@@ -397,7 +399,18 @@ def processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuro
 def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndices, conceptColumnsFeatureIndices):
 		
 	if(useSANI):
-		featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=0) 	#sum activations across all segments
+		if(algorithmMatrixSANImethod=="doNotEnforceSequentialityAcrossSegments"):
+			featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=0) 	#sum activations across all segments
+		elif(algorithmMatrixSANImethod=="enforceSequentialActivationAcrossSegments"):
+			featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=0) 	#sum activations across all segments
+			if(algorithmMatrixSANIenforceRequirement=="enforceAnySegmentMustBeActive"):
+				pass
+			elif(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+				adjacentOrInternalColumnActive = globalFeatureNeuronsActivation[arrayIndexSegmentAdjacentColumn] + globalFeatureNeuronsActivation[arrayIndexSegmentInternalColumn]	#only activate neuron if last (ie adjacent or internal column) segment active
+				featureNeuronsActive = GIAANNproto_sparseTensors.selectAindicesContainedInB(featureNeuronsActive, adjacentOrInternalColumnActive)
+			elif(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):	#redundant; use enforceLastSegmentMustBeActive instead
+				for s in range(arrayNumberOfSegments-1):	#ignore internal column activation requirement
+					featureNeuronsActive = GIAANNproto_sparseTensors.selectAindicesContainedInB(featureNeuronsActive, globalFeatureNeuronsActivation[s])
 	else:
 		featureNeuronsActive = globalFeatureNeuronsActivation[arrayIndexSegmentInternalColumn] 		#select last (most proximal) segment activation
 	featureNeuronsActive = featureNeuronsActive[conceptColumnsIndices.squeeze().item()]	#select columns
@@ -416,8 +429,16 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 		featureNeuronsTargetActivation = featureNeuronsTargetActivation*j1
 		
 	#update the activations of the target nodes;
-	globalFeatureNeuronsActivation += featureNeuronsTargetActivation
-	
+	if(not useSANI or algorithmMatrixSANImethod=="doNotEnforceSequentialityAcrossSegments"):
+		globalFeatureNeuronsActivation += featureNeuronsTargetActivation
+	elif(algorithmMatrixSANImethod=="enforceSequentialActivationAcrossSegments"):
+		globalFeatureNeuronsActivationDense = globalFeatureNeuronsActivation.to_dense()
+		featureNeuronsTargetActivationDense = featureNeuronsTargetActivation.to_dense()
+		previousChannelActivation = globalFeatureNeuronsActivationDense[:-1] > 0	
+		globalFeatureNeuronsActivationDense[1:] += featureNeuronsTargetActivationDense[1:] * previousChannelActivation
+		globalFeatureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
+		globalFeatureNeuronsActivation = globalFeatureNeuronsActivationDense.to_sparse()
+		
 	if(transformerUseInputConnections):
 		featureNeuronsTargetActivation = GIAANNproto_sparseTensors.expand_sparse_tensor(featureNeuronsTargetActivation, 1, conceptColumnsIndices.squeeze(), new_dim_size=databaseNetworkObject.c)
 		featureNeuronsTargetActivation = GIAANNproto_sparseTensors.expand_sparse_tensor(featureNeuronsTargetActivation, 2, conceptColumnsFeatureIndices.squeeze(), new_dim_size=databaseNetworkObject.f)

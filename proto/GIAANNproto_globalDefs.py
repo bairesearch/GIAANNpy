@@ -45,6 +45,8 @@ if(useInference):
 		inferenceSavePredictiveNetwork = False
 		inferencePredictiveNetworkIndependentFCpredictions = True	#required for large database network (else may require output MLP of shape c*f * c*f)
 		inferencePredictiveNetworkNormaliseInputs = True
+		if(inferencePredictiveNetworkNormaliseInputs):
+			inferencePredictiveNetworkNormaliseDim = 1	#orig: 0 #default: 1 -  normalise across SANI segments independently
 		inferenceUseNeuronFeaturePropertiesTime = True	#default:True	#orig:False		#FUTURE; else can use during train	#requires inferencePredictiveNetworkUseInputAllProperties
 		if(inferenceTrainPredictiveNetworkAllSentences):
 			inferenceRetainActivationsAcrossMultipleSentences = False	#default: False	#retain activations across sentences such that these can be used during training/inference
@@ -60,7 +62,7 @@ if(useInference):
 			inferencePredictiveNetworkModelFilterColumnsKmax = True	#filter columns by max column activation rather than sum column activation.
 			inferencePredictiveNetworkUseInputAllProperties = True	#default: True
 			inferencePredictiveNetworkIndependentFCpredictions = True	#currently required
-			numberOfHiddenLayers = 1
+			numberOfHiddenLayers = 1	#new: 2	#orig: 1
 		elif(inferencePredictiveNetworkModel=="MLP"):
 			inferencePredictiveNetworkLearningRate = 0.0005	#default: 0.0005
 			inferencePredictiveNetworkUseInputAllProperties = False	#default: False
@@ -250,10 +252,17 @@ arrayNumberOfProperties = 5
 arrayPropertiesList = [arrayIndexPropertiesStrength, arrayIndexPropertiesPermanence, arrayIndexPropertiesActivation, arrayIndexPropertiesTime, arrayIndexPropertiesPos]
 arrayIndexSegmentFirst = 0
 if(useSANI):
-	arrayNumberOfSegments = 2	#default:3	#orig: 10	#max number of SANI segments per sequence (= max number of concept columns per sequence)	#note if arrayNumberOfSegments=3 then; sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: all other column connections
+	arrayNumberOfSegments = 3	#default:3	#orig: 10	#max number of SANI segments per sequence (= max number of concept columns per sequence)	#note if arrayNumberOfSegments=3 then; sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: all other column connections
+	#algorithmMatrixSANImethod="doNotEnforceSequentialityAcrossSegments"	#orig	#activate segments without any sequentiality requirement	#simply addActivationAcrossSegments
+	algorithmMatrixSANImethod="enforceSequentialActivationAcrossSegments"	#default	#only activate a segment if previous segment active
+	if(algorithmMatrixSANImethod=="enforceSequentialActivationAcrossSegments"):
+		#algorithmMatrixSANIenforceRequirement="enforceAnySegmentMustBeActive"	#activate neuron if any segment is active
+		algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default	#only activate neuron if last (ie adjacent or internal column) segment active
+		#algorithmMatrixSANIenforceRequirement="enforceAllSegmentsMustBeActive"	#only activate neuron if all segments are active	#redundant; use enforceLastSegmentMustBeActive instead
 else:
 	arrayNumberOfSegments = 1
 arrayIndexSegmentInternalColumn = arrayNumberOfSegments-1
+arrayIndexSegmentAdjacentColumn = arrayNumberOfSegments-2
 arrayType = pt.float32	#pt.long	#pt.float32
 
 # Define POS tag sets for nouns and non-nouns

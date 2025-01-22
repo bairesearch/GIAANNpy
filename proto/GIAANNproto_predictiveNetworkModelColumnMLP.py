@@ -70,8 +70,8 @@ def nextWordPredictionColumnMLPtrainStep(globalFeatureNeurons, targets, targetsC
 	globalFeatureNeurons = globalFeatureNeurons.to_dense()	#shape: (p, s, inferencePredictiveNetworkModelFilterColumnsK, f) or (s, inferencePredictiveNetworkModelFilterColumnsK, f)
 	conceptColumnsActivationTopkConceptsIndices = conceptColumnsActivationTopkConceptsIndices.to(devicePredictiveNetworkModel)
 	
-	if(inferencePredictiveNetworkNormaliseInputs and useGPUpredictiveNetworkModel):
-		globalFeatureNeurons = GIAANNproto_predictiveNetworkOperations.normaliseDenseTensor(globalFeatureNeurons, dim=0)
+	if(inferencePredictiveNetworkNormaliseInputs):	#and useGPUpredictiveNetworkModel
+		globalFeatureNeurons = GIAANNproto_predictiveNetworkOperations.normaliseDenseTensor(globalFeatureNeurons, dim=inferencePredictiveNetworkNormaliseDim)
 		
 	if(inferencePredictiveNetworkUseInputAllProperties):
 		globalFeatureNeurons = globalFeatureNeurons.reshape(globalFeatureNeurons.shape[2], globalFeatureNeurons.shape[0]*globalFeatureNeurons.shape[1]*globalFeatureNeurons.shape[3])	#shape: (inferencePredictiveNetworkModelFilterColumnsK, inputSize)
@@ -133,10 +133,10 @@ class NextWordPredictionColumnMLPmodel(nn.Module):
 		
 		if(inferencePredictiveNetworkUseInputAllProperties):
 			inputSize = databaseNetworkObject.p * databaseNetworkObject.s * databaseNetworkObject.f
-			hiddenSizeMultiplier = 4	#default: 1	#TODO: requires testing
+			hiddenSizeMultiplier = 4	#high:12	#default:4	#orig: 1	#TODO: requires testing
 		else:
 			inputSize = databaseNetworkObject.s * databaseNetworkObject.f
-			hiddenSizeMultiplier = 8	#default: 2	#TODO: requires testing
+			hiddenSizeMultiplier = 8	#high:24	#default:8	#orig: 2	#TODO: requires testing
 		outputSize = databaseNetworkObject.f
 		hiddenSize = inputSize * hiddenSizeMultiplier
 		self.hiddenSize = hiddenSize
