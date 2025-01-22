@@ -1,5 +1,5 @@
-DOING//do:
-o1 preview prompt 1c23c;
+DONE//do:
+o1 preview prompt 1c23d;
 
 v1b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -167,3 +167,5 @@ MANUAL; - add ignoreNewlineCharacters - ignore new line characters (do not parse
 MANUAL; - update processFeaturesActivePredictSingle for useSANI (sum activations across all segments). update processFeaturesActivePredictSingle/Multi to select conceptIndex column from sequenceObservedColumnsPrediction.featureConnections. extract processFeaturesActivePredict from processFeaturesActivePredictSingle.
 MANUAL; - add option algorithmMatrixSANImethod="enforceSequentialActivationAcrossSegments" - only activate a segment if previous segment active.
 MANUAL; - normalise across SANI segments independently - set inferencePredictiveNetworkNormaliseDim=1. depreciate sparse tensor normalise option (only normalise once converted to dense tensors).
+MANUAL; - update processColumnInferencePrediction - replace modifySparseTensor with addElementValueToSparseTensor to support case where sparse tensor element is empty.
+MANUAL; - add option connectionsStrengthBoolean - use boolean synaptic connectivity. add option activationStrengthBoolean - use boolean segment activation strength (once a segment is activated, do not increase its activation level).

@@ -38,6 +38,12 @@ if(useInference):
 	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	transformerUseInputConnections = False	#initialise (dependent var)
 	printPredictionsDuringInferencePredict = True	#default: True
+	if(useSANI):
+		inferenceConnectionsStrengthBoolean = False	#default: False
+		inferenceActivationStrengthBoolean = False	#default: False
+	else:
+		inferenceConnectionsStrengthBoolean = False	#default: False
+		inferenceActivationStrengthBoolean = False	#default: False	
 	if(inferencePredictiveNetwork):
 		inferencePredictiveNetworkModel = "ColumnMLP"
 		#inferencePredictiveNetworkModel = "MLP"
@@ -62,7 +68,7 @@ if(useInference):
 			inferencePredictiveNetworkModelFilterColumnsKmax = True	#filter columns by max column activation rather than sum column activation.
 			inferencePredictiveNetworkUseInputAllProperties = True	#default: True
 			inferencePredictiveNetworkIndependentFCpredictions = True	#currently required
-			numberOfHiddenLayers = 1	#new: 2	#orig: 1
+			numberOfHiddenLayers = 1	#default: 2	#orig: 1
 		elif(inferencePredictiveNetworkModel=="MLP"):
 			inferencePredictiveNetworkLearningRate = 0.0005	#default: 0.0005
 			inferencePredictiveNetworkUseInputAllProperties = False	#default: False
@@ -75,7 +81,7 @@ if(useInference):
 			transformerOutputLayerUseEveryColumn = True	#default: True	#orig: False	#whether the output layer uses features from every column (or just the final column in the sequence)
 	else:
 		inferenceUseNeuronFeaturePropertiesTime = False
-		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default:True #currently mandatory (only implementation available)	#False is only for debug
+		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default:True	#set to False to compare predictive performance with inferencePredictiveNetwork
 	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		inferenceSeedNetwork = True	#default: True
 		inferenceBurstAllPredictionsOrTargetsInSequence = False	#default: False	#orig: False
@@ -284,7 +290,7 @@ def posStringToPosInt(nlp, posString):
 z1 = 3  # Initial permanence value	
 z2 = 1  # Decrement value when not activated
 if(inferenceActivationFunction):
-	j1 = 1
+	j1 = 1 #default: 1
 else:
 	j1 = 5   # Activation trace duration
 

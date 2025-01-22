@@ -169,19 +169,19 @@ def visualizeGraph(sequenceObservedColumns, save=False, fileName=None):
 		
 			featurePresent = False
 			featureActive = False
-			if(featureNeurons[arrayIndexPropertiesStrength, arrayIndexSegmentInternalColumn, featureIndexInObservedColumn] > 0 and featureNeurons[arrayIndexPropertiesPermanence, arrayIndexSegmentInternalColumn, featureIndexInObservedColumn] > 0):
+			if(neuronIsActive(featureNeurons, arrayIndexPropertiesStrength, featureIndexInObservedColumn) and neuronIsActive(featureNeurons, arrayIndexPropertiesPermanence, featureIndexInObservedColumn)):
 				featurePresent = True
-			if(featureNeurons[arrayIndexPropertiesActivation, arrayIndexSegmentInternalColumn, featureIndexInObservedColumn] > 0):
+			if(neuronIsActive(featureNeurons, arrayIndexPropertiesActivation, featureIndexInObservedColumn)):
 				featureActive = True
 				
 			if(featurePresent):
 				if(drawRelationTypes):
 					if not conceptNeuronFeature:
-						neuronColor = generateFeatureNeuronColour(
-							databaseNetworkObject, 
-							featureNeurons[arrayIndexPropertiesPos, arrayIndexSegmentInternalColumn, featureIndexInObservedColumn], 
-							featureWord
-						)
+						if(useSANI):
+							segmentIndex = arrayIndexSegmentAdjacentColumn #arrayIndexSegmentAdjacentColumn has a higher probability of being filled than arrayIndexSegmentInternalColumn
+						else:
+							segmentIndex = arrayIndexSegmentInternalColumn
+						neuronColor = generateFeatureNeuronColour(databaseNetworkObject, featureNeurons[arrayIndexPropertiesPos, segmentIndex, featureIndexInObservedColumn], featureWord)	
 				elif(featureActive):
 					if(conceptNeuronFeature):
 						neuronColor = 'lightskyblue'
@@ -189,10 +189,7 @@ def visualizeGraph(sequenceObservedColumns, save=False, fileName=None):
 						neuronColor = 'cyan'
 						
 				if(debugDrawNeuronActivations):
-					neuronName = createNeuronLabelWithActivation(
-						neuronName, 
-						featureNeurons[arrayIndexPropertiesActivation, arrayIndexSegmentInternalColumn, featureIndexInObservedColumn]
-					)
+					neuronName = createNeuronLabelWithActivation(neuronName, neuronActivation(featureNeurons, arrayIndexPropertiesActivation, featureIndexInObservedColumn))
 
 				featureNode = f"{lemma}_{featureWord}_{fIdx}"
 				if(randomiseColumnFeatureXposition and not conceptNeuronFeature):
@@ -247,12 +244,7 @@ def visualizeGraph(sequenceObservedColumns, save=False, fileName=None):
 								featurePresent = True
 								
 							if(drawRelationTypes):
-								connectionColor = generateFeatureNeuronColour(
-									databaseNetworkObject, 
-									featureConnections[arrayIndexPropertiesPos, fIdx, cIdx, otherFIdx], 
-									featureWord, 
-									internalConnection=True
-								)
+								connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnections[arrayIndexPropertiesPos, fIdx, cIdx, otherFIdx], featureWord, internalConnection=True)
 							else:
 								connectionColor = 'yellow'
 								
@@ -290,12 +282,7 @@ def visualizeGraph(sequenceObservedColumns, save=False, fileName=None):
 									featurePresent = True
 
 							if(drawRelationTypes):
-								connectionColor = generateFeatureNeuronColour(
-									databaseNetworkObject, 
-									featureConnections[arrayIndexPropertiesPos, fIdx, otherCIdx, otherFIdx], 
-									featureWord, 
-									internalConnection=False
-								)
+								connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnections[arrayIndexPropertiesPos, fIdx, otherCIdx, otherFIdx], featureWord, internalConnection=False)
 							else:
 								connectionColor = 'orange'
 								
@@ -335,3 +322,16 @@ def visualizeGraph(sequenceObservedColumns, save=False, fileName=None):
 		plt.clf()	
 	else:
 		plt.show()
+
+def neuronIsActive(featureNeurons, arrayIndexProperties, featureIndexInObservedColumn):
+	featureNeuronsActive = neuronActivation(featureNeurons, arrayIndexProperties, featureIndexInObservedColumn)
+	featureNeuronsActive = featureNeuronsActive.item() > 0
+	return featureNeuronsActive
+
+def neuronActivation(featureNeurons, arrayIndexProperties, featureIndexInObservedColumn):
+	featureNeuronsActivation = featureNeurons[arrayIndexProperties]
+	featureNeuronsActivation = GIAANNproto_sparseTensors.neuronActivationSparse(featureNeuronsActivation)
+	featureNeuronsActivation = featureNeuronsActivation[featureIndexInObservedColumn]
+	return featureNeuronsActivation
+	
+		
