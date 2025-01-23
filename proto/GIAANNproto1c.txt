@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1c24a;
+o1 preview prompt 1c24b;
 
 v1b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -172,3 +172,4 @@ MANUAL; - add option connectionsStrengthBoolean - use boolean synaptic connectiv
 MANUAL; - update getTokenConceptFeatureIndexTensor:getTokenConceptFeatureIndex to not predict 2 columns for concept features.
 MANUAL; - update GIAANNproto_databaseNetworkDraw to print all SANI segment values.
 MANUAL; - add option multisentencePredictions - support multisentence predictions. Rename all instances of sentence/doc to sequence.
+MANUAL; - update GIAANNproto_main:processSequence to remove backupGlobalArrays/restoreGlobalArrays if(inferencePredictiveNetwork) condition.

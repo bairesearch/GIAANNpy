@@ -47,6 +47,8 @@ if(useInference):
 	else:
 		inferenceConnectionsStrengthBoolean = False	#default: False
 		inferenceActivationStrengthBoolean = False	#default: False	
+	if(inferenceTrainPredictiveNetworkAllSequences):
+		inferenceRetainActivationsAcrossMultipleSequences = False	#default: False	#retain activations across sequences such that these can be used during training/inference
 	if(inferencePredictiveNetwork):
 		inferencePredictiveNetworkModel = "ColumnMLP"
 		#inferencePredictiveNetworkModel = "MLP"
@@ -58,7 +60,6 @@ if(useInference):
 			inferencePredictiveNetworkNormaliseDim = 1	#orig: 0 #default: 1 -  normalise across SANI segments independently
 		inferenceUseNeuronFeaturePropertiesTime = True	#default:True	#orig:False		#FUTURE; else can use during train	#requires inferencePredictiveNetworkUseInputAllProperties
 		if(inferenceTrainPredictiveNetworkAllSequences):
-			inferenceRetainActivationsAcrossMultipleSequences = False	#default: False	#retain activations across sequences such that these can be used during training/inference
 			inferenceSavePredictiveNetwork = True
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False	#next token predictions are used to activate the next column features (rather than prediction targets)
 			numberEpochs = 1000	#default: 1	#10	#debug: 1000	#number of epochs to train predictive network

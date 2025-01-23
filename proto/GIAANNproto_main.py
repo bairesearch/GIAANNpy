@@ -54,8 +54,9 @@ databaseNetworkObject.nlp = nlp	#used by posStringToPosInt
 def main():
 	global sequenceCount
 	GIAANNproto_databaseNetworkFiles.initialiseDatabaseFiles()
-	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSequences):
-		GIAANNproto_predictiveNetwork.initialisePredictiveNetwork(databaseNetworkObject)
+	if(useInference and inferenceTrainPredictiveNetworkAllSequences):
+		if(inferencePredictiveNetwork):
+			GIAANNproto_predictiveNetwork.initialisePredictiveNetwork(databaseNetworkObject)
 		GIAANNproto_databaseNetwork.backupGlobalArrays(databaseNetworkObject)
 
 	for epochIndex in range(numberEpochs):
@@ -117,7 +118,7 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 		initialiseDatabaseNetwork()
 		if(not lowMem):
 			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_databaseNetwork.initialiseFeatureNeuronsGlobal(databaseNetworkObject.c, databaseNetworkObject.f)
-	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSequences):
+	if(useInference and inferenceTrainPredictiveNetworkAllSequences):
 		if(not inferenceRetainActivationsAcrossMultipleSequences or sequenceIndex==0):	#or (articleIndex==0 and sequenceIndex==0)
 			GIAANNproto_databaseNetwork.restoreGlobalArrays(databaseNetworkObject)	#restore global arrays (reset activation and time etc properties between inferencePredictiveNetworkTrainAcrossMultipleSequences:articles/sequences)
 		
