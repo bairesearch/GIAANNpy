@@ -512,7 +512,7 @@ def selectAindicesContainedInB(A, B):
 	
 	return A_intersect_B
 
-def neuronActivationSparse(globalFeatureNeuronsActivation):
+def neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANImethod):
 	if(useSANI):
 		if(algorithmMatrixSANImethod=="doNotEnforceSequentialityAcrossSegments"):
 			featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=0) 	#sum activations across all segments
@@ -521,15 +521,10 @@ def neuronActivationSparse(globalFeatureNeuronsActivation):
 			if(algorithmMatrixSANIenforceRequirement=="enforceAnySegmentMustBeActive"):
 				pass
 			elif(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
-				'''
-				print("\nfeatureNeuronsActive = ", featureNeuronsActive)
-				adjacentOrInternalColumnActive = globalFeatureNeuronsActivation[arrayIndexSegmentAdjacentColumn] + globalFeatureNeuronsActivation[arrayIndexSegmentInternalColumn]	#only activate neuron if last (ie adjacent or internal column) segment active
-				print("globalFeatureNeuronsActivation[arrayIndexSegmentAdjacentColumn] = ", globalFeatureNeuronsActivation[arrayIndexSegmentAdjacentColumn])
-				print("globalFeatureNeuronsActivation[arrayIndexSegmentInternalColumn] = ", globalFeatureNeuronsActivation[arrayIndexSegmentInternalColumn])
-				print("adjacentOrInternalColumnActive = ", adjacentOrInternalColumnActive)
-				'''
+				#adjacentOrInternalColumnActive = globalFeatureNeuronsActivation[arrayIndexSegmentAdjacentColumn] + globalFeatureNeuronsActivation[arrayIndexSegmentInternalColumn]	#only activate neuron if last (ie adjacent or internal column) segment active
 				#CHECKTHIS: if last segment (internal) is active, then all previous segments are active
-				featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, globalFeatureNeuronsActivation[arrayIndexSegmentInternalColumn])
+				adjacentOrInternalColumnActive = globalFeatureNeuronsActivation[arrayIndexSegmentInternalColumn]
+				featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, adjacentOrInternalColumnActive)
 			elif(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):	#redundant; use enforceLastSegmentMustBeActive instead
 				for s in range(arrayNumberOfSegments-1):	#ignore internal column activation requirement
 					featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, globalFeatureNeuronsActivation[s])

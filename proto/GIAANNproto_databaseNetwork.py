@@ -261,19 +261,23 @@ def getTokenConceptFeatureIndex(sequenceObservedColumns, wordsDoc, lemmasDoc, co
 		targetFeatureIndex = databaseNetworkObject.conceptFeaturesDict[word]
 	docLen = conceptMask.shape[0]
 	foundFeature = False
+	conceptFeature = False
 	targetFoundNextColumnIndex = False
 	targetPreviousColumnIndex = 0
 	targetNextColumnIndex = 0
 	for i in range(docLen):
 		if(foundFeature):
-			if(not targetFoundNextColumnIndex):
-				if(conceptMask[i] != 0):
-					targetNextColumnIndex = columnsIndexSequenceWordIndexDict[i]
-					targetFoundNextColumnIndex = True
+			if(not conceptFeature):
+				if(not targetFoundNextColumnIndex):
+					if(conceptMask[i] != 0):
+						targetNextColumnIndex = columnsIndexSequenceWordIndexDict[i]
+						targetFoundNextColumnIndex = True
 		else:
 			if(conceptMask[i] != 0):
 				targetPreviousColumnIndex = columnsIndexSequenceWordIndexDict[i]
 		if(i == sequenceWordIndex):
 			foundFeature = True
+			if(conceptMask[i] != 0):
+				conceptFeature = True
 	
 	return targetFoundNextColumnIndex, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex

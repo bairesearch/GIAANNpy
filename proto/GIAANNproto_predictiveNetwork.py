@@ -395,8 +395,6 @@ def processFeaturesActivePredictMulti(databaseNetworkObject, globalFeatureNeuron
 	for conceptIndex in range(conceptColumnsIndices.shape[0]):
 		conceptColumnsIndicesSource = conceptColumnsIndices[conceptIndex].unsqueeze(dim=0)
 		conceptColumnsFeatureIndicesSource = conceptColumnsFeatureIndices[conceptIndex].unsqueeze(dim=0)
-		#print("conceptColumnsIndicesSource = ", conceptColumnsIndicesSource)
-		#print("conceptColumnsFeatureIndicesSource = ", conceptColumnsFeatureIndicesSource)
 		featureConnections = GIAANNproto_sparseTensors.sliceSparseTensor(sequenceObservedColumnsPrediction.featureConnections, 2, conceptIndex)	#sequence concept index dimension	#CHECKTHIS
 		globalFeatureNeuronsActivation, globalFeatureConnectionsActivation = processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource)
 	
@@ -409,12 +407,10 @@ def processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuro
 
 def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndices, conceptColumnsFeatureIndices):
 		
-	#print("globalFeatureNeuronsActivation = ", globalFeatureNeuronsActivation)
-	featureNeuronsActive = GIAANNproto_sparseTensors.neuronActivationSparse(globalFeatureNeuronsActivation)
+	featureNeuronsActive = GIAANNproto_sparseTensors.neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANImethod)
 	
 	featureNeuronsActive = featureNeuronsActive[conceptColumnsIndices.squeeze().item()]	#select columns
 	featureNeuronsActive = featureNeuronsActive[conceptColumnsFeatureIndices.squeeze().squeeze().item()]	#select features
-	#print("featureNeuronsActive = ", featureNeuronsActive)
 	
 	#target neuron activation dependence on connection strength;
 	featureConnections = featureConnections[arrayIndexPropertiesStrength]
@@ -423,11 +419,12 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 	featureConnections = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnections, 1, conceptColumnsFeatureIndices.squeeze().item())
 	if(inferenceConnectionsStrengthBoolean):
 		featureConnections = featureConnections.bool().float()
-		
+	
 	featureNeuronsTargetActivation = featureNeuronsActive * featureConnections
 
 	if(inferenceActivationFunction):
 		featureNeuronsTargetActivation = GIAANNproto_databaseNetworkTrain.activationFunction(featureNeuronsTargetActivation)
+		#print("featureNeuronsTargetActivation = ", featureNeuronsTargetActivation)
 	else:
 		featureNeuronsTargetActivation = featureNeuronsTargetActivation*j1
 		
@@ -438,11 +435,9 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 		globalFeatureNeuronsActivationDense = globalFeatureNeuronsActivation.to_dense()
 		featureNeuronsTargetActivationDense = featureNeuronsTargetActivation.to_dense()
 		previousChannelActivation = globalFeatureNeuronsActivationDense[:-1] > 0	
-		#print("previousChannelActivation = ", previousChannelActivation)
 		globalFeatureNeuronsActivationDense[1:] += featureNeuronsTargetActivationDense[1:] * previousChannelActivation
 		globalFeatureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
 		globalFeatureNeuronsActivation = globalFeatureNeuronsActivationDense.to_sparse_coo()
-		#print("globalFeatureNeuronsActivation = ", globalFeatureNeuronsActivation)
 	if(inferenceActivationStrengthBoolean):
 		globalFeatureNeuronsActivation = globalFeatureNeuronsActivation.bool().float()
 		

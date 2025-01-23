@@ -193,7 +193,7 @@ if(useInference):
 			inferenceUseNeuronFeaturePropertiesTimeDecrement = -1
 	else:
 		inferenceInvertNeuronActivationUponPrediction = False
-		inferenceDeactivateNeuronsUponPrediction = True
+		inferenceDeactivateNeuronsUponPrediction = True	#default: True
 		inferenceDecrementActivations = False
 	activationDecrementPerPredictedToken = 0.1	#0.05	#CHECKTHIS
 	activationDecrementPerPredictedSentence = 0.5
@@ -258,7 +258,9 @@ arrayNumberOfProperties = 5
 arrayPropertiesList = [arrayIndexPropertiesStrength, arrayIndexPropertiesPermanence, arrayIndexPropertiesActivation, arrayIndexPropertiesTime, arrayIndexPropertiesPos]
 arrayIndexSegmentFirst = 0
 if(useSANI):
-	arrayNumberOfSegments = 3	#default:3	#orig: 10	#max number of SANI segments per sequence (= max number of concept columns per sequence)	#note if arrayNumberOfSegments=3 then; sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: all other column connections
+	arrayNumberOfSegments = 3	#default:3	#orig: 10	#max number of SANI segments per sequence (= max number of concept columns per sequence)	
+		#note if arrayNumberOfSegments=3 then; sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: all other column connections
+		#must be less than the (total number of concepts in a sequence - total number of concepts in effective predictive seed sequence)
 	#algorithmMatrixSANImethod="doNotEnforceSequentialityAcrossSegments"	#orig	#activate segments without any sequentiality requirement	#simply addActivationAcrossSegments
 	algorithmMatrixSANImethod="enforceSequentialActivationAcrossSegments"	#default	#only activate a segment if previous segment active
 	if(algorithmMatrixSANImethod=="enforceSequentialActivationAcrossSegments"):
@@ -267,6 +269,8 @@ if(useSANI):
 		#algorithmMatrixSANIenforceRequirement="enforceAllSegmentsMustBeActive"	#only activate neuron if all segments are active	#redundant; use enforceLastSegmentMustBeActive instead
 else:
 	arrayNumberOfSegments = 1
+	algorithmMatrixSANImethod = "NA"
+	
 arrayIndexSegmentInternalColumn = arrayNumberOfSegments-1
 arrayIndexSegmentAdjacentColumn = arrayNumberOfSegments-2
 arrayType = pt.float32	#pt.long	#pt.float32

@@ -102,14 +102,17 @@ if(drawRelationTypes):
 G = nx.DiGraph()
 
 
-def createNeuronLabelWithActivation(name, strength):
-	label = name + "\n" + floatToString(strength)
+def createNeuronLabelWithActivation(name, value):
+	label = name + "\n" + value
 	return label
+
+def intToString(value):
+	result = str(int(value))
+	return result
 	
 def floatToString(value):
-	result = str(round(value.item(), 2))
+	result = str(round(value, 2))
 	return result
-		
 		
 def visualizeGraph(sequenceObservedColumns, save=False, fileName=None):
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
@@ -169,9 +172,9 @@ def visualizeGraph(sequenceObservedColumns, save=False, fileName=None):
 		
 			featurePresent = False
 			featureActive = False
-			if(neuronIsActive(featureNeurons, arrayIndexPropertiesStrength, featureIndexInObservedColumn) and neuronIsActive(featureNeurons, arrayIndexPropertiesPermanence, featureIndexInObservedColumn)):
+			if(neuronIsActive(featureNeurons, arrayIndexPropertiesStrength, featureIndexInObservedColumn, "doNotEnforceSequentialityAcrossSegments")):	#if not useSANI: and neuronIsActive(featureNeurons, arrayIndexPropertiesPermanence, featureIndexInObservedColumn)
 				featurePresent = True
-			if(neuronIsActive(featureNeurons, arrayIndexPropertiesActivation, featureIndexInObservedColumn)):
+			if(neuronIsActive(featureNeurons, arrayIndexPropertiesActivation, featureIndexInObservedColumn, "doNotEnforceSequentialityAcrossSegments")):	#default: algorithmMatrixSANImethod
 				featureActive = True
 				
 			if(featurePresent):
@@ -189,7 +192,7 @@ def visualizeGraph(sequenceObservedColumns, save=False, fileName=None):
 						neuronColor = 'cyan'
 						
 				if(debugDrawNeuronActivations):
-					neuronName = createNeuronLabelWithActivation(neuronName, neuronActivation(featureNeurons, arrayIndexPropertiesActivation, featureIndexInObservedColumn))
+					neuronName = createNeuronLabelWithActivation(neuronName, neuronActivationString(featureNeurons, arrayIndexPropertiesActivation, featureIndexInObservedColumn))
 
 				featureNode = f"{lemma}_{featureWord}_{fIdx}"
 				if(randomiseColumnFeatureXposition and not conceptNeuronFeature):
@@ -323,15 +326,28 @@ def visualizeGraph(sequenceObservedColumns, save=False, fileName=None):
 	else:
 		plt.show()
 
-def neuronIsActive(featureNeurons, arrayIndexProperties, featureIndexInObservedColumn):
-	featureNeuronsActive = neuronActivation(featureNeurons, arrayIndexProperties, featureIndexInObservedColumn)
+def neuronIsActive(featureNeurons, arrayIndexProperties, featureIndexInObservedColumn, algorithmMatrixSANImethod):
+	featureNeuronsActive = neuronActivation(featureNeurons, arrayIndexProperties, featureIndexInObservedColumn, algorithmMatrixSANImethod)
 	featureNeuronsActive = featureNeuronsActive.item() > 0
 	return featureNeuronsActive
 
-def neuronActivation(featureNeurons, arrayIndexProperties, featureIndexInObservedColumn):
+def neuronActivation(featureNeurons, arrayIndexProperties, featureIndexInObservedColumn, algorithmMatrixSANImethod):
 	featureNeuronsActivation = featureNeurons[arrayIndexProperties]
-	featureNeuronsActivation = GIAANNproto_sparseTensors.neuronActivationSparse(featureNeuronsActivation)
+	featureNeuronsActivation = GIAANNproto_sparseTensors.neuronActivationSparse(featureNeuronsActivation, algorithmMatrixSANImethod)	#algorithmMatrixSANImethod
 	featureNeuronsActivation = featureNeuronsActivation[featureIndexInObservedColumn]
 	return featureNeuronsActivation
+
+def neuronActivationString(featureNeurons, arrayIndexProperties, featureIndexInObservedColumn):
+	string = ""
+	featureNeuronsActivation = featureNeurons[arrayIndexProperties]
+	for s in range(arrayNumberOfSegments):	#ignore internal column activation requirement
+		value = featureNeuronsActivation[s, featureIndexInObservedColumn].item()
+		if(inferenceActivationStrengthBoolean):
+			value = intToString(value)
+		else:
+			value = floatToString(value)
+		if s != arrayNumberOfSegments-1:
+			value += " "
+		string += value
+	return string
 	
-		
