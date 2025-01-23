@@ -224,17 +224,17 @@ def loadAllColumns(databaseNetworkObject):
 	return observedColumnsDict
 
 '''
-def getTokenConceptFeatureIndexForSequenceConceptIndex(sequence_observed_columns, words_doc, concept_mask, sequenceConceptIndex, sequenceWordIndex):
+def getTokenConceptFeatureIndexForSequenceConceptIndex(sequence_observed_columns, words_sequence, concept_mask, sequenceConceptIndex, sequenceWordIndex):
 	conceptIndex = sequence_observed_columns.sequence_observed_columns_dict[sequenceConceptIndex].conceptIndex
 	if(concept_mask[sequenceWordIndex]):
 		feature_index = featureIndexConceptNeuron
 	else:
-		feature_index = sequence_observed_columns.featureWordToIndex[words_doc[sequenceWordIndex]]
+		feature_index = sequence_observed_columns.featureWordToIndex[words_sequence[sequenceWordIndex]]
 	return conceptIndex, feature_index
 '''
 
-def getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsDoc, lemmasDoc, conceptMask, sequenceWordIndex, kcMax):
-	targetFoundNextColumnIndex, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = getTokenConceptFeatureIndex(sequenceObservedColumns, wordsDoc, lemmasDoc, conceptMask, sequenceWordIndex)
+def getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsSequence, lemmasSequence, conceptMask, sequenceWordIndex, kcMax):
+	targetFoundNextColumnIndex, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = getTokenConceptFeatureIndex(sequenceObservedColumns, wordsSequence, lemmasSequence, conceptMask, sequenceWordIndex)
 
 	if(kcMax == 1 or not targetFoundNextColumnIndex):
 		targetConceptColumnsIndices = pt.tensor(targetPreviousColumnIndex).unsqueeze(0)
@@ -249,23 +249,23 @@ def getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsDoc, lemmasD
 
 	return targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices
 
-def getTokenConceptFeatureIndex(sequenceObservedColumns, wordsDoc, lemmasDoc, conceptMask, sequenceWordIndex):
+def getTokenConceptFeatureIndex(sequenceObservedColumns, wordsSequence, lemmasSequence, conceptMask, sequenceWordIndex):
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 	columnsIndexSequenceWordIndexDict = sequenceObservedColumns.columnsIndexSequenceWordIndexDict
 	
 	if(conceptMask[sequenceWordIndex]):
-		lemma = lemmasDoc[sequenceWordIndex]
+		lemma = lemmasSequence[sequenceWordIndex]
 		targetFeatureIndex = databaseNetworkObject.conceptColumnsDict[lemma]
 	else:
-		word = wordsDoc[sequenceWordIndex]
+		word = wordsSequence[sequenceWordIndex]
 		targetFeatureIndex = databaseNetworkObject.conceptFeaturesDict[word]
-	docLen = conceptMask.shape[0]
+	sequenceLen = conceptMask.shape[0]
 	foundFeature = False
 	conceptFeature = False
 	targetFoundNextColumnIndex = False
 	targetPreviousColumnIndex = 0
 	targetNextColumnIndex = 0
-	for i in range(docLen):
+	for i in range(sequenceLen):
 		if(foundFeature):
 			if(not conceptFeature):
 				if(not targetFoundNextColumnIndex):

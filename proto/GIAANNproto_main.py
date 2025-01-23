@@ -52,22 +52,22 @@ databaseNetworkObject = GIAANNproto_databaseNetwork.initialiseDatabaseNetwork()
 databaseNetworkObject.nlp = nlp	#used by posStringToPosInt
 
 def main():
-	global sentenceCount
+	global sequenceCount
 	GIAANNproto_databaseNetworkFiles.initialiseDatabaseFiles()
-	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSentences):
+	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSequences):
 		GIAANNproto_predictiveNetwork.initialisePredictiveNetwork(databaseNetworkObject)
 		GIAANNproto_databaseNetwork.backupGlobalArrays(databaseNetworkObject)
 
 	for epochIndex in range(numberEpochs):
 		print("\nepochIndex = ", epochIndex)
 		# Start processing the dataset
-		sentenceCount = 0
-		if((useInference and not inferenceTrainPredictiveNetworkAllSentences) or debugSmallDataset):
+		sequenceCount = 0
+		if((useInference and not inferenceTrainPredictiveNetworkAllSequences) or debugSmallDataset):
 			processPrompt()
 		else:
 			processDataset(dataset)
 		
-	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSentences and inferenceSavePredictiveNetwork):
+	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSequences and inferenceSavePredictiveNetwork):
 		GIAANNproto_predictiveNetwork.inferenceSavePredictiveNetwork()
 
 def processPrompt():
@@ -79,54 +79,66 @@ def processPrompt():
 def processDataset(dataset):
 	for articleIndex, article in enumerate(dataset):
 		processArticle(article['text'], articleIndex)
-		if sentenceCount == maxSentences:
+		if sequenceCount == maxSequences:
 			break
 
 def processArticle(text, articleIndex):
-	#sentences = sent_tokenize(text)
+	#sequences = sent_tokenize(text)
 	if(ignoreNewlineCharacters):
 		text = text.replace('\n', ' ')
-	sentences = nlp(text)
-	numberOfSentences = len(list(sentences.sents))
-	for sentenceIndex, sentence in enumerate(sentences.sents):
-		lastSentenceInPrompt = False
-		if(useInference and not inferenceTrainPredictiveNetworkAllSentences):
-			if(sentenceIndex == numberOfSentences-1):
-				lastSentenceInPrompt = True
-		if(len(sentence) <= maxSentenceLength):
-			processSentence(articleIndex, sentenceIndex, sentence, lastSentenceInPrompt)
-		if sentenceCount == maxSentences:
+	textParsed = nlp(text)
+
+	if(multisentencePredictions):
+		sentences = list(textParsed.sents)
+		sequences = []
+		for i in range(0, len(sentences), numSentencesPerSequence):
+			startIndex = sentences[i].start
+			endIndex = sentences[min(i + numSentencesPerSequence, len(sentences)) - 1].end
+			span = textParsed[startIndex:endIndex]
+			sequences.append(span)
+	else:
+		sequences = list(textParsed.sents)
+	
+	numberOfSequences = len(sequences)
+	for sequenceIndex, sequence in enumerate(sequences):
+		lastSequenceInPrompt = False
+		if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
+			if(sequenceIndex == numberOfSequences-1):
+				lastSequenceInPrompt = True
+		if(len(sequence) <= maxSequenceLength):
+			processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
+		if sequenceCount == maxSequences:
 			break
 			
-def processSentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
-	global sentenceCount
+def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt):
+	global sequenceCount
 	
-	if(debugReloadGlobalFeatureNeuronsEverySentence):
+	if(debugReloadGlobalFeatureNeuronsEverySequence):
 		initialiseDatabaseNetwork()
 		if(not lowMem):
 			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_databaseNetwork.initialiseFeatureNeuronsGlobal(databaseNetworkObject.c, databaseNetworkObject.f)
-	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSentences):
-		if(not inferenceRetainActivationsAcrossMultipleSentences or sentenceIndex==0):	#or (articleIndex==0 and sentenceIndex==0)
-			GIAANNproto_databaseNetwork.restoreGlobalArrays(databaseNetworkObject)	#restore global arrays (reset activation and time etc properties between inferencePredictiveNetworkTrainAcrossMultipleSentences:articles/sentences)
+	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSequences):
+		if(not inferenceRetainActivationsAcrossMultipleSequences or sequenceIndex==0):	#or (articleIndex==0 and sequenceIndex==0)
+			GIAANNproto_databaseNetwork.restoreGlobalArrays(databaseNetworkObject)	#restore global arrays (reset activation and time etc properties between inferencePredictiveNetworkTrainAcrossMultipleSequences:articles/sequences)
 		
-	print(f"Processing article: {articleIndex}, sentence: {sentenceIndex} {doc.text}")
+	print(f"Processing article: {articleIndex}, sequence: {sequenceIndex} {sequence.text}")
 
 	databaseNetworkObject.articleIndexDebug = articleIndex
-	databaseNetworkObject.sentenceIndexDebug = sentenceIndex
+	databaseNetworkObject.sequenceIndexDebug = sequenceIndex
 	
 	# Refresh the observed columns dictionary for each new sequence
 	observedColumnsDict = {}  # key: lemma, value: ObservedColumn
 	observedColumnsSequenceWordIndexDict = {}  # key: sequence word index, value: ObservedColumn
 	
-	if(useInference and (inferenceTrainPredictiveNetworkAllSentences or lastSentenceInPrompt)):
-		if(lastSentenceInPrompt):
-			if(numSeedTokens >= len(doc)):
+	if(useInference and (inferenceTrainPredictiveNetworkAllSequences or lastSequenceInPrompt)):
+		if(lastSequenceInPrompt):
+			if(numSeedTokens >= len(sequence)):
 				return
-		docSeed = doc[0:numSeedTokens]	#prompt
-		docPredict = doc[numSeedTokens:]
+		sequenceSeed = sequence[0:numSeedTokens]	#prompt
+		sequencePredict = sequence[numSeedTokens:]
 
 	# First pass: Extract words, lemmas, POS tags, and update concept_columns_dict and c
-	conceptsFound, words, lemmas, posTags = firstPass(doc)
+	conceptsFound, words, lemmas, posTags = firstPass(sequence)
 	
 	if(conceptsFound):
 		# When usePOS is enabled, detect all possible new features in the sequence
@@ -139,12 +151,12 @@ def processSentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
 		# Create the sequence observed columns object
 		sequenceObservedColumns = GIAANNproto_databaseNetworkTrain.SequenceObservedColumns(databaseNetworkObject, words, lemmas, observedColumnsDict, observedColumnsSequenceWordIndexDict)
 
-		if(useInference and (inferenceTrainPredictiveNetworkAllSentences or lastSentenceInPrompt)):
+		if(useInference and (inferenceTrainPredictiveNetworkAllSequences or lastSequenceInPrompt)):
 			# Process each concept word in the sequence (predict)
-			GIAANNproto_predictiveNetwork.processConceptWordsInference(sequenceObservedColumns, sentenceCount, doc, docSeed, docPredict, numSeedTokens)
+			GIAANNproto_predictiveNetwork.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens)
 		else:
 			# Process each concept word in the sequence (train)
-			GIAANNproto_databaseNetworkTrain.processConceptWords(sequenceObservedColumns, sentenceCount, doc, words, lemmas, posTags)
+			GIAANNproto_databaseNetworkTrain.processConceptWords(sequenceObservedColumns, sequenceCount, sequence, words, lemmas, posTags)
 
 			# Update observed columns from sequence observed columns
 			sequenceObservedColumns.updateObservedColumnsWrapper()
@@ -154,20 +166,20 @@ def processSentence(articleIndex, sentenceIndex, doc, lastSentenceInPrompt):
 				GIAANNproto_databaseNetworkFiles.saveData(databaseNetworkObject, observedColumnsDict)
 				
 			if(drawNetworkDuringTrain):
-				# Visualize the complete graph every time a new sentence is parsed by the application.
-				GIAANNproto_databaseNetworkDraw.visualizeGraph(sequenceObservedColumns, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+str(sentenceIndex))
+				# Visualize the complete graph every time a new sequence is parsed by the application.
+				GIAANNproto_databaseNetworkDraw.visualizeGraph(sequenceObservedColumns, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+str(sequenceIndex))
 
-	# Break if we've reached the maximum number of sentences
-	sentenceCount += 1
+	# Break if we've reached the maximum number of sequences
+	sequenceCount += 1
 		
-def firstPass(doc):
+def firstPass(sequence):
 	words = []
 	lemmas = []
 	posTags = []
 	newConceptsAdded = False
 	conceptsFound = False
 	
-	for token in doc:
+	for token in sequence:
 		word = token.text.lower()
 		lemma = token.lemma_.lower()
 		pos = token.pos_  # Part-of-speech tag

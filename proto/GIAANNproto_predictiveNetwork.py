@@ -64,13 +64,13 @@ if not drawSequenceObservedColumns:
 			self.databaseNetworkObject = databaseNetworkObject
 			self.observedColumnsDict = observedColumnsDict
 
-def seedNetwork(sequenceObservedColumns, sentenceIndex, doc, firstSeedTokenIndex, numSeedTokens):
-	words, lemmas, posTags = getLemmas(doc)
+def seedNetwork(sequenceObservedColumns, sequenceIndex, sequence, firstSeedTokenIndex, numSeedTokens):
+	words, lemmas, posTags = getLemmas(sequence)
 	if(inferenceIncrementallySeedNetwork):
 		print("\t seedNetwork: seedTokenIndex = ", firstSeedTokenIndex, ", word = ", words[firstSeedTokenIndex])
 	else:
 		print("\t seedNetwork: firstSeedTokenIndex = ", firstSeedTokenIndex, ", words = ", words[firstSeedTokenIndex:numSeedTokens])
-	GIAANNproto_databaseNetworkTrain.processConceptWords(sequenceObservedColumns, sentenceIndex, doc, words, lemmas, posTags, train=False, firstSeedTokenIndex=firstSeedTokenIndex, numSeedTokens=numSeedTokens)
+	GIAANNproto_databaseNetworkTrain.processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, words, lemmas, posTags, train=False, firstSeedTokenIndex=firstSeedTokenIndex, numSeedTokens=numSeedTokens)
 
 	if(inferenceDecrementActivations):
 		if(not inferenceSeedTargetActivationsGlobalFeatureArrays):
@@ -83,14 +83,14 @@ def seedNetwork(sequenceObservedColumns, sentenceIndex, doc, firstSeedTokenIndex
 		GIAANNproto_databaseNetworkDraw.visualize_graph(sequenceObservedColumns, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(firstSeedTokenIndex))
 
 
-def processConceptWordsInference(sequenceObservedColumns, sentenceIndex, doc, docSeed, docPredict, numSeedTokens):
+def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequence, sequenceSeed, sequencePredict, numSeedTokens):
 
 	print("processConceptWordsInference:")
 
 	sequenceWordIndex = 0
 	
-	wordsDoc, lemmasDoc, posTagsDoc = getLemmas(doc)
-	conceptMask, conceptIndices, numberConcepts = GIAANNproto_databaseNetworkTrain.createConceptMask(sequenceObservedColumns, lemmasDoc)
+	wordsSequence, lemmasSequence, posTagsSequence = getLemmas(sequence)
+	conceptMask, conceptIndices, numberConcepts = GIAANNproto_databaseNetworkTrain.createConceptMask(sequenceObservedColumns, lemmasSequence)
 	
 	if(transformerUseInputConnections):
 		GIAANNproto_databaseNetwork.generateGlobalFeatureConnections(sequenceObservedColumns.databaseNetworkObject)
@@ -99,17 +99,17 @@ def processConceptWordsInference(sequenceObservedColumns, sentenceIndex, doc, do
 		#seed network;
 		if(inferenceIncrementallySeedNetwork):
 			for seedTokenIndex in range(numSeedTokens):
-				seedNetwork(sequenceObservedColumns, sentenceIndex, doc, seedTokenIndex, 1)
+				seedNetwork(sequenceObservedColumns, sequenceIndex, sequence, seedTokenIndex, 1)
 		else:
-			seedNetwork(sequenceObservedColumns, sentenceIndex, doc, 0, numSeedTokens)
+			seedNetwork(sequenceObservedColumns, sequenceIndex, sequence, 0, numSeedTokens)
 
 		if(not inferenceSeedTargetActivationsGlobalFeatureArrays):
 			# Update observed columns from sequence observed columns
 			sequenceObservedColumns.updateObservedColumnsWrapper()	#convert sequence observed columns feature neuron arrays back to global feature neuron arrays
 	
-	numPredictionTokens = len(docPredict)	#set numPredictionTokens (dynamic)
+	numPredictionTokens = len(sequencePredict)	#set numPredictionTokens (dynamic)
 	
-	if(inferencePredictiveNetwork and not inferenceTrainPredictiveNetworkAllSentences):
+	if(inferencePredictiveNetwork and not inferenceTrainPredictiveNetworkAllSequences):
 		initialisePredictiveNetwork(sequenceObservedColumns.databaseNetworkObject)
 			
 	#identify first activated column(s) in prediction phase:
@@ -117,16 +117,16 @@ def processConceptWordsInference(sequenceObservedColumns, sentenceIndex, doc, do
 		kcMax = kcNetwork
 	else:
 		kcMax = 1	#not used
-	multipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, conceptColumnsIndices, conceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsDoc, lemmasDoc, conceptMask, 0, kcMax)
+	multipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, conceptColumnsIndices, conceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsSequence, lemmasSequence, conceptMask, 0, kcMax)
 	observedColumnsDict = sequenceObservedColumns.observedColumnsDict  # key: lemma, value: ObservedColumn	#every observed column in inference (seed and prediction phases)
 	
 	#predict next tokens;
 	for wordPredictionIndex in range(numPredictionTokens):
 		sequenceWordIndex = numSeedTokens + wordPredictionIndex
-		featurePredictionTargetMatch, conceptColumnsIndices, conceptColumnsFeatureIndices, multipleSources = processColumnInferencePrediction(sequenceObservedColumns, sentenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, wordsDoc, lemmasDoc, conceptColumnsIndices, conceptColumnsFeatureIndices, conceptMask, multipleSources)
+		featurePredictionTargetMatch, conceptColumnsIndices, conceptColumnsFeatureIndices, multipleSources = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, wordsSequence, lemmasSequence, conceptColumnsIndices, conceptColumnsFeatureIndices, conceptMask, multipleSources)
 		
 
-def processColumnInferencePrediction(sequenceObservedColumns, sentenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, wordsDoc, lemmasDoc, conceptColumnsIndices, conceptColumnsFeatureIndices, conceptMask, multipleSources):
+def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, wordsSequence, lemmasSequence, conceptColumnsIndices, conceptColumnsFeatureIndices, conceptMask, multipleSources):
 	
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 	
@@ -221,13 +221,13 @@ def processColumnInferencePrediction(sequenceObservedColumns, sentenceIndex, obs
 		print("globalFeatureNeuronsTemp = ", globalFeatureNeuronsTemp)
 
 	if(inferencePredictiveNetwork):
-		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wordsDoc, lemmasDoc, wordPredictionIndex, sequenceWordIndex, conceptMask)	
+		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask)	
 	else:
-		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsDoc, lemmasDoc, wordPredictionIndex, sequenceWordIndex, conceptMask)
+		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask)
 	
 	featurePredictionTargetMatch = False
 	if(printPredictionsDuringInferencePredict):
-		#compare topk column/feature predictions to docPredict (target words);
+		#compare topk column/feature predictions to sequencePredict (target words);
 		#implementation limitation; only works with kf = 1;
 		for columnPredictionIndex in range(conceptColumnsIndicesPred.shape[0]):
 			columnIndex = conceptColumnsIndicesPred[columnPredictionIndex]
@@ -239,7 +239,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sentenceIndex, obs
 				predictedWord = databaseNetworkObject.conceptFeaturesList[observedColumnFeatureIndex]
 			predictedColumnName = columnName
 			
-			targetWord = wordsDoc[sequenceWordIndex]
+			targetWord = wordsSequence[sequenceWordIndex]
 			if(targetMultipleSources):
 				targetColumnName = databaseNetworkObject.conceptColumnsList[targetPreviousColumnIndex] + "/" + databaseNetworkObject.conceptColumnsList[targetNextColumnIndex]
 			else:
@@ -255,9 +255,9 @@ def processColumnInferencePrediction(sequenceObservedColumns, sentenceIndex, obs
 
 	return featurePredictionTargetMatch, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext
 
-def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wordsDoc, lemmasDoc, wordPredictionIndex, sequenceWordIndex, conceptMask):		
+def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask):		
 	#generate targets;
-	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsDoc, lemmasDoc, conceptMask, sequenceWordIndex, kcNetwork)
+	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsSequence, lemmasSequence, conceptMask, sequenceWordIndex, kcNetwork)
 	
 	if(inferencePredictiveNetworkIndependentFCpredictions):
 		targets = None
@@ -324,9 +324,9 @@ def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wor
 	return conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex
 
 		
-def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsDoc, lemmasDoc, wordPredictionIndex, sequenceWordIndex, conceptMask):
+def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask):
 	#generate targets;
-	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsDoc, lemmasDoc, conceptMask, sequenceWordIndex, kcNetwork)
+	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsSequence, lemmasSequence, conceptMask, sequenceWordIndex, kcNetwork)
 
 	globalFeatureNeuronsActivationAllSegments = pt.sum(globalFeatureNeuronsActivation, dim=0)	#sum across all segments 	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
 	globalFeatureNeuronsStrengthAllSegments = pt.sum(globalFeatureNeuronsStrength, dim=0)	#sum across all segments 	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
@@ -448,12 +448,12 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 
 	return globalFeatureNeuronsActivation, globalFeatureConnectionsActivation
 		
-def getLemmas(doc):
+def getLemmas(sequence):
 	words = []
 	lemmas = []
 	posTags = []
 	
-	for token in doc:
+	for token in sequence:
 		word = token.text.lower()
 		lemma = token.lemma_.lower()
 		pos = token.pos_  # Part-of-speech tag

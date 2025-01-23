@@ -387,7 +387,7 @@ def createConceptMask(sequenceObservedColumns, lemmas):
 	numberConcepts = conceptIndices.shape[0]
 	return conceptMask, conceptIndices, numberConcepts
 	
-def processConceptWords(sequenceObservedColumns, sentenceIndex, doc, words, lemmas, posTags, train=True, firstSeedTokenIndex=None, numSeedTokens=None):
+def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, words, lemmas, posTags, train=True, firstSeedTokenIndex=None, numSeedTokens=None):
 	"""
 	For every concept word (lemma) in the sequence, identify every feature neuron in that column that occurs q words before or after the concept word in the sequence, including the concept neuron. This function has been parallelized using PyTorch array operations.
 	"""
@@ -417,8 +417,8 @@ def processConceptWords(sequenceObservedColumns, sentenceIndex, doc, words, lemm
 		nextConceptPositions = pt.searchsorted(conceptIndicesSorted, conceptIndices, right=True)
 		nextConceptExists = nextConceptPositions < len(conceptIndices)
 		nextConceptPositions = nextConceptPositions.clamp(max=len(nextConceptPositions)-1)
-		nextConceptIndices = pt.where(nextConceptExists, conceptIndicesSorted[nextConceptPositions], pt.full_like(conceptIndices, len(doc)))
-		distToNextConcept = pt.where(nextConceptExists, nextConceptIndices - conceptIndices, len(doc) - conceptIndices)
+		nextConceptIndices = pt.where(nextConceptExists, conceptIndicesSorted[nextConceptPositions], pt.full_like(conceptIndices, len(sequence)))
+		distToNextConcept = pt.where(nextConceptExists, nextConceptIndices - conceptIndices, len(sequence) - conceptIndices)
 	else:
 		q = 5
 		distToPrevConcept = pt.full((conceptIndices.size(0),), q, dtype=pt.long)
@@ -428,23 +428,23 @@ def processConceptWords(sequenceObservedColumns, sentenceIndex, doc, words, lemm
 	if(debugConceptFeaturesOccurFirstInSubsequence):
 		if usePOS:
 			startIndices = (conceptIndices).clamp(min=0)
-			endIndices = (conceptIndices + distToNextConcept).clamp(max=len(doc))
+			endIndices = (conceptIndices + distToNextConcept).clamp(max=len(sequence))
 		else:
 			startIndices = (conceptIndices).clamp(min=0)
-			endIndices = (conceptIndices + q + 1).clamp(max=len(doc))	
+			endIndices = (conceptIndices + q + 1).clamp(max=len(sequence))	
 	else:
 		if usePOS:
 			startIndices = (conceptIndices - distToPrevConcept + 1).clamp(min=0)
-			endIndices = (conceptIndices + distToNextConcept).clamp(max=len(doc))
+			endIndices = (conceptIndices + distToNextConcept).clamp(max=len(sequence))
 		else:
 			startIndices = (conceptIndices - q).clamp(min=0)
-			endIndices = (conceptIndices + q + 1).clamp(max=len(doc))
+			endIndices = (conceptIndices + q + 1).clamp(max=len(sequence))
 
-	processFeatures(sequenceObservedColumns, sentenceIndex, startIndices, endIndices, doc, words, lemmas, posTags, conceptIndices, train, firstSeedTokenIndex, numSeedTokens)
+	processFeatures(sequenceObservedColumns, sequenceIndex, startIndices, endIndices, sequence, words, lemmas, posTags, conceptIndices, train, firstSeedTokenIndex, numSeedTokens)
 	
 	return conceptIndices, startIndices, endIndices
 
-def processFeatures(sequenceObservedColumns, sentenceIndex, startIndices, endIndices, doc, words, lemmas, posTags, conceptIndices, train, firstSeedTokenIndex=None, numSeedTokens=None):
+def processFeatures(sequenceObservedColumns, sequenceIndex, startIndices, endIndices, sequence, words, lemmas, posTags, conceptIndices, train, firstSeedTokenIndex=None, numSeedTokens=None):
 	numberConceptsInSequence = conceptIndices.shape[0]
 	
 	cs = sequenceObservedColumns.cs
@@ -517,12 +517,12 @@ def processFeatures(sequenceObservedColumns, sentenceIndex, startIndices, endInd
 	#print("featureNeuronsSegmentMask = ", featureNeuronsSegmentMask)	
 	
 	if(train):
-		processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sentenceIndex)
+		processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex)
 	else:
-		firstSeedConceptIndex, numSeedConcepts, firstSeedFeatureIndex = identifySeedIndices(sequenceObservedColumns, sentenceIndex, startIndices, endIndices, doc, words, lemmas, posTags, conceptIndices, firstSeedTokenIndex, numSeedTokens)
+		firstSeedConceptIndex, numSeedConcepts, firstSeedFeatureIndex = identifySeedIndices(sequenceObservedColumns, sequenceIndex, startIndices, endIndices, sequence, words, lemmas, posTags, conceptIndices, firstSeedTokenIndex, numSeedTokens)
 		processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, firstSeedTokenIndex, numSeedTokens, firstSeedConceptIndex, numSeedConcepts, firstSeedFeatureIndex)
 
-def identifySeedIndices(sequenceObservedColumns, sentenceIndex, startIndices, endIndices, doc, words, lemmas, posTags, conceptIndices, firstSeedTokenIndex, numSeedTokens):
+def identifySeedIndices(sequenceObservedColumns, sequenceIndex, startIndices, endIndices, sequence, words, lemmas, posTags, conceptIndices, firstSeedTokenIndex, numSeedTokens):
 	firstSeedConceptIndex = None
 	numSeedConcepts = None
 	foundFirstSeedConcept = False
@@ -637,7 +637,7 @@ def createFeatureConnectionsActiveSeed(featureConnectionsActive, cs, fs, cs2, fs
 	
 	
 #first dim cs1 pertains to every concept node in sequence
-def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sentenceIndex):
+def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex):
 	featureNeuronsInactive = 1 - featureNeuronsActive
 		
 	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesStrength, :, :, :] += featureNeuronsActive
@@ -646,7 +646,7 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 	if(inferenceUseNeuronFeaturePropertiesTime):
 		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTime, :, :, :] = 0
 	else:
-		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTime, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTime] + featureNeuronsActive*sentenceIndex
+		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTime, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTime] + featureNeuronsActive*sequenceIndex
 	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPos, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPos] + featureNeuronsActive*featureNeuronsPos
 
 	featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[arrayIndexSegmentInternalColumn], cs, fs, columnsWordOrder, featureNeuronsWordOrder)
@@ -677,7 +677,7 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 	if(inferenceUseNeuronFeaturePropertiesTime):
 		sequenceObservedColumns.featureConnections[arrayIndexPropertiesTime, :, :, :, :, :] = 0
 	else:
-		sequenceObservedColumns.featureConnections[arrayIndexPropertiesTime, :, :, :, :, :] = featureConnectionsInactive*sequenceObservedColumns.featureConnections[arrayIndexPropertiesTime] + featureConnectionsActive*sentenceIndex
+		sequenceObservedColumns.featureConnections[arrayIndexPropertiesTime, :, :, :, :, :] = featureConnectionsInactive*sequenceObservedColumns.featureConnections[arrayIndexPropertiesTime] + featureConnectionsActive*sequenceIndex
 	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPos, :, :, :, :, :] = featureConnectionsInactive*sequenceObservedColumns.featureConnections[arrayIndexPropertiesPos] + featureConnectionsActive*featureConnectionsPos
 
 	if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections):
@@ -765,7 +765,7 @@ def decrementActivationDense(featureNeuronsActivation, activationDecrement):
 	if(inferenceDecrementActivationsNonlinear):
 		featureNeuronsActivation = featureNeuronsActivation * (1-activationDecrement)
 	else:
-		featureNeuronsActivation = featureNeuronsActivation - activationDecrementPerPredictedSentence
+		featureNeuronsActivation = featureNeuronsActivation - activationDecrementPerPredictedSequence
 	return featureNeuronsActivation
 
 
@@ -773,7 +773,7 @@ def decrementActivation(featureNeuronsActivation, activationDecrement):
 	if(inferenceDecrementActivationsNonlinear):
 		featureNeuronsActivation = featureNeuronsActivation * (1-activationDecrement)
 	else:
-		featureNeuronsActivation = GIAANNproto_sparseTensors.subtractValueFromSparseTensorValues(featureNeuronsActivation, activationDecrementPerPredictedSentence)
+		featureNeuronsActivation = GIAANNproto_sparseTensors.subtractValueFromSparseTensorValues(featureNeuronsActivation, activationDecrementPerPredictedSequence)
 	return featureNeuronsActivation
 
 

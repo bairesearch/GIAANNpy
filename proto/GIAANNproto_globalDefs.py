@@ -23,17 +23,20 @@ import torch as pt
 useGPUdense = True	#default: True
 useGPUsparse = False	#default: False	#orig: True
 useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/MLP predictive network model
-maxSentenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM availability during train (with trainSequenceObservedColumnsUseSequenceFeaturesOnly only limited amount of data is ever loaded to GPU during train)
+maxSequenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM availability during train (with trainSequenceObservedColumnsUseSequenceFeaturesOnly only limited amount of data is ever loaded to GPU during train)
 databaseFolder = "" #default: ""
-maxSentences = 10	#debug: 10, 500 	#default: 100000000	  #adjust as needed (eg lower max_sentences during train before independent inferenceTrainPredictiveNetworkAllSentences execution)	#max sentences for train or inference
+maxSequences = 10	#debug: 10, 500 	#default: 100000000	  #adjust as needed (eg lower max_sequences during train before independent inferenceTrainPredictiveNetworkAllSequences execution)	#max sequences for train or inference
 numberEpochs = 1	#default: 1
+multisentencePredictions = False	#default: False	#requires higher GPU RAM for train
+if(multisentencePredictions):
+	numSentencesPerSequence = 3	#default: 3
 
 # Set boolean variables as per specification
 useSANI = False	#sequentially activated neuronal input (divide dendrites into segments)
 useInference = False  # useInference mode
 if(useInference):
 	inferencePredictiveNetwork = True	#use MLP to predict next token	#orig:False
-	inferenceTrainPredictiveNetworkAllSentences = True	#support predictive network training on every sentence in corpus.	#precondition: expects database network to have been completely trained (with !useInference on all sentences)
+	inferenceTrainPredictiveNetworkAllSequences = True	#support predictive network training on every sequence in corpus.	#precondition: expects database network to have been completely trained (with !useInference on all sequences)
 	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False	#incremental seeding is used to match the inference prediction phase algorithm (for consistency in activation method)	#requires inferenceSeedNetwork
 	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	transformerUseInputConnections = False	#initialise (dependent var)
@@ -54,8 +57,8 @@ if(useInference):
 		if(inferencePredictiveNetworkNormaliseInputs):
 			inferencePredictiveNetworkNormaliseDim = 1	#orig: 0 #default: 1 -  normalise across SANI segments independently
 		inferenceUseNeuronFeaturePropertiesTime = True	#default:True	#orig:False		#FUTURE; else can use during train	#requires inferencePredictiveNetworkUseInputAllProperties
-		if(inferenceTrainPredictiveNetworkAllSentences):
-			inferenceRetainActivationsAcrossMultipleSentences = False	#default: False	#retain activations across sentences such that these can be used during training/inference
+		if(inferenceTrainPredictiveNetworkAllSequences):
+			inferenceRetainActivationsAcrossMultipleSequences = False	#default: False	#retain activations across sequences such that these can be used during training/inference
 			inferenceSavePredictiveNetwork = True
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False	#next token predictions are used to activate the next column features (rather than prediction targets)
 			numberEpochs = 1000	#default: 1	#10	#debug: 1000	#number of epochs to train predictive network
@@ -63,7 +66,7 @@ if(useInference):
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True
 		if(inferencePredictiveNetworkModel=="ColumnMLP"):
 			inferencePredictiveNetworkLearningRate = 0.0005	#default: 0.0005
-			inferencePredictiveNetworkModelFilterColumnsK = max(5, maxSentences//10)	#max(5, maxSentences//10)	#heuristic: int(c/10)	#5	#10	#50		#only consider top k columns for prediction (prefilter)
+			inferencePredictiveNetworkModelFilterColumnsK = max(5, maxSequences//10)	#max(5, maxSequences//10)	#heuristic: int(c/10)	#5	#10	#50		#only consider top k columns for prediction (prefilter)
 			print("inferencePredictiveNetworkModelFilterColumnsK = ", inferencePredictiveNetworkModelFilterColumnsK)
 			inferencePredictiveNetworkModelFilterColumnsKmax = True	#filter columns by max column activation rather than sum column activation.
 			inferencePredictiveNetworkUseInputAllProperties = True	#default: True
@@ -88,7 +91,7 @@ if(useInference):
 	else:
 		inferenceSeedNetwork = False	#default: False	#True is only for debug
 		inferenceBurstAllPredictionsOrTargetsInSequence = True	#default: True	#orig: True
-	trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised	#if used during seed phase will bias prediction towards target sentence words
+	trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised	#if used during seed phase will bias prediction towards target sequence words
 	if(inferenceSeedNetwork):
 		if(inferenceIncrementallySeedNetwork):
 			inferenceSeedTargetActivationsGlobalFeatureArrays = False	#optional	#default:True	#orig:False	
@@ -97,7 +100,7 @@ if(useInference):
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 			trainSequenceObservedColumnsUseSequenceFeaturesOnly = False	#mandatory	#global feature arrays are directly written to during inference seed phase
 	lowMem = False		#mandatory
-	trainSequenceObservedColumnsMatchSequenceWords = True	#optional	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sentence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
+	trainSequenceObservedColumnsMatchSequenceWords = True	#optional	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
 	drawSequenceObservedColumns = False	#mandatory
 	drawAllColumns = False	#mandatory
 	drawRelationTypes = False	#False: draw activation status
@@ -110,17 +113,17 @@ else:
 	inferenceUseNeuronFeaturePropertiesTime = True	#required to initialise time part of inferencePredictiveNetworkUseInputAllProperties to 0
 	lowMem = False		 #default: False	#orig: True	#currently required to be False for inference compatibility	#optional
 	trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
-	trainSequenceObservedColumnsMatchSequenceWords = True	#optional	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sentence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
+	trainSequenceObservedColumnsMatchSequenceWords = True	#optional	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
 	drawSequenceObservedColumns = False	#optional	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !trainSequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns	#optional (will affect which network changes can be visualised)
 	drawAllColumns = False	#optional	#draw all columns in network (only used for automated visualisation; drawNetworkDuringTrainSave)	#requires !drawSequenceObservedColumns
 	if(drawAllColumns):
 		assert not trainSequenceObservedColumnsUseSequenceFeaturesOnly
 	drawRelationTypes = True	#draw feature neuron and connection relation types in different colours
-	drawNetworkDuringTrain = True	#default: True	#disable if intend to use useInference:inferenceTrainPredictiveNetworkAllSentences after train 
+	drawNetworkDuringTrain = True	#default: True	#disable if intend to use useInference:inferenceTrainPredictiveNetworkAllSequences after train 
 	drawNetworkDuringTrainSave = False
 	inferenceActivationFunction = False
 	
-drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSentenceIndex"
+drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSequenceIndex"
 drawNetworkDuringInferenceSaveFilenamePrepend = "GIAANNproto1cSequenceObservedColumnsInferenceTokenIndex"
 drawHighResolutionFigure = True	#required for inference debug
 ignoreNewlineCharacters = True
@@ -141,7 +144,7 @@ if(trainSequenceObservedColumnsMatchSequenceWords):
 	#sumChangesToConceptNeuronSequenceInstances = True	#mandatory	#for multiple instances of concept in sequence, need to take the sum of the changes between the existing and modified arrays for each instance of a same concept in the sequence
 	assert not drawSequenceObservedColumns, "trainSequenceObservedColumnsMatchSequenceWords does not currently support drawSequenceObservedColumns; requires concept_name_to_index (i.e. one-to-one mapping between name and feature index in SequenceObservedColumns arrays) etc"
 
-useSaveData = True	#save data is required to allow consecutive sentence training and inference (because connection data are stored in observed columns, which are refreshed every sentence)
+useSaveData = True	#save data is required to allow consecutive sequence training and inference (because connection data are stored in observed columns, which are refreshed every sequence)
 usePOS = True		 # usePOS mode	#mandatory
 useParallelProcessing = True	#mandatory (else restore original code pre-GIAANNproto1b3a)
 randomiseColumnFeatureXposition = True	#shuffle x position of column internal features such that their connections can be better visualised
@@ -158,7 +161,7 @@ debugDrawNeuronActivations = False
 if(useInference):
 	debugConceptFeaturesOccurFirstInSubsequence = False #default: False	#orig: True	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
 	debugDrawNeuronActivations = True
-debugReloadGlobalFeatureNeuronsEverySentence = False
+debugReloadGlobalFeatureNeuronsEverySequence = False
 debugInferencePredictionActivationAccumulation = False	#monitor exponential runaway of activations negatively affects predictionNetwork loss optimisation (go to nan)	 #see inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures for comparison	#solved by inferenceActivationFunction
 
 useDedicatedFeatureLists = False
@@ -196,15 +199,15 @@ if(useInference):
 		inferenceDeactivateNeuronsUponPrediction = True	#default: True
 		inferenceDecrementActivations = False
 	activationDecrementPerPredictedToken = 0.1	#0.05	#CHECKTHIS
-	activationDecrementPerPredictedSentence = 0.5
+	activationDecrementPerPredictedSequence = 0.5
 	if(inferenceSeedNetwork):
 		if(inferenceIncrementallySeedNetwork):
 			activationDecrementSeed = activationDecrementPerPredictedToken
 		else:
-			activationDecrementSeed = activationDecrementPerPredictedSentence
+			activationDecrementSeed = activationDecrementPerPredictedSequence
 	
 	if(inferenceSeedNetwork):
-		numSeedTokens = 5	#number of seed tokens in last sentence of inference prompt (remaining tokens will be prediction tokens)
+		numSeedTokens = 5	#number of seed tokens in last sequence of inference prompt (remaining tokens will be prediction tokens)
 	else:
 		numSeedTokens = 0
 	
@@ -216,13 +219,13 @@ if(useInference):
 	if(inferencePredictiveNetwork):
 		if(debugConceptFeaturesOccurFirstInSubsequence):
 			kcPred = 1 	#number of topk columns to predict	#mandatory: 1
-			#inferenceTrainPredictiveNetworkAllSentences currently requires debugConceptFeaturesOccurFirstInSubsequence:!multipleTargets if kcNetwork == 1"
+			#inferenceTrainPredictiveNetworkAllSequences currently requires debugConceptFeaturesOccurFirstInSubsequence:!multipleTargets if kcNetwork == 1"
 			multipleTargets = False
 		else:
 			kcPred = 1 	#number of topk columns to predict
 			multipleTargets = True
 		kf = 1	#number of topk features to predict
-		if inferenceTrainPredictiveNetworkAllSentences:
+		if inferenceTrainPredictiveNetworkAllSequences:
 			assert kf==1
 		if kf>1:
 			multipleTargets = True
@@ -258,7 +261,10 @@ arrayNumberOfProperties = 5
 arrayPropertiesList = [arrayIndexPropertiesStrength, arrayIndexPropertiesPermanence, arrayIndexPropertiesActivation, arrayIndexPropertiesTime, arrayIndexPropertiesPos]
 arrayIndexSegmentFirst = 0
 if(useSANI):
-	arrayNumberOfSegments = 3	#default:3	#orig: 10	#max number of SANI segments per sequence (= max number of concept columns per sequence)	
+	if(multisentencePredictions):
+		arrayNumberOfSegments = 5
+	else:
+		arrayNumberOfSegments = 3	#default:3	#orig: 10	#max number of SANI segments per sequence (= max number of concept columns per sequence)	
 		#note if arrayNumberOfSegments=3 then; sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: all other column connections
 		#must be less than the (total number of concepts in a sequence - total number of concepts in effective predictive seed sequence)
 	#algorithmMatrixSANImethod="doNotEnforceSequentialityAcrossSegments"	#orig	#activate segments without any sequentiality requirement	#simply addActivationAcrossSegments
