@@ -43,6 +43,8 @@ import GIAANNproto_databaseNetworkDraw
 import GIAANNproto_databaseNetworkTrain
 if(useInference):
 	import GIAANNproto_predictiveNetwork
+if(SANIconceptNeurons):
+	import GIAANNproto_SANIconceptNeurons
 
 
 # Initialize spaCy model
@@ -139,9 +141,18 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 		sequencePredict = sequence[numSeedTokens:]
 
 	# First pass: Extract words, lemmas, POS tags, and update concept_columns_dict and c
-	conceptsFound, words, lemmas, posTags = firstPass(sequence)
+	conceptsFound, conceptMask = firstPass(sequence)
 	
+	sequenceList = []
 	if(conceptsFound):
+		if(SANIconceptNeurons):
+			sequenceList = GIAANNproto_SANIconceptNeurons.generateSANIsequenceList(sequence, conceptMask, nlp)
+		else:
+			sequenceList.append(sequence)
+		
+	for sequence in sequenceList:
+		words, lemmas, posTags = GIAANNproto_databaseNetworkTrain.getLemmas(sequence)
+
 		# When usePOS is enabled, detect all possible new features in the sequence
 		if not (useDedicatedFeatureLists):
 			detectNewFeatures(databaseNetworkObject, words, lemmas, posTags)
@@ -172,30 +183,32 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 
 	# Break if we've reached the maximum number of sequences
 	sequenceCount += 1
+	#note sequenceCount can be used as sequenceIndex (independent of index in sequenceList) because sequenceIndex is only used to index sequence time (same for all sequences in sequenceList)
 		
 def firstPass(sequence):
-	words = []
-	lemmas = []
-	posTags = []
 	newConceptsAdded = False
 	conceptsFound = False
+	conceptMask = []
 	
 	for token in sequence:
 		word = token.text.lower()
 		lemma = token.lemma_.lower()
 		pos = token.pos_  # Part-of-speech tag
-		
+
+		conceptFound = False
 		if usePOS:
 			if pos in nounPosTags:
 				# Only assign unique concept columns for nouns
-				conceptsFound, newConceptsAdded = GIAANNproto_databaseNetwork.addConceptToConceptColumnsDict(databaseNetworkObject, lemma, conceptsFound, newConceptsAdded)
+				conceptFound = True
 		else:
 			# When usePOS is disabled, assign concept columns for every new lemma encountered
+			conceptFound = True
+		
+		if(conceptFound):
 			conceptsFound, newConceptsAdded = GIAANNproto_databaseNetwork.addConceptToConceptColumnsDict(databaseNetworkObject, lemma, conceptsFound, newConceptsAdded)
-
-		words.append(word)
-		lemmas.append(lemma)
-		posTags.append(pos)
+			conceptMask.append(True)
+		else:
+			conceptMask.append(False)
 
 	# If new concept columns have been added, expand arrays as needed
 	if newConceptsAdded:
@@ -207,7 +220,7 @@ def firstPass(sequence):
 					databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons.coalesce()
 				databaseNetworkObject.globalFeatureNeurons = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeurons._indices(), databaseNetworkObject.globalFeatureNeurons._values(), size=newShape, dtype=arrayType, device=deviceSparse)
 				
-	return conceptsFound, words, lemmas, posTags
+	return conceptsFound, conceptMask
 
 				
 def secondPass(databaseNetworkObject, lemmas, posTags):

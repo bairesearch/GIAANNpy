@@ -65,7 +65,7 @@ if not drawSequenceObservedColumns:
 			self.observedColumnsDict = observedColumnsDict
 
 def seedNetwork(sequenceObservedColumns, sequenceIndex, sequence, firstSeedTokenIndex, numSeedTokens):
-	words, lemmas, posTags = getLemmas(sequence)
+	words, lemmas, posTags = GIAANNproto_databaseNetworkTrain.getLemmas(sequence)
 	if(inferenceIncrementallySeedNetwork):
 		print("\t seedNetwork: seedTokenIndex = ", firstSeedTokenIndex, ", word = ", words[firstSeedTokenIndex])
 	else:
@@ -89,7 +89,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 
 	sequenceWordIndex = 0
 	
-	wordsSequence, lemmasSequence, posTagsSequence = getLemmas(sequence)
+	wordsSequence, lemmasSequence, posTagsSequence = GIAANNproto_databaseNetworkTrain.getLemmas(sequence)
 	conceptMask, conceptIndices, numberConcepts = GIAANNproto_databaseNetworkTrain.createConceptMask(sequenceObservedColumns, lemmasSequence)
 	
 	if(transformerUseInputConnections):
@@ -448,19 +448,4 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 
 	return globalFeatureNeuronsActivation, globalFeatureConnectionsActivation
 		
-def getLemmas(sequence):
-	words = []
-	lemmas = []
-	posTags = []
-	
-	for token in sequence:
-		word = token.text.lower()
-		lemma = token.lemma_.lower()
-		pos = token.pos_  # Part-of-speech tag
-		words.append(word)
-		lemmas.append(lemma)
-		posTags.append(pos)
-	
-	return words, lemmas, posTags
-
 

@@ -22,6 +22,7 @@ import torch as pt
 from GIAANNproto_globalDefs import *
 import GIAANNproto_sparseTensors
 
+
 # Define the SequenceObservedColumns class
 class SequenceObservedColumns:
 	"""
@@ -796,3 +797,19 @@ def hybridActivation(x, scale=100.0):
 	f = (pt.sigmoid(x / scale) - 0.5 ) * 2.0
 	#print("f = ", f)
 	return f
+
+def getLemmas(sequence):
+	words = []
+	lemmas = []
+	posTags = []
+	
+	for token in sequence:
+		word = token.text.lower()
+		lemma = token.lemma_.lower()
+		pos = token.pos_  # Part-of-speech tag
+		words.append(word)
+		lemmas.append(lemma)
+		posTags.append(pos)
+	
+	return words, lemmas, posTags
+

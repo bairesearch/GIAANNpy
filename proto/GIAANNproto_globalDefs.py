@@ -31,6 +31,15 @@ multisentencePredictions = False	#default: False	#requires higher GPU RAM for tr
 if(multisentencePredictions):
 	numSentencesPerSequence = 3	#default: 3
 
+#SANI concept neuron vars;
+SANIconceptNeurons = False	#execute preprocessor to allocate neurons to non-noun tuples for each concept	#similar to SANIHFNLP algorithmMatrixSANI - emulate DendriticSANIbiologicalSimulationSimple	#these are effectively concept neurons but not specific to a particular concept
+if(SANIconceptNeurons):
+	SANIconceptNeuronsAllocateConceptFeatureWordNeuron = True	 #allocate a separate neuron for the concept feature neuron	#currently required for implementation
+	SANIconceptNeuronsAllocateWordNeurons = False	#still allocate original individual word neurons (create word connnections along with concept connections)
+	#SANIconceptNeuronsAllocateForPartialSubsequences = True	#unimplemented #assign SANI concept neurons for partial subsequences (2, 3, 4, etc word tuples; not just x word tupes where x is the length of the non-noun word tuple)
+	assert SANIconceptNeuronsAllocateConceptFeatureWordNeuron, "!SANIconceptNeuronsAllocateConceptFeatureWordNeuron not yet coded; need to update entire codebase to ensure only token.lemma or token.pos=NOUN is used to detect concept features and only token.word is used to generate a feature neuron name"
+	debugSANIconceptNeurons = False
+	
 # Set boolean variables as per specification
 useSANI = False	#sequentially activated neuronal input (divide dendrites into segments)
 useInference = False  # useInference mode
@@ -110,6 +119,8 @@ if(useInference):
 	drawNetworkDuringInferenceSeed = False
 	drawNetworkDuringInferencePredict = False	#True is only for debug
 	drawNetworkDuringInferenceSave = False	#True is only for debug
+	if(SANIconceptNeurons):
+		print("SANIconceptNeurons:useInference warning: there are too many SANI concept neuron (ie non-noun tuple) features per column to perform production level GIAANN inference on a conventional system; eg 100m phrases")
 else:
 	inferenceUseNeuronFeaturePropertiesTime = True	#required to initialise time part of inferencePredictiveNetworkUseInputAllProperties to 0
 	lowMem = False		 #default: False	#orig: True	#currently required to be False for inference compatibility	#optional
@@ -123,6 +134,8 @@ else:
 	drawNetworkDuringTrain = True	#default: True	#disable if intend to use useInference:inferenceTrainPredictiveNetworkAllSequences after train 
 	drawNetworkDuringTrainSave = False
 	inferenceActivationFunction = False
+	if(SANIconceptNeurons):
+		assert trainSequenceObservedColumnsUseSequenceFeaturesOnly	#required to significantly decrease GPU RAM during training
 	
 drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSequenceIndex"
 drawNetworkDuringInferenceSaveFilenamePrepend = "GIAANNproto1cSequenceObservedColumnsInferenceTokenIndex"
@@ -263,7 +276,7 @@ arrayPropertiesList = [arrayIndexPropertiesStrength, arrayIndexPropertiesPermane
 arrayIndexSegmentFirst = 0
 if(useSANI):
 	if(multisentencePredictions):
-		arrayNumberOfSegments = 5
+		arrayNumberOfSegments = 10	#default: 5
 	else:
 		arrayNumberOfSegments = 3	#default:3	#orig: 10	#max number of SANI segments per sequence (= max number of concept columns per sequence)	
 		#note if arrayNumberOfSegments=3 then; sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: all other column connections
@@ -311,6 +324,7 @@ if not lowMem:
 	globalFeatureNeuronsFile = 'globalFeatureNeurons'
 
 variableConceptNeuronFeatureName = "variableConceptNeuronFeature"
+variableConceptNeuronFeatureNameAbbreviation = "VCNF"
 featureIndexConceptNeuron = 0
 
 def printe(str):
