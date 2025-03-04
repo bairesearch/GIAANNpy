@@ -36,9 +36,14 @@ SANIconceptNeurons = False	#execute preprocessor to allocate neurons to non-noun
 if(SANIconceptNeurons):
 	SANIconceptNeuronsAllocateConceptFeatureWordNeuron = True	 #allocate a separate neuron for the concept feature neuron	#currently required for implementation
 	SANIconceptNeuronsAllocateWordNeurons = False	#still allocate original individual word neurons (create word connnections along with concept connections)
-	#SANIconceptNeuronsAllocateForPartialSubsequences = True	#unimplemented #assign SANI concept neurons for partial subsequences (2, 3, 4, etc word tuples; not just x word tupes where x is the length of the non-noun word tuple)
+	SANIconceptNeuronsAllocateForPartialSubsequences = True	#assign SANI concept neurons for partial subsequences (2, 3, 4, etc word tuples; not just x word tupes where x is the length of the non-noun word tuple)
+	if(SANIconceptNeuronsAllocateForPartialSubsequences):
+		SANIconceptNeuronsAllocateForPartialSubsequencesMinTupleSize = 2
+		SANIconceptNeuronsAllocateForPartialSubsequencesMaxTupleSize = 5
+		SANIconceptNeuronsAllocateForPartialSubsequencesMinWeight = 1	#number of times a tuple instance must occur in corpus before a SANIconceptNeuron is assigned to the database network concept column
+		SANIconceptNeuronsAllocateForPartialSubsequencesWeightIncrement = 1
 	assert SANIconceptNeuronsAllocateConceptFeatureWordNeuron, "!SANIconceptNeuronsAllocateConceptFeatureWordNeuron not yet coded; need to update entire codebase to ensure only token.lemma or token.pos=NOUN is used to detect concept features and only token.word is used to generate a feature neuron name"
-	debugSANIconceptNeurons = False
+	debugSANIconceptNeurons = True
 	
 # Set boolean variables as per specification
 useSANI = False	#sequentially activated neuronal input (divide dendrites into segments)
@@ -264,6 +269,8 @@ observedColumnsDir = databaseFolder + 'observedColumns'
 pytorchTensorFileExtension = ".pt"
 predictiveNetworkFolder = "."
 predictiveNetworkFileName = "predictiveNetworkModel.pt"
+SANIconceptNeuronsDictFile = databaseFolder + 'SANIconceptNeuronsDict.pkl'
+SANIconceptNeuronWeightsListFile = databaseFolder + 'SANIconceptNeuronWeightsList.pkl'
 
 #common array indices
 arrayIndexPropertiesStrength = 0
