@@ -27,6 +27,8 @@ maxSequenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM a
 databaseFolder = "" #default: ""
 maxSequences = 10	#debug: 10, 500 	#default: 100000000	  #adjust as needed (eg lower max_sequences during train before independent inferenceTrainPredictiveNetworkAllSequences execution)	#max sequences for train or inference
 numberEpochs = 1	#default: 1
+inferenceBeamWidth = 1	#beam search width for inference predictions (1 retains original behaviour)
+inferenceBeamScoreStrategy = None	#options: None/"activation"/"connection"/"activation_connection"
 multisentencePredictions = False	#default: False	#requires higher GPU RAM for train
 if(multisentencePredictions):
 	numSentencesPerSequence = 3	#default: 3

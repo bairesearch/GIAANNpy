@@ -121,12 +121,13 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	observedColumnsDict = sequenceObservedColumns.observedColumnsDict  # key: lemma, value: ObservedColumn	#every observed column in inference (seed and prediction phases)
 	
 	#predict next tokens;
+	beamSequences = None
 	for wordPredictionIndex in range(numPredictionTokens):
 		sequenceWordIndex = numSeedTokens + wordPredictionIndex
-		featurePredictionTargetMatch, conceptColumnsIndices, conceptColumnsFeatureIndices, multipleSources = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, wordsSequence, lemmasSequence, conceptColumnsIndices, conceptColumnsFeatureIndices, conceptMask, multipleSources)
-		
+		featurePredictionTargetMatch, conceptColumnsIndices, conceptColumnsFeatureIndices, multipleSources, beamSequences = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, wordsSequence, lemmasSequence, conceptColumnsIndices, conceptColumnsFeatureIndices, conceptMask, multipleSources, beamSequences)
 
-def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, wordsSequence, lemmasSequence, conceptColumnsIndices, conceptColumnsFeatureIndices, conceptMask, multipleSources):
+
+def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, wordsSequence, lemmasSequence, conceptColumnsIndices, conceptColumnsFeatureIndices, conceptMask, multipleSources, beamSequences):
 	
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 	
@@ -221,10 +222,74 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		print("globalFeatureNeuronsTemp = ", globalFeatureNeuronsTemp)
 
 	if(inferencePredictiveNetwork):
-		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask)	
+		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask)
 	else:
 		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask)
-	
+
+	# Beam search over predicted columns/features
+	if(beamSequences is None):
+		initialActivation = {"features": globalFeatureNeuronsActivation.clone()}
+		if(transformerUseInputConnections):
+			initialActivation["connections"] = None if globalFeatureConnectionsActivation is None else globalFeatureConnectionsActivation.clone()
+		else:
+			initialActivation["connections"] = None
+		if(inferenceUseNeuronFeaturePropertiesTime):
+			initialActivation["time"] = globalFeatureNeuronsTime.clone()
+		else:
+			initialActivation["time"] = None
+		beamSequences = [{"sequence": [], "score": 0.0, "activation": initialActivation}]
+
+	if(inferenceBeamWidth > 1 or inferenceBeamScoreStrategy is not None):
+		strengthDense = globalFeatureNeuronsStrength.to_dense()
+		beamCandidates = []
+		for beamSequence in beamSequences:
+			baseScore = beamSequence["score"]
+			for predictionIndex in range(conceptColumnsIndicesPred.shape[0]):
+				columnIndex = conceptColumnsIndicesPred[predictionIndex]
+				featureIndex = conceptColumnsFeatureIndicesPred[predictionIndex, 0]
+				candidateActivationFeatures = beamSequence["activation"]["features"].clone()
+				indicesToUpdateList = [arrayIndexPropertiesActivation, arrayIndexSegmentInternalColumn, columnIndex, featureIndex]
+				candidateActivationFeatures = GIAANNproto_sparseTensors.addElementValueToSparseTensor(candidateActivationFeatures, indicesToUpdateList, j1)
+				candidateActivationTime = None
+				if(inferenceUseNeuronFeaturePropertiesTime and beamSequence["activation"]["time"] is not None):
+					candidateActivationTime = beamSequence["activation"]["time"].clone()
+				candidateActivationConnections = None
+				if(transformerUseInputConnections and beamSequence["activation"]["connections"] is not None):
+					candidateActivationConnections = beamSequence["activation"]["connections"].clone()
+				activationDense = candidateActivationFeatures.to_dense()
+				activationScore = activationDense[:, columnIndex, featureIndex].sum().item()
+				connectionScore = strengthDense[:, columnIndex, featureIndex].sum().item()
+				if(inferenceBeamScoreStrategy == "activation_connection"):
+					pathScore = baseScore + activationScore + connectionScore
+				elif(inferenceBeamScoreStrategy == "connection"):
+					pathScore = baseScore + connectionScore
+				else:
+					pathScore = baseScore + activationScore
+				beamCandidates.append({"sequence": beamSequence["sequence"] + [(columnIndex, featureIndex)], "score": pathScore, "activation": {"features": candidateActivationFeatures, "connections": candidateActivationConnections, "time": candidateActivationTime}})
+
+		beamCandidates = sorted(beamCandidates, key=lambda x: x["score"], reverse=True)
+		beamSequences = beamCandidates[:inferenceBeamWidth]
+		bestBeamActivation = beamSequences[0]["activation"]
+		bestColumnIndex, bestFeatureIndex = beamSequences[0]["sequence"][-1]
+		conceptColumnsIndicesNext = pt.stack([bestColumnIndex])
+		conceptColumnsFeatureIndicesNext = pt.stack([bestFeatureIndex]).unsqueeze(dim=1)
+		multipleSourcesNext = (conceptColumnsIndicesNext.shape[0] > 1) or multipleSourcesNext
+		kc = conceptColumnsIndicesNext.shape[0]
+		globalFeatureNeuronsActivation = bestBeamActivation["features"]
+		if(transformerUseInputConnections and bestBeamActivation["connections"] is not None):
+			globalFeatureConnectionsActivation = bestBeamActivation["connections"]
+		if(inferenceUseNeuronFeaturePropertiesTime and bestBeamActivation["time"] is not None):
+			globalFeatureNeuronsTime = bestBeamActivation["time"]
+	else:
+		beamSequences = [{"sequence": [(conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext)], "score": 0.0, "activation": {"features": globalFeatureNeuronsActivation.clone(), "connections": None if (not transformerUseInputConnections or globalFeatureConnectionsActivation is None) else globalFeatureConnectionsActivation.clone(), "time": None if (not inferenceUseNeuronFeaturePropertiesTime) else globalFeatureNeuronsTime.clone()}}]
+
+	# align shared network state with selected beam activation snapshot
+	databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivation)
+	if(transformerUseInputConnections and globalFeatureConnectionsActivation is not None):
+		databaseNetworkObject.globalFeatureConnections = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureConnections, globalFeatureConnectionsActivation, arrayIndexPropertiesActivation)
+	if(inferenceUseNeuronFeaturePropertiesTime and globalFeatureNeuronsTime is not None):
+		databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTime)
+
 	featurePredictionTargetMatch = False
 	if(printPredictionsDuringInferencePredict):
 		#compare topk column/feature predictions to sequencePredict (target words);
@@ -253,7 +318,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		#FUTURE: convert globalFeatureNeuronsActivation back to globalFeatureNeurons for draw
 		GIAANNproto_databaseNetworkDraw.visualizeGraph(sequenceObservedColumnsPrediction, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(sequenceWordIndex))
 
-	return featurePredictionTargetMatch, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext
+	return featurePredictionTargetMatch, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, beamSequences
 
 def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask):		
 	#generate targets;
