@@ -20,6 +20,7 @@ pip install nltk spacy
 pip install datasets
 python3 -m spacy download en_core_web_sm
 pip install benepar
+pip install sortedcontainers
 
 # Usage:
 source activate pytorchsenv
@@ -60,7 +61,9 @@ def main():
 		if(inferencePredictiveNetwork):
 			GIAANNproto_predictiveNetwork.initialisePredictiveNetwork(databaseNetworkObject)
 		GIAANNproto_databaseNetwork.backupGlobalArrays(databaseNetworkObject)
-
+	if(SANIconceptNeurons):
+		GIAANNproto_SANIconceptNeurons.initialiseSANIconceptNeurons()
+		
 	for epochIndex in range(numberEpochs):
 		print("\nepochIndex = ", epochIndex)
 		# Start processing the dataset
@@ -72,6 +75,8 @@ def main():
 		
 	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSequences and inferenceSavePredictiveNetwork):
 		GIAANNproto_predictiveNetwork.inferenceSavePredictiveNetwork()
+	if(SANIconceptNeurons):
+		GIAANNproto_SANIconceptNeurons.finaliseSANIconceptNeurons()
 
 def processPrompt():
 	with open(inferencePromptFile, 'r', encoding='utf-8') as file:
@@ -123,7 +128,7 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 	if(useInference and inferenceTrainPredictiveNetworkAllSequences):
 		if(not inferenceRetainActivationsAcrossMultipleSequences or sequenceIndex==0):	#or (articleIndex==0 and sequenceIndex==0)
 			GIAANNproto_databaseNetwork.restoreGlobalArrays(databaseNetworkObject)	#restore global arrays (reset activation and time etc properties between inferencePredictiveNetworkTrainAcrossMultipleSequences:articles/sequences)
-		
+	
 	print(f"Processing article: {articleIndex}, sequence: {sequenceIndex} {sequence.text}")
 
 	databaseNetworkObject.articleIndexDebug = articleIndex

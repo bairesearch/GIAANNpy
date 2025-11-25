@@ -1,5 +1,5 @@
 DONE//do:
-o1 preview prompt 1c25a;
+o1 preview prompt 1c25b;
 
 v1b:
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
@@ -174,3 +174,4 @@ MANUAL; - update GIAANNproto_databaseNetworkDraw to print all SANI segment value
 MANUAL; - add option multisentencePredictions - support multisentence predictions. Rename all instances of sentence/doc to sequence.
 MANUAL; - update GIAANNproto_main:processSequence to remove backupGlobalArrays/restoreGlobalArrays if(inferencePredictiveNetwork) condition.
 MANUAL; - start SANIconceptNeurons - execute preprocessor to allocate neurons to non-noun tuples for each concept.
+MANUAL; - add SANIconceptNeuronsAllocateForPartialSubsequences - assign SANI concept neurons for partial subsequences (2, 3, 4, etc word tuples; not just x word tuples where x is the length of the non-noun word tuple).

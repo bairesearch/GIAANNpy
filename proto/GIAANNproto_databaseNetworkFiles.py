@@ -38,6 +38,21 @@ def loadDictFile(dictFileName):
 		dictionary = pickle.load(fIn)
 	return dictionary
 
+def saveDictFile(dictFileName, dictObject):
+	# Save dictionary to disk
+	with open(dictFileName, 'wb') as fOut:
+		pickle.dump(dictObject, fOut)
+
+def loadListFile(listFileName):
+	with open(listFileName, 'rb') as fIn:
+		listObject = pickle.load(fIn)
+	return listObject
+
+def saveListFile(listFileName, listObject):
+	# Save list to disk
+	with open(listFileName, 'wb') as fOut:
+		pickle.dump(listObject, fOut)
+
 def loadFeatureNeuronsGlobalFile():
 	globalFeatureNeurons = loadTensor(databaseFolder, globalFeatureNeuronsFile)
 	return globalFeatureNeurons
@@ -54,12 +69,10 @@ def saveData(databaseNetworkObject, observedColumnsDict):
 		saveTensor(databaseNetworkObject.globalFeatureNeurons, databaseFolder, globalFeatureNeuronsFile)
 
 	# Save concept columns dictionary to disk
-	with open(conceptColumnsDictFile, 'wb') as fOut:
-		pickle.dump(databaseNetworkObject.conceptColumnsDict, fOut)
-
+	saveDictFile(conceptColumnsDictFile, databaseNetworkObject.conceptColumnsDict)
+	
 	# Save concept features dictionary to disk
-	with open(conceptFeaturesDictFile, 'wb') as fOut:
-		pickle.dump(databaseNetworkObject.conceptFeaturesDict, fOut)
+	saveDictFile(conceptFeaturesDictFile, databaseNetworkObject.conceptFeaturesDict)
 
 
 def observedColumnSaveToDisk(self):

@@ -19,32 +19,57 @@ GIA ANN proto global Defs
 
 import torch as pt
 
+#train/inference mode selection:
+useInference = False  # useInference mode	#else train mode
+trainNetworkForInference = False	#disables network drawing for fast training
+
 #RAM availability vars;
 useGPUdense = True	#default: True
 useGPUsparse = False	#default: False	#orig: True
 useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/MLP predictive network model
 maxSequenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM availability during train (with trainSequenceObservedColumnsUseSequenceFeaturesOnly only limited amount of data is ever loaded to GPU during train)
-databaseFolder = "" #default: ""
+databaseFolder = "../../../database"	#orig: ""
 maxSequences = 10	#debug: 10, 500 	#default: 100000000	  #adjust as needed (eg lower max_sequences during train before independent inferenceTrainPredictiveNetworkAllSequences execution)	#max sequences for train or inference
 numberEpochs = 1	#default: 1
 multisentencePredictions = False	#default: False	#requires higher GPU RAM for train
 if(multisentencePredictions):
 	numSentencesPerSequence = 3	#default: 3
 
+#Beam Search parameters
+inferenceBeamSearch = False	#orig: False
+if(inferenceBeamSearch):
+	inferenceBeamSearchConceptColumns = False
+	inferenceBeamScoreStrategy = "nodeActivation"	#options: "nodeActivation", "activation_connection", "connection"
+	inferenceBeamConceptColumnNodeActivationThreshold = 0.0
+	inferenceBeamInstanceNodeActivationThreshold = 0.0
+	if(inferenceBeamSearchConceptColumns):
+		inferenceBeamWidth = 3
+		inferenceBeamDepth = 3
+	else:
+		inferenceBeamWidth = 3
+		inferenceBeamDepth = 6
+
 #SANI concept neuron vars;
 SANIconceptNeurons = False	#execute preprocessor to allocate neurons to non-noun tuples for each concept	#similar to SANIHFNLP algorithmMatrixSANI - emulate DendriticSANIbiologicalSimulationSimple	#these are effectively concept neurons but not specific to a particular concept
 if(SANIconceptNeurons):
 	SANIconceptNeuronsAllocateConceptFeatureWordNeuron = True	 #allocate a separate neuron for the concept feature neuron	#currently required for implementation
 	SANIconceptNeuronsAllocateWordNeurons = False	#still allocate original individual word neurons (create word connnections along with concept connections)
-	#SANIconceptNeuronsAllocateForPartialSubsequences = True	#unimplemented #assign SANI concept neurons for partial subsequences (2, 3, 4, etc word tuples; not just x word tupes where x is the length of the non-noun word tuple)
+	SANIconceptNeuronsAllocateForPartialSubsequences = True	#assign SANI concept neurons for partial subsequences (2, 3, 4, etc word tuples; not just x word tupes where x is the length of the non-noun word tuple)
+	if(SANIconceptNeuronsAllocateForPartialSubsequences):
+		SANIconceptNeuronsAllocateForPartialSubsequencesMinTupleSize = 2
+		SANIconceptNeuronsAllocateForPartialSubsequencesMaxTupleSize = 5
+		SANIconceptNeuronsAllocateForPartialSubsequencesMinWeight = 1	#number of times a tuple instance must occur in corpus before a SANIconceptNeuron is assigned to the database network concept column
+		SANIconceptNeuronsAllocateForPartialSubsequencesWeightIncrement = 1
 	assert SANIconceptNeuronsAllocateConceptFeatureWordNeuron, "!SANIconceptNeuronsAllocateConceptFeatureWordNeuron not yet coded; need to update entire codebase to ensure only token.lemma or token.pos=NOUN is used to detect concept features and only token.word is used to generate a feature neuron name"
-	debugSANIconceptNeurons = False
+	debugSANIconceptNeurons = True
 	
 # Set boolean variables as per specification
 useSANI = False	#sequentially activated neuronal input (divide dendrites into segments)
-useInference = False  # useInference mode
 if(useInference):
-	inferencePredictiveNetwork = True	#use MLP to predict next token	#orig:False
+	if(inferenceBeamSearch):
+		inferencePredictiveNetwork = False
+	else:
+		inferencePredictiveNetwork = True	#use MLP to predict next token	#orig:False
 	inferenceTrainPredictiveNetworkAllSequences = True	#support predictive network training on every sequence in corpus.	#precondition: expects database network to have been completely trained (with !useInference on all sequences)
 	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False	#incremental seeding is used to match the inference prediction phase algorithm (for consistency in activation method)	#requires inferenceSeedNetwork
 	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
@@ -131,7 +156,10 @@ else:
 	if(drawAllColumns):
 		assert not trainSequenceObservedColumnsUseSequenceFeaturesOnly
 	drawRelationTypes = True	#draw feature neuron and connection relation types in different colours
-	drawNetworkDuringTrain = True	#default: True	#disable if intend to use useInference:inferenceTrainPredictiveNetworkAllSequences after train 
+	if(trainNetworkForInference):
+		drawNetworkDuringTrain = False	#disabled as intend to use useInference:inferenceTrainPredictiveNetworkAllSequences after train
+	else:
+		drawNetworkDuringTrain = True
 	drawNetworkDuringTrainSave = False
 	inferenceActivationFunction = False
 	if(SANIconceptNeurons):
@@ -264,6 +292,8 @@ observedColumnsDir = databaseFolder + 'observedColumns'
 pytorchTensorFileExtension = ".pt"
 predictiveNetworkFolder = "."
 predictiveNetworkFileName = "predictiveNetworkModel.pt"
+SANIconceptNeuronsDictFile = databaseFolder + 'SANIconceptNeuronsDict.pkl'
+SANIconceptNeuronWeightsListFile = databaseFolder + 'SANIconceptNeuronWeightsList.pkl'
 
 #common array indices
 arrayIndexPropertiesStrength = 0
