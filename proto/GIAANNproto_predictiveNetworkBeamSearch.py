@@ -51,13 +51,14 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 				continue
 			for candidate in candidates:
 				predictInfo = describeBeamCandidate(databaseNetworkObject, candidate)
-				if(printPredictionsDuringInferencePredict):
-					print("\t"*(depthIndex+2) + f"Predicting beam node(s): {predictInfo}")	# Debug: print beam depth and the node(s)/column being predicted
-				newState = cloneBeamActivationState(beam["state"])
+				#if(printPredictionsDuringInferencePredict):
+				#	print("\t"*(depthIndex+2) + f"Predicting beam node(s): {predictInfo}")	# Debug: print beam depth and the node(s)/column being predicted
+				oldState = beam["state"]
+				newState = cloneBeamActivationState(oldState)
 				for nodeColumn, nodeFeature in candidate["nodes"]:
 					executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, newState, nodeColumn, nodeFeature, sequenceWordIndex)
 				newSequence = beam["sequence"] + [candidate]
-				activationGain = computeCandidateActivationGain(newState["features"], candidate["nodes"])
+				activationGain = computeCandidateActivationGain(newState["features"], oldState["features"], candidate["nodes"])
 				candidateScore = computeBeamNodeScore(activationGain, candidate["connectionValue"])
 				newScore = beam["score"] + candidateScore
 				newBeams.append({"score": newScore, "state": newState, "sequence": newSequence})
@@ -333,20 +334,27 @@ def getConnectionValue(strengthLookup, columnIndex, featureIndex, maxFeatures):
 	return strengthLookup.get(key, 0.0)
 
 
-def computeCandidateActivationGain(stateFeatures, nodes):
-	if(len(nodes) == 0):
+def computeCandidateActivationGain(newStateFeatures, oldStateFeatures, candidateNodes):
+	if(len(candidateNodes) == 0):
 		return 0.0
-	stateFeatures = stateFeatures.coalesce()
-	if(stateFeatures._nnz() == 0):
+	newStateFeatures = newStateFeatures.coalesce()
+	oldStateFeatures = oldStateFeatures.coalesce()
+	newValues = newStateFeatures.values()
+	oldValues = oldStateFeatures.values()
+	if(newValues.numel() == 0 and oldValues.numel() == 0):
 		return 0.0
-	indices = stateFeatures.indices()
-	values = stateFeatures.values()
-	totalActivation = 0.0
-	for columnIndex, featureIndex in nodes:
-		columnTensor = pt.tensor(columnIndex, dtype=indices.dtype, device=indices.device)
-		featureTensor = pt.tensor(featureIndex, dtype=indices.dtype, device=indices.device)
-		mask = (indices[1] == columnTensor) & (indices[2] == featureTensor)
-		if(mask.any()):
-			totalActivation += values[mask].sum().item()
-	activationAverage = totalActivation / len(nodes)
-	return activationAverage
+	device = newStateFeatures.device
+	size = newStateFeatures.size()
+	newIndices = newStateFeatures.indices()
+	oldIndices = oldStateFeatures.indices()
+	combinedIndices = pt.cat([newIndices, oldIndices], dim=1)
+	combinedValues = pt.cat([newValues, -oldValues], dim=0)
+	deltaTensor = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=size, device=device).coalesce()
+	if(deltaTensor._values().numel() == 0):
+		return 0.0
+	indices = deltaTensor.indices()
+	values = deltaTensor.values()
+	positiveMask = values > 0
+	if(positiveMask.sum() == 0):
+		return 0.0
+	return values[positiveMask].sum().item()
