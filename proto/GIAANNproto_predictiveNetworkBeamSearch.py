@@ -21,7 +21,7 @@ import torch as pt
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_databaseNetwork
-import GIAANNproto_databaseNetworkTrain	#low level processFeaturesActivePredict functions currently stored here
+import GIAANNproto_databaseNetworkTrain	   #low level processFeaturesActivePredict functions currently stored here
 import GIAANNproto_sparseTensors
 
 
@@ -52,13 +52,15 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 			for candidate in candidates:
 				predictInfo = describeBeamCandidate(databaseNetworkObject, candidate)
 				#if(printPredictionsDuringInferencePredict):
-				#	print("\t"*(depthIndex+2) + f"Predicting beam node(s): {predictInfo}")	# Debug: print beam depth and the node(s)/column being predicted
+				#	 print("\t"*(depthIndex+2) + f"Predicting beam node(s): {predictInfo}")	   # Debug: print beam depth and the node(s)/column being predicted
 				oldState = beam["state"]
 				newState = cloneBeamActivationState(oldState)
 				for nodeColumn, nodeFeature in candidate["nodes"]:
 					executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, newState, nodeColumn, nodeFeature, sequenceWordIndex)
 				newSequence = beam["sequence"] + [candidate]
 				activationGain = computeCandidateActivationGain(newState["features"], oldState["features"], candidate["nodes"])
+				if(inferenceBeamSearchConceptColumns and inferenceBeamScoreStrategy == "nodeActivation"):
+					activationGain = candidate.get("activationValue", activationGain)
 				candidateScore = computeBeamNodeScore(activationGain, candidate["connectionValue"])
 				newScore = beam["score"] + candidateScore
 				newBeams.append({"score": newScore, "state": newState, "sequence": newSequence})
@@ -72,7 +74,8 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 	if(len(beams) == 0 or len(beams[0]["sequence"]) == 0):
 		return selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask)
 
-	bestBeam = max(beams, key=lambda item: item["score"])
+	allBeams = beams + completedBeams
+	bestBeam = max(allBeams, key=lambda item: item["score"])
 	bestAction = bestBeam["sequence"][0]
 	conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = convertNodesToPrediction(bestAction["nodes"])
 	if(conceptColumnsIndicesNext.shape[0] == 0):
@@ -241,7 +244,7 @@ def selectBeamCandidatesConceptColumns(columnIndices, featureIndices, activation
 			continue
 		meanActivation = selectedActivations.mean().item()
 		meanConnection = connectionSum/len(nodes)
-		candidates.append({"columnIndex": columnIndex, "featureIndex": nodes[0][1], "nodes": nodes, "connectionValue": meanConnection})
+		candidates.append({"columnIndex": columnIndex, "featureIndex": nodes[0][1], "nodes": nodes, "connectionValue": meanConnection, "activationValue": columnActivationTotals[columnTensorIndex].item()})
 	return candidates
 
 
