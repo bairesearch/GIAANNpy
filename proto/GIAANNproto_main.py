@@ -87,7 +87,7 @@ def processPrompt():
 def processDataset(dataset):
 	for articleIndex, article in enumerate(dataset):
 		processArticle(article['text'], articleIndex)
-		if sequenceCount == maxSequences:
+		if(sequenceCount == maxSequences and useMaxSequences):
 			break
 
 def processArticle(text, articleIndex):
@@ -115,11 +115,12 @@ def processArticle(text, articleIndex):
 				lastSequenceInPrompt = True
 		if(len(sequence) <= maxSequenceLength):
 			processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
-		if sequenceCount == maxSequences:
+		if(sequenceCount == maxSequences and useMaxSequences):
 			break
 			
 def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt):
 	global sequenceCount
+	global drawRelationTypes
 	
 	if(debugReloadGlobalFeatureNeuronsEverySequence):
 		initialiseDatabaseNetwork()
@@ -184,7 +185,7 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 				
 			if(drawNetworkDuringTrain):
 				# Visualize the complete graph every time a new sequence is parsed by the application.
-				GIAANNproto_databaseNetworkDraw.visualizeGraph(sequenceObservedColumns, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+str(sequenceIndex))
+				GIAANNproto_databaseNetworkDraw.visualizeGraph(sequenceObservedColumns, False, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+str(sequenceIndex))
 
 	# Break if we've reached the maximum number of sequences
 	sequenceCount += 1

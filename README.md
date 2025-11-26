@@ -26,6 +26,7 @@ pip install nltk spacy
 pip install datasets
 python3 -m spacy download en_core_web_sm
 pip install benepar
+pip install sortedcontainers
 ```
 
 ### Execution

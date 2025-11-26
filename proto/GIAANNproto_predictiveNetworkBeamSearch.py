@@ -22,6 +22,7 @@ import torch as pt
 from GIAANNproto_globalDefs import *
 import GIAANNproto_databaseNetwork
 import GIAANNproto_databaseNetworkTrain	#low level processFeaturesActivePredict functions currently stored here
+import GIAANNproto_sparseTensors
 
 
 def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask):
@@ -39,7 +40,6 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 	initialState = initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime)
 	beams = [{"score": 0.0, "state": initialState, "sequence": []}]
 	completedBeams = []
-	initialCandidates = None
 	beamDepth = max(1, inferenceBeamDepth)
 	beamWidthLimit = max(1, inferenceBeamWidth)
 
@@ -48,12 +48,13 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 		for beam in beams:
 			activationDense = pt.sum(beam["state"]["features"], dim=0).to_dense()
 			candidates = selectBeamCandidates(activationDense, strengthDense, beamWidthLimit)
-			if(depthIndex == 0 and initialCandidates is None and len(candidates) > 0):
-				initialCandidates = candidates.copy()
 			if(len(candidates) == 0):
 				completedBeams.append(beam)
 				continue
 			for candidate in candidates:
+				predictInfo = describeBeamCandidate(databaseNetworkObject, candidate)
+				if(printPredictionsDuringInferencePredict):
+					print("\t"*(depthIndex+2) + f"Predicting beam node(s): {predictInfo}")	# Debug: print beam depth and the node(s)/column being predicted
 				newState = cloneBeamActivationState(beam["state"])
 				for nodeColumn, nodeFeature in candidate["nodes"]:
 					executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, newState, nodeColumn, nodeFeature, sequenceWordIndex)
@@ -77,7 +78,10 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 		return selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask)
 	multipleSourcesNext = conceptColumnsIndicesNext.shape[0] > 1
 	kc = conceptColumnsIndicesNext.shape[0]
-	conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = buildBeamPredictionSummary(initialCandidates, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext)
+	if(printPredictionsDuringInferencePredict):
+		printBestBeamPath(bestBeam, databaseNetworkObject)
+	conceptColumnsIndicesPred = conceptColumnsIndicesNext.clone()
+	conceptColumnsFeatureIndicesPred = conceptColumnsFeatureIndicesNext.clone()
 	return conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex
 
 
@@ -118,7 +122,72 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 	conceptColumnsIndicesSource = pt.tensor([columnIndex], dtype=pt.long, device=deviceSparse)
 	conceptColumnsFeatureIndicesSource = pt.tensor([[featureIndex]], dtype=pt.long, device=deviceSparse)
 	state["features"], state["connections"] = GIAANNproto_databaseNetworkTrain.processFeaturesActivePredict(databaseNetworkObject, state["features"], state["connections"], featureConnections, conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource)
+	applyBeamNodePredictionEffects(state, columnIndex, featureIndex)
 	return state
+
+
+def applyBeamNodePredictionEffects(state, columnIndex, featureIndex):
+	modifyActivation = inferenceDeactivateNeuronsUponPrediction or inferenceInvertNeuronActivationUponPrediction
+	modifyTime = inferenceUseNeuronFeaturePropertiesTime and state.get("time") is not None
+	if(not modifyActivation and not modifyTime):
+		return
+	indicesToUpdate = buildBeamNodeIndices(state["features"].device, columnIndex, featureIndex)
+	if(modifyActivation):
+		if(inferenceDeactivateNeuronsUponPrediction):
+			modifier = 0
+		else:
+			modifier = inferenceInvertNeuronActivationUponPredictionLevel
+		state["features"] = GIAANNproto_sparseTensors.modifySparseTensor(state["features"], indicesToUpdate, modifier, multiply=inferenceInvertNeuronActivationUponPrediction)
+	if(modifyTime):
+		state["time"] = GIAANNproto_sparseTensors.modifySparseTensor(state["time"], indicesToUpdate, inferenceUseNeuronFeaturePropertiesTimeActivate)
+
+
+def buildBeamNodeIndices(device, columnIndex, featureIndex):
+	indicesToUpdateList = []
+	columnTensor = pt.tensor(columnIndex, dtype=pt.long, device=device)
+	featureTensor = pt.tensor(featureIndex, dtype=pt.long, device=device)
+	if(useSANI):
+		for segmentIndex in range(arrayNumberOfSegments):
+			segmentTensor = pt.tensor(segmentIndex, dtype=pt.long, device=device)
+			indicesToUpdateList.append(pt.stack([segmentTensor, columnTensor, featureTensor], dim=0))
+	else:
+		segmentTensor = pt.tensor(arrayIndexSegmentFirst, dtype=pt.long, device=device)
+		indicesToUpdateList.append(pt.stack([segmentTensor, columnTensor, featureTensor], dim=0))
+	return pt.stack(indicesToUpdateList, dim=0)
+
+
+def describeBeamCandidate(databaseNetworkObject, candidate):
+	if(inferenceBeamSearchConceptColumns):
+		columnIndex = candidate["columnIndex"]
+		columnName = databaseNetworkObject.conceptColumnsList[columnIndex]
+		nodeIndices = [nodeFeature for _, nodeFeature in candidate["nodes"]]
+		return f"column {columnIndex} ({columnName}), node indices {nodeIndices}"
+	return describeBeamNodes(databaseNetworkObject, candidate["nodes"])
+
+
+def describeBeamNodes(databaseNetworkObject, nodes):
+	nodeDescriptions = []
+	for nodeColumn, nodeFeature in nodes:
+		columnName = databaseNetworkObject.conceptColumnsList[nodeColumn]
+		if(nodeFeature == featureIndexConceptNeuron):
+			nodeName = f"{columnName} (concept)"
+		elif(nodeFeature < len(databaseNetworkObject.conceptFeaturesList)):
+			nodeName = databaseNetworkObject.conceptFeaturesList[nodeFeature]
+		else:
+			nodeName = f"feature_{nodeFeature}"
+		nodeDescriptions.append(f"column {nodeColumn} ({columnName}), node {nodeFeature} ({nodeName})")
+	return "; ".join(nodeDescriptions)
+
+
+def printBestBeamPath(bestBeam, databaseNetworkObject):
+	sequence = bestBeam.get("sequence", [])
+	if(len(sequence) == 0):
+		return
+	pathSegments = []
+	for depthIndex, candidate in enumerate(sequence):
+		description = describeBeamCandidate(databaseNetworkObject, candidate)
+		pathSegments.append(f"Depth {depthIndex}: {description}")
+	print("\t\tBest beam path:\n\t\t\t" + "\n\t\t\t".join(pathSegments))	# Debug: summary of the highest scoring beam path
 
 
 def selectBeamCandidates(activationDense, strengthDense, candidateLimit):
@@ -219,19 +288,3 @@ def convertNodesToPrediction(nodes):
 	conceptColumnsIndicesNext = pt.tensor(conceptColumnsIndicesNextList, dtype=pt.long)
 	conceptColumnsFeatureIndicesNext = pt.tensor(conceptColumnsFeatureIndicesNextList, dtype=pt.long).unsqueeze(1)
 	return conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext
-
-
-def buildBeamPredictionSummary(initialCandidates, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext):
-	if(initialCandidates is None or len(initialCandidates) == 0):
-		return conceptColumnsIndicesNext.clone(), conceptColumnsFeatureIndicesNext.clone()
-	columnsList = []
-	featuresList = []
-	for candidate in initialCandidates:
-		columnsList.append(candidate["columnIndex"])
-		featuresList.append(candidate["featureIndex"])
-	conceptColumnsIndicesPred = pt.tensor(columnsList, dtype=pt.long)
-	conceptColumnsFeatureIndicesPred = pt.tensor(featuresList, dtype=pt.long).unsqueeze(1)
-	return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
-
-
-

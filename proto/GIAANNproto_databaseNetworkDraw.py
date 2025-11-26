@@ -25,7 +25,7 @@ import GIAANNproto_sparseTensors
 from GIAANNproto_globalDefs import *
 import GIAANNproto_databaseNetwork
 
-if(drawRelationTypes):
+if(drawRelationTypesTrain):
 	relationTypeConceptPos1 = 'NOUN'
 	relationTypeConceptPos2 = 'PROPN'
 	relationTypeActionPos = 'VERB'
@@ -114,7 +114,13 @@ def floatToString(value):
 	result = str(round(value, 2))
 	return result
 		
-def visualizeGraph(sequenceObservedColumns, save=False, fileName=None):
+def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=None):
+
+	if(inferenceMode):
+		drawRelationTypes = drawRelationTypesInference
+	else:
+		drawRelationTypes = drawRelationTypesTrain
+
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 	G.clear()
 
@@ -190,9 +196,10 @@ def visualizeGraph(sequenceObservedColumns, save=False, fileName=None):
 						neuronColor = 'lightskyblue'
 					else:
 						neuronColor = 'cyan'
-						
-				if(debugDrawNeuronActivations):
-					neuronName = createNeuronLabelWithActivation(neuronName, neuronActivationString(featureNeurons, arrayIndexPropertiesActivation, featureIndexInObservedColumn))
+
+				if(inferenceMode):	
+					if(debugDrawNeuronActivations):
+						neuronName = createNeuronLabelWithActivation(neuronName, neuronActivationString(featureNeurons, arrayIndexPropertiesActivation, featureIndexInObservedColumn))
 
 				featureNode = f"{lemma}_{featureWord}_{fIdx}"
 				if(randomiseColumnFeatureXposition and not conceptNeuronFeature):
