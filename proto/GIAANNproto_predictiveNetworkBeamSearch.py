@@ -32,10 +32,9 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 	if(inferenceBeamDepth <= 0 or inferenceBeamWidth <= 0):
 		return selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask)
 
-	strengthDense = None
+	strengthLookup = None
 	if(globalFeatureNeuronsStrength is not None):
-		globalFeatureNeuronsStrengthAllSegments = pt.sum(globalFeatureNeuronsStrength, dim=0)
-		strengthDense = globalFeatureNeuronsStrengthAllSegments.to_dense()
+		strengthLookup = buildStrengthLookup(globalFeatureNeuronsStrength, databaseNetworkObject.f)
 
 	initialState = initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime)
 	beams = [{"score": 0.0, "state": initialState, "sequence": []}]
@@ -46,8 +45,7 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 	for depthIndex in range(beamDepth):
 		newBeams = []
 		for beam in beams:
-			activationDense = pt.sum(beam["state"]["features"], dim=0).to_dense()
-			candidates = selectBeamCandidates(activationDense, strengthDense, beamWidthLimit)
+			candidates = selectBeamCandidates(beam["state"]["features"], strengthLookup, beamWidthLimit, databaseNetworkObject)
 			if(len(candidates) == 0):
 				completedBeams.append(beam)
 				continue
@@ -59,7 +57,9 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 				for nodeColumn, nodeFeature in candidate["nodes"]:
 					executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, newState, nodeColumn, nodeFeature, sequenceWordIndex)
 				newSequence = beam["sequence"] + [candidate]
-				newScore = beam["score"] + candidate["score"]
+				activationGain = computeCandidateActivationGain(newState["features"], candidate["nodes"])
+				candidateScore = computeBeamNodeScore(activationGain, candidate["connectionValue"])
+				newScore = beam["score"] + candidateScore
 				newBeams.append({"score": newScore, "state": newState, "sequence": newSequence})
 		if(len(newBeams) == 0):
 			break
@@ -190,80 +190,84 @@ def printBestBeamPath(bestBeam, databaseNetworkObject):
 	print("\t\tBest beam path:\n\t\t\t" + "\n\t\t\t".join(pathSegments))	# Debug: summary of the highest scoring beam path
 
 
-def selectBeamCandidates(activationDense, strengthDense, candidateLimit):
-	if(activationDense.numel() == 0):
-		return []
+def selectBeamCandidates(stateFeatures, strengthLookup, candidateLimit, databaseNetworkObject):
 	candidateLimit = max(1, candidateLimit)
-	if(inferenceBeamSearchConceptColumns):
-		return selectBeamCandidatesConceptColumns(activationDense, strengthDense, candidateLimit)
-	else:
-		return selectBeamCandidatesInstanceNodes(activationDense, strengthDense, candidateLimit)
-
-
-def selectBeamCandidatesConceptColumns(activationDense, strengthDense, candidateLimit):
-	conceptActivations = pt.sum(activationDense, dim=1)
-	numColumns = conceptActivations.shape[0]
-	if(numColumns == 0):
+	columnIndices, featureIndices, activationValues = aggregateSparseColumnFeatureValues(stateFeatures, databaseNetworkObject.f)
+	if(columnIndices is None):
 		return []
-	selectionCount = min(candidateLimit, numColumns)
-	columnValues, columnIndices = pt.topk(conceptActivations, selectionCount)
+	if(inferenceBeamSearchConceptColumns):
+		return selectBeamCandidatesConceptColumns(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, databaseNetworkObject.f)
+	else:
+		return selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, databaseNetworkObject.f)
+
+
+def selectBeamCandidatesConceptColumns(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures):
+	if(activationValues.numel() == 0):
+		return []
+	uniqueColumns, inverseIndices = pt.unique(columnIndices, return_inverse=True)
+	columnActivationTotals = pt.zeros(uniqueColumns.shape[0], dtype=activationValues.dtype, device=activationValues.device)
+	columnActivationTotals.scatter_add_(0, inverseIndices, activationValues)
+	selectionCount = min(candidateLimit, columnActivationTotals.shape[0])
+	_, columnRanks = pt.topk(columnActivationTotals, selectionCount)
 	candidates = []
-	for idx in columnIndices.tolist():
-		columnActivation = activationDense[idx]
+	for rankTensor in columnRanks:
+		columnTensorIndex = rankTensor.item()
+		columnIndex = uniqueColumns[columnTensorIndex].item()
+		mask = (inverseIndices == columnTensorIndex)
+		columnFeatures = featureIndices[mask]
+		columnFeatureActivations = activationValues[mask]
+		if(columnFeatures.numel() == 0):
+			continue
 		nodeThreshold = inferenceBeamConceptColumnNodeActivationThreshold
 		if(nodeThreshold > 0):
-			activeNodes = (columnActivation >= nodeThreshold).nonzero(as_tuple=True)[0].tolist()
+			activeMask = columnFeatureActivations >= nodeThreshold
 		else:
-			activeNodes = (columnActivation > 0).nonzero(as_tuple=True)[0].tolist()
-		if(len(activeNodes) == 0):
-			activeNodes = [pt.argmax(columnActivation).item()]
-		nodes = [(idx, featureIndex) for featureIndex in activeNodes]
-		score = 0.0
-		for _, featureIndex in nodes:
-			activationValue = columnActivation[featureIndex].item()
-			connectionValue = 0.0
-			if(strengthDense is not None):
-				connectionValue = strengthDense[idx, featureIndex].item()
-			score += computeBeamNodeScore(activationValue, connectionValue)
-		candidateFeature = nodes[0][1]
-		candidates.append({"columnIndex": idx, "featureIndex": candidateFeature, "nodes": nodes, "score": score})
+			activeMask = columnFeatureActivations > 0
+		if(activeMask.sum() == 0):
+			#fallback to most active feature
+			maxIdx = pt.argmax(columnFeatureActivations)
+			activeMask = pt.zeros_like(columnFeatureActivations, dtype=pt.bool)
+			activeMask[maxIdx] = True
+		selectedFeatures = columnFeatures[activeMask]
+		selectedActivations = columnFeatureActivations[activeMask]
+		nodes = []
+		connectionSum = 0.0
+		for featureTensor in selectedFeatures:
+			featureIndex = featureTensor.item()
+			nodes.append((columnIndex, featureIndex))
+			connectionSum += getConnectionValue(strengthLookup, columnIndex, featureIndex, maxFeatures)
+		if(len(nodes) == 0):
+			continue
+		meanActivation = selectedActivations.mean().item()
+		meanConnection = connectionSum/len(nodes)
+		candidates.append({"columnIndex": columnIndex, "featureIndex": nodes[0][1], "nodes": nodes, "connectionValue": meanConnection})
 	return candidates
 
 
-def selectBeamCandidatesInstanceNodes(activationDense, strengthDense, candidateLimit):
-	c, f = activationDense.shape
-	if(c == 0 or f == 0):
+def selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures):
+	if(activationValues.numel() == 0):
 		return []
-	flatActivations = activationDense.view(-1)
-	selectionCount = min(candidateLimit, flatActivations.shape[0])
-	values, indices = pt.topk(flatActivations, selectionCount)
+	selectionCount = min(candidateLimit, activationValues.shape[0])
+	values, indices = pt.topk(activationValues, selectionCount)
 	candidates = []
 	threshold = inferenceBeamInstanceNodeActivationThreshold
 	selectedCount = 0
-	for rankIndex, flatIndex in enumerate(indices.tolist()):
+	for rankIndex, activationIndex in enumerate(indices.tolist()):
 		value = values[rankIndex].item()
 		if(threshold > 0 and value < threshold and selectedCount > 0):
 			continue
-		columnIndex = flatIndex // f
-		featureIndex = flatIndex % f
-		connectionValue = 0.0
-		if(strengthDense is not None):
-			connectionValue = strengthDense[columnIndex, featureIndex].item()
-		score = computeBeamNodeScore(value, connectionValue)
-		candidates.append({"columnIndex": columnIndex, "featureIndex": featureIndex, "nodes": [(columnIndex, featureIndex)], "score": score})
+		columnIndex = columnIndices[activationIndex].item()
+		featureIndex = featureIndices[activationIndex].item()
+		connectionValue = getConnectionValue(strengthLookup, columnIndex, featureIndex, maxFeatures)
+		candidates.append({"columnIndex": columnIndex, "featureIndex": featureIndex, "nodes": [(columnIndex, featureIndex)], "connectionValue": connectionValue})
 		selectedCount += 1
 		if(selectedCount == selectionCount):
 			break
 	if(len(candidates) == 0 and indices.shape[0] > 0):
-		flatIndex = indices[0].item()
-		columnIndex = flatIndex // f
-		featureIndex = flatIndex % f
-		value = values[0].item()
-		connectionValue = 0.0
-		if(strengthDense is not None):
-			connectionValue = strengthDense[columnIndex, featureIndex].item()
-		score = computeBeamNodeScore(value, connectionValue)
-		candidates.append({"columnIndex": columnIndex, "featureIndex": featureIndex, "nodes": [(columnIndex, featureIndex)], "score": score})
+		columnIndex = columnIndices[indices[0]].item()
+		featureIndex = featureIndices[indices[0]].item()
+		connectionValue = getConnectionValue(strengthLookup, columnIndex, featureIndex, maxFeatures)
+		candidates.append({"columnIndex": columnIndex, "featureIndex": featureIndex, "nodes": [(columnIndex, featureIndex)], "connectionValue": connectionValue})
 	return candidates
 
 
@@ -288,3 +292,61 @@ def convertNodesToPrediction(nodes):
 	conceptColumnsIndicesNext = pt.tensor(conceptColumnsIndicesNextList, dtype=pt.long)
 	conceptColumnsFeatureIndicesNext = pt.tensor(conceptColumnsFeatureIndicesNextList, dtype=pt.long).unsqueeze(1)
 	return conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext
+
+
+def aggregateSparseColumnFeatureValues(sparseTensor, maxFeatures):
+	if(sparseTensor is None):
+		return None, None, None
+	sparseTensor = sparseTensor.coalesce()
+	if(sparseTensor._nnz() == 0):
+		return None, None, None
+	indices = sparseTensor.indices()
+	values = sparseTensor.values()
+	columnIndices = indices[1]
+	featureIndices = indices[2]
+	keys = columnIndices * maxFeatures + featureIndices
+	uniqueKeys, inverseIndices = pt.unique(keys, return_inverse=True)
+	aggregatedValues = pt.zeros((uniqueKeys.shape[0],), dtype=values.dtype, device=values.device)
+	aggregatedValues.scatter_add_(0, inverseIndices, values)
+	aggregatedColumns = uniqueKeys // maxFeatures
+	aggregatedFeatures = uniqueKeys % maxFeatures
+	return aggregatedColumns, aggregatedFeatures, aggregatedValues
+
+
+def buildStrengthLookup(globalFeatureNeuronsStrength, maxFeatures):
+	columnIndices, featureIndices, values = aggregateSparseColumnFeatureValues(globalFeatureNeuronsStrength, maxFeatures)
+	if(columnIndices is None):
+		return None
+	strengthLookup = {}
+	for idx in range(columnIndices.shape[0]):
+		columnIndex = columnIndices[idx].item()
+		featureIndex = featureIndices[idx].item()
+		key = columnIndex * maxFeatures + featureIndex
+		strengthLookup[key] = values[idx].item()
+	return strengthLookup
+
+
+def getConnectionValue(strengthLookup, columnIndex, featureIndex, maxFeatures):
+	if(strengthLookup is None):
+		return 0.0
+	key = columnIndex * maxFeatures + featureIndex
+	return strengthLookup.get(key, 0.0)
+
+
+def computeCandidateActivationGain(stateFeatures, nodes):
+	if(len(nodes) == 0):
+		return 0.0
+	stateFeatures = stateFeatures.coalesce()
+	if(stateFeatures._nnz() == 0):
+		return 0.0
+	indices = stateFeatures.indices()
+	values = stateFeatures.values()
+	totalActivation = 0.0
+	for columnIndex, featureIndex in nodes:
+		columnTensor = pt.tensor(columnIndex, dtype=indices.dtype, device=indices.device)
+		featureTensor = pt.tensor(featureIndex, dtype=indices.dtype, device=indices.device)
+		mask = (indices[1] == columnTensor) & (indices[2] == featureTensor)
+		if(mask.any()):
+			totalActivation += values[mask].sum().item()
+	activationAverage = totalActivation / len(nodes)
+	return activationAverage

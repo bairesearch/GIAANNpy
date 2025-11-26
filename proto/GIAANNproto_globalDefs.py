@@ -21,7 +21,7 @@ import torch as pt
 
 #train/inference mode selection:
 useInference = True  #default: True	#support inference mode else train (only) mode
-drawNetworkDuringTrain = True	#default: False  	#network drawing for prototype (not suitable for fast training)
+drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
 if(useInference):
 	inferenceBeamSearch = True	#default: True	#orig: False
 	if(inferenceBeamSearch):
