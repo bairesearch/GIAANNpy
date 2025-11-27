@@ -381,10 +381,10 @@ def computeBeamNodeScore(activationValue, connectionValue):
 
 
 def convertNodesToPrediction(nodes):
-        if(len(nodes) == 0):
-                return pt.tensor([], dtype=pt.long), pt.tensor([], dtype=pt.long)
-        conceptColumnsIndicesNextList = []
-        conceptColumnsFeatureIndicesNextList = []
+	if(len(nodes) == 0):
+		return pt.tensor([], dtype=pt.long), pt.tensor([], dtype=pt.long)
+	conceptColumnsIndicesNextList = []
+	conceptColumnsFeatureIndicesNextList = []
 	for columnIndex, featureIndex in nodes:
 		conceptColumnsIndicesNextList.append(columnIndex)
 		conceptColumnsFeatureIndicesNextList.append(featureIndex)
@@ -394,10 +394,10 @@ def convertNodesToPrediction(nodes):
 
 
 def aggregateSparseColumnFeatureValues(sparseTensor, maxFeatures):
-        if(sparseTensor is None):
-                return None, None, None
-        sparseTensor = sparseTensor.coalesce()
-        if(sparseTensor._nnz() == 0):
+	if(sparseTensor is None):
+		return None, None, None
+	sparseTensor = sparseTensor.coalesce()
+	if(sparseTensor._nnz() == 0):
 		return None, None, None
 	indices = sparseTensor.indices()
 	values = sparseTensor.values()
