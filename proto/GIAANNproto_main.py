@@ -54,9 +54,23 @@ nlp = spacy.load('en_core_web_sm')
 databaseNetworkObject = GIAANNproto_databaseNetwork.initialiseDatabaseNetwork()
 databaseNetworkObject.nlp = nlp	#used by posStringToPosInt
 
+def ensurePredictiveInferenceDatabaseReady():
+	if(useInference and inferenceTrainPredictiveNetworkAllSequences):
+		missingFiles = []
+		if not GIAANNproto_databaseNetworkFiles.pathExists(conceptColumnsDictFile):
+			missingFiles.append(conceptColumnsDictFile)
+		if not GIAANNproto_databaseNetworkFiles.pathExists(conceptFeaturesDictFile):
+			missingFiles.append(conceptFeaturesDictFile)
+		if missingFiles:
+			print("error: inferenceTrainPredictiveNetworkAllSequences expects the database network to have been trained with useInference=False on all sequences.")
+			print("missing database files:", ", ".join(missingFiles))
+			print("precondition: expects database network to have been completely trained (with !useInference on all sequences).")
+			raise SystemExit(1)
+
 def main():
 	global sequenceCount
 	GIAANNproto_databaseNetworkFiles.initialiseDatabaseFiles()
+	ensurePredictiveInferenceDatabaseReady()
 	if(useInference and inferenceTrainPredictiveNetworkAllSequences):
 		if(inferencePredictiveNetwork):
 			GIAANNproto_predictiveNetwork.initialisePredictiveNetwork(databaseNetworkObject)

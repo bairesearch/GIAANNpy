@@ -32,11 +32,14 @@ if(useInference):
 		inferenceTrainPredictiveNetworkAllSequences = True	 #default: True - performs inference on all input text (enables predictive network training on every sequence in corpus)	#precondition: expects database network to have been completely trained (with !useInference on all sequences)
 	else:
 		inferenceTrainPredictiveNetworkAllSequences = False	#default: False - requires inference_prompt.txt (performs training on all sentences except last, and then prediction on the last sentence)	#precondition: None
-	if(inferenceTrainPredictiveNetworkAllSequences):
-		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False #False: prediction targets (rather than predictions) are used to continously seed inference to train predictive network
+	if(inferenceBeamSearch):
+		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#mandatory (beam search always follows predictions not targets)
 	else:
-		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True	#True: next token predictions are used to activate the next column features (rather than prediction targets)
-		
+		if(inferenceTrainPredictiveNetworkAllSequences):
+			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False #False: prediction targets (rather than predictions) are used to continously seed inference to train predictive network
+		else:
+			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#orig: True	#True: next token predictions are used to activate the next column features (rather than prediction targets)	#set to False only to compare predictive performance with inferencePredictiveNetwork
+
 #RAM availability vars;
 useGPUdense = True	#default: True
 useGPUsparse = False	#default: False	#orig: True
@@ -131,7 +134,6 @@ if(useInference):
 			transformerOutputLayerUseEveryColumn = True	#default: True	#orig: False	#whether the output layer uses features from every column (or just the final column in the sequence)
 	else:
 		inferenceUseNeuronFeaturePropertiesTime = False
-		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default:True	#set to False to compare predictive performance with inferencePredictiveNetwork
 	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		inferenceSeedNetwork = True	#default: True
 		inferenceBurstAllPredictionsOrTargetsInSequence = False	#default: False	#orig: False

@@ -28,6 +28,26 @@ from GIAANNproto_globalDefs import *
 import GIAANNproto_predictiveNetworkOperations
 import GIAANNproto_sparseTensors
 
+model = None
+criterion = None
+criterionC = None
+criterionF = None
+optimizer = None
+batchSize = 1
+
+def ensureModelMatchesDatabase(databaseNetworkObject):
+	"""Recreate the predictive model if the database dimensions changed."""
+	global model
+	if model is None:
+		nextWordPredictionModelCreate(databaseNetworkObject)
+		return
+	if (model.p != databaseNetworkObject.p or
+		model.s != databaseNetworkObject.s or
+		model.c != databaseNetworkObject.c or
+		model.f != databaseNetworkObject.f):
+		print("Reinitialising predictive Column MLP to match database dimensions")
+		nextWordPredictionModelCreate(databaseNetworkObject)
+
 def nextWordPredictionModelCreate(databaseNetworkObject):
 	global model, criterion, criterionC, criterionF, optimizer, batchSize
 
@@ -225,5 +245,3 @@ def selectMostActiveColumns(globalFeatureNeurons, kc):
 	globalFeatureNeuronsFilteredColumns = GIAANNproto_sparseTensors.sliceSparseTensorMulti(globalFeatureNeurons, cDim, conceptColumnsActivationTopkConceptsIndices)	#select topk concept indices
 	
 	return globalFeatureNeuronsFilteredColumns, conceptColumnsActivationTopkConceptsIndices
-
-
