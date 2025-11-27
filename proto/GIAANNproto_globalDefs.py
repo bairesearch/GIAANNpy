@@ -59,6 +59,9 @@ if(useInference and inferenceBeamSearch):
 	inferenceBeamScoreStrategy = "nodeActivation"	#options: "nodeActivation", "activation_connection", "connection"
 	inferenceBeamConceptColumnNodeActivationThreshold = 0.0
 	inferenceBeamInstanceNodeActivationThreshold = 0.0
+	inferenceBeamInstancePreferActiveNodeCounts = False		  #optional: prioritise columns with more active nodes (count-based)
+	inferenceBeamInstancePreferInternalConnectivity = False      #optional: prioritise columns with stronger internal connectivity between active nodes
+	inferenceBeamInstancePreferAdjacentOverlap = False           #optional: prioritise columns sharing active features with adjacent columns
 	if(inferenceBeamSearchConceptColumns):
 		inferenceBeamWidth = 3
 		inferenceBeamDepth = 3
