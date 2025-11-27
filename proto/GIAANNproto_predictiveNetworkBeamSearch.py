@@ -251,6 +251,43 @@ def selectBeamCandidatesConceptColumns(columnIndices, featureIndices, activation
 def selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures):
 	if(activationValues.numel() == 0):
 		return []
+	useColumnPreferences = (inferenceBeamInstancePreferActiveNodeCounts or
+		inferenceBeamInstancePreferInternalConnectivity or
+		inferenceBeamInstancePreferAdjacentOverlap)
+	if(not useColumnPreferences):
+		return selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures)
+	columnData = buildInstanceColumnData(columnIndices, featureIndices, activationValues)
+	if(len(columnData) == 0):
+		return selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures)
+	columnScores = computeInstanceColumnScores(columnData, strengthLookup, maxFeatures, activationValues.device, activationValues.dtype)
+	if(len(columnScores) == 0):
+		return selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures)
+	sortedColumns = sorted(columnScores.items(), key=lambda item: item[1], reverse=True)
+	candidates = []
+	threshold = inferenceBeamInstanceNodeActivationThreshold
+	for columnIndex, _ in sortedColumns:
+		columnEntry = columnData[columnIndex]
+		activationsTensor = pt.tensor(columnEntry["activations"], device=activationValues.device, dtype=activationValues.dtype)
+		featuresList = columnEntry["features"]
+		if(activationsTensor.numel() == 0):
+			continue
+		order = pt.argsort(activationsTensor, descending=True)
+		for idx in order.tolist():
+			value = activationsTensor[idx].item()
+			featureIndex = featuresList[idx]
+			if(threshold > 0 and value < threshold and len(candidates) > 0):
+				continue
+			connectionValue = getConnectionValue(strengthLookup, columnIndex, featureIndex, maxFeatures)
+			candidates.append({"columnIndex": columnIndex, "featureIndex": featureIndex, "nodes": [(columnIndex, featureIndex)], "connectionValue": connectionValue})
+			break
+		if(len(candidates) == candidateLimit):
+			break
+	if(len(candidates) == 0):
+		return selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures)
+	return candidates
+
+
+def selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures):
 	selectionCount = min(candidateLimit, activationValues.shape[0])
 	values, indices = pt.topk(activationValues, selectionCount)
 	candidates = []
@@ -275,6 +312,64 @@ def selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationV
 	return candidates
 
 
+def buildInstanceColumnData(columnIndices, featureIndices, activationValues):
+	columnData = {}
+	for idx in range(columnIndices.shape[0]):
+		columnIndex = columnIndices[idx].item()
+		featureIndex = featureIndices[idx].item()
+		activationValue = activationValues[idx].item()
+		if(columnIndex not in columnData):
+			columnData[columnIndex] = {"features": [], "activations": []}
+		columnData[columnIndex]["features"].append(featureIndex)
+		columnData[columnIndex]["activations"].append(activationValue)
+	return columnData
+
+
+def computeInstanceColumnScores(columnData, strengthLookup, maxFeatures, device, dtype):
+	columnScores = {}
+	activeFeatureSets = {}
+	for columnIndex, data in columnData.items():
+		activeFeatures = set()
+		for featureIndex, activationValue in zip(data["features"], data["activations"]):
+			if(activationValue > 0):
+				activeFeatures.add(featureIndex)
+		activeFeatureSets[columnIndex] = activeFeatures
+	for columnIndex, data in columnData.items():
+		activationsTensor = pt.tensor(data["activations"], device=device, dtype=dtype)
+		featuresList = data["features"]
+		if(activationsTensor.numel() == 0):
+			continue
+		baseScore = activationsTensor.max().item()
+		totalScore = baseScore
+		if(inferenceBeamInstancePreferActiveNodeCounts):
+			if(inferenceBeamInstanceNodeActivationThreshold > 0):
+				activeCount = sum(activationValue >= inferenceBeamInstanceNodeActivationThreshold for activationValue in data["activations"])
+			else:
+				activeCount = sum(activationValue > 0 for activationValue in data["activations"])
+			totalScore += float(activeCount)
+		if(inferenceBeamInstancePreferInternalConnectivity):
+			connectivityValues = []
+			for featureIndex, activationValue in zip(featuresList, data["activations"]):
+				if(activationValue > 0):
+					connectivityValues.append(getConnectionValue(strengthLookup, columnIndex, featureIndex, maxFeatures))
+			if(len(connectivityValues) > 0):
+				totalScore += sum(connectivityValues)/len(connectivityValues)
+		if(inferenceBeamInstancePreferAdjacentOverlap):
+			overlapScore = computeAdjacentOverlapScore(columnIndex, activeFeatureSets)
+			totalScore += overlapScore
+		columnScores[columnIndex] = totalScore
+	return columnScores
+
+
+def computeAdjacentOverlapScore(columnIndex, activeFeatureSets):
+	currentSet = activeFeatureSets.get(columnIndex, set())
+	if(len(currentSet) == 0):
+		return 0.0
+	previousOverlap = len(currentSet.intersection(activeFeatureSets.get(columnIndex-1, set())))
+	nextOverlap = len(currentSet.intersection(activeFeatureSets.get(columnIndex+1, set())))
+	return float(max(previousOverlap, nextOverlap))
+
+
 def computeBeamNodeScore(activationValue, connectionValue):
 	strategy = inferenceBeamScoreStrategy
 	if(strategy == "connection"):
@@ -286,10 +381,10 @@ def computeBeamNodeScore(activationValue, connectionValue):
 
 
 def convertNodesToPrediction(nodes):
-	if(len(nodes) == 0):
-		return pt.tensor([], dtype=pt.long), pt.tensor([], dtype=pt.long)
-	conceptColumnsIndicesNextList = []
-	conceptColumnsFeatureIndicesNextList = []
+        if(len(nodes) == 0):
+                return pt.tensor([], dtype=pt.long), pt.tensor([], dtype=pt.long)
+        conceptColumnsIndicesNextList = []
+        conceptColumnsFeatureIndicesNextList = []
 	for columnIndex, featureIndex in nodes:
 		conceptColumnsIndicesNextList.append(columnIndex)
 		conceptColumnsFeatureIndicesNextList.append(featureIndex)
@@ -299,10 +394,10 @@ def convertNodesToPrediction(nodes):
 
 
 def aggregateSparseColumnFeatureValues(sparseTensor, maxFeatures):
-	if(sparseTensor is None):
-		return None, None, None
-	sparseTensor = sparseTensor.coalesce()
-	if(sparseTensor._nnz() == 0):
+        if(sparseTensor is None):
+                return None, None, None
+        sparseTensor = sparseTensor.coalesce()
+        if(sparseTensor._nnz() == 0):
 		return None, None, None
 	indices = sparseTensor.indices()
 	values = sparseTensor.values()
