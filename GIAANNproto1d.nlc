@@ -1,6 +1,6 @@
-DONE//do:
-prompts 1d1a;
+//GIANNpy Specification (prompts):
 
+---
 v1b (o1 preview prompt):
 Please create an abstract biological neural neural network simulation for natural language processing in python. This is the specification:
 - Use the pytorch API for hardware acceleration of all arrays (for efficient parallel processing of connectivity). Do not initialise the array with a predetermined dictionary; dynamically populate the arrays as new dictionary words and relations are encountered. Will be discussed below.
@@ -82,6 +82,7 @@ MANUAL; - Initialise all feature neuron and feature connection tensors to zero (
 MANUAL; - patch populate_arrays self.feature_connections generation from sparse tensors.
 MANUAL; - Convert feature neuron/connections tensor redundant type dimension into SANI (sequentially activated neuronal input) segment dimension.
 
+---
 v1c (o1 preview prompt):
 MANUAL; - Create a hybrid GNN AI that comprises a database network (the abstract biological neural neural network defined previously) and a predictive network. The database network is easily modified upon encountering new information, enabling continuous learning (low energy/compute). The database network is trained using a target sequence (ground truth) and non-backpropagation algorithm. The predictive network is trained to generate next token predictions based on the database network along with the target sequence (ground truth). The AI is then capable of generating next token predictions based on a seed sequence (prompt) and its current revision of the database network. It learns to reason across/from the database network to generate its predictions. The database network is made amenable to existing LLM architectures (transformer/MLP) by structuring/storing its contents in permutation invariant assemblies.
 /MANUAL; - restore option not useSANI (set array_number_of_segments = 1). add option inferencePredictiveNetwork. Create class NextWordPredictionMLPmodel. Extract predictMostActiveFeature/selectMostActiveFeature from process_column_inference_prediction.
@@ -136,7 +137,7 @@ MANUAL; - patch process_column_inference_prediction:trainPredictionNetworkAllSen
 MANUAL; - patch process_concept_words_inference:!trainPredictionNetworkAllSentences - restore execution of initialisePredictiveNetwork after completing training steps in prompt. Extract option useNextTokenPredictionsOrTargetsToActivateNextColumnFeatures - next token predictions are used to activate the next column features (rather than prediction targets).
 MANUAL; - add inferenceActivationFunction - required to prevent exponential runaway of activations (that negatively affect predictionNetwork loss optimisation).
 MANUAL; - rename normaliseColumnSelectionByFeatureConnections*/normaliseFeatureSelectionByFeatureConnections*/useActivationDecrementNonlinear/useNeuronFeaturePropertiesTimeDuringInference/savePredictiveNetwork/useNextTokenPredictionsOrTargetsToActivateNextColumnFeatures/trainPredictionNetworkAllSentences/incrementallySeedNetwork/deactivateNeuronsUponPrediction/useActivationDecrement to inferenceNormaliseColumnSelectionByFeatureConnections*/inferenceNormaliseFeatureSelectionByFeatureConnections*/inferenceDecrementActivationsNonlinear/inferenceUseNeuronFeaturePropertiesTime/inferenceSavePredictiveNetwork/inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures/inferenceTrainPredictionNetworkAllSentences/inferenceIncrementallySeedNetwork/inferenceDeactivateNeuronsUponPrediction/inferenceDecrementActivations.
-MANUAL; - rename increaseColumnInternalConnectionsStrength*/normaliseConnectionStrengthWrtContextLength/decreasePermanenceOfInactiveFeatureNeuronsAndConnections/sequenceObservedColumnsUseSequenceFeaturesOnly/trainSequenceObservedColumnsMatchSequenceWords to trainIncreaseColumnInternalConnectionsStrength*/trainNormaliseConnectionStrengthWrtContextLength/trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections/sequenceObservedColumnsUseSequenceFeaturesOnly/trainSequenceObservedColumnsMatchSequenceWords
+MANUAL; - rename increaseColumnInternalConnectionsStrength*/normaliseConnectionStrengthWrtContextLength/decreasePermanenceOfInactiveFeatureNeuronsAndConnections/sequenceObservedColumnsUseSequenceFeaturesOnly/trainSequenceObservedColumnsMatchSequenceWords to trainConnectionStrengthIncreaseColumnInternal*/trainConnectionStrengthNormaliseWrtContextLength/trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections/sequenceObservedColumnsUseSequenceFeaturesOnly/trainSequenceObservedColumnsMatchSequenceWords
 MANUAL; - add option inferenceInvertNeuronActivationUponPrediction - set activations of previously activated neurons to negative - refractory period preventing consecutive feature reactivation and facilitating prediction based on past predictions. Update process_column_inference_prediction:inferenceDeactivateNeuronsUponPrediction.
 MANUAL; - add option useGPUpredictiveNetworkModel - use GPU to train transformer/MLP predictive network model.
 MANUAL; - update inferencePredictiveNetworkModelTransformer - independently predict c/f (rather than producing a single c*f matrix, produce an independent c and f matrix).
@@ -176,20 +177,36 @@ MANUAL; - update GIAANNproto_main:processSequence to remove backupGlobalArrays/r
 MANUAL; - start SANIconceptNeurons - execute preprocessor to allocate neurons to non-noun tuples for each concept.
 MANUAL; - add SANIconceptNeuronsAllocateForPartialSubsequences - assign SANI concept neurons for partial subsequences (2, 3, 4, etc word tuples; not just x word tuples where x is the length of the non-noun word tuple).
 
+---
 v1d (Codex IDE GPT-5.1-Codex):
-Please implement a beam search prediction algorithm according to this specification:
-If inferenceBeamSearch = True:
-	- Activate every token in sequence prompt (and resolve their connection target neuron updates).
-	- For every prediction in sequence:
-		- Perform beam search along inferenceBeamWidth and inferenceBeamDepth
-			- Maintain independent network activations for every beam search path (they should not conflict).
-			- For each prediction in beam search path, resolve their connection target neuron updates.
-			- If inferenceBeamSearchConceptColumns = True perform beam search along concept columns (ie select topk next most activated concept columns).
-			- ElseIf inferenceBeamSearchConceptColumns = False perform beam search along instance nodes within columns (ie select topk next most activated nodes in any network column).
-			- Record the total activation of all executed nodes in path (respect inferenceBeamScoreStrategy). 
-		- Calculate the execution path that results in the highest total activation values.
-		- Take the next most activated concept column (inferenceBeamSearchConceptColumns=True) or instance node (inferenceBeamSearchConceptColumns=False) as the next prediction.
-		- If inferenceBeamSearchConceptColumns=True only: then execute every most activated node within the predicted concept column (above a certain activation threshold). 
-Elseif inferenceBeamSearch = False:
-	- Retain original prediction method(s) - apply no changes to the original codebase
-I have added dev/GIAANNproto_predictiveNetwork-processColumnInferencePrediction-beamSearchExample.py with example beam search code (do not use this but it may help you with your implementation of the required specification).
+- inferenceBeamSearch
+	Please implement a beam search prediction algorithm according to this specification:
+	If inferenceBeamSearch = True:
+		- Activate every token in sequence prompt (and resolve their connection target neuron updates).
+		- For every prediction in sequence:
+			- Perform beam search along inferenceBeamWidth and inferenceBeamDepth
+				- Maintain independent network activations for every beam search path (they should not conflict).
+				- For each prediction in beam search path, resolve their connection target neuron updates.
+				- If inferenceBeamSearchConceptColumns = True perform beam search along concept columns (ie select topk next most activated concept columns).
+				- ElseIf inferenceBeamSearchConceptColumns = False perform beam search along instance nodes within columns (ie select topk next most activated nodes in any network column).
+				- Record the total activation of all executed nodes in path (respect inferenceBeamScoreStrategy). 
+			- Calculate the execution path that results in the highest total activation values.
+			- Take the next most activated concept column (inferenceBeamSearchConceptColumns=True) or instance node (inferenceBeamSearchConceptColumns=False) as the next prediction.
+			- If inferenceBeamSearchConceptColumns=True only: then execute every most activated node within the predicted concept column (above a certain activation threshold). 
+	Elseif inferenceBeamSearch = False:
+		- Retain original prediction method(s) - apply no changes to the original codebase
+	I have added dev/GIAANNproto_predictiveNetwork-processColumnInferencePrediction-beamSearchExample.py with example beam search code (do not use this but it may help you with your implementation of the required specification).
+- update inferenceBeamSearch - deactivate nodes along beam search path during search
+- update printPredictionsDuringInferencePredict for inferenceBeamSearch
+- patch beam search scoring so candidates are evaluated after their activations propagate, allowing deeper paths to influence the result.
+- update candidate generation to operate directly on sparse activation/strength data, avoiding full dense conversions during the search.
+- inferenceBeamSearchConceptColumns: normalise concept-column candidates by averaging their node activations/connections so wide columns no longer dominate purely by node count.
+- refine beam-search scoring so each expansion runs in a cloned state, measures the positive activation delta after firing candidate nodes, and updates cumulative scores accordingly
+- Added concept-column candidate activation totals to beam scoring when inferenceBeamScoreStrategy is nodeActivation, ensuring column predictions reflect summed node activity rather than per-step deltas.
+- Selected the best beam from both active and completed paths so the emitted depth-0 action always comes from the highest-scoring trajectory.
+- Updated the beam search review document to reflect the revised scoring and path-selection behavior while noting current and future configuration options.
+- Added optional configuration flags to enable column-aware beam-search heuristics while keeping defaults unchanged when disabled.
+- Implemented column-scoring logic for instance-node beam search, incorporating active-node counts, internal connectivity, and adjacent-column overlap before selecting candidate nodes.
+- add option trainConnectionStrengthPOSdependence=True - different nodes receive different external column (ie intercolumn) connection strength modification based on their source POS. The modification of their connection strengths will be higher/lower depending on the source node POS; connectionStrengthPOSdependenceTypes, connectionStrengthPOSdependenceValues.
+- implement option inferenceConnectionStrengthPOSdependence=True - in which the connection strength modifiers do not affect stored connection strengths during training, but instead affect the immediate next token predictions during inference. The connection modifiers are applied during inference to bias the next token prediction, but these modifiers are immediately disgarded do not affect subsequence token prediction. Recommended implementation: the connection modifiers are applied to existing trained connection weights to temporiarily bias the immediate (subthreshold) activation strengths of the nodes in the network, but these temporary biases are immediately disgarded after the next token prediction (selection) has occured.
+- implement option connectionStrengthPOSdependenceExternal=False - in which the connection strength modifiers are applied to both internal and external connections (during train if trainConnectionStrengthPOSdependence, or inference if inferenceConnectionStrengthPOSdependence).

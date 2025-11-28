@@ -56,7 +56,15 @@ multisentencePredictions = False	#default: False	#requires higher GPU RAM for tr
 if(multisentencePredictions):
 	numSentencesPerSequence = 3	#default: 3
 
-#Beam Search parameters
+#Connection strength modifiers;
+trainConnectionStrengthPOSdependence = False	#default: False	#orig: False
+inferenceConnectionStrengthPOSdependence = False	#default: False	#orig: False
+if(trainConnectionStrengthPOSdependence or inferenceConnectionStrengthPOSdependence):
+	connectionStrengthPOSdependenceTypes = ['NOUN', 'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X']	
+	connectionStrengthPOSdependenceValues = [10, 3, 3, 10, 5, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1]
+	connectionStrengthPOSdependenceExternal = True	#default: True	#orig: True	#False: apply modifiers to both internal/external connections, True: external connections only
+
+#Beam Search parameters;
 if(useInference and inferenceBeamSearch):
 	inferenceBeamSearchConceptColumns = False
 	inferenceBeamScoreStrategy = "nodeActivation"	#options: "nodeActivation", "activation_connection", "connection"
@@ -186,7 +194,7 @@ if(inferenceNormaliseColumnSelectionByFeatureConnections):
 inferenceNormaliseFeatureSelectionByFeatureConnections = False	#default: False
 if(inferenceNormaliseFeatureSelectionByFeatureConnections):
 	inferenceNormaliseFeatureSelectionByFeatureConnectionsStrength = True	#mandatory
-trainNormaliseConnectionStrengthWrtContextLength = True	#default: True
+trainConnectionStrengthNormaliseWrtContextLength = True	#default: True
 trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections = False	#default: True
 
 performRedundantCoalesce = False	#additional redundant coalesce operations
@@ -200,8 +208,8 @@ usePOS = True		 # usePOS mode	#mandatory
 useParallelProcessing = True	#mandatory (else restore original code pre-GIAANNproto1b3a)
 randomiseColumnFeatureXposition = True	#shuffle x position of column internal features such that their connections can be better visualised
 
-trainIncreaseColumnInternalConnectionsStrength = True #Increase column internal connections strength
-if(trainIncreaseColumnInternalConnectionsStrength):
+trainConnectionStrengthIncreaseColumnInternal = True #Increase column internal connections strength
+if(trainConnectionStrengthIncreaseColumnInternal):
  	trainIncreaseColumnInternalConnectionsStrengthModifier = 10.0
 	
 #debug vars;

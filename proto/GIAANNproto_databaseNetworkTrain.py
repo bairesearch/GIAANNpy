@@ -382,6 +382,81 @@ class SequenceObservedColumns:
 			self.databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.mergeTensorSlicesSum(self.databaseNetworkObject.globalFeatureNeurons, observedColumnFeatureNeuronsDict, 2)
 
 
+def getConnectionStrengthPOSdependenceLookup(databaseNetworkObject):
+	if not hasattr(databaseNetworkObject, "connectionStrengthPOSdependenceLookup"):
+		posLookup = []
+		for posType, value in zip(connectionStrengthPOSdependenceTypes, connectionStrengthPOSdependenceValues):
+			posIndex = posStringToPosInt(databaseNetworkObject.nlp, posType)
+			posLookup.append((posIndex, float(value)))
+		databaseNetworkObject.connectionStrengthPOSdependenceLookup = posLookup
+	return databaseNetworkObject.connectionStrengthPOSdependenceLookup
+
+
+def applyConnectionStrengthPOSdependenceTrain(sequenceObservedColumns, featureConnectionsStrengthUpdate, featureConnectionsPos, csIndicesSource, csIndicesTarget):
+	posLookup = getConnectionStrengthPOSdependenceLookup(sequenceObservedColumns.databaseNetworkObject)
+	if not posLookup:
+		return featureConnectionsStrengthUpdate
+	if(connectionStrengthPOSdependenceExternal):
+		scopeMask = (csIndicesSource != csIndicesTarget)
+	else:
+		scopeMask = pt.ones_like(csIndicesSource, dtype=pt.bool)
+	featureConnectionsPosLong = featureConnectionsPos.long()
+	for posIndex, scaleValue in posLookup:
+		if scaleValue == 1:
+			continue
+		posMask = (featureConnectionsPosLong == posIndex) & scopeMask
+		if pt.any(posMask):
+			posMaskFloat = posMask.to(featureConnectionsStrengthUpdate.dtype)
+			featureConnectionsStrengthUpdate = featureConnectionsStrengthUpdate + (scaleValue - 1.0) * featureConnectionsStrengthUpdate * posMaskFloat
+	return featureConnectionsStrengthUpdate
+
+
+def applyConnectionStrengthPOSdependenceInference(databaseNetworkObject, featureConnectionsStrength, featureConnectionsPos, sourceConceptIndex):
+	posLookup = getConnectionStrengthPOSdependenceLookup(databaseNetworkObject)
+	if not posLookup:
+		return featureConnectionsStrength
+	featureConnectionsStrength = featureConnectionsStrength.coalesce()
+	if featureConnectionsStrength._nnz() == 0:
+		return featureConnectionsStrength
+	if featureConnectionsPos is None:
+		return featureConnectionsStrength
+	featureConnectionsPos = featureConnectionsPos.coalesce()
+	if featureConnectionsPos._nnz() == 0:
+		return featureConnectionsStrength
+	strengthIndices = featureConnectionsStrength.indices()
+	strengthValues = featureConnectionsStrength.values()
+	posIndices = featureConnectionsPos.indices()
+	posValues = featureConnectionsPos.values()
+	if strengthIndices.shape[1] == posIndices.shape[1] and pt.equal(strengthIndices, posIndices):
+		alignedPosValues = posValues
+	else:
+		posIndicesCPU = posIndices.cpu()
+		posValuesCPU = posValues.cpu()
+		posIndexMap = {tuple(posIndicesCPU[:, idx].tolist()): posValuesCPU[idx].item() for idx in range(posIndicesCPU.shape[1])}
+		strengthIndicesCPU = strengthIndices.cpu()
+		alignedPosList = []
+		for idx in range(strengthIndicesCPU.shape[1]):
+			key = tuple(strengthIndicesCPU[:, idx].tolist())
+			alignedPosList.append(posIndexMap.get(key, 0.0))
+		alignedPosValues = pt.tensor(alignedPosList, dtype=posValues.dtype, device=posValues.device)
+	alignedPosValues = alignedPosValues.long()
+	if(connectionStrengthPOSdependenceExternal and sourceConceptIndex is not None):
+		scopeMask = (strengthIndices[1] != sourceConceptIndex)
+	else:
+		scopeMask = pt.ones(strengthIndices.shape[1], dtype=pt.bool, device=strengthValues.device)
+	if not pt.any(scopeMask):
+		return featureConnectionsStrength
+	scaleTensor = pt.ones_like(strengthValues)
+	for posIndex, scaleValue in posLookup:
+		if scaleValue == 1:
+			continue
+		posMask = (alignedPosValues == posIndex) & scopeMask
+		if pt.any(posMask):
+			scaleTensor[posMask] = scaleValue
+	strengthValues *= scaleTensor
+	return featureConnectionsStrength
+
+
 def createConceptMask(sequenceObservedColumns, lemmas):
 	conceptMask = pt.tensor([i in sequenceObservedColumns.columnsIndexSequenceWordIndexDict for i in range(len(lemmas))], dtype=pt.bool)
 	conceptIndices = pt.nonzero(conceptMask).squeeze(1)
@@ -656,7 +731,7 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 
 	featureConnectionsInactive = 1 - featureConnectionsActive
 
-	if(trainNormaliseConnectionStrengthWrtContextLength):
+	if(trainConnectionStrengthNormaliseWrtContextLength):
 		featureNeuronsWordOrder1d = featureNeuronsWordOrder.flatten()
 		featureConnectionsDistances = pt.abs(featureNeuronsWordOrder1d.unsqueeze(1) - featureNeuronsWordOrder1d).reshape(cs, fs, cs, fs)
 		featureConnectionsProximity = 1/(featureConnectionsDistances + 1) * 10
@@ -665,12 +740,19 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 	else:
 		featureConnectionsStrengthUpdate = featureConnectionsActive
 
-	if(trainIncreaseColumnInternalConnectionsStrength):
+	csIndices1 = None
+	csIndices2 = None
+	if(trainConnectionStrengthIncreaseColumnInternal or trainConnectionStrengthPOSdependence):
 		csIndices1 = pt.arange(cs).view(1, cs, 1, 1, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
 		csIndices2 = pt.arange(cs).view(1, 1, 1, cs, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
+
+	if(trainConnectionStrengthIncreaseColumnInternal):
 		columnInternalConnectionsMask = (csIndices1 == csIndices2)
 		columnInternalConnectionsMaskOff = pt.logical_not(columnInternalConnectionsMask)
 		featureConnectionsStrengthUpdate = columnInternalConnectionsMask.float()*featureConnectionsStrengthUpdate*trainIncreaseColumnInternalConnectionsStrengthModifier + columnInternalConnectionsMaskOff.float()*featureConnectionsStrengthUpdate
+
+	if(trainConnectionStrengthPOSdependence):
+		featureConnectionsStrengthUpdate = applyConnectionStrengthPOSdependenceTrain(sequenceObservedColumns, featureConnectionsStrengthUpdate, featureConnectionsPos, csIndices1, csIndices2)
 
 	sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength, :, :, :, :, :] += featureConnectionsStrengthUpdate
 	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanence, :, :, :, :, :] += featureConnectionsActive*z1
@@ -825,17 +907,19 @@ def processFeaturesActivePredictMulti(databaseNetworkObject, globalFeatureNeuron
 	for conceptIndex in range(conceptColumnsIndices.shape[0]):
 		conceptColumnsIndicesSource = conceptColumnsIndices[conceptIndex].unsqueeze(dim=0)
 		conceptColumnsFeatureIndicesSource = conceptColumnsFeatureIndices[conceptIndex].unsqueeze(dim=0)
+		sourceConceptIndexValue = conceptColumnsIndicesSource.squeeze().item()
 		featureConnections = GIAANNproto_sparseTensors.sliceSparseTensor(sequenceObservedColumnsPrediction.featureConnections, 2, conceptIndex)	#sequence concept index dimension	#CHECKTHIS
-		globalFeatureNeuronsActivation, globalFeatureConnectionsActivation = processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource)
+		globalFeatureNeuronsActivation, globalFeatureConnectionsActivation = processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource, sourceConceptIndexValue)
 	
 	return globalFeatureNeuronsActivation, globalFeatureConnectionsActivation
 	
 #first dim cs1 restricted to a single token
 def processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndices):
 	featureConnections = GIAANNproto_sparseTensors.sliceSparseTensor(sequenceObservedColumnsPrediction.featureConnections, 2, 0)	#sequence concept index dimension
-	return processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndices, conceptColumnsFeatureIndices)
+	sourceConceptIndexValue = conceptColumnsIndices.squeeze().item()
+	return processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndices, conceptColumnsFeatureIndices, sourceConceptIndexValue)
 
-def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndices, conceptColumnsFeatureIndices):
+def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndices, conceptColumnsFeatureIndices, sourceConceptIndex=None):
 		
 	featureNeuronsActive = GIAANNproto_sparseTensors.neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANImethod)
 	
@@ -843,14 +927,19 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 	featureNeuronsActive = featureNeuronsActive[conceptColumnsFeatureIndices.squeeze().squeeze().item()]	#select features
 	
 	#target neuron activation dependence on connection strength;
-	featureConnections = featureConnections[arrayIndexPropertiesStrength]
+	featureConnectionsStrength = featureConnections[arrayIndexPropertiesStrength]
+	if(inferenceConnectionStrengthPOSdependence):
+		featureConnectionsPos = featureConnections[arrayIndexPropertiesPos]
 	if(inferencePredictiveNetwork and not useGPUsparse):
 		conceptColumnsFeatureIndices = conceptColumnsFeatureIndices.to(deviceSparse)
-	featureConnections = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnections, 1, conceptColumnsFeatureIndices.squeeze().item())
+	featureConnectionsStrength = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsStrength, 1, conceptColumnsFeatureIndices.squeeze().item())
+	if(inferenceConnectionStrengthPOSdependence):
+		featureConnectionsPos = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsPos, 1, conceptColumnsFeatureIndices.squeeze().item())
+		featureConnectionsStrength = applyConnectionStrengthPOSdependenceInference(databaseNetworkObject, featureConnectionsStrength, featureConnectionsPos, sourceConceptIndex)
 	if(inferenceConnectionsStrengthBoolean):
-		featureConnections = featureConnections.bool().float()
+		featureConnectionsStrength = featureConnectionsStrength.bool().float()
 	
-	featureNeuronsTargetActivation = featureNeuronsActive * featureConnections
+	featureNeuronsTargetActivation = featureNeuronsActive * featureConnectionsStrength
 
 	if(inferenceActivationFunction):
 		featureNeuronsTargetActivation = activationFunction(featureNeuronsTargetActivation)

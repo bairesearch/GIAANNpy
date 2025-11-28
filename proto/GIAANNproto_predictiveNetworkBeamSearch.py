@@ -125,7 +125,7 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 	featureConnections = observedColumn.featureConnections
 	conceptColumnsIndicesSource = pt.tensor([columnIndex], dtype=pt.long, device=deviceSparse)
 	conceptColumnsFeatureIndicesSource = pt.tensor([[featureIndex]], dtype=pt.long, device=deviceSparse)
-	state["features"], state["connections"] = GIAANNproto_databaseNetworkTrain.processFeaturesActivePredict(databaseNetworkObject, state["features"], state["connections"], featureConnections, conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource)
+	state["features"], state["connections"] = GIAANNproto_databaseNetworkTrain.processFeaturesActivePredict(databaseNetworkObject, state["features"], state["connections"], featureConnections, conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource, columnIndex)
 	applyBeamNodePredictionEffects(state, columnIndex, featureIndex)
 	return state
 

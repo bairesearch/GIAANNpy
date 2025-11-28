@@ -307,7 +307,7 @@ def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wor
 				print("predictMostActiveFeature warning: inferencePredictiveNetworkNormaliseDim>0 - can only normalise globalFeatureConnections along first dimension (properties)")
 				
 	if(inferencePredictiveNetworkModel=="ColumnMLP"):
-		GIAANNproto_predictiveNetworkModel.ensureModelMatchesDatabase(databaseNetworkObject)
+		#GIAANNproto_predictiveNetworkModel.ensureModelMatchesDatabase(databaseNetworkObject)
 		conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = GIAANNproto_predictiveNetworkModel.nextWordPredictionColumnMLPtrainStep(globalFeatureNeurons, targets, targetsC, targetsF)
 	elif(inferencePredictiveNetworkModel=="MLP"):
 		conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = GIAANNproto_predictiveNetworkModel.nextWordPredictionMLPtrainStep(globalFeatureNeurons, targets, targetsC, targetsF)
