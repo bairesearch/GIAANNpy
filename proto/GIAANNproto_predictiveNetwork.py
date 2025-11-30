@@ -59,6 +59,99 @@ class SequenceObservedColumnsInferencePrediction:
 		self.featureConnections = pt.stack(featureConnectionsList, dim=2)
 		
 
+def buildAllowedColumnsLookup(conceptColumnsIndices, totalColumns):
+	if(conceptColumnsIndices is None or conceptColumnsIndices.numel() == 0):
+		return None
+	allowedColumnsList = []
+	seenColumns = set()
+	for columnValue in conceptColumnsIndices.cpu().tolist():
+		if(columnValue < 0 or columnValue >= totalColumns):
+			continue
+		if(columnValue not in seenColumns):
+			allowedColumnsList.append(columnValue)
+			seenColumns.add(columnValue)
+	if(len(allowedColumnsList) == 0):
+		return None
+	device = conceptColumnsIndices.device
+	dtype = conceptColumnsIndices.dtype
+	return pt.tensor(allowedColumnsList, dtype=dtype, device=device)
+
+def isFeatureIndexReferenceSetDelimiter(databaseNetworkObject, featureIndex):
+	if(not conceptColumnsDelimitByPOS):
+		return False
+	if(featureIndex is None):
+		return False
+	if(featureIndex == featureIndexConceptNeuron or featureIndex < 0):
+		return False
+	conceptFeaturesList = databaseNetworkObject.conceptFeaturesList
+	if(featureIndex >= len(conceptFeaturesList)):
+		return False
+	nodeNameString = conceptFeaturesList[featureIndex]
+	return isWordReferenceSetDelimiterType(nodeNameString)
+
+def activatedNodesAreReferenceSetDelimiters(databaseNetworkObject, conceptColumnsFeatureIndices):
+	if(not conceptColumnsDelimitByPOS):
+		return False
+	if(conceptColumnsFeatureIndices is None):
+		return False
+	if(conceptColumnsFeatureIndices.numel() == 0):
+		return False
+	flattenedFeatureIndices = conceptColumnsFeatureIndices.reshape(-1)
+	if(flattenedFeatureIndices.numel() == 0):
+		return False
+	for featureIndexTensor in flattenedFeatureIndices:
+		featureIndex = featureIndexTensor.item()
+		if(not isFeatureIndexReferenceSetDelimiter(databaseNetworkObject, featureIndex)):
+			return False
+	return True
+
+def applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, allowedColumns, constraintMode):
+	if(conceptColumnsIndicesPred is None or constraintMode is None):
+		return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
+	if(allowedColumns is None or allowedColumns.numel() == 0):
+		return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
+	allowedSet = set(allowedColumns.cpu().tolist())
+	if(len(allowedSet) == 0):
+		return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
+	predictedColumnsList = conceptColumnsIndicesPred.cpu().tolist()
+	if(constraintMode == "internal"):
+		indicesToKeep = [idx for idx, columnValue in enumerate(predictedColumnsList) if columnValue in allowedSet]
+		if(len(indicesToKeep) == 0):
+			repeatFactor = max(1, (conceptColumnsIndicesPred.shape[0] + allowedColumns.shape[0] - 1) // allowedColumns.shape[0])
+			replacementColumns = allowedColumns.repeat(repeatFactor)[:conceptColumnsIndicesPred.shape[0]]
+			conceptColumnsIndicesPred = replacementColumns
+			return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
+		indexTensor = pt.tensor(indicesToKeep, dtype=pt.long, device=conceptColumnsIndicesPred.device)
+		conceptColumnsIndicesPred = conceptColumnsIndicesPred.index_select(0, indexTensor)
+		if(conceptColumnsFeatureIndicesPred is not None and conceptColumnsFeatureIndicesPred.shape[0] >= indexTensor.shape[0]):
+			conceptColumnsFeatureIndicesPred = conceptColumnsFeatureIndicesPred.index_select(0, indexTensor)
+		return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
+	elif(constraintMode == "external"):
+		indicesToKeep = [idx for idx, columnValue in enumerate(predictedColumnsList) if columnValue not in allowedSet]
+		if(len(indicesToKeep) > 0):
+			indexTensor = pt.tensor(indicesToKeep, dtype=pt.long, device=conceptColumnsIndicesPred.device)
+			conceptColumnsIndicesPred = conceptColumnsIndicesPred.index_select(0, indexTensor)
+			if(conceptColumnsFeatureIndicesPred is not None and conceptColumnsFeatureIndicesPred.shape[0] >= indexTensor.shape[0]):
+				conceptColumnsFeatureIndicesPred = conceptColumnsFeatureIndicesPred.index_select(0, indexTensor)
+			return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
+		if(len(allowedSet) >= databaseNetworkObject.c):
+			return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
+		fallbackColumns = []
+		for columnIndex in range(databaseNetworkObject.c):
+			if(columnIndex not in allowedSet):
+				fallbackColumns.append(columnIndex)
+			if(len(fallbackColumns) == conceptColumnsIndicesPred.shape[0]):
+				break
+		if(len(fallbackColumns) == 0):
+			return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
+		conceptColumnsIndicesPred = pt.tensor(fallbackColumns, dtype=conceptColumnsIndicesPred.dtype, device=conceptColumnsIndicesPred.device)
+		if(conceptColumnsFeatureIndicesPred is not None):
+			rowsAvailable = min(conceptColumnsFeatureIndicesPred.shape[0], len(fallbackColumns))
+			conceptColumnsFeatureIndicesPred = conceptColumnsFeatureIndicesPred[:rowsAvailable]
+		return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
+	else:
+		return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
+
 if not drawSequenceObservedColumns:
 	class SequenceObservedColumnsDraw:
 		def __init__(self, databaseNetworkObject, observedColumnsDict):
@@ -160,6 +253,20 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		globalFeatureConnectionsActivation = databaseNetworkObject.globalFeatureConnections[arrayIndexPropertiesActivation]
 	else:
 		globalFeatureConnectionsActivation = None
+
+	allowedColumnsConstraint = None
+	constraintModePrediction = None
+	if(conceptColumnsDelimitByPOS):
+		allowedColumnsConstraint = buildAllowedColumnsLookup(conceptColumnsIndices, databaseNetworkObject.c)
+		if(allowedColumnsConstraint is not None and allowedColumnsConstraint.numel() > 0):
+			if(conceptColumnsFeatureIndices is None or conceptColumnsFeatureIndices.numel() == 0):
+				constraintModePrediction = "internal"
+			else:
+				isDelimiterNode = activatedNodesAreReferenceSetDelimiters(databaseNetworkObject, conceptColumnsFeatureIndices)
+				if(isDelimiterNode):
+					constraintModePrediction = "external"
+				else:
+					constraintModePrediction = "internal"
 		
 	if(wordPredictionIndex > 0):
 		# Refresh the observed columns dictionary for each new sequence
@@ -231,12 +338,12 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		print("globalFeatureNeuronsTemp = ", globalFeatureNeuronsTemp)
 
 	if(inferenceBeamSearch):
-		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = GIAANNproto_predictiveNetworkBeamSearch.beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask)
+		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = GIAANNproto_predictiveNetworkBeamSearch.beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, selectMostActiveFeature)
 	else:
 		if(inferencePredictiveNetwork):
-			conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask)	
+			conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction)	
 		else:
-			conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask)
+			conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction)
 	
 	featurePredictionTargetMatch = False
 	if(printPredictionsDuringInferencePredict):
@@ -268,7 +375,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 
 	return featurePredictionTargetMatch, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext
 
-def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask):		
+def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None):		
 	#generate targets;
 	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsSequence, lemmasSequence, conceptMask, sequenceWordIndex, kcNetwork)
 	
@@ -314,6 +421,8 @@ def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wor
 	elif(inferencePredictiveNetworkModel=="Transformer"):
 		conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = GIAANNproto_predictiveNetworkModel.nextWordPredictionTransformerTrainStep(globalFeatureNeurons, globalFeatureConnections, targets, targetsC, targetsF)
 
+	conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, allowedColumns, constraintMode)
+
 	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		conceptColumnsIndicesNext = conceptColumnsIndicesPred
 		conceptColumnsFeatureIndicesNext = conceptColumnsFeatureIndicesPred
@@ -340,7 +449,7 @@ def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, wor
 
 
 
-def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask):
+def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None):
 	#generate targets;
 	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsSequence, lemmasSequence, conceptMask, sequenceWordIndex, kcNetwork)
 
@@ -356,32 +465,80 @@ def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivat
 		if(not inferenceNormaliseColumnSelectionByFeatureConnectionsStrength):
 			conceptColumnsActivationTotalConnections = (conceptColumnsActivationTotalConnections > 0).float()
 		conceptColumnsActivation = conceptColumnsActivation / conceptColumnsActivationTotalConnections
-	if(kcDynamic):
-		conceptColumnsActivation = conceptColumnsActivation[conceptColumnsActivation > kcActivationThreshold]	#select kcMax columns above threshold
-	conceptColumnsActivationTopkConcepts = pt.topk(conceptColumnsActivation, kcMax)
-	kc = len(conceptColumnsActivationTopkConcepts.indices)
-	if(kcDynamic and kc < 1):
-		print("selectMostActiveFeature kcDynamic error: kc < 1; cannot continue to predict columns; consider disabling kcDynamic for debug")
-		exit()
+
+	if(conceptColumnsDelimitByPOS):
+		columnIndexLookup = pt.arange(conceptColumnsActivation.shape[0], dtype=pt.long, device=conceptColumnsActivation.device)
+		if(allowedColumns is not None and allowedColumns.numel() > 0):
+			allowedColumnsDevice = allowedColumns.to(columnIndexLookup.device)
+		else:
+			allowedColumnsDevice = None
+		if(allowedColumnsDevice is not None and constraintMode is not None):
+			if(constraintMode == "internal"):
+				columnIndexLookup = allowedColumnsDevice
+				columnActivationValues = conceptColumnsActivation.index_select(0, columnIndexLookup)
+			elif(constraintMode == "external"):
+				mask = pt.ones(conceptColumnsActivation.shape[0], dtype=pt.bool, device=conceptColumnsActivation.device)
+				mask.scatter_(0, allowedColumnsDevice, False)
+				filteredIndices = columnIndexLookup[mask]
+				filteredActivations = conceptColumnsActivation[mask]
+				if(filteredIndices.numel() > 0):
+					columnIndexLookup = filteredIndices
+					columnActivationValues = filteredActivations
+				else:
+					columnActivationValues = conceptColumnsActivation
+			else:
+				columnActivationValues = conceptColumnsActivation
+		else:
+			columnActivationValues = conceptColumnsActivation
+		if(columnIndexLookup.numel() == 0):
+			columnIndexLookup = pt.arange(conceptColumnsActivation.shape[0], dtype=pt.long, device=conceptColumnsActivation.device)
+			columnActivationValues = conceptColumnsActivation
+		if(kcDynamic):
+			activeMask = columnActivationValues > kcActivationThreshold
+			columnActivationValues = columnActivationValues[activeMask]
+			columnIndexLookup = columnIndexLookup[activeMask]
+		kcAvailable = columnActivationValues.shape[0]
+		if(kcDynamic and kcAvailable < 1):
+			print("selectMostActiveFeature kcDynamic error: kc < 1; cannot continue to predict columns; consider disabling kcDynamic for debug")
+			exit()
+		if(kcAvailable == 0):
+			columnIndexLookup = pt.arange(conceptColumnsActivation.shape[0], dtype=pt.long, device=conceptColumnsActivation.device)
+			columnActivationValues = conceptColumnsActivation
+			kcAvailable = columnActivationValues.shape[0]
+		topkCount = min(kcMax, kcAvailable)
+		if(topkCount < 1):
+			topkCount = 1
+		conceptColumnsActivationTopkConcepts = pt.topk(columnActivationValues, topkCount)
+		kc = len(conceptColumnsActivationTopkConcepts.indices)
+		selectedColumnIndices = columnIndexLookup.index_select(0, conceptColumnsActivationTopkConcepts.indices)
+	else:
+		if(kcDynamic):
+			conceptColumnsActivation = conceptColumnsActivation[conceptColumnsActivation > kcActivationThreshold]	#select kcMax columns above threshold
+		conceptColumnsActivationTopkConcepts = pt.topk(conceptColumnsActivation, kcMax)
+		kc = len(conceptColumnsActivationTopkConcepts.indices)
+		if(kcDynamic and kc < 1):
+			print("selectMostActiveFeature kcDynamic error: kc < 1; cannot continue to predict columns; consider disabling kcDynamic for debug")
+			exit()
+		selectedColumnIndices = conceptColumnsActivationTopkConcepts.indices
 
 	#top feature selection;
 	if(kc==1):
-		topkConceptColumnsActivation = globalFeatureNeuronsActivationAllSegments[conceptColumnsActivationTopkConcepts.indices[0]].unsqueeze(0)	#select topk concept indices
+		topkConceptColumnsActivation = globalFeatureNeuronsActivationAllSegments[selectedColumnIndices[0]].unsqueeze(0)	#select topk concept indices
 	else:
-		topkConceptColumnsActivation = GIAANNproto_sparseTensors.sliceSparseTensorMulti(globalFeatureNeuronsActivationAllSegments, 0, conceptColumnsActivationTopkConcepts.indices)	#select topk concept indices
+		topkConceptColumnsActivation = GIAANNproto_sparseTensors.sliceSparseTensorMulti(globalFeatureNeuronsActivationAllSegments, 0, selectedColumnIndices)	#select topk concept indices
 	topkConceptColumnsActivation = topkConceptColumnsActivation.to_dense()
 	if(inferenceNormaliseFeatureSelectionByFeatureConnections):
 		if(kc==1):
-			topkConceptColumnsStrength = globalFeatureNeuronsStrengthAllSegments[conceptColumnsActivationTopkConcepts.indices[0]].unsqueeze(0)	#select topk concept indices
+			topkConceptColumnsStrength = globalFeatureNeuronsStrengthAllSegments[selectedColumnIndices[0]].unsqueeze(0)	#select topk concept indices
 		else:
-			topkConceptColumnsStrength = GIAANNproto_sparseTensors.sliceSparseTensorMulti(globalFeatureNeuronsStrengthAllSegments, 0, conceptColumnsActivationTopkConcepts.indices)	#select topk concept indices
+			topkConceptColumnsStrength = GIAANNproto_sparseTensors.sliceSparseTensorMulti(globalFeatureNeuronsStrengthAllSegments, 0, selectedColumnIndices)	#select topk concept indices
 		topkConceptColumnsStrength = topkConceptColumnsStrength.to_dense()
 		if(not inferenceNormaliseFeatureSelectionByFeatureConnectionsStrength):
 			topkConceptColumnsStrength = (topkConceptColumnsStrength > 0).float()
 		topkConceptColumnsActivation = topkConceptColumnsActivation / topkConceptColumnsStrength
 	topkConceptColumnsActivationTopkFeatures = pt.topk(topkConceptColumnsActivation, kf, dim=1)
 
-	conceptColumnsIndicesPred = conceptColumnsActivationTopkConcepts.indices
+	conceptColumnsIndicesPred = selectedColumnIndices
 	conceptColumnsFeatureIndicesPred = topkConceptColumnsActivationTopkFeatures.indices
 	
 	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):

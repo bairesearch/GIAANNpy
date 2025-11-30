@@ -56,11 +56,11 @@ if(increaseColumnInternalConnectionsStrength):
 	
 #debug vars;
 debugSmallDataset = False
-debugConceptFeaturesOccurFirstInSubsequence = False #Constrain column feature detection to be after concept feature detection
+conceptColumnsDelimitByConceptFeaturesStart = False #Constrain column feature detection to be after concept feature detection
 debugConnectColumnsToNextColumnsInSequenceOnly = False
 debugDrawNeuronStrengths = False
 if(useInference):
-	debugConceptFeaturesOccurFirstInSubsequence = True	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
+	conceptColumnsDelimitByConceptFeaturesStart = True	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
 	debugDrawNeuronStrengths = True
 debugReloadGlobalFeatureNeuronsEverySentence = False
 
@@ -1416,7 +1416,7 @@ def process_concept_words(doc, words, lemmas, pos_tags, sequence_observed_column
 		dist_to_next_concept = torch.full((concept_indices.size(0),), q, dtype=torch.long)
 
 	# Calculate start and end indices for each concept word
-	if(debugConceptFeaturesOccurFirstInSubsequence):
+	if(conceptColumnsDelimitByConceptFeaturesStart):
 		if usePOS:
 			start_indices = (concept_indices).clamp(min=0)
 			end_indices = (concept_indices + dist_to_next_concept).clamp(max=len(doc))

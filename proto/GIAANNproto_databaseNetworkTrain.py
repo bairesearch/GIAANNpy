@@ -501,14 +501,43 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, words,
 		distToNextConcept = pt.full((conceptIndices.size(0),), q, dtype=pt.long)
 
 	# Calculate start and end indices for each concept word
-	if(debugConceptFeaturesOccurFirstInSubsequence):
+	if(conceptColumnsDelimitByPOS):
+		sequenceLength = len(lemmas)
+		if(sequenceLength == 0):
+			startIndices = pt.empty_like(conceptIndices)
+			endIndices = pt.empty_like(conceptIndices)
+		delimiterMaskList = [pos in conceptColumnsDelimiterPOStypes for pos in posTags]
+		if(len(delimiterMaskList) == 0):
+			delimiterIndices = pt.tensor([], dtype=conceptIndices.dtype)
+		else:
+			delimiterMask = pt.tensor(delimiterMaskList, dtype=pt.bool)
+			delimiterIndices = pt.nonzero(delimiterMask).squeeze(1)
+		if(delimiterIndices.numel() == 0):
+			startIndices = pt.zeros_like(conceptIndices)
+			endIndices = pt.full_like(conceptIndices, sequenceLength)
+		else:
+			delimiterIndicesSorted = delimiterIndices.sort().values
+			prevDelimiterPositions = pt.searchsorted(delimiterIndicesSorted, conceptIndices, right=False) - 1
+			prevDelimiterExists = prevDelimiterPositions >= 0
+			prevDelimiterPositions = prevDelimiterPositions.clamp(min=0)
+			prevDelimiterIndices = pt.where(prevDelimiterExists, delimiterIndicesSorted[prevDelimiterPositions], pt.full_like(conceptIndices, -1))
+			startIndices = pt.where(prevDelimiterExists, prevDelimiterIndices + 1, pt.zeros_like(conceptIndices))
+			nextDelimiterPositions = pt.searchsorted(delimiterIndicesSorted, conceptIndices, right=True)
+			nextDelimiterExists = nextDelimiterPositions < delimiterIndicesSorted.shape[0]
+			if(delimiterIndicesSorted.shape[0] > 0):
+				nextDelimiterPositions = nextDelimiterPositions.clamp(max=delimiterIndicesSorted.shape[0]-1)
+			nextDelimiterIndices = pt.where(nextDelimiterExists, delimiterIndicesSorted[nextDelimiterPositions], pt.full_like(conceptIndices, sequenceLength))
+			endIndices = pt.where(nextDelimiterExists, nextDelimiterIndices + 1, pt.full_like(conceptIndices, sequenceLength))	#Include delimiter token in current column before advancing to next column
+		startIndices = startIndices.clamp(min=0, max=sequenceLength)
+		endIndices = endIndices.clamp(min=0, max=sequenceLength)
+	elif(conceptColumnsDelimitByConceptFeaturesStart):
 		if usePOS:
 			startIndices = (conceptIndices).clamp(min=0)
 			endIndices = (conceptIndices + distToNextConcept).clamp(max=len(sequence))
 		else:
 			startIndices = (conceptIndices).clamp(min=0)
 			endIndices = (conceptIndices + q + 1).clamp(max=len(sequence))	
-	else:
+	elif(conceptColumnsDelimitByConceptFeaturesMid):
 		if usePOS:
 			startIndices = (conceptIndices - distToPrevConcept + 1).clamp(min=0)
 			endIndices = (conceptIndices + distToNextConcept).clamp(max=len(sequence))

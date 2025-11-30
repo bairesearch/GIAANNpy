@@ -50,6 +50,7 @@ if(SANIconceptNeurons):
 
 # Initialize spaCy model
 nlp = spacy.load('en_core_web_sm')
+registerReferenceNLP(nlp)
 
 databaseNetworkObject = GIAANNproto_databaseNetwork.initialiseDatabaseNetwork()
 databaseNetworkObject.nlp = nlp	#used by posStringToPosInt

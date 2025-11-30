@@ -56,6 +56,13 @@ multisentencePredictions = False	#default: False	#requires higher GPU RAM for tr
 if(multisentencePredictions):
 	numSentencesPerSequence = 3	#default: 3
 
+#Concept column delimiter parameters:
+conceptColumnsDelimitByPOS = True	#planned new default: True	#orig: False	#closer to original GIA specification
+conceptColumnsDelimitByConceptFeaturesStart = False #default: False	#orig: True	#Constrain column feature detection to be after concept feature detection	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
+conceptColumnsDelimitByConceptFeaturesMid = False	#default: True	#default: False
+if(conceptColumnsDelimitByPOS):
+	conceptColumnsDelimiterPOStypes = ['VERB', 'ADP', 'CCONJ', 'SCONJ']	#reference set delimiters (GIA actions/conditions)
+
 #Connection strength modifiers;
 trainConnectionStrengthPOSdependence = False	#default: False	#orig: False
 inferenceConnectionStrengthPOSdependence = False	#default: False	#orig: False
@@ -214,13 +221,10 @@ if(trainConnectionStrengthIncreaseColumnInternal):
 	
 #debug vars;
 debugSmallDataset = False	#required if huggingface Wikipedia dataset is offline
-debugConceptFeaturesOccurFirstInSubsequence = False #Constrain column feature detection to be after concept feature detection
 debugConnectColumnsToNextColumnsInSequenceOnly = False
 debugDrawNeuronActivations = False
 if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
 	debugDrawNeuronActivations = True
-if(useInference):
-	debugConceptFeaturesOccurFirstInSubsequence = False #default: False	#orig: True	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
 debugReloadGlobalFeatureNeuronsEverySequence = False
 debugInferencePredictionActivationAccumulation = False	#monitor exponential runaway of activations negatively affects predictionNetwork loss optimisation (go to nan)	 #see inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures for comparison	#solved by inferenceActivationFunction
 
@@ -271,17 +275,22 @@ if(useInference):
 	else:
 		numSeedTokens = 0
 	
-	if(debugConceptFeaturesOccurFirstInSubsequence):
+	if(conceptColumnsDelimitByPOS):
 		kcNetwork = 1	#number of topk columns to target
-	else:
+	elif(conceptColumnsDelimitByConceptFeaturesStart):
+		kcNetwork = 1	#number of topk columns to target
+	elif(conceptColumnsDelimitByConceptFeaturesMid):
 		kcNetwork = 2	#number of topk columns to target	#it is unknown which exact column a token belongs to (unless it corresponds to a concept feature/noun)
 			
 	if(inferencePredictiveNetwork):
-		if(debugConceptFeaturesOccurFirstInSubsequence):
+		if(conceptColumnsDelimitByPOS):
 			kcPred = 1 	#number of topk columns to predict	#mandatory: 1
-			#inferenceTrainPredictiveNetworkAllSequences currently requires debugConceptFeaturesOccurFirstInSubsequence:!multipleTargets if kcNetwork == 1"
 			multipleTargets = False
-		else:
+		elif(conceptColumnsDelimitByConceptFeaturesStart):
+			kcPred = 1 	#number of topk columns to predict	#mandatory: 1
+			#inferenceTrainPredictiveNetworkAllSequences currently requires conceptColumnsDelimitByConceptFeaturesStart:!multipleTargets if kcNetwork == 1"
+			multipleTargets = False
+		elif(conceptColumnsDelimitByConceptFeaturesMid):
 			kcPred = 1 	#number of topk columns to predict
 			multipleTargets = True
 		kf = 1	#number of topk features to predict
@@ -347,6 +356,9 @@ arrayType = pt.float32	#pt.long	#pt.float32
 nounPosTags = {'NOUN', 'PROPN'}
 nonNounPosTags = {'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X'}
 
+_nlpReferenceObject = None
+_referenceSetDelimiterCache = {}
+
 def posIntToPosString(nlp, posInt):
 	if posInt in nlp.vocab.strings:
 		return nlp.vocab[posInt].text
@@ -355,6 +367,28 @@ def posIntToPosString(nlp, posInt):
 		
 def posStringToPosInt(nlp, posString):
 	return nlp.vocab.strings[posString]
+
+def registerReferenceNLP(nlpObject):
+	global _nlpReferenceObject
+	_nlpReferenceObject = nlpObject
+
+def isWordReferenceSetDelimiterType(nodeNameString):
+	if(not conceptColumnsDelimitByPOS):
+		return False
+	if(nodeNameString is None):
+		return False
+	nodeNameStringStripped = nodeNameString.strip()
+	if(nodeNameStringStripped == ""):
+		return False
+	wordKey = nodeNameStringStripped.lower()
+	if(wordKey in _referenceSetDelimiterCache):
+		return _referenceSetDelimiterCache[wordKey]
+	if(_nlpReferenceObject is None):
+		return False
+	doc = _nlpReferenceObject(wordKey)
+	isDelimiter = any(token.pos_ in conceptColumnsDelimiterPOStypes for token in doc)
+	_referenceSetDelimiterCache[wordKey] = isDelimiter
+	return isDelimiter
 		
 
 	

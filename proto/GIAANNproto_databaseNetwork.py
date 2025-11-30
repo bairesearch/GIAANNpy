@@ -245,7 +245,7 @@ def getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsSequence, le
 		targetConceptColumnsFeatureIndices = pt.stack([pt.tensor(targetFeatureIndex).unsqueeze(0), pt.tensor(targetFeatureIndex).unsqueeze(0)], dim=0)
 		targetMultipleSources = True
 	else:
-		printe("getTokenConceptFeatureIndexTensor currently requires kcMax == 1 or 2; corresponding to the number of target columns per token; check debugConceptFeaturesOccurFirstInSubsequence/multipleTargets")
+		printe("getTokenConceptFeatureIndexTensor currently requires kcMax == 1 or 2; corresponding to the number of target columns per token; check conceptColumnsDelimitByConceptFeaturesStart/multipleTargets")
 
 	return targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices
 
