@@ -25,7 +25,7 @@ import GIAANNproto_databaseNetworkTrain	   #low level processFeaturesActivePredi
 import GIAANNproto_sparseTensors
 
 
-def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, selectMostActiveFeatureFunc=None):
+def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, selectMostActiveFeatureFunc=None, conceptActivationState=None):
 	#generate targets for debug/analysis output
 	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsSequence, lemmasSequence, conceptMask, sequenceWordIndex, kcNetwork)
 
@@ -33,14 +33,14 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 		raise ValueError("beamSearchPredictNextFeature requires selectMostActiveFeatureFunc to be provided to avoid circular imports")
 
 	if(inferenceBeamDepth <= 0 or inferenceBeamWidth <= 0):
-		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode)
+		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState)
 
 	strengthLookup = None
 	if(globalFeatureNeuronsStrength is not None):
 		strengthLookup = buildStrengthLookup(globalFeatureNeuronsStrength, databaseNetworkObject.f)
 	initialConstraintState = createConstraintStateForBeam(allowedColumns, constraintMode)
 
-	initialState = initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime)
+	initialState = initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState)
 	beams = [{"score": 0.0, "state": initialState, "sequence": [], "constraintState": initialConstraintState}]
 	completedBeams = []
 	beamDepth = max(1, inferenceBeamDepth)
@@ -49,7 +49,7 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 	for depthIndex in range(beamDepth):
 		newBeams = []
 		for beam in beams:
-			candidates = selectBeamCandidates(beam["state"]["features"], strengthLookup, beamWidthLimit, databaseNetworkObject, beam.get("constraintState"))
+			candidates = selectBeamCandidates(beam["state"]["features"], strengthLookup, beamWidthLimit, databaseNetworkObject, beam.get("constraintState"), beam["state"].get("conceptActivations"))
 			if(len(candidates) == 0):
 				completedBeams.append(beam)
 				continue
@@ -77,14 +77,14 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 	if(len(beams) == 0):
 		beams = completedBeams
 	if(len(beams) == 0 or len(beams[0]["sequence"]) == 0):
-		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode)
+		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState)
 
 	allBeams = beams + completedBeams
 	bestBeam = max(allBeams, key=lambda item: item["score"])
 	bestAction = bestBeam["sequence"][0]
 	conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = convertNodesToPrediction(bestAction["nodes"])
 	if(conceptColumnsIndicesNext.shape[0] == 0):
-		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode)
+		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState)
 	multipleSourcesNext = conceptColumnsIndicesNext.shape[0] > 1
 	kc = conceptColumnsIndicesNext.shape[0]
 	if(printPredictionsDuringInferencePredict):
@@ -94,7 +94,7 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 	return conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex
 
 
-def initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime):
+def initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState):
 	state = {"features": globalFeatureNeuronsActivation.clone()}
 	if(transformerUseInputConnections and globalFeatureConnectionsActivation is not None):
 		state["connections"] = globalFeatureConnectionsActivation.clone()
@@ -104,6 +104,10 @@ def initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureC
 		state["time"] = globalFeatureNeuronsTime.clone()
 	else:
 		state["time"] = None
+	if(conceptActivationState is not None):
+		state["conceptActivations"] = set(conceptActivationState)
+	else:
+		state["conceptActivations"] = None
 	return state
 
 
@@ -117,6 +121,10 @@ def cloneBeamActivationState(state):
 		clonedState["time"] = state["time"].clone()
 	else:
 		clonedState["time"] = None
+	if("conceptActivations" in state and state["conceptActivations"] is not None):
+		clonedState["conceptActivations"] = set(state["conceptActivations"])
+	else:
+		clonedState["conceptActivations"] = None
 	return clonedState
 
 
@@ -132,6 +140,13 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 	conceptColumnsFeatureIndicesSource = pt.tensor([[featureIndex]], dtype=pt.long, device=deviceSparse)
 	state["features"], state["connections"] = GIAANNproto_databaseNetworkTrain.processFeaturesActivePredict(databaseNetworkObject, state["features"], state["connections"], featureConnections, conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource, columnIndex)
 	applyBeamNodePredictionEffects(state, columnIndex, featureIndex)
+	if(predictionColumnsMustActivateConceptFeature):
+		conceptState = state.get("conceptActivations")
+		if(conceptState is None):
+			conceptState = set()
+			state["conceptActivations"] = conceptState
+		if(featureIndex == featureIndexConceptNeuron):
+			conceptState.add(columnIndex)
 	return state
 
 
@@ -199,18 +214,18 @@ def printBestBeamPath(bestBeam, databaseNetworkObject):
 	print("\t\tBest beam path:\n\t\t\t" + "\n\t\t\t".join(pathSegments))	# Debug: summary of the highest scoring beam path
 
 
-def selectBeamCandidates(stateFeatures, strengthLookup, candidateLimit, databaseNetworkObject, constraintState=None):
+def selectBeamCandidates(stateFeatures, strengthLookup, candidateLimit, databaseNetworkObject, constraintState=None, conceptActivationState=None):
 	candidateLimit = max(1, candidateLimit)
 	columnIndices, featureIndices, activationValues = aggregateSparseColumnFeatureValues(stateFeatures, databaseNetworkObject.f)
 	if(columnIndices is None):
 		return []
 	if(inferenceBeamSearchConceptColumns):
-		return selectBeamCandidatesConceptColumns(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, databaseNetworkObject.f, constraintState)
+		return selectBeamCandidatesConceptColumns(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, databaseNetworkObject.f, databaseNetworkObject, constraintState, conceptActivationState)
 	else:
-		return selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, databaseNetworkObject.f, constraintState)
+		return selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, databaseNetworkObject.f, databaseNetworkObject, constraintState, conceptActivationState)
 
 
-def selectBeamCandidatesConceptColumns(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures, constraintState=None):
+def selectBeamCandidatesConceptColumns(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures, databaseNetworkObject, constraintState=None, conceptActivationState=None):
 	if(activationValues.numel() == 0):
 		return []
 	uniqueColumns, inverseIndices = pt.unique(columnIndices, return_inverse=True)
@@ -241,12 +256,8 @@ def selectBeamCandidatesConceptColumns(columnIndices, featureIndices, activation
 			activeMask[maxIdx] = True
 		selectedFeatures = columnFeatures[activeMask]
 		selectedActivations = columnFeatureActivations[activeMask]
-		nodes = []
-		connectionSum = 0.0
-		for featureTensor in selectedFeatures:
-			featureIndex = featureTensor.item()
-			nodes.append((columnIndex, featureIndex))
-			connectionSum += getConnectionValue(strengthLookup, columnIndex, featureIndex, maxFeatures)
+		nodes = [(columnIndex, featureTensor.item()) for featureTensor in selectedFeatures]
+		nodes, connectionSum = prepareBeamNodes(databaseNetworkObject, nodes, conceptActivationState, constraintState, strengthLookup, maxFeatures)
 		if(len(nodes) == 0):
 			continue
 		meanActivation = selectedActivations.mean().item()
@@ -255,20 +266,20 @@ def selectBeamCandidatesConceptColumns(columnIndices, featureIndices, activation
 	return candidates
 
 
-def selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures, constraintState=None):
+def selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures, databaseNetworkObject, constraintState=None, conceptActivationState=None):
 	if(activationValues.numel() == 0):
 		return []
 	useColumnPreferences = (inferenceBeamInstancePreferActiveNodeCounts or
 		inferenceBeamInstancePreferInternalConnectivity or
 		inferenceBeamInstancePreferAdjacentOverlap)
 	if(not useColumnPreferences):
-		return selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures, constraintState)
+		return selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures, databaseNetworkObject, constraintState, conceptActivationState)
 	columnData = buildInstanceColumnData(columnIndices, featureIndices, activationValues, constraintState)
 	if(len(columnData) == 0):
-		return selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures, constraintState)
+		return selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures, databaseNetworkObject, constraintState, conceptActivationState)
 	columnScores = computeInstanceColumnScores(columnData, strengthLookup, maxFeatures, activationValues.device, activationValues.dtype)
 	if(len(columnScores) == 0):
-		return selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures, constraintState)
+		return selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures, databaseNetworkObject, constraintState, conceptActivationState)
 	sortedColumns = sorted(columnScores.items(), key=lambda item: item[1], reverse=True)
 	candidates = []
 	threshold = inferenceBeamInstanceNodeActivationThreshold
@@ -285,16 +296,20 @@ def selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationV
 			if(threshold > 0 and value < threshold and len(candidates) > 0):
 				continue
 			connectionValue = getConnectionValue(strengthLookup, columnIndex, featureIndex, maxFeatures)
-			candidates.append({"columnIndex": columnIndex, "featureIndex": featureIndex, "nodes": [(columnIndex, featureIndex)], "connectionValue": connectionValue})
+			nodes = [(columnIndex, featureIndex)]
+			nodes, adjustedConnection = prepareBeamNodes(databaseNetworkObject, nodes, conceptActivationState, constraintState, strengthLookup, maxFeatures)
+			if(len(nodes) == 0):
+				continue
+			candidates.append({"columnIndex": nodes[0][0], "featureIndex": nodes[0][1], "nodes": nodes, "connectionValue": adjustedConnection})
 			break
 		if(len(candidates) == candidateLimit):
 			break
 	if(len(candidates) == 0):
-		return selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures)
+		return selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures, databaseNetworkObject, constraintState, conceptActivationState)
 	return candidates
 
 
-def selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures, constraintState=None):
+def selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures, databaseNetworkObject, constraintState=None, conceptActivationState=None):
 	selectionCount = min(candidateLimit, activationValues.shape[0])
 	values, indices = pt.topk(activationValues, selectionCount)
 	candidates = []
@@ -308,8 +323,11 @@ def selectTopInstanceNodesByActivation(columnIndices, featureIndices, activation
 		if(not constraintAllowsColumn(columnIndex, constraintState)):
 			continue
 		featureIndex = featureIndices[activationIndex].item()
-		connectionValue = getConnectionValue(strengthLookup, columnIndex, featureIndex, maxFeatures)
-		candidates.append({"columnIndex": columnIndex, "featureIndex": featureIndex, "nodes": [(columnIndex, featureIndex)], "connectionValue": connectionValue})
+		nodes = [(columnIndex, featureIndex)]
+		nodes, connectionValue = prepareBeamNodes(databaseNetworkObject, nodes, conceptActivationState, constraintState, strengthLookup, maxFeatures)
+		if(len(nodes) == 0):
+			continue
+		candidates.append({"columnIndex": nodes[0][0], "featureIndex": nodes[0][1], "nodes": nodes, "connectionValue": connectionValue})
 		selectedCount += 1
 		if(selectedCount == selectionCount):
 			break
@@ -401,7 +419,7 @@ def tensorToColumnSet(allowedColumnsTensor):
 	return set(columnList)
 
 def createConstraintStateForBeam(allowedColumnsTensor, constraintMode):
-	if(constraintMode not in ["internal", "external"]):
+	if(constraintMode not in ["internal", "external", "delimiter"]):
 		return None
 	columnSet = tensorToColumnSet(allowedColumnsTensor)
 	if(columnSet is None or len(columnSet) == 0):
@@ -419,7 +437,36 @@ def constraintAllowsColumn(columnIndex, constraintState):
 		return columnIndex in allowedSet
 	elif(constraintMode == "external"):
 		return columnIndex not in allowedSet
+	elif(constraintMode == "delimiter"):
+		return True
 	return True
+
+
+def prepareBeamNodes(databaseNetworkObject, nodes, conceptActivationState, constraintState, strengthLookup, maxFeatures):
+	preparedNodes = []
+	connectionSum = 0.0
+	activeColumns = conceptActivationState or set()
+	delimiterMode = False
+	allowedSet = None
+	if(constraintState is not None):
+		delimiterMode = constraintState.get("mode") == "delimiter"
+		allowedSet = constraintState.get("columns")
+	seenNodes = set()
+	for columnIndex, featureIndex in nodes:
+		adjustedFeature = featureIndex
+		if(predictionColumnsMustActivateConceptFeature):
+			if(conceptActivationState is None or columnIndex not in activeColumns):
+				adjustedFeature = featureIndexConceptNeuron
+		if(delimiterMode and allowedSet is not None and columnIndex in allowedSet):
+			if(not isFeatureIndexReferenceSetDelimiterBeam(databaseNetworkObject, adjustedFeature)):
+				continue
+		nodeKey = (columnIndex, adjustedFeature)
+		if(nodeKey in seenNodes):
+			continue
+		seenNodes.add(nodeKey)
+		preparedNodes.append((columnIndex, adjustedFeature))
+		connectionSum += getConnectionValue(strengthLookup, columnIndex, adjustedFeature, maxFeatures)
+	return preparedNodes, connectionSum
 
 def nodesContainReferenceSetDelimiter(databaseNetworkObject, nodes):
 	if(not conceptColumnsDelimitByPOS):
@@ -447,7 +494,7 @@ def updateConstraintStateAfterNodes(databaseNetworkObject, previousConstraintSta
 	if(len(newColumns) == 0):
 		return previousConstraintState
 	if(nodesContainReferenceSetDelimiter(databaseNetworkObject, nodes)):
-		return {"columns": newColumns, "mode": "external"}
+		return {"columns": newColumns, "mode": "delimiter"}
 	else:
 		return {"columns": newColumns, "mode": "internal"}
 

@@ -62,13 +62,18 @@ conceptColumnsDelimitByConceptFeaturesStart = False #default: False	#orig: True	
 conceptColumnsDelimitByConceptFeaturesMid = False	#default: True	#default: False
 if(conceptColumnsDelimitByPOS):
 	conceptColumnsDelimiterPOStypes = ['VERB', 'ADP', 'CCONJ', 'SCONJ']	#reference set delimiters (GIA actions/conditions)
+	predictionColumnsMustActivateConceptFeature = True	#default: True	#orig: False
+	pretrainCombineConsecutiveNouns = True #default: True	#orig: False
+else:
+	predictionColumnsMustActivateConceptFeature = False
+	pretrainCombineConsecutiveNouns = False
 
 #Connection strength modifiers;
 trainConnectionStrengthPOSdependence = False	#default: False	#orig: False
 inferenceConnectionStrengthPOSdependence = False	#default: False	#orig: False
 if(trainConnectionStrengthPOSdependence or inferenceConnectionStrengthPOSdependence):
-	connectionStrengthPOSdependenceTypes = ['NOUN', 'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X']	
-	connectionStrengthPOSdependenceValues = [10, 3, 3, 10, 5, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1]
+	connectionStrengthPOSdependenceTypes = ['NOUN', 'PROPN', 'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X']	
+	connectionStrengthPOSdependenceValues = [10, 10, 3, 3, 10, 5, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1]
 	connectionStrengthPOSdependenceExternal = True	#default: True	#orig: True	#False: apply modifiers to both internal/external connections, True: external connections only
 
 #Beam Search parameters;

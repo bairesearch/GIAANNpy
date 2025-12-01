@@ -136,6 +136,8 @@ def processArticle(text, articleIndex):
 def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt):
 	global sequenceCount
 	global drawRelationTypes
+
+	sequence = GIAANNproto_databaseNetworkTrain.preprocessSequence(sequence)
 	
 	if(debugReloadGlobalFeatureNeuronsEverySequence):
 		initialiseDatabaseNetwork()

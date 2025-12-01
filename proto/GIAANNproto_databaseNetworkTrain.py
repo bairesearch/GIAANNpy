@@ -22,6 +22,82 @@ import torch as pt
 from GIAANNproto_globalDefs import *
 import GIAANNproto_sparseTensors
 
+class PreprocessedToken:
+	__slots__ = ("text", "lemma_", "pos_")
+
+	def __init__(self, text, lemma, pos):
+		self.text = text
+		self.lemma_ = lemma
+		self.pos_ = pos
+
+
+class PreprocessedSequence:
+	__slots__ = ("tokens",)
+
+	def __init__(self, tokens):
+		self.tokens = tokens
+
+	def __len__(self):
+		return len(self.tokens)
+
+	def __iter__(self):
+		return iter(self.tokens)
+
+	def __getitem__(self, item):
+		if isinstance(item, slice):
+			return PreprocessedSequence(self.tokens[item])
+		return self.tokens[item]
+
+	@property
+	def text(self):
+		return " ".join(token.text for token in self.tokens)
+
+
+def preprocessSequence(sequence):
+	if isinstance(sequence, PreprocessedSequence):
+		return sequence
+	preprocessedTokens = []
+	if(pretrainCombineConsecutiveNouns):
+		buffer = []
+
+		def flush_buffer():
+			nonlocal buffer, preprocessedTokens
+			if(len(buffer) == 0):
+				return
+			preprocessedTokens.append(createCombinedToken(buffer))
+			buffer = []
+
+		for token in sequence:
+			if(token.pos_ in nounPosTags):
+				buffer.append(token)
+			else:
+				flush_buffer()
+				preprocessedTokens.append(createSingleToken(token))
+		flush_buffer()
+	else:
+		for token in sequence:
+			preprocessedTokens.append(createSingleToken(token))
+	return PreprocessedSequence(preprocessedTokens)
+
+
+def createSingleToken(token):
+	text = token.text
+	lemma = token.lemma_.lower()
+	pos = token.pos_
+	return PreprocessedToken(text, lemma, pos)
+
+
+def createCombinedToken(tokens):
+	if(len(tokens) == 1):
+		return createSingleToken(tokens[0])
+	combinedText = "_".join(token.text for token in tokens)
+	combinedLemma = "_".join(token.lemma_.lower() for token in tokens)
+	if(all(token.pos_ == 'PROPN' for token in tokens)):
+		combinedPos = 'PROPN'
+	else:
+		combinedPos = 'NOUN'
+	return PreprocessedToken(combinedText, combinedLemma, combinedPos)
+
 
 # Define the SequenceObservedColumns class
 class SequenceObservedColumns:
@@ -506,7 +582,16 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, words,
 		if(sequenceLength == 0):
 			startIndices = pt.empty_like(conceptIndices)
 			endIndices = pt.empty_like(conceptIndices)
-		delimiterMaskList = [pos in conceptColumnsDelimiterPOStypes for pos in posTags]
+		delimiterMaskList = []
+		for posIndex, pos in enumerate(posTags):
+			if(pos in conceptColumnsDelimiterPOStypes):
+				nextIndex = posIndex + 1
+				if(nextIndex < len(posTags) and posTags[nextIndex] in conceptColumnsDelimiterPOStypes):
+					delimiterMaskList.append(False)
+				else:
+					delimiterMaskList.append(True)
+			else:
+				delimiterMaskList.append(False)
 		if(len(delimiterMaskList) == 0):
 			delimiterIndices = pt.tensor([], dtype=conceptIndices.dtype)
 		else:
