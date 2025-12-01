@@ -22,6 +22,8 @@ import torch as pt
 from GIAANNproto_globalDefs import *
 import GIAANNproto_sparseTensors
 
+_pretrainCombineConsecutiveNounsOption = pretrainCombineConsecutiveNouns
+
 class PreprocessedToken:
 	__slots__ = ("text", "lemma_", "pos_")
 
@@ -53,11 +55,21 @@ class PreprocessedSequence:
 		return " ".join(token.text for token in self.tokens)
 
 
+def pretrain(sequence):
+	sequence = pretrainCombineConsecutiveNouns(sequence)
+	sequence = pretrainRenamePunc(sequence)
+	return sequence
+
+
 def preprocessSequence(sequence):
+	return pretrain(sequence)
+
+
+def pretrainCombineConsecutiveNouns(sequence):
 	if isinstance(sequence, PreprocessedSequence):
 		return sequence
 	preprocessedTokens = []
-	if(pretrainCombineConsecutiveNouns):
+	if(_pretrainCombineConsecutiveNounsOption):
 		buffer = []
 
 		def flush_buffer():
@@ -78,6 +90,30 @@ def preprocessSequence(sequence):
 		for token in sequence:
 			preprocessedTokens.append(createSingleToken(token))
 	return PreprocessedSequence(preprocessedTokens)
+
+
+def pretrainRenamePunc(sequence):
+	if(not isinstance(sequence, PreprocessedSequence)):
+		return sequence
+	if(not detectReferenceSetDelimitersPunctComma):
+		return sequence
+
+	noun_since_delimiter = False
+	for token_index, token in enumerate(sequence.tokens):
+		token_word = token.text.lower()
+		if(token.pos_ in conceptColumnsDelimiterPOStypes or token_word in conceptColumnsDelimiterPUNCtypes):
+			noun_since_delimiter = False
+			continue
+		if(token_word == ','):
+			if(noun_since_delimiter):
+				token.text = ",,"
+				token.lemma_ = ",,"
+				noun_since_delimiter = False
+			continue
+		if(token.pos_ in nounPosTags):
+			noun_since_delimiter = True
+			continue
+	return sequence
 
 
 def createSingleToken(token):
@@ -582,11 +618,20 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, words,
 		if(sequenceLength == 0):
 			startIndices = pt.empty_like(conceptIndices)
 			endIndices = pt.empty_like(conceptIndices)
+		def has_next_reference_delimiter(token_index):
+			next_index = token_index + 1
+			if(next_index >= sequenceLength):
+				return False
+			if(posTags[next_index] in conceptColumnsDelimiterPOStypes):
+				return True
+			if(words[next_index] in conceptColumnsDelimiterPUNCtypes):
+				return True
+			return False
+
 		delimiterMaskList = []
-		for posIndex, pos in enumerate(posTags):
-			if(pos in conceptColumnsDelimiterPOStypes):
-				nextIndex = posIndex + 1
-				if(nextIndex < len(posTags) and posTags[nextIndex] in conceptColumnsDelimiterPOStypes):
+		for posIndex, (pos, word) in enumerate(zip(posTags, words)):
+			if(word in conceptColumnsDelimiterPUNCtypes or pos in conceptColumnsDelimiterPOStypes):
+				if(has_next_reference_delimiter(posIndex)):
 					delimiterMaskList.append(False)
 				else:
 					delimiterMaskList.append(True)

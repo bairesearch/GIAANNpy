@@ -62,11 +62,16 @@ conceptColumnsDelimitByConceptFeaturesStart = False #default: False	#orig: True	
 conceptColumnsDelimitByConceptFeaturesMid = False	#default: True	#default: False
 if(conceptColumnsDelimitByPOS):
 	conceptColumnsDelimiterPOStypes = ['VERB', 'ADP', 'CCONJ', 'SCONJ']	#reference set delimiters (GIA actions/conditions)
+	conceptColumnsDelimiterPUNCtypes = [';', ':', '.', '?', '!', '-', ',,']
+	detectReferenceSetDelimitersPunctComma = True	#default: True	#orig False
 	predictionColumnsMustActivateConceptFeature = True	#default: True	#orig: False
 	pretrainCombineConsecutiveNouns = True #default: True	#orig: False
+	predictionEnsureConnectedToPreviousPrediction = True	#default: True	#ensure every new prediction connects to previous node
 else:
+	detectReferenceSetDelimitersPunctComma = False
 	predictionColumnsMustActivateConceptFeature = False
 	pretrainCombineConsecutiveNouns = False
+	predictionEnsureConnectedToPreviousPrediction = False
 
 #Connection strength modifiers;
 trainConnectionStrengthPOSdependence = False	#default: False	#orig: False
@@ -75,6 +80,7 @@ if(trainConnectionStrengthPOSdependence or inferenceConnectionStrengthPOSdepende
 	connectionStrengthPOSdependenceTypes = ['NOUN', 'PROPN', 'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X']	
 	connectionStrengthPOSdependenceValues = [10, 10, 3, 3, 10, 5, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1]
 	connectionStrengthPOSdependenceExternal = True	#default: True	#orig: True	#False: apply modifiers to both internal/external connections, True: external connections only
+trainConnectionStrengthNonLinear = False	#default: True	#orig: False	#unimplemented
 
 #Beam Search parameters;
 if(useInference and inferenceBeamSearch):
@@ -220,12 +226,16 @@ usePOS = True		 # usePOS mode	#mandatory
 useParallelProcessing = True	#mandatory (else restore original code pre-GIAANNproto1b3a)
 randomiseColumnFeatureXposition = True	#shuffle x position of column internal features such that their connections can be better visualised
 
-trainConnectionStrengthIncreaseColumnInternal = True #Increase column internal connections strength
+if(conceptColumnsDelimitByPOS):
+	trainConnectionStrengthIncreaseColumnInternal = False	#not required as internal column nodes will be predicted unless current node is a reference set delimiter
+else:
+	trainConnectionStrengthIncreaseColumnInternal = True #Increase column internal connections strength
 if(trainConnectionStrengthIncreaseColumnInternal):
  	trainIncreaseColumnInternalConnectionsStrengthModifier = 10.0
 	
 #debug vars;
 debugSmallDataset = False	#required if huggingface Wikipedia dataset is offline
+debugPrintTrainSentencePOS = True	#print each training sentence with POS tags
 debugConnectColumnsToNextColumnsInSequenceOnly = False
 debugDrawNeuronActivations = False
 if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
@@ -388,6 +398,9 @@ def isWordReferenceSetDelimiterType(nodeNameString):
 	wordKey = nodeNameStringStripped.lower()
 	if(wordKey in _referenceSetDelimiterCache):
 		return _referenceSetDelimiterCache[wordKey]
+	if(wordKey in conceptColumnsDelimiterPUNCtypes):
+		_referenceSetDelimiterCache[wordKey] = True
+		return True
 	if(_nlpReferenceObject is None):
 		return False
 	doc = _nlpReferenceObject(wordKey)
@@ -481,3 +494,5 @@ def compareDenseArrayDiff(array1, array2):
 	indices = pt.nonzero(difference, as_tuple=False)
 	print("Indices of differences:")
 	print(indices)
+
+spacyModelName = 'en_core_web_trf'	#orig: 'en_core_web_sm'

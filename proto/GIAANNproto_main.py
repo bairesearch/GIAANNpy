@@ -18,7 +18,7 @@ pip install torch
 pip install torch_geometric
 pip install nltk spacy
 pip install datasets
-python3 -m spacy download en_core_web_sm
+python3 -m spacy download spacyModelName (default:en_core_web_trf, orig: en_core_web_sm)
 pip install benepar
 pip install sortedcontainers
 
@@ -49,7 +49,7 @@ if(SANIconceptNeurons):
 
 
 # Initialize spaCy model
-nlp = spacy.load('en_core_web_sm')
+nlp = spacy.load(spacyModelName)
 registerReferenceNLP(nlp)
 
 databaseNetworkObject = GIAANNproto_databaseNetwork.initialiseDatabaseNetwork()
@@ -137,7 +137,7 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 	global sequenceCount
 	global drawRelationTypes
 
-	sequence = GIAANNproto_databaseNetworkTrain.preprocessSequence(sequence)
+	sequence = GIAANNproto_databaseNetworkTrain.pretrain(sequence)
 	
 	if(debugReloadGlobalFeatureNeuronsEverySequence):
 		initialiseDatabaseNetwork()
@@ -147,7 +147,11 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 		if(not inferenceRetainActivationsAcrossMultipleSequences or sequenceIndex==0):	#or (articleIndex==0 and sequenceIndex==0)
 			GIAANNproto_databaseNetwork.restoreGlobalArrays(databaseNetworkObject)	#restore global arrays (reset activation and time etc properties between inferencePredictiveNetworkTrainAcrossMultipleSequences:articles/sequences)
 	
-	print(f"Processing article: {articleIndex}, sequence: {sequenceIndex} {sequence.text}")
+	if(debugPrintTrainSentencePOS):
+		sentenceWithPOS = " ".join(f"{token.text} ({token.pos_})" for token in sequence)
+		print(f"Processing article: {articleIndex}, sequence: {sequenceIndex} {sentenceWithPOS}")
+	else:
+		print(f"Processing article: {articleIndex}, sequence: {sequenceIndex} {sequence.text}")
 
 	databaseNetworkObject.articleIndexDebug = articleIndex
 	databaseNetworkObject.sequenceIndexDebug = sequenceIndex

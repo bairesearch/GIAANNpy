@@ -25,7 +25,7 @@ import GIAANNproto_databaseNetworkTrain	   #low level processFeaturesActivePredi
 import GIAANNproto_sparseTensors
 
 
-def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, selectMostActiveFeatureFunc=None, conceptActivationState=None):
+def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, selectMostActiveFeatureFunc=None, conceptActivationState=None, connectedColumnsConstraint=None):
 	#generate targets for debug/analysis output
 	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsSequence, lemmasSequence, conceptMask, sequenceWordIndex, kcNetwork)
 
@@ -33,7 +33,7 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 		raise ValueError("beamSearchPredictNextFeature requires selectMostActiveFeatureFunc to be provided to avoid circular imports")
 
 	if(inferenceBeamDepth <= 0 or inferenceBeamWidth <= 0):
-		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState)
+		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState, connectedColumnsConstraint)
 
 	strengthLookup = None
 	if(globalFeatureNeuronsStrength is not None):
@@ -77,14 +77,14 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 	if(len(beams) == 0):
 		beams = completedBeams
 	if(len(beams) == 0 or len(beams[0]["sequence"]) == 0):
-		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState)
+		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState, connectedColumnsConstraint)
 
 	allBeams = beams + completedBeams
 	bestBeam = max(allBeams, key=lambda item: item["score"])
 	bestAction = bestBeam["sequence"][0]
 	conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = convertNodesToPrediction(bestAction["nodes"])
 	if(conceptColumnsIndicesNext.shape[0] == 0):
-		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState)
+		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState, connectedColumnsConstraint)
 	multipleSourcesNext = conceptColumnsIndicesNext.shape[0] > 1
 	kc = conceptColumnsIndicesNext.shape[0]
 	if(printPredictionsDuringInferencePredict):

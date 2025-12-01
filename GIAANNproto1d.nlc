@@ -217,3 +217,8 @@ v1d (Codex IDE GPT-5.1-Codex):
 - implement option pretrainCombineConsecutiveNouns - during sentence preprocessing combine consecutive nouns/propernouns (NOUN/PROPN) into a single word, delimited by '_'.
 - update conceptColumnsDelimitByPOS train method - when detecting concept column delimiters during train (conceptColumnsDelimiterPOStypes), and if there is more than one consecutive concept column delimiter in the sequence, then take the last word in the subsequence as the consecutive concept column delimiter. 
 - update conceptColumnsDelimitByPOS prediction method - if a currently activated node is of type reference set delimiter (conceptColumnsDelimiterPOStypes), then must predict either an external node or an internal node that is also a reference set delimiter. 
+- add option predictionEnsureConnectedToPreviousPrediction - ensure that every new prediction is connected to its previously predicted node (for both internal and external connections).
+- upgrade spacyModelName = 'en_core_web_trf' (orig: 'en_core_web_sm').
+- add pretrainCombineConsecutiveNouns() and pretrainRenamePunc() to pretrain(). 
+- implement option detectReferenceSetDelimitersPunctComma=True; in pretrainRenamePunc(); If "," is proceeded by a NOUN without a intermediate POS based reference set delimiter (conceptColumnsDelimiterPOStypes), then rename "," to ",,". ",," will then be detected as a reference set delimiter below.
+- if conceptColumnsDelimitByPOS=True: update processConceptWords() to detect conceptColumnsDelimiterPUNCtypes (semicolons ";", colons ":", full stops ".", and ",,") as reference set delimiters. 
