@@ -222,4 +222,7 @@ v1d (Codex IDE GPT-5.1-Codex):
 - add pretrainCombineConsecutiveNouns() and pretrainRenamePunc() to pretrain(). 
 - implement option detectReferenceSetDelimitersPunctComma=True; in pretrainRenamePunc(); If "," is proceeded by a NOUN without a intermediate POS based reference set delimiter (conceptColumnsDelimiterPOStypes), then rename "," to ",,". ",," will then be detected as a reference set delimiter below.
 - if conceptColumnsDelimitByPOS=True: update processConceptWords() to detect conceptColumnsDelimiterPUNCtypes (semicolons ";", colons ":", full stops ".", and ",,") as reference set delimiters. 
-- add databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList
+- add databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList.
+- add option debugConnectNodesToNextNodesInSequenceOnly.
+- add option arrayIndexPropertiesMinWordDistance=True. 1. in train; if arrayIndexPropertiesMinWordDistance=True, record the minimum word distance of every trained connection (overwriting this accordingly with any lower value than its currently stored value). 2. in inference ;if arrayIndexPropertiesMinWordDistance=True, ensure that the connection minWordDistance between every predicted node in the inference phase = 1 exactly (including in inferenceBeamSearch).
+

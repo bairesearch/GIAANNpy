@@ -136,7 +136,7 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 	global sequenceCount
 	global drawRelationTypes
 
-	sequence = GIAANNproto_databaseNetworkTrain.pretrain(sequence)
+	sequence = GIAANNproto_databaseNetworkTrain.preprocessSequence(sequence)
 	
 	if(debugReloadGlobalFeatureNeuronsEverySequence):
 		initialiseDatabaseNetwork()
@@ -317,6 +317,8 @@ def isFeaturePOSreferenceSetDelimiterType(nodeNameString, nodePOS):
 		if(nodeNameString in conceptColumnsDelimiterPUNCtypes):
 			isDelimiter = True
 		elif(nodePOS in conceptColumnsDelimiterPOStypes):
+			isDelimiter = True
+		elif(nodeNameString in conceptColumnsDelimiterAUXtypes):
 			isDelimiter = True
 		else:
 			isDelimiter = False

@@ -56,6 +56,9 @@ multisentencePredictions = False	#default: False	#requires higher GPU RAM for tr
 if(multisentencePredictions):
 	numSentencesPerSequence = 3	#default: 3
 
+#identify immediate connections
+arrayIndexPropertiesMinWordDistance = False	#default: True	#orig: False	#when True, store min word distance per connection and enforce during inference
+
 #Concept column delimiter parameters:
 conceptColumnsDelimitByPOS = True	#planned new default: True	#orig: False	#closer to original GIA specification
 conceptColumnsDelimitByConceptFeaturesStart = False #default: False	#orig: True	#Constrain column feature detection to be after concept feature detection	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
@@ -63,15 +66,18 @@ conceptColumnsDelimitByConceptFeaturesMid = False	#default: True	#default: False
 if(conceptColumnsDelimitByPOS):
 	conceptColumnsDelimiterPOStypes = ['VERB', 'ADP', 'CCONJ', 'SCONJ']	#reference set delimiters (GIA actions/conditions)
 	conceptColumnsDelimiterPUNCtypes = [';', ':', '.', '?', '!', '-', ',,']
+	conceptColumnsDelimiterAUXtypes = ['is_a']
 	detectReferenceSetDelimitersPunctComma = True	#default: True	#orig False
 	predictionColumnsMustActivateConceptFeature = True	#default: True	#orig: False
 	pretrainCombineConsecutiveNouns = True #default: True	#orig: False
 	predictionEnsureConnectedToPreviousPrediction = True	#default: True	#ensure every new prediction connects to previous node
+	pretrainCombineIsA = True	#default: True	#orig: False
 else:
 	detectReferenceSetDelimitersPunctComma = False
 	predictionColumnsMustActivateConceptFeature = False
 	pretrainCombineConsecutiveNouns = False
 	predictionEnsureConnectedToPreviousPrediction = False
+	pretrainCombineIsA = False
 
 #Connection strength modifiers;
 trainConnectionStrengthPOSdependence = False	#default: False	#orig: False
@@ -233,9 +239,10 @@ if(trainConnectionStrengthIncreaseColumnInternal):
  	trainIncreaseColumnInternalConnectionsStrengthModifier = 10.0
 	
 #debug vars;
-debugSmallDataset = False	#required if huggingface Wikipedia dataset is offline
 debugPrintTrainSentencePOS = False	#print each training sentence with POS tags
+debugSmallDataset = False	#required if huggingface Wikipedia dataset is offline
 debugConnectColumnsToNextColumnsInSequenceOnly = False
+debugConnectNodesToNextNodesInSequenceOnly = False
 debugDrawNeuronActivations = False
 if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
 	debugDrawNeuronActivations = True
@@ -343,8 +350,13 @@ arrayIndexPropertiesPermanence = 1
 arrayIndexPropertiesActivation = 2
 arrayIndexPropertiesTime = 3
 arrayIndexPropertiesPos = 4
-arrayNumberOfProperties = 5
-arrayPropertiesList = [arrayIndexPropertiesStrength, arrayIndexPropertiesPermanence, arrayIndexPropertiesActivation, arrayIndexPropertiesTime, arrayIndexPropertiesPos]
+arrayIndexPropertiesMinWordDistanceIndex = 5	#optional property storing min distance between connected words
+if(arrayIndexPropertiesMinWordDistance):
+	arrayNumberOfProperties = 6
+	arrayPropertiesList = [arrayIndexPropertiesStrength, arrayIndexPropertiesPermanence, arrayIndexPropertiesActivation, arrayIndexPropertiesTime, arrayIndexPropertiesPos, arrayIndexPropertiesMinWordDistanceIndex]
+else:
+	arrayNumberOfProperties = 5
+	arrayPropertiesList = [arrayIndexPropertiesStrength, arrayIndexPropertiesPermanence, arrayIndexPropertiesActivation, arrayIndexPropertiesTime, arrayIndexPropertiesPos]
 arrayIndexSegmentFirst = 0
 if(useSANI):
 	if(multisentencePredictions):

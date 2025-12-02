@@ -22,8 +22,7 @@ import torch as pt
 from GIAANNproto_globalDefs import *
 import GIAANNproto_sparseTensors
 
-_pretrainCombineConsecutiveNounsOption = pretrainCombineConsecutiveNouns
-
+# Preprocessing helpers
 class PreprocessedToken:
 	__slots__ = ("text", "lemma_", "pos_")
 
@@ -55,49 +54,45 @@ class PreprocessedSequence:
 		return " ".join(token.text for token in self.tokens)
 
 
-def pretrain(sequence):
-	sequence = pretrainCombineConsecutiveNouns(sequence)
-	sequence = pretrainRenamePunc(sequence)
-	return sequence
-
+def ensure_preprocessed_sequence(sequence):
+	if isinstance(sequence, PreprocessedSequence):
+		return sequence
+	preprocessed = [createSingleToken(token) for token in sequence]
+	return PreprocessedSequence(preprocessed)
 
 def preprocessSequence(sequence):
 	return pretrain(sequence)
 
+def pretrain(sequence):
+	if(pretrainCombineConsecutiveNouns):
+		sequence = pretrainCombineConsecutiveNoun(sequence)
+	if(pretrainCombineIsA):
+		sequence = pretrainCombineIsAterms(sequence)
+	if(detectReferenceSetDelimitersPunctComma):
+		sequence = pretrainRenamePunc(sequence)
+	return sequence
 
-def pretrainCombineConsecutiveNouns(sequence):
-	if isinstance(sequence, PreprocessedSequence):
-		return sequence
+def pretrainCombineConsecutiveNoun(sequence):
+	sequence = ensure_preprocessed_sequence(sequence)
 	preprocessedTokens = []
-	if(_pretrainCombineConsecutiveNounsOption):
+	buffer = []
+	def flush_buffer():
+		nonlocal buffer, preprocessedTokens
+		if(len(buffer) == 0):
+			return
+		preprocessedTokens.append(createCombinedToken(buffer))
 		buffer = []
-
-		def flush_buffer():
-			nonlocal buffer, preprocessedTokens
-			if(len(buffer) == 0):
-				return
-			preprocessedTokens.append(createCombinedToken(buffer))
-			buffer = []
-
-		for token in sequence:
-			if(token.pos_ in nounPosTags):
-				buffer.append(token)
-			else:
-				flush_buffer()
-				preprocessedTokens.append(createSingleToken(token))
-		flush_buffer()
-	else:
-		for token in sequence:
-			preprocessedTokens.append(createSingleToken(token))
+	for token in sequence.tokens:
+		if(token.pos_ in nounPosTags):
+			buffer.append(token)
+		else:
+			flush_buffer()
+			preprocessedTokens.append(token)
+	flush_buffer()
 	return PreprocessedSequence(preprocessedTokens)
 
-
 def pretrainRenamePunc(sequence):
-	if(not isinstance(sequence, PreprocessedSequence)):
-		return sequence
-	if(not detectReferenceSetDelimitersPunctComma):
-		return sequence
-
+	sequence = ensure_preprocessed_sequence(sequence)
 	noun_since_delimiter = False
 	for token_index, token in enumerate(sequence.tokens):
 		token_word = token.text.lower()
@@ -114,6 +109,25 @@ def pretrainRenamePunc(sequence):
 			noun_since_delimiter = True
 			continue
 	return sequence
+
+def pretrainCombineIsAterms(sequence):
+	sequence = ensure_preprocessed_sequence(sequence)
+	combined_tokens = []
+	i = 0
+	while i < len(sequence.tokens):
+		token = sequence.tokens[i]
+		if(token.text.lower() == "is" and i+1 < len(sequence.tokens)):
+			next_token = sequence.tokens[i+1]
+			if(next_token.text.lower() == "a"):
+				text = f"{token.text}_{next_token.text}"
+				lemma = f"{token.lemma_}_{next_token.lemma_}"
+				pos = token.pos_
+				combined_tokens.append(PreprocessedToken(text, lemma, pos))
+				i += 2
+				continue
+		combined_tokens.append(token)
+		i += 1
+	return PreprocessedSequence(combined_tokens)
 
 
 def createSingleToken(token):
@@ -929,10 +943,34 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 	else:
 		sequenceObservedColumns.featureConnections[arrayIndexPropertiesTime, :, :, :, :, :] = featureConnectionsInactive*sequenceObservedColumns.featureConnections[arrayIndexPropertiesTime] + featureConnectionsActive*sequenceIndex
 	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPos, :, :, :, :, :] = featureConnectionsInactive*sequenceObservedColumns.featureConnections[arrayIndexPropertiesPos] + featureConnectionsActive*featureConnectionsPos
+	if(arrayIndexPropertiesMinWordDistance):
+		updateConnectionMinWordDistances(sequenceObservedColumns, featureConnectionsActive, featureNeuronsWordOrder)
 
 	if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections):
 		decreasePermanenceActive(sequenceObservedColumns, featureNeuronsActive[arrayIndexSegmentInternalColumn], featureNeuronsInactive[arrayIndexSegmentInternalColumn], sequenceConceptIndexMask, featureNeuronsSegmentMask, featureConnectionsSegmentMask)
 	
+
+def updateConnectionMinWordDistances(sequenceObservedColumns, featureConnectionsActive, featureNeuronsWordOrder):
+	if(featureNeuronsWordOrder is None):
+		return
+	cs = sequenceObservedColumns.cs
+	fs = sequenceObservedColumns.fs
+	device = featureConnectionsActive.device
+	wordOrderTensor = featureNeuronsWordOrder.to(device)
+	wordOrderSource = wordOrderTensor.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
+	wordOrderTarget = wordOrderTensor.view(1, 1, cs, fs).expand(cs, fs, cs, fs)
+	wordDistances = pt.abs(wordOrderTarget - wordOrderSource).to(arrayType)
+	wordDistances = wordDistances.unsqueeze(0).expand(arrayNumberOfSegments, cs, fs, cs, fs)
+	wordDistances = wordDistances * featureConnectionsActive
+	updateMask = featureConnectionsActive > 0
+	validDistanceMask = updateMask & (wordDistances > 0)
+	connectionMinDistances = sequenceObservedColumns.featureConnections[arrayIndexPropertiesMinWordDistanceIndex]
+	firstWriteMask = validDistanceMask & (connectionMinDistances == 0)
+	connectionMinDistances = pt.where(firstWriteMask, wordDistances, connectionMinDistances)
+	smallerMask = validDistanceMask & (connectionMinDistances > 0) & (wordDistances < connectionMinDistances)
+	connectionMinDistances = pt.where(smallerMask, wordDistances, connectionMinDistances)
+	sequenceObservedColumns.featureConnections[arrayIndexPropertiesMinWordDistanceIndex] = connectionMinDistances
+
 
 def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder):
 
@@ -942,7 +980,11 @@ def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWor
 	if(featureNeuronsWordOrder is not None):
 		featureNeuronsWordOrderExpanded1 = featureNeuronsWordOrder.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
 		featureNeuronsWordOrderExpanded2 = featureNeuronsWordOrder.view(1, 1, cs, fs).expand(cs, fs, cs, fs)
-		wordOrderMask = featureNeuronsWordOrderExpanded2 > featureNeuronsWordOrderExpanded1
+		if(debugConnectNodesToNextNodesInSequenceOnly):
+			wordOrderUpperBound = featureNeuronsWordOrderExpanded1 + 1
+			wordOrderMask = pt.logical_and(featureNeuronsWordOrderExpanded2 > featureNeuronsWordOrderExpanded1, featureNeuronsWordOrderExpanded2 <= wordOrderUpperBound)
+		else:
+			wordOrderMask = featureNeuronsWordOrderExpanded2 > featureNeuronsWordOrderExpanded1
 		featureConnectionsActive = featureConnectionsActive * wordOrderMask
 	if(columnsWordOrder is not None):
 		columnsWordOrderExpanded1 = columnsWordOrder.view(cs, 1, 1, 1).expand(cs, fs, cs, fs)
