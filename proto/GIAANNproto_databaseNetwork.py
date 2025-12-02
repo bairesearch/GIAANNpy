@@ -24,7 +24,7 @@ import GIAANNproto_databaseNetworkFiles
 import GIAANNproto_sparseTensors
 
 class DatabaseNetworkClass():
-	def __init__(self, c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList):
+	def __init__(self, c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList, conceptFeaturesReferenceSetDelimiterDeterministicList, conceptFeaturesReferenceSetDelimiterProbabilisticList):
 		self.c = c
 		self.f = f
 		self.s = s
@@ -35,7 +35,13 @@ class DatabaseNetworkClass():
 		self.conceptFeaturesList = conceptFeaturesList
 		self.globalFeatureNeurons = globalFeatureNeurons
 		self.globalFeatureConnections = None #transformerUseInputConnections: initialised during prediction phase
-		self.conceptFeaturesReferenceSetDelimiterList = conceptFeaturesReferenceSetDelimiterList
+		if(conceptColumnsDelimitByPOS):
+			if(detectReferenceSetDelimitersBetweenNouns):
+				self.conceptFeaturesReferenceSetDelimiterList = conceptFeaturesReferenceSetDelimiterList
+				self.conceptFeaturesReferenceSetDelimiterDeterministicList = conceptFeaturesReferenceSetDelimiterDeterministicList
+				self.conceptFeaturesReferenceSetDelimiterProbabilisticList = conceptFeaturesReferenceSetDelimiterProbabilisticList
+			else:
+				self.conceptFeaturesReferenceSetDelimiterList = conceptFeaturesReferenceSetDelimiterList
 
 def backupGlobalArrays(databaseNetworkObject):
 	databaseNetworkObject.globalFeatureNeuronsBackup = databaseNetworkObject.globalFeatureNeurons.clone()
@@ -71,7 +77,9 @@ def initialiseDatabaseNetwork():
 	conceptFeaturesList = []  # list of concept feature names (words)
 	f = 0  # current number of concept features
 	conceptFeaturesReferenceSetDelimiterList = []
-	
+	conceptFeaturesReferenceSetDelimiterDeterministicList = []
+	conceptFeaturesReferenceSetDelimiterProbabilisticList = []
+
 	# Initialize the concept columns dictionary
 	if(GIAANNproto_databaseNetworkFiles.pathExists(conceptColumnsDictFile)):
 		conceptColumnsDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptColumnsDictFile)
@@ -80,8 +88,21 @@ def initialiseDatabaseNetwork():
 		conceptFeaturesDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesDictFile)
 		f = len(conceptFeaturesDict)
 		conceptFeaturesList = list(conceptFeaturesDict.keys())
-		conceptFeaturesReferenceSetDelimiterDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterListFile)
-		conceptFeaturesReferenceSetDelimiterList = list(conceptFeaturesReferenceSetDelimiterDict.values())
+		if(conceptColumnsDelimitByPOS):
+			if(detectReferenceSetDelimitersBetweenNouns):	
+				conceptFeaturesReferenceSetDelimiterDeterministicDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterDeterministicListFile)
+				conceptFeaturesReferenceSetDelimiterDeterministicList = list(conceptFeaturesReferenceSetDelimiterDeterministicDict.values())
+				conceptFeaturesReferenceSetDelimiterProbabilisticDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterProbabilisticListFile)
+				conceptFeaturesReferenceSetDelimiterProbabilisticList = list(conceptFeaturesReferenceSetDelimiterProbabilisticDict.values())
+				maxReferenceListLength = max(len(conceptFeaturesReferenceSetDelimiterDeterministicList), len(conceptFeaturesReferenceSetDelimiterProbabilisticList))
+				conceptFeaturesReferenceSetDelimiterList = []
+				for i in range(maxReferenceListLength):
+					isDeterministic = conceptFeaturesReferenceSetDelimiterDeterministicList[i] if i < len(conceptFeaturesReferenceSetDelimiterDeterministicList) else False
+					isProbabilistic = conceptFeaturesReferenceSetDelimiterProbabilisticList[i] if i < len(conceptFeaturesReferenceSetDelimiterProbabilisticList) else False
+					conceptFeaturesReferenceSetDelimiterList.append(isDeterministic or isProbabilistic)
+			else:
+				conceptFeaturesReferenceSetDelimiterDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterListFile)
+				conceptFeaturesReferenceSetDelimiterList = list(conceptFeaturesReferenceSetDelimiterDict.values())
 	else:
 		if(useDedicatedConceptNames):
 			# Add dummy feature for concept neuron (different per concept column)
@@ -94,7 +115,13 @@ def initialiseDatabaseNetwork():
 			exit()
 			# f = max_num_non_nouns + 1  # Maximum number of non-nouns in an English dictionary, plus the concept neuron of each column
 
-		conceptFeaturesReferenceSetDelimiterList.append(False)
+		if(conceptColumnsDelimitByPOS):
+			if(detectReferenceSetDelimitersBetweenNouns):
+				conceptFeaturesReferenceSetDelimiterDeterministicList.append(False)
+				conceptFeaturesReferenceSetDelimiterProbabilisticList.append(False)
+				conceptFeaturesReferenceSetDelimiterList.append(False)	#combined det+prob representation for current sequence train only
+			else:
+				conceptFeaturesReferenceSetDelimiterList.append(False)
 	if not lowMem:
 		globalFeatureNeurons = loadFeatureNeuronsGlobal(c, f)
 	else:
@@ -103,7 +130,7 @@ def initialiseDatabaseNetwork():
 	s = arrayNumberOfSegments
 	p = arrayNumberOfProperties
 		
-	databaseNetworkObject = DatabaseNetworkClass(c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList)
+	databaseNetworkObject = DatabaseNetworkClass(c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList, conceptFeaturesReferenceSetDelimiterDeterministicList, conceptFeaturesReferenceSetDelimiterProbabilisticList)
 	
 	return databaseNetworkObject
 	
@@ -238,8 +265,8 @@ def getTokenConceptFeatureIndexForSequenceConceptIndex(sequence_observed_columns
 	return conceptIndex, feature_index
 '''
 
-def getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsSequence, lemmasSequence, conceptMask, sequenceWordIndex, kcMax):
-	targetFoundNextColumnIndex, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = getTokenConceptFeatureIndex(sequenceObservedColumns, wordsSequence, lemmasSequence, conceptMask, sequenceWordIndex)
+def getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcMax):
+	targetFoundNextColumnIndex, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = getTokenConceptFeatureIndex(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex)
 
 	if(kcMax == 1 or not targetFoundNextColumnIndex):
 		targetConceptColumnsIndices = pt.tensor(targetPreviousColumnIndex).unsqueeze(0)
@@ -254,15 +281,15 @@ def getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsSequence, le
 
 	return targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices
 
-def getTokenConceptFeatureIndex(sequenceObservedColumns, wordsSequence, lemmasSequence, conceptMask, sequenceWordIndex):
+def getTokenConceptFeatureIndex(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex):
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 	columnsIndexSequenceWordIndexDict = sequenceObservedColumns.columnsIndexSequenceWordIndexDict
 	
 	if(conceptMask[sequenceWordIndex]):
-		lemma = lemmasSequence[sequenceWordIndex]
+		lemma = tokensSequence[sequenceWordIndex].lemma
 		targetFeatureIndex = databaseNetworkObject.conceptColumnsDict[lemma]
 	else:
-		word = wordsSequence[sequenceWordIndex]
+		word = tokensSequence[sequenceWordIndex].word
 		targetFeatureIndex = databaseNetworkObject.conceptFeaturesDict[word]
 	sequenceLen = conceptMask.shape[0]
 	foundFeature = False
@@ -287,13 +314,26 @@ def getTokenConceptFeatureIndex(sequenceObservedColumns, wordsSequence, lemmasSe
 	
 	return targetFoundNextColumnIndex, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex
 
-def isFeatureIndexReferenceSetDelimiter(databaseNetworkObject, featureIndex):
+def isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, featureIndex):
 	if(conceptColumnsDelimitByPOS):
-		isDelimiter = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList[featureIndex]
+		if(detectReferenceSetDelimitersBetweenNouns):
+			isDelimiter = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterDeterministicList[featureIndex]
+			isDelimiterProbabilistic = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex]
+		else:
+			isDelimiter = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList[featureIndex]
 	else:
 		isDelimiter = False
 	return isDelimiter
 
+def isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, featureIndex):
+	if(conceptColumnsDelimitByPOS):
+		if(detectReferenceSetDelimitersBetweenNouns):
+			isDelimiterProbabilistic = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex]
+		else:
+			isDelimiterProbabilistic = False
+	else:
+		isDelimiterProbabilistic = False
+	return isDelimiterProbabilistic
 
 def computeConnectionMinWordDistanceMask(observedColumn, sourceFeatureIndex, targetIndices, requiredDistance=1.0):
 	if(not arrayIndexPropertiesMinWordDistance):

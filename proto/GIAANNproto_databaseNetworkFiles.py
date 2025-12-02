@@ -71,9 +71,16 @@ def saveData(databaseNetworkObject, observedColumnsDict):
 	saveDictFile(conceptColumnsDictFile, databaseNetworkObject.conceptColumnsDict)
 	saveDictFile(conceptFeaturesDictFile, databaseNetworkObject.conceptFeaturesDict)
 
-	conceptFeaturesReferenceSetDelimiterDict = dict(enumerate(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList))
-	saveDictFile(conceptFeaturesReferenceSetDelimiterListFile, conceptFeaturesReferenceSetDelimiterDict)
-
+	if(conceptColumnsDelimitByPOS):
+		if(detectReferenceSetDelimitersBetweenNouns):
+			conceptFeaturesReferenceSetDelimiterProbabilisticDict = dict(enumerate(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList))
+			saveDictFile(conceptFeaturesReferenceSetDelimiterProbabilisticListFile, conceptFeaturesReferenceSetDelimiterProbabilisticDict)
+			conceptFeaturesReferenceSetDelimiterDeterministicDict = dict(enumerate(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterDeterministicList))
+			saveDictFile(conceptFeaturesReferenceSetDelimiterDeterministicListFile, conceptFeaturesReferenceSetDelimiterDeterministicDict)
+		else:
+			conceptFeaturesReferenceSetDelimiterDict = dict(enumerate(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList))
+			saveDictFile(conceptFeaturesReferenceSetDelimiterListFile, conceptFeaturesReferenceSetDelimiterDict)
+		
 def observedColumnSaveToDisk(self):
 	"""
 	Save the observed column data to disk.

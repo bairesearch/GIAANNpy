@@ -25,15 +25,15 @@ import GIAANNproto_databaseNetworkTrain	   #low level processFeaturesActivePredi
 import GIAANNproto_sparseTensors
 
 
-def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, selectMostActiveFeatureFunc=None, conceptActivationState=None, connectedColumnsConstraint=None, connectedColumnsFeatures=None):
+def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, selectMostActiveFeatureFunc=None, conceptActivationState=None, connectedColumnsConstraint=None, connectedColumnsFeatures=None):
 	#generate targets for debug/analysis output
-	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, wordsSequence, lemmasSequence, conceptMask, sequenceWordIndex, kcNetwork)
+	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 
 	if(selectMostActiveFeatureFunc is None):
 		raise ValueError("beamSearchPredictNextFeature requires selectMostActiveFeatureFunc to be provided to avoid circular imports")
 
 	if(inferenceBeamDepth <= 0 or inferenceBeamWidth <= 0):
-		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatures)
+		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatures)
 
 	strengthLookup = None
 	if(globalFeatureNeuronsStrength is not None):
@@ -77,14 +77,14 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 	if(len(beams) == 0):
 		beams = completedBeams
 	if(len(beams) == 0 or len(beams[0]["sequence"]) == 0):
-		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatures)
+		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatures)
 
 	allBeams = beams + completedBeams
 	bestBeam = max(allBeams, key=lambda item: item["score"])
 	bestAction = bestBeam["sequence"][0]
 	conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = convertNodesToPrediction(bestAction["nodes"])
 	if(conceptColumnsIndicesNext.shape[0] == 0):
-		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, wordsSequence, lemmasSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatures)
+		return selectMostActiveFeatureFunc(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatures)
 	multipleSourcesNext = conceptColumnsIndicesNext.shape[0] > 1
 	kc = conceptColumnsIndicesNext.shape[0]
 	if(printPredictionsDuringInferencePredict):
@@ -498,7 +498,7 @@ def prepareBeamNodes(databaseNetworkObject, nodes, conceptActivationState, const
 			if(conceptActivationState is None or columnIndex not in activeColumns):
 				adjustedFeature = featureIndexConceptNeuron
 		if(delimiterMode and allowedSet is not None and columnIndex in allowedSet):
-			if(not GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiter(databaseNetworkObject, adjustedFeature)):
+			if(not GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, adjustedFeature)):
 				continue
 		nodeKey = (columnIndex, adjustedFeature)
 		if(nodeKey in seenNodes):
@@ -512,7 +512,15 @@ def nodesContainReferenceSetDelimiter(databaseNetworkObject, nodes):
 	if(not conceptColumnsDelimitByPOS):
 		return False
 	for nodeColumn, nodeFeature in nodes:
-		if(GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiter(databaseNetworkObject, nodeFeature)):
+		if(GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, nodeFeature)):
+			return True
+	return False
+
+def nodesContainProbabilisticReferenceSetDelimiter(databaseNetworkObject, nodes):
+	if(not conceptColumnsDelimitByPOS or not detectReferenceSetDelimitersBetweenNouns):
+		return False
+	for nodeColumn, nodeFeature in nodes:
+		if(GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, nodeFeature)):
 			return True
 	return False
 
@@ -526,12 +534,16 @@ def updateConstraintStateAfterNodes(databaseNetworkObject, previousConstraintSta
 		return previousConstraintState
 	if(nodesContainReferenceSetDelimiter(databaseNetworkObject, nodes)):
 		return {"columns": newColumns, "mode": "delimiter"}
+	elif(nodesContainProbabilisticReferenceSetDelimiter(databaseNetworkObject, nodes)):
+		return None
 	else:
 		return {"columns": newColumns, "mode": "internal"}
 
 
 def buildConnectedColumnsLookupForBeamNodes(databaseNetworkObject, observedColumnsDict, nodes):
 	if(nodes is None or len(nodes) == 0):
+		return None, None
+	if(nodesContainProbabilisticReferenceSetDelimiter(databaseNetworkObject, nodes)):
 		return None, None
 	connectedColumnsSet = set()
 	if(debugConnectNodesToNextNodesInSequenceOnly):

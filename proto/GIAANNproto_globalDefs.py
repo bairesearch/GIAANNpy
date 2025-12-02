@@ -64,20 +64,19 @@ conceptColumnsDelimitByPOS = True	#planned new default: True	#orig: False	#close
 conceptColumnsDelimitByConceptFeaturesStart = False #default: False	#orig: True	#Constrain column feature detection to be after concept feature detection	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
 conceptColumnsDelimitByConceptFeaturesMid = False	#default: True	#default: False
 if(conceptColumnsDelimitByPOS):
-	conceptColumnsDelimiterPOStypes = ['VERB', 'ADP', 'CCONJ', 'SCONJ']	#reference set delimiters (GIA actions/conditions)
-	conceptColumnsDelimiterPUNCtypes = [';', ':', '.', '?', '!', '-', ',,']
-	conceptColumnsDelimiterAUXtypes = ['is_a']
-	detectReferenceSetDelimitersPunctComma = True	#default: True	#orig False
+	conceptColumnsDelimiterPOStypes = ['VERB', 'ADP']	#deterministic reference set delimiters (GIA actions/conditions)
+	conceptColumnsDelimiterWordTypes = [';', ':', '.', '?', '!']	#deterministic reference set delimiters (GIA logical conditions)
+	detectReferenceSetDelimitersBetweenNouns = True	#default: assign reference set delimiters if they appear between two nouns (without designated reference set delimiter types)
+	detectReferenceSetDelimitersBetweenNounsPOStypes = ['CCONJ', 'SCONJ']	#probabilistic reference set delimiters (GIA logical conditions) - only assign if they are detected inbetween nouns (without intermediate deterministic delimiters)
+	detectReferenceSetDelimitersBetweenNounsWordTypes = ['is', 'are', ',']	#eg a dog is an animal / dogs are animals
+	#TODO: detectReferenceSetDelimitersBetweenNounsTagtypes = ['PRP', etc]
 	predictionColumnsMustActivateConceptFeature = True	#default: True	#orig: False
 	pretrainCombineConsecutiveNouns = True #default: True	#orig: False
 	predictionEnsureConnectedToPreviousPrediction = True	#default: True	#ensure every new prediction connects to previous node
-	pretrainCombineIsA = True	#default: True	#orig: False
 else:
-	detectReferenceSetDelimitersPunctComma = False
 	predictionColumnsMustActivateConceptFeature = False
 	pretrainCombineConsecutiveNouns = False
 	predictionEnsureConnectedToPreviousPrediction = False
-	pretrainCombineIsA = False
 
 #Connection strength modifiers;
 trainConnectionStrengthPOSdependence = False	#default: False	#orig: False
@@ -342,7 +341,12 @@ predictiveNetworkFolder = "."
 predictiveNetworkFileName = "predictiveNetworkModel.pt"
 SANIconceptNeuronsDictFile = databaseFolder + 'SANIconceptNeuronsDict.pkl'
 SANIconceptNeuronWeightsListFile = databaseFolder + 'SANIconceptNeuronWeightsList.pkl'
-conceptFeaturesReferenceSetDelimiterListFile = databaseFolder + 'conceptFeaturesReferenceSetDelimiterList.pkl'
+if(conceptColumnsDelimitByPOS):
+	if(detectReferenceSetDelimitersBetweenNouns):
+		conceptFeaturesReferenceSetDelimiterDeterministicListFile = databaseFolder + 'conceptFeaturesReferenceSetDelimiterDeterministicList.pkl'
+		conceptFeaturesReferenceSetDelimiterProbabilisticListFile = databaseFolder + 'conceptFeaturesReferenceSetDelimiterProbabilisticList.pkl'
+	else:
+		conceptFeaturesReferenceSetDelimiterListFile = databaseFolder + 'conceptFeaturesReferenceSetDelimiterList.pkl'
 
 #common array indices
 arrayIndexPropertiesStrength = 0
@@ -380,7 +384,7 @@ arrayIndexSegmentAdjacentColumn = arrayNumberOfSegments-2
 arrayType = pt.float32	#pt.long	#pt.float32
 
 # Define POS tag sets for nouns and non-nouns
-nounPosTags = {'NOUN', 'PROPN'}
+nounPosTags = {'NOUN', 'PROPN', 'PRON'}
 nonNounPosTags = {'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X'}
 
 def posIntToPosString(nlp, posInt):

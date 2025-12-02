@@ -166,7 +166,7 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 		sequenceSeed = sequence[0:numSeedTokens]	#prompt
 		sequencePredict = sequence[numSeedTokens:]
 
-	# First pass: Extract words, lemmas, POS tags, and update concept_columns_dict and c
+	# First pass: Extract words, lemmas, pos, tags, and update concept_columns_dict and c
 	conceptsFound, conceptMask = firstPass(sequence)
 	
 	sequenceList = []
@@ -177,24 +177,24 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 			sequenceList.append(sequence)
 		
 	for sequence in sequenceList:
-		words, lemmas, posTags = GIAANNproto_databaseNetworkTrain.getLemmas(sequence)
+		tokens = GIAANNproto_databaseNetworkTrain.getTokens(sequence)
 
 		# When usePOS is enabled, detect all possible new features in the sequence
 		if not (useDedicatedFeatureLists):
-			detectNewFeatures(databaseNetworkObject, words, lemmas, posTags)
+			detectNewFeatures(databaseNetworkObject, tokens)
 
 		# Second pass: Create observed_columns_dict
-		observedColumnsDict, observedColumnsSequenceWordIndexDict = secondPass(databaseNetworkObject, lemmas, posTags)
+		observedColumnsDict, observedColumnsSequenceWordIndexDict = secondPass(databaseNetworkObject, tokens)
 
 		# Create the sequence observed columns object
-		sequenceObservedColumns = GIAANNproto_databaseNetworkTrain.SequenceObservedColumns(databaseNetworkObject, words, lemmas, observedColumnsDict, observedColumnsSequenceWordIndexDict)
+		sequenceObservedColumns = GIAANNproto_databaseNetworkTrain.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict)
 
 		if(useInference and (inferenceTrainPredictiveNetworkAllSequences or lastSequenceInPrompt)):
 			# Process each concept word in the sequence (predict)
 			GIAANNproto_predictiveNetwork.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens)
 		else:
 			# Process each concept word in the sequence (train)
-			GIAANNproto_databaseNetworkTrain.processConceptWords(sequenceObservedColumns, sequenceCount, sequence, words, lemmas, posTags)
+			GIAANNproto_databaseNetworkTrain.processConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)
 
 			# Update observed columns from sequence observed columns
 			sequenceObservedColumns.updateObservedColumnsWrapper()
@@ -249,11 +249,12 @@ def firstPass(sequence):
 	return conceptsFound, conceptMask
 
 				
-def secondPass(databaseNetworkObject, lemmas, posTags):
+def secondPass(databaseNetworkObject, tokens):
 	observedColumnsDict = {}
 	observedColumnsSequenceWordIndexDict = {}
-	for i, lemma in enumerate(lemmas):
-		pos = posTags[i]
+	for i, token in enumerate(tokens):
+		lemma = token.lemma
+		pos = token.pos
 		if usePOS:
 			if pos in nounPosTags:
 				conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
@@ -270,15 +271,16 @@ def secondPass(databaseNetworkObject, lemmas, posTags):
 	return observedColumnsDict, observedColumnsSequenceWordIndexDict
 
 
-def detectNewFeatures(databaseNetworkObject, words, lemmas, posTags):
+def detectNewFeatures(databaseNetworkObject, tokens):
 	"""
 	When usePOS mode is enabled, detect all possible new features in the sequence
 	by searching for all new non-nouns in the sequence.
 	"""
 
 	numNewFeatures = 0
-	for j, (wordJ, posJ) in enumerate(zip(words, posTags)):
-		if(processFeatureDetection(databaseNetworkObject, j, wordJ, posTags)):
+	for j, token in enumerate(tokens):
+		wordJ = token.word
+		if(processFeatureDetection(databaseNetworkObject, j, wordJ, tokens)):
 			numNewFeatures += 1
 
 	# After processing all features, update f
@@ -292,12 +294,12 @@ def detectNewFeatures(databaseNetworkObject, words, lemmas, posTags):
 			databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons.coalesce()
 			databaseNetworkObject.globalFeatureNeurons = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeurons.indices(), databaseNetworkObject.globalFeatureNeurons.values(), size=newShape, dtype=arrayType, device=deviceSparse)
 
-def processFeatureDetection(databaseNetworkObject, j, wordJ, posTags):
+def processFeatureDetection(databaseNetworkObject, j, wordJ, tokens):
 	"""
 	Helper function to detect new features prior to processing concept words.
 	"""
 	
-	posJ = posTags[j]
+	posJ = tokens[j].pos
 	featureWord = wordJ.lower()
 	
 	if usePOS and (posJ in nounPosTags):
@@ -306,25 +308,79 @@ def processFeatureDetection(databaseNetworkObject, j, wordJ, posTags):
 		if featureWord not in databaseNetworkObject.conceptFeaturesDict:
 			databaseNetworkObject.conceptFeaturesDict[featureWord] = len(databaseNetworkObject.conceptFeaturesDict)
 			databaseNetworkObject.conceptFeaturesList.append(featureWord)
-			isDelimiter = isFeaturePOSreferenceSetDelimiterType(featureWord, posJ)	
-			databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList.append(isDelimiter)
+			isDelimiter, isDelimiterDeterministic, isDelimiterProbabilistic = isFeaturePOSreferenceSetDelimiterType(featureWord, posJ, tokens, j)
+			if(conceptColumnsDelimitByPOS):
+				databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList.append(isDelimiter)
+				if(detectReferenceSetDelimitersBetweenNouns):
+					databaseNetworkObject.conceptFeaturesReferenceSetDelimiterDeterministicList.append(isDelimiterDeterministic)
+					databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList.append(isDelimiterProbabilistic)
 			return True
 		else:
 			return False
 	
-def isFeaturePOSreferenceSetDelimiterType(nodeNameString, nodePOS):
+def isFeaturePOSreferenceSetDelimiterType(nodeNameString, nodePOS, tokens=None, tokenIndex=None):
+	isDelimiterDeterministic = False
+	isDelimiterProbabilistic = False
 	if(conceptColumnsDelimitByPOS):
-		if(nodeNameString in conceptColumnsDelimiterPUNCtypes):
-			isDelimiter = True
-		elif(nodePOS in conceptColumnsDelimiterPOStypes):
-			isDelimiter = True
-		elif(nodeNameString in conceptColumnsDelimiterAUXtypes):
-			isDelimiter = True
-		else:
-			isDelimiter = False
+		nodeWordLower = nodeNameString.lower()
+		if(nodePOS in conceptColumnsDelimiterPOStypes or nodeWordLower in conceptColumnsDelimiterWordTypes):
+			isDelimiterDeterministic = True
+		if(detectReferenceSetDelimitersBetweenNouns and not isDelimiterDeterministic):
+			if(tokens is not None and tokenIndex is not None):
+				isDelimiterProbabilistic = detectProbabilisticReferenceSetDelimiterBetweenNouns(tokens, tokenIndex, nodePOS, nodeWordLower)
+		isDelimiter = isDelimiterDeterministic or isDelimiterProbabilistic
 	else:
 		isDelimiter = False
-	return isDelimiter
+	return isDelimiter, isDelimiterDeterministic, isDelimiterProbabilistic
+
+
+def detectProbabilisticReferenceSetDelimiterBetweenNouns(tokens, tokenIndex, nodePOS, nodeWordLower):
+	if(tokenIndex < 0 or tokenIndex >= len(tokens)):
+		return False
+	if(not (nodePOS in detectReferenceSetDelimitersBetweenNounsPOStypes or nodeWordLower in detectReferenceSetDelimitersBetweenNounsWordTypes)):
+		return False
+	leftNounIndex = findNearestNounIndex(tokens, tokenIndex-1, -1)
+	rightNounIndex = findNearestNounIndex(tokens, tokenIndex+1, 1)
+	if(leftNounIndex is None or rightNounIndex is None):
+		return False
+	if(leftNounIndex >= rightNounIndex):
+		return False
+	if(hasDeterministicDelimiterBetween(tokens, leftNounIndex, rightNounIndex)):
+		return False
+	candidateIndices = collectProbabilisticDelimiterIndices(tokens, leftNounIndex, rightNounIndex)
+	if(len(candidateIndices) == 0):
+		return False
+	#NOTE: Only assign the first probabilistic delimiter per noun span for now (upgradeable in future).
+	return candidateIndices[0] == tokenIndex
+
+
+def findNearestNounIndex(tokens, startIndex, step):
+	index = startIndex
+	while(0 <= index < len(tokens)):
+		if(tokens[index].pos in nounPosTags):
+			return index
+		index += step
+	return None
+
+
+def hasDeterministicDelimiterBetween(tokens, startIndex, endIndex):
+	for idx in range(startIndex+1, endIndex):
+		token = tokens[idx]
+		tokenWord = token.word
+		if(token.pos in conceptColumnsDelimiterPOStypes or tokenWord in conceptColumnsDelimiterWordTypes):
+			return True
+	return False
+
+
+def collectProbabilisticDelimiterIndices(tokens, startIndex, endIndex):
+	candidateIndices = []
+	for idx in range(startIndex+1, endIndex):
+		token = tokens[idx]
+		tokenWord = token.word
+		if(token.pos in detectReferenceSetDelimitersBetweenNounsPOStypes or tokenWord in detectReferenceSetDelimitersBetweenNounsWordTypes):
+			if(not (token.pos in conceptColumnsDelimiterPOStypes or tokenWord in conceptColumnsDelimiterWordTypes)):
+				candidateIndices.append(idx)
+	return candidateIndices
 	
 	
 # Load the Wikipedia dataset using Hugging Face datasets

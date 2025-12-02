@@ -22,16 +22,22 @@ import torch as pt
 from GIAANNproto_globalDefs import *
 import GIAANNproto_sparseTensors
 
+class SequenceToken:
+	def __init__(self, word, lemma, pos, tag):
+		self.word = word
+		self.lemma = lemma
+		self.pos = pos
+		self.tag = tag
+
 # Preprocessing helpers
 class PreprocessedToken:
-	__slots__ = ("text", "lemma_", "pos_")
-
-	def __init__(self, text, lemma, pos):
+	__slots__ = ("text", "lemma_", "pos_", "tag_")
+	def __init__(self, text, lemma, pos, tag):
 		self.text = text
 		self.lemma_ = lemma
 		self.pos_ = pos
-
-
+		self.tag_ = tag
+		
 class PreprocessedSequence:
 	__slots__ = ("tokens",)
 
@@ -54,99 +60,56 @@ class PreprocessedSequence:
 		return " ".join(token.text for token in self.tokens)
 
 
-def ensure_preprocessed_sequence(sequence):
-	if isinstance(sequence, PreprocessedSequence):
-		return sequence
-	preprocessed = [createSingleToken(token) for token in sequence]
-	return PreprocessedSequence(preprocessed)
-
 def preprocessSequence(sequence):
 	return pretrain(sequence)
 
 def pretrain(sequence):
 	if(pretrainCombineConsecutiveNouns):
 		sequence = pretrainCombineConsecutiveNoun(sequence)
-	if(pretrainCombineIsA):
-		sequence = pretrainCombineIsAterms(sequence)
-	if(detectReferenceSetDelimitersPunctComma):
-		sequence = pretrainRenamePunc(sequence)
 	return sequence
 
-def pretrainCombineConsecutiveNoun(sequence):
-	sequence = ensure_preprocessed_sequence(sequence)
-	preprocessedTokens = []
-	buffer = []
-	def flush_buffer():
-		nonlocal buffer, preprocessedTokens
-		if(len(buffer) == 0):
-			return
-		preprocessedTokens.append(createCombinedToken(buffer))
+if(pretrainCombineConsecutiveNouns):
+
+	def pretrainCombineConsecutiveNoun(sequence):
+		sequence = ensure_preprocessed_sequence(sequence)
+		preprocessedTokens = []
 		buffer = []
-	for token in sequence.tokens:
-		if(token.pos_ in nounPosTags):
-			buffer.append(token)
-		else:
-			flush_buffer()
-			preprocessedTokens.append(token)
-	flush_buffer()
-	return PreprocessedSequence(preprocessedTokens)
+		def flush_buffer():
+			nonlocal buffer, preprocessedTokens
+			if(len(buffer) == 0):
+				return
+			preprocessedTokens.append(createCombinedToken(buffer))
+			buffer = []
+		for token in sequence.tokens:
+			if(token.pos_ in nounPosTags):
+				buffer.append(token)
+			else:
+				flush_buffer()
+				preprocessedTokens.append(token)
+		flush_buffer()
+		return PreprocessedSequence(preprocessedTokens)
 
-def pretrainRenamePunc(sequence):
-	sequence = ensure_preprocessed_sequence(sequence)
-	noun_since_delimiter = False
-	for token_index, token in enumerate(sequence.tokens):
-		token_word = token.text.lower()
-		if(token.pos_ in conceptColumnsDelimiterPOStypes or token_word in conceptColumnsDelimiterPUNCtypes):
-			noun_since_delimiter = False
-			continue
-		if(token_word == ','):
-			if(noun_since_delimiter):
-				token.text = ",,"
-				token.lemma_ = ",,"
-				noun_since_delimiter = False
-			continue
-		if(token.pos_ in nounPosTags):
-			noun_since_delimiter = True
-			continue
-	return sequence
+	def ensure_preprocessed_sequence(sequence):
+		if isinstance(sequence, PreprocessedSequence):
+			return sequence
+		preprocessed = [createSinglePreprocessedToken(token) for token in sequence]
+		return PreprocessedSequence(preprocessed)
 
-def pretrainCombineIsAterms(sequence):
-	sequence = ensure_preprocessed_sequence(sequence)
-	combined_tokens = []
-	i = 0
-	while i < len(sequence.tokens):
-		token = sequence.tokens[i]
-		if(token.text.lower() == "is" and i+1 < len(sequence.tokens)):
-			next_token = sequence.tokens[i+1]
-			if(next_token.text.lower() == "a"):
-				text = f"{token.text}_{next_token.text}"
-				lemma = f"{token.lemma_}_{next_token.lemma_}"
-				pos = token.pos_
-				combined_tokens.append(PreprocessedToken(text, lemma, pos))
-				i += 2
-				continue
-		combined_tokens.append(token)
-		i += 1
-	return PreprocessedSequence(combined_tokens)
+	def createSinglePreprocessedToken(token):
+		text = token.text
+		lemma = token.lemma_
+		pos = token.pos_
+		tag = token.tag_
+		return PreprocessedToken(text, lemma, pos, tag)
 
-
-def createSingleToken(token):
-	text = token.text
-	lemma = token.lemma_.lower()
-	pos = token.pos_
-	return PreprocessedToken(text, lemma, pos)
-
-
-def createCombinedToken(tokens):
-	if(len(tokens) == 1):
-		return createSingleToken(tokens[0])
-	combinedText = "_".join(token.text for token in tokens)
-	combinedLemma = "_".join(token.lemma_.lower() for token in tokens)
-	if(all(token.pos_ == 'PROPN' for token in tokens)):
-		combinedPos = 'PROPN'
-	else:
-		combinedPos = 'NOUN'
-	return PreprocessedToken(combinedText, combinedLemma, combinedPos)
+	def createCombinedToken(tokens):
+		if(len(tokens) == 1):
+			return createSinglePreprocessedToken(tokens[0])
+		combinedText = "_".join(token.text for token in tokens)
+		combinedLemma = "_".join(token.lemma_ for token in tokens)
+		combinedPos = tokens[0].pos_
+		combinedTag = tokens[0].tag_
+		return PreprocessedToken(combinedText, combinedLemma, combinedPos, combinedTag)
 
 
 # Define the SequenceObservedColumns class
@@ -154,7 +117,7 @@ class SequenceObservedColumns:
 	"""
 	Contains sequence observed columns object arrays which stack a feature subset of the observed columns object arrays for the current sequence.
 	"""
-	def __init__(self, databaseNetworkObject, words, lemmas, observedColumnsDict, observedColumnsSequenceWordIndexDict):
+	def __init__(self, databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict):
 		#note cs may be slightly longer than number of unique columns in the sequence, if there are multiple instances of the same concept/noun lemma in the sequence
 	
 		self.databaseNetworkObject = databaseNetworkObject
@@ -194,11 +157,10 @@ class SequenceObservedColumns:
 		self.featureNeuronChanges = [None]*self.cs
 			
 		# Collect all feature words from observed columns
-		self.words = words
-		self.lemmas = lemmas
+		self.tokens = tokens
 		#identify feature indices from complete ObservedColumns.featureNeurons or globalFeatureNeurons feature lists currently stored in SequenceObservedColumns.featureNeurons	#required for useInference
 		observedColumn = list(observedColumnsDict.values())[0]	#all features (including words) are identical per observed column
-		self.featureWords, self.featureIndicesInObservedTensor, self.fIdxTensor = self.identifyObservedColumnFeatureWords(words, lemmas, observedColumn)
+		self.featureWords, self.featureIndicesInObservedTensor, self.fIdxTensor = self.identifyObservedColumnFeatureWords(tokens, observedColumn)
 
 		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
 			self.fs = self.featureIndicesInObservedTensor.shape[0]
@@ -216,19 +178,19 @@ class SequenceObservedColumns:
 
 		# Populate arrays with data from observedColumnsDict
 		if(trainSequenceObservedColumnsMatchSequenceWords):
-			self.populateArrays(words, lemmas, self.sequenceObservedColumnsDict)
+			self.populateArrays(tokens, self.sequenceObservedColumnsDict)
 		else:
-			self.populateArrays(words, lemmas, self.observedColumnsDict2)
+			self.populateArrays(tokens, self.observedColumnsDict2)
 
 			
-	def identifyObservedColumnFeatureWords(self, words, lemmas, observedColumn):
+	def identifyObservedColumnFeatureWords(self, tokens, observedColumn):
 		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
 			featureWords = []
 			featureIndicesInObserved = []
-			#print("\nidentifyObservedColumnFeatureWords: words = ", len(words))
-			for wordIndex, (word, lemma) in enumerate(zip(words, lemmas)):
-				featureWord = word
-				featureLemma = lemma
+			#print("\nidentifyObservedColumnFeatureWords: num words = ", len(tokens))
+			for wordIndex, token in enumerate(tokens):
+				featureWord = token.word
+				featureLemma = token.lemma
 				if(useDedicatedConceptNames and wordIndex in self.observedColumnsSequenceWordIndexDict):	
 					if(useDedicatedConceptNames2):
 						#only provide 1 observedColumn to identifyObservedColumnFeatureWords (therefore this condition will only be triggered once when when featureLemma == observedColumn.conceptName of some arbitrary concept column. Once triggered a singular artificial variableConceptNeuronFeatureName will be added)
@@ -274,7 +236,7 @@ class SequenceObservedColumns:
 		featureConnections = pt.zeros(arrayNumberOfProperties, arrayNumberOfSegments, cs, fs, cs, fs, dtype=arrayType)
 		return featureConnections
 	
-	def populateArrays(self, words, lemmas, sequenceObservedColumnsDict):
+	def populateArrays(self, tokens, sequenceObservedColumnsDict):
 		#print("\n\n\n\n\npopulate_arrays:")
 		
 		# Optimized code for collecting indices and data for feature neurons
@@ -583,13 +545,13 @@ def applyConnectionStrengthPOSdependenceInference(databaseNetworkObject, feature
 	return featureConnectionsStrength
 
 
-def createConceptMask(sequenceObservedColumns, lemmas):
-	conceptMask = pt.tensor([i in sequenceObservedColumns.columnsIndexSequenceWordIndexDict for i in range(len(lemmas))], dtype=pt.bool)
+def createConceptMask(sequenceObservedColumns, tokens):
+	conceptMask = pt.tensor([i in sequenceObservedColumns.columnsIndexSequenceWordIndexDict for i in range(len(tokens))], dtype=pt.bool)
 	conceptIndices = pt.nonzero(conceptMask).squeeze(1)
 	numberConcepts = conceptIndices.shape[0]
 	return conceptMask, conceptIndices, numberConcepts
 	
-def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, words, lemmas, posTags, train=True, firstSeedTokenIndex=None, numSeedTokens=None):
+def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens, train=True, firstSeedTokenIndex=None, numSeedTokens=None):
 	"""
 	For every concept word (lemma) in the sequence, identify every feature neuron in that column that occurs q words before or after the concept word in the sequence, including the concept neuron. This function has been parallelized using PyTorch array operations.
 	"""
@@ -598,7 +560,7 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, words,
 		q = 5  # Fixed window size when not using POS tags
 
 	# Identify all concept word indices
-	conceptMask, conceptIndices, numberConceptsInSequence = createConceptMask(sequenceObservedColumns, lemmas)
+	conceptMask, conceptIndices, numberConceptsInSequence = createConceptMask(sequenceObservedColumns, tokens)
 	#conceptIndices may be slightly longer than number of unique columns in sequence, if there are multiple instances of the same concept/noun lemma in the sequence
 	
 	if numberConceptsInSequence == 0:
@@ -631,7 +593,7 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, words,
 		databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 		conceptFeaturesDict = databaseNetworkObject.conceptFeaturesDict
 		conceptFeaturesReferenceSetDelimiterList = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList
-		sequenceLength = len(lemmas)
+		sequenceLength = len(tokens)
 		if(sequenceLength == 0):
 			startIndices = pt.empty_like(conceptIndices)
 			endIndices = pt.empty_like(conceptIndices)
@@ -640,7 +602,7 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, words,
 			if(conceptMask[token_index]):
 				featureIndex = featureIndexConceptNeuron
 			else:
-				tokenWord = words[token_index]
+				tokenWord = tokens[token_index].word
 				featureIndex = conceptFeaturesDict.get(tokenWord)
 			isDelimiter = conceptFeaturesReferenceSetDelimiterList[featureIndex]
 			return isDelimiter
@@ -697,11 +659,11 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, words,
 			startIndices = (conceptIndices - q).clamp(min=0)
 			endIndices = (conceptIndices + q + 1).clamp(max=len(sequence))
 
-	processFeatures(sequenceObservedColumns, sequenceIndex, startIndices, endIndices, sequence, words, lemmas, posTags, conceptIndices, train, firstSeedTokenIndex, numSeedTokens)
+	processFeatures(sequenceObservedColumns, sequenceIndex, startIndices, endIndices, sequence, tokens, conceptIndices, train, firstSeedTokenIndex, numSeedTokens)
 	
 	return conceptIndices, startIndices, endIndices
 
-def processFeatures(sequenceObservedColumns, sequenceIndex, startIndices, endIndices, sequence, words, lemmas, posTags, conceptIndices, train, firstSeedTokenIndex=None, numSeedTokens=None):
+def processFeatures(sequenceObservedColumns, sequenceIndex, startIndices, endIndices, sequence, tokens, conceptIndices, train, firstSeedTokenIndex=None, numSeedTokens=None):
 	numberConceptsInSequence = conceptIndices.shape[0]
 	
 	cs = sequenceObservedColumns.cs
@@ -725,7 +687,7 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, startIndices, endInd
 		if(trainSequenceObservedColumnsMatchSequenceWords):
 			sequenceConceptIndex = i
 		else:
-			conceptLemma = lemmas[sequenceConceptWordIndex]
+			conceptLemma = tokens[sequenceConceptWordIndex].lemma
 			sequenceConceptIndex = sequenceObservedColumns.conceptNameToIndex[conceptLemma] 
 				
 		if(useSANI):
@@ -742,14 +704,14 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, startIndices, endInd
 			sequenceConceptIndexMask[:, sequenceConceptWordIndex] = 0
 			sequenceConceptIndexMask[sequenceConceptIndex, sequenceConceptWordIndex] = 1
 			for j in range(startIndices[sequenceConceptIndex], endIndices[sequenceConceptIndex]):
-				featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, posTags[j])
+				featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, tokens[j].pos)
 				featureNeuronsPos[sequenceConceptIndex, j] = featurePos
 				featureNeuronsWordOrder[sequenceConceptIndex, j] = j
 		else:
 			for j in range(startIndices[i], endIndices[i]):
-				featureWord = words[j].lower()
-				featureLemma = lemmas[j]
-				featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, posTags[j])
+				featureWord = tokens[j].word	#redundant: .lower()
+				featureLemma = tokens[j].lemma
+				featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, tokens[j].pos)
 				if(j in sequenceObservedColumns.columnsIndexSequenceWordIndexDict):
 					sequenceConceptWordIndex = j
 					columnsWordOrder[sequenceConceptIndex] = sequenceConceptIndex
@@ -776,19 +738,19 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, startIndices, endInd
 	if(train):
 		processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex)
 	else:
-		firstSeedConceptIndex, numSeedConcepts, firstSeedFeatureIndex = identifySeedIndices(sequenceObservedColumns, sequenceIndex, startIndices, endIndices, sequence, words, lemmas, posTags, conceptIndices, firstSeedTokenIndex, numSeedTokens)
+		firstSeedConceptIndex, numSeedConcepts, firstSeedFeatureIndex = identifySeedIndices(sequenceObservedColumns, sequenceIndex, startIndices, endIndices, sequence, tokens, conceptIndices, firstSeedTokenIndex, numSeedTokens)
 		processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, firstSeedTokenIndex, numSeedTokens, firstSeedConceptIndex, numSeedConcepts, firstSeedFeatureIndex)
 
-def identifySeedIndices(sequenceObservedColumns, sequenceIndex, startIndices, endIndices, sequence, words, lemmas, posTags, conceptIndices, firstSeedTokenIndex, numSeedTokens):
+def identifySeedIndices(sequenceObservedColumns, sequenceIndex, startIndices, endIndices, sequence, tokens, conceptIndices, firstSeedTokenIndex, numSeedTokens):
 	firstSeedConceptIndex = None
 	numSeedConcepts = None
 	foundFirstSeedConcept = False
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-		featureWord = words[firstSeedTokenIndex]
+		featureWord = tokens[firstSeedTokenIndex].word
 		if(useDedicatedConceptNames and firstSeedTokenIndex in sequenceObservedColumns.observedColumnsSequenceWordIndexDict):	
 			firstSeedFeatureIndex = featureIndexConceptNeuron
 		elif(featureWord in sequenceObservedColumns.featureWordToIndex):
-			firstSeedFeatureWord = words[firstSeedTokenIndex]
+			firstSeedFeatureWord = tokens[firstSeedTokenIndex].word
 			firstSeedFeatureIndex = sequenceObservedColumns.databaseNetworkObject.conceptFeaturesDict[firstSeedFeatureWord]
 	else:
 		firstSeedFeatureIndex = None
@@ -798,7 +760,7 @@ def identifySeedIndices(sequenceObservedColumns, sequenceIndex, startIndices, en
 		if(trainSequenceObservedColumnsMatchSequenceWords):
 			sequenceConceptIndex = i
 		else:
-			conceptLemma = lemmas[sequenceConceptWordIndex]
+			conceptLemma = tokens[sequenceConceptWordIndex].lemma
 			sequenceConceptIndex = sequenceObservedColumns.conceptNameToIndex[conceptLemma] 
 
 		lastWordIndexSeedPhase = firstSeedTokenIndex+numSeedTokens-1
@@ -1089,25 +1051,17 @@ def hybridActivation(x, scale=100.0):
 	#print("f = ", f)
 	return f
 
-def getLemmas(sequence):
-	words = []
-	lemmas = []
-	posTags = []
-	
+def getTokens(sequence):
+	tokens = []
 	for token in sequence:
 		word = token.text.lower()
 		lemma = token.lemma_.lower()
-		pos = token.pos_  # Part-of-speech tag
-		words.append(word)
-		lemmas.append(lemma)
-		posTags.append(pos)
+		pos = token.pos_  #coarse Part-of-speech (e.g. PRON) 
+		tag = token.tag_	#fine-grained POS (e.g., PRP, PRP$, WP, WP$, etc.)
+		token = SequenceToken(word, lemma, pos, tag)
+		tokens.append(token)
+	return tokens
 	
-	return words, lemmas, posTags
-
-
-
-
-
 #low level processFeaturesActivePredict functions currently stored here (shared):
 
 #first dim cs1 restricted to a candiate set of tokens.
