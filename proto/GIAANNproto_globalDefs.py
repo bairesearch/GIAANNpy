@@ -80,7 +80,6 @@ if(trainConnectionStrengthPOSdependence or inferenceConnectionStrengthPOSdepende
 	connectionStrengthPOSdependenceTypes = ['NOUN', 'PROPN', 'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X']	
 	connectionStrengthPOSdependenceValues = [10, 10, 3, 3, 10, 5, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1]
 	connectionStrengthPOSdependenceExternal = True	#default: True	#orig: True	#False: apply modifiers to both internal/external connections, True: external connections only
-trainConnectionStrengthNonLinear = False	#default: True	#orig: False	#unimplemented
 
 #Beam Search parameters;
 if(useInference and inferenceBeamSearch):
@@ -235,7 +234,7 @@ if(trainConnectionStrengthIncreaseColumnInternal):
 	
 #debug vars;
 debugSmallDataset = False	#required if huggingface Wikipedia dataset is offline
-debugPrintTrainSentencePOS = True	#print each training sentence with POS tags
+debugPrintTrainSentencePOS = False	#print each training sentence with POS tags
 debugConnectColumnsToNextColumnsInSequenceOnly = False
 debugDrawNeuronActivations = False
 if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
@@ -336,6 +335,7 @@ predictiveNetworkFolder = "."
 predictiveNetworkFileName = "predictiveNetworkModel.pt"
 SANIconceptNeuronsDictFile = databaseFolder + 'SANIconceptNeuronsDict.pkl'
 SANIconceptNeuronWeightsListFile = databaseFolder + 'SANIconceptNeuronWeightsList.pkl'
+conceptFeaturesReferenceSetDelimiterListFile = databaseFolder + 'conceptFeaturesReferenceSetDelimiterList.pkl'
 
 #common array indices
 arrayIndexPropertiesStrength = 0
@@ -371,9 +371,6 @@ arrayType = pt.float32	#pt.long	#pt.float32
 nounPosTags = {'NOUN', 'PROPN'}
 nonNounPosTags = {'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X'}
 
-_nlpReferenceObject = None
-_referenceSetDelimiterCache = {}
-
 def posIntToPosString(nlp, posInt):
 	if posInt in nlp.vocab.strings:
 		return nlp.vocab[posInt].text
@@ -383,32 +380,6 @@ def posIntToPosString(nlp, posInt):
 def posStringToPosInt(nlp, posString):
 	return nlp.vocab.strings[posString]
 
-def registerReferenceNLP(nlpObject):
-	global _nlpReferenceObject
-	_nlpReferenceObject = nlpObject
-
-def isWordReferenceSetDelimiterType(nodeNameString):
-	if(not conceptColumnsDelimitByPOS):
-		return False
-	if(nodeNameString is None):
-		return False
-	nodeNameStringStripped = nodeNameString.strip()
-	if(nodeNameStringStripped == ""):
-		return False
-	wordKey = nodeNameStringStripped.lower()
-	if(wordKey in _referenceSetDelimiterCache):
-		return _referenceSetDelimiterCache[wordKey]
-	if(wordKey in conceptColumnsDelimiterPUNCtypes):
-		_referenceSetDelimiterCache[wordKey] = True
-		return True
-	if(_nlpReferenceObject is None):
-		return False
-	doc = _nlpReferenceObject(wordKey)
-	isDelimiter = any(token.pos_ in conceptColumnsDelimiterPOStypes for token in doc)
-	_referenceSetDelimiterCache[wordKey] = isDelimiter
-	return isDelimiter
-		
-
 	
 # Define constants for permanence and activation trace	#TODO: train hyperparameters
 z1 = 3  # Initial permanence value	
@@ -417,8 +388,6 @@ if(inferenceActivationFunction):
 	j1 = 1 #default: 1
 else:
 	j1 = 5   # Activation trace duration
-
-	
 
 if not lowMem:
 	globalFeatureNeuronsFile = 'globalFeatureNeurons'

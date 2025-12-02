@@ -76,20 +76,6 @@ def buildAllowedColumnsLookup(conceptColumnsIndices, totalColumns):
 	dtype = conceptColumnsIndices.dtype
 	return pt.tensor(allowedColumnsList, dtype=dtype, device=device)
 
-def isFeatureIndexReferenceSetDelimiter(databaseNetworkObject, featureIndex):
-	if(conceptColumnsDelimitByPOS):
-		if(featureIndex is None):
-			return False
-		if(featureIndex == featureIndexConceptNeuron or featureIndex < 0):
-			return False
-		conceptFeaturesList = databaseNetworkObject.conceptFeaturesList
-		if(featureIndex >= len(conceptFeaturesList)):
-			return False
-		nodeNameString = conceptFeaturesList[featureIndex]
-		return isWordReferenceSetDelimiterType(nodeNameString)
-	else:
-		return False
-
 def activatedNodesAreReferenceSetDelimiters(databaseNetworkObject, conceptColumnsFeatureIndices):
 	if(conceptColumnsDelimitByPOS):
 		if(conceptColumnsFeatureIndices is None):
@@ -101,7 +87,7 @@ def activatedNodesAreReferenceSetDelimiters(databaseNetworkObject, conceptColumn
 			return False
 		for featureIndexTensor in flattenedFeatureIndices:
 			featureIndex = featureIndexTensor.item()
-			if(not isFeatureIndexReferenceSetDelimiter(databaseNetworkObject, featureIndex)):
+			if(not GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiter(databaseNetworkObject, featureIndex)):
 				return False
 		return True
 	else:
@@ -175,7 +161,7 @@ def applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnsIndi
 				featureValue = get_feature_value(idx)
 				if(featureValue is None):
 					continue
-				if(isFeatureIndexReferenceSetDelimiter(databaseNetworkObject, int(featureValue))):
+				if(GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiter(databaseNetworkObject, int(featureValue))):
 					indicesToKeep.append(idx)
 		if(len(indicesToKeep) == 0):
 			fallbackColumns = []

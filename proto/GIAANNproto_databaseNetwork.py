@@ -24,7 +24,7 @@ import GIAANNproto_databaseNetworkFiles
 import GIAANNproto_sparseTensors
 
 class DatabaseNetworkClass():
-	def __init__(self, c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons):
+	def __init__(self, c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList):
 		self.c = c
 		self.f = f
 		self.s = s
@@ -35,6 +35,7 @@ class DatabaseNetworkClass():
 		self.conceptFeaturesList = conceptFeaturesList
 		self.globalFeatureNeurons = globalFeatureNeurons
 		self.globalFeatureConnections = None #transformerUseInputConnections: initialised during prediction phase
+		self.conceptFeaturesReferenceSetDelimiterList = conceptFeaturesReferenceSetDelimiterList
 
 def backupGlobalArrays(databaseNetworkObject):
 	databaseNetworkObject.globalFeatureNeuronsBackup = databaseNetworkObject.globalFeatureNeurons.clone()
@@ -69,6 +70,7 @@ def initialiseDatabaseNetwork():
 	conceptFeaturesDict = {}  # key: word, value: index
 	conceptFeaturesList = []  # list of concept feature names (words)
 	f = 0  # current number of concept features
+	conceptFeaturesReferenceSetDelimiterList = []
 	
 	# Initialize the concept columns dictionary
 	if(GIAANNproto_databaseNetworkFiles.pathExists(conceptColumnsDictFile)):
@@ -78,6 +80,8 @@ def initialiseDatabaseNetwork():
 		conceptFeaturesDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesDictFile)
 		f = len(conceptFeaturesDict)
 		conceptFeaturesList = list(conceptFeaturesDict.keys())
+		conceptFeaturesReferenceSetDelimiterDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterListFile)
+		conceptFeaturesReferenceSetDelimiterList = list(conceptFeaturesReferenceSetDelimiterDict.values())
 	else:
 		if(useDedicatedConceptNames):
 			# Add dummy feature for concept neuron (different per concept column)
@@ -90,6 +94,7 @@ def initialiseDatabaseNetwork():
 			exit()
 			# f = max_num_non_nouns + 1  # Maximum number of non-nouns in an English dictionary, plus the concept neuron of each column
 
+		conceptFeaturesReferenceSetDelimiterList.append(False)
 	if not lowMem:
 		globalFeatureNeurons = loadFeatureNeuronsGlobal(c, f)
 	else:
@@ -98,7 +103,7 @@ def initialiseDatabaseNetwork():
 	s = arrayNumberOfSegments
 	p = arrayNumberOfProperties
 		
-	databaseNetworkObject = DatabaseNetworkClass(c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons)
+	databaseNetworkObject = DatabaseNetworkClass(c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList)
 	
 	return databaseNetworkObject
 	
@@ -281,3 +286,11 @@ def getTokenConceptFeatureIndex(sequenceObservedColumns, wordsSequence, lemmasSe
 				conceptFeature = True
 	
 	return targetFoundNextColumnIndex, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex
+
+def isFeatureIndexReferenceSetDelimiter(databaseNetworkObject, featureIndex):
+	if(conceptColumnsDelimitByPOS):
+		isDelimiter = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList[featureIndex]
+	else:
+		isDelimiter = False
+	return isDelimiter
+	

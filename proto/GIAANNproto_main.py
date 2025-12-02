@@ -50,7 +50,6 @@ if(SANIconceptNeurons):
 
 # Initialize spaCy model
 nlp = spacy.load(spacyModelName)
-registerReferenceNLP(nlp)
 
 databaseNetworkObject = GIAANNproto_databaseNetwork.initialiseDatabaseNetwork()
 databaseNetworkObject.nlp = nlp	#used by posStringToPosInt
@@ -301,19 +300,31 @@ def processFeatureDetection(databaseNetworkObject, j, wordJ, posTags):
 	posJ = posTags[j]
 	featureWord = wordJ.lower()
 	
-	if usePOS:
-		if posJ in nounPosTags:
-			return False  # Skip nouns as features
-
-	if featureWord not in databaseNetworkObject.conceptFeaturesDict:
-		databaseNetworkObject.conceptFeaturesDict[featureWord] = len(databaseNetworkObject.conceptFeaturesDict)
-		databaseNetworkObject.conceptFeaturesList.append(featureWord)
-		return True
+	if usePOS and (posJ in nounPosTags):
+		return False  # Skip nouns as features
 	else:
-		return False
+		if featureWord not in databaseNetworkObject.conceptFeaturesDict:
+			databaseNetworkObject.conceptFeaturesDict[featureWord] = len(databaseNetworkObject.conceptFeaturesDict)
+			databaseNetworkObject.conceptFeaturesList.append(featureWord)
+			isDelimiter = isFeaturePOSreferenceSetDelimiterType(featureWord, posJ)	
+			databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList.append(isDelimiter)
+			return True
+		else:
+			return False
 	
-
-
+def isFeaturePOSreferenceSetDelimiterType(nodeNameString, nodePOS):
+	if(conceptColumnsDelimitByPOS):
+		if(nodeNameString in conceptColumnsDelimiterPUNCtypes):
+			isDelimiter = True
+		elif(nodePOS in conceptColumnsDelimiterPOStypes):
+			isDelimiter = True
+		else:
+			isDelimiter = False
+	else:
+		isDelimiter = False
+	return isDelimiter
+	
+	
 # Load the Wikipedia dataset using Hugging Face datasets
 dataset = load_dataset('wikipedia', '20220301.en', split='train', streaming=True)
 

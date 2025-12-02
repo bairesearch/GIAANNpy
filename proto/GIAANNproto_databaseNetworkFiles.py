@@ -68,12 +68,11 @@ def saveData(databaseNetworkObject, observedColumnsDict):
 			databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons.coalesce()
 		saveTensor(databaseNetworkObject.globalFeatureNeurons, databaseFolder, globalFeatureNeuronsFile)
 
-	# Save concept columns dictionary to disk
 	saveDictFile(conceptColumnsDictFile, databaseNetworkObject.conceptColumnsDict)
-	
-	# Save concept features dictionary to disk
 	saveDictFile(conceptFeaturesDictFile, databaseNetworkObject.conceptFeaturesDict)
 
+	conceptFeaturesReferenceSetDelimiterDict = dict(enumerate(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList))
+	saveDictFile(conceptFeaturesReferenceSetDelimiterListFile, conceptFeaturesReferenceSetDelimiterDict)
 
 def observedColumnSaveToDisk(self):
 	"""

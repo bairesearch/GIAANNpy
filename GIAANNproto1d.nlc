@@ -222,3 +222,4 @@ v1d (Codex IDE GPT-5.1-Codex):
 - add pretrainCombineConsecutiveNouns() and pretrainRenamePunc() to pretrain(). 
 - implement option detectReferenceSetDelimitersPunctComma=True; in pretrainRenamePunc(); If "," is proceeded by a NOUN without a intermediate POS based reference set delimiter (conceptColumnsDelimiterPOStypes), then rename "," to ",,". ",," will then be detected as a reference set delimiter below.
 - if conceptColumnsDelimitByPOS=True: update processConceptWords() to detect conceptColumnsDelimiterPUNCtypes (semicolons ";", colons ":", full stops ".", and ",,") as reference set delimiters. 
+- add databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList

@@ -614,23 +614,31 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, words,
 
 	# Calculate start and end indices for each concept word
 	if(conceptColumnsDelimitByPOS):
+		databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
+		conceptFeaturesDict = databaseNetworkObject.conceptFeaturesDict
+		conceptFeaturesReferenceSetDelimiterList = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList
 		sequenceLength = len(lemmas)
 		if(sequenceLength == 0):
 			startIndices = pt.empty_like(conceptIndices)
 			endIndices = pt.empty_like(conceptIndices)
+
+		def token_is_reference_set_delimiter(token_index):
+			if(conceptMask[token_index]):
+				featureIndex = featureIndexConceptNeuron
+			else:
+				tokenWord = words[token_index]
+				featureIndex = conceptFeaturesDict.get(tokenWord)
+			isDelimiter = conceptFeaturesReferenceSetDelimiterList[featureIndex]
+			return isDelimiter
 		def has_next_reference_delimiter(token_index):
 			next_index = token_index + 1
 			if(next_index >= sequenceLength):
 				return False
-			if(posTags[next_index] in conceptColumnsDelimiterPOStypes):
-				return True
-			if(words[next_index] in conceptColumnsDelimiterPUNCtypes):
-				return True
-			return False
+			return token_is_reference_set_delimiter(next_index)
 
 		delimiterMaskList = []
-		for posIndex, (pos, word) in enumerate(zip(posTags, words)):
-			if(word in conceptColumnsDelimiterPUNCtypes or pos in conceptColumnsDelimiterPOStypes):
+		for posIndex in range(sequenceLength):
+			if(token_is_reference_set_delimiter(posIndex)):
 				if(has_next_reference_delimiter(posIndex)):
 					delimiterMaskList.append(False)
 				else:

@@ -458,7 +458,7 @@ def prepareBeamNodes(databaseNetworkObject, nodes, conceptActivationState, const
 			if(conceptActivationState is None or columnIndex not in activeColumns):
 				adjustedFeature = featureIndexConceptNeuron
 		if(delimiterMode and allowedSet is not None and columnIndex in allowedSet):
-			if(not isFeatureIndexReferenceSetDelimiterBeam(databaseNetworkObject, adjustedFeature)):
+			if(not GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiter(databaseNetworkObject, adjustedFeature)):
 				continue
 		nodeKey = (columnIndex, adjustedFeature)
 		if(nodeKey in seenNodes):
@@ -472,18 +472,9 @@ def nodesContainReferenceSetDelimiter(databaseNetworkObject, nodes):
 	if(not conceptColumnsDelimitByPOS):
 		return False
 	for nodeColumn, nodeFeature in nodes:
-		if(isFeatureIndexReferenceSetDelimiterBeam(databaseNetworkObject, nodeFeature)):
+		if(GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiter(databaseNetworkObject, nodeFeature)):
 			return True
 	return False
-
-def isFeatureIndexReferenceSetDelimiterBeam(databaseNetworkObject, featureIndex):
-	if(featureIndex is None or featureIndex == featureIndexConceptNeuron):
-		return False
-	conceptFeaturesList = databaseNetworkObject.conceptFeaturesList
-	if(featureIndex < 0 or featureIndex >= len(conceptFeaturesList)):
-		return False
-	nodeNameString = conceptFeaturesList[featureIndex]
-	return isWordReferenceSetDelimiterType(nodeNameString)
 
 def updateConstraintStateAfterNodes(databaseNetworkObject, previousConstraintState, nodes):
 	if(not conceptColumnsDelimitByPOS):
