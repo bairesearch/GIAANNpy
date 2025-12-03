@@ -19,6 +19,10 @@ GIA ANN proto global Defs
 
 import torch as pt
 
+#recent debug vars;
+debugPrintTrainSentencePOS = True	#print each training sentence with POS tags
+debugConnectNodesToNextNodesInSequenceOnly = False
+
 #train/inference mode selection:
 useInference = True  #default: True	#support inference mode else train (only) mode
 drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
@@ -66,10 +70,12 @@ conceptColumnsDelimitByConceptFeaturesMid = False	#default: True	#default: False
 if(conceptColumnsDelimitByPOS):
 	conceptColumnsDelimiterPOStypes = ['VERB', 'ADP']	#deterministic reference set delimiters (GIA actions/conditions)
 	conceptColumnsDelimiterWordTypes = [';', ':', '.', '?', '!']	#deterministic reference set delimiters (GIA logical conditions)
+	conceptColumnsDelimiterTagTypes = ['POS']	#eg possessive apostrophe "'s" (singular) or "'" (plural) -> pos: PART, tag: POS.
 	detectReferenceSetDelimitersBetweenNouns = True	#default: assign reference set delimiters if they appear between two nouns (without designated reference set delimiter types)
-	detectReferenceSetDelimitersBetweenNounsPOStypes = ['CCONJ', 'SCONJ']	#probabilistic reference set delimiters (GIA logical conditions) - only assign if they are detected inbetween nouns (without intermediate deterministic delimiters)
-	detectReferenceSetDelimitersBetweenNounsWordTypes = ['is', 'are', ',']	#eg a dog is an animal / dogs are animals
-	#TODO: detectReferenceSetDelimitersBetweenNounsTagtypes = ['PRP', etc]
+	if(detectReferenceSetDelimitersBetweenNouns):
+		detectReferenceSetDelimitersBetweenNounsPOStypes = ['CCONJ', 'SCONJ']	#probabilistic reference set delimiters (GIA logical conditions) - only assign if they are detected inbetween nouns (without intermediate deterministic delimiters)
+		detectReferenceSetDelimitersBetweenNounsWordTypes = ['is', 'are', ',']	#eg a dog is an animal / dogs are animals
+		detectReferenceSetDelimitersBetweenNounsTagTypes = []
 	predictionColumnsMustActivateConceptFeature = True	#default: True	#orig: False
 	pretrainCombineConsecutiveNouns = True #default: True	#orig: False
 	predictionEnsureConnectedToPreviousPrediction = True	#default: True	#ensure every new prediction connects to previous node
@@ -236,12 +242,10 @@ else:
 	trainConnectionStrengthIncreaseColumnInternal = True #Increase column internal connections strength
 if(trainConnectionStrengthIncreaseColumnInternal):
  	trainIncreaseColumnInternalConnectionsStrengthModifier = 10.0
-	
+
 #debug vars;
-debugPrintTrainSentencePOS = False	#print each training sentence with POS tags
-debugSmallDataset = False	#required if huggingface Wikipedia dataset is offline
 debugConnectColumnsToNextColumnsInSequenceOnly = False
-debugConnectNodesToNextNodesInSequenceOnly = False
+debugSmallDataset = False	#required if huggingface Wikipedia dataset is offline
 debugDrawNeuronActivations = False
 if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
 	debugDrawNeuronActivations = True
@@ -384,8 +388,9 @@ arrayIndexSegmentAdjacentColumn = arrayNumberOfSegments-2
 arrayType = pt.float32	#pt.long	#pt.float32
 
 # Define POS tag sets for nouns and non-nouns
-nounPosTags = {'NOUN', 'PROPN', 'PRON'}
-nonNounPosTags = {'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X'}
+nounPos = {'NOUN', 'PROPN'}
+#nonNounPos = {'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X'}	#now invalid as nounTags can be a subset of these (e.g. PRON: 'PRP', 'WP')
+nounTags = {}	#{'PRP', 'WP'}
 
 def posIntToPosString(nlp, posInt):
 	if posInt in nlp.vocab.strings:

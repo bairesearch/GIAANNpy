@@ -33,6 +33,7 @@ if(inferencePredictiveNetwork):
 import GIAANNproto_databaseNetworkDraw
 import GIAANNproto_sparseTensors
 import GIAANNproto_predictiveNetworkBeamSearch
+import GIAANNproto_tokens
 
 def inferenceSavePredictiveNetwork():
 	GIAANNproto_predictiveNetworkModel.saveModel(predictiveNetworkFolder, predictiveNetworkFileName)
@@ -296,9 +297,6 @@ def buildConnectedColumnsLookupFromPrediction(databaseNetworkObject, observedCol
 		return None, None
 	if(conceptColumnsIndices is None or conceptColumnsFeatureIndices is None):
 		return None, None
-	if(conceptColumnsDelimitByPOS and detectReferenceSetDelimitersBetweenNouns):
-		if(activatedNodesAreProbabilisticReferenceSetDelimiters(databaseNetworkObject, conceptColumnsFeatureIndices)):
-			return None, None
 	if(conceptColumnsIndices.numel() == 0 or conceptColumnsFeatureIndices.numel() == 0):
 		device = conceptColumnsIndices.device
 		dtype = conceptColumnsIndices.dtype
@@ -467,7 +465,7 @@ if not drawSequenceObservedColumns:
 			self.observedColumnsDict = observedColumnsDict
 
 def seedNetwork(sequenceObservedColumns, sequenceIndex, sequence, firstSeedTokenIndex, numSeedTokens):
-	tokens = GIAANNproto_databaseNetworkTrain.getTokens(sequence)
+	tokens = GIAANNproto_tokens.getTokens(sequence)
 	if(inferenceIncrementallySeedNetwork):
 		print("\t seedNetwork: seedTokenIndex = ", firstSeedTokenIndex, ", word = ", tokens[firstSeedTokenIndex].word)
 	else:
@@ -491,7 +489,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 
 	sequenceWordIndex = 0
 	
-	tokensSequence = GIAANNproto_databaseNetworkTrain.getTokens(sequence)
+	tokensSequence = GIAANNproto_tokens.getTokens(sequence)
 	conceptMask, conceptIndices, numberConcepts = GIAANNproto_databaseNetworkTrain.createConceptMask(sequenceObservedColumns, tokensSequence)
 	
 	if(transformerUseInputConnections):
@@ -592,11 +590,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 						constraintModePrediction = "internal"
 	if(predictionEnsureConnectedToPreviousPrediction):
 		#limit prediction candidates to columns directly connected to previously predicted nodes
-		if(probabilisticDelimiterActive):
-			connectedColumnsConstraint = None
-			connectedColumnsFeatureMap = None
-		else:
-			connectedColumnsConstraint, connectedColumnsFeatureMap = buildConnectedColumnsLookupFromPrediction(databaseNetworkObject, observedColumnsDict, conceptColumnsIndices, conceptColumnsFeatureIndices)
+		connectedColumnsConstraint, connectedColumnsFeatureMap = buildConnectedColumnsLookupFromPrediction(databaseNetworkObject, observedColumnsDict, conceptColumnsIndices, conceptColumnsFeatureIndices)
 	else:
 		connectedColumnsConstraint = None
 		connectedColumnsFeatureMap = None

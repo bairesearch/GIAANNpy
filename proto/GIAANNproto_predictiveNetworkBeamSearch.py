@@ -543,8 +543,6 @@ def updateConstraintStateAfterNodes(databaseNetworkObject, previousConstraintSta
 def buildConnectedColumnsLookupForBeamNodes(databaseNetworkObject, observedColumnsDict, nodes):
 	if(nodes is None or len(nodes) == 0):
 		return None, None
-	if(nodesContainProbabilisticReferenceSetDelimiter(databaseNetworkObject, nodes)):
-		return None, None
 	connectedColumnsSet = set()
 	if(debugConnectNodesToNextNodesInSequenceOnly):
 		connectedColumnsFeatures = {}
