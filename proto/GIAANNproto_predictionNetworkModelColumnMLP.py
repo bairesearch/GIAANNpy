@@ -1,4 +1,4 @@
-"""GIAANNproto_predictiveNetworkModelColumnMLP.py
+"""GIAANNproto_predictionNetworkModelColumnMLP.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2025 Baxter AI (baxterai.com)
@@ -13,7 +13,7 @@ see GIAANNproto_main.py
 see GIAANNproto_main.py
 
 # Description:
-GIA ANN proto predictive Network Column MLP
+GIA ANN proto prediction Network Column MLP
 
 FUTURE: consider pytorch implementation for sparse tensors.
 
@@ -25,7 +25,7 @@ import torch.optim as optim
 
 
 from GIAANNproto_globalDefs import *
-import GIAANNproto_predictiveNetworkOperations
+import GIAANNproto_predictionNetworkOperations
 import GIAANNproto_sparseTensors
 
 model = None
@@ -91,7 +91,7 @@ def nextWordPredictionColumnMLPtrainStep(globalFeatureNeurons, targets, targetsC
 	conceptColumnsActivationTopkConceptsIndices = conceptColumnsActivationTopkConceptsIndices.to(devicePredictiveNetworkModel)
 	
 	if(inferencePredictiveNetworkNormaliseInputs):	#and useGPUpredictiveNetworkModel
-		globalFeatureNeurons = GIAANNproto_predictiveNetworkOperations.normaliseDenseTensor(globalFeatureNeurons, dim=inferencePredictiveNetworkNormaliseDim)
+		globalFeatureNeurons = GIAANNproto_predictionNetworkOperations.normaliseDenseTensor(globalFeatureNeurons, dim=inferencePredictiveNetworkNormaliseDim)
 		
 	if(inferencePredictiveNetworkUseInputAllProperties):
 		globalFeatureNeurons = globalFeatureNeurons.reshape(globalFeatureNeurons.shape[2], globalFeatureNeurons.shape[0]*globalFeatureNeurons.shape[1]*globalFeatureNeurons.shape[3])	#shape: (inferencePredictiveNetworkModelFilterColumnsK, inputSize)
@@ -131,11 +131,11 @@ def nextWordPredictionColumnMLPtrainStep(globalFeatureNeurons, targets, targetsC
 	print("loss_value = ", lossValue)
 
 	if(inferencePredictiveNetworkIndependentFCpredictions):
-		topkC = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsC(outputsC)
-		topkF = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsF(outputsF)
+		topkC = GIAANNproto_predictionNetworkOperations.getTopkPredictionsC(outputsC)
+		topkF = GIAANNproto_predictionNetworkOperations.getTopkPredictionsF(outputsF)
 		return topkC, topkF
 	else:
-		topk = GIAANNproto_predictiveNetworkOperations.getTopkPredictions(outputs)
+		topk = GIAANNproto_predictionNetworkOperations.getTopkPredictions(outputs)
 		return topk
 	
 class NextWordPredictionColumnMLPmodel(nn.Module):

@@ -21,11 +21,11 @@ import torch as pt
 
 #recent debug vars;
 debugPrintTrainSentencePOS = True	#print each training sentence with POS tags
-debugConnectNodesToNextNodesInSequenceOnly = False
+debugConnectNodesToNextNodesInSequenceOnly = True
 
 #train/inference mode selection:
 useInference = True  #default: True	#support inference mode else train (only) mode
-drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
+drawNetworkDuringTrain = True	#default: False  	#network drawing for prototype (not suitable for fast training)
 if(useInference):
 	inferenceBeamSearch = True	#default: True	#orig: False
 	if(inferenceBeamSearch):

@@ -1,4 +1,4 @@
-"""GIAANNproto_predictiveNetworkBeamSearch.py
+"""GIAANNproto_predictionBeamSearch.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2025 Baxter AI (baxterai.com)
@@ -7,13 +7,13 @@ Richard Bruce Baxter - Copyright (c) 2024-2025 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_predictiveNetworkBeamSearch.py
+see GIAANNproto_predictionBeamSearch.py
 
 # Usage:
-see GIAANNproto_predictiveNetworkBeamSearch.py
+see GIAANNproto_predictionBeamSearch.py
 
 # Description: 
-GIA ANN proto predictive Network Beam Search
+GIA ANN proto prediction Beam Search
 
 """
 
@@ -21,9 +21,8 @@ import torch as pt
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_databaseNetwork
-import GIAANNproto_databaseNetworkTrain	   #low level processFeaturesActivePredict functions currently stored here
 import GIAANNproto_sparseTensors
-
+import GIAANNproto_predictionActivate
 
 def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, selectMostActiveFeatureFunc=None, conceptActivationState=None, connectedColumnsConstraint=None, connectedColumnsFeatures=None):
 	#generate targets for debug/analysis output
@@ -138,7 +137,7 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 	featureConnections = observedColumn.featureConnections
 	conceptColumnsIndicesSource = pt.tensor([columnIndex], dtype=pt.long, device=deviceSparse)
 	conceptColumnsFeatureIndicesSource = pt.tensor([[featureIndex]], dtype=pt.long, device=deviceSparse)
-	state["features"], state["connections"] = GIAANNproto_databaseNetworkTrain.processFeaturesActivePredict(databaseNetworkObject, state["features"], state["connections"], featureConnections, conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource, columnIndex)
+	state["features"], state["connections"] = GIAANNproto_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, state["features"], state["connections"], featureConnections, conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource, columnIndex)
 	applyBeamNodePredictionEffects(state, columnIndex, featureIndex)
 	if(predictionColumnsMustActivateConceptFeature):
 		conceptState = state.get("conceptActivations")

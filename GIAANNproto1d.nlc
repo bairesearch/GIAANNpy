@@ -238,3 +238,7 @@ MANUAL; - extract isConcept() and add nounTags checks
 MANUAL; - extract GIAANNproto_tokens
 MANUAL; - add conceptColumnsDelimiterTagTypes/detectReferenceSetDelimitersBetweenNounsTagTypes
 MANUAL; - patch conceptColumnsDelimitByPOS - use sequenceReferenceSetDelimiterList
+- patch GIAANNproto_databaseNetwork.py:getTokenConceptFeatureIndexTensor(): if(conceptMask[sequenceWordIndex]): targetFeatureIndex = featureIndexConceptNeuron
+MANUAL; - update GIAANNproto1d.nlc with full change history (including both specification and patches)
+MANUAL; - rename files from *predictiveNetwork* -> *prediction*, extract GIAANNproto_predictionNetwork, GIAANNproto_predictionSeed, GIAANNproto_predictionActivate, GIAANNproto_sequenceConcepts, GIAANNproto_sequenceObservedColumns, rename GIAANNproto_sequenceTokens
+

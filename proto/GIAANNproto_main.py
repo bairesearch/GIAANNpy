@@ -41,19 +41,48 @@ import GIAANNproto_sparseTensors
 import GIAANNproto_databaseNetwork
 import GIAANNproto_databaseNetworkFiles
 import GIAANNproto_databaseNetworkDraw
+if(SANIconceptNeurons):
+	import GIAANNproto_sequenceSANIconceptNeurons
+import GIAANNproto_sequenceTokens
+import GIAANNproto_sequenceConcepts
+import GIAANNproto_sequenceObservedColumns
 import GIAANNproto_databaseNetworkTrain
 if(useInference):
-	import GIAANNproto_predictiveNetwork
-if(SANIconceptNeurons):
-	import GIAANNproto_SANIconceptNeurons
-import GIAANNproto_tokens
+	import GIAANNproto_prediction
 
+# Load the Wikipedia dataset using Hugging Face datasets
+dataset = load_dataset('wikipedia', '20220301.en', split='train', streaming=True)
 
 # Initialize spaCy model
 nlp = spacy.load(spacyModelName)
 
 databaseNetworkObject = GIAANNproto_databaseNetwork.initialiseDatabaseNetwork()
 databaseNetworkObject.nlp = nlp	#used by posStringToPosInt
+
+def main():
+	global sequenceCount
+	GIAANNproto_databaseNetworkFiles.initialiseDatabaseFiles()
+	ensurePredictiveInferenceDatabaseReady()
+	if(useInference and inferenceTrainPredictiveNetworkAllSequences):
+		if(inferencePredictiveNetwork):
+			GIAANNproto_predictionNetwork.initialisePredictiveNetwork(databaseNetworkObject)
+		GIAANNproto_databaseNetwork.backupGlobalArrays(databaseNetworkObject)
+	if(SANIconceptNeurons):
+		GIAANNproto_sequenceSANIconceptNeurons.initialiseSANIconceptNeurons()
+		
+	for epochIndex in range(numberEpochs):
+		print("\nepochIndex = ", epochIndex)
+		# Start processing the dataset
+		sequenceCount = 0
+		if((useInference and not inferenceTrainPredictiveNetworkAllSequences) or debugSmallDataset):
+			processPrompt()
+		else:
+			processDataset(dataset)
+		
+	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSequences and inferenceSavePredictiveNetwork):
+		GIAANNproto_predictionNetwork.inferenceSavePredictiveNetwork()
+	if(SANIconceptNeurons):
+		GIAANNproto_sequenceSANIconceptNeurons.finaliseSANIconceptNeurons()
 
 def ensurePredictiveInferenceDatabaseReady():
 	if(useInference and inferenceTrainPredictiveNetworkAllSequences):
@@ -67,32 +96,7 @@ def ensurePredictiveInferenceDatabaseReady():
 			print("missing database files:", ", ".join(missingFiles))
 			print("precondition: expects database network to have been completely trained (with !useInference on all sequences).")
 			raise SystemExit(1)
-
-def main():
-	global sequenceCount
-	GIAANNproto_databaseNetworkFiles.initialiseDatabaseFiles()
-	ensurePredictiveInferenceDatabaseReady()
-	if(useInference and inferenceTrainPredictiveNetworkAllSequences):
-		if(inferencePredictiveNetwork):
-			GIAANNproto_predictiveNetwork.initialisePredictiveNetwork(databaseNetworkObject)
-		GIAANNproto_databaseNetwork.backupGlobalArrays(databaseNetworkObject)
-	if(SANIconceptNeurons):
-		GIAANNproto_SANIconceptNeurons.initialiseSANIconceptNeurons()
-		
-	for epochIndex in range(numberEpochs):
-		print("\nepochIndex = ", epochIndex)
-		# Start processing the dataset
-		sequenceCount = 0
-		if((useInference and not inferenceTrainPredictiveNetworkAllSequences) or debugSmallDataset):
-			processPrompt()
-		else:
-			processDataset(dataset)
-		
-	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSequences and inferenceSavePredictiveNetwork):
-		GIAANNproto_predictiveNetwork.inferenceSavePredictiveNetwork()
-	if(SANIconceptNeurons):
-		GIAANNproto_SANIconceptNeurons.finaliseSANIconceptNeurons()
-
+			
 def processPrompt():
 	with open(inferencePromptFile, 'r', encoding='utf-8') as file:
 		text = file.read()
@@ -137,7 +141,7 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 	global sequenceCount
 	global drawRelationTypes
 
-	sequence = GIAANNproto_tokens.preprocessSequence(sequence)
+	sequence = GIAANNproto_sequenceTokens.preprocessSequence(sequence)
 	
 	if(debugReloadGlobalFeatureNeuronsEverySequence):
 		initialiseDatabaseNetwork()
@@ -168,34 +172,34 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 		sequencePredict = sequence[numSeedTokens:]
 
 	# First pass: Extract words, lemmas, pos, tags, and update concept_columns_dict and c
-	conceptsFound, conceptMask = firstPass(sequence)
+	conceptsFound, conceptMask = GIAANNproto_sequenceConcepts.firstPass(databaseNetworkObject, sequence)
 	
 	sequenceList = []
 	if(conceptsFound):
 		if(SANIconceptNeurons):
-			sequenceList = GIAANNproto_SANIconceptNeurons.generateSANIsequenceList(sequence, conceptMask, nlp)
+			sequenceList = GIAANNproto_sequenceSANIconceptNeurons.generateSANIsequenceList(sequence, conceptMask, nlp)
 		else:
 			sequenceList.append(sequence)
 		
 	for sequence in sequenceList:
-		tokens = GIAANNproto_tokens.getTokens(sequence)
+		tokens = GIAANNproto_sequenceTokens.getTokens(sequence)
 
 		# When usePOS is enabled, detect all possible new features in the sequence
 		if not (useDedicatedFeatureLists):
-			detectNewFeatures(databaseNetworkObject, tokens)
+			GIAANNproto_sequenceConcepts.detectNewFeatures(databaseNetworkObject, tokens)
 
 		# Second pass: Create observed_columns_dict
-		observedColumnsDict, observedColumnsSequenceWordIndexDict = secondPass(databaseNetworkObject, tokens)
+		observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNproto_sequenceConcepts.secondPass(databaseNetworkObject, tokens)
 
 		# Create the sequence observed columns object
-		sequenceObservedColumns = GIAANNproto_databaseNetworkTrain.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict)
+		sequenceObservedColumns = GIAANNproto_sequenceObservedColumns.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict)
 
 		if(useInference and (inferenceTrainPredictiveNetworkAllSequences or lastSequenceInPrompt)):
 			# Process each concept word in the sequence (predict)
-			GIAANNproto_predictiveNetwork.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens)
+			GIAANNproto_prediction.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens)
 		else:
 			# Process each concept word in the sequence (train)
-			GIAANNproto_databaseNetworkTrain.processConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)
+			GIAANNproto_databaseNetworkTrain.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)
 
 			# Update observed columns from sequence observed columns
 			sequenceObservedColumns.updateObservedColumnsWrapper()
@@ -212,183 +216,5 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 	sequenceCount += 1
 	#note sequenceCount can be used as sequenceIndex (independent of index in sequenceList) because sequenceIndex is only used to index sequence time (same for all sequences in sequenceList)
 		
-def firstPass(sequence):
-	newConceptsAdded = False
-	conceptsFound = False
-	conceptMask = []
-	
-	for preprocessedToken in sequence:
-		token = GIAANNproto_tokens.convertPreprocessedTokenToSequenceToken(preprocessedToken)
-
-		conceptFound = False
-		if usePOS:
-			if GIAANNproto_tokens.isConcept(token):
-				# Only assign unique concept columns for nouns
-				conceptFound = True
-		else:
-			# When usePOS is disabled, assign concept columns for every new lemma encountered
-			conceptFound = True
-		
-		if(conceptFound):
-			conceptsFound, newConceptsAdded = GIAANNproto_databaseNetwork.addConceptToConceptColumnsDict(databaseNetworkObject, token.lemma, conceptsFound, newConceptsAdded)
-			conceptMask.append(True)
-		else:
-			conceptMask.append(False)
-
-	# If new concept columns have been added, expand arrays as needed
-	if newConceptsAdded:
-		if not lowMem:
-			# Expand global feature neuron arrays
-			if databaseNetworkObject.globalFeatureNeurons.shape[2] < databaseNetworkObject.c:
-				newShape = (databaseNetworkObject.globalFeatureNeurons.shape[0], databaseNetworkObject.globalFeatureNeurons.shape[1], databaseNetworkObject.c, databaseNetworkObject.globalFeatureNeurons.shape[3])
-				if(performRedundantCoalesce):
-					databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons.coalesce()
-				databaseNetworkObject.globalFeatureNeurons = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeurons._indices(), databaseNetworkObject.globalFeatureNeurons._values(), size=newShape, dtype=arrayType, device=deviceSparse)
-				
-	return conceptsFound, conceptMask
-
-				
-def secondPass(databaseNetworkObject, tokens):
-	observedColumnsDict = {}
-	observedColumnsSequenceWordIndexDict = {}
-	for i, token in enumerate(tokens):
-		lemma = token.lemma
-		pos = token.pos
-		if usePOS:
-			if GIAANNproto_tokens.isConcept(token):
-				conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
-				# Load observed column from disk or create new one
-				observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
-				observedColumnsDict[lemma] = observedColumn
-				observedColumnsSequenceWordIndexDict[i] = observedColumn
-		else:
-			conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
-			# Load observed column from disk or create new one
-			observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
-			observedColumnsDict[lemma] = observedColumn
-			observedColumnsSequenceWordIndexDict[i] = observedColumn
-	return observedColumnsDict, observedColumnsSequenceWordIndexDict
-
-
-def detectNewFeatures(databaseNetworkObject, tokens):
-	"""
-	When usePOS mode is enabled, detect all possible new features in the sequence
-	by searching for all new non-nouns in the sequence.
-	"""
-
-	if(conceptColumnsDelimitByPOS):
-		databaseNetworkObject.sequenceReferenceSetDelimiterList = [None]*len(tokens)
-
-	numNewFeatures = 0
-	for tokenIndex, token in enumerate(tokens):
-		if(processFeatureDetection(databaseNetworkObject, tokenIndex, token, tokens)):
-			numNewFeatures += 1
-
-	# After processing all features, update f
-	databaseNetworkObject.f += numNewFeatures
-
-	# Now, expand arrays accordingly
-	if not lowMem:
-		if databaseNetworkObject.f > databaseNetworkObject.globalFeatureNeurons.shape[3]:
-			extraCols = databaseNetworkObject.f - databaseNetworkObject.globalFeatureNeurons.shape[3]
-			newShape = (databaseNetworkObject.globalFeatureNeurons.shape[0], databaseNetworkObject.globalFeatureNeurons.shape[1], databaseNetworkObject.globalFeatureNeurons.shape[2], databaseNetworkObject.f)
-			databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons.coalesce()
-			databaseNetworkObject.globalFeatureNeurons = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeurons.indices(), databaseNetworkObject.globalFeatureNeurons.values(), size=newShape, dtype=arrayType, device=deviceSparse)
-
-def processFeatureDetection(databaseNetworkObject, tokenIndex, token, tokens):
-	"""
-	Helper function to detect new features prior to processing concept words.
-	"""
-	
-	featureWord = token.word
-
-	if usePOS and (GIAANNproto_tokens.isConcept(token)):
-		return False  # Skip nouns as features
-	else:
-		if featureWord not in databaseNetworkObject.conceptFeaturesDict:
-			featureIndex = len(databaseNetworkObject.conceptFeaturesDict)
-			databaseNetworkObject.conceptFeaturesDict[featureWord] = featureIndex
-			databaseNetworkObject.conceptFeaturesList.append(featureWord)
-			isDelimiter, isDelimiterDeterministic, isDelimiterProbabilistic = isFeaturePOSreferenceSetDelimiterType(featureWord, token, tokens, tokenIndex)
-			if(conceptColumnsDelimitByPOS):
-				databaseNetworkObject.sequenceReferenceSetDelimiterList[tokenIndex] = isDelimiter
-				if(detectReferenceSetDelimitersBetweenNouns):
-					databaseNetworkObject.conceptFeaturesReferenceSetDelimiterDeterministicList.append(isDelimiterDeterministic)
-					databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList.append(isDelimiterProbabilistic)
-				else:
-					databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList.append(isDelimiter)
-			return True
-		else:
-			if(conceptColumnsDelimitByPOS):
-				isDelimiter, isDelimiterDeterministic, isDelimiterProbabilistic = isFeaturePOSreferenceSetDelimiterType(featureWord, token, tokens, tokenIndex)
-				databaseNetworkObject.sequenceReferenceSetDelimiterList[tokenIndex] = isDelimiter	#deterministic or incontext probabilistic reference set delimiter detected (train only)
-				if(detectReferenceSetDelimitersBetweenNouns):
-					featureIndex = databaseNetworkObject.conceptFeaturesDict[featureWord]
-					databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex] = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex] or isDelimiterProbabilistic	#reassign probabilistic if ever probabilistic in past (inference only)
-			return False
-	
-def isFeaturePOSreferenceSetDelimiterType(nodeNameString, token, tokens, tokenIndex):
-	isDelimiterDeterministic = False
-	isDelimiterProbabilistic = False
-	if(conceptColumnsDelimitByPOS):
-		nodeWordLower = nodeNameString.lower()
-		if(GIAANNproto_tokens.isTokenReferenceSetDelimiterDeterministic(token)):
-			isDelimiterDeterministic = True
-		if(detectReferenceSetDelimitersBetweenNouns and not isDelimiterDeterministic):
-			isDelimiterProbabilistic = detectProbabilisticReferenceSetDelimiterBetweenNouns(nodeWordLower, token, tokens, tokenIndex)
-		isDelimiter = isDelimiterDeterministic or isDelimiterProbabilistic
-	else:
-		isDelimiter = False
-	return isDelimiter, isDelimiterDeterministic, isDelimiterProbabilistic
-
-
-def detectProbabilisticReferenceSetDelimiterBetweenNouns(nodeWordLower, token, tokens, tokenIndex):
-	if(tokenIndex < 0 or tokenIndex >= len(tokens)):
-		return False
-	if(not GIAANNproto_tokens.isTokenReferenceSetDelimiterProbabilistic(token)):
-		return False
-	leftNounIndex = findNearestNounIndex(tokens, tokenIndex-1, -1)
-	rightNounIndex = findNearestNounIndex(tokens, tokenIndex+1, 1)
-	if(leftNounIndex is None or rightNounIndex is None):
-		return False
-	if(leftNounIndex >= rightNounIndex):
-		return False
-	if(hasDeterministicDelimiterBetween(tokens, leftNounIndex, rightNounIndex)):
-		return False
-	candidateIndices = collectProbabilisticDelimiterIndices(tokens, leftNounIndex, rightNounIndex)
-	if(len(candidateIndices) == 0):
-		return False
-	#NOTE: Only assign the first probabilistic delimiter per noun span for now (upgradeable in future).
-	return candidateIndices[0] == tokenIndex
-
-
-def findNearestNounIndex(tokens, startIndex, step):
-	index = startIndex
-	while(0 <= index < len(tokens)):
-		if GIAANNproto_tokens.isConcept(tokens[index]):
-			return index
-		index += step
-	return None
-
-def hasDeterministicDelimiterBetween(tokens, startIndex, endIndex):
-	for idx in range(startIndex+1, endIndex):
-		token = tokens[idx]
-		if(GIAANNproto_tokens.isTokenReferenceSetDelimiterDeterministic(token)):
-			return True
-	return False
-
-def collectProbabilisticDelimiterIndices(tokens, startIndex, endIndex):
-	candidateIndices = []
-	for idx in range(startIndex+1, endIndex):
-		token = tokens[idx]
-		if(GIAANNproto_tokens.isTokenReferenceSetDelimiterProbabilistic(token)):
-			if(not GIAANNproto_tokens.isTokenReferenceSetDelimiterDeterministic(token)):
-				candidateIndices.append(idx)
-	return candidateIndices
-	
-	
-# Load the Wikipedia dataset using Hugging Face datasets
-dataset = load_dataset('wikipedia', '20220301.en', split='train', streaming=True)
-
 if __name__ == "__main__":
 	main()

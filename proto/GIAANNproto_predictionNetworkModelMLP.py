@@ -1,4 +1,4 @@
-"""GIAANNproto_predictiveNetworkModelMLP.py
+"""GIAANNproto_predictionNetworkModelMLP.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2025 Baxter AI (baxterai.com)
@@ -25,7 +25,7 @@ import torch.optim as optim
 
 
 from GIAANNproto_globalDefs import *
-import GIAANNproto_predictiveNetworkOperations
+import GIAANNproto_predictionNetworkOperations
 
 def nextWordPredictionModelCreate(databaseNetworkObject):
 	global model, criterion, criterionC, criterionF, optimizer, batchSize
@@ -63,7 +63,7 @@ def nextWordPredictionMLPtrainStep(globalFeatureNeurons, targets, targetsC, targ
 	globalFeatureNeurons = globalFeatureNeurons.to_dense()	#shape: (p, s, c, f) or (s, c, f)
 
 	if(inferencePredictiveNetworkNormaliseInputs):	#and useGPUpredictiveNetworkModel
-		globalFeatureNeurons = GIAANNproto_predictiveNetworkOperations.normaliseDenseTensor(globalFeatureNeurons, dim=inferencePredictiveNetworkNormaliseDim)
+		globalFeatureNeurons = GIAANNproto_predictionNetworkOperations.normaliseDenseTensor(globalFeatureNeurons, dim=inferencePredictiveNetworkNormaliseDim)
 		
 	if(inferencePredictiveNetworkUseInputAllProperties):
 		globalFeatureNeurons = globalFeatureNeurons.reshape(globalFeatureNeurons.shape[2], globalFeatureNeurons.shape[0]*globalFeatureNeurons.shape[1]*globalFeatureNeurons.shape[3])
@@ -88,11 +88,11 @@ def nextWordPredictionMLPtrainStep(globalFeatureNeurons, targets, targetsC, targ
 	print("loss_value = ", lossValue)
 
 	if(inferencePredictiveNetworkIndependentFCpredictions):
-		topkC = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsC(outputsC)
-		topkF = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsF(outputsF)
+		topkC = GIAANNproto_predictionNetworkOperations.getTopkPredictionsC(outputsC)
+		topkF = GIAANNproto_predictionNetworkOperations.getTopkPredictionsF(outputsF)
 		return topkC, topkF
 	else:
-		topk = GIAANNproto_predictiveNetworkOperations.getTopkPredictions(outputs)
+		topk = GIAANNproto_predictionNetworkOperations.getTopkPredictions(outputs)
 		return topk
 		
 class NextWordPredictionMLPmodel(nn.Module):

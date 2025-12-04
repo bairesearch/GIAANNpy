@@ -1,4 +1,4 @@
-"""GIAANNproto_predictiveNetworkModelTransformer.py
+"""GIAANNproto_predictionNetworkModelTransformer.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2025 Baxter AI (baxterai.com)
@@ -13,7 +13,7 @@ see GIAANNproto_main.py
 see GIAANNproto_main.py
 
 # Description:
-GIA ANN proto predictive Network Transformer
+GIA ANN proto prediction Network Transformer
 
 FUTURE: consider pytorch implementation for sparse tensors.
 
@@ -27,7 +27,7 @@ import torch.nn.functional as F
 import os
 
 from GIAANNproto_globalDefs import *
-import GIAANNproto_predictiveNetworkOperations
+import GIAANNproto_predictionNetworkOperations
 	
 
 def nextWordPredictionModelCreate(databaseNetworkObject):
@@ -76,7 +76,7 @@ def nextWordPredictionTransformerTrainStep(globalFeatureNeurons, databaseFeature
 	globalFeatureNeurons = globalFeatureNeurons.to_dense()
 
 	if(inferencePredictiveNetworkNormaliseInputs):	#and useGPUpredictiveNetworkModel
-		globalFeatureNeurons = GIAANNproto_predictiveNetworkOperations.normaliseDenseTensor(globalFeatureNeurons, dim=inferencePredictiveNetworkNormaliseDim)
+		globalFeatureNeurons = GIAANNproto_predictionNetworkOperations.normaliseDenseTensor(globalFeatureNeurons, dim=inferencePredictiveNetworkNormaliseDim)
 	
 	if(inferencePredictiveNetworkIndependentFCpredictions):
 		outputsC, outputsF = model(globalFeatureNeurons, databaseFeatureConnections)  # Outputs shape: (batch_size, c, f)
@@ -95,11 +95,11 @@ def nextWordPredictionTransformerTrainStep(globalFeatureNeurons, databaseFeature
 	print("loss_value = ", lossValue)
 	
 	if(inferencePredictiveNetworkIndependentFCpredictions):
-		topkC = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsC(outputsC)
-		topkF = GIAANNproto_predictiveNetworkOperations.getTopkPredictionsF(outputsF)
+		topkC = GIAANNproto_predictionNetworkOperations.getTopkPredictionsC(outputsC)
+		topkF = GIAANNproto_predictionNetworkOperations.getTopkPredictionsF(outputsF)
 		return topkC, topkF
 	else:
-		topk = GIAANNproto_predictiveNetworkOperations.getTopkPredictions(outputs)
+		topk = GIAANNproto_predictionNetworkOperations.getTopkPredictions(outputs)
 		return topk
 	
 	

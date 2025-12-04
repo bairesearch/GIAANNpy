@@ -1,4 +1,4 @@
-"""GIAANNproto_predictiveNetworkOperations.py
+"""GIAANNproto_predictionNetworkOperations.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2025 Baxter AI (baxterai.com)
@@ -13,7 +13,7 @@ see GIAANNproto_main.py
 see GIAANNproto_main.py
 
 # Description:
-GIA ANN proto predictive Network Operations
+GIA ANN proto prediction Network Operations
 
 """
 
@@ -112,3 +112,5 @@ else:
 		conceptColumnsIndicesNext = conceptColumnsIndicesNext[0]	#select first sample of batch
 		conceptColumnsFeatureIndicesNext = conceptColumnsFeatureIndicesNext[0]	#select first sample of batch
 		return conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext
+
+
