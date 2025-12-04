@@ -21,11 +21,12 @@ import torch as pt
 
 #recent debug vars;
 debugPrintTrainSentencePOS = True	#print each training sentence with POS tags
-debugConnectNodesToNextNodesInSequenceOnly = True
+debugConnectNodesToNextNodesInSequenceOnly = False
+debugPrintNeuronActivations = False
 
 #train/inference mode selection:
 useInference = True  #default: True	#support inference mode else train (only) mode
-drawNetworkDuringTrain = True	#default: False  	#network drawing for prototype (not suitable for fast training)
+drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
 if(useInference):
 	inferenceBeamSearch = True	#default: True	#orig: False
 	if(inferenceBeamSearch):
@@ -189,8 +190,8 @@ if(useInference):
 	drawSequenceObservedColumns = False	#mandatory
 	drawAllColumns = False	#mandatory
 	drawNetworkDuringTrainSave = False
-	drawNetworkDuringInferenceSeed = True
-	drawNetworkDuringInferencePredict = True	#True is only for debug
+	drawNetworkDuringInferenceSeed = False
+	drawNetworkDuringInferencePredict = False	#True is only for debug
 	drawNetworkDuringInferenceSave = False	#True is only for debug
 	if(SANIconceptNeurons):
 		print("SANIconceptNeurons:useInference warning: there are too many SANI concept neuron (ie non-noun tuple) features per column to perform production level GIAANN inference on a conventional system; eg 100m phrases")

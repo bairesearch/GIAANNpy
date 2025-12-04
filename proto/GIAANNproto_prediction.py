@@ -471,6 +471,9 @@ if not drawSequenceObservedColumns:
 def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequence, sequenceSeed, sequencePredict, numSeedTokens):
 
 	print("processConceptWordsInference:")
+	if(debugPrintNeuronActivations):
+		strengthSum = sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength].sum().item()
+		print("\tprocessConceptWordsInference debug: featureConnections strength sum = ", strengthSum)
 
 	sequenceWordIndex = 0
 	

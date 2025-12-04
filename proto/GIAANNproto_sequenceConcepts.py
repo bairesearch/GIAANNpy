@@ -382,6 +382,23 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 	
 	featureNeuronsSegmentMask = featureNeuronsSegmentMask.swapdims(0, 1)	#swap from dims [c, s] to [s, c] (in line with featureNeuronsActive)
 	#print("featureNeuronsSegmentMask = ", featureNeuronsSegmentMask)	
+	if(debugDrawNeuronActivations):
+		startList = startIndices.tolist()
+		endList = endIndices.tolist()
+		for seqConceptIndex, (startIdx, endIdx) in enumerate(zip(startList, endList)):
+			columnName = None
+			if(hasattr(sequenceObservedColumns, "sequenceObservedColumnsDict") and seqConceptIndex in sequenceObservedColumns.sequenceObservedColumnsDict):
+				columnName = sequenceObservedColumns.sequenceObservedColumnsDict[seqConceptIndex].conceptName
+			elif(hasattr(sequenceObservedColumns, "observedColumnsDict2") and seqConceptIndex in sequenceObservedColumns.observedColumnsDict2):
+				columnName = sequenceObservedColumns.observedColumnsDict2[seqConceptIndex].conceptName
+			tokenSpan = ""
+			if(endIdx > startIdx and len(tokens) > 0):
+				tokenSlice = []
+				for tokenIndex in range(startIdx, min(endIdx, len(tokens))):
+					tokenSlice.append(tokens[tokenIndex].word)
+				tokenSpan = " ".join(tokenSlice)
+			
+			if(debugPrintNeuronActivations):
+				print(f"\tprocessFeatures debug: columnIndex={seqConceptIndex}, columnName={columnName}, localRange=[{startIdx}, {endIdx}), tokens={tokenSpan}")
 	
 	return featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask
-

@@ -111,7 +111,8 @@ def intToString(value):
 	return result
 	
 def floatToString(value):
-	result = str(round(value, 2))
+	result = f"{value:.3f}"
+	#result = str(round(value, 2))
 	return result
 		
 def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=None):

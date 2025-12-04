@@ -32,8 +32,80 @@ def seedConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens, f
 	featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask = GIAANNproto_sequenceConcepts.processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices)
 
 	firstSeedConceptIndex, numSeedConcepts, firstSeedFeatureIndex = identifySeedIndices(sequenceObservedColumns, sequenceIndex, startIndices, endIndices, sequence, tokens, conceptIndices, firstSeedTokenIndex, numSeedTokens)
+	printSeedNodeDetails(sequenceObservedColumns, tokens, conceptIndices, startIndices, endIndices, firstSeedTokenIndex, numSeedTokens)
 	processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, firstSeedTokenIndex, numSeedTokens, firstSeedConceptIndex, numSeedConcepts, firstSeedFeatureIndex)
-	
+
+def printSeedNodeDetails(sequenceObservedColumns, tokens, conceptIndices, startIndices, endIndices, firstSeedTokenIndex, numSeedTokens):
+	conceptIndicesList = conceptIndices.tolist()
+	startIndicesList = startIndices.tolist()
+	endIndicesList = endIndices.tolist()
+	for offset in range(numSeedTokens):
+		tokenIndex = firstSeedTokenIndex + offset
+		if(tokenIndex >= len(tokens)):
+			continue
+		token = tokens[tokenIndex]
+		columnSequenceIndex = None
+		columnName = None
+		columnIndex = None
+		for seqConceptIndex, (startIdx, endIdx) in enumerate(zip(startIndicesList, endIndicesList)):
+			if(tokenIndex >= startIdx and tokenIndex < endIdx):
+				columnSequenceIndex = seqConceptIndex
+				if(seqConceptIndex < len(conceptIndicesList)):
+					columnConceptWordIndex = conceptIndicesList[seqConceptIndex]
+					columnName = tokens[columnConceptWordIndex].lemma
+					columnIndex = sequenceObservedColumns.columnsIndexSequenceWordIndexDict.get(columnConceptWordIndex)
+				break
+		if(columnIndex is None):
+			columnIndex = sequenceObservedColumns.columnsIndexSequenceWordIndexDict.get(tokenIndex)
+		featureName = token.word
+		featureIndex = sequenceObservedColumns.featureWordToIndex.get(featureName)
+		if(featureIndex is None and useDedicatedConceptNames and tokenIndex in sequenceObservedColumns.columnsIndexSequenceWordIndexDict):
+			featureName = variableConceptNeuronFeatureName
+			featureIndex = featureIndexConceptNeuron
+
+		if(debugPrintNeuronActivations):
+			print("\tseed node: tokenIndex = {0}, word = {1}, featureIndex = {2}, featureName = {3}, columnSequenceIndex = {4}, columnIndex = {5}, columnName = {6}".format(tokenIndex, token.word, featureIndex, featureName, columnSequenceIndex, columnIndex, columnName))
+
+def getSequenceColumnName(sequenceObservedColumns, sequenceConceptIndex):
+	columnName = None
+	if(hasattr(sequenceObservedColumns, "sequenceObservedColumnsDict") and sequenceConceptIndex in sequenceObservedColumns.sequenceObservedColumnsDict):
+		columnName = sequenceObservedColumns.sequenceObservedColumnsDict[sequenceConceptIndex].conceptName
+	elif(hasattr(sequenceObservedColumns, "observedColumnsDict2") and sequenceConceptIndex in sequenceObservedColumns.observedColumnsDict2):
+		columnName = sequenceObservedColumns.observedColumnsDict2[sequenceConceptIndex].conceptName
+	return columnName
+
+def debugPrintActiveConnectionSamples(sequenceObservedColumns, featureConnectionsActive, maxSamples=5):
+	nonzero = pt.nonzero(featureConnectionsActive)
+	if(nonzero.shape[0] == 0):
+		print("\tseed debug: no active connections after mask")
+		return
+	nonzero = nonzero[:maxSamples].cpu()
+	for idx in nonzero:
+		if(idx.shape[0] == 5):
+			segmentIndex, sourceColumnIndex, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex = idx.tolist()
+		else:
+			segmentIndex, sourceColumnIndex, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex = idx[0], idx[1], idx[2], idx[3], idx[4]
+		sourceColumnName = getSequenceColumnName(sequenceObservedColumns, sourceColumnIndex)
+		targetColumnName = getSequenceColumnName(sequenceObservedColumns, targetColumnIndex)
+		sourceFeatureName = sequenceObservedColumns.indexToFeatureWord.get(sourceFeatureIndex, "NA") if hasattr(sequenceObservedColumns, "indexToFeatureWord") else "NA"
+		targetFeatureName = sequenceObservedColumns.indexToFeatureWord.get(targetFeatureIndex, "NA") if hasattr(sequenceObservedColumns, "indexToFeatureWord") else "NA"
+		connectionStrength = sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength, segmentIndex, sourceColumnIndex, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex]
+		indexTuple = (int(segmentIndex), int(sourceColumnIndex), int(sourceFeatureIndex), int(targetColumnIndex), int(targetFeatureIndex))
+		print("\tseed debug: idx={0}, source=({1}:{2}), target=({3}:{4}), strength={5}".format(indexTuple, sourceColumnName, sourceFeatureName, targetColumnName, targetFeatureName, float(connectionStrength)))
+
+def debugPrintDenseConnectionSnapshot(sequenceObservedColumns, label="featureConnections snapshot", maxSamples=10):
+	denseStrength = sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength]
+	nonzero = pt.nonzero(denseStrength)
+	numEntries = nonzero.shape[0]
+	print("\tseed debug: {0} non-zero entries = {1}".format(label, numEntries))
+	if(numEntries == 0):
+		return
+	sample = nonzero[:maxSamples].cpu()
+	for idx in sample:
+		indexTuple = tuple(int(value) for value in idx.tolist())
+		value = float(denseStrength[indexTuple])
+		print("\tseed debug: tensor idx={0}, strength={1}".format(indexTuple, value))
+
 def seedNetwork(sequenceObservedColumns, sequenceIndex, sequence, numSeedTokens):
 	if(inferenceSeedNetwork):
 		if(inferenceIncrementallySeedNetwork):
@@ -60,6 +132,10 @@ def seedNetworkToken(sequenceObservedColumns, sequenceIndex, sequence, firstSeed
 		print("\t seedNetwork: seedTokenIndex = ", firstSeedTokenIndex, ", word = ", tokens[firstSeedTokenIndex].word)
 	else:
 		print("\t seedNetwork: firstSeedTokenIndex = ", firstSeedTokenIndex, ", words = ", tokens[firstSeedTokenIndex:numSeedTokens].word)
+	
+	if(debugPrintNeuronActivations):
+		debugPrintDenseConnectionSnapshot(sequenceObservedColumns, "pre-seed featureConnections snapshot")
+	
 	seedConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens, firstSeedTokenIndex, numSeedTokens)
 
 	if(inferenceDecrementActivations):
@@ -69,7 +145,7 @@ def seedNetworkToken(sequenceObservedColumns, sequenceIndex, sequence, firstSeed
 			sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivation)
 	
 	if(drawNetworkDuringInferenceSeed):
-		#FUTURE: convert globalFeatureNeuronsActivation back to globalFeatureNeurons for draw
+		sequenceObservedColumns.updateObservedColumnsWrapper()
 		GIAANNproto_databaseNetworkDraw.visualizeGraph(sequenceObservedColumns, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(firstSeedTokenIndex))
 
 def identifySeedIndices(sequenceObservedColumns, sequenceIndex, startIndices, endIndices, sequence, tokens, conceptIndices, firstSeedTokenIndex, numSeedTokens):
@@ -107,9 +183,10 @@ def identifySeedIndices(sequenceObservedColumns, sequenceIndex, startIndices, en
 				lastSeedConceptIndex = sequenceConceptIndex
 				numSeedConcepts = lastSeedConceptIndex-firstSeedConceptIndex+1
 	
-	print("firstSeedConceptIndex = ", firstSeedConceptIndex)
-	print("numSeedConcepts = ", numSeedConcepts)
-	print("firstSeedFeatureIndex = ", firstSeedFeatureIndex)
+	if(debugPrintNeuronActivations):
+		print("firstSeedConceptIndex = ", firstSeedConceptIndex)
+		print("numSeedConcepts = ", numSeedConcepts)
+		print("firstSeedFeatureIndex = ", firstSeedFeatureIndex)
 		
 	return firstSeedConceptIndex, numSeedConcepts, firstSeedFeatureIndex
 	
@@ -124,10 +201,25 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 	else:
 		cs2 = cs
 		featureConnectionsActive, featureConnectionsSegmentMask = GIAANNproto_databaseNetworkTrain.createFeatureConnectionsActiveTrain(featureNeuronsActive[arrayIndexSegmentInternalColumn], cs, fs, columnsWordOrder, featureNeuronsWordOrder)
+		
+		if(debugPrintNeuronActivations):
+			activeConnectionsPreMask = (featureConnectionsActive > 0).sum().item()
+			print("\tseed debug: connections before mask = ", activeConnectionsPreMask)
 
 	firstWordIndexPredictPhase = firstSeedTokenIndex+numSeedTokens
 	firstConceptIndexPredictPhase = firstSeedConceptIndex+numSeedConcepts
 	featureConnectionsActive = createFeatureConnectionsActiveSeed(featureConnectionsActive, cs, fs, cs2, fs2, columnsWordOrder, featureNeuronsWordOrder, firstSeedTokenIndex, firstWordIndexPredictPhase, firstSeedConceptIndex, firstConceptIndexPredictPhase)
+	
+	if(debugPrintNeuronActivations):
+		activeConnectionsPostMask = (featureConnectionsActive > 0).sum().item()
+		print("\tseed debug: connections after mask = ", activeConnectionsPostMask)
+		debugPrintActiveConnectionSamples(sequenceObservedColumns, featureConnectionsActive)
+		if(firstSeedConceptIndex is not None and numSeedConcepts is not None):
+			sourceSegment = featureNeuronsActive[arrayIndexSegmentInternalColumn, firstSeedConceptIndex:firstSeedConceptIndex+numSeedConcepts]
+			sourceActiveCount = (sourceSegment > 0).sum().item()
+			print("\tseed debug: active source features in current columns = ", sourceActiveCount)
+		else:
+			print("\tseed debug: active source features unavailable (seed concept indices undefined)")
 
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 		featureConnectionsActivationUpdate = featureConnectionsActive[:, firstSeedConceptIndex] * sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength]
@@ -138,6 +230,12 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 		featureNeuronsTargetActivation = pt.sum(featureConnectionsActivationUpdate, dim=(1))
 	else:
 		featureNeuronsTargetActivation = pt.sum(featureConnectionsActivationUpdate, dim=(1, 2))
+	
+	if(debugPrintNeuronActivations):
+		nonZeroTargets = (featureNeuronsTargetActivation > 0).sum().item()
+		maxTargetValue = featureNeuronsTargetActivation.max().item()
+		print("\tseed debug: target activation count = ", nonZeroTargets, " max = ", float(maxTargetValue))
+
 	if(inferenceActivationFunction):
 		featureNeuronsTargetActivation = GIAANNproto_predictionActivate.activationFunction(featureNeuronsTargetActivation)
 	else:

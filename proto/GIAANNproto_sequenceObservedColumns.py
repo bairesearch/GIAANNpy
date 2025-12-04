@@ -21,6 +21,18 @@ import torch as pt
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_sparseTensors
+import GIAANNproto_sequenceConcepts
+
+def debugPrintConnectionSamples(label, indices, values, maxSamples=5):
+	numEntries = indices.shape[1]
+	print(f"\tsequenceObservedColumns debug: {label}: entries={numEntries}")
+	if(numEntries == 0):
+		return
+	sampleCount = min(numEntries, maxSamples)
+	for entryIndex in range(sampleCount):
+		indexTuple = indices[:, entryIndex].tolist()
+		value = float(values[entryIndex].item())
+		print(f"\tsequenceObservedColumns debug:\tindices={indexTuple}, value={value}")
 
 # Define the SequenceObservedColumns class
 class SequenceObservedColumns:
@@ -81,6 +93,11 @@ class SequenceObservedColumns:
 		for idx, featureWord in enumerate(self.featureWords):
 			self.featureWordToIndex[featureWord] = idx
 			self.indexToFeatureWord[idx] = featureWord
+
+		self.columnStartIndicesTensor = None
+		self.columnEndIndicesTensor = None
+		self.columnFeatureLocalIndices = None
+		self.computeColumnLocalFeatureMaps(tokens)
 
 		# Initialize arrays
 		self.featureNeurons = self.initialiseFeatureNeuronsSequence(self.cs, self.fs)
@@ -145,6 +162,56 @@ class SequenceObservedColumns:
 	def initialiseFeatureConnectionsSequence(cs, fs):
 		featureConnections = pt.zeros(arrayNumberOfProperties, arrayNumberOfSegments, cs, fs, cs, fs, dtype=arrayType)
 		return featureConnections
+
+	def computeColumnLocalFeatureMaps(self, tokens):
+		if(not trainSequenceObservedColumnsMatchSequenceWords):
+			return
+		try:
+			result = GIAANNproto_sequenceConcepts.processConceptWords(self, 0, tokens, tokens)
+		except Exception:
+			result = None
+		if(not result):
+			return
+		conceptIndices, startIndices, endIndices = result
+		if(startIndices is None or endIndices is None):
+			return
+		self.columnStartIndicesTensor = startIndices
+		self.columnEndIndicesTensor = endIndices
+		startList = startIndices.tolist()
+		endList = endIndices.tolist()
+		self.columnFeatureLocalIndices = []
+		featureIndicesList = self.featureIndicesInObservedTensor.tolist()
+		for cIdx in range(len(startList)):
+			localMap = {}
+			startIdx = max(0, startList[cIdx])
+			endIdx = min(len(featureIndicesList), endList[cIdx])
+			for localIndex in range(startIdx, endIdx):
+				globalIndex = int(featureIndicesList[localIndex])
+				if(globalIndex not in localMap):
+					localMap[globalIndex] = []
+				localMap[globalIndex].append(localIndex)
+			self.columnFeatureLocalIndices.append(localMap)
+
+	def mapGlobalToLocalIndices(self, defaultTensor, globalTensor, columnIndex):
+		if(self.columnFeatureLocalIndices is None):
+			return defaultTensor
+		if(columnIndex >= len(self.columnFeatureLocalIndices)):
+			return defaultTensor
+		columnLocalMap = self.columnFeatureLocalIndices[columnIndex]
+		if not columnLocalMap:
+			return defaultTensor
+		defaultCPU = defaultTensor.detach().cpu()
+		globalCPU = globalTensor.detach().cpu()
+		defaultList = defaultCPU.tolist()
+		globalList = globalCPU.tolist()
+		newList = []
+		for defaultValue, globalValue in zip(defaultList, globalList):
+			candidates = columnLocalMap.get(int(globalValue))
+			if(candidates and len(candidates) > 0):
+				newList.append(int(candidates[0]))
+			else:
+				newList.append(int(defaultValue))
+		return pt.tensor(newList, dtype=defaultTensor.dtype, device=defaultTensor.device)
 	
 	def populateArrays(self, tokens, sequenceObservedColumnsDict):
 		#print("\n\n\n\n\npopulate_arrays:")
@@ -233,6 +300,9 @@ class SequenceObservedColumns:
 			if not useGPUsparse:
 				featureConnections = featureConnections.to(deviceDense)
 
+			if(debugPrintNeuronActivations):
+				debugPrintConnectionSamples(f"raw observed connections for column {observedColumn.conceptName}", featureConnections.indices(), featureConnections.values())
+
 			indices = featureConnections.indices()  # shape [5, n_entries]
 			values = featureConnections.values()	# shape [n_entries]
 
@@ -260,10 +330,15 @@ class SequenceObservedColumns:
 				filteredIndices = indices[:, combinedMask]
 				filteredValues = values[combinedMask]
 
+				if(debugPrintNeuronActivations):
+					debugPrintConnectionSamples(f"filtered observed connections source={observedColumn.conceptName} target={otherObservedColumn.conceptName}", filteredIndices, filteredValues)
+
 				# If we got no matches, filteredIndices and filteredValues will be empty.
 				# We do NOT continue here; we proceed to create and append empty results as per the original requirement.
 
 				if filteredIndices.numel() > 0:
+					sourceGlobalIndices = filteredIndices[2].clone()
+					targetGlobalIndices = filteredIndices[4].clone()
 					# Map indices[2] back to fIdxTensor
 					fIdxPositions = pt.searchsorted(featureIndicesInObservedSorted, filteredIndices[2])
 					mappedFIdx = fIdxTensorSorted[fIdxPositions]
@@ -272,6 +347,9 @@ class SequenceObservedColumns:
 					otherFIdxPositions = pt.searchsorted(otherFeatureIndicesInObservedSorted, filteredIndices[4])
 					mappedOtherFIdx = otherFIdxTensorSorted[otherFIdxPositions]
 
+					mappedFIdx = self.mapGlobalToLocalIndices(mappedFIdx, sourceGlobalIndices, cIdx)
+					mappedOtherFIdx = self.mapGlobalToLocalIndices(mappedOtherFIdx, targetGlobalIndices, otherCIdx)
+
 					# Adjust indices:
 					# After filtering, we have:
 					#   filteredIndices = [property, type, feature_idx, concept_idx, other_feature_idx]
@@ -279,6 +357,19 @@ class SequenceObservedColumns:
 					filteredIndices[2] = mappedFIdx
 					filteredIndices[3] = otherCIdx
 					filteredIndices[4] = mappedOtherFIdx
+					if(debugDrawNeuronActivations):
+						sampleCount = min(5, filteredIndices.shape[1])
+						for sampleIdx in range(sampleCount):
+							globalSourceIdx = int(sourceGlobalIndices[sampleIdx].item())
+							localSourceIdx = int(mappedFIdx[sampleIdx].item())
+							sourceFeatureName = self.indexToFeatureWord.get(localSourceIdx, "NA") if hasattr(self, "indexToFeatureWord") else "NA"
+							globalTargetIdx = int(targetGlobalIndices[sampleIdx].item())
+							localTargetIdx = int(mappedOtherFIdx[sampleIdx].item())
+							targetFeatureName = self.indexToFeatureWord.get(localTargetIdx, "NA") if hasattr(self, "indexToFeatureWord") else "NA"
+							
+							if(debugPrintNeuronActivations):
+								print(f"\tsequenceObservedColumns debug: map source={observedColumn.conceptName} globalIdx={globalSourceIdx} -> localIdx={localSourceIdx} ({sourceFeatureName})")
+								print(f"\tsequenceObservedColumns debug: map target={otherObservedColumn.conceptName} globalIdx={globalTargetIdx} -> localIdx={localTargetIdx} ({targetFeatureName})")
 				else:
 					# Even if empty, we need to maintain correct shape to append
 					pass
@@ -294,6 +385,9 @@ class SequenceObservedColumns:
 				connectionIndicesList.append(filteredIndices)
 				connectionValuesList.append(filteredValues)
 
+				if(debugPrintNeuronActivations):
+					debugPrintConnectionSamples(f"sequence connections sourceIndex={cIdx} targetIndex={otherCIdx}", filteredIndices, filteredValues)
+
 		# Combine results
 		if connectionIndicesList:
 			combinedIndices = pt.cat(connectionIndicesList, dim=1)
@@ -306,6 +400,11 @@ class SequenceObservedColumns:
 				device=deviceDense
 			).to_dense()
 			self.featureConnectionsOriginal = self.featureConnections.clone()
+			if(debugDrawNeuronActivations):
+				strengthSum = self.featureConnections[arrayIndexPropertiesStrength].sum().item()
+
+				if(debugPrintNeuronActivations):
+					print("\tsequenceObservedColumns debug: featureConnections dense strength sum = ", strengthSum)
 
 	
 	def updateObservedColumnsWrapper(self):
@@ -378,5 +477,3 @@ class SequenceObservedColumns:
 				conceptIndex = observedColumn.conceptIndex
 				observedColumnFeatureNeuronsDict[conceptIndex] = self.featureNeuronChanges[cIdx]
 			self.databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.mergeTensorSlicesSum(self.databaseNetworkObject.globalFeatureNeurons, observedColumnFeatureNeuronsDict, 2)
-
-
