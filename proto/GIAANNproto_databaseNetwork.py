@@ -37,7 +37,6 @@ class DatabaseNetworkClass():
 		self.globalFeatureConnections = None #transformerUseInputConnections: initialised during prediction phase
 		if(conceptColumnsDelimitByPOS):
 			if(detectReferenceSetDelimitersBetweenNouns):
-				self.conceptFeaturesReferenceSetDelimiterList = conceptFeaturesReferenceSetDelimiterList
 				self.conceptFeaturesReferenceSetDelimiterDeterministicList = conceptFeaturesReferenceSetDelimiterDeterministicList
 				self.conceptFeaturesReferenceSetDelimiterProbabilisticList = conceptFeaturesReferenceSetDelimiterProbabilisticList
 			else:
@@ -94,12 +93,6 @@ def initialiseDatabaseNetwork():
 				conceptFeaturesReferenceSetDelimiterDeterministicList = list(conceptFeaturesReferenceSetDelimiterDeterministicDict.values())
 				conceptFeaturesReferenceSetDelimiterProbabilisticDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterProbabilisticListFile)
 				conceptFeaturesReferenceSetDelimiterProbabilisticList = list(conceptFeaturesReferenceSetDelimiterProbabilisticDict.values())
-				maxReferenceListLength = max(len(conceptFeaturesReferenceSetDelimiterDeterministicList), len(conceptFeaturesReferenceSetDelimiterProbabilisticList))
-				conceptFeaturesReferenceSetDelimiterList = []
-				for i in range(maxReferenceListLength):
-					isDeterministic = conceptFeaturesReferenceSetDelimiterDeterministicList[i] if i < len(conceptFeaturesReferenceSetDelimiterDeterministicList) else False
-					isProbabilistic = conceptFeaturesReferenceSetDelimiterProbabilisticList[i] if i < len(conceptFeaturesReferenceSetDelimiterProbabilisticList) else False
-					conceptFeaturesReferenceSetDelimiterList.append(isDeterministic or isProbabilistic)
 			else:
 				conceptFeaturesReferenceSetDelimiterDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterListFile)
 				conceptFeaturesReferenceSetDelimiterList = list(conceptFeaturesReferenceSetDelimiterDict.values())
@@ -116,10 +109,10 @@ def initialiseDatabaseNetwork():
 			# f = max_num_non_nouns + 1  # Maximum number of non-nouns in an English dictionary, plus the concept neuron of each column
 
 		if(conceptColumnsDelimitByPOS):
+			#initialise for concept feature;
 			if(detectReferenceSetDelimitersBetweenNouns):
 				conceptFeaturesReferenceSetDelimiterDeterministicList.append(False)
 				conceptFeaturesReferenceSetDelimiterProbabilisticList.append(False)
-				conceptFeaturesReferenceSetDelimiterList.append(False)	#combined det+prob representation for current sequence train only
 			else:
 				conceptFeaturesReferenceSetDelimiterList.append(False)
 	if not lowMem:
@@ -286,8 +279,7 @@ def getTokenConceptFeatureIndex(sequenceObservedColumns, tokensSequence, concept
 	columnsIndexSequenceWordIndexDict = sequenceObservedColumns.columnsIndexSequenceWordIndexDict
 	
 	if(conceptMask[sequenceWordIndex]):
-		lemma = tokensSequence[sequenceWordIndex].lemma
-		targetFeatureIndex = databaseNetworkObject.conceptColumnsDict[lemma]
+		targetFeatureIndex = featureIndexConceptNeuron
 	else:
 		word = tokensSequence[sequenceWordIndex].word
 		targetFeatureIndex = databaseNetworkObject.conceptFeaturesDict[word]
@@ -318,7 +310,6 @@ def isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, feat
 	if(conceptColumnsDelimitByPOS):
 		if(detectReferenceSetDelimitersBetweenNouns):
 			isDelimiter = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterDeterministicList[featureIndex]
-			isDelimiterProbabilistic = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex]
 		else:
 			isDelimiter = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList[featureIndex]
 	else:

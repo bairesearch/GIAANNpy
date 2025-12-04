@@ -189,8 +189,8 @@ if(useInference):
 	drawSequenceObservedColumns = False	#mandatory
 	drawAllColumns = False	#mandatory
 	drawNetworkDuringTrainSave = False
-	drawNetworkDuringInferenceSeed = False
-	drawNetworkDuringInferencePredict = False	#True is only for debug
+	drawNetworkDuringInferenceSeed = True
+	drawNetworkDuringInferencePredict = True	#True is only for debug
 	drawNetworkDuringInferenceSave = False	#True is only for debug
 	if(SANIconceptNeurons):
 		print("SANIconceptNeurons:useInference warning: there are too many SANI concept neuron (ie non-noun tuple) features per column to perform production level GIAANN inference on a conventional system; eg 100m phrases")

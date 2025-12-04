@@ -245,7 +245,10 @@ def rowHasAllowedFeature(conceptColumnsFeatureIndicesPred, rowIndex, allowedFeat
 	if(conceptColumnsFeatureIndicesPred.dim() == 1):
 		if(rowIndex >= conceptColumnsFeatureIndicesPred.shape[0]):
 			return False
-		return int(conceptColumnsFeatureIndicesPred[rowIndex].item()) in allowedFeaturesSet
+		featureValue = int(conceptColumnsFeatureIndicesPred[rowIndex].item())
+		if(featureValue == featureIndexConceptNeuron):
+			return True
+		return featureValue in allowedFeaturesSet
 	if(rowIndex >= conceptColumnsFeatureIndicesPred.shape[0]):
 		return False
 	rowTensor = conceptColumnsFeatureIndicesPred[rowIndex]
@@ -253,7 +256,10 @@ def rowHasAllowedFeature(conceptColumnsFeatureIndicesPred, rowIndex, allowedFeat
 		return False
 	rowValues = rowTensor.view(-1)
 	for value in rowValues:
-		if(int(value.item()) in allowedFeaturesSet):
+		featureValue = int(value.item())
+		if(featureValue == featureIndexConceptNeuron):
+			return True
+		if(featureValue in allowedFeaturesSet):
 			return True
 	return False
 
@@ -480,7 +486,7 @@ def seedNetwork(sequenceObservedColumns, sequenceIndex, sequence, firstSeedToken
 	
 	if(drawNetworkDuringInferenceSeed):
 		#FUTURE: convert globalFeatureNeuronsActivation back to globalFeatureNeurons for draw
-		GIAANNproto_databaseNetworkDraw.visualize_graph(sequenceObservedColumns, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(firstSeedTokenIndex))
+		GIAANNproto_databaseNetworkDraw.visualizeGraph(sequenceObservedColumns, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(firstSeedTokenIndex))
 
 
 def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequence, sequenceSeed, sequencePredict, numSeedTokens):
@@ -598,6 +604,10 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		raisePredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "previous prediction has no outgoing connections")
 		
 	if(wordPredictionIndex > 0):
+		if(predictionColumnsMustActivateConceptFeature):
+			_, conceptColumnsFeatureIndicesActivation = enforceConceptFeaturePredictionOrder(conceptColumnsIndices, conceptColumnsFeatureIndices, conceptActivationState)
+		else:
+			conceptColumnsFeatureIndicesActivation = conceptColumnsFeatureIndices
 		# Refresh the observed columns dictionary for each new sequence
 		observedColumnsSequenceCandidateIndexDict = {}  # key: sequence candidate index, value: ObservedColumn	#used to populate sequence feature connection arrays based on observed columns (i does not correspond to sequence word index as assumed by observedColumnsSequenceWordIndexDict)
 
@@ -627,15 +637,15 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 				
 		#process features (activate global target neurons);
 		if(multipleSources):
-			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation = GIAANNproto_databaseNetworkTrain.processFeaturesActivePredictMulti(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndices)
+			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation = GIAANNproto_databaseNetworkTrain.processFeaturesActivePredictMulti(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation)
 		else:
-			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation = GIAANNproto_databaseNetworkTrain.processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndices)
+			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation = GIAANNproto_databaseNetworkTrain.processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation)
 
 		if(inferenceDeactivateNeuronsUponPrediction or inferenceInvertNeuronActivationUponPrediction):
 			indicesToUpdateList = []
 			for conceptIndex in range(conceptColumnsIndices.shape[0]):
 				conceptColumnsIndicesSource = conceptColumnsIndices[conceptIndex]
-				conceptColumnsFeatureIndicesSource = conceptColumnsFeatureIndices[conceptIndex].squeeze(dim=0)
+				conceptColumnsFeatureIndicesSource = conceptColumnsFeatureIndicesActivation[conceptIndex].squeeze(dim=0)
 				if(useSANI):
 					for segmentIndex in range(arrayNumberOfSegments):
 						indexToUpdate = pt.stack([pt.tensor(segmentIndex, device=conceptColumnsIndicesSource.device), conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource], dim=0)
@@ -653,11 +663,13 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 			if(inferenceUseNeuronFeaturePropertiesTime):
 				globalFeatureNeuronsTime = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsTime, indicesToUpdate, inferenceUseNeuronFeaturePropertiesTimeActivate)	#higher: neuron was more recently activated
 			
-		databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivation)
-		if(transformerUseInputConnections):
-			databaseNetworkObject.globalFeatureConnections = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureConnections, globalFeatureConnectionsActivation, arrayIndexPropertiesActivation)
-		if(inferenceUseNeuronFeaturePropertiesTime):
-			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTime)
+			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivation)
+			if(transformerUseInputConnections):
+				databaseNetworkObject.globalFeatureConnections = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureConnections, globalFeatureConnectionsActivation, arrayIndexPropertiesActivation)
+			if(inferenceUseNeuronFeaturePropertiesTime):
+				databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTime)
+			if(predictionColumnsMustActivateConceptFeature):
+				conceptActivationState = updateConceptActivationState(conceptActivationState, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation)
 	else:
 		#activation targets have already been activated
 		sequenceObservedColumnsPrediction = SequenceObservedColumnsDraw(databaseNetworkObject, observedColumnsDict)
@@ -674,14 +686,14 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		else:
 			conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap)
 
-	if(predictionEnsureConnectedToPreviousPrediction and connectedColumnsConstraint is not None):
-		conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = applyConnectedColumnsConstraint(conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, connectedColumnsConstraint, connectedColumnsFeatureMap)
-		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = applyConnectedColumnsConstraint(conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, connectedColumnsConstraint, connectedColumnsFeatureMap)
-		if(conceptColumnsIndicesPred is None or conceptColumnsIndicesPred.numel() == 0):
-			raisePredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected predictions available for current step")
-		if(conceptColumnsIndicesNext is None or conceptColumnsIndicesNext.numel() == 0):
-			raisePredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected activations available for next step")
-	
+		if(predictionEnsureConnectedToPreviousPrediction and connectedColumnsConstraint is not None):
+			conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = applyConnectedColumnsConstraint(conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, connectedColumnsConstraint, connectedColumnsFeatureMap)
+			conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = applyConnectedColumnsConstraint(conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, connectedColumnsConstraint, connectedColumnsFeatureMap)
+			if(conceptColumnsIndicesPred is None or conceptColumnsIndicesPred.numel() == 0):
+				raisePredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected predictions available for current step")
+			if(conceptColumnsIndicesNext is None or conceptColumnsIndicesNext.numel() == 0):
+				raisePredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected activations available for next step")
+		
 	featurePredictionTargetMatch = False
 	if(printPredictionsDuringInferencePredict):
 		#compare topk column/feature predictions to sequencePredict (target words);
@@ -709,9 +721,6 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	if(drawNetworkDuringInferencePredict):
 		#FUTURE: convert globalFeatureNeuronsActivation back to globalFeatureNeurons for draw
 		GIAANNproto_databaseNetworkDraw.visualizeGraph(sequenceObservedColumnsPrediction, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(sequenceWordIndex))
-	if(predictionColumnsMustActivateConceptFeature):
-		conceptActivationState = updateConceptActivationState(conceptActivationState, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext)
-
 	return featurePredictionTargetMatch, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, conceptActivationState
 
 def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, conceptActivationState=None, connectedColumns=None, connectedColumnsFeatures=None):		
@@ -760,13 +769,11 @@ def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, tok
 	elif(inferencePredictiveNetworkModel=="Transformer"):
 		conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = GIAANNproto_predictiveNetworkModel.nextWordPredictionTransformerTrainStep(globalFeatureNeurons, globalFeatureConnections, targets, targetsC, targetsF)
 
-	conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = enforceConceptFeaturePredictionOrder(conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, conceptActivationState)
 	conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, allowedColumns, constraintMode, connectedColumns, connectedColumnsFeatures)
-
+	
 	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		conceptColumnsIndicesNext = conceptColumnsIndicesPred
 		conceptColumnsFeatureIndicesNext = conceptColumnsFeatureIndicesPred
-		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = enforceConceptFeaturePredictionOrder(conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, conceptActivationState)
 		kc = kcNetwork
 		if(kc == 1 and kf == 1):
 			multipleSourcesNext = False
@@ -888,13 +895,11 @@ def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivat
 
 	conceptColumnsIndicesPred = selectedColumnIndices
 	conceptColumnsFeatureIndicesPred = topkConceptColumnsActivationTopkFeatures.indices
-	conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = enforceConceptFeaturePredictionOrder(conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, conceptActivationState)
 	conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, allowedColumns, constraintMode, connectedColumns, connectedColumnsFeatures)
 	
 	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		conceptColumnsIndicesNext = conceptColumnsIndicesPred
 		conceptColumnsFeatureIndicesNext = conceptColumnsFeatureIndicesPred
-		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = enforceConceptFeaturePredictionOrder(conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, conceptActivationState)
 		if(kc > 1 or kf > 1):
 			multipleSourcesNext = True
 		else:

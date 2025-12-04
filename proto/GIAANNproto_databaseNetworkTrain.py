@@ -503,19 +503,14 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 	if(conceptColumnsDelimitByPOS):
 		databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 		conceptFeaturesDict = databaseNetworkObject.conceptFeaturesDict
-		conceptFeaturesReferenceSetDelimiterList = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList
+		sequenceReferenceSetDelimiterList = databaseNetworkObject.sequenceReferenceSetDelimiterList
 		sequenceLength = len(tokens)
 		if(sequenceLength == 0):
 			startIndices = pt.empty_like(conceptIndices)
 			endIndices = pt.empty_like(conceptIndices)
 
 		def token_is_reference_set_delimiter(token_index):
-			if(conceptMask[token_index]):
-				featureIndex = featureIndexConceptNeuron
-			else:
-				tokenWord = tokens[token_index].word
-				featureIndex = conceptFeaturesDict.get(tokenWord)
-			isDelimiter = conceptFeaturesReferenceSetDelimiterList[featureIndex]
+			isDelimiter = sequenceReferenceSetDelimiterList[token_index]
 			return isDelimiter
 		def has_next_reference_delimiter(token_index):
 			next_index = token_index + 1
@@ -526,6 +521,7 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 		delimiterMaskList = []
 		for posIndex in range(sequenceLength):
 			if(token_is_reference_set_delimiter(posIndex)):
+				#print("token_is_reference_set_delimiter: posIndex ", posIndex)
 				if(has_next_reference_delimiter(posIndex)):
 					delimiterMaskList.append(False)
 				else:
@@ -686,7 +682,11 @@ def identifySeedIndices(sequenceObservedColumns, sequenceIndex, startIndices, en
 			if(lastWordIndexSeedPhase >= startIndices[sequenceConceptIndex] and lastWordIndexSeedPhase < endIndices[sequenceConceptIndex]):
 				lastSeedConceptIndex = sequenceConceptIndex
 				numSeedConcepts = lastSeedConceptIndex-firstSeedConceptIndex+1
-					
+	
+	print("firstSeedConceptIndex = ", firstSeedConceptIndex)
+	print("numSeedConcepts = ", numSeedConcepts)
+	print("firstSeedFeatureIndex = ", firstSeedFeatureIndex)
+		
 	return firstSeedConceptIndex, numSeedConcepts, firstSeedFeatureIndex
 	
 #first dim cs1 pertains to every concept node in sequence

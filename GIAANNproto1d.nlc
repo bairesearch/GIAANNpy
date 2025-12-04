@@ -179,7 +179,7 @@ MANUAL; - add SANIconceptNeuronsAllocateForPartialSubsequences - assign SANI con
 
 ---
 v1d (Codex IDE GPT-5.1-Codex):
-- inferenceBeamSearch
+- add proto GIAANNproto1d1a - start inferenceBeamSearch
 	Please implement a beam search prediction algorithm according to this specification:
 	If inferenceBeamSearch = True:
 		- Activate every token in sequence prompt (and resolve their connection target neuron updates).
@@ -207,9 +207,10 @@ v1d (Codex IDE GPT-5.1-Codex):
 - Updated the beam search review document to reflect the revised scoring and path-selection behavior while noting current and future configuration options.
 - Added optional configuration flags to enable column-aware beam-search heuristics while keeping defaults unchanged when disabled.
 - Implemented column-scoring logic for instance-node beam search, incorporating active-node counts, internal connectivity, and adjacent-column overlap before selecting candidate nodes.
+- if useInference and inferenceTrainPredictiveNetworkAllSequences: add ensurePredictiveInferenceDatabaseReady to check for existing trained databaseNetwork before running prediction
 - add option trainConnectionStrengthPOSdependence=True - different nodes receive different external column (ie intercolumn) connection strength modification based on their source POS. The modification of their connection strengths will be higher/lower depending on the source node POS; connectionStrengthPOSdependenceTypes, connectionStrengthPOSdependenceValues.
-- implement option inferenceConnectionStrengthPOSdependence=True - in which the connection strength modifiers do not affect stored connection strengths during training, but instead affect the immediate next token predictions during inference. The connection modifiers are applied during inference to bias the next token prediction, but these modifiers are immediately disgarded do not affect subsequence token prediction. Recommended implementation: the connection modifiers are applied to existing trained connection weights to temporiarily bias the immediate (subthreshold) activation strengths of the nodes in the network, but these temporary biases are immediately disgarded after the next token prediction (selection) has occured.
-- implement option connectionStrengthPOSdependenceExternal=False - in which the connection strength modifiers are applied to both internal and external connections (during train if trainConnectionStrengthPOSdependence, or inference if inferenceConnectionStrengthPOSdependence).
+- add option inferenceConnectionStrengthPOSdependence=True - in which the connection strength modifiers do not affect stored connection strengths during training, but instead affect the immediate next token predictions during inference. The connection modifiers are applied during inference to bias the next token prediction, but these modifiers are immediately disgarded do not affect subsequence token prediction. Recommended implementation: the connection modifiers are applied to existing trained connection weights to temporiarily bias the immediate (subthreshold) activation strengths of the nodes in the network, but these temporary biases are immediately disgarded after the next token prediction (selection) has occured.
+- add option connectionStrengthPOSdependenceExternal=False - in which the connection strength modifiers are applied to both internal and external connections (during train if trainConnectionStrengthPOSdependence, or inference if inferenceConnectionStrengthPOSdependence).
 - implement option conceptColumnsDelimitByPOS=True - delimit concept columns by specific pos types (conceptColumnsDelimiterPOStypes) instead of concept features (conceptColumnsDelimitByConceptFeaturesStart/Mid).
 - also update the prediction algorithm to support conceptColumnsDelimitByPOS=True (for both case inferencePredictiveNetwork=True/False and case inferenceBeamSearch=True/False) to always predict an external concept column node if the current activated node is of type isReferenceSetDelimiter (conceptColumnsDelimiterPOStypes), else always predict an internal concept column node.
 - conceptColumnsDelimitByPOS=True needs to be able to detect whether a node in a concept column (e.g. currently activated node) is of type isReferenceSetDelimiter. To achieve this I recommend that you do not update the GIA database network to store a flag, but instead create and execute the python function isWordReferenceSetDelimiterType(nodeNameString) on demand. If you think you can instead update the GIA database network to store this flag, then inform me how you wish to do this before starting your implementation.
@@ -218,13 +219,22 @@ v1d (Codex IDE GPT-5.1-Codex):
 - update conceptColumnsDelimitByPOS train method - when detecting concept column delimiters during train (conceptColumnsDelimiterPOStypes), and if there is more than one consecutive concept column delimiter in the sequence, then take the last word in the subsequence as the consecutive concept column delimiter. 
 - update conceptColumnsDelimitByPOS prediction method - if a currently activated node is of type reference set delimiter (conceptColumnsDelimiterPOStypes), then must predict either an external node or an internal node that is also a reference set delimiter. 
 - add option predictionEnsureConnectedToPreviousPrediction - ensure that every new prediction is connected to its previously predicted node (for both internal and external connections).
-- upgrade spacyModelName = 'en_core_web_trf' (orig: 'en_core_web_sm').
+MANUAL; - upgrade spacyModelName = 'en_core_web_trf' (orig: 'en_core_web_sm').
 - add pretrainCombineConsecutiveNouns() and pretrainRenamePunc() to pretrain(). 
 - implement option detectReferenceSetDelimitersPunctComma=True; in pretrainRenamePunc(); If "," is proceeded by a NOUN without a intermediate POS based reference set delimiter (conceptColumnsDelimiterPOStypes), then rename "," to ",,". ",," will then be detected as a reference set delimiter below.
 - if conceptColumnsDelimitByPOS=True: update processConceptWords() to detect conceptColumnsDelimiterPUNCtypes (semicolons ";", colons ":", full stops ".", and ",,") as reference set delimiters. 
 - add databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList.
-- add option debugConnectNodesToNextNodesInSequenceOnly.
 - add option arrayIndexPropertiesMinWordDistance=True. 1. in train; if arrayIndexPropertiesMinWordDistance=True, record the minimum word distance of every trained connection (overwriting this accordingly with any lower value than its currently stored value). 2. in inference ;if arrayIndexPropertiesMinWordDistance=True, ensure that the connection minWordDistance between every predicted node in the inference phase = 1 exactly (including in inferenceBeamSearch).
+- add option debugConnectNodesToNextNodesInSequenceOnly.
+- patch predictionEnsureConnectedToPreviousPrediction - ensure no fallback strategy
+- patch predictionColumnsMustActivateConceptFeature
+- patch debugConnectColumnsToNextColumnsInSequenceOnly
 - add class SequenceToken, and pass tokens between functions instead of words, lemmas, posTags.
 - implement option detectReferenceSetDelimitersBetweenNouns in isFeaturePOSreferenceSetDelimiterType (using detectReferenceSetDelimitersBetweenNounsPOStypes and detectReferenceSetDelimitersBetweenNounsWordTypes) - assign probabilistic reference set delimiters if they are detected inbetween nouns without deterministic delimiters (previously detected via conceptColumnsDelimiterPOStypes, conceptColumnsDelimiterWordTypes). If there is more than one probabilistic reference set delimiter detected, then take the first one detected (add a comment to allow this condition to be upgraded in the future).
 - upgrade the prediction phase to support detectReferenceSetDelimitersBetweenNouns=True probabilistic reference set delimiters. a) maintain the same requirements for case isFeatureIndexReferenceSetDelimiterDeterministic()==True: if previously predicted node is a reference set delimiter then must either predict an external node or an internal node that is also a reference set delimiter (no change to functionality). b) add an additional requirement for case isFeatureIndexReferenceSetDelimiterProbabilistic(): if previously predicted node isFeatureIndexReferenceSetDelimiterProbabilistic()==True then support prediction of either an internal or an external node.
+MANUAL; - patch processFeatureDetection:conceptColumnsDelimitByPOS - compute isDelimiterProbabilistic for case featureWord in databaseNetworkObject.conceptFeaturesDict. 
+- patch predictionEnsureConnectedToPreviousPrediction
+MANUAL; - extract isConcept() and add nounTags checks
+MANUAL; - extract GIAANNproto_tokens
+MANUAL; - add conceptColumnsDelimiterTagTypes/detectReferenceSetDelimitersBetweenNounsTagTypes
+MANUAL; - patch conceptColumnsDelimitByPOS - use sequenceReferenceSetDelimiterList

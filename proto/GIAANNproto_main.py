@@ -148,7 +148,7 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 			GIAANNproto_databaseNetwork.restoreGlobalArrays(databaseNetworkObject)	#restore global arrays (reset activation and time etc properties between inferencePredictiveNetworkTrainAcrossMultipleSequences:articles/sequences)
 	
 	if(debugPrintTrainSentencePOS):
-		sentenceWithPOS = " ".join(f"{token.text} ({token.pos_})" for token in sequence)
+		sentenceWithPOS = " ".join(f"{token.text} ({tokenIndex}:{token.pos_})" for tokenIndex, token in enumerate(sequence))
 		print(f"Processing article: {articleIndex}, sequence: {sequenceIndex} {sentenceWithPOS}")
 	else:
 		print(f"Processing article: {articleIndex}, sequence: {sequenceIndex} {sequence.text}")
@@ -276,9 +276,12 @@ def detectNewFeatures(databaseNetworkObject, tokens):
 	by searching for all new non-nouns in the sequence.
 	"""
 
+	if(conceptColumnsDelimitByPOS):
+		databaseNetworkObject.sequenceReferenceSetDelimiterList = [None]*len(tokens)
+
 	numNewFeatures = 0
-	for j, token in enumerate(tokens):
-		if(processFeatureDetection(databaseNetworkObject, j, token, tokens)):
+	for tokenIndex, token in enumerate(tokens):
+		if(processFeatureDetection(databaseNetworkObject, tokenIndex, token, tokens)):
 			numNewFeatures += 1
 
 	# After processing all features, update f
@@ -292,7 +295,7 @@ def detectNewFeatures(databaseNetworkObject, tokens):
 			databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons.coalesce()
 			databaseNetworkObject.globalFeatureNeurons = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeurons.indices(), databaseNetworkObject.globalFeatureNeurons.values(), size=newShape, dtype=arrayType, device=deviceSparse)
 
-def processFeatureDetection(databaseNetworkObject, j, token, tokens):
+def processFeatureDetection(databaseNetworkObject, tokenIndex, token, tokens):
 	"""
 	Helper function to detect new features prior to processing concept words.
 	"""
@@ -303,21 +306,25 @@ def processFeatureDetection(databaseNetworkObject, j, token, tokens):
 		return False  # Skip nouns as features
 	else:
 		if featureWord not in databaseNetworkObject.conceptFeaturesDict:
-			databaseNetworkObject.conceptFeaturesDict[featureWord] = len(databaseNetworkObject.conceptFeaturesDict)
+			featureIndex = len(databaseNetworkObject.conceptFeaturesDict)
+			databaseNetworkObject.conceptFeaturesDict[featureWord] = featureIndex
 			databaseNetworkObject.conceptFeaturesList.append(featureWord)
-			isDelimiter, isDelimiterDeterministic, isDelimiterProbabilistic = isFeaturePOSreferenceSetDelimiterType(featureWord, token, tokens, j)
+			isDelimiter, isDelimiterDeterministic, isDelimiterProbabilistic = isFeaturePOSreferenceSetDelimiterType(featureWord, token, tokens, tokenIndex)
 			if(conceptColumnsDelimitByPOS):
-				databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList.append(isDelimiter)
+				databaseNetworkObject.sequenceReferenceSetDelimiterList[tokenIndex] = isDelimiter
 				if(detectReferenceSetDelimitersBetweenNouns):
 					databaseNetworkObject.conceptFeaturesReferenceSetDelimiterDeterministicList.append(isDelimiterDeterministic)
 					databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList.append(isDelimiterProbabilistic)
+				else:
+					databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList.append(isDelimiter)
 			return True
 		else:
 			if(conceptColumnsDelimitByPOS):
-				isDelimiter, isDelimiterDeterministic, isDelimiterProbabilistic = isFeaturePOSreferenceSetDelimiterType(featureWord, token, tokens, j)
-				featureIndex = databaseNetworkObject.conceptFeaturesDict[featureWord]
-				databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList[featureIndex] = isDelimiter	#reassign if deterministic or incontext probabilistic reference set delmiter detected (train only)
-				databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex] = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex] or isDelimiterProbabilistic	#reassign probabilistic if ever probabilistic in past (inference only)
+				isDelimiter, isDelimiterDeterministic, isDelimiterProbabilistic = isFeaturePOSreferenceSetDelimiterType(featureWord, token, tokens, tokenIndex)
+				databaseNetworkObject.sequenceReferenceSetDelimiterList[tokenIndex] = isDelimiter	#deterministic or incontext probabilistic reference set delimiter detected (train only)
+				if(detectReferenceSetDelimitersBetweenNouns):
+					featureIndex = databaseNetworkObject.conceptFeaturesDict[featureWord]
+					databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex] = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex] or isDelimiterProbabilistic	#reassign probabilistic if ever probabilistic in past (inference only)
 			return False
 	
 def isFeaturePOSreferenceSetDelimiterType(nodeNameString, token, tokens, tokenIndex):
