@@ -138,20 +138,8 @@ def applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnsIndi
 				conceptColumnsFeatureIndicesPred = conceptColumnsFeatureIndicesPred.index_select(0, indexTensor)
 			return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
 		if(len(allowedSet) >= databaseNetworkObject.c):
-			return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
-		fallbackColumns = []
-		for columnIndex in range(databaseNetworkObject.c):
-			if(columnIndex not in allowedSet):
-				fallbackColumns.append(columnIndex)
-			if(len(fallbackColumns) == conceptColumnsIndicesPred.shape[0]):
-				break
-		if(len(fallbackColumns) == 0):
-			return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
-		conceptColumnsIndicesPred = pt.tensor(fallbackColumns, dtype=conceptColumnsIndicesPred.dtype, device=conceptColumnsIndicesPred.device)
-		if(conceptColumnsFeatureIndicesPred is not None):
-			rowsAvailable = min(conceptColumnsFeatureIndicesPred.shape[0], len(fallbackColumns))
-		conceptColumnsFeatureIndicesPred = conceptColumnsFeatureIndicesPred[:rowsAvailable]
-		return applyConnectedColumnsConstraint(conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, connectedColumns, connectedColumnsFeatures)
+			raise RuntimeError("applyColumnConstraintToPredictions: external constraint requires columns outside allowed set, but no columns are available.")
+		raise RuntimeError("applyColumnConstraintToPredictions: external constraint removed all predicted columns; no eligible external predictions remain.")
 	elif(constraintMode == "delimiter"):
 		if(allowedSet is None or len(allowedSet) == 0):
 			return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
@@ -179,22 +167,7 @@ def applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnsIndi
 				if(GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, int(featureValue))):
 					indicesToKeep.append(idx)
 		if(len(indicesToKeep) == 0):
-			fallbackColumns = []
-			for columnIndex in range(databaseNetworkObject.c):
-				if(columnIndex not in allowedSet):
-					fallbackColumns.append(columnIndex)
-				if(len(fallbackColumns) == conceptColumnsIndicesPred.shape[0]):
-					break
-			if(len(fallbackColumns) == 0):
-				conceptColumnsIndicesPred = conceptColumnsIndicesPred[:0]
-				if(conceptColumnsFeatureIndicesPred is not None):
-					conceptColumnsFeatureIndicesPred = conceptColumnsFeatureIndicesPred[:0]
-				return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
-			conceptColumnsIndicesPred = pt.tensor(fallbackColumns, dtype=conceptColumnsIndicesPred.dtype, device=conceptColumnsIndicesPred.device)
-			if(conceptColumnsFeatureIndicesPred is not None):
-				rowsAvailable = min(conceptColumnsFeatureIndicesPred.shape[0], len(fallbackColumns))
-				conceptColumnsFeatureIndicesPred = conceptColumnsFeatureIndicesPred[:rowsAvailable]
-			return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
+			raise RuntimeError("applyColumnConstraintToPredictions: delimiter constraint removed all predictions; unable to find external/delimiter-compatible columns.")
 		indexTensor = pt.tensor(indicesToKeep, dtype=pt.long, device=conceptColumnsIndicesPred.device)
 		conceptColumnsIndicesPred = conceptColumnsIndicesPred.index_select(0, indexTensor)
 		if(conceptColumnsFeatureIndicesPred is not None and conceptColumnsFeatureIndicesPred.shape[0] >= indexTensor.shape[0]):

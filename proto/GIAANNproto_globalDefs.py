@@ -106,8 +106,8 @@ if(useInference and inferenceBeamSearch):
 		inferenceBeamWidth = 3
 		inferenceBeamDepth = 3
 	else:
-		inferenceBeamWidth = 3
-		inferenceBeamDepth = 6
+		inferenceBeamWidth = 3	#orig: 3
+		inferenceBeamDepth = 6	#orig: 6
 
 #SANI concept neuron vars;
 SANIconceptNeurons = False	#execute preprocessor to allocate neurons to non-noun tuples for each concept	#similar to SANIHFNLP algorithmMatrixSANI - emulate DendriticSANIbiologicalSimulationSimple	#these are effectively concept neurons but not specific to a particular concept
