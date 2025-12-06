@@ -164,7 +164,10 @@ def applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnsIndi
 				featureValue = get_feature_value(idx)
 				if(featureValue is None):
 					continue
-				if(GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, int(featureValue))):
+				featureValueInt = int(featureValue)
+				isDeterministicDelimiter = GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, featureValueInt)
+				isProbabilisticDelimiter = GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, featureValueInt)
+				if(isDeterministicDelimiter or isProbabilisticDelimiter):
 					indicesToKeep.append(idx)
 		if(len(indicesToKeep) == 0):
 			raise RuntimeError("applyColumnConstraintToPredictions: delimiter constraint removed all predictions; unable to find external/delimiter-compatible columns.")

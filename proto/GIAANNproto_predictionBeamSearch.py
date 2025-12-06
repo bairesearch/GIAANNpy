@@ -579,10 +579,12 @@ def prepareBeamNodes(databaseNetworkObject, nodes, conceptActivationState, const
 	for columnIndex, featureIndex in nodes:
 		adjustedFeature = featureIndex
 		if(delimiterMode and allowedSet is not None and columnIndex in allowedSet):
-			if(not GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, adjustedFeature)):
+			isDeterministicDelimiter = GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, adjustedFeature)
+			isProbabilisticDelimiter = GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, adjustedFeature)
+			if(not (isDeterministicDelimiter or isProbabilisticDelimiter)):
 				if(debugPrintNeuronActivations9):
 					columnName, featureName = debugDescribeColumnFeatureName(databaseNetworkObject, columnIndex, adjustedFeature)
-					print(f"debug9: beam node rejected in prepareBeamNodes - delimiter requires deterministic feature but got {columnName}[{adjustedFeature}:{featureName}]")
+					print(f"debug9: beam node rejected in prepareBeamNodes - delimiter requires reference set delimiter feature but got {columnName}[{adjustedFeature}:{featureName}]")
 				continue
 		nodeKey = (columnIndex, adjustedFeature)
 		if(nodeKey in seenNodes):
