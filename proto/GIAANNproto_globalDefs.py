@@ -22,7 +22,12 @@ import torch as pt
 #recent debug vars;
 debugPrintTrainSentencePOS = True	#print each training sentence with POS tags
 debugConnectNodesToNextNodesInSequenceOnly = False
+printPredictionsDuringInferencePredict = True
+printPredictionsDuringInferencePredictBeamSearch = False
 debugPrintNeuronActivations = False
+debugPrintNeuronActivations7 = False
+debugPrintNeuronActivations8 = False	#prevent activation decay across sequences
+debugPrintNeuronActivations9 = False
 
 #train/inference mode selection:
 useInference = True  #default: True	#support inference mode else train (only) mode
@@ -63,6 +68,7 @@ if(multisentencePredictions):
 
 #identify immediate connections
 arrayIndexPropertiesMinWordDistance = False	#default: True	#orig: False	#when True, store min word distance per connection and enforce during inference
+minimumPredictionActivationThreshold = 0.0	#explicit threshold application not required (for verification only)
 
 #Concept column delimiter parameters:
 conceptColumnsDelimitByPOS = True	#planned new default: True	#orig: False	#closer to original GIA specification
@@ -129,7 +135,6 @@ if(useInference):
 	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False	#incremental seeding is used to match the inference prediction phase algorithm (for consistency in activation method)	#requires inferenceSeedNetwork
 	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	transformerUseInputConnections = False	#initialise (dependent var)
-	printPredictionsDuringInferencePredict = True	#default: True
 	if(useSANI):
 		inferenceConnectionsStrengthBoolean = False	#default: False
 		inferenceActivationStrengthBoolean = False	#default: False
