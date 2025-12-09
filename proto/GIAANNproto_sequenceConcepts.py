@@ -204,7 +204,17 @@ def createConceptMask(sequenceObservedColumns, tokens):
 	conceptIndices = pt.nonzero(conceptMask).squeeze(1)
 	numberConcepts = conceptIndices.shape[0]
 	return conceptMask, conceptIndices, numberConcepts
-	
+
+def token_is_reference_set_delimiter(token_index, sequenceReferenceSetDelimiterList):
+	isDelimiter = sequenceReferenceSetDelimiterList[token_index]
+	return bool(isDelimiter)
+
+def has_next_reference_delimiter(token_index, sequenceLength, sequenceReferenceSetDelimiterList):
+	next_index = token_index + 1
+	if(next_index >= sequenceLength):
+		return False
+	return token_is_reference_set_delimiter(next_index, sequenceReferenceSetDelimiterList)
+
 def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 	"""
 	For every concept word (lemma) in the sequence, identify every feature neuron in that column that occurs q words before or after the concept word in the sequence, including the concept neuron. This function has been parallelized using PyTorch array operations.
@@ -252,20 +262,28 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 			startIndices = pt.empty_like(conceptIndices)
 			endIndices = pt.empty_like(conceptIndices)
 
-		def token_is_reference_set_delimiter(token_index):
-			isDelimiter = sequenceReferenceSetDelimiterList[token_index]
-			return isDelimiter
-		def has_next_reference_delimiter(token_index):
-			next_index = token_index + 1
-			if(next_index >= sequenceLength):
-				return False
-			return token_is_reference_set_delimiter(next_index)
+		sequenceIsolatedReferenceSetDelimiterList = [False]*sequenceLength
+
+		# Track isolated delimiters (eg ADP tokens that start a sequence or follow another delimiter)
+		if(detectIsolatedReferenceSetDelimiters):
+			if(sequenceLength > 0):
+				for posIndex in range(sequenceLength):
+					if(not token_is_reference_set_delimiter(posIndex, sequenceReferenceSetDelimiterList)):
+						continue
+					token = tokens[posIndex]
+					if(token.pos not in detectIsolatedReferenceSetDelimitersPOStypes):
+						continue
+					if(posIndex == 0 or token_is_reference_set_delimiter(posIndex-1, sequenceReferenceSetDelimiterList)):
+						sequenceIsolatedReferenceSetDelimiterList[posIndex] = True
+			else:
+				sequenceIsolatedReferenceSetDelimiterList = [False]*sequenceLength
+			databaseNetworkObject.sequenceIsolatedReferenceSetDelimiterList = sequenceIsolatedReferenceSetDelimiterList
 
 		delimiterMaskList = []
 		for posIndex in range(sequenceLength):
-			if(token_is_reference_set_delimiter(posIndex)):
+			if(token_is_reference_set_delimiter(posIndex, sequenceReferenceSetDelimiterList)):
 				#print("token_is_reference_set_delimiter: posIndex ", posIndex)
-				if(has_next_reference_delimiter(posIndex)):
+				if(has_next_reference_delimiter(posIndex, sequenceLength, sequenceReferenceSetDelimiterList)):
 					delimiterMaskList.append(False)
 				else:
 					delimiterMaskList.append(True)
@@ -292,6 +310,16 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 				nextDelimiterPositions = nextDelimiterPositions.clamp(max=delimiterIndicesSorted.shape[0]-1)
 			nextDelimiterIndices = pt.where(nextDelimiterExists, delimiterIndicesSorted[nextDelimiterPositions], pt.full_like(conceptIndices, sequenceLength))
 			endIndices = pt.where(nextDelimiterExists, nextDelimiterIndices + 1, pt.full_like(conceptIndices, sequenceLength))	#Include delimiter token in current column before advancing to next column
+		
+		# Extend start indices leftwards so isolated delimiters belong to the following column
+		if(detectIsolatedReferenceSetDelimiters):
+			if(any(sequenceIsolatedReferenceSetDelimiterList)):
+				for startIndexTensorPosition in range(startIndices.shape[0]):
+					startIndexValue = int(startIndices[startIndexTensorPosition].item())
+					while(startIndexValue > 0 and sequenceIsolatedReferenceSetDelimiterList[startIndexValue-1]):
+						startIndexValue -= 1
+					startIndices[startIndexTensorPosition] = startIndexValue
+		
 		startIndices = startIndices.clamp(min=0, max=sequenceLength)
 		endIndices = endIndices.clamp(min=0, max=sequenceLength)
 	elif(conceptColumnsDelimitByConceptFeaturesStart):

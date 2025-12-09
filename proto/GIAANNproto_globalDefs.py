@@ -83,6 +83,9 @@ if(conceptColumnsDelimitByPOS):
 		detectReferenceSetDelimitersBetweenNounsPOStypes = ['CCONJ', 'SCONJ']	#probabilistic reference set delimiters (GIA logical conditions) - only assign if they are detected inbetween nouns (without intermediate deterministic delimiters)
 		detectReferenceSetDelimitersBetweenNounsWordTypes = ['is', 'are', ',']	#eg a dog is an animal / dogs are animals
 		detectReferenceSetDelimitersBetweenNounsTagTypes = []
+	detectIsolatedReferenceSetDelimiters = True	#default: True	#orig: False	#assign isolated reference set delimiters to the next concept column
+	if(detectIsolatedReferenceSetDelimiters):
+		detectIsolatedReferenceSetDelimitersPOStypes = [ 'ADP']
 	predictionColumnsMustActivateConceptFeature = True	#default: True	#orig: False
 	pretrainCombineConsecutiveNouns = True #default: True	#orig: False
 	predictionEnsureConnectedToPreviousPrediction = True	#default: True	#ensure every new prediction connects to previous node
