@@ -367,9 +367,28 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 			sequenceConceptIndex = sequenceObservedColumns.conceptNameToIndex[conceptLemma] 
 				
 		if(useSANI):
-			numberOfSegments = min(arrayNumberOfSegments, i+1)
-			featureNeuronsSegmentMask[sequenceConceptIndex, :] = pt.cat([pt.zeros(arrayNumberOfSegments-numberOfSegments), pt.ones(numberOfSegments)], dim=0)
-			minSequentialSegmentIndex = max(0, arrayNumberOfSegments-sequenceConceptIndex-1)
+			# When useSANIcolumns is True (original behaviour), assign segment indices based on
+			# the concept/column position in the sequence (sequenceConceptIndex).
+			#
+			# When useSANIcolumns is False, assign segment indices based on the underlying
+			# feature/word position in the sentence (sequenceConceptWordIndex), so that
+			# segments correspond to feature positions rather than column positions.
+			if(useSANIcolumns):
+				positionIndex = sequenceConceptIndex
+			else:
+				# sequenceConceptWordIndex is the absolute token index of this concept's word
+				# in the original sequence; this gives "feature-position-based" segments.
+				positionIndex = sequenceConceptWordIndex
+
+			numberOfSegments = min(arrayNumberOfSegments, positionIndex+1)
+			featureNeuronsSegmentMask[sequenceConceptIndex, :] = pt.cat(
+				[
+					pt.zeros(arrayNumberOfSegments-numberOfSegments, dtype=arrayType),
+					pt.ones(numberOfSegments, dtype=arrayType),
+				],
+				dim=0,
+			)
+			minSequentialSegmentIndex = max(0, arrayNumberOfSegments-positionIndex-1)
 			activeSequentialSegments = pt.arange(minSequentialSegmentIndex, arrayNumberOfSegments, 1)
 		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly and trainSequenceObservedColumnsMatchSequenceWords):
 			if(useSANI):
