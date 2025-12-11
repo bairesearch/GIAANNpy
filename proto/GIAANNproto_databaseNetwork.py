@@ -326,36 +326,3 @@ def isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, feat
 		isDelimiterProbabilistic = False
 	return isDelimiterProbabilistic
 
-def computeConnectionMinWordDistanceMask(observedColumn, sourceFeatureIndex, targetIndices, requiredDistance=1.0):
-	if(not arrayIndexPropertiesMinWordDistance):
-		return None
-	if(targetIndices is None or targetIndices.shape[1] == 0):
-		return None
-	featureConnectionsMinWordDistance = observedColumn.featureConnections[arrayIndexPropertiesMinWordDistanceIndex]
-	featureConnectionsMinWordDistance = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsMinWordDistance, 1, sourceFeatureIndex)
-	featureConnectionsMinWordDistance = featureConnectionsMinWordDistance.coalesce()
-	if(featureConnectionsMinWordDistance._nnz() == 0):
-		return pt.zeros(targetIndices.shape[1], dtype=pt.bool, device=targetIndices.device)
-	minIndices = featureConnectionsMinWordDistance.indices()
-	minValues = featureConnectionsMinWordDistance.values()
-	minDistanceLookup = {}
-	for idx in range(minValues.shape[0]):
-		columnValue = int(minIndices[1, idx].item())
-		featureValue = int(minIndices[2, idx].item())
-		distanceValue = float(minValues[idx].item())
-		key = (columnValue, featureValue)
-		if(key not in minDistanceLookup or distanceValue < minDistanceLookup[key]):
-			minDistanceLookup[key] = distanceValue
-	maskList = []
-	for idx in range(targetIndices.shape[1]):
-		columnValue = int(targetIndices[1, idx].item())
-		featureValue = int(targetIndices[2, idx].item())
-		distanceValue = minDistanceLookup.get((columnValue, featureValue))
-		if(distanceValue is None):
-			maskList.append(False)
-		else:
-			maskList.append(abs(distanceValue - requiredDistance) < 1e-4)
-	if(len(maskList) == 0):
-		return pt.zeros(0, dtype=pt.bool, device=targetIndices.device)
-	return pt.tensor(maskList, dtype=pt.bool, device=targetIndices.device)
-	

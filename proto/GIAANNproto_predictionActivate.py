@@ -105,47 +105,50 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 
 def applyConnectionStrengthPOSdependenceInference(databaseNetworkObject, featureConnectionsStrength, featureConnectionsPos, sourceConceptIndex):
 	posLookup = getConnectionStrengthPOSdependenceLookup(databaseNetworkObject)
-	if not posLookup:
-		return featureConnectionsStrength
-	featureConnectionsStrength = featureConnectionsStrength.coalesce()
-	if featureConnectionsStrength._nnz() == 0:
-		return featureConnectionsStrength
-	if featureConnectionsPos is None:
-		return featureConnectionsStrength
-	featureConnectionsPos = featureConnectionsPos.coalesce()
-	if featureConnectionsPos._nnz() == 0:
-		return featureConnectionsStrength
-	strengthIndices = featureConnectionsStrength.indices()
-	strengthValues = featureConnectionsStrength.values()
-	posIndices = featureConnectionsPos.indices()
-	posValues = featureConnectionsPos.values()
-	if strengthIndices.shape[1] == posIndices.shape[1] and pt.equal(strengthIndices, posIndices):
-		alignedPosValues = posValues
-	else:
-		posIndicesCPU = posIndices.cpu()
-		posValuesCPU = posValues.cpu()
-		posIndexMap = {tuple(posIndicesCPU[:, idx].tolist()): posValuesCPU[idx].item() for idx in range(posIndicesCPU.shape[1])}
-		strengthIndicesCPU = strengthIndices.cpu()
-		alignedPosList = []
-		for idx in range(strengthIndicesCPU.shape[1]):
-			key = tuple(strengthIndicesCPU[:, idx].tolist())
-			alignedPosList.append(posIndexMap.get(key, 0.0))
-		alignedPosValues = pt.tensor(alignedPosList, dtype=posValues.dtype, device=posValues.device)
-	alignedPosValues = alignedPosValues.long()
-	if(connectionStrengthPOSdependenceExternal and sourceConceptIndex is not None):
-		scopeMask = (strengthIndices[1] != sourceConceptIndex)
-	else:
-		scopeMask = pt.ones(strengthIndices.shape[1], dtype=pt.bool, device=strengthValues.device)
-	if not pt.any(scopeMask):
-		return featureConnectionsStrength
-	scaleTensor = pt.ones_like(strengthValues)
-	for posIndex, scaleValue in posLookup:
-		if scaleValue == 1:
-			continue
-		posMask = (alignedPosValues == posIndex) & scopeMask
-		if pt.any(posMask):
-			scaleTensor[posMask] = scaleValue
-	strengthValues *= scaleTensor
+	if posLookup:
+		featureConnectionsStrength = featureConnectionsStrength.coalesce()
+		if featureConnectionsStrength._nnz() == 0:
+			printe("featureConnectionsStrength._nnz() == 0")
+			#return featureConnectionsStrength
+		if featureConnectionsPos is None:
+			printe("featureConnectionsPos is None")
+			#return featureConnectionsStrength
+		featureConnectionsPos = featureConnectionsPos.coalesce()
+		if featureConnectionsPos._nnz() == 0:
+			printe("featureConnectionsPos._nnz() == 0")
+			#return featureConnectionsStrength
+		strengthIndices = featureConnectionsStrength.indices()
+		strengthValues = featureConnectionsStrength.values()
+		posIndices = featureConnectionsPos.indices()
+		posValues = featureConnectionsPos.values()
+		if strengthIndices.shape[1] == posIndices.shape[1] and pt.equal(strengthIndices, posIndices):
+			alignedPosValues = posValues
+		else:
+			posIndicesCPU = posIndices.cpu()
+			posValuesCPU = posValues.cpu()
+			posIndexMap = {tuple(posIndicesCPU[:, idx].tolist()): posValuesCPU[idx].item() for idx in range(posIndicesCPU.shape[1])}
+			strengthIndicesCPU = strengthIndices.cpu()
+			alignedPosList = []
+			for idx in range(strengthIndicesCPU.shape[1]):
+				key = tuple(strengthIndicesCPU[:, idx].tolist())
+				alignedPosList.append(posIndexMap.get(key, 0.0))
+			alignedPosValues = pt.tensor(alignedPosList, dtype=posValues.dtype, device=posValues.device)
+		alignedPosValues = alignedPosValues.long()
+		if(connectionStrengthPOSdependenceExternal and sourceConceptIndex is not None):
+			scopeMask = (strengthIndices[1] != sourceConceptIndex)
+		else:
+			scopeMask = pt.ones(strengthIndices.shape[1], dtype=pt.bool, device=strengthValues.device)
+		if not pt.any(scopeMask):
+			return featureConnectionsStrength
+		else:
+			scaleTensor = pt.ones_like(strengthValues)
+			for posIndex, scaleValue in posLookup:
+				if scaleValue == 1:
+					continue
+				posMask = (alignedPosValues == posIndex) & scopeMask
+				if pt.any(posMask):
+					scaleTensor[posMask] = scaleValue
+			strengthValues *= scaleTensor
 	return featureConnectionsStrength
 
 def activationFunction(x):
@@ -167,4 +170,43 @@ def hybridActivation(x, scale=100.0):
 	f = (pt.sigmoid(x / scale) - 0.5 ) * 2.0
 	#print("f = ", f)
 	return f
+
+def computeConnectionMinWordDistanceMask(observedColumn, sourceFeatureIndex, targetIndices, requiredDistance=1.0):
+	if(enforceDirectConnections and enforceDirectConnectionsMinWordDistance):
+		if(targetIndices is None or targetIndices.shape[1] == 0):
+			printe("(targetIndices is None or targetIndices.shape[1] == 0)")
+			#return None
+		featureConnectionsMinWordDistance = observedColumn.featureConnections[arrayIndexPropertiesMinWordDistanceIndex]
+		featureConnectionsMinWordDistance = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsMinWordDistance, 1, sourceFeatureIndex)
+		featureConnectionsMinWordDistance = featureConnectionsMinWordDistance.coalesce()
+		if(featureConnectionsMinWordDistance._nnz() == 0):
+			printe("(featureConnectionsMinWordDistance._nnz() == 0)")
+			#return pt.zeros(targetIndices.shape[1], dtype=pt.bool, device=targetIndices.device)
+		minIndices = featureConnectionsMinWordDistance.indices()
+		minValues = featureConnectionsMinWordDistance.values()
+		minDistanceLookup = {}
+		for idx in range(minValues.shape[0]):
+			columnValue = int(minIndices[1, idx].item())
+			featureValue = int(minIndices[2, idx].item())
+			distanceValue = float(minValues[idx].item())
+			key = (columnValue, featureValue)
+			if(key not in minDistanceLookup or distanceValue < minDistanceLookup[key]):
+				minDistanceLookup[key] = distanceValue
+		maskList = []
+		for idx in range(targetIndices.shape[1]):
+			columnValue = int(targetIndices[1, idx].item())
+			featureValue = int(targetIndices[2, idx].item())
+			distanceValue = minDistanceLookup.get((columnValue, featureValue))
+			if(distanceValue is None):
+				maskList.append(False)
+			else:
+				maskList.append(abs(distanceValue - requiredDistance) < 1e-4)
+		if(len(maskList) == 0):
+			mask = pt.zeros(0, dtype=pt.bool, device=targetIndices.device)
+		else:
+			mask = pt.tensor(maskList, dtype=pt.bool, device=targetIndices.device)
+		#print("mask = ", mask)
+	else:
+		mask = None
+	return mask
 	

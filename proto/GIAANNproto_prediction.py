@@ -360,7 +360,7 @@ def getConnectedColumnsForFeature(observedColumn, featureIndex, includeFeatureDe
 	targetColumnIndices = featureConnectionsStrength.indices()
 	if(targetColumnIndices.shape[1] == 0):
 		return [], {} if includeFeatureDetails else None
-	minWordDistanceMask = GIAANNproto_databaseNetwork.computeConnectionMinWordDistanceMask(observedColumn, featureIndex, targetColumnIndices)
+	minWordDistanceMask = GIAANNproto_predictionActivate.computeConnectionMinWordDistanceMask(observedColumn, featureIndex, targetColumnIndices)
 	if(minWordDistanceMask is not None):
 		if(minWordDistanceMask.sum().item() == 0):
 			return [], {} if includeFeatureDetails else None

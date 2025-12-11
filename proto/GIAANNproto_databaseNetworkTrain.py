@@ -142,23 +142,34 @@ def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWor
 	featureConnectionsActive = featureConnectionsActive * identityMask
 
 	if(useSANI):
-		featureConnectionsActive, featureConnectionsSegmentMask = assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs)
+		featureConnectionsActive, featureConnectionsSegmentMask = assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, featureNeuronsWordOrder)
 	else:
 		featureConnectionsActive = featureConnectionsActive.unsqueeze(0)
 		featureConnectionsSegmentMask = pt.ones_like(featureConnectionsActive)
 	
 	return featureConnectionsActive, featureConnectionsSegmentMask
 
-def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs):
+def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, featureNeuronsWordOrder):
 
-	conceptNeuronsConceptOrder1d = pt.arange(cs)
-	conceptNeuronsDistances = pt.abs(conceptNeuronsConceptOrder1d.unsqueeze(1) - conceptNeuronsConceptOrder1d).reshape(cs, cs)
-	connectionsSegmentIndex = arrayNumberOfSegments-conceptNeuronsDistances-1
-	connectionsSegmentIndex = pt.clamp(connectionsSegmentIndex, min=0)
-	
-	featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, cs), dtype=pt.bool)
-	featureConnectionsSegmentMask = featureConnectionsSegmentMask.scatter_(0, connectionsSegmentIndex.unsqueeze(0), True)
-	featureConnectionsSegmentMask = featureConnectionsSegmentMask.view(arrayNumberOfSegments, cs, 1, cs, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
+	if(useSANIcolumns):
+		conceptNeuronsConceptOrder1d = pt.arange(cs)
+		conceptNeuronsDistances = pt.abs(conceptNeuronsConceptOrder1d.unsqueeze(1) - conceptNeuronsConceptOrder1d).reshape(cs, cs)
+		connectionsSegmentIndex = arrayNumberOfSegments-conceptNeuronsDistances-1
+		connectionsSegmentIndex = pt.clamp(connectionsSegmentIndex, min=0)
+		featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, cs), dtype=pt.bool)
+		featureConnectionsSegmentMask = featureConnectionsSegmentMask.scatter_(0, connectionsSegmentIndex.unsqueeze(0), True)
+		featureConnectionsSegmentMask = featureConnectionsSegmentMask.view(arrayNumberOfSegments, cs, 1, cs, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
+	else:
+		device = featureConnectionsActive.device
+		wordOrderTensor = featureNeuronsWordOrder.to(device)
+		wordOrderSource = wordOrderTensor.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
+		wordOrderTarget = wordOrderTensor.view(1, 1, cs, fs).expand(cs, fs, cs, fs)
+		relativeDistance = (wordOrderTarget - wordOrderSource)
+		relativeDistance = pt.clamp(relativeDistance, min=1)
+		connectionsSegmentIndex = arrayNumberOfSegments - relativeDistance
+		connectionsSegmentIndex = connectionsSegmentIndex.clamp(min=0, max=arrayNumberOfSegments-1).long()
+		featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
+		featureConnectionsSegmentMask.scatter_(0, connectionsSegmentIndex.unsqueeze(0), True)
 	
 	featureConnectionsActive = featureConnectionsSegmentMask * featureConnectionsActive.unsqueeze(0)
 	
@@ -217,5 +228,4 @@ def getConnectionStrengthPOSdependenceLookup(databaseNetworkObject):
 			posLookup.append((posIndex, float(value)))
 		databaseNetworkObject.connectionStrengthPOSdependenceLookup = posLookup
 	return databaseNetworkObject.connectionStrengthPOSdependenceLookup
-
 

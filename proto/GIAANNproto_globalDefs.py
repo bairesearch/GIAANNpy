@@ -33,6 +33,8 @@ debugPrintNeuronActivations9 = False
 useInference = True  #default: True	#support inference mode else train (only) mode
 drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
 if(useInference):
+	drawNetworkDuringInferenceSeed = False	#default: False
+	drawNetworkDuringInferencePredict = False	#default: False
 	inferenceBeamSearch = True	#default: True	#orig: False
 	if(inferenceBeamSearch):
 		inferencePredictiveNetwork = False	#default: False
@@ -55,8 +57,8 @@ useGPUdense = True	#default: True
 useGPUsparse = False	#default: False	#orig: True
 useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/MLP predictive network model
 maxSequenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM availability during train (with trainSequenceObservedColumnsUseSequenceFeaturesOnly only limited amount of data is ever loaded to GPU during train)
-databaseFolder = "../database/"	#orig: ""
-maxSequences = 10	#debug: 10, 500 	#default: 100000000	  #adjust as needed (eg lower max_sequences during train before independent inferenceTrainPredictiveNetworkAllSequences execution)	#max sequences for train or inference
+databaseFolder = "../database/" #default: "../database/"	#performance: "/media/user/ssddata/GIAANN/database/"	#orig: ""
+maxSequences = 10		#debug: 10, 500, 10000 	#default: 100000000	  #adjust as needed (eg lower max_sequences during train before independent inferenceTrainPredictiveNetworkAllSequences execution)	#max sequences for train or inference
 if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
     useMaxSequences = False	#use all sequences from inference_prompt.txt
 else:
@@ -67,7 +69,21 @@ if(multisentencePredictions):
 	numSentencesPerSequence = 3	#default: 3
 
 #identify immediate connections
-arrayIndexPropertiesMinWordDistance = False	#default: True	#orig: False	#when True, store min word distance per connection and enforce during inference
+enforceDirectConnections = False	#future default: True	#orig: False	#prediction requires a direct connection from previous prediction as observed during training (ie adjacent tokens)
+if(enforceDirectConnections):
+	enforceDirectConnectionsSANI = True	#default: True #orig: False	#enforce activation of first segment (direct feature connection)
+	enforceDirectConnectionsMinWordDistance = False	#default: False #orig: True	#enforce min word distance (=1) during inference
+else:
+	enforceDirectConnectionsSANI = False
+	enforceDirectConnectionsMinWordDistance = False
+if(enforceDirectConnectionsSANI):
+	useSANI = True	#sequentially activated neuronal input (divide dendrites into segments)
+else:
+	useSANI = False	#optional	#default: False	#sequentially activated neuronal input (divide dendrites into segments)
+if(enforceDirectConnectionsMinWordDistance):
+	arrayIndexPropertiesMinWordDistance = True	#store min word distance per connection
+else:
+	arrayIndexPropertiesMinWordDistance = False	#optional	#default: False
 minimumPredictionActivationThreshold = 0.0	#explicit threshold application not required (for verification only)
 
 #Concept column delimiter parameters:
@@ -133,7 +149,6 @@ if(SANIconceptNeurons):
 	debugSANIconceptNeurons = True
 	
 # Set boolean variables as per specification
-useSANI = False	#sequentially activated neuronal input (divide dendrites into segments)
 if(useInference):
 	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False	#incremental seeding is used to match the inference prediction phase algorithm (for consistency in activation method)	#requires inferenceSeedNetwork
 	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
@@ -198,8 +213,6 @@ if(useInference):
 	drawSequenceObservedColumns = False	#mandatory
 	drawAllColumns = False	#mandatory
 	drawNetworkDuringTrainSave = False
-	drawNetworkDuringInferenceSeed = False
-	drawNetworkDuringInferencePredict = False	#True is only for debug
 	drawNetworkDuringInferenceSave = False	#True is only for debug
 	if(SANIconceptNeurons):
 		print("SANIconceptNeurons:useInference warning: there are too many SANI concept neuron (ie non-noun tuple) features per column to perform production level GIAANN inference on a conventional system; eg 100m phrases")
@@ -216,7 +229,13 @@ else:
 	inferenceActivationFunction = False
 	if(SANIconceptNeurons):
 		assert trainSequenceObservedColumnsUseSequenceFeaturesOnly	#required to significantly decrease GPU RAM during training
-	
+
+if(useSANI):
+	drawSegmentsTrain = True #default: True	#draws connection colours based on their target node incoming segment index	#overrides drawRelationTypesTrain connection draw colours
+	drawSegmentsInference = True #default: True	#overrides drawRelationTypesInference connection draw colours
+else:
+	drawSegmentsTrain = False
+	drawSegmentsInference = False
 drawRelationTypesTrain = True	#True: draw feature neuron and connection relation types in different colours
 drawRelationTypesInference = False	#False: draw activation status
 drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSequenceIndex"
@@ -376,8 +395,14 @@ else:
 	arrayPropertiesList = [arrayIndexPropertiesStrength, arrayIndexPropertiesPermanence, arrayIndexPropertiesActivation, arrayIndexPropertiesTime, arrayIndexPropertiesPos]
 arrayIndexSegmentFirst = 0
 if(useSANI):
-	useSANIcolumns = False	#default:False (assign feature positions to segments) #orig: True (assign column positions to segments)
-	if(useSANIcolumns):
+	if(enforceDirectConnectionsSANI):
+		useSANIcolumns = False	#assign segments by feature proximity to connection target during train
+		arrayNumberOfSegments = 2
+		#note if arrayNumberOfSegments=2 then; sIndex=1: sequential segment connections for adjacent feature, sIndex=0: sequential segment connections for all other feature
+		algorithmMatrixSANImethod="enforceSequentialActivationAcrossSegments"	#default	#only activate a segment if previous segment(s) active
+		algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default	#only activate neuron if last (adjacent feature) segment active
+	else:
+		useSANIcolumns = True	#assign segments by concept column proximity to connection target during train
 		if(multisentencePredictions):
 			arrayNumberOfSegments = 10	#default: 5
 		else:
@@ -390,11 +415,6 @@ if(useSANI):
 			#algorithmMatrixSANIenforceRequirement="enforceAnySegmentMustBeActive"	#activate neuron if any segment is active
 			algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default	#only activate neuron if last (internal column) segment active
 			#algorithmMatrixSANIenforceRequirement="enforceAllSegmentsMustBeActive"	#only activate neuron if all segments are active	#redundant; use enforceLastSegmentMustBeActive instead
-	else:
-		arrayNumberOfSegments = 2
-		#note if arrayNumberOfSegments=2 then; sIndex=1: sequential segment connections for adjacent feature, sIndex=0: sequential segment connections for all other feature
-		algorithmMatrixSANImethod="enforceSequentialActivationAcrossSegments"	#default	#only activate a segment if previous segment(s) active
-		algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default	#only activate neuron if last (adjacent feature) segment active
 else:
 	arrayNumberOfSegments = 1
 	algorithmMatrixSANImethod = "NA"
