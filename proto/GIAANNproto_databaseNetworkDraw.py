@@ -184,9 +184,9 @@ def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=
 		
 			featurePresent = False
 			featureActive = False
-			if(neuronIsActive(featureNeurons, arrayIndexPropertiesStrength, featureIndexInObservedColumn, "doNotEnforceSequentialityAcrossSegments")):	#if not useSANI: and neuronIsActive(featureNeurons, arrayIndexPropertiesPermanence, featureIndexInObservedColumn)
+			if(neuronIsActive(featureNeurons, arrayIndexPropertiesStrength, featureIndexInObservedColumn, "doNotEnforceActivationAcrossSegments")):	#if not useSANI: and neuronIsActive(featureNeurons, arrayIndexPropertiesPermanence, featureIndexInObservedColumn)
 				featurePresent = True
-			if(neuronIsActive(featureNeurons, arrayIndexPropertiesActivation, featureIndexInObservedColumn, "doNotEnforceSequentialityAcrossSegments")):	#default: algorithmMatrixSANImethod
+			if(neuronIsActive(featureNeurons, arrayIndexPropertiesActivation, featureIndexInObservedColumn, "doNotEnforceActivationAcrossSegments")):	#default: algorithmMatrixSANImethod
 				featureActive = True
 				
 			if(featurePresent):

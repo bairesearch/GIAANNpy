@@ -84,15 +84,21 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 		featureNeuronsTargetActivation = featureNeuronsTargetActivation*j1
 		
 	#update the activations of the target nodes;
-	if(not useSANI or algorithmMatrixSANImethod=="doNotEnforceSequentialityAcrossSegments"):
+	if(useSANI):
+		if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
+			if(enforceSequentialActivation):
+				globalFeatureNeuronsActivationDense = globalFeatureNeuronsActivation.to_dense()
+				featureNeuronsTargetActivationDense = featureNeuronsTargetActivation.to_dense()
+				previousChannelActivation = globalFeatureNeuronsActivationDense[:-1] > 0
+				globalFeatureNeuronsActivationDense[1:] += featureNeuronsTargetActivationDense[1:] * previousChannelActivation
+				globalFeatureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
+				globalFeatureNeuronsActivation = globalFeatureNeuronsActivationDense.to_sparse_coo()
+			else:
+				globalFeatureNeuronsActivation += featureNeuronsTargetActivation
+		elif(algorithmMatrixSANImethod=="doNotEnforceActivationAcrossSegments"):
+			globalFeatureNeuronsActivation += featureNeuronsTargetActivation
+	else:
 		globalFeatureNeuronsActivation += featureNeuronsTargetActivation
-	elif(algorithmMatrixSANImethod=="enforceSequentialActivationAcrossSegments"):
-		globalFeatureNeuronsActivationDense = globalFeatureNeuronsActivation.to_dense()
-		featureNeuronsTargetActivationDense = featureNeuronsTargetActivation.to_dense()
-		previousChannelActivation = globalFeatureNeuronsActivationDense[:-1] > 0	
-		globalFeatureNeuronsActivationDense[1:] += featureNeuronsTargetActivationDense[1:] * previousChannelActivation
-		globalFeatureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
-		globalFeatureNeuronsActivation = globalFeatureNeuronsActivationDense.to_sparse_coo()
 	if(inferenceActivationStrengthBoolean):
 		globalFeatureNeuronsActivation = globalFeatureNeuronsActivation.bool().float()
 		

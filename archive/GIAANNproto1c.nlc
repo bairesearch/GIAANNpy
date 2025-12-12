@@ -165,7 +165,7 @@ MANUAL; - add option inferenceRetainActivationsAcrossMultipleSentences - retain 
 MANUAL; - patch processFeatures:activeSequentialSegments to ensure positive; set minSequentialSegmentIndex = max(0, arrayNumberOfSegments-sequenceConceptIndex-1). patch processFeatures:featureNeuronsSegmentMask to include all segments receiving forward connections; set numberOfSegments = min(arrayNumberOfSegments, i+1).
 MANUAL; - add ignoreNewlineCharacters - ignore new line characters (do not parse).
 MANUAL; - update processFeaturesActivePredictSingle for useSANI (sum activations across all segments). update processFeaturesActivePredictSingle/Multi to select conceptIndex column from sequenceObservedColumnsPrediction.featureConnections. extract processFeaturesActivePredict from processFeaturesActivePredictSingle.
-MANUAL; - add option algorithmMatrixSANImethod="enforceSequentialActivationAcrossSegments" - only activate a segment if previous segment active.
+MANUAL; - add option algorithmMatrixSANImethod="enforceActivationAcrossSegments" - only activate a segment if previous segment active.
 MANUAL; - normalise across SANI segments independently - set inferencePredictiveNetworkNormaliseDim=1. depreciate sparse tensor normalise option (only normalise once converted to dense tensors).
 MANUAL; - update processColumnInferencePrediction - replace modifySparseTensor with addElementValueToSparseTensor to support case where sparse tensor element is empty.
 MANUAL; - add option connectionsStrengthBoolean - use boolean synaptic connectivity. add option activationStrengthBoolean - use boolean segment activation strength (once a segment is activated, do not increase its activation level).

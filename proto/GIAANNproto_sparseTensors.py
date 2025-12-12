@@ -514,22 +514,24 @@ def selectAindicesContainedInB(A, B):
 
 def neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANImethod):
 	if(useSANI):
-		if(algorithmMatrixSANImethod=="doNotEnforceSequentialityAcrossSegments"):
+		if(algorithmMatrixSANImethod=="doNotEnforceActivationAcrossSegments"):
 			featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=0) 	#sum activations across all segments
-		elif(algorithmMatrixSANImethod=="enforceSequentialActivationAcrossSegments"):
+		elif(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
 			featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=0) 	#sum activations across all segments
+			if(enforceActivationAcrossSegmentsIgnoreInternalColumn):
+				lastSegmentConstraint = arrayIndexSegmentAdjacentColumn	#ignore internal column activation requirement
+			else:
+				lastSegmentConstraint = arrayIndexSegmentInternalColumn
 			if(algorithmMatrixSANIenforceRequirement=="enforceAnySegmentMustBeActive"):
 				pass
 			elif(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
-				#adjacentOrInternalColumnActive = globalFeatureNeuronsActivation[arrayIndexSegmentAdjacentColumn] + globalFeatureNeuronsActivation[arrayIndexSegmentInternalColumn]	#only activate neuron if last (ie adjacent or internal column) segment active
-				#CHECKTHIS: if last segment (internal) is active, then all previous segments are active
-				adjacentOrInternalColumnActive = globalFeatureNeuronsActivation[arrayIndexSegmentInternalColumn]
-				featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, adjacentOrInternalColumnActive)
-			elif(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):	#redundant; use enforceLastSegmentMustBeActive instead
-				for s in range(arrayNumberOfSegments-1):	#ignore internal column activation requirement
+				# Only require that the last constraint segment (ie adjacent column or adjacent feature) is active; the internal column segment is ignored
+				lastConstraintSegmentActive = globalFeatureNeuronsActivation[lastSegmentConstraint]
+				featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, lastConstraintSegmentActive)
+			elif(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):
+				for s in range(lastSegmentConstraint+1):	#ignore internal column activation requirement
 					featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, globalFeatureNeuronsActivation[s])
 	else:
 		featureNeuronsActive = globalFeatureNeuronsActivation[arrayIndexSegmentInternalColumn] 		#select last (most proximal) segment activation
 	return featureNeuronsActive	
 			
-
