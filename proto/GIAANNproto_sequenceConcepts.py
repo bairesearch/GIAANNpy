@@ -370,16 +370,16 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 			# When useSANIcolumns is True (original behaviour), assign segment indices based on
 			# the concept/column position in the sequence (sequenceConceptIndex).
 			#
-			# When useSANIcolumns is False, assign segment indices based on the underlying
-			# feature/word position in the sentence (sequenceConceptWordIndex), so that
-			# segments correspond to feature positions rather than column positions.
+			# When useSANIfeatures is True (legacy !useSANIcolumns behaviour) or when
+			# useSANIfeaturesAndColumns is enabled, assign segment indices based on the
+			# underlying feature/word position in the sentence (sequenceConceptWordIndex), so
+			# that feature proximity is captured by the sequential segments.
 			if(useSANIcolumns):
 				positionIndex = sequenceConceptIndex
 			else:
 				# sequenceConceptWordIndex is the absolute token index of this concept's word
 				# in the original sequence; this gives "feature-position-based" segments.
 				positionIndex = sequenceConceptWordIndex
-
 			numberOfSegments = min(arrayNumberOfSegments, positionIndex+1)
 			featureNeuronsSegmentMask[sequenceConceptIndex, :] = pt.cat(
 				[
