@@ -87,7 +87,15 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 
 	if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections):
 		decreasePermanenceActive(sequenceObservedColumns, featureNeuronsActive[arrayIndexSegmentInternalColumn], featureNeuronsInactive[arrayIndexSegmentInternalColumn], sequenceConceptIndexMask, featureNeuronsSegmentMask, featureConnectionsSegmentMask)
-	
+
+	applyTrainConnectionStrengthLimits(sequenceObservedColumns)
+
+
+def applyTrainConnectionStrengthLimits(sequenceObservedColumns):
+	if(trainConnectionStrengthLimitMax):
+		sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength] = sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength].clamp(max=1.0)
+	if(trainConnectionStrengthLimitTanh):
+		sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength] = pt.tanh(sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength])
 
 def updateConnectionMinWordDistances(sequenceObservedColumns, featureConnectionsActive, featureNeuronsWordOrder):
 	if(featureNeuronsWordOrder is None):
@@ -159,7 +167,7 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 		featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, cs), dtype=pt.bool)
 		featureConnectionsSegmentMask = featureConnectionsSegmentMask.scatter_(0, connectionsSegmentIndex.unsqueeze(0), True)
 		featureConnectionsSegmentMask = featureConnectionsSegmentMask.view(arrayNumberOfSegments, cs, 1, cs, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
-	else:
+	elif(useSANIfeatures):
 		device = featureConnectionsActive.device
 		wordOrderTensor = featureNeuronsWordOrder.to(device)
 		wordOrderSource = wordOrderTensor.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
@@ -170,11 +178,31 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 		connectionsSegmentIndex = connectionsSegmentIndex.clamp(min=0, max=arrayNumberOfSegments-1).long()
 		featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
 		featureConnectionsSegmentMask.scatter_(0, connectionsSegmentIndex.unsqueeze(0), True)
-	
+	else:
+		device = featureConnectionsActive.device
+		wordOrderTensor = featureNeuronsWordOrder.to(device)
+		wordOrderSource = wordOrderTensor.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
+		wordOrderTarget = wordOrderTensor.view(1, 1, cs, fs).expand(cs, fs, cs, fs)
+		relativeDistance = (wordOrderTarget - wordOrderSource)
+		relativeDistance = pt.clamp(relativeDistance, min=1)
+		featureSegmentIndex = arrayNumberOfSegmentsFeatureDistance - relativeDistance
+		featureSegmentIndex = featureSegmentIndex.clamp(min=0, max=arrayNumberOfSegmentsFeatureDistance-1).long()
+
+		conceptNeuronsConceptOrder1d = pt.arange(cs, device=device)
+		conceptNeuronsDistances = pt.abs(conceptNeuronsConceptOrder1d.unsqueeze(1) - conceptNeuronsConceptOrder1d).reshape(cs, cs)
+		conceptNeuronsDistances = conceptNeuronsDistances.view(cs, 1, cs, 1).expand(cs, fs, cs, fs)
+		columnSegmentIndex = arrayNumberOfSegmentsFeatureDistance + arrayNumberOfSegmentsColumnDistance - conceptNeuronsDistances - 1
+		columnSegmentIndex = columnSegmentIndex.clamp(min=arrayNumberOfSegmentsFeatureDistance, max=arrayNumberOfSegments-1).long()
+		useFeatureSegmentsMask = (conceptNeuronsDistances == 0)
+		connectionsSegmentIndex = pt.where(useFeatureSegmentsMask, featureSegmentIndex, columnSegmentIndex)
+		featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
+		featureConnectionsSegmentMask.scatter_(0, connectionsSegmentIndex.unsqueeze(0), True)
+
 	featureConnectionsActive = featureConnectionsSegmentMask * featureConnectionsActive.unsqueeze(0)
-	
+
 	return featureConnectionsActive, featureConnectionsSegmentMask
-		
+
+
 def decreasePermanenceActive(sequenceObservedColumns, featureNeuronsActive, featureNeuronsInactive, sequenceConceptIndexMask, featureNeuronsSegmentMask, featureConnectionsSegmentMask):
 
 	if(trainSequenceObservedColumnsMatchSequenceWords):
@@ -228,4 +256,3 @@ def getConnectionStrengthPOSdependenceLookup(databaseNetworkObject):
 			posLookup.append((posIndex, float(value)))
 		databaseNetworkObject.connectionStrengthPOSdependenceLookup = posLookup
 	return databaseNetworkObject.connectionStrengthPOSdependenceLookup
-
