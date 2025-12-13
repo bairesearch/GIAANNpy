@@ -32,6 +32,8 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 #first dim cs1 pertains to every concept node in sequence
 def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex):
 	featureNeuronsInactive = 1 - featureNeuronsActive
+	featureNeuronsActiveUnion = featureNeuronsActive.amax(dim=0)
+	featureNeuronsInactiveUnion = 1 - featureNeuronsActiveUnion
 		
 	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesStrength, :, :, :] += featureNeuronsActive
 	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPermanence, :, :, :] += featureNeuronsActive*z1
@@ -42,8 +44,28 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTime, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTime] + featureNeuronsActive*sequenceIndex
 	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPos, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPos] + featureNeuronsActive*featureNeuronsPos
 
-	featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[arrayIndexSegmentInternalColumn], cs, fs, columnsWordOrder, featureNeuronsWordOrder)
-	
+	if(useSANI):
+		featureConnectionsActive = None
+		featureConnectionsSegmentMask = None
+		for segmentIndex in range(arrayNumberOfSegments):
+			segmentActive = featureNeuronsActive[segmentIndex]
+			if not pt.any(segmentActive):
+				continue
+			segmentConnectionsActive, segmentMask = createFeatureConnectionsActiveTrain(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder)
+			if featureConnectionsActive is None:
+				featureConnectionsActive = segmentConnectionsActive
+				featureConnectionsSegmentMask = segmentMask
+			else:
+				featureConnectionsActive = pt.maximum(featureConnectionsActive, segmentConnectionsActive)
+				featureConnectionsSegmentMask = pt.logical_or(featureConnectionsSegmentMask, segmentMask)
+		if featureConnectionsActive is None:
+			printe("processFeaturesActiveTrain() error: featureConnectionsActive is None")
+			#featureConnectionsActive = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=arrayType)
+			#featureConnectionsSegmentMask = pt.zeros_like(featureConnectionsActive, dtype=pt.bool)
+	else:
+		featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder)
+
+
 	if(debugPrintNeuronActivations8):
 		featureConnectionsActive = featureConnectionsActive*1000
 	
@@ -86,7 +108,7 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 		updateConnectionMinWordDistances(sequenceObservedColumns, featureConnectionsActive, featureNeuronsWordOrder)
 
 	if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections):
-		decreasePermanenceActive(sequenceObservedColumns, featureNeuronsActive[arrayIndexSegmentInternalColumn], featureNeuronsInactive[arrayIndexSegmentInternalColumn], sequenceConceptIndexMask, featureNeuronsSegmentMask, featureConnectionsSegmentMask)
+		decreasePermanenceActive(sequenceObservedColumns, featureNeuronsActiveUnion, featureNeuronsInactiveUnion, sequenceConceptIndexMask, featureNeuronsSegmentMask, featureConnectionsSegmentMask)
 
 	applyTrainConnectionStrengthLimits(sequenceObservedColumns)
 
@@ -178,21 +200,23 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 		connectionsSegmentIndex = connectionsSegmentIndex.clamp(min=0, max=arrayNumberOfSegments-1).long()
 		featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
 		featureConnectionsSegmentMask.scatter_(0, connectionsSegmentIndex.unsqueeze(0), True)
-	else:
+	elif(useSANIfeaturesAndColumns):
 		device = featureConnectionsActive.device
 		wordOrderTensor = featureNeuronsWordOrder.to(device)
 		wordOrderSource = wordOrderTensor.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
 		wordOrderTarget = wordOrderTensor.view(1, 1, cs, fs).expand(cs, fs, cs, fs)
 		relativeDistance = (wordOrderTarget - wordOrderSource)
-		relativeDistance = pt.clamp(relativeDistance, min=1)
-		featureSegmentIndex = arrayNumberOfSegmentsFeatureDistance - relativeDistance
-		featureSegmentIndex = featureSegmentIndex.clamp(min=0, max=arrayNumberOfSegmentsFeatureDistance-1).long()
+		#relativeDistance = pt.clamp(relativeDistance, min=1, max=arrayNumberOfSegmentsFeatureDistance)	
+		relativeDistance = pt.clamp(relativeDistance, min=1)	
+		featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
+		featureSegmentIndex = featureSegmentsOffset + arrayNumberOfSegmentsFeatureDistance - relativeDistance
+		featureSegmentIndex = featureSegmentIndex.clamp(min=featureSegmentsOffset, max=arrayNumberOfSegments-1).long()
 
 		conceptNeuronsConceptOrder1d = pt.arange(cs, device=device)
 		conceptNeuronsDistances = pt.abs(conceptNeuronsConceptOrder1d.unsqueeze(1) - conceptNeuronsConceptOrder1d).reshape(cs, cs)
 		conceptNeuronsDistances = conceptNeuronsDistances.view(cs, 1, cs, 1).expand(cs, fs, cs, fs)
-		columnSegmentIndex = arrayNumberOfSegmentsFeatureDistance + arrayNumberOfSegmentsColumnDistance - conceptNeuronsDistances - 1
-		columnSegmentIndex = columnSegmentIndex.clamp(min=arrayNumberOfSegmentsFeatureDistance, max=arrayNumberOfSegments-1).long()
+		columnSegmentIndex = arrayNumberOfSegmentsColumnDistance - conceptNeuronsDistances
+		columnSegmentIndex = columnSegmentIndex.clamp(min=0, max=max(arrayNumberOfSegmentsColumnDistance-1, 0)).long()
 		useFeatureSegmentsMask = (conceptNeuronsDistances == 0)
 		connectionsSegmentIndex = pt.where(useFeatureSegmentsMask, featureSegmentIndex, columnSegmentIndex)
 		featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)

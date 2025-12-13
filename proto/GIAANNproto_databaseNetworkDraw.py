@@ -192,10 +192,10 @@ def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=
 			if(featurePresent):
 				if(drawRelationTypes):
 					if not conceptNeuronFeature:
-						if(useSANI):
-							segmentIndex = arrayIndexSegmentAdjacentColumn #arrayIndexSegmentAdjacentColumn has a higher probability of being filled than arrayIndexSegmentInternalColumn
+						if(useSANI and useSANIcolumns):
+							segmentIndex = arrayIndexSegmentAdjacentColumn #arrayIndexSegmentAdjacentColumn has a higher probability of being filled than arrayIndexSegmentLast
 						else:
-							segmentIndex = arrayIndexSegmentInternalColumn
+							segmentIndex = arrayIndexSegmentLast
 						neuronColor = generateFeatureNeuronColour(databaseNetworkObject, featureNeurons[arrayIndexPropertiesPos, segmentIndex, featureIndexInObservedColumn], featureWord)	
 				elif(featureActive):
 					if(conceptNeuronFeature):

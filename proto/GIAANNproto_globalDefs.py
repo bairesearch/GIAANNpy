@@ -69,7 +69,7 @@ if(multisentencePredictions):
 	numSentencesPerSequence = 3	#default: 3
 
 #identify immediate connections
-enforceDirectConnections = False	#future default: True	#orig: False	#prediction requires a direct connection from previous prediction as observed during training (ie adjacent tokens)
+enforceDirectConnections = True	#default: True	#orig: False	#prediction requires a direct connection from previous prediction as observed during training (ie adjacent tokens)
 if(enforceDirectConnections):
 	enforceDirectConnectionsSANI = False	#default: False #orig: False	#enforce activation of first segment (direct feature connection)
 	enforceDirectConnectionsMinWordDistance = True	#default: True #orig: True	#enforce min word distance (=1) during inference
@@ -79,7 +79,7 @@ else:
 if(enforceDirectConnectionsSANI):
 	useSANI = True	#sequentially activated neuronal input (divide dendrites into segments)
 else:
-	useSANI = False	#optional	#default: False	#sequentially activated neuronal input (divide dendrites into segments)
+	useSANI = True	#optional	#default: True	#orig: False	#sequentially activated neuronal input (divide dendrites into segments)
 if(enforceDirectConnectionsMinWordDistance):
 	arrayIndexPropertiesMinWordDistance = True	#store min word distance per connection
 else:
@@ -87,7 +87,7 @@ else:
 minimumPredictionActivationThreshold = 0.0	#explicit threshold application not required (for verification only)
 
 #Concept column delimiter parameters:
-conceptColumnsDelimitByPOS = True	#planned new default: True	#orig: False	#closer to original GIA specification
+conceptColumnsDelimitByPOS = True	#default: True	#orig: False	#closer to original GIA specification	#FUTURE: still requires working for edge cases
 conceptColumnsDelimitByConceptFeaturesStart = False #default: False	#orig: True	#Constrain column feature detection to be after concept feature detection	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
 conceptColumnsDelimitByConceptFeaturesMid = False	#default: True	#default: False
 if(conceptColumnsDelimitByPOS):
@@ -112,8 +112,10 @@ else:
 
 #Connection strength modifiers;
 trainConnectionStrengthPOSdependence = False	#default: False	#orig: False
-trainConnectionStrengthLimitTanh = False	#default: False
-trainConnectionStrengthLimitMax = False	#default: False
+trainConnectionStrengthLimitTanh = False	#default: False	#orig: False	#TODO: review this - reduce algorithmic dependency on high frequency tokens
+trainConnectionStrengthLimitMax = False	#default: False	#orig: False	#TODO: review this - reduce algorithmic dependency on high frequency tokens
+if(useSANI):
+	trainConnectionStrengthLimitMax = False	#planned new default: True	#apply normalisation to with SANI to emphasise the combination of relevant precedents rather than overweight to specific precedents
 inferenceConnectionStrengthPOSdependence = False	#default: False	#orig: False
 if(trainConnectionStrengthPOSdependence or inferenceConnectionStrengthPOSdependence):
 	connectionStrengthPOSdependenceTypes = ['NOUN', 'PROPN', 'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X']	
@@ -397,13 +399,11 @@ else:
 	arrayPropertiesList = [arrayIndexPropertiesStrength, arrayIndexPropertiesPermanence, arrayIndexPropertiesActivation, arrayIndexPropertiesTime, arrayIndexPropertiesPos]
 arrayIndexSegmentFirst = 0
 if(useSANI):
-	useSANIcolumns = True	#assign segments by concept column proximity to connection target during train
+	useSANIcolumns = False	#assign segments by concept column proximity to connection target during train (includes internal concept column)
 	useSANIfeatures = False	#assign segments by feature proximity to connection target during train
-	useSANIfeaturesAndColumns = False	#assign segments by feature proximity first and then column proximity
+	useSANIfeaturesAndColumns = False	#assign segments by column proximity first (excludes internal concept column) then feature proximity
 	if(enforceDirectConnectionsSANI):
-		useSANIcolumns = False
 		useSANIfeatures = True
-		useSANIfeaturesAndColumns = False
 		arrayNumberOfSegments = 2
 		#note if arrayNumberOfSegments=2 then; sIndex=1: sequential segment connections for adjacent feature, sIndex=0: sequential segment connections for all other feature
 		algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment if previous segment(s) active
@@ -411,23 +411,23 @@ if(useSANI):
 		enforceSequentialActivation = False
 		enforceActivationAcrossSegmentsIgnoreInternalColumn = False
 	else:
+		#useSANIcolumns = True	#orig: True
+		#useSANIfeatures = True
+		useSANIfeaturesAndColumns = True	#default: True
 		if(useSANIfeaturesAndColumns):
-			arrayNumberOfSegmentsFeatureDistance = 5
-			arrayNumberOfSegmentsColumnDistance = 2
-			arrayNumberOfSegments = arrayNumberOfSegmentsFeatureDistance + arrayNumberOfSegmentsColumnDistance
+			arrayNumberOfSegmentsColumnDistance = 1	#min number of external column connections to target node (note first segment captures all other external columns)
+			arrayNumberOfSegmentsFeatureDistance = 4	#number of nearest features to target node
+			arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance + arrayNumberOfSegmentsFeatureDistance
 		elif(useSANIcolumns):
 			if(multisentencePredictions):
-				arrayNumberOfSegments = 10	#default: 5
+				arrayNumberOfSegments = 5	#default: 5	#min number of external and internal column connections to target node (note first segment captures all other external columns)
 			else:
-				arrayNumberOfSegments = 3	#default:3	#orig: 10	#max number of SANI segments per sequence (= max number of concept columns per sequence - 1)
+				arrayNumberOfSegments = 2	#default: 2	#orig:3		#min number of external and internal column connections to target node (note first segment captures all other external columns)
+					#max number of SANI segments per sequence (= max number of concept columns per sequence - 1)
 					#note if arrayNumberOfSegments=3 then;	sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: all other column connections
 					#must be less than the (total number of concepts in a sequence - total number of concepts in effective predictive seed sequence)
-		else:
-			useSANIfeatures = True
-			if(multisentencePredictions):
-				arrayNumberOfSegments = 10
-			else:
-				arrayNumberOfSegments = 3
+		elif(useSANIfeatures):
+			arrayNumberOfSegments = 5	#min number of nearest features to target node (note first segment captures all other features)
 		algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment if previous external segment(s) active
 		#algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI
 		if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
@@ -435,20 +435,29 @@ if(useSANI):
 			algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default	#only activate neuron if last external segment active
 			#algorithmMatrixSANIenforceRequirement="enforceAllSegmentsMustBeActive" #only activate neuron if all external segments are active	#if(enforceSequentialActivation) then redundant; use enforceLastSegmentMustBeActive instead
 			enforceSequentialActivation = True	#optional	#default: True #orig: True	#only activation next segment if previous segment activated
+		enforceActivationAcrossSegmentsIgnoreInternalColumn = False
+		if(useSANIcolumns):	
 			enforceActivationAcrossSegmentsIgnoreInternalColumn = True	#ignore internal column as this column features do not necessarily have an input from the current column
 	assert (int(useSANIcolumns) + int(useSANIfeatures) + int(useSANIfeaturesAndColumns)) == 1
+
+	if(useSANIfeaturesAndColumns):
+		arrayIndexSegmentLast = arrayNumberOfSegments-1	#last feature index
+		#arrayIndexSegmentAdjacentColumn = arrayNumberOfSegmentsColumnDistance-1
+	elif(useSANIcolumns):
+		arrayIndexSegmentLast = arrayNumberOfSegments-1
+		arrayIndexSegmentAdjacentColumn = arrayNumberOfSegments-2
+	elif(useSANIfeatures):
+		arrayIndexSegmentLast = arrayNumberOfSegments-1
+
+	if(useInference):
+		#arrayNumberOfSegments must be <= numSeedTokens (eg with numSeedTokens = 5, segment budget = 5)
+		#absolute minimum, for useSANIcolumns (and useSANIfeaturesAndColumns with arrayNumberOfSegmentsColumnDistance>1), arrayNumberOfSegments must be significantly less than numSeedTokens
+		assert arrayNumberOfSegments <= numSeedTokens	
 else:
 	arrayNumberOfSegments = 1
 	algorithmMatrixSANImethod = "NA"
+	arrayIndexSegmentLast = 0
 
-if(useSANIfeaturesAndColumns):
-	arrayIndexSegmentInternalColumn = arrayNumberOfSegmentsFeatureDistance-1
-	arrayIndexSegmentAdjacentColumn = arrayNumberOfSegments-1
-else:
-	arrayNumberOfSegmentsFeatureDistance = arrayNumberOfSegments
-	arrayNumberOfSegmentsColumnDistance = 0
-	arrayIndexSegmentInternalColumn = arrayNumberOfSegments-1
-	arrayIndexSegmentAdjacentColumn = arrayNumberOfSegments-2
 arrayType = pt.float32	#pt.long	#pt.float32
 
 # Define POS tag sets for nouns and non-nouns

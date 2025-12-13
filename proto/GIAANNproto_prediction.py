@@ -504,7 +504,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		for conceptIndex in range(conceptColumnsIndices.shape[0]):
 			conceptColumnsIndicesSource = conceptColumnsIndices[conceptIndex].item()
 			conceptColumnsFeatureIndicesSource = conceptColumnsFeatureIndices[conceptIndex].squeeze().item()
-			indicesToUpdateList = [arrayIndexPropertiesActivation, arrayIndexSegmentInternalColumn, conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource]
+			indicesToUpdateList = [arrayIndexPropertiesActivation, arrayIndexSegmentLast, conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource]
 			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.addElementValueToSparseTensor(databaseNetworkObject.globalFeatureNeurons, indicesToUpdateList, j1)
 				
 	globalFeatureNeuronsActivation = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivation]

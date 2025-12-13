@@ -383,13 +383,12 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 			numberOfSegments = min(arrayNumberOfSegments, positionIndex+1)
 			featureNeuronsSegmentMask[sequenceConceptIndex, :] = pt.cat(
 				[
-					pt.zeros(arrayNumberOfSegments-numberOfSegments, dtype=arrayType),
 					pt.ones(numberOfSegments, dtype=arrayType),
+					pt.zeros(arrayNumberOfSegments-numberOfSegments, dtype=arrayType),
 				],
 				dim=0,
 			)
-			minSequentialSegmentIndex = max(0, arrayNumberOfSegments-positionIndex-1)
-			activeSequentialSegments = pt.arange(minSequentialSegmentIndex, arrayNumberOfSegments, 1)
+			activeSequentialSegments = pt.arange(0, numberOfSegments, 1)
 		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly and trainSequenceObservedColumnsMatchSequenceWords):
 			if(useSANI):
 				featureNeuronsActive[activeSequentialSegments, sequenceConceptIndex, startIndices[sequenceConceptIndex]:endIndices[sequenceConceptIndex]] = 1

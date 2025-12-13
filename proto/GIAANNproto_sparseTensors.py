@@ -521,7 +521,7 @@ def neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANIme
 			if(enforceActivationAcrossSegmentsIgnoreInternalColumn):
 				lastSegmentConstraint = arrayIndexSegmentAdjacentColumn	#ignore internal column activation requirement
 			else:
-				lastSegmentConstraint = arrayIndexSegmentInternalColumn
+				lastSegmentConstraint = arrayIndexSegmentLast
 			if(algorithmMatrixSANIenforceRequirement=="enforceAnySegmentMustBeActive"):
 				pass
 			elif(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
@@ -532,6 +532,6 @@ def neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANIme
 				for s in range(lastSegmentConstraint+1):	#ignore internal column activation requirement
 					featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, globalFeatureNeuronsActivation[s])
 	else:
-		featureNeuronsActive = globalFeatureNeuronsActivation[arrayIndexSegmentInternalColumn] 		#select last (most proximal) segment activation
+		featureNeuronsActive = globalFeatureNeuronsActivation[arrayIndexSegmentLast] 		#select last (most proximal) segment activation
 	return featureNeuronsActive	
 			

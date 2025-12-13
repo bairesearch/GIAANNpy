@@ -200,7 +200,7 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 		featureConnectionsActive = pt.ones(cs, fs, cs2, fs2)
 	else:
 		cs2 = cs
-		featureConnectionsActive, featureConnectionsSegmentMask = GIAANNproto_databaseNetworkTrain.createFeatureConnectionsActiveTrain(featureNeuronsActive[arrayIndexSegmentInternalColumn], cs, fs, columnsWordOrder, featureNeuronsWordOrder)
+		featureConnectionsActive, featureConnectionsSegmentMask = GIAANNproto_databaseNetworkTrain.createFeatureConnectionsActiveTrain(featureNeuronsActive[arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder)
 		
 		if(debugPrintNeuronActivations):
 			activeConnectionsPreMask = (featureConnectionsActive > 0).sum().item()
@@ -215,7 +215,7 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 		print("\tseed debug: connections after mask = ", activeConnectionsPostMask)
 		debugPrintActiveConnectionSamples(sequenceObservedColumns, featureConnectionsActive)
 		if(firstSeedConceptIndex is not None and numSeedConcepts is not None):
-			sourceSegment = featureNeuronsActive[arrayIndexSegmentInternalColumn, firstSeedConceptIndex:firstSeedConceptIndex+numSeedConcepts]
+			sourceSegment = featureNeuronsActive[arrayIndexSegmentLast, firstSeedConceptIndex:firstSeedConceptIndex+numSeedConcepts]
 			sourceActiveCount = (sourceSegment > 0).sum().item()
 			print("\tseed debug: active source features in current columns = ", sourceActiveCount)
 		else:
