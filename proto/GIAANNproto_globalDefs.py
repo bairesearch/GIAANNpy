@@ -68,6 +68,17 @@ multisentencePredictions = False	#default: False	#requires higher GPU RAM for tr
 if(multisentencePredictions):
 	numSentencesPerSequence = 3	#default: 3
 
+#inhibitory neurons;
+useInhibitoryNeurons = False	#planned new default: True #orig: False
+if(useInhibitoryNeurons):
+	trainInhibitoryNeurons = True	
+	inferenceInhibitoryNeurons = False		#FUTURE	#TODO
+	inhibitoryNeuronYoffset = 10
+else:
+	trainInhibitoryNeurons = False
+	inferenceInhibitoryNeurons = False
+inhibitoryConnectionStrengthIncrement = 1.0	#default increment applied when wiring inhibitory neurons to alternate prediction targets
+
 #identify immediate connections
 enforceDirectConnections = True	#default: True	#orig: False	#prediction requires a direct connection from previous prediction as observed during training (ie adjacent tokens)
 if(enforceDirectConnections):
@@ -79,7 +90,7 @@ else:
 if(enforceDirectConnectionsSANI):
 	useSANI = True	#sequentially activated neuronal input (divide dendrites into segments)
 else:
-	useSANI = True	#optional	#default: True	#orig: False	#sequentially activated neuronal input (divide dendrites into segments)
+	useSANI = False	#optional	#default: True	#orig: False	#sequentially activated neuronal input (divide dendrites into segments)
 if(enforceDirectConnectionsMinWordDistance):
 	arrayIndexPropertiesMinWordDistance = True	#store min word distance per connection
 else:
@@ -213,7 +224,7 @@ if(useInference):
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 			trainSequenceObservedColumnsUseSequenceFeaturesOnly = False	#mandatory	#global feature arrays are directly written to during inference seed phase
 	lowMem = False		#mandatory
-	trainSequenceObservedColumnsMatchSequenceWords = True	#optional	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
+	trainSequenceObservedColumnsMatchSequenceWords = True	#mantatory	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
 	drawSequenceObservedColumns = False	#mandatory
 	drawAllColumns = False	#mandatory
 	drawNetworkDuringTrainSave = False
@@ -223,8 +234,8 @@ if(useInference):
 else:
 	inferenceUseNeuronFeaturePropertiesTime = True	#required to initialise time part of inferencePredictiveNetworkUseInputAllProperties to 0
 	lowMem = False		 #default: False	#orig: True	#currently required to be False for inference compatibility	#optional
-	trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
-	trainSequenceObservedColumnsMatchSequenceWords = True	#optional	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
+	trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
+	trainSequenceObservedColumnsMatchSequenceWords = True	#mantatory		#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
 	drawSequenceObservedColumns = False	#optional	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !trainSequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns	#optional (will affect which network changes can be visualised)
 	drawAllColumns = False	#optional	#draw all columns in network (only used for automated visualisation; drawNetworkDuringTrainSave)	#requires !drawSequenceObservedColumns
 	if(drawAllColumns):
@@ -304,8 +315,6 @@ if(useInference):
 		inferenceInvertNeuronActivationUponPrediction = False	#default: True	#orig: False	#set activations of previously activated neurons to negative - refractory period preventing consecutive feature reactivation and facilitating prediction based on past predictions
 		#if(not inferenceActivationFunction):	#do not decrement activations if they are decremented every time the activation function is applied
 		inferenceDecrementActivations = True	#default: True	#False is only for debug
-		if(inferenceDecrementActivations):
-			inferenceDecrementActivationsNonlinear = True
 		if(inferenceInvertNeuronActivationUponPrediction):
 			inferenceInvertNeuronActivationUponPredictionLevel = -0.1	#orig: -1.0	#	#default: -0.1; inferenceInvertNeuronActivationUponPrediction inversion also significantly decreases activation level by a factor of approx 10x (ie 0.1), enabling reactivation after only a few feature predictions (by positive addition). inferenceDecrementActivations decrement will continue to be applied non-linearly (inferenceDecrementActivationsNonlinear) to negative activations thereby retaining their negative activation until they are predicted again (making them positive).
 			inferenceDeactivateNeuronsUponPrediction = False #do not use inferenceDeactivateNeuronsUponPrediction as the predictive network needs a temporarily consistent trace of the activations in the network		
@@ -317,14 +326,17 @@ if(useInference):
 	else:
 		inferenceInvertNeuronActivationUponPrediction = False
 		inferenceDeactivateNeuronsUponPrediction = True	#default: True
-		inferenceDecrementActivations = False
-	activationDecrementPerPredictedToken = 0.1	#0.05	#CHECKTHIS
-	activationDecrementPerPredictedSequence = 0.5
-	if(inferenceSeedNetwork):
-		if(inferenceIncrementallySeedNetwork):
-			activationDecrementSeed = activationDecrementPerPredictedToken
-		else:
-			activationDecrementSeed = activationDecrementPerPredictedSequence
+		inferenceDecrementActivations = False	#default: False - CHECKTHIS #orig: False
+		
+	if(inferenceDecrementActivations):
+		inferenceDecrementActivationsNonlinear = True
+		activationDecrementPerPredictedToken = 0.1	#0.05	#CHECKTHIS
+		activationDecrementPerPredictedSequence = 0.5
+		if(inferenceSeedNetwork):
+			if(inferenceIncrementallySeedNetwork):
+				activationDecrementSeed = activationDecrementPerPredictedToken
+			else:
+				activationDecrementSeed = activationDecrementPerPredictedSequence
 	
 	if(inferenceSeedNetwork):
 		numSeedTokens = 5	#number of seed tokens in last sequence of inference prompt (remaining tokens will be prediction tokens)
@@ -371,7 +383,9 @@ if(useInference):
 # Paths for saving data
 conceptColumnsDictFile = databaseFolder + 'conceptColumnsDict.pkl'
 conceptFeaturesDictFile = databaseFolder + 'conceptFeaturesDict.pkl'
+conceptInhibitoryFeaturesDictFile = databaseFolder + 'conceptInhibitoryFeaturesDict.pkl'
 observedColumnsDir = databaseFolder + 'observedColumns'
+inhibitoryObservedColumnsDir = databaseFolder + "observedColumnsInhibitory"
 pytorchTensorFileExtension = ".pt"
 predictiveNetworkFolder = "."
 predictiveNetworkFileName = "predictiveNetworkModel.pt"
@@ -485,6 +499,7 @@ else:
 
 if not lowMem:
 	globalFeatureNeuronsFile = 'globalFeatureNeurons'
+	globalFeatureNeuronsFileFull = databaseFolder + globalFeatureNeuronsFile + pytorchTensorFileExtension
 
 variableConceptNeuronFeatureName = "variableConceptNeuronFeature"
 variableConceptNeuronFeatureNameAbbreviation = "VCNF"

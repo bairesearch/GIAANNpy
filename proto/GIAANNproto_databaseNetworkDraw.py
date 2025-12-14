@@ -20,10 +20,13 @@ GIA ANN proto database Network Draw
 import networkx as nx
 import matplotlib.pyplot as plt
 import random
+import torch as pt
 import GIAANNproto_sparseTensors
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_databaseNetwork
+if(trainInhibitoryNeurons):
+	import GIAANNproto_databaseNetworkInhibitionStorage
 
 if(drawSegmentsTrain):
 	segmentColours = ['red', 'green', 'blue', 'yellow', 'magenta', 'cyan']	#len must be >= arrayNumberOfSegments
@@ -117,7 +120,7 @@ def floatToString(value):
 	result = f"{value:.3f}"
 	#result = str(round(value, 2))
 	return result
-		
+
 def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=None):
 
 	if(inferenceMode):
@@ -135,13 +138,59 @@ def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=
 	else:
 		observedColumnsDict = sequenceObservedColumns.observedColumnsDict
 	
+	conceptIndexToLemma = {}
+	for lemma, observedColumn in observedColumnsDict.items():
+		conceptIndexToLemma[observedColumn.conceptIndex] = lemma
+
 	if not lowMem:
 		global globalFeatureNeurons
 		if(performRedundantCoalesce):
 			globalFeatureNeurons = globalFeatureNeurons.coalesce()
 
+	excitatoryNodeMap = drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, drawRelationTypes, drawSegments, inferenceMode)
+	if(trainInhibitoryNeurons):
+		drawInhibitoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, conceptIndexToLemma, drawSegments, excitatoryNodeMap)
+
+								
+	# Get positions and colors for drawing
+	pos = nx.get_node_attributes(G, 'pos')
+	colors = [data['color'] for node, data in G.nodes(data=True)]
+	edgeColors = [data['color'] for u, v, data in G.edges(data=True)]
+	labels = nx.get_node_attributes(G, 'label')
+
+	if(save):
+		highResolutionFigure = True
+	else:
+		if(drawHighResolutionFigure):
+			highResolutionFigure = True
+		else:
+			highResolutionFigure = False
+	if(highResolutionFigure):
+		displayFigDPI = 100
+		saveFigDPI = 300	#approx HD
+		saveFigSize = (16,9)
+		figureWidth = 1920
+		figureHeight = 1080
+		plt.gcf().set_size_inches(figureWidth / displayFigDPI, figureHeight / displayFigDPI)
+
+	# Draw the graph
+	nx.draw(G, pos, with_labels=True, labels=labels, arrows=True, node_color=colors, edge_color=edgeColors, node_size=500, font_size=8)
+	plt.axis('off')  # Hide the axes
+	
+	if(save):
+		if(highResolutionFigure):
+			plt.savefig(fileName, dpi=saveFigDPI)
+		else:
+			plt.savefig(fileName)
+		plt.clf()	
+	else:
+		plt.show()
+
+def drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, drawRelationTypes, drawSegments, inferenceMode):
+
 	# Draw concept columns
 	posDict = {}
+	nodeNameMap = {}
 	xOffset = 0
 	for lemma, observedColumn in observedColumnsDict.items():
 		conceptIndex = observedColumn.conceptIndex
@@ -163,7 +212,7 @@ def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=
 			else:
 				featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 2, conceptIndex)
 				#featureNeurons = databaseNetworkObject.globalFeatureNeurons[:, :, conceptIndex]	#operation not supported for sparse tensors
-					
+		
 		# Draw feature neurons
 		for featureWord, featureIndexInObservedColumn in featureWordToIndex.items():
 			conceptNeuronFeature = False
@@ -216,6 +265,7 @@ def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=
 					yOffsetPrev = yOffset
 					yOffset = 1
 				G.add_node(featureNode, pos=(xOffsetShuffled, yOffset), color=neuronColor, label=neuronName)
+				nodeNameMap[(lemma, featureIndexInObservedColumn)] = featureNode
 				if(drawSequenceObservedColumns and conceptNeuronFeature):
 					yOffset = yOffsetPrev
 				else:
@@ -319,40 +369,136 @@ def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=
 									
 								if(featurePresent):
 									G.add_edge(sourceNode, targetNode, color=connectionColor)
-								
-	# Get positions and colors for drawing
-	pos = nx.get_node_attributes(G, 'pos')
-	colors = [data['color'] for node, data in G.nodes(data=True)]
-	edgeColors = [data['color'] for u, v, data in G.edges(data=True)]
-	labels = nx.get_node_attributes(G, 'label')
+	return nodeNameMap
 
-	if(save):
-		highResolutionFigure = True
-	else:
-		if(drawHighResolutionFigure):
-			highResolutionFigure = True
-		else:
-			highResolutionFigure = False
-	if(highResolutionFigure):
-		displayFigDPI = 100
-		saveFigDPI = 300	#approx HD
-		saveFigSize = (16,9)
-		figureWidth = 1920
-		figureHeight = 1080
-		plt.gcf().set_size_inches(figureWidth / displayFigDPI, figureHeight / displayFigDPI)
+if(trainInhibitoryNeurons):
+	def drawInhibitoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, conceptIndexToLemma, drawSegments, excitatoryNodeMap):
+		xOffset = 0
+		for lemma, observedColumn in observedColumnsDict.items():
+			inhibitoryColumn = GIAANNproto_databaseNetworkInhibitionStorage.getInhibitoryObservedColumn(databaseNetworkObject, observedColumn.conceptIndex, lemma)
+			if inhibitoryColumn is None:
+				xOffset += 2
+				continue
+			featureNeuronsTensor = inhibitoryColumn.featureNeurons
+			if featureNeuronsTensor.is_sparse:
+				if(featureNeuronsTensor._nnz() == 0):
+					xOffset += 2
+					continue
+				featureNeurons = featureNeuronsTensor.to_dense()
+			else:
+				if not pt.any(featureNeuronsTensor):
+					xOffset += 2
+					continue
+				featureNeurons = featureNeuronsTensor.clone()
+			yOffset = inhibitoryNeuronYoffset
+			columnNodeMap = {}
+			for featureIndex in range(featureNeurons.shape[2]):
+				featurePresent = neuronIsActive(featureNeurons, arrayIndexPropertiesStrength, featureIndex, "doNotEnforceActivationAcrossSegments")
+				if(not featurePresent):
+					continue
+				featureActive = neuronIsActive(featureNeurons, arrayIndexPropertiesActivation, featureIndex, "doNotEnforceActivationAcrossSegments")
+				neuronColor = 'crimson' if featureActive else 'lightcoral'
+				neuronLabel = f"Inhib {featureIndex}"
+				featureNode = f"inhib_{lemma}_{featureIndex}"
+				if(randomiseColumnFeatureXposition):
+					xOffsetShuffled = xOffset + random.uniform(-0.5, 0.5)
+				else:
+					xOffsetShuffled = xOffset
+				G.add_node(featureNode, pos=(xOffsetShuffled, yOffset), color=neuronColor, label=neuronLabel)
+				columnNodeMap[featureIndex] = featureNode
+				yOffset += 1
+			if(columnNodeMap):
+				plt.gca().add_patch(plt.Rectangle((xOffset - 0.5, inhibitoryNeuronYoffset - 0.5), 1, max(yOffset - inhibitoryNeuronYoffset, 1) + 0.5, fill=False, edgecolor='red', linestyle='--'))
+				drawInhibitoryInputConnections(inhibitoryColumn, columnNodeMap, excitatoryNodeMap, conceptIndexToLemma, drawSegments)
+				drawInhibitoryOutputConnections(inhibitoryColumn, columnNodeMap, excitatoryNodeMap, conceptIndexToLemma, drawSegments)
+			xOffset += 2
 
-	# Draw the graph
-	nx.draw(G, pos, with_labels=True, labels=labels, arrows=True, node_color=colors, edge_color=edgeColors, node_size=500, font_size=8)
-	plt.axis('off')  # Hide the axes
-	
-	if(save):
-		if(highResolutionFigure):
-			plt.savefig(fileName, dpi=saveFigDPI)
+	def drawInhibitoryInputConnections(inhibitoryColumn, columnNodeMap, excitatoryNodeMap, conceptIndexToLemma, drawSegments):
+		if not columnNodeMap:
+			return
+		connectionsTensor = inhibitoryColumn.featureConnectionsInput
+		if connectionsTensor.is_sparse:
+			if(connectionsTensor._nnz() == 0):
+				return
+			connectionsTensor = connectionsTensor.to_dense()
 		else:
-			plt.savefig(fileName)
-		plt.clf()	
-	else:
-		plt.show()
+			if not pt.any(connectionsTensor):
+				return
+		if(drawSegments):
+			numberOfSegmentsToIterate = arrayNumberOfSegments
+		else:
+			numberOfSegmentsToIterate = 1
+			connectionsTensor = connectionsTensor.sum(dim=1, keepdim=True)
+		for segmentIndex in range(numberOfSegmentsToIterate):
+			segmentSlice = connectionsTensor[:, segmentIndex]
+			strengthSlice = segmentSlice[arrayIndexPropertiesStrength]
+			permanenceSlice = segmentSlice[arrayIndexPropertiesPermanence]
+			activeMask = (strengthSlice > 0) & (permanenceSlice > 0)
+			activeIndices = pt.nonzero(activeMask, as_tuple=False)
+			if(activeIndices.numel() == 0):
+				continue
+			for idx in activeIndices:
+				inhibFeatureIndex = int(idx[0].item())
+				sourceConceptIndex = int(idx[1].item())
+				sourceFeatureIndex = int(idx[2].item())
+				targetNode = columnNodeMap.get(inhibFeatureIndex)
+				if targetNode is None or not G.has_node(targetNode):
+					continue
+				sourceLemma = conceptIndexToLemma.get(sourceConceptIndex)
+				if sourceLemma is None:
+					continue
+				sourceNode = excitatoryNodeMap.get((sourceLemma, sourceFeatureIndex))
+				if sourceNode is None or not G.has_node(sourceNode):
+					continue
+				if(drawSegments):
+					connectionColor = segmentColours[segmentIndex]
+				else:
+					connectionColor = 'firebrick'
+				G.add_edge(sourceNode, targetNode, color=connectionColor)
+
+	def drawInhibitoryOutputConnections(inhibitoryColumn, columnNodeMap, excitatoryNodeMap, conceptIndexToLemma, drawSegments):
+		if not columnNodeMap:
+			return
+		connectionsTensor = inhibitoryColumn.featureConnectionsOutput
+		if connectionsTensor.is_sparse:
+			if(connectionsTensor._nnz() == 0):
+				return
+			connectionsTensor = connectionsTensor.to_dense()
+		else:
+			if not pt.any(connectionsTensor):
+				return
+		if(drawSegments):
+			numberOfSegmentsToIterate = arrayNumberOfSegments
+		else:
+			numberOfSegmentsToIterate = 1
+			connectionsTensor = connectionsTensor.sum(dim=1, keepdim=True)
+		for segmentIndex in range(numberOfSegmentsToIterate):
+			segmentSlice = connectionsTensor[:, segmentIndex]
+			strengthSlice = segmentSlice[arrayIndexPropertiesStrength]
+			permanenceSlice = segmentSlice[arrayIndexPropertiesPermanence]
+			activeMask = (strengthSlice > 0) & (permanenceSlice > 0)
+			activeIndices = pt.nonzero(activeMask, as_tuple=False)
+			if(activeIndices.numel() == 0):
+				continue
+			for idx in activeIndices:
+				inhibFeatureIndex = int(idx[0].item())
+				targetConceptIndex = int(idx[1].item())
+				targetFeatureIndex = int(idx[2].item())
+				sourceNode = columnNodeMap.get(inhibFeatureIndex)
+				if sourceNode is None or not G.has_node(sourceNode):
+					continue
+				targetLemma = conceptIndexToLemma.get(targetConceptIndex)
+				if targetLemma is None:
+					continue
+				targetNode = excitatoryNodeMap.get((targetLemma, targetFeatureIndex))
+				if targetNode is None or not G.has_node(targetNode):
+					continue
+				if(drawSegments):
+					connectionColor = segmentColours[segmentIndex]
+				else:
+					connectionColor = 'indianred'
+				#print(f"draw inhibitory output connection: column {inhibitoryColumn.conceptName}, inhibitory feature {inhibFeatureIndex} -> {targetLemma}:{targetFeatureIndex}")
+				G.add_edge(sourceNode, targetNode, color=connectionColor)
 
 def neuronIsActive(featureNeurons, arrayIndexProperties, featureIndexInObservedColumn, algorithmMatrixSANImethod):
 	featureNeuronsActive = neuronActivation(featureNeurons, arrayIndexProperties, featureIndexInObservedColumn, algorithmMatrixSANImethod)
@@ -378,4 +524,3 @@ def neuronActivationString(featureNeurons, arrayIndexProperties, featureIndexInO
 			value += " "
 		string += value
 	return string
-	

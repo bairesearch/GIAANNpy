@@ -17,6 +17,7 @@ GIA ANN proto database Network
 
 """
 
+import os
 import torch as pt
 
 from GIAANNproto_globalDefs import *
@@ -60,7 +61,7 @@ if not lowMem:
 		return globalFeatureNeurons
 		
 	def loadFeatureNeuronsGlobal(c, f):
-		if GIAANNproto_databaseNetworkFiles.pathExists(globalFeatureNeuronsFile+pytorchTensorFileExtension):
+		if GIAANNproto_databaseNetworkFiles.pathExists(globalFeatureNeuronsFileFull):
 			globalFeatureNeurons = GIAANNproto_databaseNetworkFiles.loadFeatureNeuronsGlobalFile()
 		else:
 			globalFeatureNeurons = initialiseFeatureNeuronsGlobal(c, f)
@@ -325,4 +326,3 @@ def isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, feat
 	else:
 		isDelimiterProbabilistic = False
 	return isDelimiterProbabilistic
-

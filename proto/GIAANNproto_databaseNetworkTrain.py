@@ -22,19 +22,32 @@ import torch as pt
 from GIAANNproto_globalDefs import *
 import GIAANNproto_sparseTensors
 import GIAANNproto_sequenceConcepts
+if(trainInhibitoryNeurons):
+	import GIAANNproto_databaseNetworkInhibition
+	import GIAANNproto_databaseNetworkInhibitionStorage
 
 def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 	conceptIndices, startIndices, endIndices = GIAANNproto_sequenceConcepts.processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens)
 	featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask = GIAANNproto_sequenceConcepts.processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices)
 
-	processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex)
+	featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex)
+
+	if(trainInhibitoryNeurons):
+		inhibitoryResult = GIAANNproto_databaseNetworkInhibition.processFeaturesInactiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex, featureConnectionsActive, featureConnectionsSegmentMask)
+		if(inhibitoryResult is not None):
+			featureNeuronsActiveInhibitory, featureNeuronsWordOrderInhibitory, featureNeuronsPosInhibitory, inhibitionBuffer, sequenceObservedInhibitoryNeurons = inhibitoryResult
+			if(sequenceObservedInhibitoryNeurons):
+				inhibitionBuffer.switchConnectionMode("input")
+				processFeaturesActiveTrain(inhibitionBuffer, featureNeuronsActiveInhibitory, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrderInhibitory, featureNeuronsPosInhibitory, featureNeuronsSegmentMask, sequenceIndex, trainInhibitoryNeuronsMode=True, sequenceObservedInhibitoryNeurons=sequenceObservedInhibitoryNeurons)
+				inhibitionBuffer.switchConnectionMode("output")
+			GIAANNproto_databaseNetworkInhibitionStorage.applySequenceUpdates(sequenceObservedColumns, inhibitionBuffer)
 
 #first dim cs1 pertains to every concept node in sequence
-def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex):
+def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex, trainInhibitoryNeuronsMode=False, sequenceObservedInhibitoryNeurons=None):
 	featureNeuronsInactive = 1 - featureNeuronsActive
 	featureNeuronsActiveUnion = featureNeuronsActive.amax(dim=0)
 	featureNeuronsInactiveUnion = 1 - featureNeuronsActiveUnion
-		
+	
 	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesStrength, :, :, :] += featureNeuronsActive
 	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPermanence, :, :, :] += featureNeuronsActive*z1
 	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation, :, :, :] = 0
@@ -44,26 +57,31 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTime, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTime] + featureNeuronsActive*sequenceIndex
 	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPos, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPos] + featureNeuronsActive*featureNeuronsPos
 
-	if(useSANI):
-		featureConnectionsActive = None
-		featureConnectionsSegmentMask = None
-		for segmentIndex in range(arrayNumberOfSegments):
-			segmentActive = featureNeuronsActive[segmentIndex]
-			if not pt.any(segmentActive):
-				continue
-			segmentConnectionsActive, segmentMask = createFeatureConnectionsActiveTrain(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder)
-			if featureConnectionsActive is None:
-				featureConnectionsActive = segmentConnectionsActive
-				featureConnectionsSegmentMask = segmentMask
-			else:
-				featureConnectionsActive = pt.maximum(featureConnectionsActive, segmentConnectionsActive)
-				featureConnectionsSegmentMask = pt.logical_or(featureConnectionsSegmentMask, segmentMask)
-		if featureConnectionsActive is None:
-			printe("processFeaturesActiveTrain() error: featureConnectionsActive is None")
-			#featureConnectionsActive = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=arrayType)
-			#featureConnectionsSegmentMask = pt.zeros_like(featureConnectionsActive, dtype=pt.bool)
+	useExplicitInhibitoryConnections = trainInhibitoryNeuronsMode and sequenceObservedInhibitoryNeurons is not None and len(sequenceObservedInhibitoryNeurons) > 0
+
+	if(useExplicitInhibitoryConnections):
+		featureConnectionsActive, featureConnectionsSegmentMask = createInhibitoryInputConnections(sequenceObservedInhibitoryNeurons, cs, fs, featureNeuronsActive.device)
 	else:
-		featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder)
+		if(useSANI):
+			featureConnectionsActive = None
+			featureConnectionsSegmentMask = None
+			for segmentIndex in range(arrayNumberOfSegments):
+				segmentActive = featureNeuronsActive[segmentIndex]
+				if not pt.any(segmentActive):
+					continue
+				segmentConnectionsActive, segmentMask = createFeatureConnectionsActiveTrain(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder)
+				if featureConnectionsActive is None:
+					featureConnectionsActive = segmentConnectionsActive
+					featureConnectionsSegmentMask = segmentMask
+				else:
+					featureConnectionsActive = pt.maximum(featureConnectionsActive, segmentConnectionsActive)
+					featureConnectionsSegmentMask = pt.logical_or(featureConnectionsSegmentMask, segmentMask)
+			if featureConnectionsActive is None:
+				printe("processFeaturesActiveTrain() error: featureConnectionsActive is None")
+				#featureConnectionsActive = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=arrayType)
+				#featureConnectionsSegmentMask = pt.zeros_like(featureConnectionsActive, dtype=pt.bool)
+		else:
+			featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder)
 
 
 	if(debugPrintNeuronActivations8):
@@ -111,6 +129,8 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 		decreasePermanenceActive(sequenceObservedColumns, featureNeuronsActiveUnion, featureNeuronsInactiveUnion, sequenceConceptIndexMask, featureNeuronsSegmentMask, featureConnectionsSegmentMask)
 
 	applyTrainConnectionStrengthLimits(sequenceObservedColumns)
+
+	return featureConnectionsActive, featureConnectionsSegmentMask
 
 
 def applyTrainConnectionStrengthLimits(sequenceObservedColumns):
@@ -179,6 +199,40 @@ def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWor
 	
 	return featureConnectionsActive, featureConnectionsSegmentMask
 
+def createInhibitoryInputConnections(sequenceObservedInhibitoryNeurons, cs, fs, device):
+	featureConnectionsActive = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=arrayType, device=device)
+	featureConnectionsSegmentMask = pt.zeros_like(featureConnectionsActive, dtype=pt.bool)
+	if(arrayNumberOfSegments > 0):
+		defaultMask = pt.zeros(arrayNumberOfSegments, dtype=pt.bool, device=device)
+		defaultMask[arrayIndexSegmentFirst] = True
+	else:
+		defaultMask = None
+	for entry in sequenceObservedInhibitoryNeurons:
+		sourceColumnIndex = entry["sourceColumnIndex"]
+		sourceFeatureIndex = entry["sourceFeatureIndex"]
+		targetColumnIndex = entry["targetColumnIndex"]
+		inhibitoryFeatureIndex = entry["inhibitoryFeatureIndex"]
+		segmentsMask = entry.get("segmentsMask")
+		if(segmentsMask is None or (isinstance(segmentsMask, pt.Tensor) and segmentsMask.numel() == 0)):
+			segmentsTensor = defaultMask
+		else:
+			if(isinstance(segmentsMask, pt.Tensor)):
+				segmentsTensor = segmentsMask.to(device=device, dtype=pt.bool)
+			else:
+				segmentsTensor = pt.tensor(segmentsMask, dtype=pt.bool, device=device)
+		if(segmentsTensor is None):
+			continue
+		activeSegmentIndices = pt.nonzero(segmentsTensor, as_tuple=False)
+		if(activeSegmentIndices.numel() == 0):
+			activeSegmentIndices = pt.tensor([[arrayIndexSegmentFirst]], dtype=pt.long, device=device)
+		for segmentTensor in activeSegmentIndices:
+			segmentIndex = int(segmentTensor.item())
+			if(segmentIndex < 0 or segmentIndex >= arrayNumberOfSegments):
+				continue
+			featureConnectionsActive[segmentIndex, sourceColumnIndex, sourceFeatureIndex, targetColumnIndex, inhibitoryFeatureIndex] = 1
+			featureConnectionsSegmentMask[segmentIndex, sourceColumnIndex, sourceFeatureIndex, targetColumnIndex, inhibitoryFeatureIndex] = True
+	return featureConnectionsActive, featureConnectionsSegmentMask
+
 def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, featureNeuronsWordOrder):
 
 	if(useSANIcolumns):
@@ -206,8 +260,7 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 		wordOrderSource = wordOrderTensor.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
 		wordOrderTarget = wordOrderTensor.view(1, 1, cs, fs).expand(cs, fs, cs, fs)
 		relativeDistance = (wordOrderTarget - wordOrderSource)
-		#relativeDistance = pt.clamp(relativeDistance, min=1, max=arrayNumberOfSegmentsFeatureDistance)	
-		relativeDistance = pt.clamp(relativeDistance, min=1)	
+		relativeDistance = pt.clamp(relativeDistance, min=1, max=arrayNumberOfSegmentsFeatureDistance)
 		featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
 		featureSegmentIndex = featureSegmentsOffset + arrayNumberOfSegmentsFeatureDistance - relativeDistance
 		featureSegmentIndex = featureSegmentIndex.clamp(min=featureSegmentsOffset, max=arrayNumberOfSegments-1).long()
