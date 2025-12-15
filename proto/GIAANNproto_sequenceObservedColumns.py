@@ -437,39 +437,11 @@ class SequenceObservedColumns:
 				observedColumn.featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(self.databaseNetworkObject.globalFeatureNeurons, 2, conceptIndex)	
 			
 			# feature neurons;
-			indices = featureNeurons.indices()
-			values = featureNeurons.values()
-			mask = (indices[2] == cIdx) & pt.isin(indices[3], fIdxTensor)
-			filteredIndices = indices[:, mask]
-			filteredValues = values[mask]
-			filteredIndices[2] = filteredIndices[3]
-			filteredIndices = filteredIndices[0:3]
-			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-				filteredIndices[2] = featureIndicesInObserved[filteredIndices[2]]
-			if lowMem:
-				observedColumn.featureNeurons = observedColumn.featureNeurons + pt.sparse_coo_tensor(filteredIndices, filteredValues, size=observedColumn.featureNeurons.size(), dtype=arrayType, device=deviceSparse)
-				observedColumn.featureNeurons = observedColumn.featureNeurons.coalesce()
-				observedColumn.featureNeurons.values().clamp_(min=0)
-			else:
-				self.featureNeuronChanges[cIdx] = pt.sparse_coo_tensor(filteredIndices, filteredValues, size=observedColumn.featureNeurons.size(), dtype=arrayType, device=deviceSparse)
-			
+			GIAANNproto_sparseTensors.insertSequenceObservedColumnIntoObservedColumnFeatures(self, cIdx, fIdxTensor, featureIndicesInObserved, featureNeurons, observedColumn, lowMem)
+
 			# feature connections;
-			indices = featureConnections.indices()
-			values = featureConnections.values()
-			mask = (indices[2] == cIdx)
-			filteredIndices = indices[:, mask]
-			filteredValues = values[mask]
-			filteredIndices[2] = filteredIndices[3]
-			filteredIndices[3] = filteredIndices[4]
-			filteredIndices[4] = filteredIndices[5]
-			filteredIndices = filteredIndices[0:5]
-			filteredIndices[3] = self.conceptIndicesInSequenceObservedTensor[filteredIndices[3]]
-			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-				filteredIndices[2] = featureIndicesInObserved[filteredIndices[2]]
-				filteredIndices[4] = featureIndicesInObserved[filteredIndices[4]]
-			observedColumn.featureConnections = observedColumn.featureConnections + pt.sparse_coo_tensor(filteredIndices, filteredValues, size=observedColumn.featureConnections.size(), dtype=arrayType, device=deviceSparse)
-			observedColumn.featureConnections = observedColumn.featureConnections.coalesce()
-			observedColumn.featureConnections.values().clamp_(min=0)
+			observedColumn.featureConnections = GIAANNproto_sparseTensors.insertSequenceObservedColumnIntoObservedColumnConnections(self, cIdx, fIdxTensor, featureIndicesInObserved, featureConnections, observedColumn.featureConnections, featureConnectionsOutput=True)
+
 	
 		if not lowMem:
 			observedColumnFeatureNeuronsDict = {}

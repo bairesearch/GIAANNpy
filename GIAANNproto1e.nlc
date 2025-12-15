@@ -264,7 +264,6 @@ MANUAL; - rename doNotEnforceSequentialityAcrossSegments/enforceSequentialActiva
 
 ---
 v1e (Codex IDE GPT-5.1-Codex):
-
 - add proto GIAANNproto1e1a - start useInhibitoryNeurons
 	implement option useInhibitoryNeurons:trainInhibitoryNeurons=True in GIAANNproto_databaseNetworkInhibition.py:processFeaturesInactiveTrain():
 		- For each new feature declared in a concept column, declare an inhibitory neuron (maintains approx same number of excitatory and inhibitory neurons).
@@ -281,4 +280,8 @@ MANUAL; - add option !inferencePredictiveNetwork:inferenceDecrementActivations =
 MANUAL; - restore patch case useSANIfeaturesAndColumns=True so that the first feature segment only captures connections at that specific distance
 - upgrade trainInhibitoryNeurons step "1. identify all alternate prediction candidate features in network" to support option enforceDirectConnections (either method enforceDirectConnectionsSANI or method enforceDirectConnectionsMinWordDistance) - i.e. all direct (if enforceDirectConnections=True) connection targets of previous feature neuron in trained sequence except for current feature neuron in trained sequence.
 MANUAL; - update enforceDirectConnectionsSANI to use existing useSANI defaults
-
+- implement the option inferenceInhibitoryNeurons=True - for every prediction step (predicted feature):
+	1. the network inhibitory neurons are activated (via their input connections) using exactly the same code as the excitatory neurons (share existing code do not replicate code for this step). 
+	2. the network excitatory feature neurons have their activations modulated (downregulated) by the inhibitory output signal of the inhibitory neurons (via their output connections).
+	3. the next feature predictions are thus modified by this inhibition signal.
+MANUAL; - extract common excitatory/inhibitory code insertSequenceObservedColumnIntoObservedColumnFeatures/insertSequenceObservedColumnIntoObservedColumnConnection

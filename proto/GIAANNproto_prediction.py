@@ -32,6 +32,8 @@ if(inferencePredictiveNetwork):
 	import GIAANNproto_predictionNetwork
 import GIAANNproto_sequenceConcepts
 import GIAANNproto_predictionActivate
+if(inferenceInhibitoryNeurons):
+	import GIAANNproto_predictionInhibition
 
 def inferenceSavePredictiveNetwork():
 	GIAANNproto_predictionModel.saveModel(predictiveNetworkFolder, predictiveNetworkFileName)
@@ -486,6 +488,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnsIndices, conceptColumnsFeatureIndices, conceptMask, multipleSources, conceptActivationState):
 	
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
+	conceptColumnsFeatureIndicesActivation = conceptColumnsFeatureIndices
 	
 	if(debugPrintNeuronActivations7 and sequenceWordIndex > 0):
 		debugSnapshotPrev = getattr(sequenceObservedColumns, "debugActivationSnapshot", None)
@@ -706,6 +709,8 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 			print("\t sequenceWordIndex = ", sequenceWordIndex, ", wordPredictionIndex = ", wordPredictionIndex, ", targetWord = ", targetWord, ", predictedWord = ", predictedWord, ", targetColumn = ", targetColumnName, ", predictedColumn = ", predictedColumnName)
 			if(targetWord == predictedWord):
 				featurePredictionTargetMatch = True
+	if(inferenceInhibitoryNeurons):
+		globalFeatureNeuronsActivation = GIAANNproto_predictionInhibition.applyInferenceInhibition(databaseNetworkObject, globalFeatureNeuronsActivation, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext)
 	
 	if(drawNetworkDuringInferencePredict):
 		#FUTURE: convert globalFeatureNeuronsActivation back to globalFeatureNeurons for draw

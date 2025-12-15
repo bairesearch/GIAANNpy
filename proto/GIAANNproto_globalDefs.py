@@ -28,6 +28,7 @@ debugPrintNeuronActivations = False
 debugPrintNeuronActivations7 = False
 debugPrintNeuronActivations8 = False	#prevent activation decay across sequences
 debugPrintNeuronActivations9 = False
+debugPrintInferenceInhibition = True
 
 #train/inference mode selection:
 useInference = True  #default: True	#support inference mode else train (only) mode
@@ -72,7 +73,7 @@ if(multisentencePredictions):
 useInhibitoryNeurons = False	#planned new default: True #orig: False
 if(useInhibitoryNeurons):
 	trainInhibitoryNeurons = True	
-	inferenceInhibitoryNeurons = False		#FUTURE	#TODO
+	inferenceInhibitoryNeurons = True
 	inhibitoryNeuronYoffset = 10
 else:
 	trainInhibitoryNeurons = False

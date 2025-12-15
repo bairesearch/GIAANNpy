@@ -36,6 +36,8 @@ class DatabaseNetworkClass():
 		self.conceptFeaturesList = conceptFeaturesList
 		self.globalFeatureNeurons = globalFeatureNeurons
 		self.globalFeatureConnections = None #transformerUseInputConnections: initialised during prediction phase
+		if(inferenceInhibitoryNeurons):
+			self.globalInhibitoryNeuronsActivation = None
 		if(conceptColumnsDelimitByPOS):
 			if(detectReferenceSetDelimitersBetweenNouns):
 				self.conceptFeaturesReferenceSetDelimiterDeterministicList = conceptFeaturesReferenceSetDelimiterDeterministicList

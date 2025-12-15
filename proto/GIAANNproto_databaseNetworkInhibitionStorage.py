@@ -174,62 +174,12 @@ def applySequenceUpdates(sequenceObservedColumnsBase, inhibitionBuffer):
 		inhibitoryColumn = getInhibitoryObservedColumn(sequenceObservedColumnsBase.databaseNetworkObject, conceptIndex, lemma)
 
 		# feature neurons
-		indices = featureNeuronsSparse.indices()
-		values = featureNeuronsSparse.values()
-		if(indices.shape[1] > 0):
-			mask = (indices[2] == cIdx) & pt.isin(indices[3], fIdxTensor)
-			if pt.any(mask):
-				filteredIndices = indices[:, mask]
-				filteredValues = values[mask]
-				filteredIndices[2] = filteredIndices[3]
-				filteredIndices = filteredIndices[0:3]
-				if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-					filteredIndices[2] = featureIndicesInObserved[filteredIndices[2]]
-				inhibitoryColumn.featureNeurons = inhibitoryColumn.featureNeurons + pt.sparse_coo_tensor(filteredIndices, filteredValues, size=inhibitoryColumn.featureNeurons.size(), dtype=arrayType, device=deviceSparse)
-				inhibitoryColumn.featureNeurons = inhibitoryColumn.featureNeurons.coalesce()
-				inhibitoryColumn.featureNeurons.values().clamp_(min=0)
+		GIAANNproto_sparseTensors.insertSequenceObservedColumnIntoObservedColumnFeatures(None, cIdx, fIdxTensor, featureIndicesInObserved, featureNeuronsSparse, inhibitoryColumn, True)
 
 		# feature connections output
-		indicesConnOut = featureConnectionsOutputSparse.indices()
-		valuesConnOut = featureConnectionsOutputSparse.values()
-		if(indicesConnOut.shape[1] > 0):
-			maskConnOut = (indicesConnOut[2] == cIdx)
-			if pt.any(maskConnOut):
-				filteredIndices = indicesConnOut[:, maskConnOut]
-				filteredValues = valuesConnOut[maskConnOut]
-				filteredIndices[2] = filteredIndices[3]
-				filteredIndices[3] = filteredIndices[4]
-				filteredIndices[4] = filteredIndices[5]
-				filteredIndices = filteredIndices[0:5]
-				filteredIndices[3] = sequenceObservedColumnsBase.conceptIndicesInSequenceObservedTensor[filteredIndices[3]]
-				if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-					filteredIndices[2] = featureIndicesInObserved[filteredIndices[2]]
-					filteredIndices[4] = featureIndicesInObserved[filteredIndices[4]]
-				inhibitoryColumn.featureConnectionsOutput = inhibitoryColumn.featureConnectionsOutput + pt.sparse_coo_tensor(filteredIndices, filteredValues, size=inhibitoryColumn.featureConnectionsOutput.size(), dtype=arrayType, device=deviceSparse)
-				inhibitoryColumn.featureConnectionsOutput = inhibitoryColumn.featureConnectionsOutput.coalesce()
-				inhibitoryColumn.featureConnectionsOutput.values().clamp_(min=0)
+		inhibitoryColumn.featureConnectionsOutput = GIAANNproto_sparseTensors.insertSequenceObservedColumnIntoObservedColumnConnections(sequenceObservedColumnsBase, cIdx, fIdxTensor, featureIndicesInObserved, featureConnectionsOutputSparse, inhibitoryColumn.featureConnectionsOutput, featureConnectionsOutput=True)
 
 		# feature connections input
-		indicesConnIn = featureConnectionsInputSparse.indices()
-		valuesConnIn = featureConnectionsInputSparse.values()
-		if(indicesConnIn.shape[1] > 0):
-			maskConnIn = (indicesConnIn[4] == cIdx)
-			if pt.any(maskConnIn):
-				filteredIndices = indicesConnIn[:, maskConnIn]
-				filteredValues = valuesConnIn[maskConnIn]
-				reorderedIndices = pt.stack((
-					filteredIndices[0],	# property index
-					filteredIndices[1],	# segment index
-					filteredIndices[5],	# inhibitory feature index (target)
-					filteredIndices[2],	# source column index
-					filteredIndices[3],	# source feature index
-				), dim=0)
-				reorderedIndices[3] = sequenceObservedColumnsBase.conceptIndicesInSequenceObservedTensor[reorderedIndices[3]]
-				if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-					reorderedIndices[2] = featureIndicesInObserved[reorderedIndices[2]]
-					reorderedIndices[4] = featureIndicesInObserved[reorderedIndices[4]]
-				inhibitoryColumn.featureConnectionsInput = inhibitoryColumn.featureConnectionsInput + pt.sparse_coo_tensor(reorderedIndices, filteredValues, size=inhibitoryColumn.featureConnectionsInput.size(), dtype=arrayType, device=deviceSparse)
-				inhibitoryColumn.featureConnectionsInput = inhibitoryColumn.featureConnectionsInput.coalesce()
-				inhibitoryColumn.featureConnectionsInput.values().clamp_(min=0)
+		inhibitoryColumn.featureConnectionsInput = GIAANNproto_sparseTensors.insertSequenceObservedColumnIntoObservedColumnConnections(sequenceObservedColumnsBase, cIdx, fIdxTensor, featureIndicesInObserved, featureConnectionsInputSparse, inhibitoryColumn.featureConnectionsInput, featureConnectionsOutput=False)
 
 		inhibitoryColumn.save()
