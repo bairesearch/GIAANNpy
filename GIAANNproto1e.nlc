@@ -279,4 +279,6 @@ v1e (Codex IDE GPT-5.1-Codex):
 MANUAL; - patch loadFeatureNeuronsGlobal - if pathExists(globalFeatureNeuronsFileFull)
 MANUAL; - add option !inferencePredictiveNetwork:inferenceDecrementActivations = True
 MANUAL; - restore patch case useSANIfeaturesAndColumns=True so that the first feature segment only captures connections at that specific distance
+- upgrade trainInhibitoryNeurons step "1. identify all alternate prediction candidate features in network" to support option enforceDirectConnections (either method enforceDirectConnectionsSANI or method enforceDirectConnectionsMinWordDistance) - i.e. all direct (if enforceDirectConnections=True) connection targets of previous feature neuron in trained sequence except for current feature neuron in trained sequence.
+MANUAL; - update enforceDirectConnectionsSANI to use existing useSANI defaults
 

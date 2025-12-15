@@ -33,6 +33,13 @@ def processFeaturesInactiveTrain(sequenceObservedColumns, featureNeuronsActive, 
 	if(not pt.any(activeConnections)):
 		return None
 
+	directConnectionTargetsMask = None
+	directConnectionSegmentsMask = None
+	if(enforceDirectConnections):
+		directConnectionTargetsMask, directConnectionSegmentsMask = identifyDirectConnectionCandidates(sequenceObservedColumns)
+		if(directConnectionTargetsMask is None or directConnectionSegmentsMask is None):
+			return None
+
 	featureNeuronsActiveInhibitory = pt.zeros_like(featureNeuronsActive)
 	featureNeuronsWordOrderInhibitory = featureNeuronsWordOrder.clone()
 	featureNeuronsPosInhibitory = featureNeuronsPos.clone()
@@ -47,7 +54,12 @@ def processFeaturesInactiveTrain(sequenceObservedColumns, featureNeuronsActive, 
 	for connectionIndex in activeConnectionIndices:
 		sourceColumnIndex, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex = connectionIndex.tolist()
 
-		candidateMask = activeConnections[sourceColumnIndex, sourceFeatureIndex].clone()
+		if(enforceDirectConnections):
+			if(sourceColumnIndex >= directConnectionTargetsMask.shape[0] or sourceFeatureIndex >= directConnectionTargetsMask.shape[1]):
+				printe("processFeaturesInactiveTrain error: sourceColumnIndex >= directConnectionTargetsMask.shape[0] or sourceFeatureIndex >= directConnectionTargetsMask.shape[1]")
+			candidateMask = directConnectionTargetsMask[sourceColumnIndex, sourceFeatureIndex].clone().to(dtype=pt.bool)
+		else:
+			candidateMask = activeConnections[sourceColumnIndex, sourceFeatureIndex].clone().to(dtype=pt.bool)
 		if(targetColumnIndex < candidateMask.shape[0] and targetFeatureIndex < candidateMask.shape[1]):
 			candidateMask[targetColumnIndex, targetFeatureIndex] = False
 		if(not pt.any(candidateMask)):
@@ -73,11 +85,19 @@ def processFeaturesInactiveTrain(sequenceObservedColumns, featureNeuronsActive, 
 		candidateIndices = pt.nonzero(candidateMask, as_tuple=False)
 		if(candidateIndices.numel() == 0):
 			continue
-		sourceSegments = featureConnectionsActive[:, sourceColumnIndex, sourceFeatureIndex]
+		if(enforceDirectConnections):
+			sourceSegmentsTensor = directConnectionSegmentsMask
+		else:
+			sourceSegmentsTensor = featureConnectionsActive
 		sourcePosValue = featureNeuronsPos[targetColumnIndex, targetFeatureIndex]
 		for candidateIndex in candidateIndices:
 			candidateColumnIndex, candidateFeatureIndex = candidateIndex.tolist()
-			segmentsMask = sourceSegments[:, candidateColumnIndex, candidateFeatureIndex]
+			if(sourceSegmentsTensor is None):
+				segmentsMask = None
+			else:
+				if(sourceColumnIndex >= sourceSegmentsTensor.shape[1] or sourceFeatureIndex >= sourceSegmentsTensor.shape[2]):
+					printe("processFeaturesInactiveTrain error: sourceColumnIndex >= sourceSegmentsTensor.shape[1] or sourceFeatureIndex >= sourceSegmentsTensor.shape[2]")
+				segmentsMask = sourceSegmentsTensor[:, sourceColumnIndex, sourceFeatureIndex, candidateColumnIndex, candidateFeatureIndex]
 			updateInhibitoryConnection(inhibitionBuffer, targetColumnIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex, segmentsMask, sequenceIndex, sourcePosValue)
 
 	if(len(sequenceObservedInhibitoryNeurons) == 0):
@@ -140,3 +160,43 @@ def extractConnectionSegmentsMask(featureConnectionsSegmentMask, sourceColumnInd
 
 def selectInhibitoryNeuron(targetColumnIndex, targetFeatureIndex):
 	return targetFeatureIndex
+
+# Identify direct source->target pairs that satisfy enforceDirectConnections.
+def identifyDirectConnectionCandidates(sequenceObservedColumns):
+	featureConnections = getattr(sequenceObservedColumns, "featureConnections", None)
+	if(featureConnections is None):
+		#print("identifyDirectConnectionCandidates error: featureConnections unavailable in sequenceObservedColumns")
+		return None, None
+	directSegmentsMask = None
+
+	if(enforceDirectConnectionsMinWordDistance and arrayIndexPropertiesMinWordDistance):
+		minDistances = featureConnections[arrayIndexPropertiesMinWordDistanceIndex]
+		if(minDistances is None):
+			#print("identifyDirectConnectionCandidates error: min word distance tensor unavailable")
+			return None, None
+		distanceMask = (minDistances > 0) & (pt.abs(minDistances - 1.0) < 1e-4)
+		if not pt.any(distanceMask):
+			#print("identifyDirectConnectionCandidates error: no direct connections recorded for min word distance enforcement")
+			return None, None
+		directSegmentsMask = distanceMask.to(dtype=pt.bool)
+	elif(enforceDirectConnectionsSANI and arrayNumberOfSegments > 0):
+		strengthTensor = featureConnections[arrayIndexPropertiesStrength]
+		if(strengthTensor is None):
+			#print("identifyDirectConnectionCandidates error: strength tensor unavailable for SANI enforcement")
+			return None, None
+		directSegmentsMask = pt.zeros_like(strengthTensor, dtype=pt.bool)
+		lastSegmentIndex = max(0, min(arrayIndexSegmentLast, arrayNumberOfSegments-1))
+		directSegmentsMask[lastSegmentIndex] = strengthTensor[lastSegmentIndex] > 0
+		if not pt.any(directSegmentsMask):
+			#print("identifyDirectConnectionCandidates error: no direct SANI connections recorded")
+			return None, None
+	else:
+		#print("identifyDirectConnectionCandidates error: enforceDirectConnections requires enforceDirectConnectionsMinWordDistance or enforceDirectConnectionsSANI")
+		return None, None
+
+	directTargetsMask = pt.any(directSegmentsMask, dim=0)
+	if(not pt.any(directTargetsMask)):
+		#print("identifyDirectConnectionCandidates error: direct connection target mask empty")
+		return None, None
+
+	return directTargetsMask.to(dtype=pt.bool), directSegmentsMask

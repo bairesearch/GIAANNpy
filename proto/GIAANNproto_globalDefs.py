@@ -415,45 +415,41 @@ arrayIndexSegmentFirst = 0
 if(useSANI):
 	useSANIcolumns = False	#assign segments by concept column proximity to connection target during train (includes internal concept column)
 	useSANIfeatures = False	#assign segments by feature proximity to connection target during train
-	useSANIfeaturesAndColumns = False	#assign segments by column proximity first (excludes internal concept column) then feature proximity
-	if(enforceDirectConnectionsSANI):
-		useSANIfeatures = True
-		arrayNumberOfSegments = 2
-		#note if arrayNumberOfSegments=2 then; sIndex=1: sequential segment connections for adjacent feature, sIndex=0: sequential segment connections for all other feature
-		algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment if previous segment(s) active
-		algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default	#only activate neuron if last (adjacent feature) segment active
-		enforceSequentialActivation = False
-		enforceActivationAcrossSegmentsIgnoreInternalColumn = False
-	else:
-		#useSANIcolumns = True	#orig: True
-		#useSANIfeatures = True
-		useSANIfeaturesAndColumns = True	#default: True
-		if(useSANIfeaturesAndColumns):
-			arrayNumberOfSegmentsColumnDistance = 1	#min number of external column connections to target node (note first segment captures all other external columns)
-			arrayNumberOfSegmentsFeatureDistance = 4	#number of nearest features to target node
-			arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance + arrayNumberOfSegmentsFeatureDistance
-		elif(useSANIcolumns):
-			if(multisentencePredictions):
-				arrayNumberOfSegments = 5	#default: 5	#min number of external and internal column connections to target node (note first segment captures all other external columns)
-			else:
-				arrayNumberOfSegments = 2	#default: 2	#orig:3		#min number of external and internal column connections to target node (note first segment captures all other external columns)
-					#max number of SANI segments per sequence (= max number of concept columns per sequence - 1)
-					#note if arrayNumberOfSegments=3 then;	sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: all other column connections
-					#must be less than the (total number of concepts in a sequence - total number of concepts in effective predictive seed sequence)
-		elif(useSANIfeatures):
-			arrayNumberOfSegments = 5	#min number of nearest features to target node (note first segment captures all other features)
-		algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment if previous external segment(s) active
-		#algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI
-		if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
-			#algorithmMatrixSANIenforceRequirement="enforceAnySegmentMustBeActive"	#activate neuron if any external segment is active
-			algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default	#only activate neuron if last external segment active
-			#algorithmMatrixSANIenforceRequirement="enforceAllSegmentsMustBeActive" #only activate neuron if all external segments are active	#if(enforceSequentialActivation) then redundant; use enforceLastSegmentMustBeActive instead
-			enforceSequentialActivation = True	#optional	#default: True #orig: True	#only activation next segment if previous segment activated
-		enforceActivationAcrossSegmentsIgnoreInternalColumn = False
-		if(useSANIcolumns):	
-			enforceActivationAcrossSegmentsIgnoreInternalColumn = True	#ignore internal column as this column features do not necessarily have an input from the current column
+	useSANIfeaturesAndColumns = True	#assign segments by column proximity first (excludes internal concept column) then feature proximity
+
+	if(useSANIfeaturesAndColumns):
+		arrayNumberOfSegmentsColumnDistance = 1	#min number of external column connections to target node (note first segment captures all other external columns)
+		arrayNumberOfSegmentsFeatureDistance = 4	#number of nearest features to target node
+		arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance + arrayNumberOfSegmentsFeatureDistance
+	elif(useSANIcolumns):
+		if(multisentencePredictions):
+			arrayNumberOfSegments = 5	#default: 5	#min number of external and internal column connections to target node (note first segment captures all other external columns)
+		else:
+			arrayNumberOfSegments = 2	#default: 2	#orig:3		#min number of external and internal column connections to target node (note first segment captures all other external columns)
+				#max number of SANI segments per sequence (= max number of concept columns per sequence - 1)
+				#note if arrayNumberOfSegments=3 then;	sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: all other column connections
+				#must be less than the (total number of concepts in a sequence - total number of concepts in effective predictive seed sequence)
+	elif(useSANIfeatures):
+		arrayNumberOfSegments = 5	#min number of nearest features to target node (note first segment captures all other features)
+	
+	algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment if previous external segment(s) active
+	#algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI
+	if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
+		#algorithmMatrixSANIenforceRequirement="enforceAnySegmentMustBeActive"	#activate neuron if any external segment is active
+		algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default	#only activate neuron if last external segment active
+		#algorithmMatrixSANIenforceRequirement="enforceAllSegmentsMustBeActive" #only activate neuron if all external segments are active	#if(enforceSequentialActivation) then redundant; use enforceLastSegmentMustBeActive instead
+		enforceSequentialActivation = True	#optional	#default: True #orig: True	#only activation next segment if previous segment activated
+	
+	enforceActivationAcrossSegmentsIgnoreInternalColumn = False
+	if(useSANIcolumns):	
+		enforceActivationAcrossSegmentsIgnoreInternalColumn = True	#ignore internal column as this column features do not necessarily have an input from the current column
 	assert (int(useSANIcolumns) + int(useSANIfeatures) + int(useSANIfeaturesAndColumns)) == 1
 
+	if(enforceDirectConnectionsSANI):	#min requirements for enforceDirectConnectionsSANI
+		assert not useSANIcolumns	#enforceDirectConnectionsSANI requires last segment to be adjacent feature segment
+		assert arrayNumberOfSegments >= 2		#note if arrayNumberOfSegments=2 then; sIndex=1: sequential segment connections for adjacent feature, sIndex=0: sequential segment connections for all other feature
+		assert enforceSequentialActivation or not enforceSequentialActivation
+		
 	if(useSANIfeaturesAndColumns):
 		arrayIndexSegmentLast = arrayNumberOfSegments-1	#last feature index
 		#arrayIndexSegmentAdjacentColumn = arrayNumberOfSegmentsColumnDistance-1

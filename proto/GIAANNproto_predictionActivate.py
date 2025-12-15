@@ -178,7 +178,7 @@ def hybridActivation(x, scale=100.0):
 	return f
 
 def computeConnectionMinWordDistanceMask(observedColumn, sourceFeatureIndex, targetIndices, requiredDistance=1.0):
-	if(enforceDirectConnections and enforceDirectConnectionsMinWordDistance):
+	if(enforceDirectConnectionsMinWordDistance):
 		if(targetIndices is None or targetIndices.shape[1] == 0):
 			printe("(targetIndices is None or targetIndices.shape[1] == 0)")
 			#return None
