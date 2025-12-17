@@ -23,9 +23,9 @@ from GIAANNproto_globalDefs import *
 import GIAANNproto_sparseTensors
 import GIAANNproto_sequenceConcepts
 if(trainInhibitoryNeurons):
-	import GIAANNproto_databaseNetworkInhibition
-	import GIAANNproto_databaseNetworkInhibitionStorage
-
+	import GIAANNproto_databaseNetworkTrainInhibition
+	import GIAANNproto_sequenceObservedColumnsInhibition
+	
 def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 	conceptIndices, startIndices, endIndices = GIAANNproto_sequenceConcepts.processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens)
 	featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask = GIAANNproto_sequenceConcepts.processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices)
@@ -33,14 +33,14 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 	featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex)
 
 	if(trainInhibitoryNeurons):
-		inhibitoryResult = GIAANNproto_databaseNetworkInhibition.processFeaturesInactiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex, featureConnectionsActive, featureConnectionsSegmentMask)
+		inhibitoryResult = GIAANNproto_databaseNetworkTrainInhibition.processFeaturesInactiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex, featureConnectionsActive, featureConnectionsSegmentMask)
 		if(inhibitoryResult is not None):
 			featureNeuronsActiveInhibitory, featureNeuronsWordOrderInhibitory, featureNeuronsPosInhibitory, inhibitionBuffer, sequenceObservedInhibitoryNeurons = inhibitoryResult
 			if(sequenceObservedInhibitoryNeurons):
 				inhibitionBuffer.switchConnectionMode("input")
 				processFeaturesActiveTrain(inhibitionBuffer, featureNeuronsActiveInhibitory, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrderInhibitory, featureNeuronsPosInhibitory, featureNeuronsSegmentMask, sequenceIndex, trainInhibitoryNeuronsMode=True, sequenceObservedInhibitoryNeurons=sequenceObservedInhibitoryNeurons)
 				inhibitionBuffer.switchConnectionMode("output")
-			GIAANNproto_databaseNetworkInhibitionStorage.applySequenceUpdates(sequenceObservedColumns, inhibitionBuffer)
+			GIAANNproto_sequenceObservedColumnsInhibition.applySequenceUpdates(sequenceObservedColumns, inhibitionBuffer)
 
 #first dim cs1 pertains to every concept node in sequence
 def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex, trainInhibitoryNeuronsMode=False, sequenceObservedInhibitoryNeurons=None):

@@ -26,7 +26,7 @@ import GIAANNproto_sparseTensors
 from GIAANNproto_globalDefs import *
 import GIAANNproto_databaseNetwork
 if(trainInhibitoryNeurons):
-	import GIAANNproto_databaseNetworkInhibitionStorage
+	import GIAANNproto_databaseNetworkFilesInhibition
 
 if(drawSegmentsTrain):
 	segmentColours = ['red', 'green', 'blue', 'yellow', 'magenta', 'cyan']	#len must be >= arrayNumberOfSegments
@@ -375,7 +375,7 @@ if(trainInhibitoryNeurons):
 	def drawInhibitoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, conceptIndexToLemma, drawSegments, excitatoryNodeMap):
 		xOffset = 0
 		for lemma, observedColumn in observedColumnsDict.items():
-			inhibitoryColumn = GIAANNproto_databaseNetworkInhibitionStorage.getInhibitoryObservedColumn(databaseNetworkObject, observedColumn.conceptIndex, lemma)
+			inhibitoryColumn = GIAANNproto_databaseNetworkFilesInhibition.getInhibitoryObservedColumn(databaseNetworkObject, observedColumn.conceptIndex, lemma)
 			if inhibitoryColumn is None:
 				xOffset += 2
 				continue

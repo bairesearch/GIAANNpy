@@ -22,8 +22,7 @@ import torch as pt
 from GIAANNproto_globalDefs import *
 import GIAANNproto_sparseTensors
 import GIAANNproto_predictionActivate
-import GIAANNproto_databaseNetworkInhibitionStorage
-
+import GIAANNproto_databaseNetworkFilesInhibition
 
 def applyInferenceInhibition(databaseNetworkObject, globalFeatureNeuronsActivation, conceptColumnsIndicesCurrent, conceptColumnsFeatureIndicesCurrent, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext):
 	if(conceptColumnsIndicesCurrent is None or conceptColumnsIndicesCurrent.numel() == 0):
@@ -57,7 +56,7 @@ def loadInhibitoryColumns(databaseNetworkObject, conceptColumnsIndices):
 		if(columnIndex < 0 or columnIndex >= databaseNetworkObject.c):
 			continue
 		lemma = databaseNetworkObject.conceptColumnsList[columnIndex]
-		inhibitoryColumn = GIAANNproto_databaseNetworkInhibitionStorage.getInhibitoryObservedColumn(databaseNetworkObject, columnIndex, lemma)
+		inhibitoryColumn = GIAANNproto_databaseNetworkFilesInhibition.getInhibitoryObservedColumn(databaseNetworkObject, columnIndex, lemma)
 		if(inhibitoryColumn is None):
 			continue
 		inhibitoryColumns[columnIndex] = inhibitoryColumn

@@ -28,7 +28,7 @@ debugPrintNeuronActivations = False
 debugPrintNeuronActivations7 = False
 debugPrintNeuronActivations8 = False	#prevent activation decay across sequences
 debugPrintNeuronActivations9 = False
-debugPrintInferenceInhibition = True
+debugPrintInferenceInhibition = False
 
 #train/inference mode selection:
 useInference = True  #default: True	#support inference mode else train (only) mode
@@ -90,8 +90,10 @@ else:
 	enforceDirectConnectionsMinWordDistance = False
 if(enforceDirectConnectionsSANI):
 	useSANI = True	#sequentially activated neuronal input (divide dendrites into segments)
+	enforceDirectConnectionsSANIminimal = False	#default: False	#orig: True
 else:
 	useSANI = False	#optional	#default: True	#orig: False	#sequentially activated neuronal input (divide dendrites into segments)
+	enforceDirectConnectionsSANIminimal = False
 if(enforceDirectConnectionsMinWordDistance):
 	arrayIndexPropertiesMinWordDistance = True	#store min word distance per connection
 else:
@@ -414,9 +416,14 @@ else:
 	arrayPropertiesList = [arrayIndexPropertiesStrength, arrayIndexPropertiesPermanence, arrayIndexPropertiesActivation, arrayIndexPropertiesTime, arrayIndexPropertiesPos]
 arrayIndexSegmentFirst = 0
 if(useSANI):
-	useSANIcolumns = False	#assign segments by concept column proximity to connection target during train (includes internal concept column)
-	useSANIfeatures = False	#assign segments by feature proximity to connection target during train
-	useSANIfeaturesAndColumns = True	#assign segments by column proximity first (excludes internal concept column) then feature proximity
+	if(enforceDirectConnectionsSANIminimal):
+		useSANIcolumns = False
+		useSANIfeatures = True
+		useSANIfeaturesAndColumns = False
+	else:
+		useSANIcolumns = False	#assign segments by concept column proximity to connection target during train (includes internal concept column)
+		useSANIfeatures = False	#assign segments by feature proximity to connection target during train
+		useSANIfeaturesAndColumns = True	#assign segments by column proximity first (excludes internal concept column) then feature proximity
 
 	if(useSANIfeaturesAndColumns):
 		arrayNumberOfSegmentsColumnDistance = 1	#min number of external column connections to target node (note first segment captures all other external columns)
@@ -431,15 +438,21 @@ if(useSANI):
 				#note if arrayNumberOfSegments=3 then;	sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: all other column connections
 				#must be less than the (total number of concepts in a sequence - total number of concepts in effective predictive seed sequence)
 	elif(useSANIfeatures):
-		arrayNumberOfSegments = 5	#min number of nearest features to target node (note first segment captures all other features)
-	
+		if(enforceDirectConnectionsSANIminimal):
+			arrayNumberOfSegments = 2
+		else:
+			arrayNumberOfSegments = 5	#min number of nearest features to target node (note first segment captures all other features)
+		
 	algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment if previous external segment(s) active
 	#algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI
 	if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
 		#algorithmMatrixSANIenforceRequirement="enforceAnySegmentMustBeActive"	#activate neuron if any external segment is active
 		algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default	#only activate neuron if last external segment active
 		#algorithmMatrixSANIenforceRequirement="enforceAllSegmentsMustBeActive" #only activate neuron if all external segments are active	#if(enforceSequentialActivation) then redundant; use enforceLastSegmentMustBeActive instead
-		enforceSequentialActivation = True	#optional	#default: True #orig: True	#only activation next segment if previous segment activated
+		if(enforceDirectConnectionsSANIminimal):
+			enforceSequentialActivation = False
+		else:
+			enforceSequentialActivation = True	#optional	#default: True #orig: True	#only activation next segment if previous segment activated
 	
 	enforceActivationAcrossSegmentsIgnoreInternalColumn = False
 	if(useSANIcolumns):	
