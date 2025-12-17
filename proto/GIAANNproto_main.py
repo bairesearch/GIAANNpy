@@ -38,15 +38,15 @@ from datasets import load_dataset
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_sparseTensors
-import GIAANNproto_databaseNetwork
-import GIAANNproto_databaseNetworkFiles
-import GIAANNproto_databaseNetworkDraw
+import GIAANNproto_databaseNetworkExcitation
+import GIAANNproto_databaseNetworkFilesExcitation
+import GIAANNproto_databaseNetworkDrawExcitation
 if(SANIconceptNeurons):
 	import GIAANNproto_sequenceSANIconceptNeurons
 import GIAANNproto_sequenceTokens
 import GIAANNproto_sequenceConcepts
-import GIAANNproto_sequenceObservedColumns
-import GIAANNproto_databaseNetworkTrain
+import GIAANNproto_sequenceObservedColumnsExcitation
+import GIAANNproto_databaseNetworkTrainExcitation
 if(useInference):
 	import GIAANNproto_prediction
 
@@ -56,17 +56,17 @@ dataset = load_dataset('wikipedia', '20220301.en', split='train', streaming=True
 # Initialize spaCy model
 nlp = spacy.load(spacyModelName)
 
-databaseNetworkObject = GIAANNproto_databaseNetwork.initialiseDatabaseNetwork()
+databaseNetworkObject = GIAANNproto_databaseNetworkExcitation.initialiseDatabaseNetwork()
 databaseNetworkObject.nlp = nlp	#used by posStringToPosInt
 
 def main():
 	global sequenceCount
-	GIAANNproto_databaseNetworkFiles.initialiseDatabaseFiles()
+	GIAANNproto_databaseNetworkFilesExcitation.initialiseDatabaseFiles()
 	ensurePredictiveInferenceDatabaseReady()
 	if(useInference and inferenceTrainPredictiveNetworkAllSequences):
 		if(inferencePredictiveNetwork):
 			GIAANNproto_predictionNetwork.initialisePredictiveNetwork(databaseNetworkObject)
-		GIAANNproto_databaseNetwork.backupGlobalArrays(databaseNetworkObject)
+		GIAANNproto_databaseNetworkExcitation.backupGlobalArrays(databaseNetworkObject)
 	if(SANIconceptNeurons):
 		GIAANNproto_sequenceSANIconceptNeurons.initialiseSANIconceptNeurons()
 		
@@ -87,9 +87,9 @@ def main():
 def ensurePredictiveInferenceDatabaseReady():
 	if(useInference and inferenceTrainPredictiveNetworkAllSequences):
 		missingFiles = []
-		if not GIAANNproto_databaseNetworkFiles.pathExists(conceptColumnsDictFile):
+		if not GIAANNproto_databaseNetworkFilesExcitation.pathExists(conceptColumnsDictFile):
 			missingFiles.append(conceptColumnsDictFile)
-		if not GIAANNproto_databaseNetworkFiles.pathExists(conceptFeaturesDictFile):
+		if not GIAANNproto_databaseNetworkFilesExcitation.pathExists(conceptFeaturesDictFile):
 			missingFiles.append(conceptFeaturesDictFile)
 		if missingFiles:
 			print("error: inferenceTrainPredictiveNetworkAllSequences expects the database network to have been trained with useInference=False on all sequences.")
@@ -146,10 +146,10 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 	if(debugReloadGlobalFeatureNeuronsEverySequence):
 		initialiseDatabaseNetwork()
 		if(not lowMem):
-			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_databaseNetwork.initialiseFeatureNeuronsGlobal(databaseNetworkObject.c, databaseNetworkObject.f)
+			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_databaseNetworkExcitation.initialiseFeatureNeuronsGlobal(databaseNetworkObject.c, databaseNetworkObject.f)
 	if(useInference and inferenceTrainPredictiveNetworkAllSequences):
 		if(not inferenceRetainActivationsAcrossMultipleSequences or sequenceIndex==0):	#or (articleIndex==0 and sequenceIndex==0)
-			GIAANNproto_databaseNetwork.restoreGlobalArrays(databaseNetworkObject)	#restore global arrays (reset activation and time etc properties between inferencePredictiveNetworkTrainAcrossMultipleSequences:articles/sequences)
+			GIAANNproto_databaseNetworkExcitation.restoreGlobalArrays(databaseNetworkObject)	#restore global arrays (reset activation and time etc properties between inferencePredictiveNetworkTrainAcrossMultipleSequences:articles/sequences)
 	
 	if(debugPrintTrainSentencePOS):
 		sentenceWithPOS = " ".join(f"{token.text} ({tokenIndex}:{token.pos_})" for tokenIndex, token in enumerate(sequence))
@@ -192,25 +192,25 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 		observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNproto_sequenceConcepts.secondPass(databaseNetworkObject, tokens)
 
 		# Create the sequence observed columns object
-		sequenceObservedColumns = GIAANNproto_sequenceObservedColumns.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict)
+		sequenceObservedColumns = GIAANNproto_sequenceObservedColumnsExcitation.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict)
 
 		if(useInference and (inferenceTrainPredictiveNetworkAllSequences or lastSequenceInPrompt)):
 			# Process each concept word in the sequence (predict)
 			GIAANNproto_prediction.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens)
 		else:
 			# Process each concept word in the sequence (train)
-			GIAANNproto_databaseNetworkTrain.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)
+			GIAANNproto_databaseNetworkTrainExcitation.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)
 
 			# Update observed columns from sequence observed columns
 			sequenceObservedColumns.updateObservedColumnsWrapper()
 
 			# Save observed columns to disk
 			if(useSaveData):
-				GIAANNproto_databaseNetworkFiles.saveData(databaseNetworkObject, observedColumnsDict)
+				GIAANNproto_databaseNetworkFilesExcitation.saveData(databaseNetworkObject, observedColumnsDict)
 				
 			if(drawNetworkDuringTrain):
 				# Visualize the complete graph every time a new sequence is parsed by the application.
-				GIAANNproto_databaseNetworkDraw.visualizeGraph(sequenceObservedColumns, False, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+str(sequenceIndex))
+				GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumns, False, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+str(sequenceIndex))
 
 	# Break if we've reached the maximum number of sequences
 	sequenceCount += 1

@@ -20,8 +20,8 @@ GIA ANN proto sequence SANI concept neurons
 import torch as pt
 
 from GIAANNproto_globalDefs import *
-import GIAANNproto_databaseNetworkTrain
-import GIAANNproto_databaseNetworkFiles
+import GIAANNproto_databaseNetworkTrainExcitation
+import GIAANNproto_databaseNetworkFilesExcitation
 #from collections import OrderedDict
 from sortedcontainers import SortedDict	#keeps keys in a sorted order.
 
@@ -38,15 +38,15 @@ SANIconceptNeuronWeightsList = []  # list of concept neuron weights (float)
 	
 def initialiseSANIconceptNeurons():
 	# Initialize the concept columns dictionary
-	if(GIAANNproto_databaseNetworkFiles.pathExists(SANIconceptNeuronsDictFile)):
-		SANIconceptNeuronsDict = GIAANNproto_databaseNetworkFiles.loadDictFile(SANIconceptNeuronsDictFile)	#must be ordered dictionary
-		SANIconceptNeuronsWeightList = GIAANNproto_databaseNetworkFiles.loadListFile(SANIconceptNeuronsDictFile)
+	if(GIAANNproto_databaseNetworkFilesExcitation.pathExists(SANIconceptNeuronsDictFile)):
+		SANIconceptNeuronsDict = GIAANNproto_databaseNetworkFilesExcitation.loadDictFile(SANIconceptNeuronsDictFile)	#must be ordered dictionary
+		SANIconceptNeuronsWeightList = GIAANNproto_databaseNetworkFilesExcitation.loadListFile(SANIconceptNeuronsDictFile)
 		#sc = len(conceptColumnsDict)
 		#SANIconceptNeuronsList = list(conceptColumnsDict.keys())
 		
 def finaliseSANIconceptNeurons():
-	GIAANNproto_databaseNetworkFiles.saveDictFile(SANIconceptNeuronsDictFile, SANIconceptNeuronsDict)
-	GIAANNproto_databaseNetworkFiles.saveListFile(SANIconceptNeuronWeightsListFile, SANIconceptNeuronWeightsList)
+	GIAANNproto_databaseNetworkFilesExcitation.saveDictFile(SANIconceptNeuronsDictFile, SANIconceptNeuronsDict)
+	GIAANNproto_databaseNetworkFilesExcitation.saveListFile(SANIconceptNeuronWeightsListFile, SANIconceptNeuronWeightsList)
 
 
 def generateSANIsequenceList(inputSequence, conceptMask, nlp):

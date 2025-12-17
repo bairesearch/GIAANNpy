@@ -266,14 +266,14 @@ MANUAL; - rename doNotEnforceSequentialityAcrossSegments/enforceSequentialActiva
 v1e (Codex IDE GPT-5.1-Codex):
 - add proto GIAANNproto1e1a - start useInhibitoryNeurons
 	implement option useInhibitoryNeurons:trainInhibitoryNeurons=True in GIAANNproto_databaseNetworkTrainInhibition.py:processFeaturesInactiveTrain():
-		- For each new feature declared in a concept column, declare an inhibitory neuron (maintains approx same number of excitatory and inhibitory neurons).
-		- Declare temp sequenceObservedInhibitoryNeurons list
-		- For each trained feature neuron in sequence:
-			1. identify all alternate prediction candidate features in network - i.e. all connection targets of previous feature neuron in trained sequence except for current feature neuron in trained sequence.
-			2. identify an inhibitory neuron in the column that is not connected to the trained feature.
+		- [A] For each new feature declared in a concept column, declare an inhibitory neuron (maintains approx same number of excitatory and inhibitory neurons).
+		- [B] Declare temp sequenceObservedInhibitoryNeurons list
+		- [C] For each trained feature neuron in sequence:
+			1. identify all alternate prediction candidate features in network - i.e. all direct (if enforceDirectConnections=True) connection targets of previous feature neuron in trained sequence except for current feature neuron in trained sequence.
+			2. select the inhibitory neuron associated with that feature node (ie same column index and feature index as the trained excitatory neuron).
 			3. Add (or update the weight) a connection between the inhibitory neuron and each of the identified alternate prediction candidate features.
 			4. add the identified inhibitory neuron to sequenceObservedInhibitoryNeurons
-		- Train all the inhibitory neuron source connections exactly the same way as the excitatory (i.e. feature) neuron source connections: upgrade and execute processFeaturesActiveTrain(..., trainInhibitoryNeurons=True, sequenceObservedInhibitoryNeurons). i.e. for each excitatory target feature trained in source sequence, an inhibitory target feature is also trained.
+		- [D] Train all the inhibitory neuron source connections exactly the same way as the excitatory (i.e. feature) neuron source connections: upgrade and execute processFeaturesActiveTrain(..., trainInhibitoryNeurons=True, sequenceObservedInhibitoryNeurons). i.e. for each excitatory target feature trained in source sequence, an inhibitory target feature is also trained.
 		Store all excitatory neurons and connections in separate database structures and database files to inhibitory neurons and connections. Ensure that there is absolutely zero modification of the original excitatory database structures, files, and code.
 MANUAL; - patch loadFeatureNeuronsGlobal - if pathExists(globalFeatureNeuronsFileFull)
 MANUAL; - add option !inferencePredictiveNetwork:inferenceDecrementActivations = True
@@ -287,3 +287,8 @@ MANUAL; - update enforceDirectConnectionsSANI to use existing useSANI defaults
 MANUAL; - extract common excitatory/inhibitory code insertSequenceObservedColumnIntoObservedColumnFeatures/insertSequenceObservedColumnIntoObservedColumnConnection
 MANUAL; - extract GIAANNproto_sequenceObservedColumnsInhibition/GIAANNproto_databaseNetworkFilesInhibition/GIAANNproto_databaseNetworkInhibition/GIAANNproto_databaseNetworkTrainInhibition
 MANUAL; - restore option enforceDirectConnectionsSANIminimal - use useSANIfeatures and arrayNumberOfSegments=2 and enforceSequentialActivation=False
+MANUAL; - rename GIAANNproto_sequenceObservedColumnsExcitation/GIAANNproto_databaseNetworkFilesExcitation/GIAANNproto_databaseNetworkExcitation/GIAANNproto_databaseNetworkTrainExcitation/GIAANNproto_databaseNetworkDrawExcitation, extract GIAANNproto_databaseNetworkDrawInhibition
+- Please upgrade option trainInhibitoryNeurons to ensure a unique inhibitory node is assigned for every excitatory node in the network. Change specification step 2 from "identify an inhibitory neuron in the column that is not connected to the trained feature" to select the inhibitory node associated for that feature node (ie same column index and feature index). When drawing the inhibitory nodes (GIAANNproto_databaseNetworkDrawInhibition), the inhibitory neurons should be named according to their corresponding excitatory feature node name. For reference, this is how you originally implemented the trainInhibitoryNeurons algorithm, as it is the most basic interpretation.
+- There is an issue with the implementation of trainInhibitoryNeurons - please re-read the specification (in GIAANNproto1e.nlc). Please ensure that;
+	[D]. The input connections of each inhibitory neuron in the sequence should be trained exactly the same as the excitatory neurons in the sequence (executes the same code processFeaturesActiveTrain) - ie each inhibitory neuron should have input connections added for every prior excitatory node in the sequence. 
+	[C3]. The output connections of each inhibitory neuron should only be added for its identified alternate prediction candidate features [C1.]. If no alternate prediction candidate features are identified, no output connections should be added to the inhibitory node.

@@ -20,9 +20,9 @@ GIA ANN proto prediction
 import torch as pt
 
 from GIAANNproto_globalDefs import *
-import GIAANNproto_databaseNetwork
-import GIAANNproto_databaseNetworkTrain
-import GIAANNproto_databaseNetworkDraw
+import GIAANNproto_databaseNetworkExcitation
+import GIAANNproto_databaseNetworkTrainExcitation
+import GIAANNproto_databaseNetworkDrawExcitation
 import GIAANNproto_sparseTensors
 import GIAANNproto_sequenceTokens
 import GIAANNproto_predictionSeed
@@ -88,7 +88,7 @@ def activatedNodesAreReferenceSetDelimiters(databaseNetworkObject, conceptColumn
 			return False
 		for featureIndexTensor in flattenedFeatureIndices:
 			featureIndex = featureIndexTensor.item()
-			if(not GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, featureIndex)):
+			if(not GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, featureIndex)):
 				return False
 		return True
 	else:
@@ -106,7 +106,7 @@ def activatedNodesAreProbabilisticReferenceSetDelimiters(databaseNetworkObject, 
 		return False
 	for featureIndexTensor in flattenedFeatureIndices:
 		featureIndex = featureIndexTensor.item()
-		if(not GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, featureIndex)):
+		if(not GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, featureIndex)):
 			return False
 	return True
 
@@ -167,8 +167,8 @@ def applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnsIndi
 				if(featureValue is None):
 					continue
 				featureValueInt = int(featureValue)
-				isDeterministicDelimiter = GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, featureValueInt)
-				isProbabilisticDelimiter = GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, featureValueInt)
+				isDeterministicDelimiter = GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, featureValueInt)
+				isProbabilisticDelimiter = GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, featureValueInt)
 				if(isDeterministicDelimiter or isProbabilisticDelimiter):
 					indicesToKeep.append(idx)
 		if(len(indicesToKeep) == 0):
@@ -346,7 +346,7 @@ def getObservedColumnForIndex(databaseNetworkObject, observedColumnsDict, column
 	columnLemma = databaseNetworkObject.conceptColumnsList[columnIndex]
 	if(columnLemma in observedColumnsDict):
 		return observedColumnsDict[columnLemma]
-	observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, columnIndex, columnLemma, columnIndex)
+	observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, columnIndex, columnLemma, columnIndex)
 	observedColumnsDict[columnLemma] = observedColumn
 	return observedColumn
 
@@ -456,7 +456,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	conceptMask, conceptIndices, numberConcepts = GIAANNproto_sequenceConcepts.createConceptMask(sequenceObservedColumns, tokensSequence)
 	
 	if(transformerUseInputConnections):
-		GIAANNproto_databaseNetwork.generateGlobalFeatureConnections(sequenceObservedColumns.databaseNetworkObject)
+		GIAANNproto_databaseNetworkExcitation.generateGlobalFeatureConnections(sequenceObservedColumns.databaseNetworkObject)
 	
 	GIAANNproto_predictionSeed.seedNetwork(sequenceObservedColumns, sequenceIndex, sequence, numSeedTokens)
 	
@@ -475,7 +475,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	else:
 		initialContextWordIndex = 0
 	initialContextWordIndex = max(0, min(initialContextWordIndex, len(tokensSequence)-1))
-	multipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, conceptColumnsIndices, conceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, initialContextWordIndex, kcMax)
+	multipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, conceptColumnsIndices, conceptColumnsFeatureIndices = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, initialContextWordIndex, kcMax)
 	conceptActivationState = initialiseConceptActivationState(conceptColumnsIndices, conceptColumnsFeatureIndices)
 	observedColumnsDict = sequenceObservedColumns.observedColumnsDict  # key: lemma, value: ObservedColumn	#every observed column in inference (seed and prediction phases)
 	
@@ -595,7 +595,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 			lemmas.append(lemma)
 			words.append(word)
 			# Load observed column from disk or create new one
-			observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndexVal, lemma, sequenceWordIndex)
+			observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndexVal, lemma, sequenceWordIndex)
 			observedColumnsDict[lemma] = observedColumn
 			observedColumnsSequenceCandidateIndexDict[i] = observedColumn
 		sequenceObservedColumnsPrediction = SequenceObservedColumnsInferencePrediction(databaseNetworkObject, observedColumnsDict, observedColumnsSequenceCandidateIndexDict)
@@ -714,7 +714,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	
 	if(drawNetworkDuringInferencePredict):
 		#FUTURE: convert globalFeatureNeuronsActivation back to globalFeatureNeurons for draw
-		GIAANNproto_databaseNetworkDraw.visualizeGraph(sequenceObservedColumnsPrediction, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(sequenceWordIndex))
+		GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumnsPrediction, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(sequenceWordIndex))
 	return featurePredictionTargetMatch, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, conceptActivationState
 
 
@@ -744,7 +744,7 @@ def enforceMinimumPredictionActivationThreshold(conceptColumnsIndicesPred, conce
 def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, conceptActivationState=None, connectedColumns=None, connectedColumnsFeatures=None):
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 	#generate targets;
-	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
+	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 
 	globalFeatureNeuronsActivationAllSegments = pt.sum(globalFeatureNeuronsActivation, dim=0)	#sum across all segments 	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
 	globalFeatureNeuronsStrengthAllSegments = pt.sum(globalFeatureNeuronsStrength, dim=0)	#sum across all segments 	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 

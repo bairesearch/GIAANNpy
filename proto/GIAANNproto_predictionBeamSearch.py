@@ -20,13 +20,13 @@ GIA ANN proto prediction Beam Search
 import torch as pt
 
 from GIAANNproto_globalDefs import *
-import GIAANNproto_databaseNetwork
+import GIAANNproto_databaseNetworkExcitation
 import GIAANNproto_sparseTensors
 import GIAANNproto_predictionActivate
 
 def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, selectMostActiveFeatureFunc=None, conceptActivationState=None, connectedColumnsConstraint=None, connectedColumnsFeatures=None):
 	#generate targets for debug/analysis output
-	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
+	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 
 	if(selectMostActiveFeatureFunc is None):
 		raise ValueError("beamSearchPredictNextFeature requires selectMostActiveFeatureFunc to be provided to avoid circular imports")
@@ -132,7 +132,7 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 	if(lemma in observedColumnsDict):
 		observedColumn = observedColumnsDict[lemma]
 	else:
-		observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, columnIndex, lemma, sequenceWordIndex)
+		observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, columnIndex, lemma, sequenceWordIndex)
 		observedColumnsDict[lemma] = observedColumn
 	featureConnections = observedColumn.featureConnections
 	conceptColumnsIndicesSource = pt.tensor([columnIndex], dtype=pt.long, device=deviceSparse)
@@ -579,8 +579,8 @@ def prepareBeamNodes(databaseNetworkObject, nodes, conceptActivationState, const
 	for columnIndex, featureIndex in nodes:
 		adjustedFeature = featureIndex
 		if(delimiterMode and allowedSet is not None and columnIndex in allowedSet):
-			isDeterministicDelimiter = GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, adjustedFeature)
-			isProbabilisticDelimiter = GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, adjustedFeature)
+			isDeterministicDelimiter = GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, adjustedFeature)
+			isProbabilisticDelimiter = GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, adjustedFeature)
 			if(not (isDeterministicDelimiter or isProbabilisticDelimiter)):
 				if(debugPrintNeuronActivations9):
 					columnName, featureName = debugDescribeColumnFeatureName(databaseNetworkObject, columnIndex, adjustedFeature)
@@ -598,7 +598,7 @@ def nodesContainReferenceSetDelimiter(databaseNetworkObject, nodes):
 	if(not conceptColumnsDelimitByPOS):
 		return False
 	for nodeColumn, nodeFeature in nodes:
-		if(GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, nodeFeature)):
+		if(GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, nodeFeature)):
 			return True
 	return False
 
@@ -606,7 +606,7 @@ def nodesContainProbabilisticReferenceSetDelimiter(databaseNetworkObject, nodes)
 	if(not conceptColumnsDelimitByPOS or not detectReferenceSetDelimitersBetweenNouns):
 		return False
 	for nodeColumn, nodeFeature in nodes:
-		if(GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, nodeFeature)):
+		if(GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, nodeFeature)):
 			return True
 	return False
 
@@ -674,7 +674,7 @@ def getObservedColumnForBeam(databaseNetworkObject, observedColumnsDict, columnI
 	columnLemma = databaseNetworkObject.conceptColumnsList[columnIndex]
 	if(columnLemma in observedColumnsDict):
 		return observedColumnsDict[columnLemma]
-	observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, columnIndex, columnLemma, columnIndex)
+	observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, columnIndex, columnLemma, columnIndex)
 	observedColumnsDict[columnLemma] = observedColumn
 	return observedColumn
 

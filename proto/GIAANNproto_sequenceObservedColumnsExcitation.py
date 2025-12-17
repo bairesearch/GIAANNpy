@@ -1,4 +1,4 @@
-"""GIAANNproto_sequenceObservedColumns.py
+"""GIAANNproto_sequenceObservedColumnsExcitation.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2025 Baxter AI (baxterai.com)
@@ -13,7 +13,7 @@ see GIAANNproto_main.py
 see GIAANNproto_main.py
 
 # Description:
-GIA ANN proto sequence Observed Columns
+GIA ANN proto sequence Observed Columns Excitation
 
 """
 

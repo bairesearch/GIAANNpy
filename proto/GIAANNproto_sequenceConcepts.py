@@ -20,7 +20,7 @@ GIA ANN proto sequence Concepts (and feature detection)
 import torch as pt
 
 from GIAANNproto_globalDefs import *
-import GIAANNproto_databaseNetwork
+import GIAANNproto_databaseNetworkExcitation
 import GIAANNproto_sequenceTokens
 
 
@@ -42,7 +42,7 @@ def firstPass(databaseNetworkObject, sequence):
 			conceptFound = True
 		
 		if(conceptFound):
-			conceptsFound, newConceptsAdded = GIAANNproto_databaseNetwork.addConceptToConceptColumnsDict(databaseNetworkObject, token.lemma, conceptsFound, newConceptsAdded)
+			conceptsFound, newConceptsAdded = GIAANNproto_databaseNetworkExcitation.addConceptToConceptColumnsDict(databaseNetworkObject, token.lemma, conceptsFound, newConceptsAdded)
 			conceptMask.append(True)
 		else:
 			conceptMask.append(False)
@@ -70,13 +70,13 @@ def secondPass(databaseNetworkObject, tokens):
 			if GIAANNproto_sequenceTokens.isConcept(token):
 				conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
 				# Load observed column from disk or create new one
-				observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
+				observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
 				observedColumnsDict[lemma] = observedColumn
 				observedColumnsSequenceWordIndexDict[i] = observedColumn
 		else:
 			conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
 			# Load observed column from disk or create new one
-			observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
+			observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
 			observedColumnsDict[lemma] = observedColumn
 			observedColumnsSequenceWordIndexDict[i] = observedColumn
 	return observedColumnsDict, observedColumnsSequenceWordIndexDict

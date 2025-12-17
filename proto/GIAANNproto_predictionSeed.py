@@ -24,8 +24,8 @@ import GIAANNproto_sparseTensors
 import GIAANNproto_sequenceTokens
 import GIAANNproto_sequenceConcepts
 import GIAANNproto_predictionActivate
-import GIAANNproto_databaseNetworkTrain	#for createFeatureConnectionsActiveTrain only
-import GIAANNproto_databaseNetworkDraw
+import GIAANNproto_databaseNetworkTrainExcitation	#for createFeatureConnectionsActiveTrain only
+import GIAANNproto_databaseNetworkDrawExcitation
 
 def seedConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens, firstSeedTokenIndex, numSeedTokens):
 	conceptIndices, startIndices, endIndices = GIAANNproto_sequenceConcepts.processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens)
@@ -146,7 +146,7 @@ def seedNetworkToken(sequenceObservedColumns, sequenceIndex, sequence, firstSeed
 	
 	if(drawNetworkDuringInferenceSeed):
 		sequenceObservedColumns.updateObservedColumnsWrapper()
-		GIAANNproto_databaseNetworkDraw.visualizeGraph(sequenceObservedColumns, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(firstSeedTokenIndex))
+		GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumns, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(firstSeedTokenIndex))
 
 def identifySeedIndices(sequenceObservedColumns, sequenceIndex, startIndices, endIndices, sequence, tokens, conceptIndices, firstSeedTokenIndex, numSeedTokens):
 	firstSeedConceptIndex = None
@@ -200,7 +200,7 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 		featureConnectionsActive = pt.ones(cs, fs, cs2, fs2)
 	else:
 		cs2 = cs
-		featureConnectionsActive, featureConnectionsSegmentMask = GIAANNproto_databaseNetworkTrain.createFeatureConnectionsActiveTrain(featureNeuronsActive[arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder)
+		featureConnectionsActive, featureConnectionsSegmentMask = GIAANNproto_databaseNetworkTrainExcitation.createFeatureConnectionsActiveTrain(featureNeuronsActive[arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder)
 		
 		if(debugPrintNeuronActivations):
 			activeConnectionsPreMask = (featureConnectionsActive > 0).sum().item()

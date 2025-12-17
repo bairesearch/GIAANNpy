@@ -1,4 +1,4 @@
-"""GIAANNproto_databaseNetwork.py
+"""GIAANNproto_databaseNetworkExcitation.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2025 Baxter AI (baxterai.com)
@@ -13,7 +13,7 @@ see GIAANNproto_main.py
 see GIAANNproto_main.py
 
 # Description:
-GIA ANN proto database Network
+GIA ANN proto database Network Excitation
 
 """
 
@@ -21,7 +21,7 @@ import os
 import torch as pt
 
 from GIAANNproto_globalDefs import *
-import GIAANNproto_databaseNetworkFiles
+import GIAANNproto_databaseNetworkFilesExcitation
 import GIAANNproto_sparseTensors
 
 class DatabaseNetworkClass():
@@ -63,8 +63,8 @@ if not lowMem:
 		return globalFeatureNeurons
 		
 	def loadFeatureNeuronsGlobal(c, f):
-		if GIAANNproto_databaseNetworkFiles.pathExists(globalFeatureNeuronsFileFull):
-			globalFeatureNeurons = GIAANNproto_databaseNetworkFiles.loadFeatureNeuronsGlobalFile()
+		if GIAANNproto_databaseNetworkFilesExcitation.pathExists(globalFeatureNeuronsFileFull):
+			globalFeatureNeurons = GIAANNproto_databaseNetworkFilesExcitation.loadFeatureNeuronsGlobalFile()
 		else:
 			globalFeatureNeurons = initialiseFeatureNeuronsGlobal(c, f)
 			#print("initialiseFeatureNeuronsGlobal: globalFeatureNeurons = ", globalFeatureNeurons)
@@ -83,21 +83,21 @@ def initialiseDatabaseNetwork():
 	conceptFeaturesReferenceSetDelimiterProbabilisticList = []
 
 	# Initialize the concept columns dictionary
-	if(GIAANNproto_databaseNetworkFiles.pathExists(conceptColumnsDictFile)):
-		conceptColumnsDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptColumnsDictFile)
+	if(GIAANNproto_databaseNetworkFilesExcitation.pathExists(conceptColumnsDictFile)):
+		conceptColumnsDict = GIAANNproto_databaseNetworkFilesExcitation.loadDictFile(conceptColumnsDictFile)
 		c = len(conceptColumnsDict)
 		conceptColumnsList = list(conceptColumnsDict.keys())
-		conceptFeaturesDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesDictFile)
+		conceptFeaturesDict = GIAANNproto_databaseNetworkFilesExcitation.loadDictFile(conceptFeaturesDictFile)
 		f = len(conceptFeaturesDict)
 		conceptFeaturesList = list(conceptFeaturesDict.keys())
 		if(conceptColumnsDelimitByPOS):
 			if(detectReferenceSetDelimitersBetweenNouns):	
-				conceptFeaturesReferenceSetDelimiterDeterministicDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterDeterministicListFile)
+				conceptFeaturesReferenceSetDelimiterDeterministicDict = GIAANNproto_databaseNetworkFilesExcitation.loadDictFile(conceptFeaturesReferenceSetDelimiterDeterministicListFile)
 				conceptFeaturesReferenceSetDelimiterDeterministicList = list(conceptFeaturesReferenceSetDelimiterDeterministicDict.values())
-				conceptFeaturesReferenceSetDelimiterProbabilisticDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterProbabilisticListFile)
+				conceptFeaturesReferenceSetDelimiterProbabilisticDict = GIAANNproto_databaseNetworkFilesExcitation.loadDictFile(conceptFeaturesReferenceSetDelimiterProbabilisticListFile)
 				conceptFeaturesReferenceSetDelimiterProbabilisticList = list(conceptFeaturesReferenceSetDelimiterProbabilisticDict.values())
 			else:
-				conceptFeaturesReferenceSetDelimiterDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterListFile)
+				conceptFeaturesReferenceSetDelimiterDict = GIAANNproto_databaseNetworkFilesExcitation.loadDictFile(conceptFeaturesReferenceSetDelimiterListFile)
 				conceptFeaturesReferenceSetDelimiterList = list(conceptFeaturesReferenceSetDelimiterDict.values())
 	else:
 		if(useDedicatedConceptNames):
@@ -200,11 +200,11 @@ class ObservedColumn:
 				self.nextFeatureIndex += 1
 
 	def saveToDisk(self):
-		GIAANNproto_databaseNetworkFiles.observedColumnSaveToDisk(self)
+		GIAANNproto_databaseNetworkFilesExcitation.observedColumnSaveToDisk(self)
 
 	@classmethod
 	def loadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i):
-		return GIAANNproto_databaseNetworkFiles.observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i)
+		return GIAANNproto_databaseNetworkFilesExcitation.observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i)
 		
 
 def addConceptToConceptColumnsDict(databaseNetworkObject, lemma, conceptsFound, newConceptsAdded):
@@ -220,7 +220,7 @@ def addConceptToConceptColumnsDict(databaseNetworkObject, lemma, conceptsFound, 
 	
 def loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i):
 	observedColumnFile = observedColumnsDir + '/' + f"{conceptIndex}_data.pkl"
-	if GIAANNproto_databaseNetworkFiles.pathExists(observedColumnFile):
+	if GIAANNproto_databaseNetworkFilesExcitation.pathExists(observedColumnFile):
 		observedColumn = ObservedColumn.loadFromDisk(databaseNetworkObject, conceptIndex, lemma, i)
 		# Resize connection arrays if c has increased
 		observedColumn.resizeConceptArrays(databaseNetworkObject.c)
