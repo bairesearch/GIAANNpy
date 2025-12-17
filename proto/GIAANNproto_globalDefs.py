@@ -74,10 +74,12 @@ useInhibitoryNeurons = False	#planned new default: True #orig: False
 if(useInhibitoryNeurons):
 	trainInhibitoryNeurons = True	
 	inferenceInhibitoryNeurons = True
+	inferenceInhibitoryNeuronsOptimised = True	#skip full inhibitory activation by mirroring excitatory activations
 	inhibitoryNeuronYoffset = 10
 else:
 	trainInhibitoryNeurons = False
 	inferenceInhibitoryNeurons = False
+	inferenceInhibitoryNeuronsOptimised = False
 inhibitoryConnectionStrengthIncrement = 1.0	#default increment applied when wiring inhibitory neurons to alternate prediction targets
 
 #identify immediate connections
