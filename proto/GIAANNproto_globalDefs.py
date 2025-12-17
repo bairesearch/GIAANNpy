@@ -332,6 +332,8 @@ if(useInference):
 		inferenceInvertNeuronActivationUponPrediction = False
 		inferenceDeactivateNeuronsUponPrediction = True	#default: True
 		inferenceDecrementActivations = False	#default: False - CHECKTHIS #orig: False
+	inferenceDeactivateNeuronsUponPredictionInhibitory = inferenceDeactivateNeuronsUponPrediction
+	inferenceDecrementActivationsInhibitory = inferenceDecrementActivations
 		
 	if(inferenceDecrementActivations):
 		inferenceDecrementActivationsNonlinear = True
@@ -347,6 +349,10 @@ if(useInference):
 		numSeedTokens = 5	#number of seed tokens in last sequence of inference prompt (remaining tokens will be prediction tokens)
 	else:
 		numSeedTokens = 0
+	if('inferenceDeactivateNeuronsUponPredictionInhibitory' not in locals()):
+		inferenceDeactivateNeuronsUponPredictionInhibitory = inferenceDeactivateNeuronsUponPrediction
+	if('inferenceDecrementActivationsInhibitory' not in locals()):
+		inferenceDecrementActivationsInhibitory = inferenceDecrementActivations
 	
 	if(conceptColumnsDelimitByPOS):
 		kcNetwork = 1	#number of topk columns to target

@@ -41,6 +41,8 @@ class SequenceObservedColumnsInhibitionBuffer:
 		self.connectionMode = "output"
 		self.featureNeuronChanges = [None]*self.cs
 		self.baseSequenceObservedColumns = sequenceObservedColumns
+		#store output updates targeting columns/features that never appear in the local sequence buffer
+		self.externalOutputUpdates = []
 
 	def switchConnectionMode(self, mode):
 		if(mode == "input"):
@@ -77,10 +79,17 @@ def applySequenceUpdates(sequenceObservedColumnsBase, inhibitionBuffer):
 
 	featureIndicesInObserved, fIdxTensor = sequenceObservedColumnsBase.getObservedColumnFeatureIndices()
 
+	inhibitoryColumnsCache = {}
+
+	def getInhibitoryColumn(conceptIndex, lemma):
+		if(conceptIndex not in inhibitoryColumnsCache):
+			inhibitoryColumnsCache[conceptIndex] = GIAANNproto_databaseNetworkFilesInhibition.getInhibitoryObservedColumn(sequenceObservedColumnsBase.databaseNetworkObject, conceptIndex, lemma)
+		return inhibitoryColumnsCache[conceptIndex]
+
 	for cIdx, observedColumn in sequenceObservedColumnsDict.items():
 		conceptIndex = observedColumn.conceptIndex
 		lemma = observedColumn.conceptName
-		inhibitoryColumn = GIAANNproto_databaseNetworkFilesInhibition.getInhibitoryObservedColumn(sequenceObservedColumnsBase.databaseNetworkObject, conceptIndex, lemma)
+		inhibitoryColumn = getInhibitoryColumn(conceptIndex, lemma)
 
 		# feature neurons
 		GIAANNproto_sparseTensors.insertSequenceObservedColumnIntoObservedColumnFeatures(None, cIdx, fIdxTensor, featureIndicesInObserved, featureNeuronsSparse, inhibitoryColumn, True)
@@ -91,4 +100,68 @@ def applySequenceUpdates(sequenceObservedColumnsBase, inhibitionBuffer):
 		# feature connections input
 		inhibitoryColumn.featureConnectionsInput = GIAANNproto_sparseTensors.insertSequenceObservedColumnIntoObservedColumnConnections(sequenceObservedColumnsBase, cIdx, fIdxTensor, featureIndicesInObserved, featureConnectionsInputSparse, inhibitoryColumn.featureConnectionsInput, featureConnectionsOutput=False)
 
+	if(len(inhibitionBuffer.externalOutputUpdates) > 0):
+		applyExternalOutputUpdates(sequenceObservedColumnsBase, inhibitionBuffer, inhibitoryColumnsCache)
+
+	for inhibitoryColumn in inhibitoryColumnsCache.values():
 		GIAANNproto_databaseNetworkFilesInhibition.saveObservedColumnInhibition(inhibitoryColumn)
+
+def applyExternalOutputUpdates(sequenceObservedColumnsBase, inhibitionBuffer, inhibitoryColumnsCache):
+	databaseNetworkObject = sequenceObservedColumnsBase.databaseNetworkObject
+	for updateEntry in inhibitionBuffer.externalOutputUpdates:
+		targetConceptIndex = updateEntry["targetColumnConceptIndex"]
+		if(targetConceptIndex not in inhibitoryColumnsCache):
+			lemma = databaseNetworkObject.conceptColumnsList[targetConceptIndex]
+			inhibitoryColumnsCache[targetConceptIndex] = GIAANNproto_databaseNetworkFilesInhibition.getInhibitoryObservedColumn(databaseNetworkObject, targetConceptIndex, lemma)
+		inhibitoryColumn = inhibitoryColumnsCache[targetConceptIndex]
+		applyExternalOutputUpdateToColumn(inhibitoryColumn, updateEntry)
+
+def applyExternalOutputUpdateToColumn(inhibitoryColumn, updateEntry):
+	segmentsMask = updateEntry["segmentsMask"]
+	if(segmentsMask is None or not pt.any(segmentsMask)):
+		segmentsMask = pt.zeros(arrayNumberOfSegments, dtype=pt.bool)
+		segmentsMask[arrayIndexSegmentFirst] = True
+	else:
+		segmentsMask = segmentsMask.to(dtype=pt.bool)
+	activeSegmentIndices = pt.nonzero(segmentsMask, as_tuple=False)
+	if(activeSegmentIndices.numel() == 0):
+		activeSegmentIndices = pt.tensor([[arrayIndexSegmentFirst]], dtype=pt.long)
+	for segmentTensor in activeSegmentIndices:
+		segmentIndex = int(segmentTensor.item())
+		inhibitoryColumn.featureConnectionsOutput = addConnectionPropertyValue(inhibitoryColumn.featureConnectionsOutput, arrayIndexPropertiesStrength, segmentIndex, updateEntry["inhibitoryFeatureIndex"], updateEntry["candidateColumnConceptIndex"], updateEntry["candidateFeatureConceptIndex"], inhibitoryConnectionStrengthIncrement)
+		inhibitoryColumn.featureConnectionsOutput = addConnectionPropertyValue( inhibitoryColumn.featureConnectionsOutput, arrayIndexPropertiesPermanence, segmentIndex, updateEntry["inhibitoryFeatureIndex"], updateEntry["candidateColumnConceptIndex"], updateEntry["candidateFeatureConceptIndex"], z1)
+		inhibitoryColumn.featureConnectionsOutput = setConnectionPropertyValue( inhibitoryColumn.featureConnectionsOutput, arrayIndexPropertiesActivation, segmentIndex, updateEntry["inhibitoryFeatureIndex"], updateEntry["candidateColumnConceptIndex"], updateEntry["candidateFeatureConceptIndex"], 0.0)
+		if(inferenceUseNeuronFeaturePropertiesTime):
+			timeValue = 0.0
+		else:
+			timeValue = float(updateEntry["sequenceIndex"])
+		inhibitoryColumn.featureConnectionsOutput = setConnectionPropertyValue( inhibitoryColumn.featureConnectionsOutput, arrayIndexPropertiesTime, segmentIndex, updateEntry["inhibitoryFeatureIndex"], updateEntry["candidateColumnConceptIndex"], updateEntry["candidateFeatureConceptIndex"], timeValue)
+		inhibitoryColumn.featureConnectionsOutput = setConnectionPropertyValue( inhibitoryColumn.featureConnectionsOutput, arrayIndexPropertiesPos, segmentIndex, updateEntry["inhibitoryFeatureIndex"], updateEntry["candidateColumnConceptIndex"], updateEntry["candidateFeatureConceptIndex"], float(updateEntry["sourcePosValue"]))
+
+def addConnectionPropertyValue(tensorSparse, propertyIndex, segmentIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex, incrementValue):
+	dimensions = [propertyIndex, segmentIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex]
+	return GIAANNproto_sparseTensors.addElementValueToSparseTensor(tensorSparse, dimensions, incrementValue)
+
+def setConnectionPropertyValue(tensorSparse, propertyIndex, segmentIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex, newValue):
+	dimensions = [propertyIndex, segmentIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex]
+	currentValue = getSparseTensorValue(tensorSparse, dimensions)
+	delta = newValue - currentValue
+	if(abs(delta) < 1e-4):
+		return tensorSparse
+	return GIAANNproto_sparseTensors.addElementValueToSparseTensor(tensorSparse, dimensions, delta)
+
+def getSparseTensorValue(tensorSparse, dimensions):
+	tensorSparse = tensorSparse.coalesce()
+	if(tensorSparse._nnz() == 0):
+		return 0.0
+	indices = tensorSparse.indices()
+	values = tensorSparse.values()
+	targetIndex = pt.tensor(dimensions, dtype=indices.dtype, device=indices.device).unsqueeze(1)
+	mask = (indices == targetIndex).all(dim=0)
+	if(not pt.any(mask)):
+		return 0.0
+	indexTensor = mask.nonzero(as_tuple=False)
+	if(indexTensor.numel() == 0):
+		return 0.0
+	valueIndex = indexTensor[0].item()
+	return float(values[valueIndex].item())

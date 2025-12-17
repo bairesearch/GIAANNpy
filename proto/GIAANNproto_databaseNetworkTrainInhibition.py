@@ -21,6 +21,8 @@ import torch as pt
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_sequenceObservedColumnsInhibition
+import GIAANNproto_databaseNetworkExcitation
+import GIAANNproto_sparseTensors
 
 def processFeaturesInactiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex, featureConnectionsActive, featureConnectionsSegmentMask):
 	if(featureConnectionsActive is None):
@@ -73,6 +75,8 @@ def processFeaturesInactiveTrain(sequenceObservedColumns, featureNeuronsActive, 
 
 	conceptIndicesTensor = getattr(sequenceObservedColumns, "conceptIndicesInSequenceObservedTensor", None)
 	featureIndicesTensor = getattr(sequenceObservedColumns, "featureIndicesInObservedTensor", None)
+	globalToLocalColumnMap = buildGlobalToLocalColumnMap(conceptIndicesTensor)
+	observedColumnCache = {}
 	for connectionIndex in activeConnectionIndexList:
 		sourceColumnIndex = int(connectionIndex[0])
 		sourceFeatureIndex = int(connectionIndex[1])
@@ -80,6 +84,8 @@ def processFeaturesInactiveTrain(sequenceObservedColumns, featureNeuronsActive, 
 		targetFeatureIndex = int(connectionIndex[3])
 		globalTargetColumnIndex = getGlobalColumnIndex(conceptIndicesTensor, targetColumnIndex)
 		globalTargetFeatureIndex = getGlobalFeatureIndex(featureIndicesTensor, targetFeatureIndex)
+		globalSourceColumnIndex = getGlobalColumnIndex(conceptIndicesTensor, sourceColumnIndex)
+		globalSourceFeatureIndex = getGlobalFeatureIndex(featureIndicesTensor, sourceFeatureIndex)
 
 		if(enforceDirectConnections):
 			if(sourceColumnIndex >= directConnectionTargetsMask.shape[0] or sourceFeatureIndex >= directConnectionTargetsMask.shape[1]):
@@ -116,25 +122,48 @@ def processFeaturesInactiveTrain(sequenceObservedColumns, featureNeuronsActive, 
 			if(prevEntry is not None and (sourceColumnIndex, sourceFeatureIndex) not in prevEntry["sources"]):
 				continue
 
+		processedCandidateSet = set()
 		candidateIndices = pt.nonzero(candidateMask, as_tuple=False)
 		if(candidateIndices.numel() > 0):
 			if(enforceDirectConnections):
 				sourceSegmentsTensor = directConnectionSegmentsMask
 			else:
 				sourceSegmentsTensor = featureConnectionsActive
-			for candidateIndex in candidateIndices:
-				candidateColumnIndex, candidateFeatureIndex = candidateIndex.tolist()
-				globalCandidateColumnIndex = getGlobalColumnIndex(conceptIndicesTensor, candidateColumnIndex)
-				globalCandidateFeatureIndex = getGlobalFeatureIndex(featureIndicesTensor, candidateFeatureIndex)
+				for candidateIndex in candidateIndices:
+					candidateColumnIndex, candidateFeatureIndex = candidateIndex.tolist()
+					globalCandidateColumnIndex = getGlobalColumnIndex(conceptIndicesTensor, candidateColumnIndex)
+					globalCandidateFeatureIndex = getGlobalFeatureIndex(featureIndicesTensor, candidateFeatureIndex)
+					if(globalCandidateColumnIndex == globalTargetColumnIndex and globalCandidateFeatureIndex == globalTargetFeatureIndex):
+						continue	# only wire inhibitory outputs to alternate prediction candidates
+					processedCandidateSet.add((globalCandidateColumnIndex, globalCandidateFeatureIndex))
+					if(sourceSegmentsTensor is None):
+						segmentsMask = None
+					else:
+						if(sourceColumnIndex >= sourceSegmentsTensor.shape[1] or sourceFeatureIndex >= sourceSegmentsTensor.shape[2]):
+							printe("processFeaturesInactiveTrain error: sourceColumnIndex >= sourceSegmentsTensor.shape[1] or sourceFeatureIndex >= sourceSegmentsTensor.shape[2]")
+						segmentsMask = sourceSegmentsTensor[:, sourceColumnIndex, sourceFeatureIndex, candidateColumnIndex, candidateFeatureIndex]
+					updateInhibitoryConnection(inhibitionBuffer, targetColumnIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex, segmentsMask, sequenceIndex, sourcePosValue)
+
+		globalAlternateCandidates = collectGlobalAlternateCandidates(sequenceObservedColumns, observedColumnCache, globalSourceColumnIndex, globalSourceFeatureIndex)
+		if(globalAlternateCandidates):
+			for candidateEntry in globalAlternateCandidates:
+				globalCandidateColumnIndex = candidateEntry["targetColumnIndex"]
+				globalCandidateFeatureIndex = candidateEntry["targetFeatureIndex"]
 				if(globalCandidateColumnIndex == globalTargetColumnIndex and globalCandidateFeatureIndex == globalTargetFeatureIndex):
-					continue	# only wire inhibitory outputs to alternate prediction candidates
-				if(sourceSegmentsTensor is None):
-					segmentsMask = None
-				else:
-					if(sourceColumnIndex >= sourceSegmentsTensor.shape[1] or sourceFeatureIndex >= sourceSegmentsTensor.shape[2]):
-						printe("processFeaturesInactiveTrain error: sourceColumnIndex >= sourceSegmentsTensor.shape[1] or sourceFeatureIndex >= sourceSegmentsTensor.shape[2]")
-					segmentsMask = sourceSegmentsTensor[:, sourceColumnIndex, sourceFeatureIndex, candidateColumnIndex, candidateFeatureIndex]
-				updateInhibitoryConnection(inhibitionBuffer, targetColumnIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex, segmentsMask, sequenceIndex, sourcePosValue)
+					continue
+				candidateKey = (globalCandidateColumnIndex, globalCandidateFeatureIndex)
+				if(candidateKey in processedCandidateSet):
+					continue
+				localCandidateColumnIndex = globalToLocalColumnMap.get(globalCandidateColumnIndex)
+				if(localCandidateColumnIndex is not None):
+					localCandidateFeatureIndex = getLocalFeatureIndex(sequenceObservedColumns, localCandidateColumnIndex, globalCandidateFeatureIndex)
+					if(localCandidateFeatureIndex is not None):
+						segmentsMask = candidateEntry["segmentsMask"]
+						updateInhibitoryConnection(inhibitionBuffer, targetColumnIndex, inhibitoryFeatureIndex, localCandidateColumnIndex, localCandidateFeatureIndex, segmentsMask, sequenceIndex, sourcePosValue)
+						processedCandidateSet.add(candidateKey)
+						continue
+				recordExternalInhibitoryConnection(inhibitionBuffer, globalTargetColumnIndex, inhibitoryFeatureIndex, globalCandidateColumnIndex, globalCandidateFeatureIndex, candidateEntry["segmentsMask"], sequenceIndex, sourcePosValue)
+				processedCandidateSet.add(candidateKey)
 
 	if(len(sequenceObservedInhibitoryNeurons) == 0):
 		return None
@@ -228,6 +257,126 @@ def getFeatureWordOrderValue(featureNeuronsWordOrder, columnsWordOrder, columnIn
 		if(columnIndex >= 0 and columnIndex < columnsWordOrder.shape[0]):
 			return int(columnsWordOrder[columnIndex].item())
 	return None
+
+def buildGlobalToLocalColumnMap(conceptIndicesTensor):
+	columnMap = {}
+	if(conceptIndicesTensor is None):
+		return columnMap
+	for localIndex in range(conceptIndicesTensor.shape[0]):
+		globalIndex = int(conceptIndicesTensor[localIndex].item())
+		columnMap[globalIndex] = localIndex
+	return columnMap
+
+def getLocalFeatureIndex(sequenceObservedColumns, localColumnIndex, globalFeatureIndex):
+	columnFeatureMaps = getattr(sequenceObservedColumns, "columnFeatureLocalIndices", None)
+	if(columnFeatureMaps is None):
+		return None
+	if(localColumnIndex < 0 or localColumnIndex >= len(columnFeatureMaps)):
+		return None
+	columnMap = columnFeatureMaps[localColumnIndex]
+	if(columnMap is None):
+		return None
+	localEntries = columnMap.get(globalFeatureIndex)
+	if(localEntries is None or len(localEntries) == 0):
+		return None
+	return localEntries[0]
+
+def collectGlobalAlternateCandidates(sequenceObservedColumns, observedColumnCache, globalSourceColumnIndex, globalSourceFeatureIndex):
+	if(globalSourceColumnIndex is None or globalSourceFeatureIndex is None):
+		return []
+	observedColumn = getObservedColumnForConcept(sequenceObservedColumns, observedColumnCache, globalSourceColumnIndex)
+	if(observedColumn is None):
+		return []
+	strengthTensor = observedColumn.featureConnections[arrayIndexPropertiesStrength]
+	strengthSlice = GIAANNproto_sparseTensors.sliceSparseTensor(strengthTensor, 1, globalSourceFeatureIndex)
+	strengthSlice = strengthSlice.coalesce()
+	if(strengthSlice._nnz() == 0):
+		return []
+	segmentsDict = {}
+	indices = strengthSlice.indices()
+	for idx in range(indices.shape[1]):
+		segmentIndex = int(indices[0, idx].item())
+		targetColumnIndex = int(indices[1, idx].item())
+		targetFeatureIndex = int(indices[2, idx].item())
+		key = (targetColumnIndex, targetFeatureIndex)
+		if(key not in segmentsDict):
+			segmentsDict[key] = pt.zeros(arrayNumberOfSegments, dtype=pt.bool)
+		segmentsDict[key][segmentIndex] = True
+	if(enforceDirectConnectionsMinWordDistance and arrayIndexPropertiesMinWordDistance):
+		minDistanceLookup = buildMinDistanceLookup(observedColumn, globalSourceFeatureIndex)
+	else:
+		minDistanceLookup = None
+	candidates = []
+	for key, segmentsMask in segmentsDict.items():
+		if(not connectionSatisfiesGlobalDirectConstraint(segmentsMask, key, minDistanceLookup)):
+			continue
+		candidates.append({
+			"targetColumnIndex": key[0],
+			"targetFeatureIndex": key[1],
+			"segmentsMask": segmentsMask.clone().to(dtype=pt.bool)
+		})
+	return candidates
+
+def getObservedColumnForConcept(sequenceObservedColumns, observedColumnCache, globalColumnIndex):
+	if(globalColumnIndex in observedColumnCache):
+		return observedColumnCache[globalColumnIndex]
+	if(globalColumnIndex < 0 or globalColumnIndex >= sequenceObservedColumns.databaseNetworkObject.c):
+		return None
+	lemma = sequenceObservedColumns.databaseNetworkObject.conceptColumnsList[globalColumnIndex]
+	observedColumn = sequenceObservedColumns.observedColumnsDict.get(lemma)
+	if(observedColumn is None):
+		observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(sequenceObservedColumns.databaseNetworkObject, globalColumnIndex, lemma, globalColumnIndex)
+	if(observedColumn is not None):
+		observedColumnCache[globalColumnIndex] = observedColumn
+	return observedColumn
+
+def buildMinDistanceLookup(observedColumn, sourceFeatureIndex):
+	minDistances = {}
+	minTensor = observedColumn.featureConnections[arrayIndexPropertiesMinWordDistanceIndex]
+	minSlice = GIAANNproto_sparseTensors.sliceSparseTensor(minTensor, 1, sourceFeatureIndex)
+	minSlice = minSlice.coalesce()
+	if(minSlice._nnz() == 0):
+		return minDistances
+	indices = minSlice.indices()
+	values = minSlice.values()
+	for idx in range(indices.shape[1]):
+		columnIndex = int(indices[1, idx].item())
+		featureIndex = int(indices[2, idx].item())
+		value = float(values[idx].item())
+		key = (columnIndex, featureIndex)
+		if(key not in minDistances or value < minDistances[key]):
+			minDistances[key] = value
+	return minDistances
+
+def connectionSatisfiesGlobalDirectConstraint(segmentsMask, key, minDistanceLookup):
+	if(not enforceDirectConnections):
+		return True
+	if(enforceDirectConnectionsMinWordDistance and arrayIndexPropertiesMinWordDistance):
+		if(minDistanceLookup is None):
+			return False
+		distance = minDistanceLookup.get(key)
+		return (distance is not None) and (distance > 0) and (abs(distance - 1.0) < 1e-4)
+	if(enforceDirectConnectionsSANI):
+		lastSegmentIndex = max(0, min(arrayIndexSegmentLast, arrayNumberOfSegments-1))
+		return bool(segmentsMask[lastSegmentIndex].item())
+	return True
+
+def recordExternalInhibitoryConnection(inhibitionBuffer, inhibitoryColumnConceptIndex, inhibitoryFeatureIndex, candidateColumnConceptIndex, candidateFeatureConceptIndex, segmentsMask, sequenceIndex, sourcePosValue):
+	if(segmentsMask is None or not pt.any(segmentsMask)):
+		maskTensor = pt.zeros(arrayNumberOfSegments, dtype=pt.bool)
+		maskTensor[arrayIndexSegmentFirst] = True
+	else:
+		maskTensor = segmentsMask.clone().to(dtype=pt.bool)
+	updateEntry = {
+		"targetColumnConceptIndex": inhibitoryColumnConceptIndex,
+		"inhibitoryFeatureIndex": inhibitoryFeatureIndex,
+		"candidateColumnConceptIndex": candidateColumnConceptIndex,
+		"candidateFeatureConceptIndex": candidateFeatureConceptIndex,
+		"segmentsMask": maskTensor.cpu(),
+		"sequenceIndex": sequenceIndex,
+		"sourcePosValue": sourcePosValue
+	}
+	inhibitionBuffer.externalOutputUpdates.append(updateEntry)
 
 # Identify direct source->target pairs that satisfy enforceDirectConnections.
 def identifyDirectConnectionCandidates(sequenceObservedColumns):

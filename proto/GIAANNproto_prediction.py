@@ -608,6 +608,11 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 				globalFeatureConnectionsActivation = GIAANNproto_predictionActivate.decrementActivation(globalFeatureConnectionsActivation, activationDecrementPerPredictedToken)
 			if(inferenceUseNeuronFeaturePropertiesTime):
 				globalFeatureNeuronsTime = GIAANNproto_predictionActivate.decrementActivation(globalFeatureNeuronsTime, inferenceUseNeuronFeaturePropertiesTimeDecrement)
+		if(inferenceDecrementActivationsInhibitory):
+			globalInhibitoryActivation = getattr(databaseNetworkObject, "globalInhibitoryNeuronsActivation", None)
+			if(globalInhibitoryActivation is not None):
+				globalInhibitoryActivation = GIAANNproto_predictionActivate.decrementActivation(globalInhibitoryActivation, activationDecrementPerPredictedToken)
+				databaseNetworkObject.globalInhibitoryNeuronsActivation = globalInhibitoryActivation
 				
 		#process features (activate global target neurons);
 		if(multipleSources):
@@ -615,7 +620,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		else:
 			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation = GIAANNproto_predictionActivate.processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation)
 
-		if(inferenceDeactivateNeuronsUponPrediction or inferenceInvertNeuronActivationUponPrediction):
+		if(inferenceDeactivateNeuronsUponPrediction or inferenceInvertNeuronActivationUponPrediction or inferenceDeactivateNeuronsUponPredictionInhibitory):
 			indicesToUpdateList = []
 			for conceptIndex in range(conceptColumnsIndices.shape[0]):
 				conceptColumnsIndicesSource = conceptColumnsIndices[conceptIndex]
@@ -628,22 +633,28 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 					indicesToUpdate = pt.stack([pt.tensor(arrayIndexSegmentFirst, device=conceptColumnsIndicesSource.device), conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource], dim=0)
 					indicesToUpdateList.append(indicesToUpdate)
 			indicesToUpdate = pt.stack(indicesToUpdateList, dim=0)
-			if(inferenceDeactivateNeuronsUponPrediction):
-				modifier = 0
-			elif(inferenceInvertNeuronActivationUponPrediction):
-				modifier = inferenceInvertNeuronActivationUponPredictionLevel
-			globalFeatureNeuronsActivationOrig = globalFeatureNeuronsActivation
-			globalFeatureNeuronsActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsActivation, indicesToUpdate, modifier, multiply=inferenceInvertNeuronActivationUponPrediction)
-			if(inferenceUseNeuronFeaturePropertiesTime):
-				globalFeatureNeuronsTime = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsTime, indicesToUpdate, inferenceUseNeuronFeaturePropertiesTimeActivate)	#higher: neuron was more recently activated
-			
-			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivation)
-			if(transformerUseInputConnections):
-				databaseNetworkObject.globalFeatureConnections = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureConnections, globalFeatureConnectionsActivation, arrayIndexPropertiesActivation)
-			if(inferenceUseNeuronFeaturePropertiesTime):
-				databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTime)
-			if(predictionColumnsMustActivateConceptFeature):
-				conceptActivationState = updateConceptActivationState(conceptActivationState, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation)
+			if(inferenceDeactivateNeuronsUponPrediction or inferenceInvertNeuronActivationUponPrediction):
+				if(inferenceDeactivateNeuronsUponPrediction):
+					modifier = 0
+				elif(inferenceInvertNeuronActivationUponPrediction):
+					modifier = inferenceInvertNeuronActivationUponPredictionLevel
+				globalFeatureNeuronsActivationOrig = globalFeatureNeuronsActivation
+				globalFeatureNeuronsActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsActivation, indicesToUpdate, modifier, multiply=inferenceInvertNeuronActivationUponPrediction)
+				if(inferenceUseNeuronFeaturePropertiesTime):
+					globalFeatureNeuronsTime = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsTime, indicesToUpdate, inferenceUseNeuronFeaturePropertiesTimeActivate)	#higher: neuron was more recently activated
+				
+				databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivation)
+				if(transformerUseInputConnections):
+					databaseNetworkObject.globalFeatureConnections = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureConnections, globalFeatureConnectionsActivation, arrayIndexPropertiesActivation)
+				if(inferenceUseNeuronFeaturePropertiesTime):
+					databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTime)
+				if(predictionColumnsMustActivateConceptFeature):
+					conceptActivationState = updateConceptActivationState(conceptActivationState, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation)
+			if(inferenceDeactivateNeuronsUponPredictionInhibitory):
+				globalInhibitoryActivation = getattr(databaseNetworkObject, "globalInhibitoryNeuronsActivation", None)
+				if(globalInhibitoryActivation is not None):
+					globalInhibitoryActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalInhibitoryActivation, indicesToUpdate, 0, multiply=False)
+					databaseNetworkObject.globalInhibitoryNeuronsActivation = globalInhibitoryActivation
 	else:
 		#activation targets have already been activated
 		sequenceObservedColumnsPrediction = SequenceObservedColumnsDraw(databaseNetworkObject, observedColumnsDict)
@@ -711,6 +722,8 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 				featurePredictionTargetMatch = True
 	if(inferenceInhibitoryNeurons):
 		globalFeatureNeuronsActivation = GIAANNproto_predictionInhibition.applyInferenceInhibition(databaseNetworkObject, globalFeatureNeuronsActivation, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext)
+		#persist the inhibited activations so the next prediction step observes the updated state
+		databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivation)
 	
 	if(drawNetworkDuringInferencePredict):
 		#FUTURE: convert globalFeatureNeuronsActivation back to globalFeatureNeurons for draw
