@@ -79,9 +79,6 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 		featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder)
 
 
-	if(debugPrintNeuronActivations8):
-		featureConnectionsActive = featureConnectionsActive*1000
-	
 	featureConnectionsPos = featureNeuronsPos.view(1, cs, fs, 1, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
 
 	featureConnectionsInactive = 1 - featureConnectionsActive

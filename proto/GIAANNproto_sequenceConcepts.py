@@ -444,7 +444,4 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 					tokenSlice.append(tokens[tokenIndex].word)
 				tokenSpan = " ".join(tokenSlice)
 			
-			if(debugPrintNeuronActivations):
-				print(f"\tprocessFeatures debug: columnIndex={seqConceptIndex}, columnName={columnName}, localRange=[{startIdx}, {endIdx}), tokens={tokenSpan}")
-	
 	return featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask

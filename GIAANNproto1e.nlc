@@ -273,7 +273,7 @@ v1e (Codex IDE GPT-5.1-Codex):
 			2. select the inhibitory neuron associated with that feature node (ie same column index and feature index as the trained excitatory neuron).
 			3. Add (or update the weight) a connection between the inhibitory neuron and each of the identified alternate prediction candidate features.
 			4. add the identified inhibitory neuron to sequenceObservedInhibitoryNeurons
-		- [D] Train all the inhibitory neuron source connections exactly the same way as the excitatory (i.e. feature) neuron source connections: upgrade and execute processFeaturesActiveTrain(..., trainInhibitoryNeurons=True, sequenceObservedInhibitoryNeurons). i.e. for each excitatory target feature trained in source sequence, an inhibitory target feature is also trained.
+		- [D] Train all the inhibitory neuron source connections exactly the same way as the excitatory (i.e. feature) neuron source connections: upgrade and execute processFeaturesActiveTrain(). i.e. for each excitatory target feature trained in source sequence, an inhibitory target feature is also trained.
 		Store all excitatory neurons and connections in separate database structures and database files to inhibitory neurons and connections. Ensure that there is absolutely zero modification of the original excitatory database structures, files, and code.
 MANUAL; - patch loadFeatureNeuronsGlobal - if pathExists(globalFeatureNeuronsFileFull)
 MANUAL; - add option !inferencePredictiveNetwork:inferenceDecrementActivations = True
@@ -297,3 +297,5 @@ MANUAL; - rename GIAANNproto_sequenceObservedColumnsExcitation/GIAANNproto_datab
 	- 2. add option inferenceInhibitoryNeuronsOptimised=True - which skips the standard inhibitory neuron activation calculation (1.) and simply selects the inhibitory neuron to fire that is associated with the excitatory feature neuron that fired. This should be close to a single line of code. if inferenceInhibitoryNeuronsOptimised=False, then revert to method 1.
 - update GIAANNproto_databaseNetworkTrainInhibition to support detection of alternate prediction candidates external to the trained sequence
 - add options inferenceDeactivateNeuronsUponPredictionInhibitory/inferenceDecrementActivationsInhibitory
+- patch inference seeding to use any active segment features for seed connections
+- patch inferenceDeactivateNeuronsUponPredictionInhibitory/inferenceDecrementActivationsInhibitory

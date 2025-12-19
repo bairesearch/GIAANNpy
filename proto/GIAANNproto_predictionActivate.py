@@ -211,8 +211,30 @@ def computeConnectionMinWordDistanceMask(observedColumn, sourceFeatureIndex, tar
 			mask = pt.zeros(0, dtype=pt.bool, device=targetIndices.device)
 		else:
 			mask = pt.tensor(maskList, dtype=pt.bool, device=targetIndices.device)
+		if(debugPrintMinWordDistanceDetails):
+			printMinWordDistanceDetails(observedColumn, sourceFeatureIndex, targetIndices, mask, minDistanceLookup)
 		#print("mask = ", mask)
 	else:
 		mask = None
 	return mask
 	
+def printMinWordDistanceDetails(observedColumn, sourceFeatureIndex, targetIndices, mask, minDistanceLookup):
+	databaseNetworkObject = getattr(observedColumn, "databaseNetworkObject", None)
+	sourceColumnName = getattr(observedColumn, "conceptName", "<unknown>")
+	if(databaseNetworkObject is not None and 0 <= sourceFeatureIndex < len(databaseNetworkObject.conceptFeaturesList)):
+		sourceFeatureName = databaseNetworkObject.conceptFeaturesList[sourceFeatureIndex]
+	else:
+		sourceFeatureName = f"<feature:{sourceFeatureIndex}>"
+	for idx in range(targetIndices.shape[1]):
+		columnValue = int(targetIndices[1, idx].item())
+		featureValue = int(targetIndices[2, idx].item())
+		distanceValue = minDistanceLookup.get((columnValue, featureValue))
+		keepConnection = (mask[idx].item() == 1) if (mask is not None and idx < mask.shape[0]) else False
+		columnName = f"<column:{columnValue}>"
+		featureName = f"<feature:{featureValue}>"
+		if(databaseNetworkObject is not None):
+			if(0 <= columnValue < len(databaseNetworkObject.conceptColumnsList)):
+				columnName = databaseNetworkObject.conceptColumnsList[columnValue]
+			if(0 <= featureValue < len(databaseNetworkObject.conceptFeaturesList)):
+				featureName = databaseNetworkObject.conceptFeaturesList[featureValue]
+		print(f"debugMinDistance: source {sourceColumnName}:{sourceFeatureName} -> target {columnName}:{featureName} distance={distanceValue} keep={keepConnection}")

@@ -24,14 +24,11 @@ debugPrintTrainSentencePOS = True	#print each training sentence with POS tags
 debugConnectNodesToNextNodesInSequenceOnly = False
 printPredictionsDuringInferencePredict = True
 printPredictionsDuringInferencePredictBeamSearch = False
-debugPrintNeuronActivations = False
-debugPrintNeuronActivations7 = False
-debugPrintNeuronActivations8 = False	#prevent activation decay across sequences
-debugPrintNeuronActivations9 = False
 debugPrintInferenceInhibition = False
+debugPrintMinWordDistanceDetails = False
 
 #train/inference mode selection:
-useInference = True  #default: True	#support inference mode else train (only) mode
+useInference = True  #default: True	#support inference mode else train (only) modedebugPrintMinWordDistanceDetails
 drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
 if(useInference):
 	drawNetworkDuringInferenceSeed = False	#default: False
@@ -94,7 +91,7 @@ if(enforceDirectConnectionsSANI):
 	useSANI = True	#sequentially activated neuronal input (divide dendrites into segments)
 	enforceDirectConnectionsSANIminimal = False	#default: False	#orig: True
 else:
-	useSANI = False	#optional	#default: True	#orig: False	#sequentially activated neuronal input (divide dendrites into segments)
+	useSANI = True	#optional	#default: True	#orig: False	#sequentially activated neuronal input (divide dendrites into segments)
 	enforceDirectConnectionsSANIminimal = False
 if(enforceDirectConnectionsMinWordDistance):
 	arrayIndexPropertiesMinWordDistance = True	#store min word distance per connection
@@ -177,7 +174,7 @@ if(useInference):
 		inferenceConnectionsStrengthBoolean = False	#default: False
 		inferenceActivationStrengthBoolean = False	#default: False
 	else:
-		inferenceConnectionsStrengthBoolean = False	#default: False
+		inferenceConnectionsStrengthBoolean = True	#default: False
 		inferenceActivationStrengthBoolean = False	#default: False	
 	if(inferenceTrainPredictiveNetworkAllSequences):
 		inferenceRetainActivationsAcrossMultipleSequences = False	#default: False	#retain activations across sequences such that these can be used during training/inference
@@ -346,7 +343,7 @@ if(useInference):
 				activationDecrementSeed = activationDecrementPerPredictedSequence
 	
 	if(inferenceSeedNetwork):
-		numSeedTokens = 5	#number of seed tokens in last sequence of inference prompt (remaining tokens will be prediction tokens)
+		numSeedTokens = 5	#default: 5	#number of seed tokens in last sequence of inference prompt (remaining tokens will be prediction tokens)
 	else:
 		numSeedTokens = 0
 	if('inferenceDeactivateNeuronsUponPredictionInhibitory' not in locals()):
@@ -430,8 +427,8 @@ if(useSANI):
 		useSANIfeaturesAndColumns = False
 	else:
 		useSANIcolumns = False	#assign segments by concept column proximity to connection target during train (includes internal concept column)
-		useSANIfeatures = False	#assign segments by feature proximity to connection target during train
-		useSANIfeaturesAndColumns = True	#assign segments by column proximity first (excludes internal concept column) then feature proximity
+		useSANIfeatures = True	#assign segments by feature proximity to connection target during train
+		useSANIfeaturesAndColumns = False	#assign segments by column proximity first (excludes internal concept column) then feature proximity
 
 	if(useSANIfeaturesAndColumns):
 		arrayNumberOfSegmentsColumnDistance = 1	#min number of external column connections to target node (note first segment captures all other external columns)
@@ -449,7 +446,7 @@ if(useSANI):
 		if(enforceDirectConnectionsSANIminimal):
 			arrayNumberOfSegments = 2
 		else:
-			arrayNumberOfSegments = 5	#min number of nearest features to target node (note first segment captures all other features)
+			arrayNumberOfSegments = 5	#default: 5	#min number of nearest features to target node (note first segment captures all other features)
 		
 	algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment if previous external segment(s) active
 	#algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI

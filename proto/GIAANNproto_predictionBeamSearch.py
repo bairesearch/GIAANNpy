@@ -278,57 +278,29 @@ def selectBeamCandidates(stateFeatures, strengthLookup, candidateLimit, database
 
 def filterCandidatesByConnectedColumns(columnIndices, featureIndices, activationValues, connectedColumnsTensor, connectedColumnsFeatures=None, databaseNetworkObject=None):
 	if(connectedColumnsTensor is None):
-		if(debugPrintNeuronActivations9):
-			print("debug9: beam search connectivity filter disabled for candidate set")
 		return columnIndices, featureIndices, activationValues
 	if(columnIndices is None or featureIndices is None or activationValues is None):
-		if(debugPrintNeuronActivations9):
-			print("debug9: beam search connectivity filter skipped (missing candidate tensors)")
 		return None, None, None
 	if(connectedColumnsTensor.numel() == 0):
-		if(debugPrintNeuronActivations9):
-			print("debug9: beam search connectivity filter rejected all candidates (allowed tensor empty)")
 		return None, None, None
 	if(columnIndices.numel() == 0):
-		if(debugPrintNeuronActivations9):
-			print("debug9: beam search connectivity filter skipped (no candidate indices)")
 		return None, None, None
 	device = columnIndices.device
 	connectedColumnsDevice = connectedColumnsTensor.to(device)
 	if(connectedColumnsDevice.numel() == 0):
-		if(debugPrintNeuronActivations9):
-			print("debug9: beam search connectivity filter rejected all candidates (allowed tensor device empty)")
 		return None, None, None
-	if(debugPrintNeuronActivations9 and databaseNetworkObject is not None):
-		print("debug9: beam search allowed connectivity set = ", debugDescribeAllowedBeamFeatures(databaseNetworkObject, connectedColumnsTensor, connectedColumnsFeatures))
-		print("debug9: beam search candidate list prior to connectivity filter:")
-		for idx in range(columnIndices.shape[0]):
-			columnValue = int(columnIndices[idx].item())
-			featureValue = int(featureIndices[idx].item())
-			activationValue = float(activationValues[idx].item())
-			columnName, featureName = debugDescribeColumnFeatureName(databaseNetworkObject, columnValue, featureValue)
-			print(f"\t{columnName}[{featureValue}:{featureName}] activation={activationValue:.6e}")
 	allowedColumnsSet = set(connectedColumnsDevice.tolist())
 	selectedIndices = []
 	if(connectedColumnsFeatures is not None and len(connectedColumnsFeatures) > 0):
 		for idx in range(columnIndices.shape[0]):
 			columnValue = int(columnIndices[idx].item())
 			if(columnValue not in allowedColumnsSet):
-				if(debugPrintNeuronActivations9 and databaseNetworkObject is not None):
-					columnName, featureName = debugDescribeColumnFeatureName(databaseNetworkObject, columnValue, int(featureIndices[idx].item()))
-					print(f"\tdebug9: beam search rejected candidate (column not allowed): {columnName}[{featureIndices[idx].item()}:{featureName}]")
 				continue
 			featureAllowed = connectedColumnsFeatures.get(columnValue)
 			if(featureAllowed is None or len(featureAllowed) == 0):
-				if(debugPrintNeuronActivations9 and databaseNetworkObject is not None):
-					columnName, featureName = debugDescribeColumnFeatureName(databaseNetworkObject, columnValue, int(featureIndices[idx].item()))
-					print(f"\tdebug9: beam search rejected candidate (no allowed features listed): {columnName}[{featureIndices[idx].item()}:{featureName}]")
 				continue
 			featureValue = int(featureIndices[idx].item())
 			if(featureValue not in featureAllowed):
-				if(debugPrintNeuronActivations9 and databaseNetworkObject is not None):
-					columnName, featureName = debugDescribeColumnFeatureName(databaseNetworkObject, columnValue, featureValue)
-					print(f"\tdebug9: beam search rejected candidate (feature not allowed): {columnName}[{featureValue}:{featureName}]")
 				continue
 			selectedIndices.append(idx)
 	else:
@@ -336,17 +308,8 @@ def filterCandidatesByConnectedColumns(columnIndices, featureIndices, activation
 		mask = comparison.any(dim=0)
 		selectedIndices = pt.nonzero(mask, as_tuple=False).view(-1).tolist()
 	if(len(selectedIndices) == 0):
-		if(debugPrintNeuronActivations9):
-			print("debug9: beam search connectivity filter rejected all candidates")
 		return None, None, None
 	indexTensor = pt.tensor(selectedIndices, dtype=pt.long, device=columnIndices.device)
-	if(debugPrintNeuronActivations9 and databaseNetworkObject is not None):
-		print("debug9: beam search candidates surviving connectivity filter:")
-		for idx in selectedIndices:
-			columnValue = int(columnIndices[idx].item())
-			featureValue = int(featureIndices[idx].item())
-			columnName, featureName = debugDescribeColumnFeatureName(databaseNetworkObject, columnValue, featureValue)
-			print(f"\t{columnName}[{featureValue}:{featureName}]")
 	return columnIndices.index_select(0, indexTensor), featureIndices.index_select(0, indexTensor), activationValues.index_select(0, indexTensor)
 
 
@@ -582,9 +545,6 @@ def prepareBeamNodes(databaseNetworkObject, nodes, conceptActivationState, const
 			isDeterministicDelimiter = GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, adjustedFeature)
 			isProbabilisticDelimiter = GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, adjustedFeature)
 			if(not (isDeterministicDelimiter or isProbabilisticDelimiter)):
-				if(debugPrintNeuronActivations9):
-					columnName, featureName = debugDescribeColumnFeatureName(databaseNetworkObject, columnIndex, adjustedFeature)
-					print(f"debug9: beam node rejected in prepareBeamNodes - delimiter requires reference set delimiter feature but got {columnName}[{adjustedFeature}:{featureName}]")
 				continue
 		nodeKey = (columnIndex, adjustedFeature)
 		if(nodeKey in seenNodes):

@@ -300,9 +300,6 @@ class SequenceObservedColumns:
 			if not useGPUsparse:
 				featureConnections = featureConnections.to(deviceDense)
 
-			if(debugPrintNeuronActivations):
-				debugPrintConnectionSamples(f"raw observed connections for column {observedColumn.conceptName}", featureConnections.indices(), featureConnections.values())
-
 			indices = featureConnections.indices()  # shape [5, n_entries]
 			values = featureConnections.values()	# shape [n_entries]
 
@@ -329,9 +326,6 @@ class SequenceObservedColumns:
 				# Filter indices and values
 				filteredIndices = indices[:, combinedMask]
 				filteredValues = values[combinedMask]
-
-				if(debugPrintNeuronActivations):
-					debugPrintConnectionSamples(f"filtered observed connections source={observedColumn.conceptName} target={otherObservedColumn.conceptName}", filteredIndices, filteredValues)
 
 				# If we got no matches, filteredIndices and filteredValues will be empty.
 				# We do NOT continue here; we proceed to create and append empty results as per the original requirement.
@@ -367,9 +361,6 @@ class SequenceObservedColumns:
 							localTargetIdx = int(mappedOtherFIdx[sampleIdx].item())
 							targetFeatureName = self.indexToFeatureWord.get(localTargetIdx, "NA") if hasattr(self, "indexToFeatureWord") else "NA"
 							
-							if(debugPrintNeuronActivations):
-								print(f"\tsequenceObservedColumns debug: map source={observedColumn.conceptName} globalIdx={globalSourceIdx} -> localIdx={localSourceIdx} ({sourceFeatureName})")
-								print(f"\tsequenceObservedColumns debug: map target={otherObservedColumn.conceptName} globalIdx={globalTargetIdx} -> localIdx={localTargetIdx} ({targetFeatureName})")
 				else:
 					# Even if empty, we need to maintain correct shape to append
 					pass
@@ -385,9 +376,6 @@ class SequenceObservedColumns:
 				connectionIndicesList.append(filteredIndices)
 				connectionValuesList.append(filteredValues)
 
-				if(debugPrintNeuronActivations):
-					debugPrintConnectionSamples(f"sequence connections sourceIndex={cIdx} targetIndex={otherCIdx}", filteredIndices, filteredValues)
-
 		# Combine results
 		if connectionIndicesList:
 			combinedIndices = pt.cat(connectionIndicesList, dim=1)
@@ -402,10 +390,6 @@ class SequenceObservedColumns:
 			self.featureConnectionsOriginal = self.featureConnections.clone()
 			if(debugDrawNeuronActivations):
 				strengthSum = self.featureConnections[arrayIndexPropertiesStrength].sum().item()
-
-				if(debugPrintNeuronActivations):
-					print("\tsequenceObservedColumns debug: featureConnections dense strength sum = ", strengthSum)
-
 	
 	def updateObservedColumnsWrapper(self):
 		if(trainSequenceObservedColumnsMatchSequenceWords):

@@ -299,14 +299,6 @@ def buildConnectedColumnsLookupFromPrediction(databaseNetworkObject, observedCol
 		featureValues = rowTensor.detach().view(-1).tolist()
 		for featureValue in featureValues:
 			targetColumns, targetColumnFeatures = getConnectedColumnsForFeature(observedColumn, int(featureValue), includeFeatureDetails=debugConnectNodesToNextNodesInSequenceOnly)
-			if(debugPrintNeuronActivations9):
-				sourceColumnName = debugGetColumnName(databaseNetworkObject, columnIndex)
-				featureName = debugGetFeatureName(databaseNetworkObject, int(featureValue))
-				if(len(targetColumns) == 0):
-					print(f"debug9: connectivity trace - column '{sourceColumnName}' feature {featureValue} ({featureName}) has no outgoing connections")
-				else:
-					targetNames = [debugGetColumnName(databaseNetworkObject, targetColumnIndex) for targetColumnIndex in targetColumns if 0 <= targetColumnIndex < databaseNetworkObject.c]
-					print(f"debug9: connectivity trace - column '{sourceColumnName}' feature {featureValue} ({featureName}) connects to columns [{', '.join(targetNames)}]")
 			connectedColumnsSet.update(targetColumns)
 			if(debugConnectNodesToNextNodesInSequenceOnly and targetColumnFeatures is not None):
 				for targetColumnIndex, featureSet in targetColumnFeatures.items():
@@ -446,9 +438,6 @@ if not drawSequenceObservedColumns:
 def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequence, sequenceSeed, sequencePredict, numSeedTokens):
 
 	print("processConceptWordsInference:")
-	if(debugPrintNeuronActivations):
-		strengthSum = sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength].sum().item()
-		print("\tprocessConceptWordsInference debug: featureConnections strength sum = ", strengthSum)
 
 	sequenceWordIndex = 0
 	
@@ -490,13 +479,6 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 	conceptColumnsFeatureIndicesActivation = conceptColumnsFeatureIndices
 	
-	if(debugPrintNeuronActivations7 and sequenceWordIndex > 0):
-		debugSnapshotPrev = getattr(sequenceObservedColumns, "debugActivationSnapshot", None)
-		if(debugSnapshotPrev is not None and conceptColumnsIndices is not None and conceptColumnsIndices.numel() > 0 and conceptColumnsFeatureIndices is not None and conceptColumnsFeatureIndices.numel() > 0):
-			printPredictedNodeActivations(databaseNetworkObject, conceptColumnsIndices, conceptColumnsFeatureIndices, debugSnapshotPrev, f"prediction step sequenceWordIndex={sequenceWordIndex}, wordPredictionIndex={wordPredictionIndex} (pre-decrement)")
-
-	#print(f"processColumnInferencePrediction: {sequenceWordIndex}; conceptColumnsIndices = ", conceptColumnsIndices)
-
 	if(predictionEnsureConnectedToPreviousPrediction):
 		ensurePredictionStateAvailable(conceptColumnsIndices, conceptColumnsFeatureIndices, sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected context available before prediction")
 
@@ -519,15 +501,6 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	else:
 		globalFeatureConnectionsActivation = None
 
-	if(debugPrintNeuronActivations9):
-		targetWordDebug = getTargetWordForSequenceIndex(tokensSequence, sequenceWordIndex)
-		contextDescriptions = debugDescribeColumnFeatures(databaseNetworkObject, conceptColumnsIndices, conceptColumnsFeatureIndices)
-		if(len(contextDescriptions) == 0):
-			contextDescStr = "<none>"
-		else:
-			contextDescStr = ", ".join(contextDescriptions)
-		print(f"debug9: start prediction step sequenceWordIndex={sequenceWordIndex}, wordPredictionIndex={wordPredictionIndex}, targetWord='{targetWordDebug}', contextColumns={contextDescStr}")
-
 	allowedColumnsConstraint = None
 	constraintModePrediction = None
 	probabilisticDelimiterActive = False
@@ -547,33 +520,12 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 						constraintModePrediction = None
 					else:
 						constraintModePrediction = "internal"
-	if(debugPrintNeuronActivations9):
-		if(allowedColumnsConstraint is not None and allowedColumnsConstraint.numel() > 0):
-			allowedNames = [debugGetColumnName(databaseNetworkObject, int(val)) for val in allowedColumnsConstraint.detach().cpu().tolist()]
-			allowedDesc = "[" + ", ".join(allowedNames) + "]"
-		else:
-			allowedDesc = "<none>"
-		print(f"debug9: delimiter constraints -> constraintModePrediction={constraintModePrediction}, probabilisticDelimiterActive={probabilisticDelimiterActive}, allowedColumns={allowedDesc}")
 	if(predictionEnsureConnectedToPreviousPrediction):
 		#limit prediction candidates to columns directly connected to previously predicted nodes
 		connectedColumnsConstraint, connectedColumnsFeatureMap = buildConnectedColumnsLookupFromPrediction(databaseNetworkObject, observedColumnsDict, conceptColumnsIndices, conceptColumnsFeatureIndices)
 	else:
 		connectedColumnsConstraint = None
 		connectedColumnsFeatureMap = None
-	if(debugPrintNeuronActivations9):
-		if(connectedColumnsConstraint is None):
-			print("debug9: connectivity constraint disabled for this step")
-		else:
-			if(connectedColumnsConstraint.numel() == 0):
-				print("debug9: connectivity constraint empty (no outgoing connections detected)")
-			else:
-				connectedNames = [debugGetColumnName(databaseNetworkObject, int(val)) for val in connectedColumnsConstraint.detach().cpu().tolist()]
-				print(f"debug9: connectivity constraint allows columns: [{', '.join(connectedNames)}]")
-			if(connectedColumnsFeatureMap is not None and len(connectedColumnsFeatureMap) > 0):
-				for columnIndex in sorted(connectedColumnsFeatureMap.keys()):
-					columnName = debugGetColumnName(databaseNetworkObject, columnIndex)
-					featureDesc = debugDescribeFeatureSet(databaseNetworkObject, connectedColumnsFeatureMap[columnIndex])
-					print(f"debug9: connectivity feature filters for column '{columnName}': {featureDesc}")
 	if(predictionEnsureConnectedToPreviousPrediction and connectedColumnsConstraint is not None and connectedColumnsConstraint.numel() == 0):
 		raisePredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "previous prediction has no outgoing connections")
 		
@@ -608,19 +560,14 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 				globalFeatureConnectionsActivation = GIAANNproto_predictionActivate.decrementActivation(globalFeatureConnectionsActivation, activationDecrementPerPredictedToken)
 			if(inferenceUseNeuronFeaturePropertiesTime):
 				globalFeatureNeuronsTime = GIAANNproto_predictionActivate.decrementActivation(globalFeatureNeuronsTime, inferenceUseNeuronFeaturePropertiesTimeDecrement)
-		if(inferenceDecrementActivationsInhibitory):
-			globalInhibitoryActivation = getattr(databaseNetworkObject, "globalInhibitoryNeuronsActivation", None)
-			if(globalInhibitoryActivation is not None):
-				globalInhibitoryActivation = GIAANNproto_predictionActivate.decrementActivation(globalInhibitoryActivation, activationDecrementPerPredictedToken)
-				databaseNetworkObject.globalInhibitoryNeuronsActivation = globalInhibitoryActivation
-				
+
 		#process features (activate global target neurons);
 		if(multipleSources):
 			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation = GIAANNproto_predictionActivate.processFeaturesActivePredictMulti(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation)
 		else:
 			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation = GIAANNproto_predictionActivate.processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation)
 
-		if(inferenceDeactivateNeuronsUponPrediction or inferenceInvertNeuronActivationUponPrediction or inferenceDeactivateNeuronsUponPredictionInhibitory):
+		if(inferenceDeactivateNeuronsUponPrediction or inferenceInvertNeuronActivationUponPrediction):
 			indicesToUpdateList = []
 			for conceptIndex in range(conceptColumnsIndices.shape[0]):
 				conceptColumnsIndicesSource = conceptColumnsIndices[conceptIndex]
@@ -650,11 +597,6 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 					databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTime)
 				if(predictionColumnsMustActivateConceptFeature):
 					conceptActivationState = updateConceptActivationState(conceptActivationState, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation)
-			if(inferenceDeactivateNeuronsUponPredictionInhibitory):
-				globalInhibitoryActivation = getattr(databaseNetworkObject, "globalInhibitoryNeuronsActivation", None)
-				if(globalInhibitoryActivation is not None):
-					globalInhibitoryActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalInhibitoryActivation, indicesToUpdate, 0, multiply=False)
-					databaseNetworkObject.globalInhibitoryNeuronsActivation = globalInhibitoryActivation
 	else:
 		#activation targets have already been activated
 		sequenceObservedColumnsPrediction = SequenceObservedColumnsDraw(databaseNetworkObject, observedColumnsDict)
@@ -672,31 +614,13 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 			conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap)
 
 		if(predictionEnsureConnectedToPreviousPrediction and connectedColumnsConstraint is not None):
-			if(debugPrintNeuronActivations9):
-				predBeforeDesc = debugDescribeColumnFeatures(databaseNetworkObject, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred)
-				nextBeforeDesc = debugDescribeColumnFeatures(databaseNetworkObject, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext)
 			conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = applyConnectedColumnsConstraint(conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, connectedColumnsConstraint, connectedColumnsFeatureMap)
 			conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = applyConnectedColumnsConstraint(conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, connectedColumnsConstraint, connectedColumnsFeatureMap)
-			if(debugPrintNeuronActivations9):
-				predAfterDesc = debugDescribeColumnFeatures(databaseNetworkObject, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred)
-				nextAfterDesc = debugDescribeColumnFeatures(databaseNetworkObject, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext)
-				print(f"debug9: connectivity filter applied to predictions; before={predBeforeDesc if len(predBeforeDesc) > 0 else '<none>'}, after={predAfterDesc if len(predAfterDesc) > 0 else '<none>'}")
-				print(f"debug9: connectivity filter applied to next activations; before={nextBeforeDesc if len(nextBeforeDesc) > 0 else '<none>'}, after={nextAfterDesc if len(nextAfterDesc) > 0 else '<none>'}")
 			if(conceptColumnsIndicesPred is None or conceptColumnsIndicesPred.numel() == 0):
 				raisePredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected predictions available for current step")
 			if(conceptColumnsIndicesNext is None or conceptColumnsIndicesNext.numel() == 0):
 				raisePredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected activations available for next step")
 
-	if(debugPrintNeuronActivations7 or debugPrintNeuronActivations9):
-		globalFeatureNeuronsActivationAllSegmentsDebug = pt.sum(globalFeatureNeuronsActivation, dim=0)
-		if(globalFeatureNeuronsActivationAllSegmentsDebug.is_sparse):
-			globalFeatureNeuronsActivationAllSegmentsDebug = globalFeatureNeuronsActivationAllSegmentsDebug.to_dense()
-		if(debugPrintNeuronActivations7):
-			setattr(sequenceObservedColumns, "debugActivationSnapshot", globalFeatureNeuronsActivationAllSegmentsDebug.clone())
-		if(debugPrintNeuronActivations9):
-			debugPrintColumnFeatureActivationsDetailed(databaseNetworkObject, globalFeatureNeuronsActivationAllSegmentsDebug, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, "top-k predictions")
-			debugPrintColumnFeatureActivationsDetailed(databaseNetworkObject, globalFeatureNeuronsActivationAllSegmentsDebug, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, "next-step activations")
-			
 	featurePredictionTargetMatch = False
 	if(printPredictionsDuringInferencePredict):
 		#compare topk column/feature predictions to sequencePredict (target words);
@@ -724,7 +648,14 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		globalFeatureNeuronsActivation = GIAANNproto_predictionInhibition.applyInferenceInhibition(databaseNetworkObject, globalFeatureNeuronsActivation, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext)
 		#persist the inhibited activations so the next prediction step observes the updated state
 		databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivation)
-	
+		if(inferenceDecrementActivationsInhibitory):
+			globalInhibitoryActivation = getattr(databaseNetworkObject, "globalInhibitoryNeuronsActivation", None)
+			if(globalInhibitoryActivation is not None):
+				globalInhibitoryActivation = GIAANNproto_predictionActivate.decrementActivation(globalInhibitoryActivation, activationDecrementPerPredictedToken)
+				databaseNetworkObject.globalInhibitoryNeuronsActivation = globalInhibitoryActivation
+		if(inferenceDeactivateNeuronsUponPredictionInhibitory):
+			deactivatePredictedInhibitoryNeurons(databaseNetworkObject, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext)
+
 	if(drawNetworkDuringInferencePredict):
 		#FUTURE: convert globalFeatureNeuronsActivation back to globalFeatureNeurons for draw
 		GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumnsPrediction, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(sequenceWordIndex))
@@ -875,48 +806,39 @@ def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivat
 		
 	return conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex
 
+def deactivatePredictedInhibitoryNeurons(databaseNetworkObject, conceptColumnsIndices, conceptColumnsFeatureIndices):
+	indicesToUpdate = buildInhibitoryIndices(conceptColumnsIndices, conceptColumnsFeatureIndices)
+	if(indicesToUpdate is None):
+		return
+	globalInhibitoryActivation = getattr(databaseNetworkObject, "globalInhibitoryNeuronsActivation", None)
+	if(globalInhibitoryActivation is None):
+		return
+	globalInhibitoryActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalInhibitoryActivation, indicesToUpdate, 0, multiply=False)
+	databaseNetworkObject.globalInhibitoryNeuronsActivation = globalInhibitoryActivation
 
-def printPredictedNodeActivations(databaseNetworkObject, conceptColumnsIndices, conceptColumnsFeatureIndices, globalFeatureNeuronsActivationAllSegments, label):
-	if(not debugPrintNeuronActivations7):
-		return
-	if(conceptColumnsIndices is None or conceptColumnsIndices.numel() == 0):
-		print(f"debug7: {label} - no predictions available")
-		return
-	if(globalFeatureNeuronsActivationAllSegments is None):
-		print(f"debug7: {label} - activation tensor unavailable")
-		return
-	if(globalFeatureNeuronsActivationAllSegments.is_sparse):
-		activationDense = globalFeatureNeuronsActivationAllSegments.to_dense()
-	else:
-		activationDense = globalFeatureNeuronsActivationAllSegments
-	print(f"debug7: {label}")
+def buildInhibitoryIndices(conceptColumnsIndices, conceptColumnsFeatureIndices):
+	if(conceptColumnsIndices is None or conceptColumnsFeatureIndices is None):
+		return None
+	if(conceptColumnsIndices.numel() == 0 or conceptColumnsFeatureIndices.numel() == 0):
+		return None
+	indicesToUpdateList = []
 	for rowIndex in range(conceptColumnsIndices.shape[0]):
-		columnIndex = int(conceptColumnsIndices[rowIndex].item())
-		if(columnIndex < 0 or columnIndex >= activationDense.shape[0]):
+		columnTensor = conceptColumnsIndices[rowIndex]
+		rowFeatures = conceptColumnsFeatureIndices[rowIndex]
+		if(rowFeatures is None or rowFeatures.numel() == 0):
 			continue
-		rowTensor = activationDense[columnIndex]
-		if(columnIndex >= 0 and columnIndex < len(databaseNetworkObject.conceptColumnsList)):
-			columnName = databaseNetworkObject.conceptColumnsList[columnIndex]
-		else:
-			columnName = f"<invalid:{columnIndex}>"
-		if(conceptColumnsFeatureIndices is None or conceptColumnsFeatureIndices.shape[0] <= rowIndex):
-			featureValues = []
-		else:
-			rowTensorFeatures = conceptColumnsFeatureIndices[rowIndex]
-			if(rowTensorFeatures.dim() == 0):
-				featureValues = [int(rowTensorFeatures.item())]
+		featureValues = rowFeatures.reshape(-1)
+		for featureTensor in featureValues:
+			if(useSANI):
+				for segmentIndex in range(arrayNumberOfSegments):
+					indexToUpdate = pt.stack([pt.tensor(segmentIndex, device=columnTensor.device), columnTensor, featureTensor], dim=0)
+					indicesToUpdateList.append(indexToUpdate)
 			else:
-				featureValues = [int(val) for val in rowTensorFeatures.view(-1).tolist()]
-		for featureValue in featureValues:
-			if(0 <= featureValue < len(databaseNetworkObject.conceptFeaturesList)):
-				featureName = databaseNetworkObject.conceptFeaturesList[featureValue]
-			else:
-				featureName = f"feature_{featureValue}"
-			if(rowTensor is not None and 0 <= featureValue < rowTensor.shape[-1]):
-				activationValue = float(rowTensor[featureValue].item())
-			else:
-				activationValue = 0.0
-			print(f"\tcolumn '{columnName}', feature {featureValue} ({featureName}), activation={activationValue:.12e}")
+				indexToUpdate = pt.stack([pt.tensor(arrayIndexSegmentFirst, device=columnTensor.device), columnTensor, featureTensor], dim=0)
+				indicesToUpdateList.append(indexToUpdate)
+	if(len(indicesToUpdateList) == 0):
+		return None
+	return pt.stack(indicesToUpdateList, dim=0)
 
 
 def debugGetColumnName(databaseNetworkObject, columnIndex):
@@ -964,29 +886,3 @@ def debugDescribeFeatureSet(databaseNetworkObject, featureSet):
 	featureDescriptions = [f"{feature}:{debugGetFeatureName(databaseNetworkObject, feature)}" for feature in sorted(featureSet)]
 	return "[" + ", ".join(featureDescriptions) + "]"
 
-
-def debugPrintColumnFeatureActivationsDetailed(databaseNetworkObject, activationTensorDense, columnIndices, featureIndices, label):
-	if(not debugPrintNeuronActivations9):
-		return
-	if(columnIndices is None or columnIndices.numel() == 0):
-		print(f"debug9: {label} - no entries")
-		return
-	print(f"debug9: activation snapshot for {label}")
-	for rowIndex, columnValue in enumerate(columnIndices.detach().cpu().tolist()):
-		columnName = debugGetColumnName(databaseNetworkObject, int(columnValue))
-		if(featureIndices is not None and featureIndices.shape[0] > rowIndex):
-			rowTensor = featureIndices[rowIndex]
-		else:
-			rowTensor = None
-		if(rowTensor is None or rowTensor.numel() == 0):
-			print(f"\tcolumn '{columnName}' has no feature indices")
-			continue
-		rowValues = rowTensor.reshape(-1)
-		for featureValueTensor in rowValues:
-			featureValue = int(featureValueTensor.item())
-			featureName = debugGetFeatureName(databaseNetworkObject, featureValue)
-			if(0 <= featureValue < activationTensorDense.shape[-1]):
-				activationValue = float(activationTensorDense[int(columnValue), featureValue].item())
-			else:
-				activationValue = 0.0
-			print(f"\tcolumn '{columnName}', feature {featureValue} ({featureName}), activation={activationValue:.12e}")
