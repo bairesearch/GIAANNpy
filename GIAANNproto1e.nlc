@@ -299,3 +299,7 @@ MANUAL; - rename GIAANNproto_sequenceObservedColumnsExcitation/GIAANNproto_datab
 - add options inferenceDeactivateNeuronsUponPredictionInhibitory/inferenceDecrementActivationsInhibitory
 - patch inference seeding to use any active segment features for seed connections
 - patch inferenceDeactivateNeuronsUponPredictionInhibitory/inferenceDecrementActivationsInhibitory
+- every feature that fires must deactivate when fired if inferenceDeactivateNeuronsUponPrediction = True, even during seed phase.
+- every next predicted token must have minimum distance=1 from the last predicted token when enforceDirectConnectionsMinWordDistance=True - this constraint must be enforced always (even just after completing the seed phase).
+- when useSANI:enforceSequentialActivation=True the connection target node segments of the a) seeded and b) predicted nodes must activate according to the algorithmMatrixSANImethod="enforceActivationAcrossSegments rules: only activate a segment if previous segments active - see processFeaturesActivePredict(). Please patch this issue; both a) and b), and add a comment describing the issue being patched.
+- when useSANI:algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive=True; during prediction (including the first predicted node after seed), a node can only be selected to fire if its last segment is active - see neuronActivationSparse(). If this requirement is not being enforced, then apply a patch and add a comment.

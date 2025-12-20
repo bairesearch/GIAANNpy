@@ -212,9 +212,31 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 		featureNeuronsTargetActivation = featureNeuronsTargetActivation*j1
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 		globalFeatureNeuronsActivation = sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivation]
-		globalFeatureNeuronsActivation = globalFeatureNeuronsActivation + featureNeuronsTargetActivation
+	if(useSANI and algorithmMatrixSANImethod=="enforceActivationAcrossSegments" and enforceSequentialActivation):
+		# Patch: seed activation skipped SANI sequential gating, so later segments could activate without prior segments.
+		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
+			globalFeatureNeuronsActivationDense = globalFeatureNeuronsActivation.to_dense()
+			featureNeuronsTargetActivationDense = featureNeuronsTargetActivation
+			if(featureNeuronsTargetActivationDense.is_sparse):
+				featureNeuronsTargetActivationDense = featureNeuronsTargetActivationDense.to_dense()
+			previousChannelActivation = globalFeatureNeuronsActivationDense[:-1] > 0
+			globalFeatureNeuronsActivationDense[1:] += featureNeuronsTargetActivationDense[1:] * previousChannelActivation
+			globalFeatureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
+			globalFeatureNeuronsActivation = globalFeatureNeuronsActivationDense.to_sparse_coo()
+		else:
+			featureNeuronsActivationDense = sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation]
+			featureNeuronsTargetActivationDense = featureNeuronsTargetActivation
+			if(featureNeuronsTargetActivationDense.is_sparse):
+				featureNeuronsTargetActivationDense = featureNeuronsTargetActivationDense.to_dense()
+			previousChannelActivation = featureNeuronsActivationDense[:-1] > 0
+			featureNeuronsActivationDense[1:] += featureNeuronsTargetActivationDense[1:] * previousChannelActivation
+			featureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
+			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation] = featureNeuronsActivationDense
 	else:
-		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation, :, :, :] += featureNeuronsTargetActivation
+		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
+			globalFeatureNeuronsActivation = globalFeatureNeuronsActivation + featureNeuronsTargetActivation
+		else:
+			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation, :, :, :] += featureNeuronsTargetActivation
 	
 	if(inferenceDecrementActivations):
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
@@ -223,23 +245,37 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation] = GIAANNproto_predictionActivate.decrementActivationDense(sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation], activationDecrementSeed)
 					
 	if(inferenceDeactivateNeuronsUponPrediction):
+		wordOrderMask = pt.logical_and(featureNeuronsWordOrder >= firstSeedTokenIndex, featureNeuronsWordOrder < firstWordIndexPredictPhase)
+		columnsWordOrderExpanded1 = columnsWordOrder.view(cs, 1).expand(cs, fs)
+		columnsWordOrderMask = pt.logical_and(columnsWordOrderExpanded1 >= firstSeedConceptIndex, columnsWordOrderExpanded1 < firstConceptIndexPredictPhase)
+		wordOrderMask = pt.logical_and(wordOrderMask, columnsWordOrderMask)
+		seedFeatureMask = wordOrderMask.unsqueeze(0).expand(arrayNumberOfSegments, cs, fs)
+		indicesToUpdateLocal = pt.nonzero(seedFeatureMask, as_tuple=False)
+		indicesToUpdateGlobal = None
+		if(indicesToUpdateLocal.numel() > 0):
+			conceptIndexLookup = sequenceObservedColumns.conceptIndicesInSequenceObservedTensor.to(indicesToUpdateLocal.device)
+			featureIndexLookup = sequenceObservedColumns.featureIndicesInObservedTensor.to(indicesToUpdateLocal.device)
+			sequenceConceptIndices = indicesToUpdateLocal[:, 1]
+			sequenceFeatureIndices = indicesToUpdateLocal[:, 2]
+			globalConceptIndices = conceptIndexLookup.index_select(0, sequenceConceptIndices)
+			globalFeatureIndices = featureIndexLookup.index_select(0, sequenceFeatureIndices)
+			segmentIndices = indicesToUpdateLocal[:, 0].unsqueeze(1)
+			indicesToUpdateGlobal = pt.cat([segmentIndices, globalConceptIndices.unsqueeze(1), globalFeatureIndices.unsqueeze(1)], dim=1)
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-			if(useSANI):
-				printe("processFeaturesActiveSeed error: inferenceDeactivateNeuronsUponPrediction:inferenceSeedTargetActivationsGlobalFeatureArrays:useSANI is not yet implemented")
-			else:
-				indicesToUpdate = pt.tensor([0, firstSeedConceptIndex, firstSeedFeatureIndex]).unsqueeze(0)
+			# Patch: seed deactivation must also clear matching global activations so fired features cannot persist into prediction.
+			if(indicesToUpdateGlobal is not None and indicesToUpdateGlobal.numel() > 0):
+				indicesToUpdateGlobal = indicesToUpdateGlobal.to(globalFeatureNeuronsActivation.device)
 				globalFeatureNeuronsActivation = globalFeatureNeuronsActivation.coalesce()
-				globalFeatureNeuronsActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsActivation, indicesToUpdate, 0)
+				globalFeatureNeuronsActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsActivation, indicesToUpdateGlobal, 0)
 		else:
-			wordOrderMask = pt.logical_and(featureNeuronsWordOrder >= firstSeedTokenIndex, featureNeuronsWordOrder < firstWordIndexPredictPhase)
-			columnsWordOrderExpanded1 = columnsWordOrder.view(cs, 1).expand(cs, fs)
-			columnsWordOrderMask = pt.logical_and(columnsWordOrderExpanded1 >= firstSeedConceptIndex, columnsWordOrderExpanded1 < firstConceptIndexPredictPhase)
-
-			wordOrderMask = pt.logical_and(wordOrderMask, columnsWordOrderMask)
-			wordOrderMask = wordOrderMask.unsqueeze(0).expand(arrayNumberOfSegments, cs, fs)
-			featureNeuronsActiveSource = pt.logical_and(wordOrderMask, featureNeuronsActive > 0)
-			featureNeuronsInactiveSource = pt.logical_not(featureNeuronsActiveSource).float()
+			featureNeuronsInactiveSource = pt.logical_not(seedFeatureMask).float()
 			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation, :, :, :] *= featureNeuronsInactiveSource
+			if(indicesToUpdateGlobal is not None and indicesToUpdateGlobal.numel() > 0):
+				globalFeatureNeuronsActivation = sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivation]
+				indicesToUpdateGlobal = indicesToUpdateGlobal.to(globalFeatureNeuronsActivation.device)
+				globalFeatureNeuronsActivation = globalFeatureNeuronsActivation.coalesce()
+				globalFeatureNeuronsActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsActivation, indicesToUpdateGlobal, 0)
+				sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivation)
 
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 		sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivation)

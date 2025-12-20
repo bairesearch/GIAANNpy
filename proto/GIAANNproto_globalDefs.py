@@ -37,7 +37,7 @@ if(useInference):
 	if(inferenceBeamSearch):
 		inferencePredictiveNetwork = False	#default: False
 	else:
-		inferencePredictiveNetwork = True	#default: True	#use MLP to predict next token
+		inferencePredictiveNetwork = False	#default: True	#use MLP to predict next token
 	if(inferencePredictiveNetwork):
 		inferenceTrainPredictiveNetworkAllSequences = True	 #default: True - performs inference on all input text (enables predictive network training on every sequence in corpus)	#precondition: expects database network to have been completely trained (with !useInference on all sequences)
 	else:
@@ -48,7 +48,7 @@ if(useInference):
 		if(inferenceTrainPredictiveNetworkAllSequences):
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False #False: prediction targets (rather than predictions) are used to continously seed inference to train predictive network
 		else:
-			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#orig: True	#True: next token predictions are used to activate the next column features (rather than prediction targets)	#set to False only to compare predictive performance with inferencePredictiveNetwork
+			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#orig: True	#True: next token predictions are used to activate the next column features (rather than prediction targets)	#set to False only to compare predictive performance with inferencePredictiveNetwork
 
 #RAM availability vars;
 useGPUdense = True	#default: True
@@ -65,11 +65,12 @@ numberEpochs = 1	#default: 1
 multisentencePredictions = False	#default: False	#requires higher GPU RAM for train
 if(multisentencePredictions):
 	numSentencesPerSequence = 3	#default: 3
+numSeedTokensInference = 8	#default: 5
 
 #inhibitory neurons;
 useInhibitoryNeurons = False	#planned new default: True #orig: False
 if(useInhibitoryNeurons):
-	trainInhibitoryNeurons = True	
+	trainInhibitoryNeurons = True
 	inferenceInhibitoryNeurons = True
 	inferenceInhibitoryNeuronsOptimised = True	#skip full inhibitory activation by mirroring excitatory activations
 	inhibitoryNeuronYoffset = 10
@@ -171,10 +172,10 @@ if(useInference):
 	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	transformerUseInputConnections = False	#initialise (dependent var)
 	if(useSANI):
-		inferenceConnectionsStrengthBoolean = False	#default: False
-		inferenceActivationStrengthBoolean = False	#default: False
+		inferenceConnectionsStrengthBoolean = True	#default: True	#do not overweight by common features (e.g. determiners)
+		inferenceActivationStrengthBoolean = True	#default: True	#do not overweight by common features (e.g. determiners)
 	else:
-		inferenceConnectionsStrengthBoolean = True	#default: False
+		inferenceConnectionsStrengthBoolean = False	#default: False
 		inferenceActivationStrengthBoolean = False	#default: False	
 	if(inferenceTrainPredictiveNetworkAllSequences):
 		inferenceRetainActivationsAcrossMultipleSequences = False	#default: False	#retain activations across sequences such that these can be used during training/inference
@@ -343,7 +344,7 @@ if(useInference):
 				activationDecrementSeed = activationDecrementPerPredictedSequence
 	
 	if(inferenceSeedNetwork):
-		numSeedTokens = 5	#default: 5	#number of seed tokens in last sequence of inference prompt (remaining tokens will be prediction tokens)
+		numSeedTokens = numSeedTokensInference	#default: 5	#number of seed tokens in last sequence of inference prompt (remaining tokens will be prediction tokens)
 	else:
 		numSeedTokens = 0
 	if('inferenceDeactivateNeuronsUponPredictionInhibitory' not in locals()):
@@ -432,7 +433,7 @@ if(useSANI):
 
 	if(useSANIfeaturesAndColumns):
 		arrayNumberOfSegmentsColumnDistance = 1	#min number of external column connections to target node (note first segment captures all other external columns)
-		arrayNumberOfSegmentsFeatureDistance = 4	#number of nearest features to target node
+		arrayNumberOfSegmentsFeatureDistance = numSeedTokensInference-arrayNumberOfSegmentsColumnDistance	#number of nearest features to target node
 		arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance + arrayNumberOfSegmentsFeatureDistance
 	elif(useSANIcolumns):
 		if(multisentencePredictions):
@@ -446,14 +447,14 @@ if(useSANI):
 		if(enforceDirectConnectionsSANIminimal):
 			arrayNumberOfSegments = 2
 		else:
-			arrayNumberOfSegments = 5	#default: 5	#min number of nearest features to target node (note first segment captures all other features)
+			arrayNumberOfSegments = numSeedTokensInference	#default: 5	#min number of nearest features to target node (note first segment captures all other features)
 		
-	algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment if previous external segment(s) active
+	algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment if previous segment(s) active
 	#algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI
 	if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
-		#algorithmMatrixSANIenforceRequirement="enforceAnySegmentMustBeActive"	#activate neuron if any external segment is active
-		algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default	#only activate neuron if last external segment active
-		#algorithmMatrixSANIenforceRequirement="enforceAllSegmentsMustBeActive" #only activate neuron if all external segments are active	#if(enforceSequentialActivation) then redundant; use enforceLastSegmentMustBeActive instead
+		#algorithmMatrixSANIenforceRequirement="enforceAnySegmentMustBeActive"	#activate neuron if any segment is active
+		algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default	#only activate neuron if last segment active
+		#algorithmMatrixSANIenforceRequirement="enforceAllSegmentsMustBeActive" #only activate neuron if all segments are active	#if(enforceSequentialActivation) then redundant; use enforceLastSegmentMustBeActive instead
 		if(enforceDirectConnectionsSANIminimal):
 			enforceSequentialActivation = False
 		else:
@@ -481,7 +482,7 @@ if(useSANI):
 	if(useInference):
 		#arrayNumberOfSegments must be <= numSeedTokens (eg with numSeedTokens = 5, segment budget = 5)
 		#absolute minimum, for useSANIcolumns (and useSANIfeaturesAndColumns with arrayNumberOfSegmentsColumnDistance>1), arrayNumberOfSegments must be significantly less than numSeedTokens
-		assert arrayNumberOfSegments <= numSeedTokens	
+		assert arrayNumberOfSegments <= numSeedTokensInference	
 else:
 	arrayNumberOfSegments = 1
 	algorithmMatrixSANImethod = "NA"

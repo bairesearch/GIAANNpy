@@ -265,6 +265,7 @@ def selectBeamCandidates(stateFeatures, strengthLookup, candidateLimit, database
 	if(columnIndices is None):
 		return []
 	columnIndices, featureIndices, activationValues = filterCandidatesByActivationThreshold(columnIndices, featureIndices, activationValues)
+	columnIndices, featureIndices, activationValues = filterCandidatesByLastSegment(columnIndices, featureIndices, activationValues, stateFeatures, databaseNetworkObject.f)
 	if(columnIndices is None):
 		return []
 	columnIndices, featureIndices, activationValues = filterCandidatesByConnectedColumns(columnIndices, featureIndices, activationValues, connectedColumnsTensor, connectedColumnsFeatures, databaseNetworkObject)
@@ -311,6 +312,57 @@ def filterCandidatesByConnectedColumns(columnIndices, featureIndices, activation
 		return None, None, None
 	indexTensor = pt.tensor(selectedIndices, dtype=pt.long, device=columnIndices.device)
 	return columnIndices.index_select(0, indexTensor), featureIndices.index_select(0, indexTensor), activationValues.index_select(0, indexTensor)
+
+def filterCandidatesByLastSegment(columnIndices, featureIndices, activationValues, stateFeatures, maxFeatures):
+	filteredColumns = columnIndices
+	filteredFeatures = featureIndices
+	filteredActivations = activationValues
+	if(useSANI and algorithmMatrixSANImethod=="enforceActivationAcrossSegments" and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+		if(filteredColumns is None or filteredFeatures is None or filteredActivations is None):
+			filteredColumns = None
+			filteredFeatures = None
+			filteredActivations = None
+		else:
+			# Patch: beam candidates ignored last-segment gating, so filter by last-segment-active nodes.
+			if(enforceActivationAcrossSegmentsIgnoreInternalColumn):
+				lastSegmentConstraint = arrayIndexSegmentAdjacentColumn
+			else:
+				lastSegmentConstraint = arrayIndexSegmentLast
+			lastSegmentActivation = stateFeatures[lastSegmentConstraint]
+			if(lastSegmentActivation is None):
+				filteredColumns = None
+				filteredFeatures = None
+				filteredActivations = None
+			else:
+				lastSegmentActivation = lastSegmentActivation.coalesce()
+				if(lastSegmentActivation._nnz() == 0):
+					filteredColumns = None
+					filteredFeatures = None
+					filteredActivations = None
+				else:
+					lastIndices = lastSegmentActivation.indices()
+					lastKeys = (lastIndices[0].cpu() * maxFeatures + lastIndices[1].cpu()).tolist()
+					if(len(lastKeys) == 0):
+						filteredColumns = None
+						filteredFeatures = None
+						filteredActivations = None
+					else:
+						lastKeySet = set(int(value) for value in lastKeys)
+						selectedIndices = []
+						for idx in range(filteredColumns.shape[0]):
+							key = int(filteredColumns[idx].item()) * maxFeatures + int(filteredFeatures[idx].item())
+							if(key in lastKeySet):
+								selectedIndices.append(idx)
+						if(len(selectedIndices) == 0):
+							filteredColumns = None
+							filteredFeatures = None
+							filteredActivations = None
+						else:
+							indexTensor = pt.tensor(selectedIndices, dtype=pt.long, device=filteredColumns.device)
+							filteredColumns = filteredColumns.index_select(0, indexTensor)
+							filteredFeatures = filteredFeatures.index_select(0, indexTensor)
+							filteredActivations = filteredActivations.index_select(0, indexTensor)
+	return filteredColumns, filteredFeatures, filteredActivations
 
 
 def selectBeamCandidatesConceptColumns(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures, databaseNetworkObject, constraintState=None, conceptActivationState=None):
@@ -590,7 +642,7 @@ def buildConnectedColumnsLookupForBeamNodes(databaseNetworkObject, observedColum
 	if(nodes is None or len(nodes) == 0):
 		return None, None
 	connectedColumnsSet = set()
-	if(debugConnectNodesToNextNodesInSequenceOnly):
+	if(debugConnectNodesToNextNodesInSequenceOnly or enforceDirectConnectionsMinWordDistance):
 		connectedColumnsFeatures = {}
 	else:
 		connectedColumnsFeatures = None
@@ -598,9 +650,9 @@ def buildConnectedColumnsLookupForBeamNodes(databaseNetworkObject, observedColum
 		observedColumn = getObservedColumnForBeam(databaseNetworkObject, observedColumnsDict, columnIndex)
 		if(observedColumn is None):
 			continue
-		targetColumns, targetFeatures = getConnectedColumnsForBeamFeature(observedColumn, featureIndex, includeFeatureDetails=debugConnectNodesToNextNodesInSequenceOnly)
+		targetColumns, targetFeatures = getConnectedColumnsForBeamFeature(observedColumn, featureIndex, includeFeatureDetails=(connectedColumnsFeatures is not None))
 		connectedColumnsSet.update(targetColumns)
-		if(debugConnectNodesToNextNodesInSequenceOnly and targetFeatures is not None):
+		if(connectedColumnsFeatures is not None and targetFeatures is not None):
 			for targetColumnIndex, featureSet in targetFeatures.items():
 				if(targetColumnIndex < 0 or targetColumnIndex >= databaseNetworkObject.c):
 					continue
@@ -608,14 +660,14 @@ def buildConnectedColumnsLookupForBeamNodes(databaseNetworkObject, observedColum
 				columnFeatureSet.update(featureSet)
 	if(len(connectedColumnsSet) == 0):
 		emptyTensor = pt.empty(0, dtype=pt.long, device=deviceSparse)
-		return emptyTensor, ({} if debugConnectNodesToNextNodesInSequenceOnly else None)
+		return emptyTensor, ({} if connectedColumnsFeatures is not None else None)
 	validColumns = [col for col in connectedColumnsSet if col >= 0 and col < databaseNetworkObject.c]
 	if(len(validColumns) == 0):
 		emptyTensor = pt.empty(0, dtype=pt.long, device=deviceSparse)
-		return emptyTensor, ({} if debugConnectNodesToNextNodesInSequenceOnly else None)
+		return emptyTensor, ({} if connectedColumnsFeatures is not None else None)
 	validColumns.sort()
 	connectedTensor = pt.tensor(validColumns, dtype=pt.long, device=deviceSparse)
-	if(debugConnectNodesToNextNodesInSequenceOnly):
+	if(connectedColumnsFeatures is not None):
 		filteredFeatureMap = {}
 		for columnIndex in validColumns:
 			if(connectedColumnsFeatures is None):
