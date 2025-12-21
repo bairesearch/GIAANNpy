@@ -190,7 +190,6 @@ def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWor
 	return featureConnectionsActive, featureConnectionsSegmentMask
 
 def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, featureNeuronsWordOrder):
-
 	if(useSANIcolumns):
 		conceptNeuronsConceptOrder1d = pt.arange(cs)
 		conceptNeuronsDistances = pt.abs(conceptNeuronsConceptOrder1d.unsqueeze(1) - conceptNeuronsConceptOrder1d).reshape(cs, cs)
@@ -224,12 +223,22 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 		conceptNeuronsConceptOrder1d = pt.arange(cs, device=device)
 		conceptNeuronsDistances = pt.abs(conceptNeuronsConceptOrder1d.unsqueeze(1) - conceptNeuronsConceptOrder1d).reshape(cs, cs)
 		conceptNeuronsDistances = conceptNeuronsDistances.view(cs, 1, cs, 1).expand(cs, fs, cs, fs)
-		columnSegmentIndex = arrayNumberOfSegmentsColumnDistance - conceptNeuronsDistances
-		columnSegmentIndex = columnSegmentIndex.clamp(min=0, max=max(arrayNumberOfSegmentsColumnDistance-1, 0)).long()
-		useFeatureSegmentsMask = (conceptNeuronsDistances == 0)
-		connectionsSegmentIndex = pt.where(useFeatureSegmentsMask, featureSegmentIndex, columnSegmentIndex)
 		featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
-		featureConnectionsSegmentMask.scatter_(0, connectionsSegmentIndex.unsqueeze(0), True)
+		featureConnectionsSegmentMask.scatter_(0, featureSegmentIndex.unsqueeze(0), True)
+		if(arrayNumberOfSegmentsColumnDistance > 0):
+			if(useSANIfeaturesAndColumnsInternal):
+				# Include internal column as the most proximal concept segment.
+				columnSegmentIndex = arrayNumberOfSegmentsColumnDistance - conceptNeuronsDistances - 1
+			else:
+				# External columns only: exclude the internal column from concept segments.
+				columnSegmentIndex = arrayNumberOfSegmentsColumnDistance - conceptNeuronsDistances
+			columnSegmentIndex = columnSegmentIndex.clamp(min=0, max=arrayNumberOfSegmentsColumnDistance-1).long()
+			columnSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
+			columnSegmentMask.scatter_(0, columnSegmentIndex.unsqueeze(0), True)
+			if(not useSANIfeaturesAndColumnsInternal):
+				externalColumnMask = (conceptNeuronsDistances > 0)
+				columnSegmentMask = columnSegmentMask & externalColumnMask.unsqueeze(0)	#exclude internal column
+			featureConnectionsSegmentMask = featureConnectionsSegmentMask | columnSegmentMask
 
 	featureConnectionsActive = featureConnectionsSegmentMask * featureConnectionsActive.unsqueeze(0)
 

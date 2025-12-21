@@ -37,6 +37,42 @@ def decrementActivation(featureNeuronsActivation, activationDecrement):
 		featureNeuronsActivation = GIAANNproto_sparseTensors.subtractValueFromSparseTensorValues(featureNeuronsActivation, activationDecrementPerPredictedSequence)
 	return featureNeuronsActivation
 
+if(inferenceSegmentActivationsBoolean):
+	def applySegmentActivationsBooleanFeatureSegmentsOnly(globalFeatureNeuronsActivation):
+		featureSegmentStart = arrayNumberOfSegmentsColumnDistance
+		if featureSegmentStart <= 0:
+			printe("useSANIfeaturesAndColumns and no feature segments")
+		if globalFeatureNeuronsActivation.is_sparse:
+			sparseActivation = globalFeatureNeuronsActivation.coalesce()
+			if featureSegmentStart >= sparseActivation.size(0):
+				printe("feature segments start beyond the last segment")
+			indices = sparseActivation.indices()
+			values = sparseActivation.values()
+			mask = indices[0] >= featureSegmentStart
+			if pt.any(mask):
+				#entries in feature segments
+				values = values.clone()
+				values[mask] = (values[mask] > 0).to(values.dtype)
+				return pt.sparse_coo_tensor(indices, values, sparseActivation.size(), device=sparseActivation.device)
+			else:
+				return sparseActivation
+		else:
+			globalFeatureNeuronsActivation = globalFeatureNeuronsActivation.clone()
+			if featureSegmentStart < globalFeatureNeuronsActivation.size(0):
+				globalFeatureNeuronsActivation[featureSegmentStart:] = (globalFeatureNeuronsActivation[featureSegmentStart:] > 0).to(globalFeatureNeuronsActivation.dtype)
+			return globalFeatureNeuronsActivation
+
+	def applySegmentActivationsBoolean(globalFeatureNeuronsActivation):
+		if(inferenceSegmentActivationsBooleanFeatureSegmentsOnly):
+			if(useSANIcolumns):
+				return globalFeatureNeuronsActivation
+			elif(useSANIfeatures):
+				return globalFeatureNeuronsActivation.bool().float()
+			elif(useSANIfeaturesAndColumns):
+				return applySegmentActivationsBooleanFeatureSegmentsOnly(globalFeatureNeuronsActivation)
+		else:
+			return globalFeatureNeuronsActivation.bool().float()
+
 #first dim cs1 restricted to a candiate set of tokens.
 def processFeaturesActivePredictMulti(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndices):
 	#print("processFeaturesActivePredictMulti:")
@@ -61,7 +97,9 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 	
 	featureNeuronsActive = featureNeuronsActive[conceptColumnsIndices.squeeze().item()]	#select columns
 	featureNeuronsActive = featureNeuronsActive[conceptColumnsFeatureIndices.squeeze().squeeze().item()]	#select features
-	
+	if(inferenceSourceActivationsBoolean):
+		featureNeuronsActive = (featureNeuronsActive > 0).to(featureNeuronsActive.dtype)	#ensure the source activation signal is binary (even with useSANI)
+
 	#target neuron activation dependence on connection strength;
 	featureConnectionsStrength = featureConnections[arrayIndexPropertiesStrength]
 	if(inferenceConnectionStrengthPOSdependence):
@@ -82,16 +120,30 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 		#print("featureNeuronsTargetActivation = ", featureNeuronsTargetActivation)
 	else:
 		featureNeuronsTargetActivation = featureNeuronsTargetActivation*j1
-		
+
 	#update the activations of the target nodes;
 	if(useSANI):
 		if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
 			if(enforceSequentialActivation):
 				globalFeatureNeuronsActivationDense = globalFeatureNeuronsActivation.to_dense()
 				featureNeuronsTargetActivationDense = featureNeuronsTargetActivation.to_dense()
-				previousChannelActivation = globalFeatureNeuronsActivationDense[:-1] > 0
-				globalFeatureNeuronsActivationDense[1:] += featureNeuronsTargetActivationDense[1:] * previousChannelActivation
-				globalFeatureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
+				if(useSANIfeaturesAndColumns):
+					# For useSANIfeaturesAndColumns, enforce sequential activation independently for:
+					# a) concept/column segments and b) feature segments.
+					featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
+					assert featureSegmentsOffset >= 0 and featureSegmentsOffset < arrayNumberOfSegments
+					previousConceptChannelActivation = globalFeatureNeuronsActivationDense[:featureSegmentsOffset-1] > 0 if featureSegmentsOffset > 1 else None
+					previousFeatureChannelActivation = globalFeatureNeuronsActivationDense[featureSegmentsOffset:arrayNumberOfSegments-1] > 0 if featureSegmentsOffset+1 < arrayNumberOfSegments else None
+					if(previousConceptChannelActivation is not None):
+						globalFeatureNeuronsActivationDense[1:featureSegmentsOffset] += featureNeuronsTargetActivationDense[1:featureSegmentsOffset] * previousConceptChannelActivation
+					if(previousFeatureChannelActivation is not None):
+						globalFeatureNeuronsActivationDense[featureSegmentsOffset+1:] += featureNeuronsTargetActivationDense[featureSegmentsOffset+1:] * previousFeatureChannelActivation
+					globalFeatureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
+					globalFeatureNeuronsActivationDense[featureSegmentsOffset] += featureNeuronsTargetActivationDense[featureSegmentsOffset]
+				else:
+					previousChannelActivation = globalFeatureNeuronsActivationDense[:-1] > 0
+					globalFeatureNeuronsActivationDense[1:] += featureNeuronsTargetActivationDense[1:] * previousChannelActivation
+					globalFeatureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
 				globalFeatureNeuronsActivation = globalFeatureNeuronsActivationDense.to_sparse_coo()
 			else:
 				globalFeatureNeuronsActivation += featureNeuronsTargetActivation
@@ -99,8 +151,8 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 			globalFeatureNeuronsActivation += featureNeuronsTargetActivation
 	else:
 		globalFeatureNeuronsActivation += featureNeuronsTargetActivation
-	if(inferenceActivationStrengthBoolean):
-		globalFeatureNeuronsActivation = globalFeatureNeuronsActivation.bool().float()
+	if(inferenceSegmentActivationsBoolean):
+		globalFeatureNeuronsActivation = applySegmentActivationsBoolean(globalFeatureNeuronsActivation)
 		
 	if(transformerUseInputConnections):
 		featureNeuronsTargetActivation = GIAANNproto_sparseTensors.expand_sparse_tensor(featureNeuronsTargetActivation, 1, conceptColumnsIndices.squeeze(), new_dim_size=databaseNetworkObject.c)

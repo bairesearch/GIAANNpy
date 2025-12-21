@@ -362,6 +362,7 @@ def filterCandidatesByLastSegment(columnIndices, featureIndices, activationValue
 							filteredColumns = filteredColumns.index_select(0, indexTensor)
 							filteredFeatures = filteredFeatures.index_select(0, indexTensor)
 							filteredActivations = filteredActivations.index_select(0, indexTensor)
+
 	return filteredColumns, filteredFeatures, filteredActivations
 
 

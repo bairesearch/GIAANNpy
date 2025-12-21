@@ -566,6 +566,20 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation = GIAANNproto_predictionActivate.processFeaturesActivePredictMulti(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation)
 		else:
 			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation = GIAANNproto_predictionActivate.processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation)
+		if(debugSANIfeaturesAndColumns and useSANIfeaturesAndColumns):
+			if(globalFeatureNeuronsActivation.is_sparse):
+				featureNeuronsActivationDense = globalFeatureNeuronsActivation.to_dense()
+			else:
+				featureNeuronsActivationDense = globalFeatureNeuronsActivation
+			conceptIndexLookup = sequenceObservedColumns.conceptIndicesInSequenceObservedTensor.to(featureNeuronsActivationDense.device)
+			featureIndexLookup = sequenceObservedColumns.featureIndicesInObservedTensor.to(featureNeuronsActivationDense.device)
+			if(conceptIndexLookup.numel() == 0 or featureIndexLookup.numel() == 0):
+				segmentFeatureActivations = [[] for _ in range(arrayNumberOfSegments)]
+			else:
+				featureNeuronsActivationDense = featureNeuronsActivationDense.index_select(1, conceptIndexLookup)
+				featureNeuronsActivationDense = featureNeuronsActivationDense.index_select(2, featureIndexLookup)
+				segmentFeatureActivations = featureNeuronsActivationDense.sum(dim=1).to("cpu").tolist()
+			print("\tdebugSANIfeaturesAndColumns: predict segmentFeatureActivations={0}".format(segmentFeatureActivations))
 
 	else:
 		#activation targets have already been activated

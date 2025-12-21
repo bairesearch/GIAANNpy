@@ -195,12 +195,12 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 	firstWordIndexPredictPhase = firstSeedTokenIndex+numSeedTokens
 	firstConceptIndexPredictPhase = firstSeedConceptIndex+numSeedConcepts
 	featureConnectionsActive = createFeatureConnectionsActiveSeed(featureConnectionsActive, cs, fs, cs2, fs2, columnsWordOrder, featureNeuronsWordOrder, firstSeedTokenIndex, firstWordIndexPredictPhase, firstSeedConceptIndex, firstConceptIndexPredictPhase)
-	
+
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 		featureConnectionsActivationUpdate = featureConnectionsActive[:, firstSeedConceptIndex] * sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength]
 	else:
 		featureConnectionsActivationUpdate = featureConnectionsActive * sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength]
-	
+
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 		featureNeuronsTargetActivation = pt.sum(featureConnectionsActivationUpdate, dim=(1))
 	else:
@@ -219,18 +219,42 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 			featureNeuronsTargetActivationDense = featureNeuronsTargetActivation
 			if(featureNeuronsTargetActivationDense.is_sparse):
 				featureNeuronsTargetActivationDense = featureNeuronsTargetActivationDense.to_dense()
-			previousChannelActivation = globalFeatureNeuronsActivationDense[:-1] > 0
-			globalFeatureNeuronsActivationDense[1:] += featureNeuronsTargetActivationDense[1:] * previousChannelActivation
-			globalFeatureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
+			if(useSANIfeaturesAndColumns):
+				featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
+				assert featureSegmentsOffset >= 0 and featureSegmentsOffset < arrayNumberOfSegments
+				previousConceptChannelActivation = globalFeatureNeuronsActivationDense[:featureSegmentsOffset-1] > 0 if featureSegmentsOffset > 1 else None
+				previousFeatureChannelActivation = globalFeatureNeuronsActivationDense[featureSegmentsOffset:arrayNumberOfSegments-1] > 0 if featureSegmentsOffset+1 < arrayNumberOfSegments else None
+				if(previousConceptChannelActivation is not None):
+					globalFeatureNeuronsActivationDense[1:featureSegmentsOffset] += featureNeuronsTargetActivationDense[1:featureSegmentsOffset] * previousConceptChannelActivation
+				if(previousFeatureChannelActivation is not None):
+					globalFeatureNeuronsActivationDense[featureSegmentsOffset+1:] += featureNeuronsTargetActivationDense[featureSegmentsOffset+1:] * previousFeatureChannelActivation
+				globalFeatureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
+				globalFeatureNeuronsActivationDense[featureSegmentsOffset] += featureNeuronsTargetActivationDense[featureSegmentsOffset]
+			else:
+				previousChannelActivation = globalFeatureNeuronsActivationDense[:-1] > 0
+				globalFeatureNeuronsActivationDense[1:] += featureNeuronsTargetActivationDense[1:] * previousChannelActivation
+				globalFeatureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
 			globalFeatureNeuronsActivation = globalFeatureNeuronsActivationDense.to_sparse_coo()
 		else:
 			featureNeuronsActivationDense = sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation]
 			featureNeuronsTargetActivationDense = featureNeuronsTargetActivation
 			if(featureNeuronsTargetActivationDense.is_sparse):
 				featureNeuronsTargetActivationDense = featureNeuronsTargetActivationDense.to_dense()
-			previousChannelActivation = featureNeuronsActivationDense[:-1] > 0
-			featureNeuronsActivationDense[1:] += featureNeuronsTargetActivationDense[1:] * previousChannelActivation
-			featureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
+			if(useSANIfeaturesAndColumns):
+				featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
+				assert featureSegmentsOffset >= 0 and featureSegmentsOffset < arrayNumberOfSegments
+				previousConceptChannelActivation = featureNeuronsActivationDense[:featureSegmentsOffset-1] > 0 if featureSegmentsOffset > 1 else None
+				previousFeatureChannelActivation = featureNeuronsActivationDense[featureSegmentsOffset:arrayNumberOfSegments-1] > 0 if featureSegmentsOffset+1 < arrayNumberOfSegments else None
+				if(previousConceptChannelActivation is not None):
+					featureNeuronsActivationDense[1:featureSegmentsOffset] += featureNeuronsTargetActivationDense[1:featureSegmentsOffset] * previousConceptChannelActivation
+				if(previousFeatureChannelActivation is not None):
+					featureNeuronsActivationDense[featureSegmentsOffset+1:] += featureNeuronsTargetActivationDense[featureSegmentsOffset+1:] * previousFeatureChannelActivation
+				featureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
+				featureNeuronsActivationDense[featureSegmentsOffset] += featureNeuronsTargetActivationDense[featureSegmentsOffset]
+			else:
+				previousChannelActivation = featureNeuronsActivationDense[:-1] > 0
+				featureNeuronsActivationDense[1:] += featureNeuronsTargetActivationDense[1:] * previousChannelActivation
+				featureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
 			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation] = featureNeuronsActivationDense
 	else:
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
@@ -238,6 +262,18 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 		else:
 			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation, :, :, :] += featureNeuronsTargetActivation
 	
+	if(debugSANIfeaturesAndColumns and useSANIfeaturesAndColumns):
+		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
+			featureNeuronsActivation = globalFeatureNeuronsActivation
+		else:
+			featureNeuronsActivation = sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation]
+		if(featureNeuronsActivation.is_sparse):
+			featureNeuronsActivationDense = featureNeuronsActivation.to_dense()
+		else:
+			featureNeuronsActivationDense = featureNeuronsActivation
+		segmentFeatureActivations = featureNeuronsActivationDense.sum(dim=1).to("cpu").tolist()
+		print("\tdebugSANIfeaturesAndColumns: seed segmentFeatureActivations={0}".format(segmentFeatureActivations))
+
 	if(inferenceDecrementActivations):
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 			globalFeatureNeuronsActivation = decrementActivation(globalFeatureNeuronsActivation, activationDecrementSeed)

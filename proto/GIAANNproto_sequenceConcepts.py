@@ -370,25 +370,44 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 			# When useSANIcolumns is True (original behaviour), assign segment indices based on
 			# the concept/column position in the sequence (sequenceConceptIndex).
 			#
-			# When useSANIfeatures is True (legacy !useSANIcolumns behaviour) or when
-			# useSANIfeaturesAndColumns is enabled, assign segment indices based on the
-			# underlying feature/word position in the sentence (sequenceConceptWordIndex), so
-			# that feature proximity is captured by the sequential segments.
+			# When useSANIfeatures is True (legacy !useSANIcolumns behaviour), assign segment
+			# indices based on the underlying feature/word position in the sentence
+			# (sequenceConceptWordIndex), so that feature proximity is captured by the
+			# sequential segments.
+			#
+			# When useSANIfeaturesAndColumns is enabled, apply column-distance segments first,
+			# then add feature-distance segments based on sequenceConceptWordIndex.
+			segmentMask = pt.zeros(arrayNumberOfSegments, dtype=arrayType)
 			if(useSANIcolumns):
 				positionIndex = sequenceConceptIndex
-			else:
+				numberOfSegments = min(arrayNumberOfSegments, positionIndex+1)
+				segmentMask[:numberOfSegments] = 1
+				activeSequentialSegments = pt.arange(0, numberOfSegments, 1)
+			elif(useSANIfeatures):
 				# sequenceConceptWordIndex is the absolute token index of this concept's word
 				# in the original sequence; this gives "feature-position-based" segments.
 				positionIndex = sequenceConceptWordIndex
-			numberOfSegments = min(arrayNumberOfSegments, positionIndex+1)
-			featureNeuronsSegmentMask[sequenceConceptIndex, :] = pt.cat(
-				[
-					pt.ones(numberOfSegments, dtype=arrayType),
-					pt.zeros(arrayNumberOfSegments-numberOfSegments, dtype=arrayType),
-				],
-				dim=0,
-			)
-			activeSequentialSegments = pt.arange(0, numberOfSegments, 1)
+				numberOfSegments = min(arrayNumberOfSegments, positionIndex+1)
+				segmentMask[:numberOfSegments] = 1
+				activeSequentialSegments = pt.arange(0, numberOfSegments, 1)
+			elif(useSANIfeaturesAndColumns):
+				# Assign concept/column-distance segments first, then feature-distance segments.
+				# Note: when useSANIfeaturesAndColumnsInternal is enabled, include the internal
+				# column segment (sequenceConceptIndex==0) in the concept segment budget.
+				if(useSANIfeaturesAndColumnsInternal):
+					columnSegments = min(arrayNumberOfSegmentsColumnDistance, sequenceConceptIndex+1)
+				else:
+					# External columns only: exclude the internal column from column-distance segments.
+					columnSegments = min(arrayNumberOfSegmentsColumnDistance, max(sequenceConceptIndex, 0))
+				featureSegments = min(arrayNumberOfSegmentsFeatureDistance, sequenceConceptWordIndex+1)
+				if(columnSegments > 0):
+					segmentMask[:columnSegments] = 1
+				featureSegmentStart = arrayNumberOfSegmentsColumnDistance
+				featureSegmentEnd = min(arrayNumberOfSegments, featureSegmentStart + featureSegments)
+				if(featureSegmentEnd > featureSegmentStart):
+					segmentMask[featureSegmentStart:featureSegmentEnd] = 1
+				activeSequentialSegments = pt.nonzero(segmentMask > 0, as_tuple=False).view(-1)
+			featureNeuronsSegmentMask[sequenceConceptIndex, :] = segmentMask
 		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly and trainSequenceObservedColumnsMatchSequenceWords):
 			if(useSANI):
 				featureNeuronsActive[activeSequentialSegments, sequenceConceptIndex, startIndices[sequenceConceptIndex]:endIndices[sequenceConceptIndex]] = 1

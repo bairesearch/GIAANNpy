@@ -3,3 +3,5 @@
 .hf_cache/
 .hf_modules/
 .hf_modules_cache/
+.codex/
+.vscode/

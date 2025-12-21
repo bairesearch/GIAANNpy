@@ -18,6 +18,7 @@ GIA ANN proto global Defs
 """
 
 import torch as pt
+import math
 
 #recent debug vars;
 debugPrintTrainSentencePOS = True	#print each training sentence with POS tags
@@ -26,6 +27,7 @@ printPredictionsDuringInferencePredict = True
 printPredictionsDuringInferencePredictBeamSearch = False
 debugPrintInferenceInhibition = False
 debugPrintMinWordDistanceDetails = False
+debugSANIfeaturesAndColumns = False
 
 #train/inference mode selection:
 useInference = True  #default: True	#support inference mode else train (only) modedebugPrintMinWordDistanceDetails
@@ -58,7 +60,7 @@ maxSequenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM a
 databaseFolder = "../database/" #default: "../database/"	#performance: "/media/user/ssddata/GIAANN/database/"	#orig: ""
 maxSequences = 10		#debug: 10, 500, 10000 	#default: 100000000	  #adjust as needed (eg lower max_sequences during train before independent inferenceTrainPredictiveNetworkAllSequences execution)	#max sequences for train or inference
 if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
-    useMaxSequences = False	#use all sequences from inference_prompt.txt
+	useMaxSequences = False	#use all sequences from inference_prompt.txt
 else:
 	useMaxSequences = True
 numberEpochs = 1	#default: 1
@@ -173,10 +175,14 @@ if(useInference):
 	transformerUseInputConnections = False	#initialise (dependent var)
 	if(useSANI):
 		inferenceConnectionsStrengthBoolean = True	#default: True	#do not overweight by common features (e.g. determiners)
-		inferenceActivationStrengthBoolean = True	#default: True	#do not overweight by common features (e.g. determiners)
+		inferenceSegmentActivationsBoolean = True	#default: True	#do not overweight by common features (e.g. determiners)
+		if(inferenceSegmentActivationsBoolean):
+			inferenceSegmentActivationsBooleanFeatureSegmentsOnly = True	#orig: False
+		inferenceSourceActivationsBoolean = True	#default: True (do not sum SANI segments)	#orig: False
 	else:
 		inferenceConnectionsStrengthBoolean = False	#default: False
-		inferenceActivationStrengthBoolean = False	#default: False	
+		inferenceSegmentActivationsBoolean = False	#default: False	
+		inferenceSourceActivationsBoolean = True	#default: True	#orig: False (theoretically effectively True)
 	if(inferenceTrainPredictiveNetworkAllSequences):
 		inferenceRetainActivationsAcrossMultipleSequences = False	#default: False	#retain activations across sequences such that these can be used during training/inference
 	if(inferencePredictiveNetwork):
@@ -428,27 +434,37 @@ if(useSANI):
 		useSANIfeaturesAndColumns = False
 	else:
 		useSANIcolumns = False	#assign segments by concept column proximity to connection target during train (includes internal concept column)
-		useSANIfeatures = True	#assign segments by feature proximity to connection target during train
-		useSANIfeaturesAndColumns = False	#assign segments by column proximity first (excludes internal concept column) then feature proximity
+		useSANIfeatures = False	#assign segments by feature proximity to connection target during train
+		useSANIfeaturesAndColumns = True	#assign segments by column proximity first then feature proximity
 
 	if(useSANIfeaturesAndColumns):
-		arrayNumberOfSegmentsColumnDistance = 1	#min number of external column connections to target node (note first segment captures all other external columns)
-		arrayNumberOfSegmentsFeatureDistance = numSeedTokensInference-arrayNumberOfSegmentsColumnDistance	#number of nearest features to target node
+		useSANIfeaturesAndColumnsInternal = True	#default: True	#orig: False	#also include internal columns in column segments (not just external columns)
+		print("useSANIfeaturesAndColumns:")
+		#these are highly dependent on numSeedTokensInference and the specific seed text (ie number of features per column);
+		arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4)	#min number of concept/column segments (if useSANIfeaturesAndColumnsInternal, includes internal column segment)
+		if(useSANIfeaturesAndColumnsInternal):
+			assert arrayNumberOfSegmentsColumnDistance >= 1
+		arrayNumberOfSegmentsFeatureDistance = math.ceil(numSeedTokensInference / 2) + 1 	#number of nearest features to target node
 		arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance + arrayNumberOfSegmentsFeatureDistance
+		print("arrayNumberOfSegmentsColumnDistance = ", arrayNumberOfSegmentsColumnDistance)
+		print("arrayNumberOfSegmentsFeatureDistance = ", arrayNumberOfSegmentsFeatureDistance)
 	elif(useSANIcolumns):
+		print("useSANIcolumns:")
 		if(multisentencePredictions):
 			arrayNumberOfSegments = 5	#default: 5	#min number of external and internal column connections to target node (note first segment captures all other external columns)
 		else:
-			arrayNumberOfSegments = 2	#default: 2	#orig:3		#min number of external and internal column connections to target node (note first segment captures all other external columns)
+			arrayNumberOfSegments = 3	#default: 2	#orig:3		#min number of external and internal column connections to target node (note first segment captures all other external columns)
 				#max number of SANI segments per sequence (= max number of concept columns per sequence - 1)
 				#note if arrayNumberOfSegments=3 then;	sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: all other column connections
 				#must be less than the (total number of concepts in a sequence - total number of concepts in effective predictive seed sequence)
 	elif(useSANIfeatures):
+		print("useSANIfeatures:")
 		if(enforceDirectConnectionsSANIminimal):
 			arrayNumberOfSegments = 2
 		else:
 			arrayNumberOfSegments = numSeedTokensInference	#default: 5	#min number of nearest features to target node (note first segment captures all other features)
-		
+	print("arrayNumberOfSegments = ", arrayNumberOfSegments)
+
 	algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment if previous segment(s) active
 	#algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI
 	if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):

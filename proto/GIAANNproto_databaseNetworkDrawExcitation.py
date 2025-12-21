@@ -387,7 +387,7 @@ def neuronActivationString(featureNeurons, arrayIndexProperties, featureIndexInO
 	featureNeuronsActivation = featureNeurons[arrayIndexProperties]
 	for s in range(arrayNumberOfSegments):	#ignore internal column activation requirement
 		value = featureNeuronsActivation[s, featureIndexInObservedColumn].item()
-		if(inferenceActivationStrengthBoolean):
+		if(inferenceSegmentActivationsBoolean):
 			value = intToString(value)
 		else:
 			value = floatToString(value)
