@@ -434,8 +434,8 @@ if(useSANI):
 		useSANIfeaturesAndColumns = False
 	else:
 		useSANIcolumns = False	#assign segments by concept column proximity to connection target during train (includes internal concept column)
-		useSANIfeatures = False	#assign segments by feature proximity to connection target during train
-		useSANIfeaturesAndColumns = True	#assign segments by column proximity first then feature proximity
+		useSANIfeatures = True	#assign segments by feature proximity to connection target during train
+		useSANIfeaturesAndColumns = False	#assign segments by column proximity first then feature proximity
 
 	if(useSANIfeaturesAndColumns):
 		useSANIfeaturesAndColumnsInternal = True	#default: True	#orig: False	#also include internal columns in column segments (not just external columns)
