@@ -153,9 +153,9 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 	
 	if(debugPrintTrainSentencePOS):
 		sentenceWithPOS = " ".join(f"{token.text} ({tokenIndex}:{token.pos_})" for tokenIndex, token in enumerate(sequence))
-		print(f"Processing article: {articleIndex}, sequence: {sequenceIndex} {sentenceWithPOS}")
+		print(f"Processing sequenceCount: {sequenceCount}, {sentenceWithPOS}")	#article: {articleIndex}, sequence: {sequenceIndex}
 	else:
-		print(f"Processing article: {articleIndex}, sequence: {sequenceIndex} {sequence.text}")
+		print(f"Processing sequenceCount: {sequenceCount}, {sequence.text}")	#article: {articleIndex}, sequence: {sequenceIndex}
 
 	databaseNetworkObject.articleIndexDebug = articleIndex
 	databaseNetworkObject.sequenceIndexDebug = sequenceIndex

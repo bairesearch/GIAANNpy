@@ -21,7 +21,7 @@ import torch as pt
 import math
 
 #recent debug vars;
-debugPrintTrainSentencePOS = True	#print each training sentence with POS tags
+debugPrintTrainSentencePOS = False	#print each training sentence with POS tags
 debugConnectNodesToNextNodesInSequenceOnly = False
 printPredictionsDuringInferencePredict = True
 printPredictionsDuringInferencePredictBeamSearch = False
@@ -58,7 +58,7 @@ useGPUsparse = False	#default: False	#orig: True
 useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/MLP predictive network model
 maxSequenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM availability during train (with trainSequenceObservedColumnsUseSequenceFeaturesOnly only limited amount of data is ever loaded to GPU during train)
 databaseFolder = "../database/" #default: "../database/"	#performance: "/media/user/ssddata/GIAANN/database/"	#orig: ""
-maxSequences = 10		#debug: 10, 500, 10000 	#default: 100000000	  #adjust as needed (eg lower max_sequences during train before independent inferenceTrainPredictiveNetworkAllSequences execution)	#max sequences for train or inference
+maxSequences = 10000		#34286	#debug: 10, 500, 10000 	#default: 100000000	  #adjust as needed (eg lower max_sequences during train before independent inferenceTrainPredictiveNetworkAllSequences execution)	#max sequences for train or inference
 if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
 	useMaxSequences = False	#use all sequences from inference_prompt.txt
 else:
@@ -67,7 +67,7 @@ numberEpochs = 1	#default: 1
 multisentencePredictions = False	#default: False	#requires higher GPU RAM for train
 if(multisentencePredictions):
 	numSentencesPerSequence = 3	#default: 3
-numSeedTokensInference = 8	#default: 5
+numSeedTokensInference = 8	#8	#default: 5
 
 #inhibitory neurons;
 useInhibitoryNeurons = False	#planned new default: True #orig: False
@@ -82,11 +82,18 @@ else:
 	inferenceInhibitoryNeuronsOptimised = False
 inhibitoryConnectionStrengthIncrement = 1.0	#default increment applied when wiring inhibitory neurons to alternate prediction targets
 
+#array properties (disable to optimise train speed)
+arrayIndexPropertiesStrength = True	#mandatory: True	#orig: True
+arrayIndexPropertiesPermanence = False	#default: True	#orig: True
+arrayIndexPropertiesActivation = False	#default: True	#orig: True
+arrayIndexPropertiesTime = False	#default: True	#orig: True
+arrayIndexPropertiesPos = False	#default: True	#orig: True
+
 #identify immediate connections
 enforceDirectConnections = True	#default: True	#orig: False	#prediction requires a direct connection from previous prediction as observed during training (ie adjacent tokens)
 if(enforceDirectConnections):
-	enforceDirectConnectionsSANI = False	#default: False #orig: False	#enforce activation of first segment (direct feature connection)
-	enforceDirectConnectionsMinWordDistance = True	#default: True #orig: True	#enforce min word distance (=1) during inference
+	enforceDirectConnectionsSANI = True	#default: False #orig: False	#enforce activation of first segment (direct feature connection)
+	enforceDirectConnectionsMinWordDistance = False	#default: True #orig: True	#enforce min word distance (=1) during inference
 else:
 	enforceDirectConnectionsSANI = False
 	enforceDirectConnectionsMinWordDistance = False
@@ -266,6 +273,7 @@ drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSequenc
 drawNetworkDuringInferenceSaveFilenamePrepend = "GIAANNproto1cSequenceObservedColumnsInferenceTokenIndex"
 drawHighResolutionFigure = True	#required for inference debug
 ignoreNewlineCharacters = True
+drawSparseArrays = False	#default: False	#orig: False	#can draw sequences contained within much larger databases without running out of memory (due to densifying arrays)
 
 #algorithm preferences;
 inferenceNormaliseColumnSelectionByFeatureConnections = False  	#default: False		#cannot select one column over another if column activations are perfectly normalised with respect to each other	#see HFconnectionMatrixAlgorithmNormalise
@@ -392,9 +400,6 @@ if(useInference):
 	assert not lowMem, "useInference: global feature neuron lists are required" 
 	assert useSaveData,  "useInference: useSaveData is required" 
 
-
-
-
 # Paths for saving data
 conceptColumnsDictFile = databaseFolder + 'conceptColumnsDict.pkl'
 conceptFeaturesDictFile = databaseFolder + 'conceptFeaturesDict.pkl'
@@ -414,18 +419,35 @@ if(conceptColumnsDelimitByPOS):
 		conceptFeaturesReferenceSetDelimiterListFile = databaseFolder + 'conceptFeaturesReferenceSetDelimiterList.pkl'
 
 #common array indices
-arrayIndexPropertiesStrength = 0
-arrayIndexPropertiesPermanence = 1
-arrayIndexPropertiesActivation = 2
-arrayIndexPropertiesTime = 3
-arrayIndexPropertiesPos = 4
-arrayIndexPropertiesMinWordDistanceIndex = 5	#optional property storing min distance between connected words
+arrayIndexPropertiesStrengthIndex = None
+arrayIndexPropertiesPermanenceIndex = None
+arrayIndexPropertiesActivationIndex = None
+arrayIndexPropertiesTimeIndex = None
+arrayIndexPropertiesPosIndex = None
+arrayIndexPropertiesMinWordDistanceIndex = None	#optional property storing min distance between connected words
+arrayPropertiesList = []
+if(arrayIndexPropertiesStrength):
+	arrayIndexPropertiesStrengthIndex = len(arrayPropertiesList)
+	arrayPropertiesList.append(arrayIndexPropertiesStrengthIndex)
+if(arrayIndexPropertiesPermanence):
+	arrayIndexPropertiesPermanenceIndex = len(arrayPropertiesList)
+	arrayPropertiesList.append(arrayIndexPropertiesPermanenceIndex)
+arrayIndexPropertiesActivationCreate = arrayIndexPropertiesActivation or useInference
+if(arrayIndexPropertiesActivationCreate):
+	arrayIndexPropertiesActivationIndex = len(arrayPropertiesList)
+	arrayPropertiesList.append(arrayIndexPropertiesActivationIndex)
+if(arrayIndexPropertiesTime):
+	arrayIndexPropertiesTimeIndex = len(arrayPropertiesList)
+	arrayPropertiesList.append(arrayIndexPropertiesTimeIndex)
+if(arrayIndexPropertiesPos):
+	arrayIndexPropertiesPosIndex = len(arrayPropertiesList)
+	arrayPropertiesList.append(arrayIndexPropertiesPosIndex)
 if(arrayIndexPropertiesMinWordDistance):
-	arrayNumberOfProperties = 6
-	arrayPropertiesList = [arrayIndexPropertiesStrength, arrayIndexPropertiesPermanence, arrayIndexPropertiesActivation, arrayIndexPropertiesTime, arrayIndexPropertiesPos, arrayIndexPropertiesMinWordDistanceIndex]
-else:
-	arrayNumberOfProperties = 5
-	arrayPropertiesList = [arrayIndexPropertiesStrength, arrayIndexPropertiesPermanence, arrayIndexPropertiesActivation, arrayIndexPropertiesTime, arrayIndexPropertiesPos]
+	arrayIndexPropertiesMinWordDistanceIndex = len(arrayPropertiesList)
+	arrayPropertiesList.append(arrayIndexPropertiesMinWordDistanceIndex)
+arrayNumberOfProperties = len(arrayPropertiesList)
+
+#SANI
 arrayIndexSegmentFirst = 0
 if(useSANI):
 	if(enforceDirectConnectionsSANIminimal):
@@ -441,8 +463,9 @@ if(useSANI):
 		useSANIfeaturesAndColumnsInternal = True	#default: True	#orig: False	#also include internal columns in column segments (not just external columns)
 		print("useSANIfeaturesAndColumns:")
 		#these are highly dependent on numSeedTokensInference and the specific seed text (ie number of features per column);
-		arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4)	#min number of concept/column segments (if useSANIfeaturesAndColumnsInternal, includes internal column segment)
+		arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#min number of concept/column segments (if useSANIfeaturesAndColumnsInternal, includes internal column segment)
 		if(useSANIfeaturesAndColumnsInternal):
+			arrayNumberOfSegmentsColumnDistance = arrayNumberOfSegmentsFeatureDistance - 1
 			assert arrayNumberOfSegmentsColumnDistance >= 1
 		arrayNumberOfSegmentsFeatureDistance = math.ceil(numSeedTokensInference / 2) + 1 	#number of nearest features to target node
 		arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance + arrayNumberOfSegmentsFeatureDistance
@@ -451,9 +474,9 @@ if(useSANI):
 	elif(useSANIcolumns):
 		print("useSANIcolumns:")
 		if(multisentencePredictions):
-			arrayNumberOfSegments = 5	#default: 5	#min number of external and internal column connections to target node (note first segment captures all other external columns)
+			arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#* numSentencesPerSequence 	#default: 5	#min number of external and internal column connections to target node (note first segment captures all other external columns)
 		else:
-			arrayNumberOfSegments = 3	#default: 2	#orig:3		#min number of external and internal column connections to target node (note first segment captures all other external columns)
+			arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#default: 2	#orig:3		#min number of external and internal column connections to target node (note first segment captures all other external columns)
 				#max number of SANI segments per sequence (= max number of concept columns per sequence - 1)
 				#note if arrayNumberOfSegments=3 then;	sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: all other column connections
 				#must be less than the (total number of concepts in a sequence - total number of concepts in effective predictive seed sequence)

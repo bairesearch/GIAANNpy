@@ -52,10 +52,10 @@ def drawInhibitoryFeatureNeurons(plt, G, sequenceObservedColumns, observedColumn
 		yOffset = inhibitoryNeuronYoffset
 		columnNodeMap = {}
 		for featureIndex in range(featureNeurons.shape[2]):
-			featurePresent = neuronIsActive(featureNeurons, arrayIndexPropertiesStrength, featureIndex, "doNotEnforceActivationAcrossSegments")
+			featurePresent = neuronIsActive(featureNeurons, arrayIndexPropertiesStrengthIndex, featureIndex, "doNotEnforceActivationAcrossSegments")
 			if(not featurePresent):
 				continue
-			featureActive = neuronIsActive(featureNeurons, arrayIndexPropertiesActivation, featureIndex, "doNotEnforceActivationAcrossSegments")
+			featureActive = neuronIsActive(featureNeurons, arrayIndexPropertiesActivationIndex, featureIndex, "doNotEnforceActivationAcrossSegments")
 			neuronColor = 'crimson' if featureActive else 'lightcoral'
 			featureName = getInhibitoryFeatureName(observedColumn, databaseNetworkObject, featureIndex, lemma)
 			if(featureName is None):
@@ -106,8 +106,8 @@ def drawInhibitoryInputConnections(plt, G, inhibitoryColumn, columnNodeMap, exci
 		connectionsTensor = connectionsTensor.sum(dim=1, keepdim=True)
 	for segmentIndex in range(numberOfSegmentsToIterate):
 		segmentSlice = connectionsTensor[:, segmentIndex]
-		strengthSlice = segmentSlice[arrayIndexPropertiesStrength]
-		permanenceSlice = segmentSlice[arrayIndexPropertiesPermanence]
+		strengthSlice = segmentSlice[arrayIndexPropertiesStrengthIndex]
+		permanenceSlice = segmentSlice[arrayIndexPropertiesPermanenceIndex]
 		activeMask = (strengthSlice > 0) & (permanenceSlice > 0)
 		activeIndices = pt.nonzero(activeMask, as_tuple=False)
 		if(activeIndices.numel() == 0):
@@ -146,8 +146,8 @@ def drawInhibitoryOutputConnections(plt, G, inhibitoryColumn, columnNodeMap, exc
 		connectionsTensor = connectionsTensor.sum(dim=1, keepdim=True)
 	for segmentIndex in range(numberOfSegmentsToIterate):
 		segmentSlice = connectionsTensor[:, segmentIndex]
-		strengthSlice = segmentSlice[arrayIndexPropertiesStrength]
-		permanenceSlice = segmentSlice[arrayIndexPropertiesPermanence]
+		strengthSlice = segmentSlice[arrayIndexPropertiesStrengthIndex]
+		permanenceSlice = segmentSlice[arrayIndexPropertiesPermanenceIndex]
 		activeMask = (strengthSlice > 0) & (permanenceSlice > 0)
 		activeIndices = pt.nonzero(activeMask, as_tuple=False)
 		if(activeIndices.numel() == 0):

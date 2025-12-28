@@ -45,17 +45,23 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 #first dim cs1 pertains to every concept node in sequence
 def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex):
 	featureNeuronsInactive = 1 - featureNeuronsActive
-	featureNeuronsActiveUnion = featureNeuronsActive.amax(dim=0)
-	featureNeuronsInactiveUnion = 1 - featureNeuronsActiveUnion
+	if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections and arrayIndexPropertiesPermanence):
+		featureNeuronsActiveUnion = featureNeuronsActive.amax(dim=0)
+		featureNeuronsInactiveUnion = 1 - featureNeuronsActiveUnion
 	
-	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesStrength, :, :, :] += featureNeuronsActive
-	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPermanence, :, :, :] += featureNeuronsActive*z1
-	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation, :, :, :] = 0
-	if(inferenceUseNeuronFeaturePropertiesTime):
-		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTime, :, :, :] = 0
-	else:
-		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTime, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTime] + featureNeuronsActive*sequenceIndex
-	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPos, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPos] + featureNeuronsActive*featureNeuronsPos
+	if(arrayIndexPropertiesStrength):
+		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesStrengthIndex, :, :, :] += featureNeuronsActive
+	if(arrayIndexPropertiesPermanence):
+		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPermanenceIndex, :, :, :] += featureNeuronsActive*z1
+	if(arrayIndexPropertiesActivation):
+		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex, :, :, :] = 0
+	if(arrayIndexPropertiesTime):
+		if(inferenceUseNeuronFeaturePropertiesTime):
+			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTimeIndex, :, :, :] = 0
+		else:
+			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTimeIndex, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTimeIndex] + featureNeuronsActive*sequenceIndex
+	if(arrayIndexPropertiesPos):
+		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPosIndex, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPosIndex] + featureNeuronsActive*featureNeuronsPos
 
 	if(useSANI):
 		featureConnectionsActive = None
@@ -79,56 +85,66 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 		featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder)
 
 
-	featureConnectionsPos = featureNeuronsPos.view(1, cs, fs, 1, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
+	featureConnectionsPos = None
+	if(arrayIndexPropertiesPos or (arrayIndexPropertiesStrength and trainConnectionStrengthPOSdependence)):
+		featureConnectionsPos = featureNeuronsPos.view(1, cs, fs, 1, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
 
-	featureConnectionsInactive = 1 - featureConnectionsActive
+	featureConnectionsInactive = None
+	if(arrayIndexPropertiesTime or arrayIndexPropertiesPos):
+		featureConnectionsInactive = 1 - featureConnectionsActive
 
-	if(trainConnectionStrengthNormaliseWrtContextLength):
-		featureNeuronsWordOrder1d = featureNeuronsWordOrder.flatten()
-		featureConnectionsDistances = pt.abs(featureNeuronsWordOrder1d.unsqueeze(1) - featureNeuronsWordOrder1d).reshape(cs, fs, cs, fs)
-		featureConnectionsProximity = 1/(featureConnectionsDistances + 1) * 10
-		featureConnectionsProximity.unsqueeze(0)
-		featureConnectionsStrengthUpdate = featureConnectionsActive*featureConnectionsProximity
-	else:
-		featureConnectionsStrengthUpdate = featureConnectionsActive
+	if(arrayIndexPropertiesStrength):
+		if(trainConnectionStrengthNormaliseWrtContextLength):
+			featureNeuronsWordOrder1d = featureNeuronsWordOrder.flatten()
+			featureConnectionsDistances = pt.abs(featureNeuronsWordOrder1d.unsqueeze(1) - featureNeuronsWordOrder1d).reshape(cs, fs, cs, fs)
+			featureConnectionsProximity = 1/(featureConnectionsDistances + 1) * 10
+			featureConnectionsProximity.unsqueeze(0)
+			featureConnectionsStrengthUpdate = featureConnectionsActive*featureConnectionsProximity
+		else:
+			featureConnectionsStrengthUpdate = featureConnectionsActive
 
-	csIndices1 = None
-	csIndices2 = None
-	if(trainConnectionStrengthIncreaseColumnInternal or trainConnectionStrengthPOSdependence):
-		csIndices1 = pt.arange(cs).view(1, cs, 1, 1, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
-		csIndices2 = pt.arange(cs).view(1, 1, 1, cs, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
+		csIndices1 = None
+		csIndices2 = None
+		if(trainConnectionStrengthIncreaseColumnInternal or trainConnectionStrengthPOSdependence):
+			csIndices1 = pt.arange(cs).view(1, cs, 1, 1, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
+			csIndices2 = pt.arange(cs).view(1, 1, 1, cs, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
 
-	if(trainConnectionStrengthIncreaseColumnInternal):
-		columnInternalConnectionsMask = (csIndices1 == csIndices2)
-		columnInternalConnectionsMaskOff = pt.logical_not(columnInternalConnectionsMask)
-		featureConnectionsStrengthUpdate = columnInternalConnectionsMask.float()*featureConnectionsStrengthUpdate*trainIncreaseColumnInternalConnectionsStrengthModifier + columnInternalConnectionsMaskOff.float()*featureConnectionsStrengthUpdate
+		if(trainConnectionStrengthIncreaseColumnInternal):
+			columnInternalConnectionsMask = (csIndices1 == csIndices2)
+			columnInternalConnectionsMaskOff = pt.logical_not(columnInternalConnectionsMask)
+			featureConnectionsStrengthUpdate = columnInternalConnectionsMask.float()*featureConnectionsStrengthUpdate*trainIncreaseColumnInternalConnectionsStrengthModifier + columnInternalConnectionsMaskOff.float()*featureConnectionsStrengthUpdate
 
-	if(trainConnectionStrengthPOSdependence):
-		featureConnectionsStrengthUpdate = applyConnectionStrengthPOSdependenceTrain(sequenceObservedColumns, featureConnectionsStrengthUpdate, featureConnectionsPos, csIndices1, csIndices2)
+		if(trainConnectionStrengthPOSdependence):
+			featureConnectionsStrengthUpdate = applyConnectionStrengthPOSdependenceTrain(sequenceObservedColumns, featureConnectionsStrengthUpdate, featureConnectionsPos, csIndices1, csIndices2)
 
-	sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength, :, :, :, :, :] += featureConnectionsStrengthUpdate
-	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanence, :, :, :, :, :] += featureConnectionsActive*z1
-	sequenceObservedColumns.featureConnections[arrayIndexPropertiesActivation, :, :, :, :, :] = 0
-	if(inferenceUseNeuronFeaturePropertiesTime):
-		sequenceObservedColumns.featureConnections[arrayIndexPropertiesTime, :, :, :, :, :] = 0
-	else:
-		sequenceObservedColumns.featureConnections[arrayIndexPropertiesTime, :, :, :, :, :] = featureConnectionsInactive*sequenceObservedColumns.featureConnections[arrayIndexPropertiesTime] + featureConnectionsActive*sequenceIndex
-	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPos, :, :, :, :, :] = featureConnectionsInactive*sequenceObservedColumns.featureConnections[arrayIndexPropertiesPos] + featureConnectionsActive*featureConnectionsPos
+		sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrengthIndex, :, :, :, :, :] += featureConnectionsStrengthUpdate
+	if(arrayIndexPropertiesPermanence):
+		sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanenceIndex, :, :, :, :, :] += featureConnectionsActive*z1
+	if(arrayIndexPropertiesActivation):
+		sequenceObservedColumns.featureConnections[arrayIndexPropertiesActivationIndex, :, :, :, :, :] = 0
+	if(arrayIndexPropertiesTime):
+		if(inferenceUseNeuronFeaturePropertiesTime):
+			sequenceObservedColumns.featureConnections[arrayIndexPropertiesTimeIndex, :, :, :, :, :] = 0
+		else:
+			sequenceObservedColumns.featureConnections[arrayIndexPropertiesTimeIndex, :, :, :, :, :] = featureConnectionsInactive*sequenceObservedColumns.featureConnections[arrayIndexPropertiesTimeIndex] + featureConnectionsActive*sequenceIndex
+	if(arrayIndexPropertiesPos):
+		sequenceObservedColumns.featureConnections[arrayIndexPropertiesPosIndex, :, :, :, :, :] = featureConnectionsInactive*sequenceObservedColumns.featureConnections[arrayIndexPropertiesPosIndex] + featureConnectionsActive*featureConnectionsPos
 	if(arrayIndexPropertiesMinWordDistance):
 		updateConnectionMinWordDistances(sequenceObservedColumns, featureConnectionsActive, featureNeuronsWordOrder)
 
-	if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections):
+	if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections and arrayIndexPropertiesPermanence):
 		decreasePermanenceActive(sequenceObservedColumns, featureNeuronsActiveUnion, featureNeuronsInactiveUnion, sequenceConceptIndexMask, featureNeuronsSegmentMask, featureConnectionsSegmentMask)
 
-	applyTrainConnectionStrengthLimits(sequenceObservedColumns)
+	if(arrayIndexPropertiesStrength):
+		applyTrainConnectionStrengthLimits(sequenceObservedColumns)
 
 	return featureConnectionsActive, featureConnectionsSegmentMask
 
 def applyTrainConnectionStrengthLimits(sequenceObservedColumns):
 	if(trainConnectionStrengthLimitMax):
-		sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength] = sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength].clamp(max=1.0)
+		sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrengthIndex] = sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrengthIndex].clamp(max=1.0)
 	if(trainConnectionStrengthLimitTanh):
-		sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength] = pt.tanh(sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength])
+		sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrengthIndex] = pt.tanh(sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrengthIndex])
 
 def updateConnectionMinWordDistances(sequenceObservedColumns, featureConnectionsActive, featureNeuronsWordOrder):
 	if(featureNeuronsWordOrder is None):
@@ -254,8 +270,8 @@ def decreasePermanenceActive(sequenceObservedColumns, featureNeuronsActive, feat
 	fs = sequenceObservedColumns.fs 
 	
 	featureNeuronsDecrease = featureNeuronsInactive.unsqueeze(0)*z2 * featureNeuronsSegmentMask.unsqueeze(2)
-	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPermanence, :, :, :] -= featureNeuronsDecrease
-	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPermanence] = pt.clamp(sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPermanence], min=0)
+	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPermanenceIndex, :, :, :] -= featureNeuronsDecrease
+	sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPermanenceIndex] = pt.clamp(sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPermanenceIndex], min=0)
 
 	featureNeuronsAll = pt.ones((cs, fs), dtype=arrayType)
 	featureNeuronsAll1d = featureNeuronsAll.view(cs*fs)
@@ -264,13 +280,13 @@ def decreasePermanenceActive(sequenceObservedColumns, featureNeuronsActive, feat
 	 
 	featureConnectionsDecrease1 = pt.matmul(featureNeuronsInactive1d.unsqueeze(1), featureNeuronsAll1d.unsqueeze(0)).view(cs, fs, cs, fs)
 	featureConnectionsDecrease1 = featureConnectionsDecrease1.unsqueeze(0)*featureConnectionsSegmentMask
-	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanence, :, :, :, :, :] -= featureConnectionsDecrease1
-	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanence] = pt.clamp(sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanence], min=0)
+	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanenceIndex, :, :, :, :, :] -= featureConnectionsDecrease1
+	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanenceIndex] = pt.clamp(sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanenceIndex], min=0)
 	
 	featureConnectionsDecrease2 = pt.matmul(featureNeuronsActive1d.unsqueeze(1), featureNeuronsInactive1d.unsqueeze(0)).view(cs, fs, cs, fs)
 	featureConnectionsDecrease2 = featureConnectionsDecrease2.unsqueeze(0)*featureConnectionsSegmentMask
-	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanence, :, :, :, :, :] -= featureConnectionsDecrease2
-	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanence] = pt.clamp(sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanence], min=0)
+	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanenceIndex, :, :, :, :, :] -= featureConnectionsDecrease2
+	sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanenceIndex] = pt.clamp(sequenceObservedColumns.featureConnections[arrayIndexPropertiesPermanenceIndex], min=0)
  
 def applyConnectionStrengthPOSdependenceTrain(sequenceObservedColumns, featureConnectionsStrengthUpdate, featureConnectionsPos, csIndicesSource, csIndicesTarget):
 	posLookup = getConnectionStrengthPOSdependenceLookup(sequenceObservedColumns.databaseNetworkObject)

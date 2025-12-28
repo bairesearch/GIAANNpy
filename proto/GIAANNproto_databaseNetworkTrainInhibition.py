@@ -191,27 +191,33 @@ def updateInhibitoryConnection(inhibitionBuffer, inhibitoryColumnIndex, inhibito
 		activeSegmentIndices = pt.tensor([[arrayIndexSegmentFirst]], dtype=pt.long)
 	for segmentTensor in activeSegmentIndices:
 		segmentIndex = int(segmentTensor.item())
-		strengthIndex = (arrayIndexPropertiesStrength, segmentIndex, inhibitoryColumnIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex)
-		permanenceIndex = (arrayIndexPropertiesPermanence, segmentIndex, inhibitoryColumnIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex)
-		activationIndex = (arrayIndexPropertiesActivation, segmentIndex, inhibitoryColumnIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex)
-		timeIndex = (arrayIndexPropertiesTime, segmentIndex, inhibitoryColumnIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex)
-		posIndex = (arrayIndexPropertiesPos, segmentIndex, inhibitoryColumnIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex)
-		inhibitionBuffer.featureConnections[strengthIndex] += inhibitoryConnectionStrengthIncrement
-		inhibitionBuffer.featureConnections[permanenceIndex] += z1
-		inhibitionBuffer.featureConnections[activationIndex] = 0
-		if(inferenceUseNeuronFeaturePropertiesTime):
-			inhibitionBuffer.featureConnections[timeIndex] = 0
-		else:
-			inhibitionBuffer.featureConnections[timeIndex] = sequenceIndex
-		inhibitionBuffer.featureConnections[posIndex] = sourcePosValue
+		if(arrayIndexPropertiesStrength):
+			strengthIndex = (arrayIndexPropertiesStrengthIndex, segmentIndex, inhibitoryColumnIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex)
+			inhibitionBuffer.featureConnections[strengthIndex] += inhibitoryConnectionStrengthIncrement
+		if(arrayIndexPropertiesPermanence):
+			permanenceIndex = (arrayIndexPropertiesPermanenceIndex, segmentIndex, inhibitoryColumnIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex)
+			inhibitionBuffer.featureConnections[permanenceIndex] += z1
+		if(arrayIndexPropertiesActivation):
+			activationIndex = (arrayIndexPropertiesActivationIndex, segmentIndex, inhibitoryColumnIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex)
+			inhibitionBuffer.featureConnections[activationIndex] = 0
+		if(arrayIndexPropertiesTime):
+			timeIndex = (arrayIndexPropertiesTimeIndex, segmentIndex, inhibitoryColumnIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex)
+			if(inferenceUseNeuronFeaturePropertiesTime):
+				inhibitionBuffer.featureConnections[timeIndex] = 0
+			else:
+				inhibitionBuffer.featureConnections[timeIndex] = sequenceIndex
+		if(arrayIndexPropertiesPos):
+			posIndex = (arrayIndexPropertiesPosIndex, segmentIndex, inhibitoryColumnIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex)
+			inhibitionBuffer.featureConnections[posIndex] = sourcePosValue
 	#segmentsList = activeSegmentIndices.squeeze(1).tolist() if activeSegmentIndices.dim() > 1 else [int(activeSegmentIndices.item())]
 	#print(f"inhibitory output connection created: column {inhibitoryColumnIndex}, feature {inhibitoryFeatureIndex} -> column {candidateColumnIndex}, feature {candidateFeatureIndex}, segments {segmentsList}")
 
 def applyInhibitoryConnectionStrengthLimits(inhibitionBuffer):
-	if(trainConnectionStrengthLimitMax):
-		inhibitionBuffer.featureConnections[arrayIndexPropertiesStrength] = inhibitionBuffer.featureConnections[arrayIndexPropertiesStrength].clamp(max=1.0)
-	if(trainConnectionStrengthLimitTanh):
-		inhibitionBuffer.featureConnections[arrayIndexPropertiesStrength] = pt.tanh(inhibitionBuffer.featureConnections[arrayIndexPropertiesStrength])
+	if(arrayIndexPropertiesStrength):
+		if(trainConnectionStrengthLimitMax):
+			inhibitionBuffer.featureConnections[arrayIndexPropertiesStrengthIndex] = inhibitionBuffer.featureConnections[arrayIndexPropertiesStrengthIndex].clamp(max=1.0)
+		if(trainConnectionStrengthLimitTanh):
+			inhibitionBuffer.featureConnections[arrayIndexPropertiesStrengthIndex] = pt.tanh(inhibitionBuffer.featureConnections[arrayIndexPropertiesStrengthIndex])
 
 def extractConnectionSegmentsMask(featureConnectionsSegmentMask, sourceColumnIndex, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex):
 	if(featureConnectionsSegmentMask is None):
@@ -287,7 +293,7 @@ def collectGlobalAlternateCandidates(sequenceObservedColumns, observedColumnCach
 	observedColumn = getObservedColumnForConcept(sequenceObservedColumns, observedColumnCache, globalSourceColumnIndex)
 	if(observedColumn is None):
 		return []
-	strengthTensor = observedColumn.featureConnections[arrayIndexPropertiesStrength]
+	strengthTensor = observedColumn.featureConnections[arrayIndexPropertiesStrengthIndex]
 	strengthSlice = GIAANNproto_sparseTensors.sliceSparseTensor(strengthTensor, 1, globalSourceFeatureIndex)
 	strengthSlice = strengthSlice.coalesce()
 	if(strengthSlice._nnz() == 0):
@@ -397,7 +403,7 @@ def identifyDirectConnectionCandidates(sequenceObservedColumns):
 			return None, None
 		directSegmentsMask = distanceMask.to(dtype=pt.bool)
 	elif(enforceDirectConnectionsSANI and arrayNumberOfSegments > 0):
-		strengthTensor = featureConnections[arrayIndexPropertiesStrength]
+		strengthTensor = featureConnections[arrayIndexPropertiesStrengthIndex]
 		if(strengthTensor is None):
 			#print("identifyDirectConnectionCandidates error: strength tensor unavailable for SANI enforcement")
 			return None, None

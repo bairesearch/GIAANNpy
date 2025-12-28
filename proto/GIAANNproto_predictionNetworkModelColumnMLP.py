@@ -224,7 +224,7 @@ def loadModel(model, filepath, map_location=None):
 
 def selectMostActiveColumns(globalFeatureNeurons, kc):
 	if(inferencePredictiveNetworkUseInputAllProperties):
-		globalFeatureNeuronsActivation = globalFeatureNeurons[arrayIndexPropertiesActivation]
+		globalFeatureNeuronsActivation = globalFeatureNeurons[arrayIndexPropertiesActivationIndex]
 		cDim = 2
 	else:
 		globalFeatureNeuronsActivation = globalFeatureNeurons

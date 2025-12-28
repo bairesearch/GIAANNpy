@@ -86,12 +86,12 @@ def debugPrintActiveConnectionSamples(sequenceObservedColumns, featureConnection
 		targetColumnName = getSequenceColumnName(sequenceObservedColumns, targetColumnIndex)
 		sourceFeatureName = sequenceObservedColumns.indexToFeatureWord.get(sourceFeatureIndex, "NA") if hasattr(sequenceObservedColumns, "indexToFeatureWord") else "NA"
 		targetFeatureName = sequenceObservedColumns.indexToFeatureWord.get(targetFeatureIndex, "NA") if hasattr(sequenceObservedColumns, "indexToFeatureWord") else "NA"
-		connectionStrength = sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength, segmentIndex, sourceColumnIndex, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex]
+		connectionStrength = sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrengthIndex, segmentIndex, sourceColumnIndex, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex]
 		indexTuple = (int(segmentIndex), int(sourceColumnIndex), int(sourceFeatureIndex), int(targetColumnIndex), int(targetFeatureIndex))
 		print("\tseed debug: idx={0}, source=({1}:{2}), target=({3}:{4}), strength={5}".format(indexTuple, sourceColumnName, sourceFeatureName, targetColumnName, targetFeatureName, float(connectionStrength)))
 
 def debugPrintDenseConnectionSnapshot(sequenceObservedColumns, label="featureConnections snapshot", maxSamples=10):
-	denseStrength = sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength]
+	denseStrength = sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrengthIndex]
 	nonzero = pt.nonzero(denseStrength)
 	numEntries = nonzero.shape[0]
 	print("\tseed debug: {0} non-zero entries = {1}".format(label, numEntries))
@@ -134,9 +134,9 @@ def seedNetworkToken(sequenceObservedColumns, sequenceIndex, sequence, firstSeed
 
 	if(inferenceDecrementActivations):
 		if(not inferenceSeedTargetActivationsGlobalFeatureArrays):
-			globalFeatureNeuronsActivation = sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivation]
+			globalFeatureNeuronsActivation = sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivationIndex]
 			globalFeatureNeuronsActivation = GIAANNproto_predictionActivate.decrementActivation(globalFeatureNeuronsActivation, activationDecrementSeed)
-			sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivation)
+			sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivationIndex)
 	
 	if(drawNetworkDuringInferenceSeed):
 		sequenceObservedColumns.updateObservedColumnsWrapper()
@@ -197,9 +197,9 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 	featureConnectionsActive = createFeatureConnectionsActiveSeed(featureConnectionsActive, cs, fs, cs2, fs2, columnsWordOrder, featureNeuronsWordOrder, firstSeedTokenIndex, firstWordIndexPredictPhase, firstSeedConceptIndex, firstConceptIndexPredictPhase)
 
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-		featureConnectionsActivationUpdate = featureConnectionsActive[:, firstSeedConceptIndex] * sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength]
+		featureConnectionsActivationUpdate = featureConnectionsActive[:, firstSeedConceptIndex] * sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrengthIndex]
 	else:
-		featureConnectionsActivationUpdate = featureConnectionsActive * sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrength]
+		featureConnectionsActivationUpdate = featureConnectionsActive * sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrengthIndex]
 
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 		featureNeuronsTargetActivation = pt.sum(featureConnectionsActivationUpdate, dim=(1))
@@ -211,7 +211,7 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 	else:
 		featureNeuronsTargetActivation = featureNeuronsTargetActivation*j1
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-		globalFeatureNeuronsActivation = sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivation]
+		globalFeatureNeuronsActivation = sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivationIndex]
 	if(useSANI and algorithmMatrixSANImethod=="enforceActivationAcrossSegments" and enforceSequentialActivation):
 		# Patch: seed activation skipped SANI sequential gating, so later segments could activate without prior segments.
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
@@ -236,7 +236,7 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 				globalFeatureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
 			globalFeatureNeuronsActivation = globalFeatureNeuronsActivationDense.to_sparse_coo()
 		else:
-			featureNeuronsActivationDense = sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation]
+			featureNeuronsActivationDense = sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex]
 			featureNeuronsTargetActivationDense = featureNeuronsTargetActivation
 			if(featureNeuronsTargetActivationDense.is_sparse):
 				featureNeuronsTargetActivationDense = featureNeuronsTargetActivationDense.to_dense()
@@ -255,18 +255,18 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 				previousChannelActivation = featureNeuronsActivationDense[:-1] > 0
 				featureNeuronsActivationDense[1:] += featureNeuronsTargetActivationDense[1:] * previousChannelActivation
 				featureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
-			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation] = featureNeuronsActivationDense
+			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex] = featureNeuronsActivationDense
 	else:
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 			globalFeatureNeuronsActivation = globalFeatureNeuronsActivation + featureNeuronsTargetActivation
 		else:
-			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation, :, :, :] += featureNeuronsTargetActivation
+			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex, :, :, :] += featureNeuronsTargetActivation
 	
 	if(debugSANIfeaturesAndColumns and useSANIfeaturesAndColumns):
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 			featureNeuronsActivation = globalFeatureNeuronsActivation
 		else:
-			featureNeuronsActivation = sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation]
+			featureNeuronsActivation = sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex]
 		if(featureNeuronsActivation.is_sparse):
 			featureNeuronsActivationDense = featureNeuronsActivation.to_dense()
 		else:
@@ -278,7 +278,7 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 			globalFeatureNeuronsActivation = decrementActivation(globalFeatureNeuronsActivation, activationDecrementSeed)
 		else:
-			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation] = GIAANNproto_predictionActivate.decrementActivationDense(sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation], activationDecrementSeed)
+			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex] = GIAANNproto_predictionActivate.decrementActivationDense(sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex], activationDecrementSeed)
 					
 	if(inferenceDeactivateNeuronsUponPrediction):
 		wordOrderMask = pt.logical_and(featureNeuronsWordOrder >= firstSeedTokenIndex, featureNeuronsWordOrder < firstWordIndexPredictPhase)
@@ -305,16 +305,16 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 				globalFeatureNeuronsActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsActivation, indicesToUpdateGlobal, 0)
 		else:
 			featureNeuronsInactiveSource = pt.logical_not(seedFeatureMask).float()
-			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivation, :, :, :] *= featureNeuronsInactiveSource
+			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex, :, :, :] *= featureNeuronsInactiveSource
 			if(indicesToUpdateGlobal is not None and indicesToUpdateGlobal.numel() > 0):
-				globalFeatureNeuronsActivation = sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivation]
+				globalFeatureNeuronsActivation = sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivationIndex]
 				indicesToUpdateGlobal = indicesToUpdateGlobal.to(globalFeatureNeuronsActivation.device)
 				globalFeatureNeuronsActivation = globalFeatureNeuronsActivation.coalesce()
 				globalFeatureNeuronsActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsActivation, indicesToUpdateGlobal, 0)
-				sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivation)
+				sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivationIndex)
 
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-		sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivation)
+		sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivationIndex)
 
 def createFeatureConnectionsActiveSeed(featureConnectionsActive, cs, fs, cs2, fs2, columnsWordOrder, featureNeuronsWordOrder, firstSeedTokenIndex, firstWordIndexPredictPhase, firstSeedConceptIndex, firstConceptIndexPredictPhase):
 	if(featureNeuronsWordOrder is not None):	

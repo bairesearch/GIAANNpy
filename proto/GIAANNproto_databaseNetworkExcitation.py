@@ -178,6 +178,7 @@ class ObservedColumn:
 	def resizeConceptArrays(self, newC):
 		loadC = self.featureConnections.shape[3]
 		if newC > loadC:
+			self.featureConnections = self.featureConnections.coalesce()
 			expandedSize = (self.featureConnections.shape[0], self.featureConnections.shape[1], self.featureConnections.shape[2], newC, self.featureConnections.shape[4])
 			self.featureConnections = pt.sparse_coo_tensor(self.featureConnections.indices(), self.featureConnections.values(), size=expandedSize, dtype=arrayType, device=deviceSparse)
 		

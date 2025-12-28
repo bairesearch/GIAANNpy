@@ -55,7 +55,33 @@ def saveListFile(listFileName, listObject):
 
 def loadFeatureNeuronsGlobalFile():
 	globalFeatureNeurons = loadTensor(databaseFolder, globalFeatureNeuronsFile)
+	globalFeatureNeurons = adjustPropertyDimensions(globalFeatureNeurons, "globalFeatureNeurons")
 	return globalFeatureNeurons
+
+def adjustPropertyDimensions(tensor, tensorName):
+	propertyCount = tensor.shape[0]
+	if(propertyCount == arrayNumberOfProperties):
+		return tensor
+	if(arrayIndexPropertiesActivationCreate and not arrayIndexPropertiesActivation and propertyCount == arrayNumberOfProperties - 1):
+		return insertPropertyDimension(tensor, arrayIndexPropertiesActivationIndex, arrayNumberOfProperties)
+	raise RuntimeError(f"{tensorName} property dimension mismatch: expected {arrayNumberOfProperties}, got {propertyCount}")
+
+def insertPropertyDimension(tensor, insertIndex, targetPropertyCount):
+	if(tensor.is_sparse):
+		tensor = tensor.coalesce()
+		indices = tensor.indices()
+		values = tensor.values()
+		shiftMask = indices[0] >= insertIndex
+		if(shiftMask.any()):
+			indices = indices.clone()
+			indices[0, shiftMask] += 1
+		newSize = list(tensor.size())
+		newSize[0] = targetPropertyCount
+		return pt.sparse_coo_tensor(indices, values, size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
+	zerosShape = list(tensor.shape)
+	zerosShape[0] = 1
+	zerosTensor = pt.zeros(zerosShape, dtype=tensor.dtype, device=tensor.device)
+	return pt.cat([tensor[:insertIndex], zerosTensor, tensor[insertIndex:]], dim=0)
 	
 def saveData(databaseNetworkObject, observedColumnsDict):
 	# Save observed columns to disk
@@ -117,9 +143,9 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 	instance.featureIndexToWord = data['featureIndexToWord']
 	instance.nextFeatureIndex = data['nextFeatureIndex']
 	# Load the tensors
-	instance.featureConnections = loadTensor(observedColumnsDir, f"{conceptIndex}_featureConnections")
+	instance.featureConnections = adjustPropertyDimensions(loadTensor(observedColumnsDir, f"{conceptIndex}_featureConnections"), f"observedColumn.featureConnections[{conceptIndex}]")
 	if lowMem:
-		instance.featureNeurons = loadTensor(observedColumnsDir, f"{conceptIndex}_featureNeurons")
+		instance.featureNeurons = adjustPropertyDimensions(loadTensor(observedColumnsDir, f"{conceptIndex}_featureNeurons"), f"observedColumn.featureNeurons[{conceptIndex}]")
 	return instance
 
 def saveTensor(tensor, folderName, fileName):

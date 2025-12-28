@@ -643,7 +643,7 @@ def buildConnectedColumnsLookupForBeamNodes(databaseNetworkObject, observedColum
 	if(nodes is None or len(nodes) == 0):
 		return None, None
 	connectedColumnsSet = set()
-	if(debugConnectNodesToNextNodesInSequenceOnly or enforceDirectConnectionsMinWordDistance):
+	if(debugConnectNodesToNextNodesInSequenceOnly or enforceDirectConnectionsMinWordDistance or enforceDirectConnectionsSANI):
 		connectedColumnsFeatures = {}
 	else:
 		connectedColumnsFeatures = None
@@ -695,7 +695,7 @@ def getObservedColumnForBeam(databaseNetworkObject, observedColumnsDict, columnI
 def getConnectedColumnsForBeamFeature(observedColumn, featureIndex, includeFeatureDetails=False):
 	if(featureIndex is None or featureIndex < 0):
 		return [], {} if includeFeatureDetails else None
-	featureConnectionsStrength = observedColumn.featureConnections[arrayIndexPropertiesStrength]
+	featureConnectionsStrength = observedColumn.featureConnections[arrayIndexPropertiesStrengthIndex]
 	featureConnectionsStrength = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsStrength, 1, featureIndex)
 	featureConnectionsStrength = featureConnectionsStrength.coalesce()
 	if(featureConnectionsStrength._nnz() == 0):
@@ -708,6 +708,9 @@ def getConnectedColumnsForBeamFeature(observedColumn, featureIndex, includeFeatu
 		if(minWordDistanceMask.sum().item() == 0):
 			return [], {} if includeFeatureDetails else None
 		targetColumnIndices = targetColumnIndices[:, minWordDistanceMask]
+	elif(enforceDirectConnections and enforceDirectConnectionsSANI):
+		lastSegmentMask = targetColumnIndices[0] == arrayIndexSegmentLast
+		targetColumnIndices = targetColumnIndices[:, lastSegmentMask]
 	targetColumns = targetColumnIndices[1].unique()
 	targetColumnsList = targetColumns.cpu().tolist()
 	if(includeFeatureDetails):

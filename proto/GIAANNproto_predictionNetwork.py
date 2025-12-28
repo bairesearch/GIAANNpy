@@ -61,9 +61,9 @@ def predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, tok
 		if(transformerUseInputConnections):
 			globalFeatureConnections = databaseNetworkObject.globalFeatureConnections
 	else:
-		globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivation]
+		globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivationIndex]
 		if(transformerUseInputConnections):
-			globalFeatureConnections = databaseNetworkObject.globalFeatureConnections[arrayIndexPropertiesActivation]
+			globalFeatureConnections = databaseNetworkObject.globalFeatureConnections[arrayIndexPropertiesActivationIndex]
 	
 	if(inferencePredictiveNetworkNormaliseInputs):
 		#if(not useGPUpredictiveNetworkModel and inferencePredictiveNetworkNormaliseDim==0):

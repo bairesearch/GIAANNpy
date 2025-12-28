@@ -101,9 +101,9 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 		featureNeuronsActive = (featureNeuronsActive > 0).to(featureNeuronsActive.dtype)	#ensure the source activation signal is binary (even with useSANI)
 
 	#target neuron activation dependence on connection strength;
-	featureConnectionsStrength = featureConnections[arrayIndexPropertiesStrength]
+	featureConnectionsStrength = featureConnections[arrayIndexPropertiesStrengthIndex]
 	if(inferenceConnectionStrengthPOSdependence):
-		featureConnectionsPos = featureConnections[arrayIndexPropertiesPos]
+		featureConnectionsPos = featureConnections[arrayIndexPropertiesPosIndex]
 	if(inferencePredictiveNetwork and not useGPUsparse):
 		conceptColumnsFeatureIndices = conceptColumnsFeatureIndices.to(deviceSparse)
 	featureConnectionsStrength = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsStrength, 1, conceptColumnsFeatureIndices.squeeze().item())

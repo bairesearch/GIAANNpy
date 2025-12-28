@@ -9,3 +9,4 @@
 - If new code would be better added to a new file, then create the new file.
 - Features are defined in the globalDefs.py file (Boolean global variables: True/False = On/Off). All code within functions pertaining to a particular feature must be encapsulated by an if statement for its specific global variable; e.g. "if(conceptColumnsDelimitByPOS): ...".
 - To run the code; 1. cd proto, 2. /home/user/anaconda3/envs/pytorchsenv/bin/python GIAANNproto_main.py
+- Never declare variables, declare function arguments, or execute functions across multiple lines (assume the programmer IDE has a large horizontal view width and the programmer is capable of horizontal scrolling if necessary).

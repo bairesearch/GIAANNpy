@@ -128,15 +128,20 @@ def applyExternalOutputUpdateToColumn(inhibitoryColumn, updateEntry):
 		activeSegmentIndices = pt.tensor([[arrayIndexSegmentFirst]], dtype=pt.long)
 	for segmentTensor in activeSegmentIndices:
 		segmentIndex = int(segmentTensor.item())
-		inhibitoryColumn.featureConnectionsOutput = addConnectionPropertyValue(inhibitoryColumn.featureConnectionsOutput, arrayIndexPropertiesStrength, segmentIndex, updateEntry["inhibitoryFeatureIndex"], updateEntry["candidateColumnConceptIndex"], updateEntry["candidateFeatureConceptIndex"], inhibitoryConnectionStrengthIncrement)
-		inhibitoryColumn.featureConnectionsOutput = addConnectionPropertyValue( inhibitoryColumn.featureConnectionsOutput, arrayIndexPropertiesPermanence, segmentIndex, updateEntry["inhibitoryFeatureIndex"], updateEntry["candidateColumnConceptIndex"], updateEntry["candidateFeatureConceptIndex"], z1)
-		inhibitoryColumn.featureConnectionsOutput = setConnectionPropertyValue( inhibitoryColumn.featureConnectionsOutput, arrayIndexPropertiesActivation, segmentIndex, updateEntry["inhibitoryFeatureIndex"], updateEntry["candidateColumnConceptIndex"], updateEntry["candidateFeatureConceptIndex"], 0.0)
-		if(inferenceUseNeuronFeaturePropertiesTime):
-			timeValue = 0.0
-		else:
-			timeValue = float(updateEntry["sequenceIndex"])
-		inhibitoryColumn.featureConnectionsOutput = setConnectionPropertyValue( inhibitoryColumn.featureConnectionsOutput, arrayIndexPropertiesTime, segmentIndex, updateEntry["inhibitoryFeatureIndex"], updateEntry["candidateColumnConceptIndex"], updateEntry["candidateFeatureConceptIndex"], timeValue)
-		inhibitoryColumn.featureConnectionsOutput = setConnectionPropertyValue( inhibitoryColumn.featureConnectionsOutput, arrayIndexPropertiesPos, segmentIndex, updateEntry["inhibitoryFeatureIndex"], updateEntry["candidateColumnConceptIndex"], updateEntry["candidateFeatureConceptIndex"], float(updateEntry["sourcePosValue"]))
+		if(arrayIndexPropertiesStrength):
+			inhibitoryColumn.featureConnectionsOutput = addConnectionPropertyValue(inhibitoryColumn.featureConnectionsOutput, arrayIndexPropertiesStrengthIndex, segmentIndex, updateEntry["inhibitoryFeatureIndex"], updateEntry["candidateColumnConceptIndex"], updateEntry["candidateFeatureConceptIndex"], inhibitoryConnectionStrengthIncrement)
+		if(arrayIndexPropertiesPermanence):
+			inhibitoryColumn.featureConnectionsOutput = addConnectionPropertyValue( inhibitoryColumn.featureConnectionsOutput, arrayIndexPropertiesPermanenceIndex, segmentIndex, updateEntry["inhibitoryFeatureIndex"], updateEntry["candidateColumnConceptIndex"], updateEntry["candidateFeatureConceptIndex"], z1)
+		if(arrayIndexPropertiesActivation):
+			inhibitoryColumn.featureConnectionsOutput = setConnectionPropertyValue( inhibitoryColumn.featureConnectionsOutput, arrayIndexPropertiesActivationIndex, segmentIndex, updateEntry["inhibitoryFeatureIndex"], updateEntry["candidateColumnConceptIndex"], updateEntry["candidateFeatureConceptIndex"], 0.0)
+		if(arrayIndexPropertiesTime):
+			if(inferenceUseNeuronFeaturePropertiesTime):
+				timeValue = 0.0
+			else:
+				timeValue = float(updateEntry["sequenceIndex"])
+			inhibitoryColumn.featureConnectionsOutput = setConnectionPropertyValue( inhibitoryColumn.featureConnectionsOutput, arrayIndexPropertiesTimeIndex, segmentIndex, updateEntry["inhibitoryFeatureIndex"], updateEntry["candidateColumnConceptIndex"], updateEntry["candidateFeatureConceptIndex"], timeValue)
+		if(arrayIndexPropertiesPos):
+			inhibitoryColumn.featureConnectionsOutput = setConnectionPropertyValue( inhibitoryColumn.featureConnectionsOutput, arrayIndexPropertiesPosIndex, segmentIndex, updateEntry["inhibitoryFeatureIndex"], updateEntry["candidateColumnConceptIndex"], updateEntry["candidateFeatureConceptIndex"], float(updateEntry["sourcePosValue"]))
 
 def addConnectionPropertyValue(tensorSparse, propertyIndex, segmentIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex, incrementValue):
 	dimensions = [propertyIndex, segmentIndex, inhibitoryFeatureIndex, candidateColumnIndex, candidateFeatureIndex]
