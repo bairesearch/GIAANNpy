@@ -395,166 +395,20 @@ class SequenceObservedColumns:
 			if(debugDrawNeuronActivations):
 				strengthSum = self.featureConnections[arrayIndexPropertiesStrengthIndex].sum().item()
 	
-	def updateObservedColumnsWrapper(self):
+	def updateObservedColumnsWrapper(self, inference=False):
 		if(trainSequenceObservedColumnsMatchSequenceWords):
 			#for multiple instances of concept in sequence, need to take the sum of the changes between the existing and modified arrays for each instance of a same concept in the sequence
-			self.updateObservedColumns(self.sequenceObservedColumnsDict, mode="default")
+			self.updateObservedColumns(self.sequenceObservedColumnsDict, inference, mode="default")
 		else:
-			self.updateObservedColumns(self.observedColumnsDict2, mode="default")
+			self.updateObservedColumns(self.observedColumnsDict2, inference, mode="default")
 			
-	def buildMaskLookup(self, maskSize, indices, device):
-		maskLookup = pt.zeros((maskSize,), dtype=pt.bool, device=device)
-		if(indices.numel() > 0):
-			maskLookup[indices] = True
-		return maskLookup
-
-	def combineSparseUpdates(self, updateA, updateB, targetSize):
-		updateA = updateA.coalesce()
-		updateB = updateB.coalesce()
-		indicesA = updateA.indices()
-		valuesA = updateA.values()
-		indicesB = updateB.indices()
-		valuesB = updateB.values()
-		if(indicesA.numel() == 0 and indicesB.numel() == 0):
-			combinedIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=deviceSparse)
-			combinedValues = pt.empty((0,), dtype=arrayType, device=deviceSparse)
-		elif(indicesA.numel() == 0):
-			combinedIndices = indicesB
-			combinedValues = valuesB
-		elif(indicesB.numel() == 0):
-			combinedIndices = indicesA
-			combinedValues = valuesA
+	def updateObservedColumns(self, sequenceObservedColumnsDict, inference, mode):
+		if(arrayIndexPropertiesEfficient and not inference):
+			self.updateObservedColumnsEfficient(sequenceObservedColumnsDict, mode)
 		else:
-			combinedIndices = pt.cat([indicesA, indicesB], dim=1)
-			combinedValues = pt.cat([valuesA, valuesB], dim=0)
-		combinedSparse = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSize, dtype=arrayType, device=deviceSparse)
-		return combinedSparse
-
-	def addSparseUpdate(self, targetSparse, updateSparse):
-		targetSparse = targetSparse.coalesce()
-		updateSparse = updateSparse.coalesce()
-		indicesTarget = targetSparse.indices()
-		valuesTarget = targetSparse.values()
-		indicesUpdate = updateSparse.indices()
-		valuesUpdate = updateSparse.values()
-		if(indicesUpdate.numel() > 0):
-			combinedIndices = pt.cat([indicesTarget, indicesUpdate], dim=1)
-			combinedValues = pt.cat([valuesTarget, valuesUpdate], dim=0)
-			targetSparse = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSparse.size(), dtype=arrayType, device=deviceSparse)
-			targetSparse = targetSparse.coalesce()
-			targetSparse.values().clamp_(min=0)
-		return targetSparse
-
-	def flattenSparseIndices(self, indices, size):
-		device = indices.device
-		sizeTensor = pt.tensor(size, dtype=pt.long, device=device)
-		strides = pt.ones((len(size),), dtype=pt.long, device=device)
-		for i in range(len(size)-2, -1, -1):
-			strides[i] = strides[i+1] * sizeTensor[i+1]
-		linear = (indices * strides.unsqueeze(1)).sum(dim=0)
-		return linear
-
-	def applySparseMinUpdate(self, targetSparse, updateSparse):
-		updatedSparse = targetSparse.coalesce()
-		updateSparse = updateSparse.coalesce()
-		targetIndices = updatedSparse.indices()
-		targetValues = updatedSparse.values()
-		updateIndices = updateSparse.indices()
-		updateValues = updateSparse.values()
-		if(updateIndices.numel() > 0):
-			targetLinear = self.flattenSparseIndices(targetIndices, updatedSparse.size())
-			updateLinear = self.flattenSparseIndices(updateIndices, updatedSparse.size())
-			sortedTargetLinear, sortOrder = pt.sort(targetLinear)
-			if(sortedTargetLinear.numel() > 0):
-				updatePos = pt.searchsorted(sortedTargetLinear, updateLinear)
-				inBounds = updatePos < sortedTargetLinear.numel()
-				clampedPos = updatePos.clamp(max=sortedTargetLinear.numel()-1)
-				matchMask = inBounds & (sortedTargetLinear[clampedPos] == updateLinear)
-			else:
-				updatePos = pt.zeros_like(updateLinear, dtype=pt.long)
-				matchMask = pt.zeros_like(updateLinear, dtype=pt.bool)
-
-			updatedTargetValues = targetValues
-			if(matchMask.any()):
-				matchedPositions = updatePos[matchMask]
-				matchedTargetIndices = sortOrder[matchedPositions]
-				updatedTargetValues = targetValues.clone()
-				updatedTargetValues[matchedTargetIndices] = pt.minimum(updatedTargetValues[matchedTargetIndices], updateValues[matchMask])
-
-			nonMatchMask = pt.logical_not(matchMask)
-			if(nonMatchMask.any()):
-				newIndices = updateIndices[:, nonMatchMask]
-				newValues = updateValues[nonMatchMask]
-				combinedIndices = pt.cat([targetIndices, newIndices], dim=1)
-				combinedValues = pt.cat([updatedTargetValues, newValues], dim=0)
-			else:
-				combinedIndices = targetIndices
-				combinedValues = updatedTargetValues
-
-			updatedSparse = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=updatedSparse.size(), dtype=arrayType, device=deviceSparse)
-		return updatedSparse
-
-	def extractSequenceFeatureUpdates(self, cIdx, fIdxTensor, featureIndicesInObserved, featureNeuronsSparse, propertyMaskLookup, sequenceFeatureMaskLookup, targetSize, insertConceptIndex=None):
-		indices = featureNeuronsSparse.indices()
-		values = featureNeuronsSparse.values()
-		mask = (indices[2] == cIdx)
-		if(propertyMaskLookup is not None):
-			mask = mask & propertyMaskLookup[indices[0]]
-		if(sequenceFeatureMaskLookup is not None):
-			mask = mask & sequenceFeatureMaskLookup[indices[3]]
-		filteredIndices = indices[:, mask]
-		filteredValues = values[mask]
-		if(filteredIndices.numel() > 0):
-			filteredIndices[2] = filteredIndices[3]
-			filteredIndices = filteredIndices[0:3]
-			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-				filteredIndices[2] = featureIndicesInObserved[filteredIndices[2]]
-			if(insertConceptIndex is not None):
-				conceptIndexRow = pt.full((1, filteredIndices.size(1)), insertConceptIndex, dtype=pt.long, device=filteredIndices.device)
-				filteredIndices = pt.cat([filteredIndices[0:2], conceptIndexRow, filteredIndices[2:3]], dim=0)
-		else:
-			filteredIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=featureNeuronsSparse.device)
-			filteredValues = pt.empty((0,), dtype=arrayType, device=featureNeuronsSparse.device)
-		if not useGPUsparse:
-			filteredIndices = filteredIndices.to(deviceSparse)
-			filteredValues = filteredValues.to(deviceSparse)
-		updateSparse = pt.sparse_coo_tensor(filteredIndices, filteredValues, size=targetSize, dtype=arrayType, device=deviceSparse)
-		return updateSparse
-
-	def extractSequenceConnectionUpdates(self, cIdx, fIdxTensor, featureIndicesInObserved, featureConnectionsSparse, propertyMaskLookup, sequenceFeatureMaskLookup, targetSize):
-		indices = featureConnectionsSparse.indices()
-		values = featureConnectionsSparse.values()
-		mask = (indices[2] == cIdx)
-		if(propertyMaskLookup is not None):
-			mask = mask & propertyMaskLookup[indices[0]]
-		if(sequenceFeatureMaskLookup is not None):
-			mask = mask & sequenceFeatureMaskLookup[indices[3]]
-			mask = mask & sequenceFeatureMaskLookup[indices[5]]
-		filteredIndices = indices[:, mask]
-		filteredValues = values[mask]
-		if(filteredIndices.numel() > 0):
-			filteredIndices = pt.stack((
-				filteredIndices[0],
-				filteredIndices[1],
-				filteredIndices[3],
-				filteredIndices[4],
-				filteredIndices[5]
-			), dim=0)
-			conceptIndicesTensor = self.conceptIndicesInSequenceObservedTensor.to(filteredIndices.device)
-			filteredIndices[3] = conceptIndicesTensor[filteredIndices[3]]
-			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-				filteredIndices[2] = featureIndicesInObserved[filteredIndices[2]]
-				filteredIndices[4] = featureIndicesInObserved[filteredIndices[4]]
-		else:
-			filteredIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=featureConnectionsSparse.device)
-			filteredValues = pt.empty((0,), dtype=arrayType, device=featureConnectionsSparse.device)
-		if not useGPUsparse:
-			filteredIndices = filteredIndices.to(deviceSparse)
-			filteredValues = filteredValues.to(deviceSparse)
-		updateSparse = pt.sparse_coo_tensor(filteredIndices, filteredValues, size=targetSize, dtype=arrayType, device=deviceSparse)
-		return updateSparse
-
-	def updateObservedColumns(self, sequenceObservedColumnsDict, mode):
+			self.updateObservedColumnsVerbose(sequenceObservedColumnsDict, mode)
+	
+	def updateObservedColumnsVerbose(self, sequenceObservedColumnsDict, mode):
 		# Update observed columns with data from sequence arrays
 
 		featureNeuronsDelta = self.featureNeurons - self.featureNeuronsOriginal
@@ -692,3 +546,342 @@ class SequenceObservedColumns:
 
 		if not lowMem:
 			self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
+
+	def updateObservedColumnsEfficient(self, sequenceObservedColumnsDict, mode):
+		if not arrayIndexPropertiesStrength:
+			return
+
+		featureNeuronsDelta = self.featureNeurons[arrayIndexPropertiesStrengthIndex] - self.featureNeuronsOriginal[arrayIndexPropertiesStrengthIndex]
+		featureConnectionsDelta = self.featureConnections[arrayIndexPropertiesStrengthIndex] - self.featureConnectionsOriginal[arrayIndexPropertiesStrengthIndex]
+
+		featureNeuronsDeltaSparse = featureNeuronsDelta.to_sparse()
+		featureConnectionsDeltaSparse = featureConnectionsDelta.to_sparse()
+		if(performRedundantCoalesce):
+			featureNeuronsDeltaSparse = featureNeuronsDeltaSparse.coalesce()
+			featureConnectionsDeltaSparse = featureConnectionsDeltaSparse.coalesce()
+		if not useGPUsparse:
+			featureNeuronsDeltaSparse = featureNeuronsDeltaSparse.to(deviceSparse)
+			featureConnectionsDeltaSparse = featureConnectionsDeltaSparse.to(deviceSparse)
+
+		featureIndicesInObserved, fIdxTensor = self.getObservedColumnFeatureIndices()
+		featureDevice = featureNeuronsDeltaSparse.device
+		connectionDevice = featureConnectionsDeltaSparse.device
+		featureIndicesObservedFeatureDevice = featureIndicesInObserved.to(featureDevice)
+		featureIndicesObservedConnectionDevice = featureIndicesInObserved.to(connectionDevice)
+		sequenceFeatureMaskFeature = None
+		sequenceFeatureMaskConnection = None
+		if(fIdxTensor.numel() != self.fs):
+			fIdxTensorFeatureDevice = fIdxTensor.to(featureDevice)
+			sequenceFeatureMaskFeature = self.buildMaskLookup(self.fs, fIdxTensorFeatureDevice, featureDevice)
+			if(connectionDevice == featureDevice):
+				sequenceFeatureMaskConnection = sequenceFeatureMaskFeature
+			else:
+				fIdxTensorConnectionDevice = fIdxTensor.to(connectionDevice)
+				sequenceFeatureMaskConnection = self.buildMaskLookup(self.fs, fIdxTensorConnectionDevice, connectionDevice)
+
+		featureIndices = featureNeuronsDeltaSparse.indices()
+		featureValues = featureNeuronsDeltaSparse.values()
+		featureIndices, featureValues = self.filterSparseByFeatureMask(featureIndices, featureValues, sequenceFeatureMaskFeature, [2])
+		featureRanges, featureIndicesSorted, featureValuesSorted = self.buildSparseColumnRanges(featureIndices, featureValues, 1)
+
+		connectionIndices = featureConnectionsDeltaSparse.indices()
+		connectionValues = featureConnectionsDeltaSparse.values()
+		connectionIndices, connectionValues = self.filterSparseByFeatureMask(connectionIndices, connectionValues, sequenceFeatureMaskConnection, [2, 4])
+		connectionRanges, connectionIndicesSorted, connectionValuesSorted = self.buildSparseColumnRanges(connectionIndices, connectionValues, 1)
+
+		connectionMinRanges = {}
+		connectionMinIndicesSorted = None
+		connectionMinValuesSorted = None
+		if(arrayIndexPropertiesMinWordDistance):
+			connectionMin = self.featureConnections[arrayIndexPropertiesMinWordDistanceIndex]
+			connectionMinSparse = connectionMin.to_sparse()
+			if(performRedundantCoalesce):
+				connectionMinSparse = connectionMinSparse.coalesce()
+			if not useGPUsparse:
+				connectionMinSparse = connectionMinSparse.to(deviceSparse)
+			connectionMinIndices = connectionMinSparse.indices()
+			connectionMinValues = connectionMinSparse.values()
+			connectionMinIndices, connectionMinValues = self.filterSparseByFeatureMask(connectionMinIndices, connectionMinValues, sequenceFeatureMaskConnection, [2, 4])
+			connectionMinRanges, connectionMinIndicesSorted, connectionMinValuesSorted = self.buildSparseColumnRanges(connectionMinIndices, connectionMinValues, 1)
+
+		conceptIndicesTensor = self.conceptIndicesInSequenceObservedTensor.to(connectionDevice)
+
+		if not lowMem:
+			globalFeatureNeurons = self.databaseNetworkObject.globalFeatureNeurons
+
+		for cIdx, observedColumn in sequenceObservedColumnsDict.items():
+			conceptIndex = observedColumn.conceptIndex
+
+			if lowMem:
+				featureTargetSparse = observedColumn.featureNeurons
+				featureTargetSize = featureTargetSparse.size()
+			else:
+				featureTargetSparse = globalFeatureNeurons
+				featureTargetSize = featureTargetSparse.size()
+
+			featureRange = featureRanges.get(cIdx)
+			if(featureRange is not None):
+				start, end = featureRange
+				featureUpdateIndices = featureIndicesSorted[:, start:end]
+				featureUpdateValues = featureValuesSorted[start:end]
+				featureUpdates = self.buildFeaturePropertyUpdateSparse(featureUpdateIndices, featureUpdateValues, arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, featureTargetSize, insertConceptIndex=None if lowMem else conceptIndex)
+				featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
+
+			if lowMem:
+				observedColumn.featureNeurons = featureTargetSparse
+			else:
+				globalFeatureNeurons = featureTargetSparse
+
+			connectionTargetSparse = observedColumn.featureConnections
+			connectionTargetSize = connectionTargetSparse.size()
+
+			connectionRange = connectionRanges.get(cIdx)
+			if(connectionRange is not None):
+				start, end = connectionRange
+				connectionUpdateIndices = connectionIndicesSorted[:, start:end]
+				connectionUpdateValues = connectionValuesSorted[start:end]
+				connectionUpdates = self.buildConnectionPropertyUpdateSparse(connectionUpdateIndices, connectionUpdateValues, arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesTensor, connectionTargetSize)
+				connectionTargetSparse = self.addSparseUpdateNonNegative(connectionTargetSparse, connectionUpdates)
+
+			if(arrayIndexPropertiesMinWordDistance):
+				minRange = connectionMinRanges.get(cIdx)
+				if(minRange is not None):
+					start, end = minRange
+					minUpdateIndices = connectionMinIndicesSorted[:, start:end]
+					minUpdateValues = connectionMinValuesSorted[start:end]
+					minUpdates = self.buildConnectionPropertyUpdateSparse(minUpdateIndices, minUpdateValues, arrayIndexPropertiesMinWordDistanceIndex, featureIndicesObservedConnectionDevice, conceptIndicesTensor, connectionTargetSize)
+					connectionTargetSparse = self.applySparseMinUpdate(connectionTargetSparse, minUpdates)
+
+			observedColumn.featureConnections = connectionTargetSparse
+
+		if not lowMem:
+			self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
+
+	def buildMaskLookup(self, maskSize, indices, device):
+		maskLookup = pt.zeros((maskSize,), dtype=pt.bool, device=device)
+		if(indices.numel() > 0):
+			maskLookup[indices] = True
+		return maskLookup
+
+	def combineSparseUpdates(self, updateA, updateB, targetSize):
+		updateA = updateA.coalesce()
+		updateB = updateB.coalesce()
+		indicesA = updateA.indices()
+		valuesA = updateA.values()
+		indicesB = updateB.indices()
+		valuesB = updateB.values()
+		if(indicesA.numel() == 0 and indicesB.numel() == 0):
+			combinedIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=deviceSparse)
+			combinedValues = pt.empty((0,), dtype=arrayType, device=deviceSparse)
+		elif(indicesA.numel() == 0):
+			combinedIndices = indicesB
+			combinedValues = valuesB
+		elif(indicesB.numel() == 0):
+			combinedIndices = indicesA
+			combinedValues = valuesA
+		else:
+			combinedIndices = pt.cat([indicesA, indicesB], dim=1)
+			combinedValues = pt.cat([valuesA, valuesB], dim=0)
+		combinedSparse = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSize, dtype=arrayType, device=deviceSparse)
+		return combinedSparse
+
+	def addSparseUpdate(self, targetSparse, updateSparse):
+		targetSparse = targetSparse.coalesce()
+		updateSparse = updateSparse.coalesce()
+		indicesTarget = targetSparse.indices()
+		valuesTarget = targetSparse.values()
+		indicesUpdate = updateSparse.indices()
+		valuesUpdate = updateSparse.values()
+		if(indicesUpdate.numel() > 0):
+			combinedIndices = pt.cat([indicesTarget, indicesUpdate], dim=1)
+			combinedValues = pt.cat([valuesTarget, valuesUpdate], dim=0)
+			targetSparse = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSparse.size(), dtype=arrayType, device=deviceSparse)
+			targetSparse = targetSparse.coalesce()
+			targetSparse.values().clamp_(min=0)
+		return targetSparse
+
+	def addSparseUpdateNonNegative(self, targetSparse, updateSparse):
+		if(updateSparse._nnz() == 0):
+			return targetSparse
+		if not targetSparse.is_coalesced():
+			targetSparse = targetSparse.coalesce()
+		if not updateSparse.is_coalesced():
+			updateSparse = updateSparse.coalesce()
+		indicesTarget = targetSparse.indices()
+		valuesTarget = targetSparse.values()
+		indicesUpdate = updateSparse.indices()
+		valuesUpdate = updateSparse.values()
+		combinedIndices = pt.cat([indicesTarget, indicesUpdate], dim=1)
+		combinedValues = pt.cat([valuesTarget, valuesUpdate], dim=0)
+		combinedSparse = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSparse.size(), dtype=arrayType, device=deviceSparse)
+		return combinedSparse.coalesce()
+
+	def filterSparseByFeatureMask(self, indices, values, featureMaskLookup, featureDims):
+		if(featureMaskLookup is None or indices.numel() == 0):
+			return indices, values
+		mask = featureMaskLookup[indices[featureDims[0]]]
+		for dim in featureDims[1:]:
+			mask = mask & featureMaskLookup[indices[dim]]
+		if(mask.any()):
+			return indices[:, mask], values[mask]
+		emptyIndices = pt.empty((indices.size(0), 0), dtype=pt.long, device=indices.device)
+		emptyValues = pt.empty((0,), dtype=values.dtype, device=values.device)
+		return emptyIndices, emptyValues
+
+	def buildSparseColumnRanges(self, indices, values, columnDim):
+		if(indices.numel() == 0):
+			return {}, indices, values
+		columnIndices = indices[columnDim]
+		sortedColumnIndices, sortOrder = pt.sort(columnIndices)
+		sortedIndices = indices[:, sortOrder]
+		sortedValues = values[sortOrder]
+		uniqueColumns, counts = pt.unique_consecutive(sortedColumnIndices, return_counts=True)
+		starts = pt.cumsum(counts, 0) - counts
+		ranges = {}
+		for columnIndex, start, count in zip(uniqueColumns.tolist(), starts.tolist(), counts.tolist()):
+			if(count > 0):
+				ranges[columnIndex] = (start, start + count)
+		return ranges, sortedIndices, sortedValues
+
+	def buildFeaturePropertyUpdateSparse(self, indices, values, propertyIndex, featureIndicesInObserved, targetSize, insertConceptIndex=None):
+		if(indices.numel() == 0):
+			emptyIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=indices.device)
+			emptyValues = pt.empty((0,), dtype=arrayType, device=indices.device)
+			return pt.sparse_coo_tensor(emptyIndices, emptyValues, size=targetSize, dtype=arrayType, device=deviceSparse)
+		segment = indices[0]
+		featureIndex = indices[2]
+		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
+			featureIndex = featureIndicesInObserved[featureIndex]
+		propertyRow = pt.full_like(segment, propertyIndex)
+		if(insertConceptIndex is None):
+			updateIndices = pt.stack((propertyRow, segment, featureIndex), dim=0)
+		else:
+			conceptRow = pt.full_like(segment, insertConceptIndex)
+			updateIndices = pt.stack((propertyRow, segment, conceptRow, featureIndex), dim=0)
+		return pt.sparse_coo_tensor(updateIndices, values, size=targetSize, dtype=arrayType, device=deviceSparse)
+
+	def buildConnectionPropertyUpdateSparse(self, indices, values, propertyIndex, featureIndicesInObserved, conceptIndicesTensor, targetSize):
+		if(indices.numel() == 0):
+			emptyIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=indices.device)
+			emptyValues = pt.empty((0,), dtype=arrayType, device=indices.device)
+			return pt.sparse_coo_tensor(emptyIndices, emptyValues, size=targetSize, dtype=arrayType, device=deviceSparse)
+		segment = indices[0]
+		sourceFeatureIndex = indices[2]
+		targetConceptIndex = indices[3]
+		targetFeatureIndex = indices[4]
+		targetConceptIndex = conceptIndicesTensor[targetConceptIndex]
+		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
+			sourceFeatureIndex = featureIndicesInObserved[sourceFeatureIndex]
+			targetFeatureIndex = featureIndicesInObserved[targetFeatureIndex]
+		propertyRow = pt.full_like(segment, propertyIndex)
+		updateIndices = pt.stack((propertyRow, segment, sourceFeatureIndex, targetConceptIndex, targetFeatureIndex), dim=0)
+		return pt.sparse_coo_tensor(updateIndices, values, size=targetSize, dtype=arrayType, device=deviceSparse)
+
+	def flattenSparseIndices(self, indices, size):
+		device = indices.device
+		sizeTensor = pt.tensor(size, dtype=pt.long, device=device)
+		strides = pt.ones((len(size),), dtype=pt.long, device=device)
+		for i in range(len(size)-2, -1, -1):
+			strides[i] = strides[i+1] * sizeTensor[i+1]
+		linear = (indices * strides.unsqueeze(1)).sum(dim=0)
+		return linear
+
+	def applySparseMinUpdate(self, targetSparse, updateSparse):
+		updatedSparse = targetSparse.coalesce()
+		updateSparse = updateSparse.coalesce()
+		targetIndices = updatedSparse.indices()
+		targetValues = updatedSparse.values()
+		updateIndices = updateSparse.indices()
+		updateValues = updateSparse.values()
+		if(updateIndices.numel() > 0):
+			targetLinear = self.flattenSparseIndices(targetIndices, updatedSparse.size())
+			updateLinear = self.flattenSparseIndices(updateIndices, updatedSparse.size())
+			sortedTargetLinear, sortOrder = pt.sort(targetLinear)
+			if(sortedTargetLinear.numel() > 0):
+				updatePos = pt.searchsorted(sortedTargetLinear, updateLinear)
+				inBounds = updatePos < sortedTargetLinear.numel()
+				clampedPos = updatePos.clamp(max=sortedTargetLinear.numel()-1)
+				matchMask = inBounds & (sortedTargetLinear[clampedPos] == updateLinear)
+			else:
+				updatePos = pt.zeros_like(updateLinear, dtype=pt.long)
+				matchMask = pt.zeros_like(updateLinear, dtype=pt.bool)
+
+			updatedTargetValues = targetValues
+			if(matchMask.any()):
+				matchedPositions = updatePos[matchMask]
+				matchedTargetIndices = sortOrder[matchedPositions]
+				updatedTargetValues = targetValues.clone()
+				updatedTargetValues[matchedTargetIndices] = pt.minimum(updatedTargetValues[matchedTargetIndices], updateValues[matchMask])
+
+			nonMatchMask = pt.logical_not(matchMask)
+			if(nonMatchMask.any()):
+				newIndices = updateIndices[:, nonMatchMask]
+				newValues = updateValues[nonMatchMask]
+				combinedIndices = pt.cat([targetIndices, newIndices], dim=1)
+				combinedValues = pt.cat([updatedTargetValues, newValues], dim=0)
+			else:
+				combinedIndices = targetIndices
+				combinedValues = updatedTargetValues
+
+			updatedSparse = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=updatedSparse.size(), dtype=arrayType, device=deviceSparse)
+		return updatedSparse
+
+	def extractSequenceFeatureUpdates(self, cIdx, fIdxTensor, featureIndicesInObserved, featureNeuronsSparse, propertyMaskLookup, sequenceFeatureMaskLookup, targetSize, insertConceptIndex=None):
+		indices = featureNeuronsSparse.indices()
+		values = featureNeuronsSparse.values()
+		mask = (indices[2] == cIdx)
+		if(propertyMaskLookup is not None):
+			mask = mask & propertyMaskLookup[indices[0]]
+		if(sequenceFeatureMaskLookup is not None):
+			mask = mask & sequenceFeatureMaskLookup[indices[3]]
+		filteredIndices = indices[:, mask]
+		filteredValues = values[mask]
+		if(filteredIndices.numel() > 0):
+			filteredIndices[2] = filteredIndices[3]
+			filteredIndices = filteredIndices[0:3]
+			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
+				filteredIndices[2] = featureIndicesInObserved[filteredIndices[2]]
+			if(insertConceptIndex is not None):
+				conceptIndexRow = pt.full((1, filteredIndices.size(1)), insertConceptIndex, dtype=pt.long, device=filteredIndices.device)
+				filteredIndices = pt.cat([filteredIndices[0:2], conceptIndexRow, filteredIndices[2:3]], dim=0)
+		else:
+			filteredIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=featureNeuronsSparse.device)
+			filteredValues = pt.empty((0,), dtype=arrayType, device=featureNeuronsSparse.device)
+		if not useGPUsparse:
+			filteredIndices = filteredIndices.to(deviceSparse)
+			filteredValues = filteredValues.to(deviceSparse)
+		updateSparse = pt.sparse_coo_tensor(filteredIndices, filteredValues, size=targetSize, dtype=arrayType, device=deviceSparse)
+		return updateSparse
+
+	def extractSequenceConnectionUpdates(self, cIdx, fIdxTensor, featureIndicesInObserved, featureConnectionsSparse, propertyMaskLookup, sequenceFeatureMaskLookup, targetSize):
+		indices = featureConnectionsSparse.indices()
+		values = featureConnectionsSparse.values()
+		mask = (indices[2] == cIdx)
+		if(propertyMaskLookup is not None):
+			mask = mask & propertyMaskLookup[indices[0]]
+		if(sequenceFeatureMaskLookup is not None):
+			mask = mask & sequenceFeatureMaskLookup[indices[3]]
+			mask = mask & sequenceFeatureMaskLookup[indices[5]]
+		filteredIndices = indices[:, mask]
+		filteredValues = values[mask]
+		if(filteredIndices.numel() > 0):
+			filteredIndices = pt.stack((
+				filteredIndices[0],
+				filteredIndices[1],
+				filteredIndices[3],
+				filteredIndices[4],
+				filteredIndices[5]
+			), dim=0)
+			conceptIndicesTensor = self.conceptIndicesInSequenceObservedTensor.to(filteredIndices.device)
+			filteredIndices[3] = conceptIndicesTensor[filteredIndices[3]]
+			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
+				filteredIndices[2] = featureIndicesInObserved[filteredIndices[2]]
+				filteredIndices[4] = featureIndicesInObserved[filteredIndices[4]]
+		else:
+			filteredIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=featureConnectionsSparse.device)
+			filteredValues = pt.empty((0,), dtype=arrayType, device=featureConnectionsSparse.device)
+		if not useGPUsparse:
+			filteredIndices = filteredIndices.to(deviceSparse)
+			filteredValues = filteredValues.to(deviceSparse)
+		updateSparse = pt.sparse_coo_tensor(filteredIndices, filteredValues, size=targetSize, dtype=arrayType, device=deviceSparse)
+		return updateSparse

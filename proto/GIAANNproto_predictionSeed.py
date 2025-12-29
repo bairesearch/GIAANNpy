@@ -112,7 +112,7 @@ def seedNetwork(sequenceObservedColumns, sequenceIndex, sequence, numSeedTokens)
 			seedNetworkToken(sequenceObservedColumns, sequenceIndex, sequence, 0, numSeedTokens)
 		if(not inferenceSeedTargetActivationsGlobalFeatureArrays):
 			# Update observed columns from sequence observed columns
-			sequenceObservedColumns.updateObservedColumnsWrapper()	#convert sequence observed columns feature neuron arrays back to global feature neuron arrays
+			sequenceObservedColumns.updateObservedColumnsWrapper(inference=True)	#convert sequence observed columns feature neuron arrays back to global feature neuron arrays
 	elif(inferenceBeamSearch and numSeedTokens > 0):
 		#beam search requires prompt activations even when inferenceSeedNetwork is disabled
 		if(inferenceIncrementallySeedNetwork):
@@ -121,7 +121,7 @@ def seedNetwork(sequenceObservedColumns, sequenceIndex, sequence, numSeedTokens)
 		else:
 			seedNetworkToken(sequenceObservedColumns, sequenceIndex, sequence, 0, numSeedTokens)
 		if(not inferenceSeedTargetActivationsGlobalFeatureArrays):
-			sequenceObservedColumns.updateObservedColumnsWrapper()
+			sequenceObservedColumns.updateObservedColumnsWrapper(inference=True)
 			
 def seedNetworkToken(sequenceObservedColumns, sequenceIndex, sequence, firstSeedTokenIndex, numSeedTokens):
 	tokens = GIAANNproto_sequenceTokens.getTokens(sequence)
@@ -139,7 +139,7 @@ def seedNetworkToken(sequenceObservedColumns, sequenceIndex, sequence, firstSeed
 			sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivationIndex)
 	
 	if(drawNetworkDuringInferenceSeed):
-		sequenceObservedColumns.updateObservedColumnsWrapper()
+		sequenceObservedColumns.updateObservedColumnsWrapper(inference=True)
 		GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumns, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(firstSeedTokenIndex))
 
 def identifySeedIndices(sequenceObservedColumns, sequenceIndex, startIndices, endIndices, sequence, tokens, conceptIndices, firstSeedTokenIndex, numSeedTokens):

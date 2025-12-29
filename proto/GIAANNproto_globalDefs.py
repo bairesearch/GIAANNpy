@@ -54,7 +54,10 @@ if(useInference):
 
 #RAM availability vars;
 useGPUdense = True	#default: True
-useGPUsparse = False	#default: False	#orig: True
+if(useInference):
+	useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors
+else:
+	useGPUsparse = True		#default: True	#orig: False	#slight performance increase during train (does not use significant additional GPU ram during train)
 useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/MLP predictive network model
 maxSequenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM availability during train (with trainSequenceObservedColumnsUseSequenceFeaturesOnly only limited amount of data is ever loaded to GPU during train)
 databaseFolder = "../database/" #default: "../database/"	#performance: "/media/user/ssddata/GIAANN/database/"	#orig: ""
@@ -83,11 +86,19 @@ else:
 inhibitoryConnectionStrengthIncrement = 1.0	#default increment applied when wiring inhibitory neurons to alternate prediction targets
 
 #array properties (disable to optimise train speed)
-arrayIndexPropertiesStrength = True	#mandatory: True	#orig: True
-arrayIndexPropertiesPermanence = False	#default: True	#orig: True
-arrayIndexPropertiesActivation = False	#default: True	#orig: True
-arrayIndexPropertiesTime = False	#default: True	#orig: True
-arrayIndexPropertiesPos = False	#default: True	#orig: True
+arrayIndexPropertiesEfficient = True	#default: True	#orig: False (required for drawing pos types)
+if(arrayIndexPropertiesEfficient):
+	arrayIndexPropertiesStrength = True
+	arrayIndexPropertiesPermanence = False
+	arrayIndexPropertiesActivation = False
+	arrayIndexPropertiesTime = False
+	arrayIndexPropertiesPos = False
+else:
+	arrayIndexPropertiesStrength = True
+	arrayIndexPropertiesPermanence = True
+	arrayIndexPropertiesActivation = True
+	arrayIndexPropertiesTime = True
+	arrayIndexPropertiesPos = True
 
 #identify immediate connections
 enforceDirectConnections = True	#default: True	#orig: False	#prediction requires a direct connection from previous prediction as observed during training (ie adjacent tokens)
@@ -231,7 +242,7 @@ if(useInference):
 	else:
 		inferenceSeedNetwork = False	#default: False	#True is only for debug
 		inferenceBurstAllPredictionsOrTargetsInSequence = True	#default: True	#orig: True
-	trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised	#if used during seed phase will bias prediction towards target sequence words
+	trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised	#if used during seed phase will bias prediction towards target sequence words
 	if(inferenceSeedNetwork):
 		if(inferenceIncrementallySeedNetwork):
 			inferenceSeedTargetActivationsGlobalFeatureArrays = False	#optional	#default:True	#orig:False	
