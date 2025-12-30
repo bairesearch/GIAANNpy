@@ -36,6 +36,38 @@ def addValueToSparseTensorValues(sparseTensor, value):
 	sparseTensor = sparseTensor.coalesce()
 	return sparseTensor
 
+def scaleSparseTensorByBranchValues(sparseTensor, branchValues):
+	if(sparseTensor is None):
+		return sparseTensor
+	if(branchValues is None):
+		return sparseTensor
+	sparseTensor = sparseTensor.coalesce()
+	if(sparseTensor._nnz() == 0):
+		return sparseTensor
+	indices = sparseTensor.indices()
+	values = sparseTensor.values()
+	branchValues = branchValues.to(values.device)
+	branchIndices = indices[0]
+	scaledValues = values * branchValues[branchIndices]
+	return pt.sparse_coo_tensor(indices, scaledValues, size=sparseTensor.size(), device=sparseTensor.device).coalesce()
+
+def collapseSparseBranchDimension(sparseTensor):
+	if(sparseTensor is None):
+		return sparseTensor
+	sparseTensor = sparseTensor.coalesce()
+	if(sparseTensor._nnz() == 0):
+		newSize = sparseTensor.size()[1:]
+		emptyIndices = pt.empty((len(newSize), 0), dtype=pt.long, device=sparseTensor.device)
+		emptyValues = pt.empty((0,), dtype=sparseTensor.dtype, device=sparseTensor.device)
+		return pt.sparse_coo_tensor(emptyIndices, emptyValues, size=newSize, device=sparseTensor.device)
+	indices = sparseTensor.indices()
+	values = sparseTensor.values()
+	if(indices.shape[0] <= 1):
+		return sparseTensor
+	newIndices = indices[1:]
+	newSize = sparseTensor.size()[1:]
+	return pt.sparse_coo_tensor(newIndices, values, size=newSize, device=sparseTensor.device).coalesce()
+
 
 #replace or multiply element(s) at index with/by new_value
 #preconditions: if replace (ie !multiply), assume that the sparse array contains non-zero values at indices_to_update
@@ -513,11 +545,28 @@ def selectAindicesContainedInB(A, B):
 	return A_intersect_B
 
 def neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANImethod):
+	hasBranchDim = globalFeatureNeuronsActivation.dim() == 4
+	isSparse = globalFeatureNeuronsActivation.is_sparse
+	# Sparse tensors cannot be sliced with native indexing on CPU; use sliceSparseTensor.
+	def sliceSegment(tensor, segmentIndex):
+		if(hasBranchDim):
+			if(isSparse):
+				return sliceSparseTensor(tensor, 1, segmentIndex)
+			return tensor[:, segmentIndex]
+		if(isSparse):
+			return sliceSparseTensor(tensor, 0, segmentIndex)
+		return tensor[segmentIndex]
 	if(useSANI):
 		if(algorithmMatrixSANImethod=="doNotEnforceActivationAcrossSegments"):
-			featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=0) 	#sum activations across all segments
+			if(hasBranchDim):
+				featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=1) 	#sum activations across all segments
+			else:
+				featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=0) 	#sum activations across all segments
 		elif(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
-			featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=0) 	#sum activations across all segments
+			if(hasBranchDim):
+				featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=1) 	#sum activations across all segments
+			else:
+				featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=0) 	#sum activations across all segments
 			if(enforceActivationAcrossSegmentsIgnoreInternalColumn):
 				lastSegmentConstraint = arrayIndexSegmentAdjacentColumn	#ignore internal column activation requirement
 			else:
@@ -526,13 +575,14 @@ def neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANIme
 				pass
 			elif(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 				# Only require that the last constraint segment (ie adjacent column or adjacent feature) is active; the internal column segment is ignored
-				lastConstraintSegmentActive = globalFeatureNeuronsActivation[lastSegmentConstraint]
+				lastConstraintSegmentActive = sliceSegment(globalFeatureNeuronsActivation, lastSegmentConstraint)
 				featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, lastConstraintSegmentActive)
 			elif(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):
 				for s in range(lastSegmentConstraint+1):	#ignore internal column activation requirement
-					featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, globalFeatureNeuronsActivation[s])
+					featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, sliceSegment(globalFeatureNeuronsActivation, s))
 	else:
-		featureNeuronsActive = globalFeatureNeuronsActivation[arrayIndexSegmentLast] 		#select last (most proximal) segment activation
+		#select last (most proximal) segment activation
+		featureNeuronsActive = sliceSegment(globalFeatureNeuronsActivation, arrayIndexSegmentLast)
 	return featureNeuronsActive	
 			
 def insertSequenceObservedColumnIntoObservedColumnFeatures(self, cIdx, fIdxTensor, featureIndicesInObserved, featureNeuronsSparse, observedColumn, lowMem=True):
@@ -540,14 +590,18 @@ def insertSequenceObservedColumnIntoObservedColumnFeatures(self, cIdx, fIdxTenso
 	indices = featureNeuronsSparse.indices()
 	values = featureNeuronsSparse.values()
 	#if(indices.shape[1] > 0):
-	mask = (indices[2] == cIdx) & pt.isin(indices[3], fIdxTensor)
+	mask = (indices[3] == cIdx) & pt.isin(indices[4], fIdxTensor)
 	#if pt.any(mask):
 	filteredIndices = indices[:, mask]
 	filteredValues = values[mask]
-	filteredIndices[2] = filteredIndices[3]
-	filteredIndices = filteredIndices[0:3]
+	filteredIndices = pt.stack((
+		filteredIndices[0],	# property index
+		filteredIndices[1],	# branch index
+		filteredIndices[2],	# segment index
+		filteredIndices[4],	# feature index
+	), dim=0)
 	if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-		filteredIndices[2] = featureIndicesInObserved[filteredIndices[2]]
+		filteredIndices[3] = featureIndicesInObserved[filteredIndices[3]]
 	if lowMem:
 		observedColumn.featureNeurons = observedColumn.featureNeurons + pt.sparse_coo_tensor(filteredIndices, filteredValues, size=observedColumn.featureNeurons.size(), dtype=arrayType, device=deviceSparse)
 		observedColumn.featureNeurons = observedColumn.featureNeurons.coalesce()
@@ -561,9 +615,9 @@ def insertSequenceObservedColumnIntoObservedColumnConnections(self, cIdx, fIdxTe
 	values = featureConnectionsSparse.values()
 	#if(indices.shape[1] > 0):
 	if(featureConnectionsOutput):
-		mask = (indices[2] == cIdx)
+		mask = (indices[3] == cIdx)
 	else:
-		mask = (indices[4] == cIdx)
+		mask = (indices[5] == cIdx)
 	#if pt.any(mask):
 	filteredIndices = indices[:, mask]
 	filteredValues = values[mask]
@@ -576,23 +630,25 @@ def insertSequenceObservedColumnIntoObservedColumnConnections(self, cIdx, fIdxTe
 		'''
 		filteredIndices = pt.stack((
 			filteredIndices[0],	# property index
-			filteredIndices[1],	# segment index
-			filteredIndices[3],	# source feature index
-			filteredIndices[4],	# target column index (sequence)
-			filteredIndices[5],	# target feature index
+			filteredIndices[1],	# branch index
+			filteredIndices[2],	# segment index
+			filteredIndices[4],	# source feature index
+			filteredIndices[5],	# target column index (sequence)
+			filteredIndices[6],	# target feature index
 		), dim=0)
 	else:	#featureConnectionsInput (inhibitory connections only)
 		filteredIndices = pt.stack((
 			filteredIndices[0],	# property index
-			filteredIndices[1],	# segment index
-			filteredIndices[5],	# inhibitory feature index (target)
-			filteredIndices[2],	# source column index
-			filteredIndices[3],	# source feature index
+			filteredIndices[1],	# branch index
+			filteredIndices[2],	# segment index
+			filteredIndices[6],	# inhibitory feature index (target)
+			filteredIndices[3],	# source column index
+			filteredIndices[4],	# source feature index
 		), dim=0)
-	filteredIndices[3] = self.conceptIndicesInSequenceObservedTensor[filteredIndices[3]]
+	filteredIndices[4] = self.conceptIndicesInSequenceObservedTensor[filteredIndices[4]]
 	if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-		filteredIndices[2] = featureIndicesInObserved[filteredIndices[2]]
-		filteredIndices[4] = featureIndicesInObserved[filteredIndices[4]]
+		filteredIndices[3] = featureIndicesInObserved[filteredIndices[3]]
+		filteredIndices[5] = featureIndicesInObserved[filteredIndices[5]]
 	featureConnections = featureConnections + pt.sparse_coo_tensor(filteredIndices, filteredValues, size=featureConnections.size(), dtype=arrayType, device=deviceSparse)
 	featureConnections = featureConnections.coalesce()
 	featureConnections.values().clamp_(min=0)

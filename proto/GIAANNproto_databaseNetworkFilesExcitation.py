@@ -56,6 +56,7 @@ def saveListFile(listFileName, listObject):
 def loadFeatureNeuronsGlobalFile():
 	globalFeatureNeurons = loadTensor(databaseFolder, globalFeatureNeuronsFile)
 	globalFeatureNeurons = adjustPropertyDimensions(globalFeatureNeurons, "globalFeatureNeurons")
+	globalFeatureNeurons = adjustBranchDimensions(globalFeatureNeurons, "globalFeatureNeurons", expectedRank=5)
 	return globalFeatureNeurons
 
 def adjustPropertyDimensions(tensor, tensorName):
@@ -82,6 +83,56 @@ def insertPropertyDimension(tensor, insertIndex, targetPropertyCount):
 	zerosShape[0] = 1
 	zerosTensor = pt.zeros(zerosShape, dtype=tensor.dtype, device=tensor.device)
 	return pt.cat([tensor[:insertIndex], zerosTensor, tensor[insertIndex:]], dim=0)
+
+def adjustBranchDimensions(tensor, tensorName, expectedRank, branchCount=numberOfDendriticBranches):
+	if tensor.dim() == expectedRank:
+		return expandBranchDimensions(tensor, tensorName, branchCount)
+	if tensor.dim() == expectedRank - 1:
+		return insertBranchDimension(tensor, tensorName, insertIndex=1, branchCount=branchCount)
+	raise RuntimeError(f"{tensorName} branch dimension mismatch: expected rank {expectedRank} or {expectedRank - 1}, got {tensor.dim()}")
+
+def insertBranchDimension(tensor, tensorName, insertIndex, branchCount):
+	if tensor.is_sparse:
+		tensor = tensor.coalesce()
+		indices = tensor.indices()
+		values = tensor.values()
+		branchRow = pt.zeros((1, indices.shape[1]), dtype=indices.dtype, device=indices.device)
+		newIndices = pt.cat([indices[:insertIndex], branchRow, indices[insertIndex:]], dim=0)
+		newSize = list(tensor.size())
+		newSize.insert(insertIndex, branchCount)
+		return pt.sparse_coo_tensor(newIndices, values, size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
+	tensor = tensor.unsqueeze(insertIndex)
+	return expandBranchDimensions(tensor, tensorName, branchCount)
+
+def expandBranchDimensions(tensor, tensorName, branchCount):
+	currentBranches = tensor.size(1)
+	if currentBranches == branchCount:
+		return tensor
+	if branchCount == 1 and currentBranches > 1:
+		if tensor.is_sparse:
+			tensor = tensor.coalesce()
+			indices = tensor.indices()
+			values = tensor.values()
+			if indices.shape[1] == 0:
+				newSize = list(tensor.size())
+				newSize[1] = 1
+				return pt.sparse_coo_tensor(indices, values, size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
+			indices = indices.clone()
+			indices[1] = 0
+			newSize = list(tensor.size())
+			newSize[1] = 1
+			return pt.sparse_coo_tensor(indices, values, size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
+		return tensor.sum(dim=1, keepdim=True)
+	if currentBranches < branchCount:
+		if tensor.is_sparse:
+			newSize = list(tensor.size())
+			newSize[1] = branchCount
+			return pt.sparse_coo_tensor(tensor.indices(), tensor.values(), size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
+		padShape = list(tensor.shape)
+		padShape[1] = branchCount - currentBranches
+		padTensor = pt.zeros(padShape, dtype=tensor.dtype, device=tensor.device)
+		return pt.cat([tensor, padTensor], dim=1)
+	raise RuntimeError(f"{tensorName} branch dimension mismatch: expected {branchCount}, got {currentBranches}")
 	
 def saveData(databaseNetworkObject, observedColumnsDict):
 	# Save observed columns to disk
@@ -144,8 +195,10 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 	instance.nextFeatureIndex = data['nextFeatureIndex']
 	# Load the tensors
 	instance.featureConnections = adjustPropertyDimensions(loadTensor(observedColumnsDir, f"{conceptIndex}_featureConnections"), f"observedColumn.featureConnections[{conceptIndex}]")
+	instance.featureConnections = adjustBranchDimensions(instance.featureConnections, f"observedColumn.featureConnections[{conceptIndex}]", expectedRank=6)
 	if lowMem:
 		instance.featureNeurons = adjustPropertyDimensions(loadTensor(observedColumnsDir, f"{conceptIndex}_featureNeurons"), f"observedColumn.featureNeurons[{conceptIndex}]")
+		instance.featureNeurons = adjustBranchDimensions(instance.featureNeurons, f"observedColumn.featureNeurons[{conceptIndex}]", expectedRank=4)
 	return instance
 
 def saveTensor(tensor, folderName, fileName):

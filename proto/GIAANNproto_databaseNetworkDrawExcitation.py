@@ -28,6 +28,15 @@ import GIAANNproto_databaseNetworkExcitation
 if(trainInhibitoryNeurons):
 	import GIAANNproto_databaseNetworkDrawInhibition
 
+def selectDrawBranch(tensor):
+	if(tensor is None):
+		return tensor
+	if(tensor.dim() > 1 and tensor.size(1) == numberOfDendriticBranches):
+		if(tensor.is_sparse):
+			return GIAANNproto_sparseTensors.sliceSparseTensor(tensor, 1, 0)
+		return tensor[:, 0]
+	return tensor
+
 if(drawSegmentsTrain):
 	segmentColoursBase = ['red', 'green', 'blue', 'yellow', 'magenta', 'cyan']
 	segmentColours = segmentColoursBase
@@ -210,14 +219,15 @@ if(drawSparseArrays):
 				featureWordToIndex = sequenceObservedColumns.featureWordToIndex
 				yOffset = 1 + 1	#reserve space at bottom of column for feature concept neuron
 				cIdx = sequenceObservedColumns.conceptNameToIndex[lemma]
-				featureNeurons = sequenceObservedColumns.featureNeurons[:, :, cIdx]
+				featureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons)[:, :, cIdx]
 			else:
 				featureWordToIndex = observedColumn.featureWordToIndex
 				yOffset = 1
 				if lowMem:
-					featureNeurons = observedColumn.featureNeurons
+					featureNeurons = selectDrawBranch(observedColumn.featureNeurons)
 				else:
-					featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 2, conceptIndex)
+					featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 3, conceptIndex)
+					featureNeurons = selectDrawBranch(featureNeurons)
 					#featureNeurons = databaseNetworkObject.globalFeatureNeurons[:, :, conceptIndex]	#operation not supported for sparse tensors
 			
 			# Draw feature neurons
@@ -324,12 +334,12 @@ if(drawSparseArrays):
 				featureWordToIndex = sequenceObservedColumns.featureWordToIndex
 				otherFeatureWordToIndex = sequenceObservedColumns.featureWordToIndex
 				cIdx = sequenceObservedColumns.conceptNameToIndex[lemma]
-				featureConnections = sequenceObservedColumns.featureConnections[:, :, cIdx]
+				featureConnections = selectDrawBranch(sequenceObservedColumns.featureConnections)[:, :, cIdx]
 			else:
 				featureWordToIndex = observedColumn.featureWordToIndex
 				otherFeatureWordToIndex = observedColumn.featureWordToIndex
 				cIdx = databaseNetworkObject.conceptColumnsDict[lemma]
-				featureConnections = observedColumn.featureConnections
+				featureConnections = selectDrawBranch(observedColumn.featureConnections)
 			
 			useSparseConnections = featureConnections.is_sparse and not drawSequenceObservedColumns
 			if(useSparseConnections):
@@ -482,14 +492,15 @@ else:
 				featureWordToIndex = sequenceObservedColumns.featureWordToIndex
 				yOffset = 1 + 1	#reserve space at bottom of column for feature concept neuron
 				cIdx = sequenceObservedColumns.conceptNameToIndex[lemma]
-				featureNeurons = sequenceObservedColumns.featureNeurons[:, :, cIdx]
+				featureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons)[:, :, cIdx]
 			else:
 				featureWordToIndex = observedColumn.featureWordToIndex
 				yOffset = 1
 				if lowMem:
-					featureNeurons = observedColumn.featureNeurons
+					featureNeurons = selectDrawBranch(observedColumn.featureNeurons)
 				else:
-					featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 2, conceptIndex)
+					featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 3, conceptIndex)
+					featureNeurons = selectDrawBranch(featureNeurons)
 					#featureNeurons = databaseNetworkObject.globalFeatureNeurons[:, :, conceptIndex]	#operation not supported for sparse tensors
 			
 			# Draw feature neurons
@@ -566,12 +577,12 @@ else:
 				featureWordToIndex = sequenceObservedColumns.featureWordToIndex
 				otherFeatureWordToIndex = sequenceObservedColumns.featureWordToIndex
 				cIdx = sequenceObservedColumns.conceptNameToIndex[lemma]
-				featureConnections = sequenceObservedColumns.featureConnections[:, :, cIdx]
+				featureConnections = selectDrawBranch(sequenceObservedColumns.featureConnections)[:, :, cIdx]
 			else:
 				featureWordToIndex = observedColumn.featureWordToIndex
 				otherFeatureWordToIndex = observedColumn.featureWordToIndex
 				cIdx = databaseNetworkObject.conceptColumnsDict[lemma]
-				featureConnections = observedColumn.featureConnections
+				featureConnections = selectDrawBranch(observedColumn.featureConnections)
 			
 			if(drawSegments):
 				if featureConnections.is_sparse:

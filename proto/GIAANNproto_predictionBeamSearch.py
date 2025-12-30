@@ -153,7 +153,10 @@ def applyBeamNodePredictionEffects(state, columnIndex, featureIndex):
 	modifyTime = inferenceUseNeuronFeaturePropertiesTime and state.get("time") is not None
 	if(not modifyActivation and not modifyTime):
 		return
-	indicesToUpdate = buildBeamNodeIndices(state["features"].device, columnIndex, featureIndex)
+	branchIndex = 0
+	if(multipleDendriticBranches):
+		branchIndex = GIAANNproto_predictionActivate.selectActivatedBranchIndex(state["features"], columnIndex, featureIndex)
+	indicesToUpdate = buildBeamNodeIndices(state["features"].device, columnIndex, featureIndex, branchIndex)
 	if(modifyActivation):
 		if(inferenceDeactivateNeuronsUponPrediction):
 			modifier = 0
@@ -164,17 +167,18 @@ def applyBeamNodePredictionEffects(state, columnIndex, featureIndex):
 		state["time"] = GIAANNproto_sparseTensors.modifySparseTensor(state["time"], indicesToUpdate, inferenceUseNeuronFeaturePropertiesTimeActivate)
 
 
-def buildBeamNodeIndices(device, columnIndex, featureIndex):
+def buildBeamNodeIndices(device, columnIndex, featureIndex, branchIndex=0):
 	indicesToUpdateList = []
 	columnTensor = pt.tensor(columnIndex, dtype=pt.long, device=device)
 	featureTensor = pt.tensor(featureIndex, dtype=pt.long, device=device)
+	branchTensor = pt.tensor(branchIndex, dtype=pt.long, device=device)
 	if(useSANI):
 		for segmentIndex in range(arrayNumberOfSegments):
 			segmentTensor = pt.tensor(segmentIndex, dtype=pt.long, device=device)
-			indicesToUpdateList.append(pt.stack([segmentTensor, columnTensor, featureTensor], dim=0))
+			indicesToUpdateList.append(pt.stack([branchTensor, segmentTensor, columnTensor, featureTensor], dim=0))
 	else:
 		segmentTensor = pt.tensor(arrayIndexSegmentFirst, dtype=pt.long, device=device)
-		indicesToUpdateList.append(pt.stack([segmentTensor, columnTensor, featureTensor], dim=0))
+		indicesToUpdateList.append(pt.stack([branchTensor, segmentTensor, columnTensor, featureTensor], dim=0))
 	return pt.stack(indicesToUpdateList, dim=0)
 
 
@@ -328,12 +332,29 @@ def filterCandidatesByLastSegment(columnIndices, featureIndices, activationValue
 				lastSegmentConstraint = arrayIndexSegmentAdjacentColumn
 			else:
 				lastSegmentConstraint = arrayIndexSegmentLast
-			lastSegmentActivation = stateFeatures[lastSegmentConstraint]
+			if(stateFeatures is None):
+				lastSegmentActivation = None
+			else:
+				hasBranchDim = (stateFeatures.dim() == 4)
+				if(stateFeatures.is_sparse):
+					if(hasBranchDim):
+						lastSegmentActivation = GIAANNproto_sparseTensors.sliceSparseTensor(stateFeatures, 1, lastSegmentConstraint)
+					else:
+						lastSegmentActivation = GIAANNproto_sparseTensors.sliceSparseTensor(stateFeatures, 0, lastSegmentConstraint)
+				else:
+					if(hasBranchDim):
+						lastSegmentActivation = stateFeatures[:, lastSegmentConstraint]
+					else:
+						lastSegmentActivation = stateFeatures[lastSegmentConstraint]
 			if(lastSegmentActivation is None):
 				filteredColumns = None
 				filteredFeatures = None
 				filteredActivations = None
 			else:
+				if(not lastSegmentActivation.is_sparse):
+					lastSegmentActivation = lastSegmentActivation.to_sparse()
+				if(hasBranchDim):
+					lastSegmentActivation = GIAANNproto_sparseTensors.collapseSparseBranchDimension(lastSegmentActivation)
 				lastSegmentActivation = lastSegmentActivation.coalesce()
 				if(lastSegmentActivation._nnz() == 0):
 					filteredColumns = None
@@ -696,7 +717,7 @@ def getConnectedColumnsForBeamFeature(observedColumn, featureIndex, includeFeatu
 	if(featureIndex is None or featureIndex < 0):
 		return [], {} if includeFeatureDetails else None
 	featureConnectionsStrength = observedColumn.featureConnections[arrayIndexPropertiesStrengthIndex]
-	featureConnectionsStrength = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsStrength, 1, featureIndex)
+	featureConnectionsStrength = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsStrength, 2, featureIndex)
 	featureConnectionsStrength = featureConnectionsStrength.coalesce()
 	if(featureConnectionsStrength._nnz() == 0):
 		return [], {} if includeFeatureDetails else None
@@ -709,14 +730,14 @@ def getConnectedColumnsForBeamFeature(observedColumn, featureIndex, includeFeatu
 			return [], {} if includeFeatureDetails else None
 		targetColumnIndices = targetColumnIndices[:, minWordDistanceMask]
 	elif(enforceDirectConnections and enforceDirectConnectionsSANI):
-		lastSegmentMask = targetColumnIndices[0] == arrayIndexSegmentLast
+		lastSegmentMask = targetColumnIndices[1] == arrayIndexSegmentLast
 		targetColumnIndices = targetColumnIndices[:, lastSegmentMask]
-	targetColumns = targetColumnIndices[1].unique()
+	targetColumns = targetColumnIndices[2].unique()
 	targetColumnsList = targetColumns.cpu().tolist()
 	if(includeFeatureDetails):
-		targetFeatures = targetColumnIndices[2].cpu().tolist()
+		targetFeatures = targetColumnIndices[3].cpu().tolist()
 		columnFeatureMap = {}
-		for columnValue, featureValue in zip(targetColumnIndices[1].tolist(), targetFeatures):
+		for columnValue, featureValue in zip(targetColumnIndices[2].tolist(), targetFeatures):
 			columnFeatureMap.setdefault(columnValue, set()).add(featureValue)
 		return targetColumnsList, columnFeatureMap
 	else:
@@ -739,6 +760,10 @@ def convertNodesToPrediction(nodes):
 def aggregateSparseColumnFeatureValues(sparseTensor, maxFeatures):
 	if(sparseTensor is None):
 		return None, None, None
+	if(sparseTensor.dim() == 4):
+		sparseTensor = sparseTensor.sum(dim=0)
+		if(not sparseTensor.is_sparse):
+			sparseTensor = sparseTensor.to_sparse()
 	sparseTensor = sparseTensor.coalesce()
 	if(sparseTensor._nnz() == 0):
 		return None, None, None

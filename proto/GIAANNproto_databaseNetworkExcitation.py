@@ -59,7 +59,7 @@ def restoreGlobalArrays(databaseNetworkObject):
 # Initialize global feature neuron arrays if lowMem is disabled
 if not lowMem:
 	def initialiseFeatureNeuronsGlobal(c, f):
-		globalFeatureNeurons = GIAANNproto_sparseTensors.createEmptySparseTensor((arrayNumberOfProperties, arrayNumberOfSegments, c, f))
+		globalFeatureNeurons = GIAANNproto_sparseTensors.createEmptySparseTensor((arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, c, f))
 		return globalFeatureNeurons
 		
 	def loadFeatureNeuronsGlobal(c, f):
@@ -167,30 +167,30 @@ class ObservedColumn:
 					
 	@staticmethod
 	def initialiseFeatureNeurons(f):
-		featureNeurons = GIAANNproto_sparseTensors.createEmptySparseTensor((arrayNumberOfProperties, arrayNumberOfSegments, f))
+		featureNeurons = GIAANNproto_sparseTensors.createEmptySparseTensor((arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, f))
 		return featureNeurons
 
 	@staticmethod
 	def initialiseFeatureConnections(c, f):
-		featureConnections = GIAANNproto_sparseTensors.createEmptySparseTensor((arrayNumberOfProperties, arrayNumberOfSegments, f, c, f))
+		featureConnections = GIAANNproto_sparseTensors.createEmptySparseTensor((arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, f, c, f))
 		return featureConnections
 	
 	def resizeConceptArrays(self, newC):
-		loadC = self.featureConnections.shape[3]
+		loadC = self.featureConnections.shape[4]
 		if newC > loadC:
 			self.featureConnections = self.featureConnections.coalesce()
-			expandedSize = (self.featureConnections.shape[0], self.featureConnections.shape[1], self.featureConnections.shape[2], newC, self.featureConnections.shape[4])
+			expandedSize = (self.featureConnections.shape[0], self.featureConnections.shape[1], self.featureConnections.shape[2], self.featureConnections.shape[3], newC, self.featureConnections.shape[5])
 			self.featureConnections = pt.sparse_coo_tensor(self.featureConnections.indices(), self.featureConnections.values(), size=expandedSize, dtype=arrayType, device=deviceSparse)
 		
 	def expandFeatureArrays(self, newF):
-		loadF = self.featureConnections.shape[2]  # or self.featureConnections.shape[4]
+		loadF = self.featureConnections.shape[3]  # or self.featureConnections.shape[5]
 		if newF > loadF:
 			self.featureConnections = self.featureConnections.coalesce()
-			expandedSizeConnections = (self.featureConnections.shape[0], self.featureConnections.shape[1], newF, self.featureConnections.shape[3], newF)
+			expandedSizeConnections = (self.featureConnections.shape[0], self.featureConnections.shape[1], self.featureConnections.shape[2], newF, self.featureConnections.shape[4], newF)
 			self.featureConnections = pt.sparse_coo_tensor(self.featureConnections.indices(), self.featureConnections.values(), size=expandedSizeConnections, dtype=arrayType, device=deviceSparse)
 	
 			if lowMem:
-				expandedSizeNeurons = (self.featureNeurons.shape[0], self.featureNeurons.shape[1], newF)
+				expandedSizeNeurons = (self.featureNeurons.shape[0], self.featureNeurons.shape[1], self.featureNeurons.shape[2], newF)
 				self.featureNeurons = self.featureNeurons.coalesce()
 				self.featureNeurons = pt.sparse_coo_tensor(self.featureNeurons.indices(), self.featureNeurons.values(), size=expandedSizeNeurons, dtype=arrayType, device=deviceSparse)
 
@@ -242,7 +242,7 @@ def generateGlobalFeatureConnections(databaseNetworkObject):
 	globalFeatureConnectionsList = []
 	for conceptColumn in conceptColumnsListTemp:
 		globalFeatureConnectionsList.append(conceptColumn.featureConnections)
-	databaseNetworkObject.globalFeatureConnections = pt.stack(globalFeatureConnectionsList, dim=2)
+	databaseNetworkObject.globalFeatureConnections = pt.stack(globalFeatureConnectionsList, dim=3)
 	print("generate_global_feature_connections: databaseNetworkObject.global_feature_connections.shape = ", databaseNetworkObject.globalFeatureConnections.shape)
 
 def loadAllColumns(databaseNetworkObject):

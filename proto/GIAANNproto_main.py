@@ -63,10 +63,14 @@ def main():
 	global sequenceCount
 	GIAANNproto_databaseNetworkFilesExcitation.initialiseDatabaseFiles()
 	ensurePredictiveInferenceDatabaseReady()
-	if(useInference and inferenceTrainPredictiveNetworkAllSequences):
-		if(inferencePredictiveNetwork):
-			GIAANNproto_predictionNetwork.initialisePredictiveNetwork(databaseNetworkObject)
-		GIAANNproto_databaseNetworkExcitation.backupGlobalArrays(databaseNetworkObject)
+	if(useInference):
+		if(inferenceTrainPredictiveNetworkAllSequences):
+			if(inferencePredictiveNetwork):
+				GIAANNproto_predictionNetwork.initialisePredictiveNetwork(databaseNetworkObject)
+			GIAANNproto_databaseNetworkExcitation.backupGlobalArrays(databaseNetworkObject)
+		else:
+			if(not inferenceTrainFirstSequences):
+				GIAANNproto_databaseNetworkExcitation.backupGlobalArrays(databaseNetworkObject)
 	if(SANIconceptNeurons):
 		GIAANNproto_sequenceSANIconceptNeurons.initialiseSANIconceptNeurons()
 		
@@ -130,7 +134,10 @@ def processArticle(text, articleIndex):
 	for sequenceIndex, sequence in enumerate(sequences):
 		lastSequenceInPrompt = False
 		if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
-			if(sequenceIndex == numberOfSequences-1):
+			if(inferenceTrainFirstSequences):
+				if(sequenceIndex == numberOfSequences-1):
+					lastSequenceInPrompt = True
+			else:
 				lastSequenceInPrompt = True
 		if(len(sequence) <= maxSequenceLength):
 			processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
@@ -147,9 +154,13 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 		initialiseDatabaseNetwork()
 		if(not lowMem):
 			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_databaseNetworkExcitation.initialiseFeatureNeuronsGlobal(databaseNetworkObject.c, databaseNetworkObject.f)
-	if(useInference and inferenceTrainPredictiveNetworkAllSequences):
-		if(not inferenceRetainActivationsAcrossMultipleSequences or sequenceIndex==0):	#or (articleIndex==0 and sequenceIndex==0)
-			GIAANNproto_databaseNetworkExcitation.restoreGlobalArrays(databaseNetworkObject)	#restore global arrays (reset activation and time etc properties between inferencePredictiveNetworkTrainAcrossMultipleSequences:articles/sequences)
+	if(useInference):
+		if(inferenceTrainPredictiveNetworkAllSequences):
+			if(not inferenceRetainActivationsAcrossMultipleSequences or sequenceIndex==0):	#or (articleIndex==0 and sequenceIndex==0)
+				GIAANNproto_databaseNetworkExcitation.restoreGlobalArrays(databaseNetworkObject)	#restore global arrays (reset activation and time etc properties between inferencePredictiveNetworkTrainAcrossMultipleSequences:articles/sequences)
+		else:
+			if(not inferenceTrainFirstSequences):
+				GIAANNproto_databaseNetworkExcitation.restoreGlobalArrays(databaseNetworkObject)	#reset activations so each prompt sequence is independent
 	
 	if(debugPrintTrainSentencePOS):
 		sentenceWithPOS = " ".join(f"{token.text} ({tokenIndex}:{token.pos_})" for tokenIndex, token in enumerate(sequence))

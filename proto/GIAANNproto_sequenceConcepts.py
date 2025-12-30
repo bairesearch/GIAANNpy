@@ -51,8 +51,8 @@ def firstPass(databaseNetworkObject, sequence):
 	if newConceptsAdded:
 		if not lowMem:
 			# Expand global feature neuron arrays
-			if databaseNetworkObject.globalFeatureNeurons.shape[2] < databaseNetworkObject.c:
-				newShape = (databaseNetworkObject.globalFeatureNeurons.shape[0], databaseNetworkObject.globalFeatureNeurons.shape[1], databaseNetworkObject.c, databaseNetworkObject.globalFeatureNeurons.shape[3])
+			if databaseNetworkObject.globalFeatureNeurons.shape[3] < databaseNetworkObject.c:
+				newShape = (databaseNetworkObject.globalFeatureNeurons.shape[0], databaseNetworkObject.globalFeatureNeurons.shape[1], databaseNetworkObject.globalFeatureNeurons.shape[2], databaseNetworkObject.c, databaseNetworkObject.globalFeatureNeurons.shape[4])
 				if(performRedundantCoalesce):
 					databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons.coalesce()
 				databaseNetworkObject.globalFeatureNeurons = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeurons._indices(), databaseNetworkObject.globalFeatureNeurons._values(), size=newShape, dtype=arrayType, device=deviceSparse)
@@ -101,9 +101,9 @@ def detectNewFeatures(databaseNetworkObject, tokens):
 
 	# Now, expand arrays accordingly
 	if not lowMem:
-		if databaseNetworkObject.f > databaseNetworkObject.globalFeatureNeurons.shape[3]:
-			extraCols = databaseNetworkObject.f - databaseNetworkObject.globalFeatureNeurons.shape[3]
-			newShape = (databaseNetworkObject.globalFeatureNeurons.shape[0], databaseNetworkObject.globalFeatureNeurons.shape[1], databaseNetworkObject.globalFeatureNeurons.shape[2], databaseNetworkObject.f)
+		if databaseNetworkObject.f > databaseNetworkObject.globalFeatureNeurons.shape[4]:
+			extraCols = databaseNetworkObject.f - databaseNetworkObject.globalFeatureNeurons.shape[4]
+			newShape = (databaseNetworkObject.globalFeatureNeurons.shape[0], databaseNetworkObject.globalFeatureNeurons.shape[1], databaseNetworkObject.globalFeatureNeurons.shape[2], databaseNetworkObject.globalFeatureNeurons.shape[3], databaseNetworkObject.f)
 			databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons.coalesce()
 			databaseNetworkObject.globalFeatureNeurons = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeurons.indices(), databaseNetworkObject.globalFeatureNeurons.values(), size=newShape, dtype=arrayType, device=deviceSparse)
 
@@ -294,6 +294,9 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 		else:
 			delimiterMask = pt.tensor(delimiterMaskList, dtype=pt.bool)
 			delimiterIndices = pt.nonzero(delimiterMask).squeeze(1)
+		if(attachTrailingTokensToLastConcept and delimiterIndices.numel() > 0 and conceptIndices.numel() > 0):
+			lastConceptIndex = int(conceptIndices[-1].item())
+			delimiterIndices = delimiterIndices[delimiterIndices < lastConceptIndex]
 		if(delimiterIndices.numel() == 0):
 			startIndices = pt.zeros_like(conceptIndices)
 			endIndices = pt.full_like(conceptIndices, sequenceLength)
@@ -344,7 +347,7 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 	
 	cs = sequenceObservedColumns.cs
 	fs = sequenceObservedColumns.fs
-	featureNeuronsActive = pt.zeros((arrayNumberOfSegments, cs, fs), dtype=arrayType)
+	featureNeuronsActive = pt.zeros((numberOfDendriticBranches, arrayNumberOfSegments, cs, fs), dtype=arrayType)
 	featureNeuronsWordOrder = pt.arange(fs).unsqueeze(0).repeat(cs, 1)
 	pt.zeros((cs, fs), dtype=pt.long)
 	columnsWordOrder = pt.zeros((cs), dtype=pt.long)
@@ -357,6 +360,9 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 		featureNeuronsSegmentMask = pt.zeros((cs, arrayNumberOfSegments), dtype=arrayType)	#note this mask is for permanence updates (it assumes that the network has been constructed with forward column connections only)
 	else:
 		featureNeuronsSegmentMask = pt.ones((cs, arrayNumberOfSegments), dtype=arrayType)
+	branchCounters = None
+	if(multipleDendriticBranches):
+		branchCounters = [{} for _ in range(cs)]
 	
 	conceptIndicesList = conceptIndices.tolist()
 	for i, sequenceConceptWordIndex in enumerate(conceptIndicesList):
@@ -409,17 +415,40 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 				activeSequentialSegments = pt.nonzero(segmentMask > 0, as_tuple=False).view(-1)
 			featureNeuronsSegmentMask[sequenceConceptIndex, :] = segmentMask
 		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly and trainSequenceObservedColumnsMatchSequenceWords):
-			if(useSANI):
-				featureNeuronsActive[activeSequentialSegments, sequenceConceptIndex, startIndices[sequenceConceptIndex]:endIndices[sequenceConceptIndex]] = 1
+			branchIndex = 0
+			if(multipleDendriticBranches):
+				featureBranchCounts = branchCounters[sequenceConceptIndex]
+				startIndexValue = int(startIndices[sequenceConceptIndex].item())
+				endIndexValue = int(endIndices[sequenceConceptIndex].item())
+				featureIndicesInObservedTensor = sequenceObservedColumns.featureIndicesInObservedTensor
+				for j in range(startIndexValue, endIndexValue):
+					if(j >= featureIndicesInObservedTensor.shape[0]):
+						continue
+					globalFeatureIndex = int(featureIndicesInObservedTensor[j].item())
+					branchIndex = featureBranchCounts.get(globalFeatureIndex, 0)
+					featureBranchCounts[globalFeatureIndex] = branchIndex + 1
+					if(branchIndex >= numberOfDendriticBranches):
+						branchIndex = numberOfDendriticBranches - 1
+					if(useSANI):
+						featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, j] = 1
+					else:
+						featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, j] = 1
+					featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, tokens[j].pos)
+					featureNeuronsPos[sequenceConceptIndex, j] = featurePos
+					featureNeuronsWordOrder[sequenceConceptIndex, j] = j
 			else:
-				featureNeuronsActive[arrayIndexSegmentFirst, sequenceConceptIndex, startIndices[sequenceConceptIndex]:endIndices[sequenceConceptIndex]] = 1
+				if(useSANI):
+					featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, startIndices[sequenceConceptIndex]:endIndices[sequenceConceptIndex]] = 1
+				else:
+					featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, startIndices[sequenceConceptIndex]:endIndices[sequenceConceptIndex]] = 1
 			columnsWordOrder[sequenceConceptIndex] = sequenceConceptIndex
 			sequenceConceptIndexMask[:, sequenceConceptWordIndex] = 0
 			sequenceConceptIndexMask[sequenceConceptIndex, sequenceConceptWordIndex] = 1
-			for j in range(startIndices[sequenceConceptIndex], endIndices[sequenceConceptIndex]):
-				featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, tokens[j].pos)
-				featureNeuronsPos[sequenceConceptIndex, j] = featurePos
-				featureNeuronsWordOrder[sequenceConceptIndex, j] = j
+			if(not multipleDendriticBranches):
+				for j in range(startIndices[sequenceConceptIndex], endIndices[sequenceConceptIndex]):
+					featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, tokens[j].pos)
+					featureNeuronsPos[sequenceConceptIndex, j] = featurePos
+					featureNeuronsWordOrder[sequenceConceptIndex, j] = j
 		else:
 			for j in range(startIndices[i], endIndices[i]):
 				featureWord = tokens[j].word	#redundant: .lower()
@@ -432,16 +461,30 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 						sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[variableConceptNeuronFeatureName]
 					else:
 						sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[featureLemma]
+					branchIndex = 0
+					if(multipleDendriticBranches):
+						featureBranchCounts = branchCounters[sequenceConceptIndex]
+						branchIndex = featureBranchCounts.get(sequenceFeatureIndex, 0)
+						featureBranchCounts[sequenceFeatureIndex] = branchIndex + 1
+						if(branchIndex >= numberOfDendriticBranches):
+							branchIndex = numberOfDendriticBranches - 1
 					if(useSANI):
-						featureNeuronsActive[activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
+						featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
 					else:
-						featureNeuronsActive[arrayIndexSegmentFirst, sequenceConceptIndex, sequenceFeatureIndex] = 1
+						featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, sequenceFeatureIndex] = 1
 				elif(featureWord in sequenceObservedColumns.featureWordToIndex):
 					sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[featureWord]
+					branchIndex = 0
+					if(multipleDendriticBranches):
+						featureBranchCounts = branchCounters[sequenceConceptIndex]
+						branchIndex = featureBranchCounts.get(sequenceFeatureIndex, 0)
+						featureBranchCounts[sequenceFeatureIndex] = branchIndex + 1
+						if(branchIndex >= numberOfDendriticBranches):
+							branchIndex = numberOfDendriticBranches - 1
 					if(useSANI):
-						featureNeuronsActive[activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
+						featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
 					else:
-						featureNeuronsActive[arrayIndexSegmentFirst, sequenceConceptIndex, sequenceFeatureIndex] = 1
+						featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, sequenceFeatureIndex] = 1
 				featureNeuronsWordOrder[sequenceConceptIndex, sequenceFeatureIndex] = j
 				featureNeuronsPos[sequenceConceptIndex, sequenceFeatureIndex] = featurePos
 	

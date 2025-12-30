@@ -86,7 +86,7 @@ def debugPrintActiveConnectionSamples(sequenceObservedColumns, featureConnection
 		targetColumnName = getSequenceColumnName(sequenceObservedColumns, targetColumnIndex)
 		sourceFeatureName = sequenceObservedColumns.indexToFeatureWord.get(sourceFeatureIndex, "NA") if hasattr(sequenceObservedColumns, "indexToFeatureWord") else "NA"
 		targetFeatureName = sequenceObservedColumns.indexToFeatureWord.get(targetFeatureIndex, "NA") if hasattr(sequenceObservedColumns, "indexToFeatureWord") else "NA"
-		connectionStrength = sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrengthIndex, segmentIndex, sourceColumnIndex, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex]
+		connectionStrength = sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrengthIndex, 0, segmentIndex, sourceColumnIndex, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex]
 		indexTuple = (int(segmentIndex), int(sourceColumnIndex), int(sourceFeatureIndex), int(targetColumnIndex), int(targetFeatureIndex))
 		print("\tseed debug: idx={0}, source=({1}:{2}), target=({3}:{4}), strength={5}".format(indexTuple, sourceColumnName, sourceFeatureName, targetColumnName, targetFeatureName, float(connectionStrength)))
 
@@ -189,22 +189,31 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 		featureConnectionsActive = pt.ones(cs, fs, cs2, fs2)
 	else:
 		cs2 = cs
-		featureNeuronsActiveSeed = (featureNeuronsActive > 0).any(dim=0).to(arrayType)
+		if(multipleDendriticBranches):
+			featureNeuronsActiveSeed = (featureNeuronsActive > 0).any(dim=1).to(arrayType)
+		else:
+			featureNeuronsActiveSeed = (featureNeuronsActive > 0).any(dim=(0, 1)).to(arrayType)
 		featureConnectionsActive, featureConnectionsSegmentMask = GIAANNproto_databaseNetworkTrainExcitation.createFeatureConnectionsActiveTrain(featureNeuronsActiveSeed, cs, fs, columnsWordOrder, featureNeuronsWordOrder)
 		
 	firstWordIndexPredictPhase = firstSeedTokenIndex+numSeedTokens
 	firstConceptIndexPredictPhase = firstSeedConceptIndex+numSeedConcepts
 	featureConnectionsActive = createFeatureConnectionsActiveSeed(featureConnectionsActive, cs, fs, cs2, fs2, columnsWordOrder, featureNeuronsWordOrder, firstSeedTokenIndex, firstWordIndexPredictPhase, firstSeedConceptIndex, firstConceptIndexPredictPhase)
 
+	featureConnectionsStrength = sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrengthIndex]
+	if(featureConnectionsStrength.dim() == 6 and (not multipleDendriticBranches or inferenceSeedTargetActivationsGlobalFeatureArrays)):
+		featureConnectionsStrength = featureConnectionsStrength.sum(dim=0)
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-		featureConnectionsActivationUpdate = featureConnectionsActive[:, firstSeedConceptIndex] * sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrengthIndex]
+		featureConnectionsActivationUpdate = featureConnectionsActive[:, firstSeedConceptIndex] * featureConnectionsStrength
 	else:
-		featureConnectionsActivationUpdate = featureConnectionsActive * sequenceObservedColumns.featureConnections[arrayIndexPropertiesStrengthIndex]
+		featureConnectionsActivationUpdate = featureConnectionsActive * featureConnectionsStrength
 
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 		featureNeuronsTargetActivation = pt.sum(featureConnectionsActivationUpdate, dim=(1))
 	else:
-		featureNeuronsTargetActivation = pt.sum(featureConnectionsActivationUpdate, dim=(1, 2))
+		if(featureConnectionsActivationUpdate.dim() == 6):
+			featureNeuronsTargetActivation = pt.sum(featureConnectionsActivationUpdate, dim=(2, 3))
+		else:
+			featureNeuronsTargetActivation = pt.sum(featureConnectionsActivationUpdate, dim=(1, 2))
 	
 	if(inferenceActivationFunction):
 		featureNeuronsTargetActivation = GIAANNproto_predictionActivate.activationFunction(featureNeuronsTargetActivation)
@@ -219,48 +228,62 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 			featureNeuronsTargetActivationDense = featureNeuronsTargetActivation
 			if(featureNeuronsTargetActivationDense.is_sparse):
 				featureNeuronsTargetActivationDense = featureNeuronsTargetActivationDense.to_dense()
-			if(useSANIfeaturesAndColumns):
-				featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
-				assert featureSegmentsOffset >= 0 and featureSegmentsOffset < arrayNumberOfSegments
-				previousConceptChannelActivation = globalFeatureNeuronsActivationDense[:featureSegmentsOffset-1] > 0 if featureSegmentsOffset > 1 else None
-				previousFeatureChannelActivation = globalFeatureNeuronsActivationDense[featureSegmentsOffset:arrayNumberOfSegments-1] > 0 if featureSegmentsOffset+1 < arrayNumberOfSegments else None
-				if(previousConceptChannelActivation is not None):
-					globalFeatureNeuronsActivationDense[1:featureSegmentsOffset] += featureNeuronsTargetActivationDense[1:featureSegmentsOffset] * previousConceptChannelActivation
-				if(previousFeatureChannelActivation is not None):
-					globalFeatureNeuronsActivationDense[featureSegmentsOffset+1:] += featureNeuronsTargetActivationDense[featureSegmentsOffset+1:] * previousFeatureChannelActivation
-				globalFeatureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
-				globalFeatureNeuronsActivationDense[featureSegmentsOffset] += featureNeuronsTargetActivationDense[featureSegmentsOffset]
-			else:
-				previousChannelActivation = globalFeatureNeuronsActivationDense[:-1] > 0
-				globalFeatureNeuronsActivationDense[1:] += featureNeuronsTargetActivationDense[1:] * previousChannelActivation
-				globalFeatureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
+			for branchIndex in range(globalFeatureNeuronsActivationDense.shape[0]):
+				branchActivation = globalFeatureNeuronsActivationDense[branchIndex]
+				if(featureNeuronsTargetActivationDense.dim() == 4):
+					branchTargetActivation = featureNeuronsTargetActivationDense[branchIndex]
+				else:
+					branchTargetActivation = featureNeuronsTargetActivationDense
+				if(useSANIfeaturesAndColumns):
+					featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
+					assert featureSegmentsOffset >= 0 and featureSegmentsOffset < arrayNumberOfSegments
+					previousConceptChannelActivation = branchActivation[:featureSegmentsOffset-1] > 0 if featureSegmentsOffset > 1 else None
+					previousFeatureChannelActivation = branchActivation[featureSegmentsOffset:arrayNumberOfSegments-1] > 0 if featureSegmentsOffset+1 < arrayNumberOfSegments else None
+					if(previousConceptChannelActivation is not None):
+						branchActivation[1:featureSegmentsOffset] += branchTargetActivation[1:featureSegmentsOffset] * previousConceptChannelActivation
+					if(previousFeatureChannelActivation is not None):
+						branchActivation[featureSegmentsOffset+1:] += branchTargetActivation[featureSegmentsOffset+1:] * previousFeatureChannelActivation
+					branchActivation[0] += branchTargetActivation[0]
+					branchActivation[featureSegmentsOffset] += branchTargetActivation[featureSegmentsOffset]
+				else:
+					previousChannelActivation = branchActivation[:-1] > 0
+					branchActivation[1:] += branchTargetActivation[1:] * previousChannelActivation
+					branchActivation[0] += branchTargetActivation[0]
+				globalFeatureNeuronsActivationDense[branchIndex] = branchActivation
 			globalFeatureNeuronsActivation = globalFeatureNeuronsActivationDense.to_sparse_coo()
 		else:
 			featureNeuronsActivationDense = sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex]
 			featureNeuronsTargetActivationDense = featureNeuronsTargetActivation
 			if(featureNeuronsTargetActivationDense.is_sparse):
 				featureNeuronsTargetActivationDense = featureNeuronsTargetActivationDense.to_dense()
-			if(useSANIfeaturesAndColumns):
-				featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
-				assert featureSegmentsOffset >= 0 and featureSegmentsOffset < arrayNumberOfSegments
-				previousConceptChannelActivation = featureNeuronsActivationDense[:featureSegmentsOffset-1] > 0 if featureSegmentsOffset > 1 else None
-				previousFeatureChannelActivation = featureNeuronsActivationDense[featureSegmentsOffset:arrayNumberOfSegments-1] > 0 if featureSegmentsOffset+1 < arrayNumberOfSegments else None
-				if(previousConceptChannelActivation is not None):
-					featureNeuronsActivationDense[1:featureSegmentsOffset] += featureNeuronsTargetActivationDense[1:featureSegmentsOffset] * previousConceptChannelActivation
-				if(previousFeatureChannelActivation is not None):
-					featureNeuronsActivationDense[featureSegmentsOffset+1:] += featureNeuronsTargetActivationDense[featureSegmentsOffset+1:] * previousFeatureChannelActivation
-				featureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
-				featureNeuronsActivationDense[featureSegmentsOffset] += featureNeuronsTargetActivationDense[featureSegmentsOffset]
-			else:
-				previousChannelActivation = featureNeuronsActivationDense[:-1] > 0
-				featureNeuronsActivationDense[1:] += featureNeuronsTargetActivationDense[1:] * previousChannelActivation
-				featureNeuronsActivationDense[0] += featureNeuronsTargetActivationDense[0]
+			for branchIndex in range(featureNeuronsActivationDense.shape[0]):
+				branchActivation = featureNeuronsActivationDense[branchIndex]
+				if(featureNeuronsTargetActivationDense.dim() == 4):
+					branchTargetActivation = featureNeuronsTargetActivationDense[branchIndex]
+				else:
+					branchTargetActivation = featureNeuronsTargetActivationDense
+				if(useSANIfeaturesAndColumns):
+					featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
+					assert featureSegmentsOffset >= 0 and featureSegmentsOffset < arrayNumberOfSegments
+					previousConceptChannelActivation = branchActivation[:featureSegmentsOffset-1] > 0 if featureSegmentsOffset > 1 else None
+					previousFeatureChannelActivation = branchActivation[featureSegmentsOffset:arrayNumberOfSegments-1] > 0 if featureSegmentsOffset+1 < arrayNumberOfSegments else None
+					if(previousConceptChannelActivation is not None):
+						branchActivation[1:featureSegmentsOffset] += branchTargetActivation[1:featureSegmentsOffset] * previousConceptChannelActivation
+					if(previousFeatureChannelActivation is not None):
+						branchActivation[featureSegmentsOffset+1:] += branchTargetActivation[featureSegmentsOffset+1:] * previousFeatureChannelActivation
+					branchActivation[0] += branchTargetActivation[0]
+					branchActivation[featureSegmentsOffset] += branchTargetActivation[featureSegmentsOffset]
+				else:
+					previousChannelActivation = branchActivation[:-1] > 0
+					branchActivation[1:] += branchTargetActivation[1:] * previousChannelActivation
+					branchActivation[0] += branchTargetActivation[0]
+				featureNeuronsActivationDense[branchIndex] = branchActivation
 			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex] = featureNeuronsActivationDense
 	else:
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 			globalFeatureNeuronsActivation = globalFeatureNeuronsActivation + featureNeuronsTargetActivation
 		else:
-			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex, :, :, :] += featureNeuronsTargetActivation
+			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex] += featureNeuronsTargetActivation
 	
 	if(debugSANIfeaturesAndColumns and useSANIfeaturesAndColumns):
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
@@ -271,7 +294,7 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 			featureNeuronsActivationDense = featureNeuronsActivation.to_dense()
 		else:
 			featureNeuronsActivationDense = featureNeuronsActivation
-		segmentFeatureActivations = featureNeuronsActivationDense.sum(dim=1).to("cpu").tolist()
+		segmentFeatureActivations = featureNeuronsActivationDense.sum(dim=(0, 2)).to("cpu").tolist()
 		print("\tdebugSANIfeaturesAndColumns: seed segmentFeatureActivations={0}".format(segmentFeatureActivations))
 
 	if(inferenceDecrementActivations):
@@ -285,18 +308,21 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 		columnsWordOrderExpanded1 = columnsWordOrder.view(cs, 1).expand(cs, fs)
 		columnsWordOrderMask = pt.logical_and(columnsWordOrderExpanded1 >= firstSeedConceptIndex, columnsWordOrderExpanded1 < firstConceptIndexPredictPhase)
 		wordOrderMask = pt.logical_and(wordOrderMask, columnsWordOrderMask)
-		seedFeatureMask = wordOrderMask.unsqueeze(0).expand(arrayNumberOfSegments, cs, fs)
+		seedFeatureMask = wordOrderMask.unsqueeze(0).unsqueeze(0).expand(numberOfDendriticBranches, arrayNumberOfSegments, cs, fs)
+		if(multipleDendriticBranches):
+			seedFeatureMask = seedFeatureMask & (featureNeuronsActive > 0)
 		indicesToUpdateLocal = pt.nonzero(seedFeatureMask, as_tuple=False)
 		indicesToUpdateGlobal = None
 		if(indicesToUpdateLocal.numel() > 0):
 			conceptIndexLookup = sequenceObservedColumns.conceptIndicesInSequenceObservedTensor.to(indicesToUpdateLocal.device)
 			featureIndexLookup = sequenceObservedColumns.featureIndicesInObservedTensor.to(indicesToUpdateLocal.device)
-			sequenceConceptIndices = indicesToUpdateLocal[:, 1]
-			sequenceFeatureIndices = indicesToUpdateLocal[:, 2]
+			branchIndices = indicesToUpdateLocal[:, 0]
+			sequenceConceptIndices = indicesToUpdateLocal[:, 2]
+			sequenceFeatureIndices = indicesToUpdateLocal[:, 3]
 			globalConceptIndices = conceptIndexLookup.index_select(0, sequenceConceptIndices)
 			globalFeatureIndices = featureIndexLookup.index_select(0, sequenceFeatureIndices)
-			segmentIndices = indicesToUpdateLocal[:, 0].unsqueeze(1)
-			indicesToUpdateGlobal = pt.cat([segmentIndices, globalConceptIndices.unsqueeze(1), globalFeatureIndices.unsqueeze(1)], dim=1)
+			segmentIndices = indicesToUpdateLocal[:, 1]
+			indicesToUpdateGlobal = pt.stack([branchIndices, segmentIndices, globalConceptIndices, globalFeatureIndices], dim=1)
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 			# Patch: seed deactivation must also clear matching global activations so fired features cannot persist into prediction.
 			if(indicesToUpdateGlobal is not None and indicesToUpdateGlobal.numel() > 0):
@@ -305,7 +331,7 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 				globalFeatureNeuronsActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsActivation, indicesToUpdateGlobal, 0)
 		else:
 			featureNeuronsInactiveSource = pt.logical_not(seedFeatureMask).float()
-			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex, :, :, :] *= featureNeuronsInactiveSource
+			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex] *= featureNeuronsInactiveSource
 			if(indicesToUpdateGlobal is not None and indicesToUpdateGlobal.numel() > 0):
 				globalFeatureNeuronsActivation = sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivationIndex]
 				indicesToUpdateGlobal = indicesToUpdateGlobal.to(globalFeatureNeuronsActivation.device)

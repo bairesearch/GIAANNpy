@@ -57,7 +57,7 @@ class SequenceObservedColumnsInferencePrediction:
 		featureConnectionsList = []
 		for observedColumn in observedColumnsSequenceWordIndexDict.values():
 			 featureConnectionsList.append(observedColumn.featureConnections)
-		self.featureConnections = pt.stack(featureConnectionsList, dim=2)
+		self.featureConnections = pt.stack(featureConnectionsList, dim=3)
 		
 
 def buildAllowedColumnsLookup(conceptColumnsIndices, totalColumns):
@@ -347,7 +347,7 @@ def getConnectedColumnsForFeature(observedColumn, featureIndex, includeFeatureDe
 	if(featureIndex is None or featureIndex < 0):
 		return [], {} if includeFeatureDetails else None
 	featureConnectionsStrength = observedColumn.featureConnections[arrayIndexPropertiesStrengthIndex]
-	featureConnectionsStrength = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsStrength, 1, featureIndex)
+	featureConnectionsStrength = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsStrength, 2, featureIndex)
 	featureConnectionsStrength = featureConnectionsStrength.coalesce()
 	if(featureConnectionsStrength._nnz() == 0):
 		return [], {} if includeFeatureDetails else None
@@ -360,14 +360,14 @@ def getConnectedColumnsForFeature(observedColumn, featureIndex, includeFeatureDe
 			return [], {} if includeFeatureDetails else None
 		targetColumnIndices = targetColumnIndices[:, minWordDistanceMask]
 	elif(enforceDirectConnections and enforceDirectConnectionsSANI):
-		lastSegmentMask = targetColumnIndices[0] == arrayIndexSegmentLast
+		lastSegmentMask = targetColumnIndices[1] == arrayIndexSegmentLast
 		targetColumnIndices = targetColumnIndices[:, lastSegmentMask]
-	targetColumns = targetColumnIndices[1].unique()
+	targetColumns = targetColumnIndices[2].unique()
 	targetColumnsList = targetColumns.cpu().tolist()
 	if(includeFeatureDetails):
-		targetFeatures = targetColumnIndices[2].cpu().tolist()
+		targetFeatures = targetColumnIndices[3].cpu().tolist()
 		columnFeatureMap = {}
-		for columnValue, featureValue in zip(targetColumnIndices[1].tolist(), targetFeatures):
+		for columnValue, featureValue in zip(targetColumnIndices[2].tolist(), targetFeatures):
 			columnFeatureMap.setdefault(columnValue, set()).add(featureValue)
 		return targetColumnsList, columnFeatureMap
 	else:
@@ -579,9 +579,9 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 			if(conceptIndexLookup.numel() == 0 or featureIndexLookup.numel() == 0):
 				segmentFeatureActivations = [[] for _ in range(arrayNumberOfSegments)]
 			else:
-				featureNeuronsActivationDense = featureNeuronsActivationDense.index_select(1, conceptIndexLookup)
-				featureNeuronsActivationDense = featureNeuronsActivationDense.index_select(2, featureIndexLookup)
-				segmentFeatureActivations = featureNeuronsActivationDense.sum(dim=1).to("cpu").tolist()
+				featureNeuronsActivationDense = featureNeuronsActivationDense.index_select(2, conceptIndexLookup)
+				featureNeuronsActivationDense = featureNeuronsActivationDense.index_select(3, featureIndexLookup)
+				segmentFeatureActivations = featureNeuronsActivationDense.sum(dim=(0, 2)).to("cpu").tolist()
 			print("\tdebugSANIfeaturesAndColumns: predict segmentFeatureActivations={0}".format(segmentFeatureActivations))
 
 	else:
@@ -593,12 +593,16 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		for conceptIndex in range(conceptColumnsIndices.shape[0]):
 			conceptColumnsIndicesSource = conceptColumnsIndices[conceptIndex]
 			conceptColumnsFeatureIndicesSource = conceptColumnsFeatureIndicesActivation[conceptIndex].squeeze(dim=0)
+			branchIndex = 0
+			if(multipleDendriticBranches):
+				branchIndex = GIAANNproto_predictionActivate.selectActivatedBranchIndex(globalFeatureNeuronsActivation, int(conceptColumnsIndicesSource.item()), int(conceptColumnsFeatureIndicesSource.item()))
+			branchTensor = pt.tensor(branchIndex, device=conceptColumnsIndicesSource.device)
 			if(useSANI):
 				for segmentIndex in range(arrayNumberOfSegments):
-					indexToUpdate = pt.stack([pt.tensor(segmentIndex, device=conceptColumnsIndicesSource.device), conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource], dim=0)
+					indexToUpdate = pt.stack([branchTensor, pt.tensor(segmentIndex, device=conceptColumnsIndicesSource.device), conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource], dim=0)
 					indicesToUpdateList.append(indexToUpdate)
 			else:
-				indicesToUpdate = pt.stack([pt.tensor(arrayIndexSegmentFirst, device=conceptColumnsIndicesSource.device), conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource], dim=0)
+				indicesToUpdate = pt.stack([branchTensor, pt.tensor(arrayIndexSegmentFirst, device=conceptColumnsIndicesSource.device), conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource], dim=0)
 				indicesToUpdateList.append(indicesToUpdate)
 		indicesToUpdate = pt.stack(indicesToUpdateList, dim=0)
 		if(inferenceDeactivateNeuronsUponPrediction or inferenceInvertNeuronActivationUponPrediction):
@@ -708,21 +712,34 @@ def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivat
 	#generate targets;
 	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 
-	globalFeatureNeuronsActivationAllSegments = pt.sum(globalFeatureNeuronsActivation, dim=0)	#sum across all segments 	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
-	globalFeatureNeuronsStrengthAllSegments = pt.sum(globalFeatureNeuronsStrength, dim=0)	#sum across all segments 	#TODO: take into account SANI requirements (distal activation must precede proximal activation) 
+	globalFeatureNeuronsActivationAllSegments = globalFeatureNeuronsActivation.sum(dim=1)	#sum across all segments
+	globalFeatureNeuronsActivationAllSegments = globalFeatureNeuronsActivationAllSegments.sum(dim=0)	#sum across all branches
+	globalFeatureNeuronsStrengthAllSegments = globalFeatureNeuronsStrength.sum(dim=1)	#sum across all segments
+	globalFeatureNeuronsStrengthAllSegments = globalFeatureNeuronsStrengthAllSegments.sum(dim=0)	#sum across all branches
 	if(useSANI and algorithmMatrixSANImethod=="enforceActivationAcrossSegments" and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 		# Patch: selection ignored last-segment gating, allowing nodes without last-segment activation to fire.
 		if(enforceActivationAcrossSegmentsIgnoreInternalColumn):
 			lastSegmentConstraint = arrayIndexSegmentAdjacentColumn
 		else:
 			lastSegmentConstraint = arrayIndexSegmentLast
-		lastSegmentActivation = globalFeatureNeuronsActivation[lastSegmentConstraint]
+		hasBranchDim = (globalFeatureNeuronsActivation.dim() == 4)
+		if(globalFeatureNeuronsActivation.is_sparse):
+			if(hasBranchDim):
+				lastSegmentActivation = GIAANNproto_sparseTensors.sliceSparseTensor(globalFeatureNeuronsActivation, 1, lastSegmentConstraint)
+			else:
+				lastSegmentActivation = GIAANNproto_sparseTensors.sliceSparseTensor(globalFeatureNeuronsActivation, 0, lastSegmentConstraint)
+		else:
+			if(hasBranchDim):
+				lastSegmentActivation = globalFeatureNeuronsActivation[:, lastSegmentConstraint]
+			else:
+				lastSegmentActivation = globalFeatureNeuronsActivation[lastSegmentConstraint]
 		if(globalFeatureNeuronsActivationAllSegments.is_sparse):
-			globalFeatureNeuronsActivationAllSegments = GIAANNproto_sparseTensors.selectAindicesContainedInB(globalFeatureNeuronsActivationAllSegments, lastSegmentActivation)
+			lastSegmentActivationCollapsed = GIAANNproto_sparseTensors.collapseSparseBranchDimension(lastSegmentActivation)
+			globalFeatureNeuronsActivationAllSegments = GIAANNproto_sparseTensors.selectAindicesContainedInB(globalFeatureNeuronsActivationAllSegments, lastSegmentActivationCollapsed)
 			if(globalFeatureNeuronsActivationAllSegments._nnz() == 0):
 				raise RuntimeError("selectMostActiveFeature error: enforceLastSegmentMustBeActive requires active last-segment nodes, but none are active.")
 		else:
-			lastSegmentMask = lastSegmentActivation.to_dense() > 0
+			lastSegmentMask = (lastSegmentActivation.to_dense() > 0).any(dim=0)
 			globalFeatureNeuronsActivationAllSegments = globalFeatureNeuronsActivationAllSegments * lastSegmentMask
 			if(not (globalFeatureNeuronsActivationAllSegments > 0).any().item()):
 				raise RuntimeError("selectMostActiveFeature error: enforceLastSegmentMustBeActive requires active last-segment nodes, but none are active.")
@@ -858,6 +875,7 @@ def buildInhibitoryIndices(conceptColumnsIndices, conceptColumnsFeatureIndices):
 	indicesToUpdateList = []
 	for rowIndex in range(conceptColumnsIndices.shape[0]):
 		columnTensor = conceptColumnsIndices[rowIndex]
+		branchTensor = pt.tensor(0, device=columnTensor.device)
 		rowFeatures = conceptColumnsFeatureIndices[rowIndex]
 		if(rowFeatures is None or rowFeatures.numel() == 0):
 			continue
@@ -865,10 +883,10 @@ def buildInhibitoryIndices(conceptColumnsIndices, conceptColumnsFeatureIndices):
 		for featureTensor in featureValues:
 			if(useSANI):
 				for segmentIndex in range(arrayNumberOfSegments):
-					indexToUpdate = pt.stack([pt.tensor(segmentIndex, device=columnTensor.device), columnTensor, featureTensor], dim=0)
+					indexToUpdate = pt.stack([branchTensor, pt.tensor(segmentIndex, device=columnTensor.device), columnTensor, featureTensor], dim=0)
 					indicesToUpdateList.append(indexToUpdate)
 			else:
-				indexToUpdate = pt.stack([pt.tensor(arrayIndexSegmentFirst, device=columnTensor.device), columnTensor, featureTensor], dim=0)
+				indexToUpdate = pt.stack([branchTensor, pt.tensor(arrayIndexSegmentFirst, device=columnTensor.device), columnTensor, featureTensor], dim=0)
 				indicesToUpdateList.append(indexToUpdate)
 	if(len(indicesToUpdateList) == 0):
 		return None

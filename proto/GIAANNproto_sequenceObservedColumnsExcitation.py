@@ -159,12 +159,12 @@ class SequenceObservedColumns:
 				
 	@staticmethod
 	def initialiseFeatureNeuronsSequence(cs, fs):
-		featureNeurons = pt.zeros(arrayNumberOfProperties, arrayNumberOfSegments, cs, fs, dtype=arrayType)
+		featureNeurons = pt.zeros(arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, dtype=arrayType)
 		return featureNeurons
 
 	@staticmethod
 	def initialiseFeatureConnectionsSequence(cs, fs):
-		featureConnections = pt.zeros(arrayNumberOfProperties, arrayNumberOfSegments, cs, fs, cs, fs, dtype=arrayType)
+		featureConnections = pt.zeros(arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs, dtype=arrayType)
 		return featureConnections
 
 	def computeColumnLocalFeatureMaps(self, tokens):
@@ -237,12 +237,12 @@ class SequenceObservedColumns:
 				featureNeurons = observedColumn.featureNeurons.coalesce()
 			else:
 				# Slice the globalFeatureNeurons as before
-				featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(self.databaseNetworkObject.globalFeatureNeurons, 2, observedColumn.conceptIndex)
+				featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(self.databaseNetworkObject.globalFeatureNeurons, 3, observedColumn.conceptIndex)
 
 			if (useGPUdense and not useGPUsparse):
 				featureNeurons = featureNeurons.to(deviceDense)
 
-			indices = featureNeurons.indices()  # [3, n_entries] for a 3D sparse tensor: (property, type, feature_idx)
+			indices = featureNeurons.indices()  # [4, n_entries] for a 4D sparse tensor: (property, branch, segment, feature_idx)
 			values = featureNeurons.values()
 
 			# Ensure that featureIndicesInObserved is sorted if not already
@@ -250,7 +250,7 @@ class SequenceObservedColumns:
 			fIdxTensorSorted = fIdxTensor[fIdxSortIdx]
 
 			# Instead of expanding and comparing, directly check membership
-			mask = pt.isin(indices[2], featureIndicesInObservedSorted)
+			mask = pt.isin(indices[3], featureIndicesInObservedSorted)
 
 			# Filter indices and values by mask
 			filteredIndices = indices[:, mask]
@@ -259,7 +259,7 @@ class SequenceObservedColumns:
 			if filteredIndices.size(1) > 0:
 				# We need to find the corresponding f_idx for each filtered feature_idx.
 				# Use searchsorted on the sorted featureIndicesInObserved
-				positions = pt.searchsorted(featureIndicesInObservedSorted, filteredIndices[2])
+				positions = pt.searchsorted(featureIndicesInObservedSorted, filteredIndices[3])
 				filteredFIdxTensor = fIdxTensorSorted[positions]
 			else:
 				# If no matches, just create empty tensors that match the expected shape.
@@ -272,10 +272,10 @@ class SequenceObservedColumns:
 			# Before insertion: filteredIndices = [property, type, feature_idx]
 			# After insertion:  filteredIndices = [property, type, cIdx, feature_idx]
 			if filteredIndices.size(1) > 0:
-				filteredIndices[2] = filteredFIdxTensor
+				filteredIndices[3] = filteredFIdxTensor
 			# Insert cIdx row
 			cIdxCol = pt.full((1, filteredIndices.size(1)), cIdx, dtype=pt.long, device=filteredIndices.device)
-			filteredIndices = pt.cat([filteredIndices[0:2], cIdxCol, filteredIndices[2:3]], dim=0)
+			filteredIndices = pt.cat([filteredIndices[0:3], cIdxCol, filteredIndices[3:4]], dim=0)
 
 			if not useGPUsparse:
 				filteredIndices = filteredIndices.to(deviceSparse)
@@ -304,7 +304,7 @@ class SequenceObservedColumns:
 			if not useGPUsparse:
 				featureConnections = featureConnections.to(deviceDense)
 
-			indices = featureConnections.indices()  # shape [5, n_entries]
+			indices = featureConnections.indices()  # shape [6, n_entries]
 			values = featureConnections.values()	# shape [n_entries]
 
 			# Sort featureIndicesInObserved and fIdxTensor together if not already sorted
@@ -321,9 +321,9 @@ class SequenceObservedColumns:
 				otherFIdxTensorSorted = otherFIdxTensor[otherFIdxSortIdx]
 
 				# Create boolean masks directly:
-				maskConcept = (indices[3] == otherConceptIndex)
-				maskF2 = pt.isin(indices[2], featureIndicesInObservedSorted)
-				maskF4 = pt.isin(indices[4], otherFeatureIndicesInObservedSorted)
+				maskConcept = (indices[4] == otherConceptIndex)
+				maskF2 = pt.isin(indices[3], featureIndicesInObservedSorted)
+				maskF4 = pt.isin(indices[5], otherFeatureIndicesInObservedSorted)
 
 				combinedMask = maskConcept & maskF2 & maskF4
 
@@ -335,14 +335,14 @@ class SequenceObservedColumns:
 				# We do NOT continue here; we proceed to create and append empty results as per the original requirement.
 
 				if filteredIndices.numel() > 0:
-					sourceGlobalIndices = filteredIndices[2].clone()
-					targetGlobalIndices = filteredIndices[4].clone()
-					# Map indices[2] back to fIdxTensor
-					fIdxPositions = pt.searchsorted(featureIndicesInObservedSorted, filteredIndices[2])
+					sourceGlobalIndices = filteredIndices[3].clone()
+					targetGlobalIndices = filteredIndices[5].clone()
+					# Map indices[3] back to fIdxTensor
+					fIdxPositions = pt.searchsorted(featureIndicesInObservedSorted, filteredIndices[3])
 					mappedFIdx = fIdxTensorSorted[fIdxPositions]
 
-					# Map indices[4] back to otherFIdxTensor
-					otherFIdxPositions = pt.searchsorted(otherFeatureIndicesInObservedSorted, filteredIndices[4])
+					# Map indices[5] back to otherFIdxTensor
+					otherFIdxPositions = pt.searchsorted(otherFeatureIndicesInObservedSorted, filteredIndices[5])
 					mappedOtherFIdx = otherFIdxTensorSorted[otherFIdxPositions]
 
 					mappedFIdx = self.mapGlobalToLocalIndices(mappedFIdx, sourceGlobalIndices, cIdx)
@@ -350,11 +350,11 @@ class SequenceObservedColumns:
 
 					# Adjust indices:
 					# After filtering, we have:
-					#   filteredIndices = [property, type, feature_idx, concept_idx, other_feature_idx]
+					#   filteredIndices = [property, branch, segment, feature_idx, concept_idx, other_feature_idx]
 					# We want to replace concept_idx with otherCIdx and feature_idx with mappedFIdx, other_feature_idx with mappedOtherFIdx.
-					filteredIndices[2] = mappedFIdx
-					filteredIndices[3] = otherCIdx
-					filteredIndices[4] = mappedOtherFIdx
+					filteredIndices[3] = mappedFIdx
+					filteredIndices[4] = otherCIdx
+					filteredIndices[5] = mappedOtherFIdx
 					if(debugDrawNeuronActivations):
 						sampleCount = min(5, filteredIndices.shape[1])
 						for sampleIdx in range(sampleCount):
@@ -369,9 +369,9 @@ class SequenceObservedColumns:
 					# Even if empty, we need to maintain correct shape to append
 					pass
 
-				# Insert cIdx at dimension 3 as per the original code.
+				# Insert cIdx after the segment dimension as per the original code.
 				cIdxCol = pt.full((1, filteredIndices.size(1)), cIdx, dtype=pt.long, device=filteredIndices.device)
-				filteredIndices = pt.cat([filteredIndices[0:2], cIdxCol, filteredIndices[2:]], dim=0)
+				filteredIndices = pt.cat([filteredIndices[0:3], cIdxCol, filteredIndices[3:]], dim=0)
 
 				if not useGPUsparse:
 					filteredIndices = filteredIndices.to(deviceSparse)
@@ -498,9 +498,9 @@ class SequenceObservedColumns:
 				targetIndices = featureTargetSparse.indices()
 				targetValues = featureTargetSparse.values()
 				if lowMem:
-					removeMask = replacePropertyMaskLookup[targetIndices[0]] & observedFeatureMaskLookup[targetIndices[2]]
+					removeMask = replacePropertyMaskLookup[targetIndices[0]] & observedFeatureMaskLookup[targetIndices[3]]
 				else:
-					removeMask = replacePropertyMaskLookup[targetIndices[0]] & (targetIndices[2] == conceptIndex) & observedFeatureMaskLookup[targetIndices[3]]
+					removeMask = replacePropertyMaskLookup[targetIndices[0]] & (targetIndices[3] == conceptIndex) & observedFeatureMaskLookup[targetIndices[4]]
 				keepMask = pt.logical_not(removeMask)
 				filteredTargetIndices = targetIndices[:, keepMask]
 				filteredTargetValues = targetValues[keepMask]
@@ -528,9 +528,9 @@ class SequenceObservedColumns:
 				connectionIndices = observedColumn.featureConnections.indices()
 				connectionValues = observedColumn.featureConnections.values()
 				removeMaskConnections = replacePropertyMaskLookup[connectionIndices[0]]
-				removeMaskConnections = removeMaskConnections & observedFeatureMaskLookup[connectionIndices[2]]
-				removeMaskConnections = removeMaskConnections & sequenceConceptMaskLookup[connectionIndices[3]]
-				removeMaskConnections = removeMaskConnections & observedFeatureMaskLookup[connectionIndices[4]]
+				removeMaskConnections = removeMaskConnections & observedFeatureMaskLookup[connectionIndices[3]]
+				removeMaskConnections = removeMaskConnections & sequenceConceptMaskLookup[connectionIndices[4]]
+				removeMaskConnections = removeMaskConnections & observedFeatureMaskLookup[connectionIndices[5]]
 				keepConnectionsMask = pt.logical_not(removeMaskConnections)
 				filteredConnectionIndices = connectionIndices[:, keepConnectionsMask]
 				filteredConnectionValues = connectionValues[keepConnectionsMask]
@@ -581,13 +581,13 @@ class SequenceObservedColumns:
 
 		featureIndices = featureNeuronsDeltaSparse.indices()
 		featureValues = featureNeuronsDeltaSparse.values()
-		featureIndices, featureValues = self.filterSparseByFeatureMask(featureIndices, featureValues, sequenceFeatureMaskFeature, [2])
-		featureRanges, featureIndicesSorted, featureValuesSorted = self.buildSparseColumnRanges(featureIndices, featureValues, 1)
+		featureIndices, featureValues = self.filterSparseByFeatureMask(featureIndices, featureValues, sequenceFeatureMaskFeature, [3])
+		featureRanges, featureIndicesSorted, featureValuesSorted = self.buildSparseColumnRanges(featureIndices, featureValues, 2)
 
 		connectionIndices = featureConnectionsDeltaSparse.indices()
 		connectionValues = featureConnectionsDeltaSparse.values()
-		connectionIndices, connectionValues = self.filterSparseByFeatureMask(connectionIndices, connectionValues, sequenceFeatureMaskConnection, [2, 4])
-		connectionRanges, connectionIndicesSorted, connectionValuesSorted = self.buildSparseColumnRanges(connectionIndices, connectionValues, 1)
+		connectionIndices, connectionValues = self.filterSparseByFeatureMask(connectionIndices, connectionValues, sequenceFeatureMaskConnection, [3, 5])
+		connectionRanges, connectionIndicesSorted, connectionValuesSorted = self.buildSparseColumnRanges(connectionIndices, connectionValues, 2)
 
 		connectionMinRanges = {}
 		connectionMinIndicesSorted = None
@@ -601,8 +601,8 @@ class SequenceObservedColumns:
 				connectionMinSparse = connectionMinSparse.to(deviceSparse)
 			connectionMinIndices = connectionMinSparse.indices()
 			connectionMinValues = connectionMinSparse.values()
-			connectionMinIndices, connectionMinValues = self.filterSparseByFeatureMask(connectionMinIndices, connectionMinValues, sequenceFeatureMaskConnection, [2, 4])
-			connectionMinRanges, connectionMinIndicesSorted, connectionMinValuesSorted = self.buildSparseColumnRanges(connectionMinIndices, connectionMinValues, 1)
+			connectionMinIndices, connectionMinValues = self.filterSparseByFeatureMask(connectionMinIndices, connectionMinValues, sequenceFeatureMaskConnection, [3, 5])
+			connectionMinRanges, connectionMinIndicesSorted, connectionMinValuesSorted = self.buildSparseColumnRanges(connectionMinIndices, connectionMinValues, 2)
 
 		conceptIndicesTensor = self.conceptIndicesInSequenceObservedTensor.to(connectionDevice)
 
@@ -748,16 +748,17 @@ class SequenceObservedColumns:
 			emptyIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=indices.device)
 			emptyValues = pt.empty((0,), dtype=arrayType, device=indices.device)
 			return pt.sparse_coo_tensor(emptyIndices, emptyValues, size=targetSize, dtype=arrayType, device=deviceSparse)
-		segment = indices[0]
-		featureIndex = indices[2]
+		branch = indices[0]
+		segment = indices[1]
+		featureIndex = indices[3]
 		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
 			featureIndex = featureIndicesInObserved[featureIndex]
 		propertyRow = pt.full_like(segment, propertyIndex)
 		if(insertConceptIndex is None):
-			updateIndices = pt.stack((propertyRow, segment, featureIndex), dim=0)
+			updateIndices = pt.stack((propertyRow, branch, segment, featureIndex), dim=0)
 		else:
 			conceptRow = pt.full_like(segment, insertConceptIndex)
-			updateIndices = pt.stack((propertyRow, segment, conceptRow, featureIndex), dim=0)
+			updateIndices = pt.stack((propertyRow, branch, segment, conceptRow, featureIndex), dim=0)
 		return pt.sparse_coo_tensor(updateIndices, values, size=targetSize, dtype=arrayType, device=deviceSparse)
 
 	def buildConnectionPropertyUpdateSparse(self, indices, values, propertyIndex, featureIndicesInObserved, conceptIndicesTensor, targetSize):
@@ -765,16 +766,17 @@ class SequenceObservedColumns:
 			emptyIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=indices.device)
 			emptyValues = pt.empty((0,), dtype=arrayType, device=indices.device)
 			return pt.sparse_coo_tensor(emptyIndices, emptyValues, size=targetSize, dtype=arrayType, device=deviceSparse)
-		segment = indices[0]
-		sourceFeatureIndex = indices[2]
-		targetConceptIndex = indices[3]
-		targetFeatureIndex = indices[4]
+		branch = indices[0]
+		segment = indices[1]
+		sourceFeatureIndex = indices[3]
+		targetConceptIndex = indices[4]
+		targetFeatureIndex = indices[5]
 		targetConceptIndex = conceptIndicesTensor[targetConceptIndex]
 		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
 			sourceFeatureIndex = featureIndicesInObserved[sourceFeatureIndex]
 			targetFeatureIndex = featureIndicesInObserved[targetFeatureIndex]
 		propertyRow = pt.full_like(segment, propertyIndex)
-		updateIndices = pt.stack((propertyRow, segment, sourceFeatureIndex, targetConceptIndex, targetFeatureIndex), dim=0)
+		updateIndices = pt.stack((propertyRow, branch, segment, sourceFeatureIndex, targetConceptIndex, targetFeatureIndex), dim=0)
 		return pt.sparse_coo_tensor(updateIndices, values, size=targetSize, dtype=arrayType, device=deviceSparse)
 
 	def flattenSparseIndices(self, indices, size):
@@ -829,21 +831,25 @@ class SequenceObservedColumns:
 	def extractSequenceFeatureUpdates(self, cIdx, fIdxTensor, featureIndicesInObserved, featureNeuronsSparse, propertyMaskLookup, sequenceFeatureMaskLookup, targetSize, insertConceptIndex=None):
 		indices = featureNeuronsSparse.indices()
 		values = featureNeuronsSparse.values()
-		mask = (indices[2] == cIdx)
+		mask = (indices[3] == cIdx)
 		if(propertyMaskLookup is not None):
 			mask = mask & propertyMaskLookup[indices[0]]
 		if(sequenceFeatureMaskLookup is not None):
-			mask = mask & sequenceFeatureMaskLookup[indices[3]]
+			mask = mask & sequenceFeatureMaskLookup[indices[4]]
 		filteredIndices = indices[:, mask]
 		filteredValues = values[mask]
 		if(filteredIndices.numel() > 0):
-			filteredIndices[2] = filteredIndices[3]
-			filteredIndices = filteredIndices[0:3]
+			filteredIndices = pt.stack((
+				filteredIndices[0],
+				filteredIndices[1],
+				filteredIndices[2],
+				filteredIndices[4]
+			), dim=0)
 			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-				filteredIndices[2] = featureIndicesInObserved[filteredIndices[2]]
+				filteredIndices[3] = featureIndicesInObserved[filteredIndices[3]]
 			if(insertConceptIndex is not None):
 				conceptIndexRow = pt.full((1, filteredIndices.size(1)), insertConceptIndex, dtype=pt.long, device=filteredIndices.device)
-				filteredIndices = pt.cat([filteredIndices[0:2], conceptIndexRow, filteredIndices[2:3]], dim=0)
+				filteredIndices = pt.cat([filteredIndices[0:3], conceptIndexRow, filteredIndices[3:4]], dim=0)
 		else:
 			filteredIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=featureNeuronsSparse.device)
 			filteredValues = pt.empty((0,), dtype=arrayType, device=featureNeuronsSparse.device)
@@ -856,27 +862,28 @@ class SequenceObservedColumns:
 	def extractSequenceConnectionUpdates(self, cIdx, fIdxTensor, featureIndicesInObserved, featureConnectionsSparse, propertyMaskLookup, sequenceFeatureMaskLookup, targetSize):
 		indices = featureConnectionsSparse.indices()
 		values = featureConnectionsSparse.values()
-		mask = (indices[2] == cIdx)
+		mask = (indices[3] == cIdx)
 		if(propertyMaskLookup is not None):
 			mask = mask & propertyMaskLookup[indices[0]]
 		if(sequenceFeatureMaskLookup is not None):
-			mask = mask & sequenceFeatureMaskLookup[indices[3]]
-			mask = mask & sequenceFeatureMaskLookup[indices[5]]
+			mask = mask & sequenceFeatureMaskLookup[indices[4]]
+			mask = mask & sequenceFeatureMaskLookup[indices[6]]
 		filteredIndices = indices[:, mask]
 		filteredValues = values[mask]
 		if(filteredIndices.numel() > 0):
 			filteredIndices = pt.stack((
 				filteredIndices[0],
 				filteredIndices[1],
-				filteredIndices[3],
+				filteredIndices[2],
 				filteredIndices[4],
-				filteredIndices[5]
+				filteredIndices[5],
+				filteredIndices[6]
 			), dim=0)
 			conceptIndicesTensor = self.conceptIndicesInSequenceObservedTensor.to(filteredIndices.device)
-			filteredIndices[3] = conceptIndicesTensor[filteredIndices[3]]
+			filteredIndices[4] = conceptIndicesTensor[filteredIndices[4]]
 			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-				filteredIndices[2] = featureIndicesInObserved[filteredIndices[2]]
-				filteredIndices[4] = featureIndicesInObserved[filteredIndices[4]]
+				filteredIndices[3] = featureIndicesInObserved[filteredIndices[3]]
+				filteredIndices[5] = featureIndicesInObserved[filteredIndices[5]]
 		else:
 			filteredIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=featureConnectionsSparse.device)
 			filteredValues = pt.empty((0,), dtype=arrayType, device=featureConnectionsSparse.device)

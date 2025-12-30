@@ -99,25 +99,26 @@ def buildInhibitoryInputConnectionTensors(databaseNetworkObject, inhibitoryColum
 		indices = connectionsInput.indices()
 		values = connectionsInput.values()
 		for sourceColumnIndex, sourceFeatureIndex in contextFeatureLookup.items():
-			columnMask = (indices[3] == sourceColumnIndex)
+			columnMask = (indices[4] == sourceColumnIndex)
 			if(not pt.any(columnMask)):
 				continue
-			featureMask = (indices[4] == sourceFeatureIndex)
+			featureMask = (indices[5] == sourceFeatureIndex)
 			combinedMask = columnMask & featureMask
 			if(not pt.any(combinedMask)):
 				continue
 			filteredIndices = indices[:, combinedMask]
 			filteredValues = values[combinedMask]
 			newIndices = pt.stack((
-				filteredIndices[0],
-				filteredIndices[1],
-				filteredIndices[4],
+				filteredIndices[0],	# property index
+				filteredIndices[1],	# branch index
+				filteredIndices[2],	# segment index
+				filteredIndices[5],	# source feature index
 				pt.full_like(filteredIndices[0], targetColumnIndex),
-				filteredIndices[2],
+				filteredIndices[3],	# inhibitory feature index (target)
 			), dim=0)
 			connectionEntries[sourceColumnIndex].append((newIndices, filteredValues))
 	connectionTensors = {}
-	shape = (arrayNumberOfProperties, arrayNumberOfSegments, databaseNetworkObject.f, databaseNetworkObject.c, databaseNetworkObject.f)
+	shape = (arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.f, databaseNetworkObject.c, databaseNetworkObject.f)
 	for sourceColumnIndex, entryList in connectionEntries.items():
 		if(len(entryList) == 0):
 			continue
@@ -132,19 +133,19 @@ def activateInhibitoryNeurons(databaseNetworkObject, connectionTensors, contextF
 	if(len(connectionTensors) == 0):
 		return
 	if(not hasattr(databaseNetworkObject, "globalInhibitoryNeuronsActivation") or databaseNetworkObject.globalInhibitoryNeuronsActivation is None):
-		databaseNetworkObject.globalInhibitoryNeuronsActivation = GIAANNproto_sparseTensors.createEmptySparseTensor((arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f))
+		databaseNetworkObject.globalInhibitoryNeuronsActivation = GIAANNproto_sparseTensors.createEmptySparseTensor((numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f))
 	for sourceColumnIndex, connectionTensor in connectionTensors.items():
 		sourceFeatureIndex = contextFeatureLookup.get(sourceColumnIndex)
 		if(sourceFeatureIndex is None):
 			continue
-		sourceActivationValue = getSparseValue(globalFeatureNeuronsActivation, [arrayIndexSegmentFirst, sourceColumnIndex, sourceFeatureIndex])
+		sourceActivationValue = getSparseValue(globalFeatureNeuronsActivation, [0, arrayIndexSegmentFirst, sourceColumnIndex, sourceFeatureIndex])
 		if(sourceActivationValue == 0):
 			sourceActivationValue = j1
 			sourceTensor = createSingleActivationTensor(databaseNetworkObject, sourceColumnIndex, sourceFeatureIndex, sourceActivationValue)
 			conceptTensor = pt.tensor([sourceColumnIndex], dtype=pt.long, device=deviceSparse)
 			featureTensor = pt.tensor([[sourceFeatureIndex]], dtype=pt.long, device=deviceSparse)
 			sourceTensor, _ = GIAANNproto_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, sourceTensor, None, connectionTensor, conceptTensor, featureTensor, sourceConceptIndex=sourceColumnIndex)
-			sourceTensor = removeActivationAtIndex(sourceTensor, [arrayIndexSegmentFirst, sourceColumnIndex, sourceFeatureIndex], sourceActivationValue)
+			sourceTensor = removeActivationAtIndex(sourceTensor, [0, arrayIndexSegmentFirst, sourceColumnIndex, sourceFeatureIndex], sourceActivationValue)
 			databaseNetworkObject.globalInhibitoryNeuronsActivation = databaseNetworkObject.globalInhibitoryNeuronsActivation + sourceTensor
 	databaseNetworkObject.globalInhibitoryNeuronsActivation = databaseNetworkObject.globalInhibitoryNeuronsActivation.coalesce()
 
@@ -153,12 +154,12 @@ def activateInhibitoryNeuronsOptimised(databaseNetworkObject, predictedFeatureLo
 	if(len(predictedFeatureLookup) == 0):
 		return
 	if(not hasattr(databaseNetworkObject, "globalInhibitoryNeuronsActivation") or databaseNetworkObject.globalInhibitoryNeuronsActivation is None):
-		databaseNetworkObject.globalInhibitoryNeuronsActivation = GIAANNproto_sparseTensors.createEmptySparseTensor((arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f))
+		databaseNetworkObject.globalInhibitoryNeuronsActivation = GIAANNproto_sparseTensors.createEmptySparseTensor((numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f))
 	for columnIndex, featureIndex in predictedFeatureLookup.items():
-		activationValue = getSparseValue(globalFeatureNeuronsActivation, [arrayIndexSegmentFirst, columnIndex, featureIndex])
+		activationValue = getSparseValue(globalFeatureNeuronsActivation, [0, arrayIndexSegmentFirst, columnIndex, featureIndex])
 		if(activationValue == 0):
 			activationValue = j1
-		dimensions = [arrayIndexSegmentFirst, columnIndex, featureIndex]
+		dimensions = [0, arrayIndexSegmentFirst, columnIndex, featureIndex]
 		databaseNetworkObject.globalInhibitoryNeuronsActivation = GIAANNproto_sparseTensors.addElementValueToSparseTensor(databaseNetworkObject.globalInhibitoryNeuronsActivation, dimensions, activationValue)
 	databaseNetworkObject.globalInhibitoryNeuronsActivation = databaseNetworkObject.globalInhibitoryNeuronsActivation.coalesce()
 
@@ -172,7 +173,7 @@ def verifyInhibitoryNeuronSelection(databaseNetworkObject, predictedFeatureLooku
 	indices = globalActivation.indices()
 	values = globalActivation.values()
 	for columnIndex, featureIndex in predictedFeatureLookup.items():
-		expectedValue = getSparseValue(globalActivation, [arrayIndexSegmentFirst, columnIndex, featureIndex])
+		expectedValue = getSparseValue(globalActivation, [0, arrayIndexSegmentFirst, columnIndex, featureIndex])
 		if(expectedValue != 0):
 			continue
 		activeDescriptions = describeInhibitoryColumnActivations(indices, values, columnIndex, databaseNetworkObject)
@@ -184,10 +185,10 @@ def verifyInhibitoryNeuronSelection(databaseNetworkObject, predictedFeatureLooku
 def describeInhibitoryColumnActivations(indices, values, columnIndex, databaseNetworkObject):
 	if(indices.shape[1] == 0):
 		return "<none>"
-	columnMask = (indices[1] == columnIndex)
+	columnMask = (indices[2] == columnIndex)
 	if(not pt.any(columnMask)):
 		return "<none>"
-	activeFeatures = indices[2, columnMask].tolist()
+	activeFeatures = indices[3, columnMask].tolist()
 	activeValues = values[columnMask].tolist()
 	descriptionParts = []
 	for featureIndex, activationValue in zip(activeFeatures, activeValues):
@@ -206,14 +207,14 @@ def computeInhibitoryOutputEffects(databaseNetworkObject, inhibitoryColumns, pre
 		inhibitoryFeatureIndex = predictedFeatureLookup.get(targetColumnIndex)
 		if(inhibitoryFeatureIndex is None):
 			continue
-		inhibitoryActivationValue = getSparseValue(databaseNetworkObject.globalInhibitoryNeuronsActivation, [arrayIndexSegmentFirst, targetColumnIndex, inhibitoryFeatureIndex])
+		inhibitoryActivationValue = getSparseValue(databaseNetworkObject.globalInhibitoryNeuronsActivation, [0, arrayIndexSegmentFirst, targetColumnIndex, inhibitoryFeatureIndex])
 		if(inhibitoryActivationValue == 0):
 			continue
 		sourceTensor = createSingleActivationTensor(databaseNetworkObject, targetColumnIndex, inhibitoryFeatureIndex, inhibitoryActivationValue)
 		conceptTensor = pt.tensor([targetColumnIndex], dtype=pt.long, device=deviceSparse)
 		featureTensor = pt.tensor([[inhibitoryFeatureIndex]], dtype=pt.long, device=deviceSparse)
 		sourceTensor, _ = GIAANNproto_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, sourceTensor, None, inhibitoryColumn.featureConnectionsOutput, conceptTensor, featureTensor, sourceConceptIndex=targetColumnIndex)
-		sourceTensor = removeActivationAtIndex(sourceTensor, [arrayIndexSegmentFirst, targetColumnIndex, inhibitoryFeatureIndex], inhibitoryActivationValue)
+		sourceTensor = removeActivationAtIndex(sourceTensor, [0, arrayIndexSegmentFirst, targetColumnIndex, inhibitoryFeatureIndex], inhibitoryActivationValue)
 		if(inhibitoryEffects is None):
 			inhibitoryEffects = sourceTensor
 		else:
@@ -233,9 +234,9 @@ def applyInhibitoryEffect(databaseNetworkObject, globalFeatureNeuronsActivation,
 		dimensions = effectIndices[:, idx].tolist()
 		value = effectValues[idx].item()
 		if(debugPrintInferenceInhibition):
-			segmentIndex = dimensions[0]
-			columnIndex = dimensions[1]
-			featureIndex = dimensions[2]
+			segmentIndex = dimensions[1]
+			columnIndex = dimensions[2]
+			featureIndex = dimensions[3]
 			columnName = getColumnName(databaseNetworkObject, columnIndex)
 			featureName = getFeatureName(databaseNetworkObject, featureIndex)
 			print("inhibitionApplied: segment=", segmentIndex, ", column=", columnName, ", feature=", featureName, ", amount=", value)
@@ -246,9 +247,9 @@ def applyInhibitoryEffect(databaseNetworkObject, globalFeatureNeuronsActivation,
 
 
 def createSingleActivationTensor(databaseNetworkObject, columnIndex, featureIndex, activationValue):
-	shape = (arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
+	shape = (numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
 	activationTensor = GIAANNproto_sparseTensors.createEmptySparseTensor(shape)
-	dimensions = [arrayIndexSegmentFirst, columnIndex, featureIndex]
+	dimensions = [0, arrayIndexSegmentFirst, columnIndex, featureIndex]
 	activationTensor = GIAANNproto_sparseTensors.addElementValueToSparseTensor(activationTensor, dimensions, activationValue)
 	return activationTensor
 

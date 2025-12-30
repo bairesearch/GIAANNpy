@@ -21,7 +21,7 @@ import torch as pt
 import math
 
 #recent debug vars;
-debugPrintTrainSentencePOS = False	#print each training sentence with POS tags
+debugPrintTrainSentencePOS = True	#print each training sentence with POS tags
 debugConnectNodesToNextNodesInSequenceOnly = False
 printPredictionsDuringInferencePredict = True
 printPredictionsDuringInferencePredictBeamSearch = False
@@ -36,21 +36,14 @@ if(useInference):
 	drawNetworkDuringInferenceSeed = False	#default: False
 	drawNetworkDuringInferencePredict = False	#default: False
 	inferenceBeamSearch = True	#default: True	#orig: False
-	if(inferenceBeamSearch):
-		inferencePredictiveNetwork = False	#default: False
-	else:
-		inferencePredictiveNetwork = False	#default: True	#use MLP to predict next token
-	if(inferencePredictiveNetwork):
-		inferenceTrainPredictiveNetworkAllSequences = True	 #default: True - performs inference on all input text (enables predictive network training on every sequence in corpus)	#precondition: expects database network to have been completely trained (with !useInference on all sequences)
-	else:
-		inferenceTrainPredictiveNetworkAllSequences = False	#default: False - requires inference_prompt.txt (performs training on all sentences except last, and then prediction on the last sentence)	#precondition: None
-	if(inferenceBeamSearch):
-		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#mandatory (beam search always follows predictions not targets)
-	else:
-		if(inferenceTrainPredictiveNetworkAllSequences):
-			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False #False: prediction targets (rather than predictions) are used to continously seed inference to train predictive network
-		else:
-			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#orig: True	#True: next token predictions are used to activate the next column features (rather than prediction targets)	#set to False only to compare predictive performance with inferencePredictiveNetwork
+	inferenceTrainFirstSequences = True	#default: True	#orig: True	#True: trains first sequences in inference_prompt.txt, performs inference only on last sequence; False: run inference on every sequence as independent seed/target prompts	#assumes inferenceTrainPredictiveNetworkAllSequences=False
+
+#dendritic branch parameters;
+multipleDendriticBranches = False	#default: False	#orig: False
+if(multipleDendriticBranches):
+	numberOfDendriticBranches = 5
+else:
+	numberOfDendriticBranches = 1
 
 #RAM availability vars;
 useGPUdense = True	#default: True
@@ -61,16 +54,12 @@ else:
 useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/MLP predictive network model
 maxSequenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM availability during train (with trainSequenceObservedColumnsUseSequenceFeaturesOnly only limited amount of data is ever loaded to GPU during train)
 databaseFolder = "../database/" #default: "../database/"	#performance: "/media/user/ssddata/GIAANN/database/"	#orig: ""
-maxSequences = 10000		#34286	#debug: 10, 500, 10000 	#default: 100000000	  #adjust as needed (eg lower max_sequences during train before independent inferenceTrainPredictiveNetworkAllSequences execution)	#max sequences for train or inference
-if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
-	useMaxSequences = False	#use all sequences from inference_prompt.txt
-else:
-	useMaxSequences = True
+maxSequences = 10000		#34286	#debug: 10, 500, 10000 	#default: 100000000	  #adjust as needed (eg lower max_sequences during train before independent inferenceTrainPredictiveNetworkAllSequences execution)	#max sequences for train or inference	#requires useMaxSequences
 numberEpochs = 1	#default: 1
 multisentencePredictions = False	#default: False	#requires higher GPU RAM for train
 if(multisentencePredictions):
 	numSentencesPerSequence = 3	#default: 3
-numSeedTokensInference = 8	#8	#default: 5
+numSeedTokensInference = 5	#8	#default: 5
 
 #inhibitory neurons;
 useInhibitoryNeurons = False	#planned new default: True #orig: False
@@ -128,6 +117,7 @@ if(conceptColumnsDelimitByPOS):
 	conceptColumnsDelimiterPOStypes = ['VERB', 'ADP']	#deterministic reference set delimiters (GIA actions/conditions)
 	conceptColumnsDelimiterWordTypes = [';', ':', '.', '?', '!']	#deterministic reference set delimiters (GIA logical conditions)
 	conceptColumnsDelimiterTagTypes = ['POS']	#eg possessive apostrophe "'s" (singular) or "'" (plural) -> pos: PART, tag: POS.
+	attachTrailingTokensToLastConcept = True	#default: False	#attach tokens after the final concept to that last column
 	detectReferenceSetDelimitersBetweenNouns = True	#default: assign reference set delimiters if they appear between two nouns (without designated reference set delimiter types)
 	if(detectReferenceSetDelimitersBetweenNouns):
 		detectReferenceSetDelimitersBetweenNounsPOStypes = ['CCONJ', 'SCONJ']	#probabilistic reference set delimiters (GIA logical conditions) - only assign if they are detected inbetween nouns (without intermediate deterministic delimiters)
@@ -185,7 +175,29 @@ if(SANIconceptNeurons):
 		SANIconceptNeuronsAllocateForPartialSubsequencesWeightIncrement = 1
 	assert SANIconceptNeuronsAllocateConceptFeatureWordNeuron, "!SANIconceptNeuronsAllocateConceptFeatureWordNeuron not yet coded; need to update entire codebase to ensure only token.lemma or token.pos=NOUN is used to detect concept features and only token.word is used to generate a feature neuron name"
 	debugSANIconceptNeurons = True
-	
+
+#Predictive network vars;
+if(useInference):
+	if(inferenceBeamSearch):
+		inferencePredictiveNetwork = False	#default: False
+	else:
+		inferencePredictiveNetwork = False	#default: False	#orig: True	#use MLP to predict next token
+	if(inferencePredictiveNetwork):
+		inferenceTrainPredictiveNetworkAllSequences = True	 #default: True - performs inference on all input text (enables predictive network training on every sequence in corpus)	#precondition: expects database network to have been completely trained (with !useInference on all sequences)
+	else:
+		inferenceTrainPredictiveNetworkAllSequences = False	#default: False - requires inference_prompt.txt (performs training on all sentences except last, and then prediction on the last sentence)	#precondition: None
+	if(inferenceBeamSearch):
+		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#mandatory (beam search always follows predictions not targets)
+	else:
+		if(inferenceTrainPredictiveNetworkAllSequences):
+			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False #False: prediction targets (rather than predictions) are used to continously seed inference to train predictive network
+		else:
+			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True	#True: next token predictions are used to activate the next column features (rather than prediction targets)	#set to False only to compare predictive performance with inferencePredictiveNetwork
+if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
+	useMaxSequences = False	#False: use all sequences from inference_prompt.txt
+else:
+	useMaxSequences = True	#True: use all sequences from dataset
+
 # Set boolean variables as per specification
 if(useInference):
 	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False	#incremental seeding is used to match the inference prediction phase algorithm (for consistency in activation method)	#requires inferenceSeedNetwork
