@@ -42,7 +42,10 @@ python3 GIAANNproto_main.py
 * Hopfield Natural Language Processing (https://github.com/bairesearch/HFNLPpy)
 * Sequentially Activated Neuronal Input neural network (https://github.com/bairesearch/SANI)
 * Excitatory Inhibitory Sequentially/Segmentally Activated Neuronal Input network (https://github.com/bairesearch/EISANIpt)
+* Sequentially Activated Neuronal Input natural language processing (https://github.com/bairesearch/SANINLPtf)
 * Local Connectome (https://github.com/bairesearch/LocalConnectome)
+* Simulated Dendritic Branch artificial neural network (https://github.com/bairesearch/SDBANNtf)
+* Simulated Dendritic Branch natural language processing (https://github.com/bairesearch/SDBNLPpt)
 * Jamali, M., Grannan, B., Cai, J., Khanna, A.R., Muñoz, W., Caprara, I., Paulk, A.C., Cash, S.S., Fedorenko, E. and Williams, Z.M. (2024). Semantic encoding during language comprehension at single-cell resolution. Nature, 1-7.
 * Hawkins, J. et al. (2011). Hierarchical Temporal Memory (HTM) Whitepaper (Version 0.2.1). Numenta.
 * Holtmaat, A., & Caroni, P. (2016). Functional and structural underpinnings of neuronal assembly formation in learning. Nature neuroscience, 19(12), 1553-1562.
