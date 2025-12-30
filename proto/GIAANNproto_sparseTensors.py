@@ -68,6 +68,49 @@ def collapseSparseBranchDimension(sparseTensor):
 	newSize = sparseTensor.size()[1:]
 	return pt.sparse_coo_tensor(newIndices, values, size=newSize, device=sparseTensor.device).coalesce()
 
+def reduceSparseBranchMax(sparseTensor):
+	result = None
+	sparseTensor = sparseTensor.coalesce()
+	indices = sparseTensor.indices()
+	values = sparseTensor.values()
+	newSize = sparseTensor.size()[1:]
+	if(indices.numel() == 0):
+		emptyIndices = pt.empty((len(newSize), 0), dtype=pt.long, device=sparseTensor.device)
+		emptyValues = pt.empty((0,), dtype=values.dtype, device=values.device)
+		result = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=newSize, device=sparseTensor.device)
+	else:
+		indicesTail = indices[1:]
+		device = indicesTail.device
+		strides = pt.ones((len(newSize),), dtype=pt.long, device=device)
+		for i in range(len(newSize)-2, -1, -1):
+			strides[i] = strides[i+1] * newSize[i+1]
+		keys = (indicesTail * strides.unsqueeze(1)).sum(dim=0)
+		sortedKeys, sortOrder = pt.sort(keys)
+		sortedValues = values.index_select(0, sortOrder)
+		sortedIndices = indicesTail.index_select(1, sortOrder)
+		uniqueKeys, counts = pt.unique_consecutive(sortedKeys, return_counts=True)
+		maxValuesList = []
+		maxIndicesList = []
+		start = 0
+		for countValue in counts.tolist():
+			end = start + countValue
+			segmentValues = sortedValues[start:end]
+			maxValue, maxPos = pt.max(segmentValues, dim=0)
+			maxValuesList.append(maxValue)
+			maxIndex = sortedIndices[:, start + int(maxPos.item())]
+			maxIndicesList.append(maxIndex)
+			start = end
+		if(len(maxValuesList) > 0):
+			newIndices = pt.stack(maxIndicesList, dim=1)
+			newValues = pt.stack(maxValuesList)
+			result = pt.sparse_coo_tensor(newIndices, newValues, size=newSize, device=sparseTensor.device)
+		else:
+			emptyIndices = pt.empty((len(newSize), 0), dtype=pt.long, device=sparseTensor.device)
+			emptyValues = pt.empty((0,), dtype=values.dtype, device=values.device)
+			result = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=newSize, device=sparseTensor.device)
+	result = result.coalesce()
+	return result
+
 
 #replace or multiply element(s) at index with/by new_value
 #preconditions: if replace (ie !multiply), assume that the sparse array contains non-zero values at indices_to_update

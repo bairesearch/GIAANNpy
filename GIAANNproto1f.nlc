@@ -333,4 +333,4 @@ v1f (Codex IDE GPT-5.2-Codex):
 	When multipleDendriticBranches=False, the code should therefore execute exactly as is (no changes should observed). All multipleDendriticBranches=True specific code should be contained within an if(multipleDendriticBranches) context.
 - implement option inferenceTrainFirstSequences = False - interprets all sequences in inference_prompt.txt as independent prediction seed/target sequences. Note option inferenceTrainFirstSequences=True is already implemented (trains first sequences in inference_prompt.txt, then performs inference only on last sequence).
 - add option attachTrailingTokensToLastConcept - attach tokens after the final concept to that last column.
-
+- remove summing across branches during selection - selection is performed based on the most activated branch across all neurons in the network (that satisfy the algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive" requirements).

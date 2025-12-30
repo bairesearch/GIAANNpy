@@ -713,9 +713,21 @@ def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivat
 	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 
 	globalFeatureNeuronsActivationAllSegments = globalFeatureNeuronsActivation.sum(dim=1)	#sum across all segments
-	globalFeatureNeuronsActivationAllSegments = globalFeatureNeuronsActivationAllSegments.sum(dim=0)	#sum across all branches
+	if(multipleDendriticBranches):
+		if(globalFeatureNeuronsActivationAllSegments.is_sparse):
+			globalFeatureNeuronsActivationAllSegments = GIAANNproto_sparseTensors.reduceSparseBranchMax(globalFeatureNeuronsActivationAllSegments)
+		else:
+			globalFeatureNeuronsActivationAllSegments = globalFeatureNeuronsActivationAllSegments.max(dim=0).values
+	else:
+		globalFeatureNeuronsActivationAllSegments = globalFeatureNeuronsActivationAllSegments.sum(dim=0)	#sum across all branches
 	globalFeatureNeuronsStrengthAllSegments = globalFeatureNeuronsStrength.sum(dim=1)	#sum across all segments
-	globalFeatureNeuronsStrengthAllSegments = globalFeatureNeuronsStrengthAllSegments.sum(dim=0)	#sum across all branches
+	if(multipleDendriticBranches):
+		if(globalFeatureNeuronsStrengthAllSegments.is_sparse):
+			globalFeatureNeuronsStrengthAllSegments = GIAANNproto_sparseTensors.reduceSparseBranchMax(globalFeatureNeuronsStrengthAllSegments)
+		else:
+			globalFeatureNeuronsStrengthAllSegments = globalFeatureNeuronsStrengthAllSegments.max(dim=0).values
+	else:
+		globalFeatureNeuronsStrengthAllSegments = globalFeatureNeuronsStrengthAllSegments.sum(dim=0)	#sum across all branches
 	if(useSANI and algorithmMatrixSANImethod=="enforceActivationAcrossSegments" and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 		# Patch: selection ignored last-segment gating, allowing nodes without last-segment activation to fire.
 		if(enforceActivationAcrossSegmentsIgnoreInternalColumn):
@@ -734,7 +746,10 @@ def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivat
 			else:
 				lastSegmentActivation = globalFeatureNeuronsActivation[lastSegmentConstraint]
 		if(globalFeatureNeuronsActivationAllSegments.is_sparse):
-			lastSegmentActivationCollapsed = GIAANNproto_sparseTensors.collapseSparseBranchDimension(lastSegmentActivation)
+			if(multipleDendriticBranches and lastSegmentActivation.dim() == 3):
+				lastSegmentActivationCollapsed = GIAANNproto_sparseTensors.reduceSparseBranchMax(lastSegmentActivation)
+			else:
+				lastSegmentActivationCollapsed = GIAANNproto_sparseTensors.collapseSparseBranchDimension(lastSegmentActivation)
 			globalFeatureNeuronsActivationAllSegments = GIAANNproto_sparseTensors.selectAindicesContainedInB(globalFeatureNeuronsActivationAllSegments, lastSegmentActivationCollapsed)
 			if(globalFeatureNeuronsActivationAllSegments._nnz() == 0):
 				raise RuntimeError("selectMostActiveFeature error: enforceLastSegmentMustBeActive requires active last-segment nodes, but none are active.")

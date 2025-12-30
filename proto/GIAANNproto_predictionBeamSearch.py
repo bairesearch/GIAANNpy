@@ -353,7 +353,9 @@ def filterCandidatesByLastSegment(columnIndices, featureIndices, activationValue
 			else:
 				if(not lastSegmentActivation.is_sparse):
 					lastSegmentActivation = lastSegmentActivation.to_sparse()
-				if(hasBranchDim):
+				if(hasBranchDim and multipleDendriticBranches and lastSegmentActivation.dim() == 3):
+					lastSegmentActivation = GIAANNproto_sparseTensors.reduceSparseBranchMax(lastSegmentActivation)
+				elif(hasBranchDim):
 					lastSegmentActivation = GIAANNproto_sparseTensors.collapseSparseBranchDimension(lastSegmentActivation)
 				lastSegmentActivation = lastSegmentActivation.coalesce()
 				if(lastSegmentActivation._nnz() == 0):
@@ -761,7 +763,13 @@ def aggregateSparseColumnFeatureValues(sparseTensor, maxFeatures):
 	if(sparseTensor is None):
 		return None, None, None
 	if(sparseTensor.dim() == 4):
-		sparseTensor = sparseTensor.sum(dim=0)
+		if(multipleDendriticBranches):
+			if(sparseTensor.is_sparse):
+				sparseTensor = GIAANNproto_sparseTensors.reduceSparseBranchMax(sparseTensor)
+			else:
+				sparseTensor = sparseTensor.max(dim=0).values
+		else:
+			sparseTensor = sparseTensor.sum(dim=0)
 		if(not sparseTensor.is_sparse):
 			sparseTensor = sparseTensor.to_sparse()
 	sparseTensor = sparseTensor.coalesce()

@@ -39,7 +39,7 @@ if(useInference):
 	inferenceTrainFirstSequences = True	#default: True	#orig: True	#True: trains first sequences in inference_prompt.txt, performs inference only on last sequence; False: run inference on every sequence as independent seed/target prompts	#assumes inferenceTrainPredictiveNetworkAllSequences=False
 
 #dendritic branch parameters;
-multipleDendriticBranches = False	#default: False	#orig: False
+multipleDendriticBranches = True	#default: True	#orig: False
 if(multipleDendriticBranches):
 	numberOfDendriticBranches = 5
 else:
