@@ -136,8 +136,14 @@ def processArticle(text, articleIndex):
 		if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
 			if(inferenceTrainFirstSequences):
 				if(sequenceIndex == numberOfSequences-1):
+					print("\ninferenceTrainFirstSequences: executing inference:")
 					lastSequenceInPrompt = True
+				else:
+					if(sequenceIndex==0):
+						print("\ninferenceTrainFirstSequences: executing train:")
 			else:
+				if(sequenceIndex==0):
+					print("\n!inferenceTrainFirstSequences: executing inference:")
 				lastSequenceInPrompt = True
 		if(len(sequence) <= maxSequenceLength):
 			processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)

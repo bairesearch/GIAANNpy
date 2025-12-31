@@ -20,17 +20,13 @@ GIA ANN proto global Defs
 import torch as pt
 import math
 
-#recent debug vars;
-debugPrintTrainSentencePOS = True	#print each training sentence with POS tags
-debugConnectNodesToNextNodesInSequenceOnly = False
-printPredictionsDuringInferencePredict = True
-printPredictionsDuringInferencePredictBeamSearch = False
-debugPrintInferenceInhibition = False
-debugPrintMinWordDistanceDetails = False
-debugSANIfeaturesAndColumns = False
 
-#train/inference mode selection:
-useInference = True  #default: True	#support inference mode else train (only) modedebugPrintMinWordDistanceDetails
+#Recent debug vars;
+debugPrintTrainSentencePOS = True	#print each training sentence with POS tags
+
+
+#Train/inference mode selection:
+useInference = True  #default: True	#support inference mode else train (inferenceTrainFirstSequences: only) mode
 drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
 if(useInference):
 	drawNetworkDuringInferenceSeed = False	#default: False
@@ -38,30 +34,35 @@ if(useInference):
 	inferenceBeamSearch = True	#default: True	#orig: False
 	inferenceTrainFirstSequences = True	#default: True	#orig: True	#True: trains first sequences in inference_prompt.txt, performs inference only on last sequence; False: run inference on every sequence as independent seed/target prompts	#assumes inferenceTrainPredictiveNetworkAllSequences=False
 
-#dendritic branch parameters;
-multipleDendriticBranches = True	#default: True	#orig: False
-if(multipleDendriticBranches):
-	numberOfDendriticBranches = 5
-else:
-	numberOfDendriticBranches = 1
 
-#RAM availability vars;
+#Dataset;
+maxSequenceLength = 100	#default:100	#orig:10000		#in words	#depends on CPU/GPU RAM availability during train #trainSequenceObservedColumnsUseSequenceFeaturesOnly can be upgraded so only a limited amount of data is ever loaded to GPU during train (it currently temporarily masks entire feature arrays in GPU during transfer phase)
+databaseFolder = "../database/" #default: "../database/"	#performance: "/media/user/ssddata/GIAANN/database/"	#orig: ""
+maxSequences = 10000		#debug: 10, 500, 10000, 34286 	#default: 100000000	  #adjust as needed (eg lower max_sequences during train before independent inferenceTrainPredictiveNetworkAllSequences execution)	#max sequences for train or inference	#requires useMaxSequences
+numberEpochs = 1	#default: 1
+multisentencePredictions = False	#default: False	#requires higher GPU RAM for train
+if(multisentencePredictions):
+	numSentencesPerSequence = 3	#default: 3
+numSeedTokensInference = 5	#default: 5 (or 8)
+
+
+#RAM;
 useGPUdense = True	#default: True
 if(useInference):
 	useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors
 else:
 	useGPUsparse = True		#default: True	#orig: False	#slight performance increase during train (does not use significant additional GPU ram during train)
 useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/MLP predictive network model
-maxSequenceLength = 100	#orig:10000	#default:100	#in words	#depends on CPU RAM availability during train (with trainSequenceObservedColumnsUseSequenceFeaturesOnly only limited amount of data is ever loaded to GPU during train)
-databaseFolder = "../database/" #default: "../database/"	#performance: "/media/user/ssddata/GIAANN/database/"	#orig: ""
-maxSequences = 10000		#34286	#debug: 10, 500, 10000 	#default: 100000000	  #adjust as needed (eg lower max_sequences during train before independent inferenceTrainPredictiveNetworkAllSequences execution)	#max sequences for train or inference	#requires useMaxSequences
-numberEpochs = 1	#default: 1
-multisentencePredictions = False	#default: False	#requires higher GPU RAM for train
-if(multisentencePredictions):
-	numSentencesPerSequence = 3	#default: 3
-numSeedTokensInference = 5	#8	#default: 5
 
-#inhibitory neurons;
+
+#Dendritic branches;
+multipleDendriticBranches = True	#default: True	#orig: False
+if(multipleDendriticBranches):
+	numberOfDendriticBranches = 5
+else:
+	numberOfDendriticBranches = 1
+
+#Inhibitory neurons;
 useInhibitoryNeurons = False	#planned new default: True #orig: False
 if(useInhibitoryNeurons):
 	trainInhibitoryNeurons = True
@@ -74,7 +75,8 @@ else:
 	inferenceInhibitoryNeuronsOptimised = False
 inhibitoryConnectionStrengthIncrement = 1.0	#default increment applied when wiring inhibitory neurons to alternate prediction targets
 
-#array properties (disable to optimise train speed)
+
+#Array properties (disable to optimise train speed/RAM)
 arrayIndexPropertiesEfficient = True	#default: True	#orig: False (required for drawing pos types)
 if(arrayIndexPropertiesEfficient):
 	arrayIndexPropertiesStrength = True
@@ -89,7 +91,8 @@ else:
 	arrayIndexPropertiesTime = True
 	arrayIndexPropertiesPos = True
 
-#identify immediate connections
+
+#Immediate (direct) connection identification;
 enforceDirectConnections = True	#default: True	#orig: False	#prediction requires a direct connection from previous prediction as observed during training (ie adjacent tokens)
 if(enforceDirectConnections):
 	enforceDirectConnectionsSANI = True	#default: False #orig: False	#enforce activation of first segment (direct feature connection)
@@ -109,7 +112,8 @@ else:
 	arrayIndexPropertiesMinWordDistance = False	#optional	#default: False
 minimumPredictionActivationThreshold = 0.0	#explicit threshold application not required (for verification only)
 
-#Concept column delimiter parameters:
+
+#Concept column delimiters:
 conceptColumnsDelimitByPOS = True	#default: True	#orig: False	#closer to original GIA specification	#FUTURE: still requires working for edge cases
 conceptColumnsDelimitByConceptFeaturesStart = False #default: False	#orig: True	#Constrain column feature detection to be after concept feature detection	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
 conceptColumnsDelimitByConceptFeaturesMid = False	#default: True	#default: False
@@ -134,6 +138,7 @@ else:
 	pretrainCombineConsecutiveNouns = False
 	predictionEnsureConnectedToPreviousPrediction = False
 
+
 #Connection strength modifiers;
 trainConnectionStrengthPOSdependence = False	#default: False	#orig: False
 trainConnectionStrengthLimitTanh = False	#default: False	#orig: False	#TODO: review this - reduce algorithmic dependency on high frequency tokens
@@ -146,7 +151,8 @@ if(trainConnectionStrengthPOSdependence or inferenceConnectionStrengthPOSdepende
 	connectionStrengthPOSdependenceValues = [10, 10, 3, 3, 10, 5, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1]
 	connectionStrengthPOSdependenceExternal = True	#default: True	#orig: True	#False: apply modifiers to both internal/external connections, True: external connections only
 
-#Beam Search parameters;
+
+#Beam search;
 if(useInference and inferenceBeamSearch):
 	inferenceBeamSearchConceptColumns = False
 	inferenceBeamScoreStrategy = "nodeActivation"	#options: "nodeActivation", "activation_connection", "connection"
@@ -162,7 +168,8 @@ if(useInference and inferenceBeamSearch):
 		inferenceBeamWidth = 3	#orig: 3
 		inferenceBeamDepth = 6	#orig: 6
 
-#SANI concept neuron vars;
+
+#SANI concept neuron;
 SANIconceptNeurons = False	#execute preprocessor to allocate neurons to non-noun tuples for each concept	#similar to SANIHFNLP algorithmMatrixSANI - emulate DendriticSANIbiologicalSimulationSimple	#these are effectively concept neurons but not specific to a particular concept
 if(SANIconceptNeurons):
 	SANIconceptNeuronsAllocateConceptFeatureWordNeuron = True	 #allocate a separate neuron for the concept feature neuron	#currently required for implementation
@@ -176,7 +183,8 @@ if(SANIconceptNeurons):
 	assert SANIconceptNeuronsAllocateConceptFeatureWordNeuron, "!SANIconceptNeuronsAllocateConceptFeatureWordNeuron not yet coded; need to update entire codebase to ensure only token.lemma or token.pos=NOUN is used to detect concept features and only token.word is used to generate a feature neuron name"
 	debugSANIconceptNeurons = True
 
-#Predictive network vars;
+
+#Inference;
 if(useInference):
 	if(inferenceBeamSearch):
 		inferencePredictiveNetwork = False	#default: False
@@ -193,13 +201,7 @@ if(useInference):
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False #default: False #False: prediction targets (rather than predictions) are used to continously seed inference to train predictive network
 		else:
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True	#True: next token predictions are used to activate the next column features (rather than prediction targets)	#set to False only to compare predictive performance with inferencePredictiveNetwork
-if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
-	useMaxSequences = False	#False: use all sequences from inference_prompt.txt
-else:
-	useMaxSequences = True	#True: use all sequences from dataset
 
-# Set boolean variables as per specification
-if(useInference):
 	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False	#incremental seeding is used to match the inference prediction phase algorithm (for consistency in activation method)	#requires inferenceSeedNetwork
 	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	transformerUseInputConnections = False	#initialise (dependent var)
@@ -215,6 +217,26 @@ if(useInference):
 		inferenceSourceActivationsBoolean = True	#default: True	#orig: False (theoretically effectively True)
 	if(inferenceTrainPredictiveNetworkAllSequences):
 		inferenceRetainActivationsAcrossMultipleSequences = False	#default: False	#retain activations across sequences such that these can be used during training/inference
+
+	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+		inferenceSeedNetwork = True	#default: True
+		inferenceBurstAllPredictionsOrTargetsInSequence = False	#default: False	#orig: False
+	else:
+		inferenceSeedNetwork = False	#default: False	#True is only for debug
+		inferenceBurstAllPredictionsOrTargetsInSequence = True	#default: True	#orig: True
+	if(inferenceSeedNetwork):
+		if(inferenceIncrementallySeedNetwork):
+			inferenceSeedTargetActivationsGlobalFeatureArrays = False	#optional	#default:True	#orig:False	
+		else:
+			inferenceSeedTargetActivationsGlobalFeatureArrays = False	#not supported
+if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
+	useMaxSequences = False	#False: use all sequences from inference_prompt.txt
+else:
+	useMaxSequences = True	#True: use all sequences from dataset
+
+
+#Predictive network;
+if(useInference):
 	if(inferencePredictiveNetwork):
 		inferencePredictiveNetworkModel = "ColumnMLP"
 		#inferencePredictiveNetworkModel = "MLP"
@@ -248,18 +270,12 @@ if(useInference):
 			transformerOutputLayerUseEveryColumn = True	#default: True	#orig: False	#whether the output layer uses features from every column (or just the final column in the sequence)
 	else:
 		inferenceUseNeuronFeaturePropertiesTime = False
-	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
-		inferenceSeedNetwork = True	#default: True
-		inferenceBurstAllPredictionsOrTargetsInSequence = False	#default: False	#orig: False
-	else:
-		inferenceSeedNetwork = False	#default: False	#True is only for debug
-		inferenceBurstAllPredictionsOrTargetsInSequence = True	#default: True	#orig: True
+
+
+#Draw;
+if(useInference):
 	trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised	#if used during seed phase will bias prediction towards target sequence words
-	if(inferenceSeedNetwork):
-		if(inferenceIncrementallySeedNetwork):
-			inferenceSeedTargetActivationsGlobalFeatureArrays = False	#optional	#default:True	#orig:False	
-		else:
-			inferenceSeedTargetActivationsGlobalFeatureArrays = False	#not supported
+	if(inferenceSeedNetwork):	
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 			trainSequenceObservedColumnsUseSequenceFeaturesOnly = False	#mandatory	#global feature arrays are directly written to during inference seed phase
 	lowMem = False		#mandatory
@@ -283,7 +299,6 @@ else:
 	inferenceActivationFunction = False
 	if(SANIconceptNeurons):
 		assert trainSequenceObservedColumnsUseSequenceFeaturesOnly	#required to significantly decrease GPU RAM during training
-
 if(useSANI):
 	drawSegmentsTrain = True #default: True	#draws connection colours based on their target node incoming segment index	#overrides drawRelationTypesTrain connection draw colours
 	drawSegmentsInference = True #default: True	#overrides drawRelationTypesInference connection draw colours
@@ -297,8 +312,12 @@ drawNetworkDuringInferenceSaveFilenamePrepend = "GIAANNproto1cSequenceObservedCo
 drawHighResolutionFigure = True	#required for inference debug
 ignoreNewlineCharacters = True
 drawSparseArrays = False	#default: False	#orig: False	#can draw sequences contained within much larger databases without running out of memory (due to densifying arrays)
+if(trainSequenceObservedColumnsMatchSequenceWords):
+	#sumChangesToConceptNeuronSequenceInstances = True	#mandatory	#for multiple instances of concept in sequence, need to take the sum of the changes between the existing and modified arrays for each instance of a same concept in the sequence
+	assert not drawSequenceObservedColumns, "trainSequenceObservedColumnsMatchSequenceWords does not currently support drawSequenceObservedColumns; requires concept_name_to_index (i.e. one-to-one mapping between name and feature index in SequenceObservedColumns arrays) etc"
 
-#algorithm preferences;
+
+#Algorithm preferences (normalisation, permanence etc);
 inferenceNormaliseColumnSelectionByFeatureConnections = False  	#default: False		#cannot select one column over another if column activations are perfectly normalised with respect to each other	#see HFconnectionMatrixAlgorithmNormalise
 if(inferenceNormaliseColumnSelectionByFeatureConnections):
 	inferenceNormaliseColumnSelectionByFeatureConnectionsStrength = False	#else normalise column selection by number connections
@@ -307,26 +326,37 @@ if(inferenceNormaliseFeatureSelectionByFeatureConnections):
 	inferenceNormaliseFeatureSelectionByFeatureConnectionsStrength = True	#mandatory
 trainConnectionStrengthNormaliseWrtContextLength = True	#default: True
 trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections = False	#default: True
-
-performRedundantCoalesce = False	#additional redundant coalesce operations
-
-if(trainSequenceObservedColumnsMatchSequenceWords):
-	#sumChangesToConceptNeuronSequenceInstances = True	#mandatory	#for multiple instances of concept in sequence, need to take the sum of the changes between the existing and modified arrays for each instance of a same concept in the sequence
-	assert not drawSequenceObservedColumns, "trainSequenceObservedColumnsMatchSequenceWords does not currently support drawSequenceObservedColumns; requires concept_name_to_index (i.e. one-to-one mapping between name and feature index in SequenceObservedColumns arrays) etc"
-
-useSaveData = True	#save data is required to allow consecutive sequence training and inference (because connection data are stored in observed columns, which are refreshed every sequence)
-usePOS = True		 # usePOS mode	#mandatory
-useParallelProcessing = True	#mandatory (else restore original code pre-GIAANNproto1b3a)
-randomiseColumnFeatureXposition = True	#shuffle x position of column internal features such that their connections can be better visualised
-
 if(conceptColumnsDelimitByPOS):
 	trainConnectionStrengthIncreaseColumnInternal = False	#not required as internal column nodes will be predicted unless current node is a reference set delimiter
 else:
 	trainConnectionStrengthIncreaseColumnInternal = True #Increase column internal connections strength
 if(trainConnectionStrengthIncreaseColumnInternal):
  	trainIncreaseColumnInternalConnectionsStrengthModifier = 10.0
+# Define constants for permanence and activation trace	#TODO: train hyperparameters
+z1 = 3  # Initial permanence value	
+z2 = 1  # Decrement value when not activated
+if(inferenceActivationFunction):
+	j1 = 1 #default: 1
+else:
+	j1 = 5   # Activation trace duration
 
-#debug vars;
+
+#Mandatory vars;
+performRedundantCoalesce = False	#additional redundant coalesce operations #CHECKTHIS
+useSaveData = True	#save data is required to allow consecutive sequence training and inference (because connection data are stored in observed columns, which are refreshed every sequence)
+usePOS = True		 # usePOS mode	#mandatory
+useParallelProcessing = True	#mandatory (else restore original code pre-GIAANNproto1b3a)
+randomiseColumnFeatureXposition = True	#shuffle x position of column internal features such that their connections can be better visualised
+
+
+#Debug vars;
+debugConnectNodesToNextNodesInSequenceOnly = False
+printPredictionsDuringInferencePredict = True
+printPredictionsDuringInferencePredictBeamSearch = False
+debugPrintInferenceInhibition = False
+debugPrintMinWordDistanceDetails = False
+debugSANIfeaturesAndColumns = False
+#older;
 debugConnectColumnsToNextColumnsInSequenceOnly = False
 debugSmallDataset = False	#required if huggingface Wikipedia dataset is offline
 debugDrawNeuronActivations = False
@@ -335,10 +365,11 @@ if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
 debugReloadGlobalFeatureNeuronsEverySequence = False
 debugInferencePredictionActivationAccumulation = False	#monitor exponential runaway of activations negatively affects predictionNetwork loss optimisation (go to nan)	 #see inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures for comparison	#solved by inferenceActivationFunction
 
-useDedicatedFeatureLists = False
+
+#Concept/feature names;
+useDedicatedFeatureLists = False	#default: False - dynamically learn concept features	#True: use static feature lists (depreciated)
 #if usePOS and not lowMem:
 #	useDedicatedFeatureLists = True
-
 useDedicatedConceptNames = False
 useDedicatedConceptNames2 = False
 if usePOS:
@@ -346,10 +377,13 @@ if usePOS:
 	if(useDedicatedConceptNames):
 		#same word can have different pos making it classed as an instance feature or concept feature
 		useDedicatedConceptNames2 = True	#mandatory
-
 #if usePOS: same word can have different pos making it classed as an instance feature or concept feature
+variableConceptNeuronFeatureName = "variableConceptNeuronFeature"
+variableConceptNeuronFeatureNameAbbreviation = "VCNF"
+featureIndexConceptNeuron = 0
 
-inferencePromptFile = databaseFolder + 'inference_prompt.txt'
+
+#Inference prediction selection;
 if(useInference):
 	if(inferencePredictiveNetwork):
 		inferenceInvertNeuronActivationUponPrediction = False	#default: True	#orig: False	#set activations of previously activated neurons to negative - refractory period preventing consecutive feature reactivation and facilitating prediction based on past predictions
@@ -369,7 +403,7 @@ if(useInference):
 		inferenceDecrementActivations = False	#default: False - CHECKTHIS #orig: False
 	inferenceDeactivateNeuronsUponPredictionInhibitory = inferenceDeactivateNeuronsUponPrediction
 	inferenceDecrementActivationsInhibitory = inferenceDecrementActivations
-		
+
 	if(inferenceDecrementActivations):
 		inferenceDecrementActivationsNonlinear = True
 		activationDecrementPerPredictedToken = 0.1	#0.05	#CHECKTHIS
@@ -423,7 +457,9 @@ if(useInference):
 	assert not lowMem, "useInference: global feature neuron lists are required" 
 	assert useSaveData,  "useInference: useSaveData is required" 
 
-# Paths for saving data
+
+#Database save paths;
+inferencePromptFile = databaseFolder + 'inference_prompt.txt'
 conceptColumnsDictFile = databaseFolder + 'conceptColumnsDict.pkl'
 conceptFeaturesDictFile = databaseFolder + 'conceptFeaturesDict.pkl'
 conceptInhibitoryFeaturesDictFile = databaseFolder + 'conceptInhibitoryFeaturesDict.pkl'
@@ -440,8 +476,12 @@ if(conceptColumnsDelimitByPOS):
 		conceptFeaturesReferenceSetDelimiterProbabilisticListFile = databaseFolder + 'conceptFeaturesReferenceSetDelimiterProbabilisticList.pkl'
 	else:
 		conceptFeaturesReferenceSetDelimiterListFile = databaseFolder + 'conceptFeaturesReferenceSetDelimiterList.pkl'
+if not lowMem:
+	globalFeatureNeuronsFile = 'globalFeatureNeurons'
+	globalFeatureNeuronsFileFull = databaseFolder + globalFeatureNeuronsFile + pytorchTensorFileExtension
 
-#common array indices
+
+#Common array indices;
 arrayIndexPropertiesStrengthIndex = None
 arrayIndexPropertiesPermanenceIndex = None
 arrayIndexPropertiesActivationIndex = None
@@ -470,7 +510,8 @@ if(arrayIndexPropertiesMinWordDistance):
 	arrayPropertiesList.append(arrayIndexPropertiesMinWordDistanceIndex)
 arrayNumberOfProperties = len(arrayPropertiesList)
 
-#SANI
+
+#SANI;
 arrayIndexSegmentFirst = 0
 if(useSANI):
 	if(enforceDirectConnectionsSANIminimal):
@@ -486,10 +527,8 @@ if(useSANI):
 		useSANIfeaturesAndColumnsInternal = True	#default: True	#orig: False	#also include internal columns in column segments (not just external columns)
 		print("useSANIfeaturesAndColumns:")
 		#these are highly dependent on numSeedTokensInference and the specific seed text (ie number of features per column);
+		print("numSeedTokensInference =", numSeedTokensInference)
 		arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#min number of concept/column segments (if useSANIfeaturesAndColumnsInternal, includes internal column segment)
-		if(useSANIfeaturesAndColumnsInternal):
-			arrayNumberOfSegmentsColumnDistance = arrayNumberOfSegmentsFeatureDistance - 1
-			assert arrayNumberOfSegmentsColumnDistance >= 1
 		arrayNumberOfSegmentsFeatureDistance = math.ceil(numSeedTokensInference / 2) + 1 	#number of nearest features to target node
 		arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance + arrayNumberOfSegmentsFeatureDistance
 		print("arrayNumberOfSegmentsColumnDistance = ", arrayNumberOfSegmentsColumnDistance)
@@ -552,41 +591,29 @@ else:
 
 arrayType = pt.float32	#pt.long	#pt.float32
 
+
+#POS;
+spacyModelName = 'en_core_web_trf'	#orig: 'en_core_web_sm'
 # Define POS tag sets for nouns and non-nouns
 nounPos = {'NOUN', 'PROPN'}
 #nonNounPos = {'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X'}	#now invalid as nounTags can be a subset of these (e.g. PRON: 'PRP', 'WP')
 nounTags = {}	#{'PRP', 'WP'}
-
 def posIntToPosString(nlp, posInt):
 	if posInt in nlp.vocab.strings:
 		return nlp.vocab[posInt].text
 	else:
 		return ''
-		
 def posStringToPosInt(nlp, posString):
 	return nlp.vocab.strings[posString]
 
-	
-# Define constants for permanence and activation trace	#TODO: train hyperparameters
-z1 = 3  # Initial permanence value	
-z2 = 1  # Decrement value when not activated
-if(inferenceActivationFunction):
-	j1 = 1 #default: 1
-else:
-	j1 = 5   # Activation trace duration
 
-if not lowMem:
-	globalFeatureNeuronsFile = 'globalFeatureNeurons'
-	globalFeatureNeuronsFileFull = databaseFolder + globalFeatureNeuronsFile + pytorchTensorFileExtension
-
-variableConceptNeuronFeatureName = "variableConceptNeuronFeature"
-variableConceptNeuronFeatureNameAbbreviation = "VCNF"
-featureIndexConceptNeuron = 0
-
+#Error report;
 def printe(str):
 	print(str)
 	exite
 
+
+#Devices;
 if(useGPUdense):
 	if pt.cuda.is_available():
 		deviceDense = pt.device("cuda")
@@ -609,7 +636,9 @@ if(useGPUpredictiveNetworkModel):
 		printe("useGPUmodel and !pt.cuda.is_available")
 else:
 	devicePredictiveNetworkModel = pt.device("cpu")
-	
+
+
+#Dedicated feature lists (non-dynamic);
 if useDedicatedFeatureLists:
 	nltk.download('punkt')
 	nltk.download('wordnet')
@@ -631,9 +660,8 @@ if useDedicatedFeatureLists:
 	nonNouns = allWords - nouns
 	maxNumNonNouns = len(nonNouns)
 
-def getTensorSizeInMB(tensor):
-	return tensor.element_size() * tensor.nelement() / (1024 ** 2)
 
+#Tensor print helpers;
 useLovelyTensors = False
 if(useLovelyTensors):
 	import lovely_tensors as lt
@@ -651,4 +679,7 @@ def compareDenseArrayDiff(array1, array2):
 	print("Indices of differences:")
 	print(indices)
 
-spacyModelName = 'en_core_web_trf'	#orig: 'en_core_web_sm'
+def getTensorSizeInMB(tensor):
+	return tensor.element_size() * tensor.nelement() / (1024 ** 2)
+
+

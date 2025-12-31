@@ -334,3 +334,8 @@ v1f (Codex IDE GPT-5.2-Codex):
 - implement option inferenceTrainFirstSequences = False - interprets all sequences in inference_prompt.txt as independent prediction seed/target sequences. Note option inferenceTrainFirstSequences=True is already implemented (trains first sequences in inference_prompt.txt, then performs inference only on last sequence).
 - add option attachTrailingTokensToLastConcept - attach tokens after the final concept to that last column.
 - remove summing across branches during selection - selection is performed based on the most activated branch across all neurons in the network (that satisfy the algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive" requirements).
+MANUAL; - update readme
+MANUAL; - sort global defs
+MANUAL; - print inferenceTrainFirstSequences phase
+MANUAL; - move inactive code to archive (GIAANNproto_sequenceSANIconceptNeurons/GIAANNproto_predictionInhibition)
+MANUAL; - patch useSANIfeaturesAndColumns parameters
