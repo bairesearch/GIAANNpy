@@ -256,75 +256,58 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 	if(conceptColumnsDelimitByPOS):
 		databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 		conceptFeaturesDict = databaseNetworkObject.conceptFeaturesDict
-		sequenceReferenceSetDelimiterList = databaseNetworkObject.sequenceReferenceSetDelimiterList
+		if(detectReferenceSetDelimitersBetweenNouns):
+			conceptFeaturesReferenceSetDelimiterDeterministicList = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterDeterministicList
+			conceptFeaturesReferenceSetDelimiterProbabilisticList = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList
+			conceptFeaturesReferenceSetDelimiterList = None
+		else:
+			conceptFeaturesReferenceSetDelimiterList = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList
+			conceptFeaturesReferenceSetDelimiterDeterministicList = None
+			conceptFeaturesReferenceSetDelimiterProbabilisticList = None
 		sequenceLength = len(tokens)
 		if(sequenceLength == 0):
 			startIndices = pt.empty_like(conceptIndices)
 			endIndices = pt.empty_like(conceptIndices)
-
-		sequenceIsolatedReferenceSetDelimiterList = [False]*sequenceLength
-
-		# Track isolated delimiters (eg ADP tokens that start a sequence or follow another delimiter)
-		if(detectIsolatedReferenceSetDelimiters):
-			if(sequenceLength > 0):
-				for posIndex in range(sequenceLength):
-					if(not token_is_reference_set_delimiter(posIndex, sequenceReferenceSetDelimiterList)):
-						continue
-					token = tokens[posIndex]
-					if(token.pos not in detectIsolatedReferenceSetDelimitersPOStypes):
-						continue
-					if(posIndex == 0 or token_is_reference_set_delimiter(posIndex-1, sequenceReferenceSetDelimiterList)):
-						sequenceIsolatedReferenceSetDelimiterList[posIndex] = True
-			else:
-				sequenceIsolatedReferenceSetDelimiterList = [False]*sequenceLength
-			databaseNetworkObject.sequenceIsolatedReferenceSetDelimiterList = sequenceIsolatedReferenceSetDelimiterList
-
-		delimiterMaskList = []
-		for posIndex in range(sequenceLength):
-			if(token_is_reference_set_delimiter(posIndex, sequenceReferenceSetDelimiterList)):
-				#print("token_is_reference_set_delimiter: posIndex ", posIndex)
-				if(has_next_reference_delimiter(posIndex, sequenceLength, sequenceReferenceSetDelimiterList)):
-					delimiterMaskList.append(False)
-				else:
-					delimiterMaskList.append(True)
-			else:
-				delimiterMaskList.append(False)
-		if(len(delimiterMaskList) == 0):
-			delimiterIndices = pt.tensor([], dtype=conceptIndices.dtype)
 		else:
-			delimiterMask = pt.tensor(delimiterMaskList, dtype=pt.bool)
-			delimiterIndices = pt.nonzero(delimiterMask).squeeze(1)
-		if(attachTrailingTokensToLastConcept and delimiterIndices.numel() > 0 and conceptIndices.numel() > 0):
-			lastConceptIndex = int(conceptIndices[-1].item())
-			delimiterIndices = delimiterIndices[delimiterIndices < lastConceptIndex]
-		if(delimiterIndices.numel() == 0):
-			startIndices = pt.zeros_like(conceptIndices)
-			endIndices = pt.full_like(conceptIndices, sequenceLength)
-		else:
-			delimiterIndicesSorted = delimiterIndices.sort().values
-			prevDelimiterPositions = pt.searchsorted(delimiterIndicesSorted, conceptIndices, right=False) - 1
-			prevDelimiterExists = prevDelimiterPositions >= 0
-			prevDelimiterPositions = prevDelimiterPositions.clamp(min=0)
-			prevDelimiterIndices = pt.where(prevDelimiterExists, delimiterIndicesSorted[prevDelimiterPositions], pt.full_like(conceptIndices, -1))
-			startIndices = pt.where(prevDelimiterExists, prevDelimiterIndices + 1, pt.zeros_like(conceptIndices))
-			nextDelimiterPositions = pt.searchsorted(delimiterIndicesSorted, conceptIndices, right=True)
-			nextDelimiterExists = nextDelimiterPositions < delimiterIndicesSorted.shape[0]
-			if(delimiterIndicesSorted.shape[0] > 0):
-				nextDelimiterPositions = nextDelimiterPositions.clamp(max=delimiterIndicesSorted.shape[0]-1)
-			nextDelimiterIndices = pt.where(nextDelimiterExists, delimiterIndicesSorted[nextDelimiterPositions], pt.full_like(conceptIndices, sequenceLength))
-			endIndices = pt.where(nextDelimiterExists, nextDelimiterIndices + 1, pt.full_like(conceptIndices, sequenceLength))	#Include delimiter token in current column before advancing to next column
-		
-		# Extend start indices leftwards so isolated delimiters belong to the following column
-		if(detectIsolatedReferenceSetDelimiters):
-			if(any(sequenceIsolatedReferenceSetDelimiterList)):
-				for startIndexTensorPosition in range(startIndices.shape[0]):
-					startIndexValue = int(startIndices[startIndexTensorPosition].item())
-					while(startIndexValue > 0 and sequenceIsolatedReferenceSetDelimiterList[startIndexValue-1]):
-						startIndexValue -= 1
-					startIndices[startIndexTensorPosition] = startIndexValue
-		
-		startIndices = startIndices.clamp(min=0, max=sequenceLength)
-		endIndices = endIndices.clamp(min=0, max=sequenceLength)
+			conceptIndicesSorted = conceptIndices.sort().values
+			numConcepts = conceptIndicesSorted.shape[0]
+			if(numConcepts <= 1):
+				startIndices = pt.zeros_like(conceptIndicesSorted)
+				endIndices = pt.full_like(conceptIndicesSorted, sequenceLength)
+			else:
+				delimiterIndices = []
+				# Choose the rightmost delimiter between adjacent concept tokens to define boundaries.
+				for conceptPosition in range(numConcepts - 1):
+					leftIndex = int(conceptIndicesSorted[conceptPosition].item())
+					rightIndex = int(conceptIndicesSorted[conceptPosition + 1].item())
+					rightmostDeterministic = None
+					rightmostIndeterministic = None
+					for tokenIndex in range(leftIndex + 1, rightIndex):
+						token = tokens[tokenIndex]
+						featureIndex = conceptFeaturesDict.get(token.word)
+						if(featureIndex is None):
+							continue
+						if(detectReferenceSetDelimitersBetweenNouns):
+							if(featureIndex < len(conceptFeaturesReferenceSetDelimiterDeterministicList) and conceptFeaturesReferenceSetDelimiterDeterministicList[featureIndex]):
+								rightmostDeterministic = tokenIndex
+							elif(featureIndex < len(conceptFeaturesReferenceSetDelimiterProbabilisticList) and conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex]):
+								rightmostIndeterministic = tokenIndex
+						else:
+							if(featureIndex < len(conceptFeaturesReferenceSetDelimiterList) and conceptFeaturesReferenceSetDelimiterList[featureIndex]):
+								rightmostDeterministic = tokenIndex
+					if(rightmostDeterministic is not None):
+						delimiterIndices.append(rightmostDeterministic)
+					elif(rightmostIndeterministic is not None):
+						delimiterIndices.append(rightmostIndeterministic)
+					else:
+						print("warning: no delimiter detected between concept tokens")
+						return None
+				startIndices = pt.zeros_like(conceptIndicesSorted)
+				endIndices = pt.full_like(conceptIndicesSorted, sequenceLength)
+				for conceptPosition, delimiterIndex in enumerate(delimiterIndices):
+					endIndices[conceptPosition] = delimiterIndex + 1
+					startIndices[conceptPosition + 1] = delimiterIndex + 1
+			conceptIndices = conceptIndicesSorted
 	elif(conceptColumnsDelimitByConceptFeaturesStart):
 		if usePOS:
 			startIndices = (conceptIndices).clamp(min=0)
@@ -340,7 +323,39 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 			startIndices = (conceptIndices - q).clamp(min=0)
 			endIndices = (conceptIndices + q + 1).clamp(max=len(sequence))
 	
+	sentenceWithConceptAssignment = buildSequenceConceptAssignment(sequenceObservedColumns, sequence, tokens, conceptIndices, startIndices, endIndices)
+	if(debugPrintTrainSequenceConceptAssignment):
+		sequenceObservedColumns.sentenceWithConceptAssignment = sentenceWithConceptAssignment
+		#print(f"Processing sequenceCount: {sequenceIndex}, {sequenceObservedColumns.sentenceWithConceptAssignment}")
+
 	return conceptIndices, startIndices, endIndices
+
+def buildSequenceConceptAssignment(sequenceObservedColumns, sequence, tokens, conceptIndices, startIndices, endIndices):
+	tokenConceptColumnIndexList = [None] * len(tokens)
+	conceptIndicesList = conceptIndices.tolist()
+	startList = startIndices.tolist()
+	endList = endIndices.tolist()
+	for conceptPosition, conceptWordIndex in enumerate(conceptIndicesList):
+		columnIndex = sequenceObservedColumns.columnsIndexSequenceWordIndexDict.get(conceptWordIndex)
+		if(columnIndex is None):
+			continue
+		startIndexValue = max(0, int(startList[conceptPosition]))
+		endIndexValue = min(len(tokens), int(endList[conceptPosition]))
+		for tokenIndex in range(startIndexValue, endIndexValue):
+			tokenConceptColumnIndexList[tokenIndex] = columnIndex
+	sequenceObservedColumns.tokenConceptColumnIndexList = tokenConceptColumnIndexList
+	conceptColumnsList = sequenceObservedColumns.databaseNetworkObject.conceptColumnsList
+	def getTokenDisplayText(token):
+		if hasattr(token, "text"):
+			return token.text
+		if hasattr(token, "word"):
+			return token.word
+		return str(token)
+	sentenceWithConceptAssignment = " ".join(
+		f"{getTokenDisplayText(token)} ({tokenIndex}:{conceptColumnsList[tokenConceptColumnIndexList[tokenIndex]] if tokenConceptColumnIndexList[tokenIndex] is not None else 'none'})"
+		for tokenIndex, token in enumerate(sequence)
+	)
+	return sentenceWithConceptAssignment
 
 def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices):
 	numberConceptsInSequence = conceptIndices.shape[0]

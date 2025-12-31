@@ -287,12 +287,18 @@ def getTokenConceptFeatureIndex(sequenceObservedColumns, tokensSequence, concept
 	else:
 		word = tokensSequence[sequenceWordIndex].word
 		targetFeatureIndex = databaseNetworkObject.conceptFeaturesDict[word]
+	assignedColumns = getattr(sequenceObservedColumns, "tokenConceptColumnIndexList", None)
+	if(assignedColumns is not None and sequenceWordIndex < len(assignedColumns)):
+		assignedColumnIndex = assignedColumns[sequenceWordIndex]
+		if(assignedColumnIndex is not None):
+			return False, assignedColumnIndex, None, targetFeatureIndex
 	sequenceLen = conceptMask.shape[0]
 	foundFeature = False
 	conceptFeature = False
 	targetFoundNextColumnIndex = False
-	targetPreviousColumnIndex = 0
-	targetNextColumnIndex = 0
+	targetPreviousColumnIndex = None
+	targetNextColumnIndex = None
+	foundPreviousColumn = False
 	for i in range(sequenceLen):
 		if(foundFeature):
 			if(not conceptFeature):
@@ -303,10 +309,20 @@ def getTokenConceptFeatureIndex(sequenceObservedColumns, tokensSequence, concept
 		else:
 			if(conceptMask[i] != 0):
 				targetPreviousColumnIndex = columnsIndexSequenceWordIndexDict[i]
+				foundPreviousColumn = True
 		if(i == sequenceWordIndex):
 			foundFeature = True
 			if(conceptMask[i] != 0):
 				conceptFeature = True
+				targetPreviousColumnIndex = columnsIndexSequenceWordIndexDict[i]
+				foundPreviousColumn = True
+
+	if(not foundPreviousColumn):
+		print("warning: no concept feature found within seed length; using next concept column within target sequence")
+		if(targetFoundNextColumnIndex):
+			targetPreviousColumnIndex = targetNextColumnIndex
+		else:
+			targetPreviousColumnIndex = 0
 	
 	return targetFoundNextColumnIndex, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex
 

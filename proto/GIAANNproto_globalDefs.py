@@ -19,10 +19,12 @@ GIA ANN proto global Defs
 
 import torch as pt
 import math
-
+import sys
 
 #Recent debug vars;
-debugPrintTrainSentencePOS = True	#print each training sentence with POS tags
+debugPrintTrainSequenceConceptAssignment = True
+debugPrintTrainSequenceDelimiters = True
+debugPrintTrainSequencePOS = False	#print each training sentence with POS tags
 
 
 #Train/inference mode selection:
@@ -610,7 +612,7 @@ def posStringToPosInt(nlp, posString):
 #Error report;
 def printe(str):
 	print(str)
-	exite
+	sys.exit()
 
 
 #Devices;

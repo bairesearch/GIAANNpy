@@ -324,7 +324,6 @@ MANUAL; - move inactive code to archive (GIAANNproto_predictionNetwork*, GIAANNp
 
 ---
 v1f (Codex IDE GPT-5.2-Codex):
-
 - add proto GIAANNproto1f1a - upgrade GIAANN to support option multipleDendriticBranches=True:
 	a) add a dendriticBranch dimension to the featureNeurons and featureConnection arrays (including global arrays) before the arrayNumberOfSegments dimension. Upgrade the entire codebase to support this change.
 	b) when multipleDendriticBranches=True: declare numberOfDendriticBranches=5, else: declare numberOfDendriticBranches=1 in global defs.
@@ -339,3 +338,8 @@ MANUAL; - sort global defs
 MANUAL; - print inferenceTrainFirstSequences phase
 MANUAL; - move inactive code to archive (GIAANNproto_sequenceSANIconceptNeurons/GIAANNproto_predictionInhibition)
 MANUAL; - patch useSANIfeaturesAndColumns parameters
+- add fallback when no concept feature found within seed (throw warning)
+- implement debugPrintTrainSequenceDelimiters, which prints the "Processing sequenceCount" statement with the delimiter types (non, deterministic, indeterministic) of each token.
+- upgrade the concept assignment token segmentation algorithm as follows: a) use the right most deterministic delimiter between two concept tokens if existent, else b) use the right most indeterministic delimiter between two concept tokens existent, else c) throw a warning ("no delimiter detected between concept tokens") and skip training the sequence. 
+- implement debugPrintTrainSentenceConceptAssignment - print each sequence token with the name of its associated concept column in brackets.
+- update seed phase (including getTokenConceptFeatureIndex) to use the known concept columns from the complete full seed+target sequence. The issue relates to the fact during a seed it is technically not known what column a token succeeding the last concept feature (or its nearest delimiter) belongs to - even though this information is embedded in the inference seed+target sequence. During the development phase of GIA however will assume that the correct concept column is known during seed - to simplify the process and speed up development.
