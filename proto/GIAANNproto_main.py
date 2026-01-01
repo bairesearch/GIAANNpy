@@ -1,7 +1,7 @@
 """GIAANNproto_main.py
 
 # Author:
-Richard Bruce Baxter - Copyright (c) 2024-2025 Baxter AI (baxterai.com)
+Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 
 # License:
 MIT License
@@ -148,12 +148,22 @@ def processArticle(text, articleIndex):
 			startIndex = sentences[i].start
 			endIndex = sentences[min(i + numSentencesPerSequence, len(sentences)) - 1].end
 			span = textParsed[startIndex:endIndex]
-			sequenceParsed = nlp(span.text)
+			sequenceText = span.text
+			if(not sequenceText.strip()):
+				continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
+			sequenceParsed = nlp(sequenceText)
+			if(len(sequenceParsed) == 0):
+				continue
 			sequences.append(sequenceParsed)
 	else:
 		sequences = []
 		for sentence in sentences:
-			sequenceParsed = nlp(sentence.text)
+			sequenceText = sentence.text
+			if(not sequenceText.strip()):
+				continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
+			sequenceParsed = nlp(sequenceText)
+			if(len(sequenceParsed) == 0):
+				continue
 			sequences.append(sequenceParsed)
 	
 	numberOfSequences = len(sequences)
