@@ -21,12 +21,14 @@ import torch as pt
 import math
 import sys
 
+
 #Recent debug vars;
 debugPrintTrainSequenceConceptAssignment = True
 debugPrintTrainSequenceConceptAssignmentByLine = True	#display each column on a new line
-debugPrintTrainSequenceDelimiters = True
+debugPrintTrainSequenceDelimiters = False
 debugPrintTrainSequencePOS = False	#print each training sentence with POS tags
 debugPrintSequenceObservedColumnsConnections = False	#debug per-sequence connection counts before merging occurrences
+debugPrintInferencePredictionIssue = False
 
 
 #Train/inference mode selection:
@@ -65,6 +67,7 @@ if(multipleDendriticBranches):
 	numberOfDendriticBranches = 5
 else:
 	numberOfDendriticBranches = 1
+
 
 #Inhibitory neurons;
 useInhibitoryNeurons = False	#planned new default: True #orig: False
@@ -304,8 +307,8 @@ else:
 	if(SANIconceptNeurons):
 		assert trainSequenceObservedColumnsUseSequenceFeaturesOnly	#required to significantly decrease GPU RAM during training
 
-drawSegments = True and useSANI
-drawBranches = False and multipleDendriticBranches
+drawSegments = False and useSANI
+drawBranches = True and multipleDendriticBranches
 
 drawBranchesTrain = False
 drawBranchesInference = False
@@ -370,6 +373,8 @@ printPredictionsDuringInferencePredictBeamSearch = False
 debugPrintInferenceInhibition = False
 debugPrintMinWordDistanceDetails = False
 debugSANIfeaturesAndColumns = False
+debugOnlyDrawBranchIndexConnections = False
+debugOnlyDrawBranchIndexX = 0
 #older;
 debugConnectColumnsToNextColumnsInSequenceOnly = False
 debugSmallDataset = False	#required if huggingface Wikipedia dataset is offline
@@ -695,4 +700,3 @@ def compareDenseArrayDiff(array1, array2):
 
 def getTensorSizeInMB(tensor):
 	return tensor.element_size() * tensor.nelement() / (1024 ** 2)
-

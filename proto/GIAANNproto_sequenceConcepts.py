@@ -69,15 +69,21 @@ def secondPass(databaseNetworkObject, tokens):
 		if usePOS:
 			if GIAANNproto_sequenceTokens.isConcept(token):
 				conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
-				# Load observed column from disk or create new one
-				observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
-				observedColumnsDict[lemma] = observedColumn
+				# Load observed column from disk or create new one (reuse per-lemma instance for multi-occurrence concepts)
+				if(lemma in observedColumnsDict):
+					observedColumn = observedColumnsDict[lemma]
+				else:
+					observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
+					observedColumnsDict[lemma] = observedColumn
 				observedColumnsSequenceWordIndexDict[i] = observedColumn
 		else:
 			conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
-			# Load observed column from disk or create new one
-			observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
-			observedColumnsDict[lemma] = observedColumn
+			# Load observed column from disk or create new one (reuse per-lemma instance for multi-occurrence concepts)
+			if(lemma in observedColumnsDict):
+				observedColumn = observedColumnsDict[lemma]
+			else:
+				observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
+				observedColumnsDict[lemma] = observedColumn
 			observedColumnsSequenceWordIndexDict[i] = observedColumn
 	return observedColumnsDict, observedColumnsSequenceWordIndexDict
 
@@ -401,7 +407,7 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 		featureNeuronsSegmentMask = pt.ones((cs, arrayNumberOfSegments), dtype=arrayType)
 	branchCounters = None
 	if(multipleDendriticBranches):
-		branchCounters = [{} for _ in range(cs)]
+		branchCounters = {}
 	
 	conceptIndicesList = conceptIndices.tolist()
 	for i, sequenceConceptWordIndex in enumerate(conceptIndicesList):
@@ -456,7 +462,14 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly and trainSequenceObservedColumnsMatchSequenceWords):
 			branchIndex = 0
 			if(multipleDendriticBranches):
-				featureBranchCounts = branchCounters[sequenceConceptIndex]
+				observedColumn = sequenceObservedColumns.observedColumnsSequenceWordIndexDict.get(sequenceConceptWordIndex)
+				if(observedColumn is None):
+					raise RuntimeError("processFeatures error: missing observedColumn for sequence concept word index")
+				conceptIndexKey = observedColumn.conceptIndex
+				featureBranchCounts = branchCounters.get(conceptIndexKey)
+				if(featureBranchCounts is None):
+					featureBranchCounts = {}
+					branchCounters[conceptIndexKey] = featureBranchCounts
 				startIndexValue = int(startIndices[sequenceConceptIndex].item())
 				endIndexValue = int(endIndices[sequenceConceptIndex].item())
 				featureIndicesInObservedTensor = sequenceObservedColumns.featureIndicesInObservedTensor
@@ -502,7 +515,14 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 						sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[featureLemma]
 					branchIndex = 0
 					if(multipleDendriticBranches):
-						featureBranchCounts = branchCounters[sequenceConceptIndex]
+						observedColumn = sequenceObservedColumns.observedColumnsSequenceWordIndexDict.get(sequenceConceptWordIndex)
+						if(observedColumn is None):
+							raise RuntimeError("processFeatures error: missing observedColumn for sequence concept word index")
+						conceptIndexKey = observedColumn.conceptIndex
+						featureBranchCounts = branchCounters.get(conceptIndexKey)
+						if(featureBranchCounts is None):
+							featureBranchCounts = {}
+							branchCounters[conceptIndexKey] = featureBranchCounts
 						branchIndex = featureBranchCounts.get(sequenceFeatureIndex, 0)
 						featureBranchCounts[sequenceFeatureIndex] = branchIndex + 1
 						if(branchIndex >= numberOfDendriticBranches):
@@ -515,7 +535,14 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 					sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[featureWord]
 					branchIndex = 0
 					if(multipleDendriticBranches):
-						featureBranchCounts = branchCounters[sequenceConceptIndex]
+						observedColumn = sequenceObservedColumns.observedColumnsSequenceWordIndexDict.get(sequenceConceptWordIndex)
+						if(observedColumn is None):
+							raise RuntimeError("processFeatures error: missing observedColumn for sequence concept word index")
+						conceptIndexKey = observedColumn.conceptIndex
+						featureBranchCounts = branchCounters.get(conceptIndexKey)
+						if(featureBranchCounts is None):
+							featureBranchCounts = {}
+							branchCounters[conceptIndexKey] = featureBranchCounts
 						branchIndex = featureBranchCounts.get(sequenceFeatureIndex, 0)
 						featureBranchCounts[sequenceFeatureIndex] = branchIndex + 1
 						if(branchIndex >= numberOfDendriticBranches):

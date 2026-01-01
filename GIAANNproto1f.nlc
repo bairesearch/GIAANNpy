@@ -348,3 +348,7 @@ MANUAL; - add '(' to detectReferenceSetDelimitersBetweenNounsWordTypes - allow i
 - Each sequence (either 1 sentence or multiple sentences if multisentencePredictions enabled) must be pos tagged independently.
 - add debugPrintSequenceObservedColumnsConnections - debug connections with multiple concept column references during train sequences
 MANUAL; - add debugPrintTrainSequenceConceptAssignmentByLine - display each column on a new line
+- patch secondPass to not overwrite observedColumnsDict[lemma]
+- patch assignment of repeated features to independent dendritic branches
+- add debugOnlyDrawBranchIndexConnections
+- patch updateObservedColumnsVerbose() - repeated concept multi-branch training/inference merges (for inference)

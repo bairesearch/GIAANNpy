@@ -198,6 +198,10 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 		else:
 			featureNeuronsActiveSeed = (featureNeuronsActive > 0).any(dim=(0, 1)).to(arrayType)
 		featureConnectionsActive, featureConnectionsSegmentMask = GIAANNproto_databaseNetworkTrainExcitation.createFeatureConnectionsActiveTrain(featureNeuronsActiveSeed, cs, fs, columnsWordOrder, featureNeuronsWordOrder)
+	if(debugPrintInferencePredictionIssue):
+		featureNeuronsActiveDense = featureNeuronsActive
+		sourceSegmentCounts = (featureNeuronsActiveDense > 0).sum(dim=(0, 2, 3)).to("cpu").tolist()
+		print(f"\tdebugInferencePredictionIssue: seedSourceActive segmentCounts={sourceSegmentCounts}")
 		
 	firstWordIndexPredictPhase = firstSeedTokenIndex+numSeedTokens
 	firstConceptIndexPredictPhase = firstSeedConceptIndex+numSeedConcepts
@@ -223,6 +227,18 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 		featureNeuronsTargetActivation = GIAANNproto_predictionActivate.activationFunction(featureNeuronsTargetActivation)
 	else:
 		featureNeuronsTargetActivation = featureNeuronsTargetActivation*j1
+	if(debugPrintInferencePredictionIssue):
+		featureNeuronsTargetActivationDense = featureNeuronsTargetActivation.to_dense() if featureNeuronsTargetActivation.is_sparse else featureNeuronsTargetActivation
+		if(featureNeuronsTargetActivationDense.dim() == 4):
+			targetSegmentCounts = (featureNeuronsTargetActivationDense > 0).sum(dim=(0, 2, 3)).to("cpu").tolist()
+			targetLastSegmentActive = int((featureNeuronsTargetActivationDense[:, arrayIndexSegmentLast] > 0).sum().item())
+		elif(featureNeuronsTargetActivationDense.dim() == 3 and featureNeuronsTargetActivationDense.shape[0] == arrayNumberOfSegments):
+			targetSegmentCounts = (featureNeuronsTargetActivationDense > 0).sum(dim=(1, 2)).to("cpu").tolist()
+			targetLastSegmentActive = int((featureNeuronsTargetActivationDense[arrayIndexSegmentLast] > 0).sum().item())
+		else:
+			targetSegmentCounts = [int((featureNeuronsTargetActivationDense > 0).sum().item())]
+			targetLastSegmentActive = 0
+		print(f"\tdebugInferencePredictionIssue: seedTargetActivation preGate segmentCounts={targetSegmentCounts}, lastSegmentActive={targetLastSegmentActive}")
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 		globalFeatureNeuronsActivation = sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivationIndex]
 	if(useSANI and algorithmMatrixSANImethod=="enforceActivationAcrossSegments" and enforceSequentialActivation):
@@ -288,6 +304,18 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 			globalFeatureNeuronsActivation = globalFeatureNeuronsActivation + featureNeuronsTargetActivation
 		else:
 			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex] += featureNeuronsTargetActivation
+	if(debugPrintInferencePredictionIssue):
+		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
+			seedActivationDense = globalFeatureNeuronsActivation.to_dense() if globalFeatureNeuronsActivation.is_sparse else globalFeatureNeuronsActivation
+		else:
+			seedActivationDense = sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex]
+		if(seedActivationDense.dim() == 4):
+			seedSegmentCounts = (seedActivationDense > 0).sum(dim=(0, 2, 3)).to("cpu").tolist()
+			seedLastSegmentActive = int((seedActivationDense[:, arrayIndexSegmentLast] > 0).sum().item())
+		else:
+			seedSegmentCounts = (seedActivationDense > 0).sum(dim=(1, 2)).to("cpu").tolist()
+			seedLastSegmentActive = int((seedActivationDense[arrayIndexSegmentLast] > 0).sum().item())
+		print(f"\tdebugInferencePredictionIssue: seedActivation postGate segmentCounts={seedSegmentCounts}, lastSegmentActive={seedLastSegmentActive}")
 	
 	if(debugSANIfeaturesAndColumns and useSANIfeaturesAndColumns):
 		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
@@ -306,6 +334,15 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 			globalFeatureNeuronsActivation = decrementActivation(globalFeatureNeuronsActivation, activationDecrementSeed)
 		else:
 			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex] = GIAANNproto_predictionActivate.decrementActivationDense(sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex], activationDecrementSeed)
+		if(debugPrintInferencePredictionIssue):
+			debugActivationDense = globalFeatureNeuronsActivation.to_dense() if (inferenceSeedTargetActivationsGlobalFeatureArrays and globalFeatureNeuronsActivation.is_sparse) else (globalFeatureNeuronsActivation if inferenceSeedTargetActivationsGlobalFeatureArrays else sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex])
+			if(debugActivationDense.dim() == 4):
+				segmentCounts = (debugActivationDense > 0).sum(dim=(0, 2, 3)).to("cpu").tolist()
+				lastSegmentActive = int((debugActivationDense[:, arrayIndexSegmentLast] > 0).sum().item())
+			else:
+				segmentCounts = (debugActivationDense > 0).sum(dim=(1, 2)).to("cpu").tolist()
+				lastSegmentActive = int((debugActivationDense[arrayIndexSegmentLast] > 0).sum().item())
+			print(f"\tdebugInferencePredictionIssue: seedActivation postDecrement segmentCounts={segmentCounts}, lastSegmentActive={lastSegmentActive}")
 					
 	if(inferenceDeactivateNeuronsUponPrediction):
 		wordOrderMask = pt.logical_and(featureNeuronsWordOrder >= firstSeedTokenIndex, featureNeuronsWordOrder < firstWordIndexPredictPhase)
@@ -342,6 +379,15 @@ def processFeaturesActiveSeed(sequenceObservedColumns, featureNeuronsActive, cs,
 				globalFeatureNeuronsActivation = globalFeatureNeuronsActivation.coalesce()
 				globalFeatureNeuronsActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsActivation, indicesToUpdateGlobal, 0)
 				sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivationIndex)
+		if(debugPrintInferencePredictionIssue):
+			debugActivationDense = globalFeatureNeuronsActivation.to_dense() if (inferenceSeedTargetActivationsGlobalFeatureArrays and globalFeatureNeuronsActivation.is_sparse) else (globalFeatureNeuronsActivation if inferenceSeedTargetActivationsGlobalFeatureArrays else sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex])
+			if(debugActivationDense.dim() == 4):
+				segmentCounts = (debugActivationDense > 0).sum(dim=(0, 2, 3)).to("cpu").tolist()
+				lastSegmentActive = int((debugActivationDense[:, arrayIndexSegmentLast] > 0).sum().item())
+			else:
+				segmentCounts = (debugActivationDense > 0).sum(dim=(1, 2)).to("cpu").tolist()
+				lastSegmentActive = int((debugActivationDense[arrayIndexSegmentLast] > 0).sum().item())
+			print(f"\tdebugInferencePredictionIssue: seedActivation postDeactivate segmentCounts={segmentCounts}, lastSegmentActive={lastSegmentActive}")
 
 	if(inferenceSeedTargetActivationsGlobalFeatureArrays):
 		sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivationIndex)

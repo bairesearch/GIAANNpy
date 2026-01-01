@@ -328,6 +328,9 @@ if(drawSparseArrays):
 					sourceFeatureIndex = int(indices[2, entryIndex].item())
 					targetColumnIndex = int(indices[3, entryIndex].item())
 					targetFeatureIndex = int(indices[4, entryIndex].item())
+				if(drawBranches and debugOnlyDrawBranchIndexConnections):
+					if(branchIndex != debugOnlyDrawBranchIndexX):
+						continue
 				if(drawSegments):
 					if(useBranchKey):
 						key = (branchIndex, segmentIndex, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex)
@@ -438,9 +441,21 @@ if(drawSparseArrays):
 					else:
 						featureConnectionsCollapsed = pt.sum(featureConnections, dim=1)	#sum along sequential segment index (draw connections to all segments)
 				if(drawBranches and hasBranchDim):
-					branchIndices = range(featureConnections.size(1))
+					if(debugOnlyDrawBranchIndexConnections):
+						if(debugOnlyDrawBranchIndexX >= 0 and debugOnlyDrawBranchIndexX < featureConnections.size(1)):
+							branchIndices = [debugOnlyDrawBranchIndexX]
+						else:
+							branchIndices = []
+					else:
+						branchIndices = range(featureConnections.size(1))
 				else:
-					branchIndices = [0]
+					if(drawBranches and debugOnlyDrawBranchIndexConnections):
+						if(debugOnlyDrawBranchIndexX == 0):
+							branchIndices = [0]
+						else:
+							branchIndices = []
+					else:
+						branchIndices = [0]
 		
 				# Internal connections (yellow)
 				for branchIndex in branchIndices:
@@ -667,9 +682,21 @@ else:
 				else:
 					featureConnectionsCollapsed = pt.sum(featureConnections, dim=1)	#sum along sequential segment index (draw connections to all segments)
 			if(drawBranches and hasBranchDim):
-				branchIndices = range(featureConnections.size(1))
+				if(debugOnlyDrawBranchIndexConnections):
+					if(debugOnlyDrawBranchIndexX >= 0 and debugOnlyDrawBranchIndexX < featureConnections.size(1)):
+						branchIndices = [debugOnlyDrawBranchIndexX]
+					else:
+						branchIndices = []
+				else:
+					branchIndices = range(featureConnections.size(1))
 			else:
-				branchIndices = [0]
+				if(drawBranches and debugOnlyDrawBranchIndexConnections):
+					if(debugOnlyDrawBranchIndexX == 0):
+						branchIndices = [0]
+					else:
+						branchIndices = []
+				else:
+					branchIndices = [0]
 		
 			# Internal connections (yellow)
 			for branchIndex in branchIndices:

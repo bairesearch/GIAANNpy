@@ -451,6 +451,17 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 		GIAANNproto_databaseNetworkExcitation.generateGlobalFeatureConnections(sequenceObservedColumns.databaseNetworkObject)
 	
 	GIAANNproto_predictionSeed.seedNetwork(sequenceObservedColumns, sequenceIndex, sequence, numSeedTokens)
+	if(debugPrintInferencePredictionIssue):
+		globalFeatureNeuronsActivation = sequenceObservedColumns.databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivationIndex]
+		globalFeatureNeuronsActivationDense = globalFeatureNeuronsActivation.to_dense() if globalFeatureNeuronsActivation.is_sparse else globalFeatureNeuronsActivation
+		totalActive = int((globalFeatureNeuronsActivationDense > 0).sum().item())
+		if(globalFeatureNeuronsActivationDense.dim() == 4):
+			segmentCounts = (globalFeatureNeuronsActivationDense > 0).sum(dim=(0, 2, 3)).to("cpu").tolist()
+			lastSegmentActive = int((globalFeatureNeuronsActivationDense[:, arrayIndexSegmentLast] > 0).sum().item())
+		else:
+			segmentCounts = (globalFeatureNeuronsActivationDense > 0).sum(dim=(1, 2)).to("cpu").tolist()
+			lastSegmentActive = int((globalFeatureNeuronsActivationDense[arrayIndexSegmentLast] > 0).sum().item())
+		print(f"\tdebugInferencePredictionIssue: seedActivation totalActive={totalActive}, segmentCounts={segmentCounts}, lastSegmentActive={lastSegmentActive}")
 	
 	numPredictionTokens = len(sequencePredict)	#set numPredictionTokens (dynamic)
 	
@@ -745,6 +756,14 @@ def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivat
 				lastSegmentActivation = globalFeatureNeuronsActivation[:, lastSegmentConstraint]
 			else:
 				lastSegmentActivation = globalFeatureNeuronsActivation[lastSegmentConstraint]
+		if(debugPrintInferencePredictionIssue):
+			lastSegmentActiveCount = int(lastSegmentActivation._nnz()) if lastSegmentActivation.is_sparse else int((lastSegmentActivation > 0).sum().item())
+			globalFeatureNeuronsActivationDense = globalFeatureNeuronsActivation.to_dense() if globalFeatureNeuronsActivation.is_sparse else globalFeatureNeuronsActivation
+			if(globalFeatureNeuronsActivationDense.dim() == 4):
+				segmentCounts = (globalFeatureNeuronsActivationDense > 0).sum(dim=(0, 2, 3)).to("cpu").tolist()
+			else:
+				segmentCounts = (globalFeatureNeuronsActivationDense > 0).sum(dim=(1, 2)).to("cpu").tolist()
+			print(f"\tdebugInferencePredictionIssue: lastSegmentConstraint={lastSegmentConstraint}, lastSegmentActiveCount={lastSegmentActiveCount}, segmentCounts={segmentCounts}")
 		if(globalFeatureNeuronsActivationAllSegments.is_sparse):
 			if(multipleDendriticBranches and lastSegmentActivation.dim() == 3):
 				lastSegmentActivationCollapsed = GIAANNproto_sparseTensors.reduceSparseBranchMax(lastSegmentActivation)
@@ -752,11 +771,15 @@ def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivat
 				lastSegmentActivationCollapsed = GIAANNproto_sparseTensors.collapseSparseBranchDimension(lastSegmentActivation)
 			globalFeatureNeuronsActivationAllSegments = GIAANNproto_sparseTensors.selectAindicesContainedInB(globalFeatureNeuronsActivationAllSegments, lastSegmentActivationCollapsed)
 			if(globalFeatureNeuronsActivationAllSegments._nnz() == 0):
+				if(debugPrintInferencePredictionIssue):
+					print(f"\tdebugInferencePredictionIssue: lastSegmentSparseSelectionEmpty lastSegmentConstraint={lastSegmentConstraint}")
 				raise RuntimeError("selectMostActiveFeature error: enforceLastSegmentMustBeActive requires active last-segment nodes, but none are active.")
 		else:
 			lastSegmentMask = (lastSegmentActivation.to_dense() > 0).any(dim=0)
 			globalFeatureNeuronsActivationAllSegments = globalFeatureNeuronsActivationAllSegments * lastSegmentMask
 			if(not (globalFeatureNeuronsActivationAllSegments > 0).any().item()):
+				if(debugPrintInferencePredictionIssue):
+					print(f"\tdebugInferencePredictionIssue: lastSegmentDenseSelectionEmpty lastSegmentConstraint={lastSegmentConstraint}")
 				raise RuntimeError("selectMostActiveFeature error: enforceLastSegmentMustBeActive requires active last-segment nodes, but none are active.")
 
 	#topk column selection;

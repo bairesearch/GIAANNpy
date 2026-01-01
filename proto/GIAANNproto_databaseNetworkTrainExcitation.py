@@ -180,7 +180,6 @@ def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWor
 	if featureNeuronsActive.dim() == 3:
 		branchCount = featureNeuronsActive.shape[0]
 		if(multipleDendriticBranches):
-			# For multi-branch training, allow any active source to drive all branches.
 			sourceActive = featureNeuronsActive.amax(dim=0)
 			sourceActive1d = sourceActive.view(1, cs*fs, 1)
 			targetActive1d = featureNeuronsActive.view(branchCount, cs*fs).unsqueeze(1)
