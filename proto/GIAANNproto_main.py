@@ -112,6 +112,8 @@ def buildSequenceWithDelimiters(sequence, tokens):
 				delimiterTypes.append("Dd")	#deterministic
 			elif(isDelimiterProbabilistic):
 				delimiterTypes.append("Di")	#indeterministic
+			elif(GIAANNproto_sequenceTokens.isConcept(token)):
+				delimiterTypes.append("C")	#concept
 			else:
 				delimiterTypes.append("")	#non
 	sentenceWithDelimiters = " ".join(
@@ -138,17 +140,21 @@ def processArticle(text, articleIndex):
 	if(ignoreNewlineCharacters):
 		text = text.replace('\n', ' ')
 	textParsed = nlp(text)
+	sentences = list(textParsed.sents)
 
 	if(multisentencePredictions):
-		sentences = list(textParsed.sents)
 		sequences = []
 		for i in range(0, len(sentences), numSentencesPerSequence):
 			startIndex = sentences[i].start
 			endIndex = sentences[min(i + numSentencesPerSequence, len(sentences)) - 1].end
 			span = textParsed[startIndex:endIndex]
-			sequences.append(span)
+			sequenceParsed = nlp(span.text)
+			sequences.append(sequenceParsed)
 	else:
-		sequences = list(textParsed.sents)
+		sequences = []
+		for sentence in sentences:
+			sequenceParsed = nlp(sentence.text)
+			sequences.append(sequenceParsed)
 	
 	numberOfSequences = len(sequences)
 	for sequenceIndex, sequence in enumerate(sequences):

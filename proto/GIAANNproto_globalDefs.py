@@ -23,8 +23,10 @@ import sys
 
 #Recent debug vars;
 debugPrintTrainSequenceConceptAssignment = True
+debugPrintTrainSequenceConceptAssignmentByLine = True	#display each column on a new line
 debugPrintTrainSequenceDelimiters = True
 debugPrintTrainSequencePOS = False	#print each training sentence with POS tags
+debugPrintSequenceObservedColumnsConnections = False	#debug per-sequence connection counts before merging occurrences
 
 
 #Train/inference mode selection:
@@ -127,7 +129,7 @@ if(conceptColumnsDelimitByPOS):
 	detectReferenceSetDelimitersBetweenNouns = True	#default: assign reference set delimiters if they appear between two nouns (without designated reference set delimiter types)
 	if(detectReferenceSetDelimitersBetweenNouns):
 		detectReferenceSetDelimitersBetweenNounsPOStypes = ['CCONJ', 'SCONJ']	#probabilistic reference set delimiters (GIA logical conditions) - only assign if they are detected inbetween nouns (without intermediate deterministic delimiters)
-		detectReferenceSetDelimitersBetweenNounsWordTypes = ['is', 'are', ',']	#eg a dog is an animal / dogs are animals
+		detectReferenceSetDelimitersBetweenNounsWordTypes = ['is', 'are', ',', '(']	#eg a dog is an animal / dogs are animals
 		detectReferenceSetDelimitersBetweenNounsTagTypes = []
 	detectIsolatedReferenceSetDelimiters = True	#default: True	#orig: False	#assign isolated reference set delimiters to the next concept column
 	if(detectIsolatedReferenceSetDelimiters):
@@ -301,12 +303,22 @@ else:
 	inferenceActivationFunction = False
 	if(SANIconceptNeurons):
 		assert trainSequenceObservedColumnsUseSequenceFeaturesOnly	#required to significantly decrease GPU RAM during training
-if(useSANI):
-	drawSegmentsTrain = True #default: True	#draws connection colours based on their target node incoming segment index	#overrides drawRelationTypesTrain connection draw colours
-	drawSegmentsInference = True #default: True	#overrides drawRelationTypesInference connection draw colours
-else:
-	drawSegmentsTrain = False
-	drawSegmentsInference = False
+
+drawSegments = True and useSANI
+drawBranches = False and multipleDendriticBranches
+
+drawBranchesTrain = False
+drawBranchesInference = False
+drawSegmentsTrain = False
+drawSegmentsInference = False
+if(drawBranches):
+	drawBranchesTrain = True 	#draws connection colours based on their target node incoming dendritic branch index	#overrides drawRelationTypesTrain connection draw colours
+	drawBranchesInference = True 	#overrides drawRelationTypesInference connection draw colours
+if(drawSegments):
+	drawSegmentsTrain = True 	#draws connection colours based on their target node incoming segment index	#overrides drawRelationTypesTrain connection draw colours
+	drawSegmentsInference = True #overrides drawRelationTypesInference connection draw colours
+
+
 drawRelationTypesTrain = True	#True: draw feature neuron and connection relation types in different colours
 drawRelationTypesInference = False	#False: draw activation status
 drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSequenceIndex"
@@ -683,5 +695,4 @@ def compareDenseArrayDiff(array1, array2):
 
 def getTensorSizeInMB(tensor):
 	return tensor.element_size() * tensor.nelement() / (1024 ** 2)
-
 

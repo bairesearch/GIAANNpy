@@ -28,11 +28,13 @@ if(trainInhibitoryNeurons):
 	
 def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 	result = GIAANNproto_sequenceConcepts.processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens)
+	if(debugPrintTrainSequenceConceptAssignment):
+		print(f"Processing sequenceCount: {sequenceIndex}, {sequenceObservedColumns.sentenceWithConceptAssignment}")	
+		if(debugPrintTrainSequenceConceptAssignmentByLine):
+			print("")	
 	if(result is None):
 		return False
 	conceptIndices, startIndices, endIndices = result
-	if(debugPrintTrainSequenceConceptAssignment):
-		print(f"Processing sequenceCount: {sequenceIndex}, {sequenceObservedColumns.sentenceWithConceptAssignment}")
 	featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask = GIAANNproto_sequenceConcepts.processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices)
 
 	featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex)

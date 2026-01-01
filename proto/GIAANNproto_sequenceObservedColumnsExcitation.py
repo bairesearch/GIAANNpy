@@ -398,9 +398,39 @@ class SequenceObservedColumns:
 	def updateObservedColumnsWrapper(self, inference=False):
 		if(trainSequenceObservedColumnsMatchSequenceWords):
 			#for multiple instances of concept in sequence, need to take the sum of the changes between the existing and modified arrays for each instance of a same concept in the sequence
+			if(debugPrintSequenceObservedColumnsConnections):
+				self.debugPrintSequenceConnectionSummary("pre-update")
 			self.updateObservedColumns(self.sequenceObservedColumnsDict, inference, mode="default")
 		else:
 			self.updateObservedColumns(self.observedColumnsDict2, inference, mode="default")
+
+	def debugPrintSequenceConnectionSummary(self, mode):
+		if(not debugPrintSequenceObservedColumnsConnections):
+			return
+		print(f"debugSequenceConnections ({mode}): cs={self.cs}, fs={self.fs}")
+		sequenceWordIndexMap = {}
+		try:
+			for idx, (sequenceWordIndex, observedColumn) in enumerate(self.observedColumnsSequenceWordIndexDict.items()):
+				sequenceWordIndexMap[idx] = sequenceWordIndex
+		except Exception:
+			pass
+		connectionsStrength = self.featureConnections[arrayIndexPropertiesStrengthIndex]
+		if(connectionsStrength.is_sparse):
+			connectionsStrength = connectionsStrength.to_dense()
+		for seqConceptIndex, observedColumn in self.sequenceObservedColumnsDict.items():
+			lemma = getattr(observedColumn, "conceptName", "<unknown>")
+			wordIndex = sequenceWordIndexMap.get(seqConceptIndex, None)
+			if(connectionsStrength.dim() == 6):
+				sourceSlice = connectionsStrength[:, :, seqConceptIndex]
+			else:
+				sourceSlice = connectionsStrength
+			outgoingCount = 0
+			maxStrength = 0.0
+			if(sourceSlice.numel() > 0):
+				outgoingMask = sourceSlice > 0
+				outgoingCount = int(outgoingMask.sum().item())
+				maxStrength = float(sourceSlice.max().item())
+			print(f"\tseqConceptIndex={seqConceptIndex}, wordIndex={wordIndex}, lemma={lemma}, outgoing>0={outgoingCount}, maxStrength={maxStrength}")
 			
 	def updateObservedColumns(self, sequenceObservedColumnsDict, inference, mode):
 		if(arrayIndexPropertiesEfficient and not inference):

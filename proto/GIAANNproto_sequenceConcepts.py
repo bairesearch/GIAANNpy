@@ -220,6 +220,8 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 	For every concept word (lemma) in the sequence, identify every feature neuron in that column that occurs q words before or after the concept word in the sequence, including the concept neuron. This function has been parallelized using PyTorch array operations.
 	"""
 
+	noDelimiterDetectedBetweenConceptTokens = False
+
 	if not usePOS:
 		q = 5  # Fixed window size when not using POS tags
 
@@ -251,7 +253,7 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 		q = 5
 		distToPrevConcept = pt.full((conceptIndices.size(0),), q, dtype=pt.long)
 		distToNextConcept = pt.full((conceptIndices.size(0),), q, dtype=pt.long)
-
+	
 	# Calculate start and end indices for each concept word
 	if(conceptColumnsDelimitByPOS):
 		databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
@@ -300,8 +302,12 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 					elif(rightmostIndeterministic is not None):
 						delimiterIndices.append(rightmostIndeterministic)
 					else:
-						print("warning: no delimiter detected between concept tokens")
-						return None
+						noDelimiterDetectedBetweenConceptTokens = True
+						print("warning: no delimiter detected between concept tokens:")
+						print("\tconcept #1: conceptPosition = ", conceptPosition, ", conceptIndex = ", leftIndex, ", conceptName = ", getTokenDisplayText(tokens[leftIndex]))
+						print("\tconcept #2: conceptPosition = ", conceptPosition+1, ", conceptIndex = ", rightIndex, ", conceptName = ", getTokenDisplayText(tokens[rightIndex]))						
+						#return None
+						delimiterIndices.append(leftIndex)	#or rightIndex	#append dummy so that sequence can still be printed
 				startIndices = pt.zeros_like(conceptIndicesSorted)
 				endIndices = pt.full_like(conceptIndicesSorted, sequenceLength)
 				for conceptPosition, delimiterIndex in enumerate(delimiterIndices):
@@ -328,6 +334,9 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 		sequenceObservedColumns.sentenceWithConceptAssignment = sentenceWithConceptAssignment
 		#print(f"Processing sequenceCount: {sequenceIndex}, {sequenceObservedColumns.sentenceWithConceptAssignment}")
 
+	if(noDelimiterDetectedBetweenConceptTokens):
+		return None
+	
 	return conceptIndices, startIndices, endIndices
 
 def buildSequenceConceptAssignment(sequenceObservedColumns, sequence, tokens, conceptIndices, startIndices, endIndices):
@@ -345,18 +354,33 @@ def buildSequenceConceptAssignment(sequenceObservedColumns, sequence, tokens, co
 			tokenConceptColumnIndexList[tokenIndex] = columnIndex
 	sequenceObservedColumns.tokenConceptColumnIndexList = tokenConceptColumnIndexList
 	conceptColumnsList = sequenceObservedColumns.databaseNetworkObject.conceptColumnsList
-	def getTokenDisplayText(token):
-		if hasattr(token, "text"):
-			return token.text
-		if hasattr(token, "word"):
-			return token.word
-		return str(token)
-	sentenceWithConceptAssignment = " ".join(
-		f"{getTokenDisplayText(token)} ({tokenIndex}:{conceptColumnsList[tokenConceptColumnIndexList[tokenIndex]] if tokenConceptColumnIndexList[tokenIndex] is not None else 'none'})"
-		for tokenIndex, token in enumerate(sequence)
-	)
+	
+	if(debugPrintTrainSequenceConceptAssignmentByLine):
+		sentenceWithConceptAssignment = ""
+		currentColumnIndex = tokenConceptColumnIndexList[tokenIndex]
+		for tokenIndex, token in enumerate(sequence):
+			sentenceWithConceptAssignmentToken = ""
+			if(tokenConceptColumnIndexList[tokenIndex] != currentColumnIndex):
+				#newColumnDetected
+				sentenceWithConceptAssignmentToken += "\nConcept Column " + conceptColumnsList[tokenConceptColumnIndexList[tokenIndex]] + ": "
+				currentColumnIndex = tokenConceptColumnIndexList[tokenIndex]
+			sentenceWithConceptAssignmentToken += f"{getTokenDisplayText(token)} ({tokenIndex}:{conceptColumnsList[tokenConceptColumnIndexList[tokenIndex]]}) "
+			sentenceWithConceptAssignment += sentenceWithConceptAssignmentToken
+	else:
+		sentenceWithConceptAssignment = " ".join(
+			f"{getTokenDisplayText(token)} ({tokenIndex}:{conceptColumnsList[tokenConceptColumnIndexList[tokenIndex]]})"	# if tokenConceptColumnIndexList[tokenIndex] is not None else 'none'
+			for tokenIndex, token in enumerate(sequence)
+		)
+
 	return sentenceWithConceptAssignment
 
+def getTokenDisplayText(token):
+	if hasattr(token, "text"):
+		return token.text
+	if hasattr(token, "word"):
+		return token.word
+	return str(token)
+	
 def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices):
 	numberConceptsInSequence = conceptIndices.shape[0]
 	

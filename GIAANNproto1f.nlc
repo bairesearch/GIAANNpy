@@ -297,7 +297,7 @@ MANUAL; - rename GIAANNproto_sequenceObservedColumnsExcitation/GIAANNproto_datab
 	- 2. add option inferenceInhibitoryNeuronsOptimised=True - which skips the standard inhibitory neuron activation calculation (1.) and simply selects the inhibitory neuron to fire that is associated with the excitatory feature neuron that fired. This should be close to a single line of code. if inferenceInhibitoryNeuronsOptimised=False, then revert to method 1.
 - update GIAANNproto_databaseNetworkTrainInhibition to support detection of alternate prediction candidates external to the trained sequence
 - add options inferenceDeactivateNeuronsUponPredictionInhibitory/inferenceDecrementActivationsInhibitory
-[Codex IDE GPT-5.2-Codex:]
+[GPT-5.2-Codex:]
 - patch inference seeding to use any active segment features for seed connections
 - patch inferenceDeactivateNeuronsUponPredictionInhibitory/inferenceDecrementActivationsInhibitory
 - enable useSANI+inferenceConnectionsStrengthBoolean+inferenceSegmentActivationsBoolean
@@ -343,3 +343,8 @@ MANUAL; - patch useSANIfeaturesAndColumns parameters
 - upgrade the concept assignment token segmentation algorithm as follows: a) use the right most deterministic delimiter between two concept tokens if existent, else b) use the right most indeterministic delimiter between two concept tokens existent, else c) throw a warning ("no delimiter detected between concept tokens") and skip training the sequence. 
 - implement debugPrintTrainSentenceConceptAssignment - print each sequence token with the name of its associated concept column in brackets.
 - update seed phase (including getTokenConceptFeatureIndex) to use the known concept columns from the complete full seed+target sequence. The issue relates to the fact during a seed it is technically not known what column a token succeeding the last concept feature (or its nearest delimiter) belongs to - even though this information is embedded in the inference seed+target sequence. During the development phase of GIA however will assume that the correct concept column is known during seed - to simplify the process and speed up development.
+MANUAL; - add '(' to detectReferenceSetDelimitersBetweenNounsWordTypes - allow isolated bracketed nouns to occur after other nouns
+- implement options drawBranchesTrain/drawBranchesInference (drawBranches in visualizeGraph).
+- Each sequence (either 1 sentence or multiple sentences if multisentencePredictions enabled) must be pos tagged independently.
+- add debugPrintSequenceObservedColumnsConnections - debug connections with multiple concept column references during train sequences
+MANUAL; - add debugPrintTrainSequenceConceptAssignmentByLine - display each column on a new line
