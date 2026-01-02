@@ -46,7 +46,7 @@ python3 GIAANNproto_main.py
 * Local Connectome (https://github.com/bairesearch/LocalConnectome)
 * Simulated Dendritic Branch artificial neural network (https://github.com/bairesearch/SDBANNtf)
 * Simulated Dendritic Branch natural language processing (https://github.com/bairesearch/SDBNLPpt)
-* Jamali, M., Grannan, B., Cai, J., Khanna, A.R., Mu�oz, W., Caprara, I., Paulk, A.C., Cash, S.S., Fedorenko, E. and Williams, Z.M. (2024). Semantic encoding during language comprehension at single-cell resolution. Nature, 1-7.
+* Jamali, M., Grannan, B., Cai, J., Khanna, A.R., Munoz, W., Caprara, I., Paulk, A.C., Cash, S.S., Fedorenko, E. and Williams, Z.M. (2024). Semantic encoding during language comprehension at single-cell resolution. Nature, 1-7.
 * Hawkins, J. et al. (2011). Hierarchical Temporal Memory (HTM) Whitepaper (Version 0.2.1). Numenta.
 * Holtmaat, A., & Caroni, P. (2016). Functional and structural underpinnings of neuronal assembly formation in learning. Nature neuroscience, 19(12), 1553-1562.
 * Hopfield, J. J. (1982). Neural networks and physical systems with emergent collective computational abilities. Proceedings of the national academy of sciences, 79(8), 2554-2558.

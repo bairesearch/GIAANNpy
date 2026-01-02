@@ -196,7 +196,7 @@ class SequenceObservedColumns:
 				localMap[globalIndex].append(localIndex)
 			self.columnFeatureLocalIndices.append(localMap)
 
-	def mapGlobalToLocalIndices(self, defaultTensor, globalTensor, columnIndex):
+	def mapGlobalToLocalIndices(self, defaultTensor, globalTensor, columnIndex, branchTensor=None):
 		if(self.columnFeatureLocalIndices is None):
 			return defaultTensor
 		if(columnIndex >= len(self.columnFeatureLocalIndices)):
@@ -206,13 +206,25 @@ class SequenceObservedColumns:
 			return defaultTensor
 		defaultCPU = defaultTensor.detach().cpu()
 		globalCPU = globalTensor.detach().cpu()
+		branchCPU = branchTensor.detach().cpu() if branchTensor is not None else None
 		defaultList = defaultCPU.tolist()
 		globalList = globalCPU.tolist()
+		branchList = branchCPU.tolist() if branchCPU is not None else None
 		newList = []
-		for defaultValue, globalValue in zip(defaultList, globalList):
+		branchMappedCount = 0
+		branchMappedNonZero = 0
+		for idx, (defaultValue, globalValue) in enumerate(zip(defaultList, globalList)):
 			candidates = columnLocalMap.get(int(globalValue))
 			if(candidates and len(candidates) > 0):
-				newList.append(int(candidates[0]))
+				if(branchList is not None):
+					branchMappedCount = branchMappedCount + 1
+					branchIndex = int(branchList[idx])
+					candidateIndex = branchIndex if branchIndex < len(candidates) else len(candidates) - 1
+					if(candidateIndex > 0):
+						branchMappedNonZero = branchMappedNonZero + 1
+					newList.append(int(candidates[candidateIndex]))
+				else:
+					newList.append(int(candidates[0]))
 			else:
 				newList.append(int(defaultValue))
 		return pt.tensor(newList, dtype=defaultTensor.dtype, device=defaultTensor.device)
@@ -261,6 +273,7 @@ class SequenceObservedColumns:
 				# Use searchsorted on the sorted featureIndicesInObserved
 				positions = pt.searchsorted(featureIndicesInObservedSorted, filteredIndices[3])
 				filteredFIdxTensor = fIdxTensorSorted[positions]
+				filteredFIdxTensor = self.mapGlobalToLocalIndices(filteredFIdxTensor, filteredIndices[3], cIdx, filteredIndices[1])
 			else:
 				# If no matches, just create empty tensors that match the expected shape.
 				filteredFIdxTensor = pt.empty((0,), dtype=fIdxTensor.dtype, device=fIdxTensor.device)
@@ -346,7 +359,7 @@ class SequenceObservedColumns:
 					mappedOtherFIdx = otherFIdxTensorSorted[otherFIdxPositions]
 
 					mappedFIdx = self.mapGlobalToLocalIndices(mappedFIdx, sourceGlobalIndices, cIdx)
-					mappedOtherFIdx = self.mapGlobalToLocalIndices(mappedOtherFIdx, targetGlobalIndices, otherCIdx)
+					mappedOtherFIdx = self.mapGlobalToLocalIndices(mappedOtherFIdx, targetGlobalIndices, otherCIdx, filteredIndices[1])
 
 					# Adjust indices:
 					# After filtering, we have:

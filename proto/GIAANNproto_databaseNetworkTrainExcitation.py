@@ -214,6 +214,12 @@ def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWor
 	fsIndices1 = pt.arange(fs).view(1, fs, 1, 1).expand(cs, fs, cs, fs)
 	fsIndices2 = pt.arange(fs).view(1, 1, 1, fs).expand(cs, fs, cs, fs)
 	identityMask = (csIndices1 != csIndices2) | (fsIndices1 != fsIndices2)
+	if(multipleDendriticBranches and featureNeuronsActive.dim() == 3):
+		featureBranchCounts = (featureNeuronsActive > 0).sum(dim=0)
+		repeatedFeatureMask = featureBranchCounts > 1
+		repeatedFeatureMaskExpanded = repeatedFeatureMask.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
+		selfMask = (csIndices1 == csIndices2) & (fsIndices1 == fsIndices2)
+		identityMask = identityMask | (selfMask & repeatedFeatureMaskExpanded)
 	featureConnectionsActive = featureConnectionsActive * identityMask
 
 	if(useSANI):

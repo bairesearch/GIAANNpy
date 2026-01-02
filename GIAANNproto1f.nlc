@@ -353,3 +353,4 @@ MANUAL; - add debugPrintTrainSequenceConceptAssignmentByLine - display each colu
 - add debugOnlyDrawBranchIndexConnections
 - patch updateObservedColumnsVerbose() - repeated concept multi-branch training/inference merges (for inference)
 - patch processArticle spacy - skip whitespace-only sequences before re-running spaCy on sentence spans
+- patch createFeatureConnectionsActiveTrain - adjusted repeated-feature mapping so inference keeps branch-specific occurrences when loading observed column

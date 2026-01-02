@@ -29,7 +29,7 @@ debugPrintTrainSequenceDelimiters = False
 debugPrintTrainSequencePOS = False	#print each training sentence with POS tags
 debugPrintSequenceObservedColumnsConnections = False	#debug per-sequence connection counts before merging occurrences
 debugPrintInferencePredictionIssue = False
-
+debugTerminateInferenceOnPredictionTargetMismatch = False
 
 #Train/inference mode selection:
 useInference = True  #default: True	#support inference mode else train (inferenceTrainFirstSequences: only) mode
@@ -70,7 +70,7 @@ else:
 
 
 #Inhibitory neurons;
-useInhibitoryNeurons = False	#planned new default: True #orig: False
+useInhibitoryNeurons = False	#default: False #orig: False
 if(useInhibitoryNeurons):
 	trainInhibitoryNeurons = True
 	inferenceInhibitoryNeurons = True
