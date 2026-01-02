@@ -357,3 +357,4 @@ MANUAL; - add debugPrintTrainSequenceConceptAssignmentByLine - display each colu
 - add option debugTerminateInferenceOnPredictionTargetMismatch
 - patch featurePredictionTargetMatch to still match concept features when the token lemmas are the same but their words are different - concept features should be ambivalent to their morphology (eg plural noun vs singular noun)
 MANUAL; - update processColumnInferencePrediction - always calculate featurePredictionTargetMatch
+MANUAL; - remove debugPrintSequenceObservedColumnsConnections/debugPrintInferencePredictionIssue/debugTerminateInferenceOnPredictionTargetMismatch

@@ -27,9 +27,7 @@ debugPrintTrainSequenceConceptAssignment = True
 debugPrintTrainSequenceConceptAssignmentByLine = True	#display each column on a new line
 debugPrintTrainSequenceDelimiters = False
 debugPrintTrainSequencePOS = False	#print each training sentence with POS tags
-debugPrintSequenceObservedColumnsConnections = False	#debug per-sequence connection counts before merging occurrences
-debugPrintInferencePredictionIssue = False
-debugTerminateInferenceOnPredictionTargetMismatch = False
+debugTerminateInferenceOnPredictionTargetMismatch = True
 
 #Train/inference mode selection:
 useInference = True  #default: True	#support inference mode else train (inferenceTrainFirstSequences: only) mode

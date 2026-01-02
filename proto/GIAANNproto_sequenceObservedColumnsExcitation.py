@@ -411,94 +411,11 @@ class SequenceObservedColumns:
 	def updateObservedColumnsWrapper(self, inference=False):
 		self.debugInferenceActive = inference
 		self.inferenceConceptUpdateCounts = {} if inference else None
-		if(inference and debugPrintInferencePredictionIssue):
-			self.debugInferenceConceptUpdateCounts = self.inferenceConceptUpdateCounts
 		if(trainSequenceObservedColumnsMatchSequenceWords):
 			#for multiple instances of concept in sequence, need to take the sum of the changes between the existing and modified arrays for each instance of a same concept in the sequence
-			if(debugPrintSequenceObservedColumnsConnections):
-				self.debugPrintSequenceConnectionSummary("pre-update")
-			if(inference and debugPrintInferencePredictionIssue):
-				activationTensor = self.featureNeurons[arrayIndexPropertiesActivationIndex]
-				activationDense = activationTensor.to_dense() if activationTensor.is_sparse else activationTensor
-				totalActive = int((activationDense > 0).sum().item())
-				if(activationDense.dim() == 4):
-					segmentCounts = (activationDense > 0).sum(dim=(0, 2, 3)).to("cpu").tolist()
-					lastSegmentActive = int((activationDense[:, arrayIndexSegmentLast] > 0).sum().item())
-				else:
-					segmentCounts = (activationDense > 0).sum(dim=(1, 2)).to("cpu").tolist()
-					lastSegmentActive = int((activationDense[arrayIndexSegmentLast] > 0).sum().item())
-				print(f"\tdebugInferencePredictionIssue: updateObservedColumnsWrapper preUpdate totalActive={totalActive}, segmentCounts={segmentCounts}, lastSegmentActive={lastSegmentActive}")
 			self.updateObservedColumns(self.sequenceObservedColumnsDict, inference, mode="default")
-			if(inference and debugPrintInferencePredictionIssue):
-				activationTensor = self.databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivationIndex]
-				activationDense = activationTensor.to_dense() if activationTensor.is_sparse else activationTensor
-				totalActive = int((activationDense > 0).sum().item())
-				if(activationDense.dim() == 4):
-					segmentCounts = (activationDense > 0).sum(dim=(0, 2, 3)).to("cpu").tolist()
-					lastSegmentActive = int((activationDense[:, arrayIndexSegmentLast] > 0).sum().item())
-				else:
-					segmentCounts = (activationDense > 0).sum(dim=(1, 2)).to("cpu").tolist()
-					lastSegmentActive = int((activationDense[arrayIndexSegmentLast] > 0).sum().item())
-				print(f"\tdebugInferencePredictionIssue: updateObservedColumnsWrapper postUpdate totalActive={totalActive}, segmentCounts={segmentCounts}, lastSegmentActive={lastSegmentActive}")
-			if(debugPrintSequenceObservedColumnsConnections):
-				self.debugPrintPersistedColumnSummary("post-update")
 		else:
 			self.updateObservedColumns(self.observedColumnsDict2, inference, mode="default")
-
-	def debugPrintSequenceConnectionSummary(self, mode):
-		debugEnabled = debugPrintSequenceObservedColumnsConnections
-		if(debugEnabled):
-			print(f"debugSequenceConnections ({mode}): cs={self.cs}, fs={self.fs}")
-			sequenceWordIndexMap = {}
-			try:
-				for idx, (sequenceWordIndex, observedColumn) in enumerate(self.observedColumnsSequenceWordIndexDict.items()):
-					sequenceWordIndexMap[idx] = sequenceWordIndex
-			except Exception:
-				pass
-			connectionsStrength = self.featureConnections[arrayIndexPropertiesStrengthIndex]
-			if(connectionsStrength.is_sparse):
-				connectionsStrength = connectionsStrength.to_dense()
-			for seqConceptIndex, observedColumn in self.sequenceObservedColumnsDict.items():
-				lemma = getattr(observedColumn, "conceptName", "<unknown>")
-				wordIndex = sequenceWordIndexMap.get(seqConceptIndex, None)
-				if(connectionsStrength.dim() == 6):
-					sourceSlice = connectionsStrength[:, :, seqConceptIndex]
-				else:
-					sourceSlice = connectionsStrength
-				outgoingCount = 0
-				maxStrength = 0.0
-				internalCount = 0
-				externalCount = 0
-				segmentCounts = None
-				lastSegmentCount = 0
-				targetTop = []
-				if(sourceSlice.numel() > 0):
-					outgoingMask = sourceSlice > 0
-					outgoingCount = int(outgoingMask.sum().item())
-					maxStrength = float(sourceSlice.max().item())
-					if(outgoingMask.dim() == 5):
-						internalMask = outgoingMask[:, :, :, seqConceptIndex, :]
-						internalCount = int(internalMask.sum().item())
-						externalCount = outgoingCount - internalCount
-						segmentCounts = outgoingMask.sum(dim=(0, 2, 3, 4)).to("cpu").tolist()
-						lastSegmentCount = int(outgoingMask[:, arrayIndexSegmentLast].sum().item())
-						targetCounts = outgoingMask.sum(dim=(0, 1, 2, 4))
-						if(targetCounts.numel() > 0):
-							topkCount = min(3, int(targetCounts.shape[0]))
-							topkValues, topkIndices = pt.topk(targetCounts, topkCount)
-							targetTop = [(int(idx.item()), int(val.item())) for idx, val in zip(topkIndices, topkValues) if int(val.item()) > 0]
-				print(f"\tseqConceptIndex={seqConceptIndex}, wordIndex={wordIndex}, lemma={lemma}, outgoing>0={outgoingCount}, maxStrength={maxStrength}, internal>0={internalCount}, external>0={externalCount}, lastSegment>0={lastSegmentCount}")
-				if(segmentCounts is not None):
-					print(f"\t\tsegmentCounts>0={segmentCounts}")
-				if(len(targetTop) > 0):
-					targetLabels = []
-					for targetIndex, targetCount in targetTop:
-						targetLemma = "<unknown>"
-						if(targetIndex in self.sequenceObservedColumnsDict):
-							targetLemma = getattr(self.sequenceObservedColumnsDict[targetIndex], "conceptName", "<unknown>")
-						targetLabels.append(f"{targetLemma}:{targetCount}")
-					print(f"\t\ttopTargets={targetLabels}")
-		return
 
 	def debugPrintPersistedColumnSummary(self, mode):
 		debugEnabled = debugPrintSequenceObservedColumnsConnections
@@ -641,18 +558,6 @@ class SequenceObservedColumns:
 				featureUpdatesAdd = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsDeltaSparse, addPropertyMaskLookup, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if lowMem else conceptIndex)
 			if(replacePropertiesEnabled):
 				featureUpdatesReplace = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsCurrentSparse, replacePropertyMaskLookup, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if lowMem else conceptIndex)
-				if(debugPrintInferencePredictionIssue and getattr(self, "debugInferenceActive", False) and arrayIndexPropertiesActivationIndex is not None):
-					activationUpdates = featureUpdatesReplace.coalesce()
-					activationIndices = activationUpdates.indices()
-					activationMask = (activationIndices[0] == arrayIndexPropertiesActivationIndex)
-					if(not lowMem):
-						activationMask = activationMask & (activationIndices[3] == conceptIndex)
-					activationCount = int(activationMask.sum().item())
-					if(activationCount > 0):
-						activationSegmentCounts = pt.bincount(activationIndices[2][activationMask], minlength=arrayNumberOfSegments).to("cpu").tolist()
-					else:
-						activationSegmentCounts = [0]*arrayNumberOfSegments
-					print(f"\tdebugInferencePredictionIssue: featureUpdatesReplace activation conceptIndex={conceptIndex}, count={activationCount}, segmentCounts={activationSegmentCounts}")
 
 				activationUpdateBranches = None
 				preserveActivationOnReplace = False
@@ -666,28 +571,7 @@ class SequenceObservedColumns:
 						activationUpdateMask = activationUpdateMask & (activationUpdateIndices[3] == conceptIndex)
 					if(activationUpdateMask.any()):
 						activationUpdateBranches = pt.unique(activationUpdateIndices[1][activationUpdateMask])
-					if(debugPrintInferencePredictionIssue):
-						activationUpdateCount = int(activationUpdateMask.sum().item())
-						if(activationUpdateMask.any()):
-							activationUpdateBranchCounts = pt.bincount(activationUpdateIndices[1][activationUpdateMask], minlength=numberOfDendriticBranches).to("cpu").tolist()
-						else:
-							activationUpdateBranchCounts = [0]*numberOfDendriticBranches
-						activationUpdateBranchesList = activationUpdateBranches.to("cpu").tolist() if activationUpdateBranches is not None else []
-						updateCountDisplay = updateCount if updateCount is not None else 0
-						print(f"\tdebugInferencePredictionIssue: activationUpdateBranches conceptIndex={conceptIndex}, updateCount={updateCountDisplay}, updateCountActive={activationUpdateCount}, branches={activationUpdateBranchesList}, branchCounts={activationUpdateBranchCounts}, preserve={preserveActivationOnReplace}")
 				featureTargetSparse = featureTargetSparse.coalesce()
-				if(debugPrintInferencePredictionIssue and getattr(self, "debugInferenceActive", False) and arrayIndexPropertiesActivationIndex is not None):
-					updateCountDisplay = updateCount if updateCount is not None else 0
-					targetIndices = featureTargetSparse.indices()
-					targetMask = (targetIndices[0] == arrayIndexPropertiesActivationIndex)
-					if(not lowMem):
-						targetMask = targetMask & (targetIndices[3] == conceptIndex)
-					targetCount = int(targetMask.sum().item())
-					if(targetCount > 0):
-						targetSegmentCounts = pt.bincount(targetIndices[2][targetMask], minlength=arrayNumberOfSegments).to("cpu").tolist()
-					else:
-						targetSegmentCounts = [0]*arrayNumberOfSegments
-					print(f"\tdebugInferencePredictionIssue: featureTargetSparse preReplace conceptIndex={conceptIndex}, updateCount={updateCountDisplay}, count={targetCount}, segmentCounts={targetSegmentCounts}")
 				targetIndices = featureTargetSparse.indices()
 				targetValues = featureTargetSparse.values()
 				if lowMem:
@@ -708,23 +592,6 @@ class SequenceObservedColumns:
 						removeMask = (removeMask & pt.logical_not(activationMask)) | activationBranchMask
 					else:
 						removeMask = removeMask & (targetIndices[0] != arrayIndexPropertiesActivationIndex)
-				if(debugPrintInferencePredictionIssue and self.debugInferenceActive and arrayIndexPropertiesActivationIndex is not None):
-					removeActivationMask = removeMask & (targetIndices[0] == arrayIndexPropertiesActivationIndex)
-					activationTargetMask = (targetIndices[0] == arrayIndexPropertiesActivationIndex)
-					if(not lowMem):
-						removeActivationMask = removeActivationMask & (targetIndices[3] == conceptIndex)
-						activationTargetMask = activationTargetMask & (targetIndices[3] == conceptIndex)
-					removeActivationCount = int(removeActivationMask.sum().item())
-					activationTargetCount = int(activationTargetMask.sum().item())
-					if(removeActivationMask.any()):
-						removeActivationBranchCounts = pt.bincount(targetIndices[1][removeActivationMask], minlength=numberOfDendriticBranches).to("cpu").tolist()
-					else:
-						removeActivationBranchCounts = [0]*numberOfDendriticBranches
-					if(activationTargetMask.any()):
-						activationTargetBranchCounts = pt.bincount(targetIndices[1][activationTargetMask], minlength=numberOfDendriticBranches).to("cpu").tolist()
-					else:
-						activationTargetBranchCounts = [0]*numberOfDendriticBranches
-					print(f"\tdebugInferencePredictionIssue: activationRemoveMask conceptIndex={conceptIndex}, removeCount={removeActivationCount}, targetCount={activationTargetCount}, removeBranchCounts={removeActivationBranchCounts}, targetBranchCounts={activationTargetBranchCounts}")
 				keepMask = pt.logical_not(removeMask)
 				filteredTargetIndices = targetIndices[:, keepMask]
 				filteredTargetValues = targetValues[keepMask]
@@ -734,18 +601,6 @@ class SequenceObservedColumns:
 			else:
 				combinedFeatureUpdates = featureUpdatesAdd
 			featureTargetSparse = self.addSparseUpdate(featureTargetSparse, combinedFeatureUpdates)
-			if(debugPrintInferencePredictionIssue and getattr(self, "debugInferenceActive", False) and arrayIndexPropertiesActivationIndex is not None):
-				activationTarget = featureTargetSparse.coalesce()
-				activationTargetIndices = activationTarget.indices()
-				activationTargetMask = (activationTargetIndices[0] == arrayIndexPropertiesActivationIndex)
-				if(not lowMem):
-					activationTargetMask = activationTargetMask & (activationTargetIndices[3] == conceptIndex)
-				activationTargetCount = int(activationTargetMask.sum().item())
-				if(activationTargetCount > 0):
-					activationTargetSegmentCounts = pt.bincount(activationTargetIndices[2][activationTargetMask], minlength=arrayNumberOfSegments).to("cpu").tolist()
-				else:
-					activationTargetSegmentCounts = [0]*arrayNumberOfSegments
-				print(f"\tdebugInferencePredictionIssue: featureTargetSparse activation conceptIndex={conceptIndex}, count={activationTargetCount}, segmentCounts={activationTargetSegmentCounts}")
 
 			if lowMem:
 				observedColumn.featureNeurons = featureTargetSparse
