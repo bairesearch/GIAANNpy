@@ -354,3 +354,6 @@ MANUAL; - add debugPrintTrainSequenceConceptAssignmentByLine - display each colu
 - patch updateObservedColumnsVerbose() - repeated concept multi-branch training/inference merges (for inference)
 - patch processArticle spacy - skip whitespace-only sequences before re-running spaCy on sentence spans
 - patch createFeatureConnectionsActiveTrain - adjusted repeated-feature mapping so inference keeps branch-specific occurrences when loading observed column
+- add option debugTerminateInferenceOnPredictionTargetMismatch
+- patch featurePredictionTargetMatch to still match concept features when the token lemmas are the same but their words are different - concept features should be ambivalent to their morphology (eg plural noun vs singular noun)
+MANUAL; - update processColumnInferencePrediction - always calculate featurePredictionTargetMatch

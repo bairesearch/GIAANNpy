@@ -486,6 +486,11 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	for wordPredictionIndex in range(numPredictionTokens):
 		sequenceWordIndex = numSeedTokens + wordPredictionIndex
 		featurePredictionTargetMatch, conceptColumnsIndices, conceptColumnsFeatureIndices, multipleSources, conceptActivationState = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnsIndices, conceptColumnsFeatureIndices, conceptMask, multipleSources, conceptActivationState)
+		if(not featurePredictionTargetMatch):
+			print("warning: featurePredictionTargetMatch=False")
+			if(debugTerminateInferenceOnPredictionTargetMismatch):
+				print("debugTerminateInferenceOnPredictionTargetMismatch: prematurely terminating inference")
+				break
 		
 
 def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnsIndices, conceptColumnsFeatureIndices, conceptMask, multipleSources, conceptActivationState):
@@ -655,27 +660,32 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 				raisePredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected activations available for next step")
 
 	featurePredictionTargetMatch = False
-	if(printPredictionsDuringInferencePredict):
+	if(True):
+		targetToken = tokensSequence[sequenceWordIndex]
+		targetWord = targetToken.word
+		targetLemma = targetToken.lemma
+		targetIsConceptFeature = bool(conceptMask[sequenceWordIndex].item())
 		#compare topk column/feature predictions to sequencePredict (target words);
 		#implementation limitation; only works with kf = 1;
 		for columnPredictionIndex in range(conceptColumnsIndicesPred.shape[0]):
 			columnIndex = conceptColumnsIndicesPred[columnPredictionIndex]
 			columnName = databaseNetworkObject.conceptColumnsList[columnIndex]
 			observedColumnFeatureIndex = conceptColumnsFeatureIndicesPred[columnPredictionIndex, 0]
-			if(observedColumnFeatureIndex == featureIndexConceptNeuron):
+			predictedIsConceptFeature = (observedColumnFeatureIndex == featureIndexConceptNeuron)
+			if(predictedIsConceptFeature):
 				predictedWord = columnName
 			else:
 				predictedWord = databaseNetworkObject.conceptFeaturesList[observedColumnFeatureIndex]
 			predictedColumnName = columnName
-			
-			targetWord = tokensSequence[sequenceWordIndex].word
 			if(targetMultipleSources):
 				targetColumnName = databaseNetworkObject.conceptColumnsList[targetPreviousColumnIndex] + "/" + databaseNetworkObject.conceptColumnsList[targetNextColumnIndex]
 			else:
 				targetColumnName = databaseNetworkObject.conceptColumnsList[targetPreviousColumnIndex]
-			
-			print("\t sequenceWordIndex = ", sequenceWordIndex, ", wordPredictionIndex = ", wordPredictionIndex, ", targetWord = ", targetWord, ", predictedWord = ", predictedWord, ", targetColumn = ", targetColumnName, ", predictedColumn = ", predictedColumnName)
+			if(printPredictionsDuringInferencePredict):
+				print("\t sequenceWordIndex = ", sequenceWordIndex, ", wordPredictionIndex = ", wordPredictionIndex, ", targetWord = ", targetWord, ", predictedWord = ", predictedWord, ", targetColumn = ", targetColumnName, ", predictedColumn = ", predictedColumnName)
 			if(targetWord == predictedWord):
+				featurePredictionTargetMatch = True
+			elif(targetIsConceptFeature and predictedIsConceptFeature and targetLemma == predictedColumnName and targetColumnName == predictedColumnName):
 				featurePredictionTargetMatch = True
 	if(inferenceInhibitoryNeurons):
 		globalFeatureNeuronsActivation = GIAANNproto_predictionInhibition.applyInferenceInhibition(databaseNetworkObject, globalFeatureNeuronsActivation, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext)
