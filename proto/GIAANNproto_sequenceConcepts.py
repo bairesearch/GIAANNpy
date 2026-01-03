@@ -17,6 +17,7 @@ GIA ANN proto sequence Concepts (and feature detection)
 
 """
 
+import random
 import torch as pt
 
 from GIAANNproto_globalDefs import *
@@ -386,6 +387,36 @@ def getTokenDisplayText(token):
 	if hasattr(token, "word"):
 		return token.word
 	return str(token)
+
+def buildDeterministicBranchOrder(conceptIndexKey, featureIndex):
+	seedValue = ((conceptIndexKey + 1) * 2654435761) ^ ((featureIndex + 1) * 1013904223)
+	seedValue = seedValue & 0xFFFFFFFF
+	rng = random.Random(seedValue)
+	branchOrder = list(range(numberOfDendriticBranches))
+	rng.shuffle(branchOrder)
+	return branchOrder
+
+def selectFeatureBranchIndex(featureBranchCounts, branchAssignments, conceptIndexKey, featureIndex):
+	branchIndex = featureBranchCounts.get(featureIndex, 0)
+	featureBranchCounts[featureIndex] = branchIndex + 1
+	if(randomlyAssignBranches):
+		if(branchAssignments is None):
+			raise RuntimeError("selectFeatureBranchIndex error: branchAssignments is None while randomlyAssignBranches enabled")
+		featureBranchOrders = branchAssignments.get(conceptIndexKey)
+		if(featureBranchOrders is None):
+			featureBranchOrders = {}
+			branchAssignments[conceptIndexKey] = featureBranchOrders
+		branchOrder = featureBranchOrders.get(featureIndex)
+		if(branchOrder is None):
+			branchOrder = buildDeterministicBranchOrder(conceptIndexKey, featureIndex)
+			featureBranchOrders[featureIndex] = branchOrder
+		if(branchIndex < numberOfDendriticBranches):
+			branchIndex = branchOrder[branchIndex]
+		else:
+			branchIndex = numberOfDendriticBranches - 1
+	if(branchIndex >= numberOfDendriticBranches):
+		branchIndex = numberOfDendriticBranches - 1
+	return branchIndex
 	
 def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices):
 	numberConceptsInSequence = conceptIndices.shape[0]
@@ -406,8 +437,11 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 	else:
 		featureNeuronsSegmentMask = pt.ones((cs, arrayNumberOfSegments), dtype=arrayType)
 	branchCounters = None
+	branchAssignments = None
 	if(multipleDendriticBranches):
 		branchCounters = {}
+		if(randomlyAssignBranches):
+			branchAssignments = {}
 	
 	conceptIndicesList = conceptIndices.tolist()
 	for i, sequenceConceptWordIndex in enumerate(conceptIndicesList):
@@ -477,10 +511,7 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 					if(j >= featureIndicesInObservedTensor.shape[0]):
 						continue
 					globalFeatureIndex = int(featureIndicesInObservedTensor[j].item())
-					branchIndex = featureBranchCounts.get(globalFeatureIndex, 0)
-					featureBranchCounts[globalFeatureIndex] = branchIndex + 1
-					if(branchIndex >= numberOfDendriticBranches):
-						branchIndex = numberOfDendriticBranches - 1
+					branchIndex = selectFeatureBranchIndex(featureBranchCounts, branchAssignments, conceptIndexKey, globalFeatureIndex)
 					if(useSANI):
 						featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, j] = 1
 					else:
@@ -523,10 +554,7 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 						if(featureBranchCounts is None):
 							featureBranchCounts = {}
 							branchCounters[conceptIndexKey] = featureBranchCounts
-						branchIndex = featureBranchCounts.get(sequenceFeatureIndex, 0)
-						featureBranchCounts[sequenceFeatureIndex] = branchIndex + 1
-						if(branchIndex >= numberOfDendriticBranches):
-							branchIndex = numberOfDendriticBranches - 1
+						branchIndex = selectFeatureBranchIndex(featureBranchCounts, branchAssignments, conceptIndexKey, sequenceFeatureIndex)
 					if(useSANI):
 						featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
 					else:
@@ -543,10 +571,7 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 						if(featureBranchCounts is None):
 							featureBranchCounts = {}
 							branchCounters[conceptIndexKey] = featureBranchCounts
-						branchIndex = featureBranchCounts.get(sequenceFeatureIndex, 0)
-						featureBranchCounts[sequenceFeatureIndex] = branchIndex + 1
-						if(branchIndex >= numberOfDendriticBranches):
-							branchIndex = numberOfDendriticBranches - 1
+						branchIndex = selectFeatureBranchIndex(featureBranchCounts, branchAssignments, conceptIndexKey, sequenceFeatureIndex)
 					if(useSANI):
 						featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
 					else:

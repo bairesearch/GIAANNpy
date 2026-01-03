@@ -574,19 +574,10 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 			#	globalFeatureNeuronsTime = GIAANNproto_predictionActivate.decrementActivation(globalFeatureNeuronsTime, inferenceUseNeuronFeaturePropertiesTimeDecrement)
 
 		#process features (activate global target neurons);
-		timeSequenceWordIndex = sequenceWordIndex
-		timeSequenceColumnIndex = sequenceColumnIndex
-		if(inferenceUseNeuronFeaturePropertiesTime):
-			timeSequenceWordIndex = sequenceWordIndex - 1
-			if(timeSequenceWordIndex < 0):
-				raise RuntimeError("processColumnInferencePrediction: timeSequenceWordIndex out of range")
-			timeSequenceColumnIndex = None
-			if(useSANIcolumns or useSANIfeaturesAndColumns):
-				timeSequenceColumnIndex = GIAANNproto_predictionActivate.calculateSequenceColumnIndex(conceptMask, timeSequenceWordIndex)
 		if(multipleSources):
-			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = GIAANNproto_predictionActivate.processFeaturesActivePredictMulti(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation, globalFeatureNeuronsTime, timeSequenceWordIndex, timeSequenceColumnIndex, sequenceWordIndex, sequenceColumnIndex)
+			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = GIAANNproto_predictionActivate.processFeaturesActivePredictMulti(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
 		else:
-			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = GIAANNproto_predictionActivate.processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation, globalFeatureNeuronsTime, timeSequenceWordIndex, timeSequenceColumnIndex, sequenceWordIndex, sequenceColumnIndex)
+			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = GIAANNproto_predictionActivate.processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
 		if(inferenceUseNeuronFeaturePropertiesTime):
 			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTimeIndex)
 		if(debugSANIfeaturesAndColumns and useSANIfeaturesAndColumns):
@@ -659,6 +650,9 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 				raisePredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected predictions available for current step")
 			if(conceptColumnsIndicesNext is None or conceptColumnsIndicesNext.numel() == 0):
 				raisePredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected activations available for next step")
+
+	if(conceptColumnsIndicesPred is None or conceptColumnsIndicesPred.numel() == 0):
+		raise RuntimeError("processColumnInferencePrediction: no prediction candidates available; sequenceWordIndex={0}, wordPredictionIndex={1}, targetWord='{2}'".format(sequenceWordIndex, wordPredictionIndex, getTargetWordForSequenceIndex(tokensSequence, sequenceWordIndex)))
 
 	featurePredictionTargetMatch = False
 	if(True):

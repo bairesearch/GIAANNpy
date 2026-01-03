@@ -67,10 +67,20 @@ else:
 useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/MLP predictive network model
 
 
+#Segment activation time optimisation;
+if(useInference):
+	inferenceUseNeuronFeaturePropertiesTime = False	#optional	#orig:False
+	inferenceUseNeuronFeaturePropertiesTimeExact = False	#optional	#orig:False
+else:
+	inferenceUseNeuronFeaturePropertiesTime = False
+	inferenceUseNeuronFeaturePropertiesTimeExact = False
+
+
 #Dendritic branches;
 multipleDendriticBranches = True	#default: True	#orig: False
 if(multipleDendriticBranches):
 	numberOfDendriticBranches = 5
+	randomlyAssignBranches = False	#optional	#orig: False
 else:
 	numberOfDendriticBranches = 1
 
@@ -103,6 +113,7 @@ else:
 	arrayIndexPropertiesActivation = True
 	arrayIndexPropertiesTime = True
 	arrayIndexPropertiesPos = True
+
 
 #Immediate (direct) connection identification;
 enforceDirectConnections = True	#default: True	#orig: False	#prediction requires a direct connection from previous prediction as observed during training (ie adjacent tokens)
@@ -258,7 +269,6 @@ if(useInference):
 		inferencePredictiveNetworkNormaliseInputs = True
 		if(inferencePredictiveNetworkNormaliseInputs):
 			inferencePredictiveNetworkNormaliseDim = 1	#orig: 0 #default: 1 -  normalise across SANI segments independently
-		inferenceUseNeuronFeaturePropertiesTime = False	#deprecated	#default:False	#orig:False	
 		if(inferenceTrainPredictiveNetworkAllSequences):
 			inferenceSavePredictiveNetwork = True
 			numberEpochs = 1000	#default: 1	#10	#debug: 1000	#number of epochs to train predictive network
@@ -280,10 +290,7 @@ if(useInference):
 			transformerUseInputConnections = False	#incomplete	#optional
 			inferencePredictiveNetworkInitialiseWeightsNearZero = True	#help predictive model to learn faster (rely exclusively on input activation levels at start of training)
 			transformerOutputLayerUseEveryColumn = True	#default: True	#orig: False	#whether the output layer uses features from every column (or just the final column in the sequence)
-	else:
-		inferenceUseNeuronFeaturePropertiesTime = False	#optional	#upgraded GIAANNproto1g1a
-else:
-	inferenceUseNeuronFeaturePropertiesTime = False
+
 
 #Draw;
 if(useInference):

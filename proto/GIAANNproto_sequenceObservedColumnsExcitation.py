@@ -197,37 +197,47 @@ class SequenceObservedColumns:
 			self.columnFeatureLocalIndices.append(localMap)
 
 	def mapGlobalToLocalIndices(self, defaultTensor, globalTensor, columnIndex, branchTensor=None):
-		if(self.columnFeatureLocalIndices is None):
-			return defaultTensor
-		if(columnIndex >= len(self.columnFeatureLocalIndices)):
-			return defaultTensor
-		columnLocalMap = self.columnFeatureLocalIndices[columnIndex]
-		if not columnLocalMap:
-			return defaultTensor
-		defaultCPU = defaultTensor.detach().cpu()
-		globalCPU = globalTensor.detach().cpu()
-		branchCPU = branchTensor.detach().cpu() if branchTensor is not None else None
-		defaultList = defaultCPU.tolist()
-		globalList = globalCPU.tolist()
-		branchList = branchCPU.tolist() if branchCPU is not None else None
-		newList = []
-		branchMappedCount = 0
-		branchMappedNonZero = 0
-		for idx, (defaultValue, globalValue) in enumerate(zip(defaultList, globalList)):
-			candidates = columnLocalMap.get(int(globalValue))
-			if(candidates and len(candidates) > 0):
-				if(branchList is not None):
-					branchMappedCount = branchMappedCount + 1
-					branchIndex = int(branchList[idx])
-					candidateIndex = branchIndex if branchIndex < len(candidates) else len(candidates) - 1
-					if(candidateIndex > 0):
-						branchMappedNonZero = branchMappedNonZero + 1
-					newList.append(int(candidates[candidateIndex]))
+		result = defaultTensor
+		columnLocalMap = None
+		conceptIndexKey = None
+		if(self.columnFeatureLocalIndices is not None):
+			if(columnIndex < len(self.columnFeatureLocalIndices)):
+				columnLocalMap = self.columnFeatureLocalIndices[columnIndex]
+		if(columnLocalMap is not None and columnLocalMap):
+			defaultCPU = defaultTensor.detach().cpu()
+			globalCPU = globalTensor.detach().cpu()
+			branchCPU = branchTensor.detach().cpu() if branchTensor is not None else None
+			defaultList = defaultCPU.tolist()
+			globalList = globalCPU.tolist()
+			branchList = branchCPU.tolist() if branchCPU is not None else None
+			newList = []
+			branchMappedCount = 0
+			branchMappedNonZero = 0
+			if(randomlyAssignBranches and branchList is not None):
+				observedColumn = self.sequenceObservedColumnsDict.get(columnIndex) if trainSequenceObservedColumnsMatchSequenceWords else self.observedColumnsDict2.get(columnIndex)
+				conceptIndexKey = observedColumn.conceptIndex if observedColumn is not None else None
+			for idx, (defaultValue, globalValue) in enumerate(zip(defaultList, globalList)):
+				candidates = columnLocalMap.get(int(globalValue))
+				if(candidates and len(candidates) > 0):
+					if(branchList is not None):
+						branchMappedCount = branchMappedCount + 1
+						branchIndex = int(branchList[idx])
+						candidateIndex = branchIndex if branchIndex < len(candidates) else len(candidates) - 1
+						if(randomlyAssignBranches and conceptIndexKey is not None):
+							branchOrder = GIAANNproto_sequenceConcepts.buildDeterministicBranchOrder(conceptIndexKey, int(globalValue))
+							if(branchIndex in branchOrder):
+								candidateIndex = branchOrder.index(branchIndex)
+								if(candidateIndex >= len(candidates)):
+									candidateIndex = len(candidates) - 1
+						if(candidateIndex > 0):
+							branchMappedNonZero = branchMappedNonZero + 1
+						newList.append(int(candidates[candidateIndex]))
+					else:
+						newList.append(int(candidates[0]))
 				else:
-					newList.append(int(candidates[0]))
-			else:
-				newList.append(int(defaultValue))
-		return pt.tensor(newList, dtype=defaultTensor.dtype, device=defaultTensor.device)
+					newList.append(int(defaultValue))
+			result = pt.tensor(newList, dtype=defaultTensor.dtype, device=defaultTensor.device)
+		return result
 	
 	def populateArrays(self, tokens, sequenceObservedColumnsDict):
 		#print("\n\n\n\n\npopulate_arrays:")
