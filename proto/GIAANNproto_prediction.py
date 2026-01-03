@@ -504,6 +504,10 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	#print("1 globalFeatureNeuronsActivation = ", globalFeatureNeuronsActivation)
 	globalFeatureNeuronsStrength = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesStrengthIndex]
 	globalFeatureNeuronsTime = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesTimeIndex]
+	sequenceColumnIndex = None
+	if(inferenceUseNeuronFeaturePropertiesTime):
+		if(useSANIcolumns or useSANIfeaturesAndColumns):
+			sequenceColumnIndex = GIAANNproto_predictionActivate.calculateSequenceColumnIndex(conceptMask, sequenceWordIndex)
 	if(transformerUseInputConnections):
 		globalFeatureConnectionsActivation = databaseNetworkObject.globalFeatureConnections[arrayIndexPropertiesActivationIndex]
 	else:
@@ -566,14 +570,25 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 			globalFeatureNeuronsActivation = GIAANNproto_predictionActivate.decrementActivation(globalFeatureNeuronsActivation, activationDecrementPerPredictedToken)
 			if(transformerUseInputConnections):
 				globalFeatureConnectionsActivation = GIAANNproto_predictionActivate.decrementActivation(globalFeatureConnectionsActivation, activationDecrementPerPredictedToken)
-			if(inferenceUseNeuronFeaturePropertiesTime):
-				globalFeatureNeuronsTime = GIAANNproto_predictionActivate.decrementActivation(globalFeatureNeuronsTime, inferenceUseNeuronFeaturePropertiesTimeDecrement)
+			#if(inferenceUseNeuronFeaturePropertiesTime):	#OLD
+			#	globalFeatureNeuronsTime = GIAANNproto_predictionActivate.decrementActivation(globalFeatureNeuronsTime, inferenceUseNeuronFeaturePropertiesTimeDecrement)
 
 		#process features (activate global target neurons);
+		timeSequenceWordIndex = sequenceWordIndex
+		timeSequenceColumnIndex = sequenceColumnIndex
+		if(inferenceUseNeuronFeaturePropertiesTime):
+			timeSequenceWordIndex = sequenceWordIndex - 1
+			if(timeSequenceWordIndex < 0):
+				raise RuntimeError("processColumnInferencePrediction: timeSequenceWordIndex out of range")
+			timeSequenceColumnIndex = None
+			if(useSANIcolumns or useSANIfeaturesAndColumns):
+				timeSequenceColumnIndex = GIAANNproto_predictionActivate.calculateSequenceColumnIndex(conceptMask, timeSequenceWordIndex)
 		if(multipleSources):
-			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation = GIAANNproto_predictionActivate.processFeaturesActivePredictMulti(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation)
+			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = GIAANNproto_predictionActivate.processFeaturesActivePredictMulti(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation, globalFeatureNeuronsTime, timeSequenceWordIndex, timeSequenceColumnIndex, sequenceWordIndex, sequenceColumnIndex)
 		else:
-			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation = GIAANNproto_predictionActivate.processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation)
+			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = GIAANNproto_predictionActivate.processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation, globalFeatureNeuronsTime, timeSequenceWordIndex, timeSequenceColumnIndex, sequenceWordIndex, sequenceColumnIndex)
+		if(inferenceUseNeuronFeaturePropertiesTime):
+			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTimeIndex)
 		if(debugSANIfeaturesAndColumns and useSANIfeaturesAndColumns):
 			if(globalFeatureNeuronsActivation.is_sparse):
 				featureNeuronsActivationDense = globalFeatureNeuronsActivation.to_dense()
@@ -617,9 +632,6 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 				modifier = inferenceInvertNeuronActivationUponPredictionLevel
 			globalFeatureNeuronsActivationOrig = globalFeatureNeuronsActivation
 			globalFeatureNeuronsActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsActivation, indicesToUpdate, modifier, multiply=inferenceInvertNeuronActivationUponPrediction)
-			if(inferenceUseNeuronFeaturePropertiesTime):
-				globalFeatureNeuronsTime = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsTime, indicesToUpdate, inferenceUseNeuronFeaturePropertiesTimeActivate)	#higher: neuron was more recently activated
-			
 			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivationIndex)
 			if(transformerUseInputConnections):
 				databaseNetworkObject.globalFeatureConnections = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureConnections, globalFeatureConnectionsActivation, arrayIndexPropertiesActivationIndex)
@@ -638,7 +650,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		if(inferencePredictiveNetwork):
 			conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = GIAANNproto_predictionNetwork.predictMostActiveFeature(sequenceObservedColumns, databaseNetworkObject, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap)	
 		else:
-			conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap)
+			conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex = selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap)
 
 		if((predictionEnsureConnectedToPreviousPrediction or enforceDirectConnectionsMinWordDistance) and connectedColumnsConstraint is not None):
 			conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = applyConnectedColumnsConstraint(conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, connectedColumnsConstraint, connectedColumnsFeatureMap)
@@ -717,12 +729,20 @@ def enforceMinimumPredictionActivationThreshold(conceptColumnsIndicesPred, conce
 	return conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred
 
 
-def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, conceptActivationState=None, connectedColumns=None, connectedColumnsFeatures=None):
+def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, conceptActivationState=None, connectedColumns=None, connectedColumnsFeatures=None):
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 	#generate targets;
 	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 
-	globalFeatureNeuronsActivationAllSegments = globalFeatureNeuronsActivation.sum(dim=1)	#sum across all segments
+	globalFeatureNeuronsActivationSelection = globalFeatureNeuronsActivation
+	if(inferenceUseNeuronFeaturePropertiesTime):
+		sequenceColumnIndex = None
+		if(useSANIcolumns or useSANIfeaturesAndColumns):
+			sequenceColumnIndex = GIAANNproto_predictionActivate.calculateSequenceColumnIndex(conceptMask, sequenceWordIndex)
+		# spec step (b): apply time-based activation modifier during feature selection
+		globalFeatureNeuronsActivationSelection = GIAANNproto_predictionActivate.applyTimeBasedActivationModifier(globalFeatureNeuronsActivationSelection, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
+
+	globalFeatureNeuronsActivationAllSegments = globalFeatureNeuronsActivationSelection.sum(dim=1)	#sum across all segments
 	if(multipleDendriticBranches):
 		if(globalFeatureNeuronsActivationAllSegments.is_sparse):
 			globalFeatureNeuronsActivationAllSegments = GIAANNproto_sparseTensors.reduceSparseBranchMax(globalFeatureNeuronsActivationAllSegments)
@@ -744,17 +764,17 @@ def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivat
 			lastSegmentConstraint = arrayIndexSegmentAdjacentColumn
 		else:
 			lastSegmentConstraint = arrayIndexSegmentLast
-		hasBranchDim = (globalFeatureNeuronsActivation.dim() == 4)
-		if(globalFeatureNeuronsActivation.is_sparse):
+		hasBranchDim = (globalFeatureNeuronsActivationSelection.dim() == 4)
+		if(globalFeatureNeuronsActivationSelection.is_sparse):
 			if(hasBranchDim):
-				lastSegmentActivation = GIAANNproto_sparseTensors.sliceSparseTensor(globalFeatureNeuronsActivation, 1, lastSegmentConstraint)
+				lastSegmentActivation = GIAANNproto_sparseTensors.sliceSparseTensor(globalFeatureNeuronsActivationSelection, 1, lastSegmentConstraint)
 			else:
-				lastSegmentActivation = GIAANNproto_sparseTensors.sliceSparseTensor(globalFeatureNeuronsActivation, 0, lastSegmentConstraint)
+				lastSegmentActivation = GIAANNproto_sparseTensors.sliceSparseTensor(globalFeatureNeuronsActivationSelection, 0, lastSegmentConstraint)
 		else:
 			if(hasBranchDim):
-				lastSegmentActivation = globalFeatureNeuronsActivation[:, lastSegmentConstraint]
+				lastSegmentActivation = globalFeatureNeuronsActivationSelection[:, lastSegmentConstraint]
 			else:
-				lastSegmentActivation = globalFeatureNeuronsActivation[lastSegmentConstraint]
+				lastSegmentActivation = globalFeatureNeuronsActivationSelection[lastSegmentConstraint]
 		if(globalFeatureNeuronsActivationAllSegments.is_sparse):
 			if(multipleDendriticBranches and lastSegmentActivation.dim() == 3):
 				lastSegmentActivationCollapsed = GIAANNproto_sparseTensors.reduceSparseBranchMax(lastSegmentActivation)

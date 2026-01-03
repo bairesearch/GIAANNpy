@@ -358,3 +358,26 @@ MANUAL; - add debugPrintTrainSequenceConceptAssignmentByLine - display each colu
 - patch featurePredictionTargetMatch to still match concept features when the token lemmas are the same but their words are different - concept features should be ambivalent to their morphology (eg plural noun vs singular noun)
 MANUAL; - update processColumnInferencePrediction - always calculate featurePredictionTargetMatch
 MANUAL; - remove debugPrintSequenceObservedColumnsConnections/debugPrintInferencePredictionIssue/debugTerminateInferenceOnPredictionTargetMismatch
+
+---
+v1g (Codex IDE GPT-5.2-Codex):
+- add proto GIAANNproto1g1a - upgrade the GIAANN inferenceUseNeuronFeaturePropertiesTime=True implementation:
+	a) store the best (not last) timeValue a branch (multipleDendriticBranches) segment (useSANI) was activated in its arrayIndexPropertiesTime property (during each prediction step).
+		- "best" is the timeValue that yields the smallest penalty for that segment when selecting the next feature node to activate (step b).
+		- when updating arrayIndexPropertiesTime, compare the existing timeValue vs the new timeValue using the step (b) penalty and keep the smaller; if penalties are equal, keep the existing timeValue (no update) to avoid tie-driven changes.
+		- pseudo code for feature segment time calculation (useSANIfeatures or useSANIfeaturesAndColumns and segmentIndex >= arrayNumberOfSegmentsColumnDistance): 
+			- timeValue = sequenceWordIndex (current sequence word index)
+		- pseudo code for column segment time calculation (useSANIcolumns or useSANIfeaturesAndColumns and segmentIndex < arrayNumberOfSegmentsColumnDistance):
+			- timeValue = sequenceColumnIndex (current sequence column index = the number of consecutive columns that have been activated in the sequence)
+	b) use arrayIndexPropertiesTime to temporarily modify the activation of each branch (multipleDendriticBranches) segment (useSANI) when selecting the next feature node to activate (during both standard inference and beam search).
+		- calculate timeValue (use same function above).
+		- each branch segment activation is temporarily modified based on how closely the last time it was activated (arrayIndexPropertiesTime) maps to its segmentIndex.
+		- pseudo code for feature segments (useSANIfeatures or useSANIfeaturesAndColumns and segmentIndex >= arrayNumberOfSegmentsColumnDistance): 
+			modifiedActivation = currentActivation - abs(currentTimeValue-arrayIndexPropertiesTime - (numberFeatureSegments-featureSegmentIndex)) 
+		- pseudo code for column segments (useSANIcolumns or useSANIfeaturesAndColumns and segmentIndex < arrayNumberOfSegmentsColumnDistance):
+			modifiedActivation = currentActivation - abs(currentTimeValue-arrayIndexPropertiesTime - (numberColumnSegments-columnSegmentIndex))
+		- ensure the code is executed vectorised across segmentIndex (do not use python for loop for each segmentIndex).
+		- if useSANIfeaturesAndColumns: feature and column segments should be processed separately using the same function (the pseudo code is same in both cases; only segment indices differ).
+		- ensure that all time modifications are applied to activations after inferenceSegmentActivationsBoolean is already applied to segments (ie time modification is always applied).
+	When implementing inferenceUseNeuronFeaturePropertiesTime, ensure to add comments referencing the precise specification step (a - b).
+MANUAL; - remove old inferenceUseNeuronFeaturePropertiesTime=True (inference time record) and inferenceUseNeuronFeaturePropertiesTime=False (train time record) implementations.

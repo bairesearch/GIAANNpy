@@ -64,10 +64,8 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 	if(arrayIndexPropertiesActivation):
 		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesActivationIndex, :, :, :, :] = 0
 	if(arrayIndexPropertiesTime):
-		if(inferenceUseNeuronFeaturePropertiesTime):
-			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTimeIndex, :, :, :, :] = 0
-		else:
-			sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTimeIndex, :, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTimeIndex] + featureNeuronsActive*sequenceIndex
+		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTimeIndex, :, :, :, :] = 0
+		#OLD inferenceUseNeuronFeaturePropertiesTime=False: sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTimeIndex, :, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[arrayIndexPropertiesTimeIndex] + featureNeuronsActive*sequenceIndex
 	if(arrayIndexPropertiesPos):
 		sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPosIndex, :, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[arrayIndexPropertiesPosIndex] + featureNeuronsActive*featureNeuronsPos
 
@@ -131,10 +129,8 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 	if(arrayIndexPropertiesActivation):
 		sequenceObservedColumns.featureConnections[arrayIndexPropertiesActivationIndex, :, :, :, :, :, :] = 0
 	if(arrayIndexPropertiesTime):
-		if(inferenceUseNeuronFeaturePropertiesTime):
-			sequenceObservedColumns.featureConnections[arrayIndexPropertiesTimeIndex, :, :, :, :, :, :] = 0
-		else:
-			sequenceObservedColumns.featureConnections[arrayIndexPropertiesTimeIndex, :, :, :, :, :, :] = featureConnectionsInactive*sequenceObservedColumns.featureConnections[arrayIndexPropertiesTimeIndex] + featureConnectionsActive*sequenceIndex
+		sequenceObservedColumns.featureConnections[arrayIndexPropertiesTimeIndex, :, :, :, :, :, :] = 0
+		#OLD inferenceUseNeuronFeaturePropertiesTime=False: sequenceObservedColumns.featureConnections[arrayIndexPropertiesTimeIndex, :, :, :, :, :, :] = featureConnectionsInactive*sequenceObservedColumns.featureConnections[arrayIndexPropertiesTimeIndex] + featureConnectionsActive*sequenceIndex
 	if(arrayIndexPropertiesPos):
 		sequenceObservedColumns.featureConnections[arrayIndexPropertiesPosIndex, :, :, :, :, :, :] = featureConnectionsInactive*sequenceObservedColumns.featureConnections[arrayIndexPropertiesPosIndex] + featureConnectionsActive*featureConnectionsPos
 	if(arrayIndexPropertiesMinWordDistance):

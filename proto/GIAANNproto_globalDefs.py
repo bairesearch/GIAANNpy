@@ -29,6 +29,14 @@ debugPrintTrainSequenceDelimiters = False
 debugPrintTrainSequencePOS = False	#print each training sentence with POS tags
 debugTerminateInferenceOnPredictionTargetMismatch = True
 
+debugInferenceUseNeuronFeaturePropertiesTime = False
+debugInferenceUseNeuronFeaturePropertiesTimeMinSequenceWordIndex = 18	#14
+debugInferenceUseNeuronFeaturePropertiesTimeTargeted = False
+debugInferenceUseNeuronFeaturePropertiesTimeTargetSequenceWordIndex = 19	#16
+debugInferenceUseNeuronFeaturePropertiesTimeTargetColumnName = "movement"
+debugInferenceUseNeuronFeaturePropertiesTimeTargetFeatureNames = ["has", "flourished"]
+
+
 #Train/inference mode selection:
 useInference = True  #default: True	#support inference mode else train (inferenceTrainFirstSequences: only) mode
 drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
@@ -81,13 +89,13 @@ else:
 inhibitoryConnectionStrengthIncrement = 1.0	#default increment applied when wiring inhibitory neurons to alternate prediction targets
 
 
-#Array properties (disable to optimise train speed/RAM)
+#Array properties (disable to optimise train speed/RAM during train)
 arrayIndexPropertiesEfficient = True	#default: True	#orig: False (required for drawing pos types)
 if(arrayIndexPropertiesEfficient):
 	arrayIndexPropertiesStrength = True
 	arrayIndexPropertiesPermanence = False
-	arrayIndexPropertiesActivation = False
-	arrayIndexPropertiesTime = False
+	arrayIndexPropertiesActivation = False	#automatically enabled during inference (see arrayIndexPropertiesActivationCreate)
+	arrayIndexPropertiesTime = False	#automatically enabled during inference (see arrayIndexPropertiesTimeCreate)
 	arrayIndexPropertiesPos = False
 else:
 	arrayIndexPropertiesStrength = True
@@ -95,7 +103,6 @@ else:
 	arrayIndexPropertiesActivation = True
 	arrayIndexPropertiesTime = True
 	arrayIndexPropertiesPos = True
-
 
 #Immediate (direct) connection identification;
 enforceDirectConnections = True	#default: True	#orig: False	#prediction requires a direct connection from previous prediction as observed during training (ie adjacent tokens)
@@ -251,7 +258,7 @@ if(useInference):
 		inferencePredictiveNetworkNormaliseInputs = True
 		if(inferencePredictiveNetworkNormaliseInputs):
 			inferencePredictiveNetworkNormaliseDim = 1	#orig: 0 #default: 1 -  normalise across SANI segments independently
-		inferenceUseNeuronFeaturePropertiesTime = True	#default:True	#orig:False		#FUTURE; else can use during train	#requires inferencePredictiveNetworkUseInputAllProperties
+		inferenceUseNeuronFeaturePropertiesTime = False	#deprecated	#default:False	#orig:False	
 		if(inferenceTrainPredictiveNetworkAllSequences):
 			inferenceSavePredictiveNetwork = True
 			numberEpochs = 1000	#default: 1	#10	#debug: 1000	#number of epochs to train predictive network
@@ -274,8 +281,9 @@ if(useInference):
 			inferencePredictiveNetworkInitialiseWeightsNearZero = True	#help predictive model to learn faster (rely exclusively on input activation levels at start of training)
 			transformerOutputLayerUseEveryColumn = True	#default: True	#orig: False	#whether the output layer uses features from every column (or just the final column in the sequence)
 	else:
-		inferenceUseNeuronFeaturePropertiesTime = False
-
+		inferenceUseNeuronFeaturePropertiesTime = False	#optional	#upgraded GIAANNproto1g1a
+else:
+	inferenceUseNeuronFeaturePropertiesTime = False
 
 #Draw;
 if(useInference):
@@ -292,7 +300,6 @@ if(useInference):
 	if(SANIconceptNeurons):
 		print("SANIconceptNeurons:useInference warning: there are too many SANI concept neuron (ie non-noun tuple) features per column to perform production level GIAANN inference on a conventional system; eg 100m phrases")
 else:
-	inferenceUseNeuronFeaturePropertiesTime = True	#required to initialise time part of inferencePredictiveNetworkUseInputAllProperties to 0
 	lowMem = False		 #default: False	#orig: True	#currently required to be False for inference compatibility	#optional
 	trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
 	trainSequenceObservedColumnsMatchSequenceWords = True	#mantatory		#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
@@ -411,9 +418,10 @@ if(useInference):
 			inferenceDeactivateNeuronsUponPrediction = False #do not use inferenceDeactivateNeuronsUponPrediction as the predictive network needs a temporarily consistent trace of the activations in the network		
 		else:
 			inferenceDeactivateNeuronsUponPrediction = True
-		if(inferenceUseNeuronFeaturePropertiesTime):
-			inferenceUseNeuronFeaturePropertiesTimeActivate = 100	#default: 100 #max tokens remembered in sequence	#time is not reinitialised upon feature selection (deactivation)
-			inferenceUseNeuronFeaturePropertiesTimeDecrement = -1
+		#depreciated:
+		#if(inferenceUseNeuronFeaturePropertiesTime):
+		#	inferenceUseNeuronFeaturePropertiesTimeActivate = 100	#default: 100 #max tokens remembered in sequence	#time is not reinitialised upon feature selection (deactivation)
+		#	inferenceUseNeuronFeaturePropertiesTimeDecrement = -1
 	else:
 		inferenceInvertNeuronActivationUponPrediction = False
 		inferenceDeactivateNeuronsUponPrediction = True	#default: True
@@ -513,10 +521,11 @@ if(arrayIndexPropertiesPermanence):
 	arrayIndexPropertiesPermanenceIndex = len(arrayPropertiesList)
 	arrayPropertiesList.append(arrayIndexPropertiesPermanenceIndex)
 arrayIndexPropertiesActivationCreate = arrayIndexPropertiesActivation or useInference
+arrayIndexPropertiesTimeCreate = arrayIndexPropertiesTime or inferenceUseNeuronFeaturePropertiesTime
 if(arrayIndexPropertiesActivationCreate):
 	arrayIndexPropertiesActivationIndex = len(arrayPropertiesList)
 	arrayPropertiesList.append(arrayIndexPropertiesActivationIndex)
-if(arrayIndexPropertiesTime):
+if(arrayIndexPropertiesTimeCreate):
 	arrayIndexPropertiesTimeIndex = len(arrayPropertiesList)
 	arrayPropertiesList.append(arrayIndexPropertiesTimeIndex)
 if(arrayIndexPropertiesPos):

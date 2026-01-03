@@ -73,25 +73,314 @@ if(inferenceSegmentActivationsBoolean):
 		else:
 			return globalFeatureNeuronsActivation.bool().float()
 
+def calculateSequenceColumnIndex(conceptMask, sequenceWordIndex):
+	result = None
+	if(conceptMask is None):
+		raise RuntimeError("calculateSequenceColumnIndex: conceptMask is None")
+	if(sequenceWordIndex < 0 or sequenceWordIndex >= conceptMask.shape[0]):
+		raise RuntimeError("calculateSequenceColumnIndex: sequenceWordIndex out of range")
+	sequenceColumnIndexTensor = pt.sum(conceptMask[:sequenceWordIndex+1].to(pt.long))
+	result = int(sequenceColumnIndexTensor.item())
+	return result
+
+def buildSparseIndexKeys(indices, size):
+	if(indices.dim() != 2):
+		raise RuntimeError("buildSparseIndexKeys: indices must be 2D")
+	if(len(size) != indices.shape[0]):
+		raise RuntimeError("buildSparseIndexKeys: size mismatch")
+	strides = pt.tensor([size[1]*size[2]*size[3], size[2]*size[3], size[3], 1], dtype=pt.long, device=indices.device)
+	keys = (indices * strides.unsqueeze(1)).sum(dim=0)
+	return keys
+
+def gatherSparseTensorValuesAtIndices(tensor, indices, dtype):
+	result = None
+	if(tensor is None):
+		result = pt.zeros((indices.shape[1],), dtype=dtype, device=indices.device)
+	else:
+		if(not tensor.is_sparse):
+			result = tensor[indices[0], indices[1], indices[2], indices[3]].to(dtype)
+		else:
+			tensor = tensor.coalesce()
+			if(tensor._nnz() == 0):
+				result = pt.zeros((indices.shape[1],), dtype=dtype, device=indices.device)
+			else:
+				size = tensor.size()
+				if(len(size) != indices.shape[0]):
+					raise RuntimeError("gatherSparseTensorValuesAtIndices: tensor/index size mismatch")
+				tensorKeys = buildSparseIndexKeys(tensor.indices(), size)
+				queryKeys = buildSparseIndexKeys(indices, size)
+				sortedTensorKeys, sortOrder = pt.sort(tensorKeys)
+				sortedTensorValues = tensor.values().index_select(0, sortOrder)
+				positions = pt.searchsorted(sortedTensorKeys, queryKeys)
+				valid = positions < sortedTensorKeys.shape[0]
+				safePositions = positions.clamp(max=sortedTensorKeys.shape[0]-1)
+				matches = valid & (sortedTensorKeys[safePositions] == queryKeys)
+				result = pt.zeros((queryKeys.shape[0],), dtype=sortedTensorValues.dtype, device=sortedTensorValues.device)
+				if(matches.any()):
+					result[matches] = sortedTensorValues.index_select(0, safePositions[matches])
+				if(result.dtype != dtype):
+					result = result.to(dtype)
+	return result
+
+def replaceSparseTensorValuesAtIndices(sparseTensor, updateIndices, updateValues):
+	result = sparseTensor
+	if(sparseTensor is None):
+		raise RuntimeError("replaceSparseTensorValuesAtIndices: sparseTensor is None")
+	if(updateIndices is None):
+		result = sparseTensor
+	else:
+		if(updateIndices.numel() == 0):
+			result = sparseTensor
+		else:
+			sparseTensor = sparseTensor.coalesce()
+			updateIndices = updateIndices.to(sparseTensor.device)
+			updateValues = updateValues.to(sparseTensor.device)
+			if(updateValues.dtype != sparseTensor.values().dtype):
+				updateValues = updateValues.to(sparseTensor.values().dtype)
+			size = sparseTensor.size()
+			if(len(size) != updateIndices.shape[0]):
+				raise RuntimeError("replaceSparseTensorValuesAtIndices: updateIndices size mismatch")
+			existingIndices = sparseTensor.indices()
+			existingValues = sparseTensor.values()
+			if(existingIndices.numel() == 0):
+				newIndices = updateIndices
+				newValues = updateValues
+			else:
+				existingKeys = buildSparseIndexKeys(existingIndices, size)
+				updateKeys = buildSparseIndexKeys(updateIndices, size)
+				sortedUpdateKeys, updateOrder = pt.sort(updateKeys)
+				positions = pt.searchsorted(sortedUpdateKeys, existingKeys)
+				valid = positions < sortedUpdateKeys.shape[0]
+				safePositions = positions.clamp(max=sortedUpdateKeys.shape[0]-1)
+				matches = valid & (sortedUpdateKeys[safePositions] == existingKeys)
+				keepMask = ~matches
+				newIndices = pt.cat([existingIndices[:, keepMask], updateIndices], dim=1)
+				newValues = pt.cat([existingValues[keepMask], updateValues], dim=0)
+			result = pt.sparse_coo_tensor(newIndices, newValues, size=size, device=sparseTensor.device).coalesce()
+	return result
+
+def buildSegmentTimeValues(segmentIndices, sequenceWordIndex, sequenceColumnIndex, dtype, device):
+	result = None
+	if(useSANIfeaturesAndColumns):
+		if(sequenceColumnIndex is None):
+			raise RuntimeError("buildSegmentTimeValues: sequenceColumnIndex is required for column segments")
+		if(sequenceWordIndex < 0):
+			raise RuntimeError("buildSegmentTimeValues: sequenceWordIndex must be >= 0 for source time")
+		if(sequenceColumnIndex < 0):
+			raise RuntimeError("buildSegmentTimeValues: sequenceColumnIndex must be >= 0 for source time")
+		result = pt.zeros_like(segmentIndices, dtype=dtype, device=device)
+		featureMask = segmentIndices >= arrayNumberOfSegmentsColumnDistance
+		if(featureMask.any()):
+			result[featureMask] = float(sequenceWordIndex)
+		if((~featureMask).any()):
+			result[~featureMask] = float(sequenceColumnIndex)
+	elif(useSANIfeatures):
+		if(sequenceWordIndex < 0):
+			raise RuntimeError("buildSegmentTimeValues: sequenceWordIndex must be >= 0 for source time")
+		result = pt.full_like(segmentIndices, float(sequenceWordIndex), dtype=dtype, device=device)
+	elif(useSANIcolumns):
+		if(sequenceColumnIndex is None):
+			raise RuntimeError("buildSegmentTimeValues: sequenceColumnIndex is required for column segments")
+		if(sequenceColumnIndex < 0):
+			raise RuntimeError("buildSegmentTimeValues: sequenceColumnIndex must be >= 0 for source time")
+		result = pt.full_like(segmentIndices, float(sequenceColumnIndex), dtype=dtype, device=device)
+	else:
+		raise RuntimeError("buildSegmentTimeValues: useSANI feature mode not configured")
+	return result
+
+def computeTimePenaltyForSegmentGroup(segmentIndices, storedTimes, currentTimeValue, numberSegments, segmentIndexOffset):
+	localSegmentIndex = (segmentIndices - segmentIndexOffset).to(storedTimes.dtype)
+	offsetValues = (float(numberSegments) - localSegmentIndex)
+	currentTimeValues = pt.full_like(storedTimes, float(currentTimeValue))
+	penaltyValues = pt.abs(currentTimeValues - storedTimes - offsetValues)
+	return penaltyValues
+
+def computeTimePenaltyForSegments(segmentIndices, storedTimes, sequenceWordIndex, sequenceColumnIndex):
+	result = pt.zeros_like(storedTimes)
+	if(useSANIfeaturesAndColumns):
+		if(sequenceColumnIndex is None):
+			raise RuntimeError("computeTimePenaltyForSegments: sequenceColumnIndex is required for column segments")
+		featureMask = segmentIndices >= arrayNumberOfSegmentsColumnDistance
+		columnMask = ~featureMask
+		if(featureMask.any()):
+			result[featureMask] = computeTimePenaltyForSegmentGroup(segmentIndices[featureMask], storedTimes[featureMask], sequenceWordIndex, arrayNumberOfSegmentsFeatureDistance, arrayNumberOfSegmentsColumnDistance)
+		if(columnMask.any()):
+			result[columnMask] = computeTimePenaltyForSegmentGroup(segmentIndices[columnMask], storedTimes[columnMask], sequenceColumnIndex, arrayNumberOfSegmentsColumnDistance, 0)
+	elif(useSANIfeatures):
+		result = computeTimePenaltyForSegmentGroup(segmentIndices, storedTimes, sequenceWordIndex, arrayNumberOfSegments, 0)
+	elif(useSANIcolumns):
+		if(sequenceColumnIndex is None):
+			raise RuntimeError("computeTimePenaltyForSegments: sequenceColumnIndex is required for column segments")
+		result = computeTimePenaltyForSegmentGroup(segmentIndices, storedTimes, sequenceColumnIndex, arrayNumberOfSegments, 0)
+	else:
+		raise RuntimeError("computeTimePenaltyForSegments: useSANI feature mode not configured")
+	return result
+
+def applyTimeBasedActivationModifier(globalFeatureNeuronsActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex):
+	result = globalFeatureNeuronsActivation
+	if(inferenceUseNeuronFeaturePropertiesTime):
+		if(not useSANI):
+			raise RuntimeError("applyTimeBasedActivationModifier: useSANI is required")
+		if(globalFeatureNeuronsTime is None):
+			raise RuntimeError("applyTimeBasedActivationModifier: globalFeatureNeuronsTime is None")
+		activationSparse = globalFeatureNeuronsActivation
+		if(not activationSparse.is_sparse):
+			activationSparse = activationSparse.to_sparse_coo()
+		activationSparse = activationSparse.coalesce()
+		if(activationSparse._nnz() == 0):
+			result = activationSparse
+		else:
+			indices = activationSparse.indices()
+			values = activationSparse.values()
+			storedTimes = gatherSparseTensorValuesAtIndices(globalFeatureNeuronsTime, indices, values.dtype)
+			segmentIndices = indices[1]
+			penaltyValues = computeTimePenaltyForSegments(segmentIndices, storedTimes, sequenceWordIndex, sequenceColumnIndex)
+			modifiedValues = values - penaltyValues
+			if(debugInferenceUseNeuronFeaturePropertiesTime and sequenceWordIndex >= debugInferenceUseNeuronFeaturePropertiesTimeMinSequenceWordIndex):
+				# spec step (b): debug time-based activation modifier per segment.
+				penaltyMin = float(penaltyValues.min().item())
+				penaltyMean = float(penaltyValues.mean().item())
+				penaltyMax = float(penaltyValues.max().item())
+				modifiedMin = float(modifiedValues.min().item())
+				modifiedMean = float(modifiedValues.mean().item())
+				modifiedMax = float(modifiedValues.max().item())
+				print(f"debugInferenceUseNeuronFeaturePropertiesTime: sequenceWordIndex={sequenceWordIndex}, sequenceColumnIndex={sequenceColumnIndex}, nnz={int(values.shape[0])}, penaltyMin={penaltyMin}, penaltyMean={penaltyMean}, penaltyMax={penaltyMax}, modifiedMin={modifiedMin}, modifiedMean={modifiedMean}, modifiedMax={modifiedMax}")
+				offsetValues = pt.zeros_like(storedTimes)
+				currentTimeValues = pt.zeros_like(storedTimes)
+				if(useSANIfeaturesAndColumns):
+					featureMask = segmentIndices >= arrayNumberOfSegmentsColumnDistance
+					if(featureMask.any()):
+						localSegmentIndex = (segmentIndices[featureMask] - arrayNumberOfSegmentsColumnDistance).to(storedTimes.dtype)
+						offsetValues[featureMask] = float(arrayNumberOfSegmentsFeatureDistance) - localSegmentIndex
+						currentTimeValues[featureMask] = float(sequenceWordIndex)
+					if((~featureMask).any()):
+						localSegmentIndex = segmentIndices[~featureMask].to(storedTimes.dtype)
+						offsetValues[~featureMask] = float(arrayNumberOfSegmentsColumnDistance) - localSegmentIndex
+						currentTimeValues[~featureMask] = float(sequenceColumnIndex)
+				elif(useSANIfeatures):
+					localSegmentIndex = segmentIndices.to(storedTimes.dtype)
+					offsetValues = float(arrayNumberOfSegments) - localSegmentIndex
+					currentTimeValues = pt.full_like(storedTimes, float(sequenceWordIndex))
+				elif(useSANIcolumns):
+					localSegmentIndex = segmentIndices.to(storedTimes.dtype)
+					offsetValues = float(arrayNumberOfSegments) - localSegmentIndex
+					currentTimeValues = pt.full_like(storedTimes, float(sequenceColumnIndex))
+				else:
+					raise RuntimeError("applyTimeBasedActivationModifier: useSANI feature mode not configured")
+				sampleIndex = int(pt.argmax(penaltyValues).item())
+				sampleBranch = int(indices[0, sampleIndex].item())
+				sampleSegment = int(segmentIndices[sampleIndex].item())
+				sampleColumn = int(indices[2, sampleIndex].item())
+				sampleFeature = int(indices[3, sampleIndex].item())
+				sampleActivation = float(values[sampleIndex].item())
+				sampleStoredTime = float(storedTimes[sampleIndex].item())
+				sampleCurrentTime = float(currentTimeValues[sampleIndex].item())
+				sampleOffset = float(offsetValues[sampleIndex].item())
+				samplePenalty = float(penaltyValues[sampleIndex].item())
+				sampleModified = float(modifiedValues[sampleIndex].item())
+				print(f"debugInferenceUseNeuronFeaturePropertiesTime: sample=penaltyMax, branch={sampleBranch}, segment={sampleSegment}, column={sampleColumn}, feature={sampleFeature}, activation={sampleActivation}, storedTime={sampleStoredTime}, currentTime={sampleCurrentTime}, offset={sampleOffset}, penalty={samplePenalty}, modified={sampleModified}")
+			result = pt.sparse_coo_tensor(indices, modifiedValues, size=activationSparse.size(), device=activationSparse.device).coalesce()
+	return result
+
+def updateTimeValuesFromActivation(globalFeatureNeuronsTime, featureNeuronsTargetActivation, updateSequenceWordIndex, updateSequenceColumnIndex, selectionSequenceWordIndex=None, selectionSequenceColumnIndex=None, debugTargetColumnIndex=None, debugTargetFeatureIndices=None):
+	result = globalFeatureNeuronsTime
+	if(inferenceUseNeuronFeaturePropertiesTime):
+		if(not useSANI):
+			raise RuntimeError("updateTimeValuesFromActivation: useSANI is required")
+		if(globalFeatureNeuronsTime is None):
+			raise RuntimeError("updateTimeValuesFromActivation: globalFeatureNeuronsTime is None")
+		if(featureNeuronsTargetActivation is None):
+			result = globalFeatureNeuronsTime
+		else:
+			activationSparse = featureNeuronsTargetActivation
+			if(not activationSparse.is_sparse):
+				activationSparse = activationSparse.to_sparse_coo()
+			activationSparse = activationSparse.coalesce()
+			if(activationSparse._nnz() == 0):
+				result = globalFeatureNeuronsTime
+			else:
+				updateIndices = activationSparse.indices()
+				segmentIndices = updateIndices[1]
+				updateValues = buildSegmentTimeValues(segmentIndices, updateSequenceWordIndex, updateSequenceColumnIndex, globalFeatureNeuronsTime.dtype, activationSparse.device)
+				storedTimes = gatherSparseTensorValuesAtIndices(globalFeatureNeuronsTime, updateIndices, updateValues.dtype)
+				if(selectionSequenceWordIndex is None):
+					selectionSequenceWordIndex = updateSequenceWordIndex
+				if(selectionSequenceColumnIndex is None):
+					selectionSequenceColumnIndex = updateSequenceColumnIndex
+				if(useSANIfeatures or useSANIfeaturesAndColumns):
+					if(selectionSequenceWordIndex is None or selectionSequenceWordIndex < 0):
+						raise RuntimeError("updateTimeValuesFromActivation: selectionSequenceWordIndex must be >= 0 for selection time")
+				if(useSANIcolumns or useSANIfeaturesAndColumns):
+					if(selectionSequenceColumnIndex is None or selectionSequenceColumnIndex < 0):
+						raise RuntimeError("updateTimeValuesFromActivation: selectionSequenceColumnIndex must be >= 0 for selection time")
+				if(globalFeatureNeuronsTime.is_sparse):
+					timeSparse = globalFeatureNeuronsTime.coalesce()
+					if(timeSparse._nnz() == 0):
+						storedMatches = pt.zeros((updateIndices.shape[1],), dtype=pt.bool, device=updateIndices.device)
+					else:
+						timeKeys = buildSparseIndexKeys(timeSparse.indices(), timeSparse.size())
+						updateKeys = buildSparseIndexKeys(updateIndices, timeSparse.size())
+						sortedTimeKeys, _ = pt.sort(timeKeys)
+						positions = pt.searchsorted(sortedTimeKeys, updateKeys)
+						valid = positions < sortedTimeKeys.shape[0]
+						safePositions = positions.clamp(max=sortedTimeKeys.shape[0]-1)
+						storedMatches = valid & (sortedTimeKeys[safePositions] == updateKeys)
+				else:
+					storedMatches = pt.ones((updateIndices.shape[1],), dtype=pt.bool, device=updateIndices.device)
+				storedPenalty = computeTimePenaltyForSegments(segmentIndices, storedTimes, selectionSequenceWordIndex, selectionSequenceColumnIndex)
+				updatePenalty = computeTimePenaltyForSegments(segmentIndices, updateValues, selectionSequenceWordIndex, selectionSequenceColumnIndex)
+				storedPenalty = pt.where(storedMatches, storedPenalty, pt.full_like(storedPenalty, float("inf")))
+				# Keep existing time on equal-penalty ties to avoid non-deterministic updates.
+				updateMask = (~storedMatches) | (updatePenalty < storedPenalty)
+				if(debugInferenceUseNeuronFeaturePropertiesTimeTargeted and debugTargetColumnIndex is not None and debugTargetFeatureIndices is not None):
+					if(debugInferenceUseNeuronFeaturePropertiesTimeTargetSequenceWordIndex is None or selectionSequenceWordIndex == debugInferenceUseNeuronFeaturePropertiesTimeTargetSequenceWordIndex):
+						debugFeatureTensor = pt.tensor(debugTargetFeatureIndices, dtype=pt.long, device=updateIndices.device)
+						debugFeatureMatch = (updateIndices[3].unsqueeze(0) == debugFeatureTensor.unsqueeze(1)).any(dim=0)
+						debugMask = (updateIndices[2] == debugTargetColumnIndex) & debugFeatureMatch
+						if(debugMask.any()):
+							debugIndices = updateIndices[:, debugMask]
+							debugSegments = debugIndices[1].to(pt.long)
+							debugFeatures = debugIndices[3].to(pt.long)
+							debugStoredTimes = storedTimes[debugMask]
+							debugUpdateTimes = updateValues[debugMask]
+							debugStoredPenalty = storedPenalty[debugMask]
+							debugUpdatePenalty = updatePenalty[debugMask]
+							debugUpdateMask = updateMask[debugMask]
+							for debugFeatureIndex in debugTargetFeatureIndices:
+								debugLocalMask = debugFeatures == debugFeatureIndex
+								if(debugLocalMask.any()):
+									debugSegmentsLocal = debugSegments[debugLocalMask]
+									debugStoredTimesLocal = debugStoredTimes[debugLocalMask]
+									debugUpdateTimesLocal = debugUpdateTimes[debugLocalMask]
+									debugStoredPenaltyLocal = debugStoredPenalty[debugLocalMask]
+									debugUpdatePenaltyLocal = debugUpdatePenalty[debugLocalMask]
+									debugUpdateMaskLocal = debugUpdateMask[debugLocalMask]
+									print(f"debugInferenceUseNeuronFeaturePropertiesTimeUpdate: selectionSequenceWordIndex={selectionSequenceWordIndex}, updateSequenceWordIndex={updateSequenceWordIndex}, column={debugTargetColumnIndex}, feature={debugFeatureIndex}, segments={debugSegmentsLocal.tolist()}, storedTimes={debugStoredTimesLocal.tolist()}, updateTimes={debugUpdateTimesLocal.tolist()}, storedPenalty={debugStoredPenaltyLocal.tolist()}, updatePenalty={debugUpdatePenaltyLocal.tolist()}, updateMask={debugUpdateMaskLocal.tolist()}")
+				bestValues = storedTimes.clone()
+				bestValues[updateMask] = updateValues[updateMask]
+				# spec step (a): store best timeValue (min penalty vs step b) for activated segments.
+				result = replaceSparseTensorValuesAtIndices(globalFeatureNeuronsTime, updateIndices, bestValues)
+	return result
+
 #first dim cs1 restricted to a candiate set of tokens.
-def processFeaturesActivePredictMulti(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndices):
+def processFeaturesActivePredictMulti(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndices, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None, selectionSequenceWordIndex=None, selectionSequenceColumnIndex=None):
 	#print("processFeaturesActivePredictMulti:")
 	for conceptIndex in range(conceptColumnsIndices.shape[0]):
 		conceptColumnsIndicesSource = conceptColumnsIndices[conceptIndex].unsqueeze(dim=0)
 		conceptColumnsFeatureIndicesSource = conceptColumnsFeatureIndices[conceptIndex].unsqueeze(dim=0)
 		sourceConceptIndexValue = conceptColumnsIndicesSource.squeeze().item()
 		featureConnections = GIAANNproto_sparseTensors.sliceSparseTensor(sequenceObservedColumnsPrediction.featureConnections, 3, conceptIndex)	#sequence concept index dimension	#CHECKTHIS
-		globalFeatureNeuronsActivation, globalFeatureConnectionsActivation = processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource, sourceConceptIndexValue)
+		globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource, sourceConceptIndexValue, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex, selectionSequenceWordIndex, selectionSequenceColumnIndex)
 	
-	return globalFeatureNeuronsActivation, globalFeatureConnectionsActivation
+	return globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime
 	
 #first dim cs1 restricted to a single token
-def processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndices):
+def processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndices, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None, selectionSequenceWordIndex=None, selectionSequenceColumnIndex=None):
 	featureConnections = GIAANNproto_sparseTensors.sliceSparseTensor(sequenceObservedColumnsPrediction.featureConnections, 3, 0)	#sequence concept index dimension
 	sourceConceptIndexValue = conceptColumnsIndices.squeeze().item()
-	return processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndices, conceptColumnsFeatureIndices, sourceConceptIndexValue)
+	return processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndices, conceptColumnsFeatureIndices, sourceConceptIndexValue, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex, selectionSequenceWordIndex, selectionSequenceColumnIndex)
 
-def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndices, conceptColumnsFeatureIndices, sourceConceptIndex=None):
+def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndices, conceptColumnsFeatureIndices, sourceConceptIndex=None, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None, selectionSequenceWordIndex=None, selectionSequenceColumnIndex=None):
 		
 	featureNeuronsActive = GIAANNproto_sparseTensors.neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANImethod)
 	
@@ -146,6 +435,35 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 		featureConnectionsStrength = applyConnectionStrengthPOSdependenceInference(databaseNetworkObject, featureConnectionsStrength, featureConnectionsPos, sourceConceptIndex)
 	if(inferenceConnectionsStrengthBoolean):
 		featureConnectionsStrength = featureConnectionsStrength.bool().float()
+	debugTargetColumnIndex = None
+	debugTargetFeatureIndices = None
+	if(inferenceUseNeuronFeaturePropertiesTime and debugInferenceUseNeuronFeaturePropertiesTimeTargeted):
+		debugSequenceWordIndex = debugInferenceUseNeuronFeaturePropertiesTimeTargetSequenceWordIndex if debugInferenceUseNeuronFeaturePropertiesTimeTargetSequenceWordIndex is None else debugInferenceUseNeuronFeaturePropertiesTimeTargetSequenceWordIndex - 1
+		if(debugSequenceWordIndex is None or sequenceWordIndex == debugSequenceWordIndex):
+			if(debugInferenceUseNeuronFeaturePropertiesTimeTargetColumnName is None or debugInferenceUseNeuronFeaturePropertiesTimeTargetFeatureNames is None):
+				raise RuntimeError("processFeaturesActivePredict: debug target column/feature names not configured")
+			if(debugInferenceUseNeuronFeaturePropertiesTimeTargetColumnName not in databaseNetworkObject.conceptColumnsList):
+				raise RuntimeError("processFeaturesActivePredict: debug target column not found")
+			debugTargetColumnIndex = databaseNetworkObject.conceptColumnsList.index(debugInferenceUseNeuronFeaturePropertiesTimeTargetColumnName)
+			if(sourceConceptIndex == debugTargetColumnIndex and sourceFeatureIndex == featureIndexConceptNeuron):
+				debugTargetFeatureIndices = [databaseNetworkObject.conceptFeaturesList.index(featureName) if featureName in databaseNetworkObject.conceptFeaturesList else -1 for featureName in debugInferenceUseNeuronFeaturePropertiesTimeTargetFeatureNames]
+				if(-1 in debugTargetFeatureIndices):
+					raise RuntimeError("processFeaturesActivePredict: debug target feature not found")
+				debugDevice = featureConnectionsStrength.device
+				debugBranchCount = numberOfDendriticBranches if multipleDendriticBranches else 1
+				debugBranchRange = pt.arange(debugBranchCount, dtype=pt.long, device=debugDevice)
+				debugSegmentRange = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=debugDevice)
+				debugBranchIndices = debugBranchRange.repeat_interleave(arrayNumberOfSegments)
+				debugSegmentIndices = debugSegmentRange.repeat(debugBranchCount)
+				debugValueDtype = featureConnectionsStrength.values().dtype if featureConnectionsStrength.is_sparse else featureConnectionsStrength.dtype
+				for debugFeatureIndex, debugFeatureName in zip(debugTargetFeatureIndices, debugInferenceUseNeuronFeaturePropertiesTimeTargetFeatureNames):
+					debugColumnIndices = pt.full_like(debugSegmentIndices, debugTargetColumnIndex)
+					debugFeatureIndices = pt.full_like(debugSegmentIndices, debugFeatureIndex)
+					debugIndices = pt.stack([debugBranchIndices, debugSegmentIndices, debugColumnIndices, debugFeatureIndices], dim=0)
+					debugConnectionValues = gatherSparseTensorValuesAtIndices(featureConnectionsStrength, debugIndices, debugValueDtype)
+					debugConnectionByBranch = debugConnectionValues.view(debugBranchCount, arrayNumberOfSegments).sum(dim=1)
+					debugConnectionBySegment = debugConnectionValues.view(debugBranchCount, arrayNumberOfSegments).max(dim=0).values
+					print(f"debugInferenceUseNeuronFeaturePropertiesTimeTargetSource: sequenceWordIndex={sequenceWordIndex}, sourceColumn={debugInferenceUseNeuronFeaturePropertiesTimeTargetColumnName}({debugTargetColumnIndex}), sourceFeature={sourceFeatureIndex}, targetFeature={debugFeatureName}({debugFeatureIndex}), connectionByBranch={debugConnectionByBranch.tolist()}, connectionBySegmentMax={debugConnectionBySegment.tolist()}")
 	
 	if(featureNeuronsActive.dim() > 0):
 		featureNeuronsActive = featureNeuronsActive.reshape(-1)
@@ -168,6 +486,8 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 	else:
 		featureNeuronsTargetActivation = featureNeuronsTargetActivation*j1
 
+	featureNeuronsTargetActivationApplied = featureNeuronsTargetActivation
+
 	#update the activations of the target nodes;
 	if(useSANI):
 		if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
@@ -176,9 +496,11 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 				featureNeuronsTargetActivationDense = featureNeuronsTargetActivation
 				if(featureNeuronsTargetActivationDense.is_sparse):
 					featureNeuronsTargetActivationDense = featureNeuronsTargetActivationDense.to_dense()
+				featureNeuronsTargetActivationAppliedDense = pt.zeros_like(featureNeuronsTargetActivationDense)
 				for branchIndex in range(globalFeatureNeuronsActivationDense.shape[0]):
 					branchActivation = globalFeatureNeuronsActivationDense[branchIndex]
 					branchTargetActivation = featureNeuronsTargetActivationDense[branchIndex]
+					branchTargetActivationApplied = featureNeuronsTargetActivationAppliedDense[branchIndex]
 					if(useSANIfeaturesAndColumns):
 						# For useSANIfeaturesAndColumns, enforce sequential activation independently for:
 						# a) concept/column segments and b) feature segments.
@@ -188,16 +510,27 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 						previousFeatureChannelActivation = branchActivation[featureSegmentsOffset:arrayNumberOfSegments-1] > 0 if featureSegmentsOffset+1 < arrayNumberOfSegments else None
 						if(previousConceptChannelActivation is not None):
 							branchActivation[1:featureSegmentsOffset] += branchTargetActivation[1:featureSegmentsOffset] * previousConceptChannelActivation
+							branchTargetActivationApplied[1:featureSegmentsOffset] = branchTargetActivation[1:featureSegmentsOffset] * previousConceptChannelActivation
 						if(previousFeatureChannelActivation is not None):
 							branchActivation[featureSegmentsOffset+1:] += branchTargetActivation[featureSegmentsOffset+1:] * previousFeatureChannelActivation
+							branchTargetActivationApplied[featureSegmentsOffset+1:] = branchTargetActivation[featureSegmentsOffset+1:] * previousFeatureChannelActivation
 						branchActivation[0] += branchTargetActivation[0]
 						branchActivation[featureSegmentsOffset] += branchTargetActivation[featureSegmentsOffset]
+						branchTargetActivationApplied[0] = branchTargetActivation[0]
+						branchTargetActivationApplied[featureSegmentsOffset] = branchTargetActivation[featureSegmentsOffset]
 					else:
 						previousChannelActivation = branchActivation[:-1] > 0
 						branchActivation[1:] += branchTargetActivation[1:] * previousChannelActivation
 						branchActivation[0] += branchTargetActivation[0]
+						branchTargetActivationApplied[1:] = branchTargetActivation[1:] * previousChannelActivation
+						branchTargetActivationApplied[0] = branchTargetActivation[0]
 					globalFeatureNeuronsActivationDense[branchIndex] = branchActivation
+					featureNeuronsTargetActivationAppliedDense[branchIndex] = branchTargetActivationApplied
 				globalFeatureNeuronsActivation = globalFeatureNeuronsActivationDense.to_sparse_coo()
+				if(featureNeuronsTargetActivation.is_sparse):
+					featureNeuronsTargetActivationApplied = featureNeuronsTargetActivationAppliedDense.to_sparse_coo()
+				else:
+					featureNeuronsTargetActivationApplied = featureNeuronsTargetActivationAppliedDense
 			else:
 				globalFeatureNeuronsActivation += featureNeuronsTargetActivation
 		elif(algorithmMatrixSANImethod=="doNotEnforceActivationAcrossSegments"):
@@ -206,13 +539,16 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 		globalFeatureNeuronsActivation += featureNeuronsTargetActivation
 	if(inferenceSegmentActivationsBoolean):
 		globalFeatureNeuronsActivation = applySegmentActivationsBoolean(globalFeatureNeuronsActivation)
+	if(inferenceUseNeuronFeaturePropertiesTime):
+		# spec step (a): store best timeValue for activated segments during each prediction step
+		globalFeatureNeuronsTime = updateTimeValuesFromActivation(globalFeatureNeuronsTime, featureNeuronsTargetActivationApplied, sequenceWordIndex, sequenceColumnIndex, selectionSequenceWordIndex, selectionSequenceColumnIndex, debugTargetColumnIndex, debugTargetFeatureIndices)
 		
 	if(transformerUseInputConnections):
 		featureNeuronsTargetActivation = GIAANNproto_sparseTensors.expand_sparse_tensor(featureNeuronsTargetActivation, 2, conceptColumnsIndices.squeeze(), new_dim_size=databaseNetworkObject.c)
 		featureNeuronsTargetActivation = GIAANNproto_sparseTensors.expand_sparse_tensor(featureNeuronsTargetActivation, 3, conceptColumnsFeatureIndices.squeeze(), new_dim_size=databaseNetworkObject.f)
 		globalFeatureConnectionsActivation = globalFeatureConnectionsActivation + featureNeuronsTargetActivation
 
-	return globalFeatureNeuronsActivation, globalFeatureConnectionsActivation
+	return globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime
 
 def selectActivatedBranchIndex(globalFeatureNeuronsActivation, columnIndex, featureIndex):
 	if(not multipleDendriticBranches):
