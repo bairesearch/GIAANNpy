@@ -132,7 +132,7 @@ def processPrompt():
 def processDataset(dataset):
 	for articleIndex, article in enumerate(dataset):
 		processArticle(article['text'], articleIndex)
-		if(sequenceCount == maxSequences and useMaxSequences):
+		if(sequenceCount == trainMaxSequences and useMaxSequences):
 			break
 
 def processArticle(text, articleIndex):
@@ -183,7 +183,7 @@ def processArticle(text, articleIndex):
 				lastSequenceInPrompt = True
 		if(len(sequence) <= maxSequenceLength):
 			processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
-		if(sequenceCount == maxSequences and useMaxSequences):
+		if(sequenceCount == trainMaxSequences and useMaxSequences):
 			break
 			
 def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt):

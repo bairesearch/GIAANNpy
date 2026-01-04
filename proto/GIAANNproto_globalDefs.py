@@ -26,7 +26,7 @@ import sys
 debugPrintTrainSequenceConceptAssignment = True
 debugPrintTrainSequenceConceptAssignmentByLine = True	#display each column on a new line
 debugPrintTrainSequenceDelimiters = False
-debugPrintTrainSequencePOS = False	#print each training sentence with POS tags
+debugPrintTrainSequencePOS = True	#print each training sentence with POS tags
 debugTerminateInferenceOnPredictionTargetMismatch = True
 
 debugInferenceUseNeuronFeaturePropertiesTime = False
@@ -37,26 +37,31 @@ debugInferenceUseNeuronFeaturePropertiesTimeTargetColumnName = "movement"
 debugInferenceUseNeuronFeaturePropertiesTimeTargetFeatureNames = ["has", "flourished"]
 debugInferenceUseNeuronFeaturePropertiesTime2 = False
 
+debugDrawRelationTypesTrain = False
+debugmultipleDendriticBranchesDisable = False
 
-#Train/inference mode selection:
+
+#Train/inference mode selection;
 useInference = True  #default: True	#support inference mode else train (inferenceTrainFirstSequences: only) mode
 drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
 if(useInference):
 	drawNetworkDuringInferenceSeed = False	#default: False
 	drawNetworkDuringInferencePredict = False	#default: False
-	inferenceBeamSearch = True	#default: True	#orig: False
 	inferenceTrainFirstSequences = True	#default: True	#orig: True	#True: trains first sequences in inference_prompt.txt, performs inference only on last sequence; False: run inference on every sequence as independent seed/target prompts	#assumes inferenceTrainPredictiveNetworkAllSequences=False
+numSeedTokensInference = 5	#default: 5 (or 8)
 
 
 #Dataset;
-maxSequenceLength = 100	#default:100	#orig:10000		#in words	#depends on CPU/GPU RAM availability during train #trainSequenceObservedColumnsUseSequenceFeaturesOnly can be upgraded so only a limited amount of data is ever loaded to GPU during train (it currently temporarily masks entire feature arrays in GPU during transfer phase)
+maxSequenceLength = 100	#default:100	#orig:10000		#in words	#depends on CPU/GPU RAM availability during train 
 databaseFolder = "../database/" #default: "../database/"	#performance: "/media/user/ssddata/GIAANN/database/"	#orig: ""
-maxSequences = 10000		#debug: 10, 500, 10000, 34286 	#default: 100000000	  #adjust as needed (eg lower max_sequences during train before independent inferenceTrainPredictiveNetworkAllSequences execution)	#max sequences for train or inference	#requires useMaxSequences
+trainMaxSequences = 10000		#debug: 10, 500, 10000, 34286 	#default: 100000000	  #adjust as needed	#max sequences for train or inference (if inferenceTrainPredictiveNetworkAllSequences=True)	#requires useMaxSequences
 numberEpochs = 1	#default: 1
-multisentencePredictions = False	#default: False	#requires higher GPU RAM for train
+
+
+#Multisentence predictions - each sequence comprises multiple sentences;
+multisentencePredictions = False	#default: False	#each sequence comprises multiple sentences	#requires higher GPU RAM for train
 if(multisentencePredictions):
 	numSentencesPerSequence = 3	#default: 3
-numSeedTokensInference = 5	#default: 5 (or 8)
 
 
 #RAM;
@@ -68,7 +73,7 @@ else:
 useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/MLP predictive network model
 
 
-#Segment activation time optimisation;
+#Segment activation time;
 if(useInference):
 	inferenceUseNeuronFeaturePropertiesTime = False	#optional	#orig:False
 	inferenceUseNeuronFeaturePropertiesTimeExact = False	#optional	#orig:False
@@ -84,6 +89,7 @@ if(multipleDendriticBranches):
 	randomlyAssignBranches = False	#optional	#orig: False
 else:
 	numberOfDendriticBranches = 1
+	randomlyAssignBranches = False
 
 
 #Inhibitory neurons;
@@ -100,7 +106,7 @@ else:
 inhibitoryConnectionStrengthIncrement = 1.0	#default increment applied when wiring inhibitory neurons to alternate prediction targets
 
 
-#Array properties (disable to optimise train speed/RAM during train)
+#Array properties (disable to optimise train speed/RAM during train);
 arrayIndexPropertiesEfficient = True	#default: True	#orig: False (required for drawing pos types)
 if(arrayIndexPropertiesEfficient):
 	arrayIndexPropertiesStrength = True
@@ -116,7 +122,11 @@ else:
 	arrayIndexPropertiesPos = True
 
 
-#Immediate (direct) connection identification;
+#SANI;
+useSANI = True	#default: True	#orig: False	#sequentially activated neuronal input
+
+
+#Immediate (direct) connections;
 enforceDirectConnections = True	#default: True	#orig: False	#prediction requires a direct connection from previous prediction as observed during training (ie adjacent tokens)
 if(enforceDirectConnections):
 	enforceDirectConnectionsSANI = True	#default: False #orig: False	#enforce activation of first segment (direct feature connection)
@@ -125,10 +135,9 @@ else:
 	enforceDirectConnectionsSANI = False
 	enforceDirectConnectionsMinWordDistance = False
 if(enforceDirectConnectionsSANI):
-	useSANI = True	#sequentially activated neuronal input (divide dendrites into segments)
+	useSANI = True	#sequentially activated neuronal input (divide dendrites into segments)	#override
 	enforceDirectConnectionsSANIminimal = False	#default: False	#orig: True
 else:
-	useSANI = True	#optional	#default: True	#orig: False	#sequentially activated neuronal input (divide dendrites into segments)
 	enforceDirectConnectionsSANIminimal = False
 if(enforceDirectConnectionsMinWordDistance):
 	arrayIndexPropertiesMinWordDistance = True	#store min word distance per connection
@@ -177,7 +186,8 @@ if(trainConnectionStrengthPOSdependence or inferenceConnectionStrengthPOSdepende
 
 
 #Beam search;
-if(useInference and inferenceBeamSearch):
+if(useInference):
+	inferenceBeamSearch = True	#default: True	#orig: False
 	inferenceBeamSearchConceptColumns = False
 	inferenceBeamScoreStrategy = "nodeActivation"	#options: "nodeActivation", "activation_connection", "connection"
 	inferenceBeamConceptColumnNodeActivationThreshold = 0.0
@@ -253,6 +263,8 @@ if(useInference):
 			inferenceSeedTargetActivationsGlobalFeatureArrays = False	#optional	#default:True	#orig:False	
 		else:
 			inferenceSeedTargetActivationsGlobalFeatureArrays = False	#not supported
+else:
+	inferenceActivationFunction = False
 if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
 	useMaxSequences = False	#False: use all sequences from inference_prompt.txt
 else:
@@ -275,7 +287,7 @@ if(useInference):
 			numberEpochs = 1000	#default: 1	#10	#debug: 1000	#number of epochs to train predictive network
 		if(inferencePredictiveNetworkModel=="ColumnMLP"):
 			inferencePredictiveNetworkLearningRate = 0.0005	#default: 0.0005
-			inferencePredictiveNetworkModelFilterColumnsK = max(5, maxSequences//10)	#max(5, maxSequences//10)	#heuristic: int(c/10)	#5	#10	#50		#only consider top k columns for prediction (prefilter)
+			inferencePredictiveNetworkModelFilterColumnsK = max(5, trainMaxSequences//10)	#max(5, trainMaxSequences//10)	#heuristic: int(c/10)	#5	#10	#50		#only consider top k columns for prediction (prefilter)
 			print("inferencePredictiveNetworkModelFilterColumnsK = ", inferencePredictiveNetworkModelFilterColumnsK)
 			inferencePredictiveNetworkModelFilterColumnsKmax = True	#filter columns by max column activation rather than sum column activation.
 			inferencePredictiveNetworkUseInputAllProperties = True	#default: True
@@ -293,7 +305,8 @@ if(useInference):
 			transformerOutputLayerUseEveryColumn = True	#default: True	#orig: False	#whether the output layer uses features from every column (or just the final column in the sequence)
 
 
-#Draw;
+#Train optimisations;
+#trainSequenceObservedColumnsUseSequenceFeaturesOnly can be upgraded so only a limited amount of data is ever loaded to GPU during train (it currently temporarily masks entire feature arrays in GPU during transfer phase)
 if(useInference):
 	trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised	#if used during seed phase will bias prediction towards target sequence words
 	if(inferenceSeedNetwork):	
@@ -301,6 +314,16 @@ if(useInference):
 			trainSequenceObservedColumnsUseSequenceFeaturesOnly = False	#mandatory	#global feature arrays are directly written to during inference seed phase
 	lowMem = False		#mandatory
 	trainSequenceObservedColumnsMatchSequenceWords = True	#mantatory	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
+else:
+	lowMem = False		 #default: False	#orig: True	#currently required to be False for inference compatibility	#optional
+	trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
+	trainSequenceObservedColumnsMatchSequenceWords = True	#mantatory		#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
+	if(SANIconceptNeurons):
+		assert trainSequenceObservedColumnsUseSequenceFeaturesOnly	#required to significantly decrease GPU RAM during training
+
+
+#Draw;
+if(useInference):
 	drawSequenceObservedColumns = False	#mandatory
 	drawAllColumns = False	#mandatory
 	drawNetworkDuringTrainSave = False
@@ -308,35 +331,32 @@ if(useInference):
 	if(SANIconceptNeurons):
 		print("SANIconceptNeurons:useInference warning: there are too many SANI concept neuron (ie non-noun tuple) features per column to perform production level GIAANN inference on a conventional system; eg 100m phrases")
 else:
-	lowMem = False		 #default: False	#orig: True	#currently required to be False for inference compatibility	#optional
-	trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
-	trainSequenceObservedColumnsMatchSequenceWords = True	#mantatory		#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
 	drawSequenceObservedColumns = False	#optional	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !trainSequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns	#optional (will affect which network changes can be visualised)
 	drawAllColumns = False	#optional	#draw all columns in network (only used for automated visualisation; drawNetworkDuringTrainSave)	#requires !drawSequenceObservedColumns
 	if(drawAllColumns):
 		assert not trainSequenceObservedColumnsUseSequenceFeaturesOnly
 	drawNetworkDuringTrainSave = False
-	inferenceActivationFunction = False
-	if(SANIconceptNeurons):
-		assert trainSequenceObservedColumnsUseSequenceFeaturesOnly	#required to significantly decrease GPU RAM during training
 
-drawSegments = False and useSANI
-drawBranches = True and multipleDendriticBranches
+drawSegments = False and useSANI	#optional
+drawBranches = False and multipleDendriticBranches	#optional
+drawRelationTypes = False and not arrayIndexPropertiesEfficient
 
-drawBranchesTrain = False
-drawBranchesInference = False
-drawSegmentsTrain = False
-drawSegmentsInference = False
-if(drawBranches):
-	drawBranchesTrain = True 	#draws connection colours based on their target node incoming dendritic branch index	#overrides drawRelationTypesTrain connection draw colours
-	drawBranchesInference = True 	#overrides drawRelationTypesInference connection draw colours
+drawBranchesTrain = False	#derived
+drawBranchesInference = False	#derived
+drawSegmentsTrain = False	#derived
+drawSegmentsInference = False	#derived
+drawRelationTypesTrain = False	#derived
+drawRelationTypesInference = False	#derived
 if(drawSegments):
-	drawSegmentsTrain = True 	#draws connection colours based on their target node incoming segment index	#overrides drawRelationTypesTrain connection draw colours
-	drawSegmentsInference = True #overrides drawRelationTypesInference connection draw colours
+	drawSegmentsTrain = True 	#draws connection colours based on their target node incoming segment index
+	drawSegmentsInference = True
+elif(drawBranches):
+	drawBranchesTrain = True 	#draws connection colours based on their target node incoming dendritic branch index
+	drawBranchesInference = True 
+elif(drawRelationTypes):
+	drawRelationTypesTrain = True	#True: draw feature neuron and connection relation types in different colours
+	drawRelationTypesInference = False	#False: draw activation status
 
-
-drawRelationTypesTrain = True	#True: draw feature neuron and connection relation types in different colours
-drawRelationTypesInference = False	#False: draw activation status
 drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSequenceIndex"
 drawNetworkDuringInferenceSaveFilenamePrepend = "GIAANNproto1cSequenceObservedColumnsInferenceTokenIndex"
 drawHighResolutionFigure = True	#required for inference debug
@@ -545,7 +565,7 @@ if(arrayIndexPropertiesMinWordDistance):
 arrayNumberOfProperties = len(arrayPropertiesList)
 
 
-#SANI;
+#SANI settings;
 arrayIndexSegmentFirst = 0
 if(useSANI):
 	if(enforceDirectConnectionsSANIminimal):
@@ -584,7 +604,7 @@ if(useSANI):
 			arrayNumberOfSegments = numSeedTokensInference	#default: 5	#min number of nearest features to target node (note first segment captures all other features)
 	print("arrayNumberOfSegments = ", arrayNumberOfSegments)
 
-	algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment if previous segment(s) active
+	algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment under conditions
 	#algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI
 	if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
 		#algorithmMatrixSANIenforceRequirement="enforceAnySegmentMustBeActive"	#activate neuron if any segment is active

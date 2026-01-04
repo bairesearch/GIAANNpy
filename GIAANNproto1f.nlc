@@ -390,3 +390,6 @@ MANUAL; - remove old inferenceUseNeuronFeaturePropertiesTime=True (inference tim
 	in step b) if inferenceUseNeuronFeaturePropertiesTimeExact: skip specification step b. Only fire a neuron if the last segment time is ideal (ie exact time expected for the last segment index). This is redundant, as it is necessarily true (as the neuron fires when the last segment is activated).
 	This update is being applied because earlier segment times may be overwritten before the neuron fires thereby compromising their use in a final segment time array check (b).
 - patch inferenceUseNeuronFeaturePropertiesTime (and inferenceUseNeuronFeaturePropertiesTimeExact) so seed-phase activation/time segment updates follow the same rules as prediction-phase updates.
+- patch the node drawing path to stop collapsing to branch 0 when randomlyAssignBranches=True
+- define !multipleDendriticBranches:randomlyAssignBranches = False
+- update readme

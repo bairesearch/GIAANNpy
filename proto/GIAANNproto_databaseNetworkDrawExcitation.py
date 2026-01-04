@@ -39,6 +39,27 @@ def selectDrawBranch(tensor, drawBranches):
 		return tensor[:, 0]
 	return tensor
 
+def collapseBranchDimensionForNodes(tensor, drawBranches):
+	result = tensor
+	if(drawBranches and multipleDendriticBranches):
+		if(tensor is None):
+			raise RuntimeError("collapseBranchDimensionForNodes error: tensor is None while drawBranches enabled")
+		if(tensor.dim() <= 1):
+			raise RuntimeError("collapseBranchDimensionForNodes error: tensor rank missing branch dimension")
+		if(tensor.size(1) != numberOfDendriticBranches):
+			raise RuntimeError("collapseBranchDimensionForNodes error: branch dimension mismatch")
+		if(tensor.is_sparse):
+			tensorCoalesced = tensor.coalesce()
+			indices = tensorCoalesced.indices()
+			values = tensorCoalesced.values()
+			reorderedIndices = pt.cat([indices[1:2], indices[0:1], indices[2:]], dim=0)
+			reorderedSize = (tensorCoalesced.size(1), tensorCoalesced.size(0)) + tensorCoalesced.size()[2:]
+			reorderedTensor = pt.sparse_coo_tensor(reorderedIndices, values, size=reorderedSize, device=tensorCoalesced.device).coalesce()
+			result = GIAANNproto_sparseTensors.reduceSparseBranchMax(reorderedTensor)
+		else:
+			result = tensor.max(dim=1).values
+	return result
+
 if(drawSegmentsTrain):
 	segmentColoursBase = ['red', 'green', 'blue', 'yellow', 'magenta', 'cyan']
 	segmentColours = segmentColoursBase
@@ -70,6 +91,8 @@ if(drawRelationTypesTrain):
 	relationTypeQuantityPos1 = 'SYM'
 	relationTypeQuantityPos2 = 'NUM'
 	relationTypeAuxPos = 'AUX'
+	relationTypePunctuationPos = 'PUNCT'
+	relationTypePronounPos = 'PRON'
 
 	neuronPosToRelationTypeDict = {}
 	neuronPosToRelationTypeDict[relationTypeConceptPos1] = 'blue'
@@ -85,6 +108,8 @@ if(drawRelationTypesTrain):
 	neuronPosToRelationTypeDict[relationTypeQuantityPos1] = 'purple'
 	neuronPosToRelationTypeDict[relationTypeQuantityPos2] = 'purple'
 	neuronPosToRelationTypeDict[relationTypeAuxPos] = 'lightskyblue'
+	neuronPosToRelationTypeDict[relationTypePunctuationPos] = 'brown'
+	neuronPosToRelationTypeDict[relationTypePronounPos] = 'indigo'
 
 	relationTypePartPropertyCol = 'cyan'
 	relationTypeAuxDefinitionCol = 'blue'
@@ -104,8 +129,10 @@ if(drawRelationTypesTrain):
 		posString = posIntToPosString(databaseNetworkObject.nlp, posInt)
 		if(posString):
 			if(posString in neuronPosToRelationTypeDict):
+				print("OK: word = ", word, ", posString = ", posString)
 				colour = neuronPosToRelationTypeDict[posString]
 			else:
+				print("FAIL: word = ", word, ", posString = ", posString)
 				colour = relationTypeOtherCol
 				
 			#special cases;
@@ -231,15 +258,22 @@ if(drawSparseArrays):
 				featureWordToIndex = sequenceObservedColumns.featureWordToIndex
 				yOffset = 1 + 1	#reserve space at bottom of column for feature concept neuron
 				cIdx = sequenceObservedColumns.conceptNameToIndex[lemma]
-				featureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons, False)[:, :, cIdx]
+				featureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons, drawBranches)
+				if(drawBranches):
+					featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
+				featureNeurons = featureNeurons[:, :, cIdx]
 			else:
 				featureWordToIndex = observedColumn.featureWordToIndex
 				yOffset = 1
 				if lowMem:
-					featureNeurons = selectDrawBranch(observedColumn.featureNeurons, False)
+					featureNeurons = selectDrawBranch(observedColumn.featureNeurons, drawBranches)
+					if(drawBranches):
+						featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
 				else:
 					featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 3, conceptIndex)
-					featureNeurons = selectDrawBranch(featureNeurons, False)
+					featureNeurons = selectDrawBranch(featureNeurons, drawBranches)
+					if(drawBranches):
+						featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
 					#featureNeurons = databaseNetworkObject.globalFeatureNeurons[:, :, conceptIndex]	#operation not supported for sparse tensors
 			
 			# Draw feature neurons
@@ -574,15 +608,22 @@ else:
 				featureWordToIndex = sequenceObservedColumns.featureWordToIndex
 				yOffset = 1 + 1	#reserve space at bottom of column for feature concept neuron
 				cIdx = sequenceObservedColumns.conceptNameToIndex[lemma]
-				featureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons, False)[:, :, cIdx]
+				featureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons, drawBranches)
+				if(drawBranches):
+					featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
+				featureNeurons = featureNeurons[:, :, cIdx]
 			else:
 				featureWordToIndex = observedColumn.featureWordToIndex
 				yOffset = 1
 				if lowMem:
-					featureNeurons = selectDrawBranch(observedColumn.featureNeurons, False)
+					featureNeurons = selectDrawBranch(observedColumn.featureNeurons, drawBranches)
+					if(drawBranches):
+						featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
 				else:
 					featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 3, conceptIndex)
-					featureNeurons = selectDrawBranch(featureNeurons, False)
+					featureNeurons = selectDrawBranch(featureNeurons, drawBranches)
+					if(drawBranches):
+						featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
 					#featureNeurons = databaseNetworkObject.globalFeatureNeurons[:, :, conceptIndex]	#operation not supported for sparse tensors
 			
 			# Draw feature neurons
