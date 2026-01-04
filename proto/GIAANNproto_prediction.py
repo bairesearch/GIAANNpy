@@ -503,7 +503,9 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	globalFeatureNeuronsActivation = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivationIndex]
 	#print("1 globalFeatureNeuronsActivation = ", globalFeatureNeuronsActivation)
 	globalFeatureNeuronsStrength = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesStrengthIndex]
-	globalFeatureNeuronsTime = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesTimeIndex]
+	globalFeatureNeuronsTime = None
+	if(inferenceUseNeuronFeaturePropertiesTime):
+		globalFeatureNeuronsTime = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesTimeIndex]
 	sequenceColumnIndex = None
 	if(inferenceUseNeuronFeaturePropertiesTime):
 		if(useSANIcolumns or useSANIfeaturesAndColumns):
@@ -539,6 +541,22 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		connectedColumnsConstraint = None
 		connectedColumnsFeatureMap = None
 	if((predictionEnsureConnectedToPreviousPrediction or enforceDirectConnectionsMinWordDistance) and connectedColumnsConstraint is not None and connectedColumnsConstraint.numel() == 0):
+		if(debugInferenceUseNeuronFeaturePropertiesTime2):
+			debugRowCount = conceptColumnsIndices.shape[0]
+			for debugRowIndex in range(debugRowCount):
+				debugSourceColumnIndex = int(conceptColumnsIndices[debugRowIndex].item())
+				debugRowTensor = conceptColumnsFeatureIndices[debugRowIndex]
+				if(debugRowTensor is None or debugRowTensor.numel() == 0):
+					print(f"debugInferenceUseNeuronFeaturePropertiesTime2: no source features for columnIndex={debugSourceColumnIndex}")
+				else:
+					debugFeatureValues = debugRowTensor.detach().view(-1).tolist()
+					for debugFeatureValue in debugFeatureValues:
+						debugObservedColumn = getObservedColumnForIndex(databaseNetworkObject, observedColumnsDict, debugSourceColumnIndex)
+						if(debugObservedColumn is None):
+							print(f"debugInferenceUseNeuronFeaturePropertiesTime2: missing observedColumn for columnIndex={debugSourceColumnIndex}")
+						else:
+							debugTargets, debugTargetFeatureMap = getConnectedColumnsForFeature(debugObservedColumn, int(debugFeatureValue), includeFeatureDetails=True)
+							print(f"debugInferenceUseNeuronFeaturePropertiesTime2: sourceColumnIndex={debugSourceColumnIndex}, sourceFeatureIndex={int(debugFeatureValue)}, targets={debugTargets}, targetFeatureMap={debugTargetFeatureMap}")
 		raisePredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "previous prediction has no outgoing connections")
 		
 	if(wordPredictionIndex > 0):
@@ -574,10 +592,18 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 			#	globalFeatureNeuronsTime = GIAANNproto_predictionActivate.decrementActivation(globalFeatureNeuronsTime, inferenceUseNeuronFeaturePropertiesTimeDecrement)
 
 		#process features (activate global target neurons);
+		activationSequenceWordIndex = sequenceWordIndex
+		activationSequenceColumnIndex = sequenceColumnIndex
+		if(inferenceUseNeuronFeaturePropertiesTime and inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+			activationSequenceWordIndex = sequenceWordIndex - 1
+			if(activationSequenceWordIndex < 0):
+				raise RuntimeError("processColumnInferencePrediction: activationSequenceWordIndex out of range")
+			if(useSANIcolumns or useSANIfeaturesAndColumns):
+				activationSequenceColumnIndex = GIAANNproto_predictionActivate.calculateSequenceColumnIndex(conceptMask, activationSequenceWordIndex)
 		if(multipleSources):
-			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = GIAANNproto_predictionActivate.processFeaturesActivePredictMulti(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
+			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = GIAANNproto_predictionActivate.processFeaturesActivePredictMulti(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex)
 		else:
-			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = GIAANNproto_predictionActivate.processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
+			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = GIAANNproto_predictionActivate.processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex)
 		if(inferenceUseNeuronFeaturePropertiesTime):
 			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTimeIndex)
 		if(debugSANIfeaturesAndColumns and useSANIfeaturesAndColumns):

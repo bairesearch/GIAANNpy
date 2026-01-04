@@ -216,6 +216,76 @@ def computeTimePenaltyForSegments(segmentIndices, storedTimes, sequenceWordIndex
 		raise RuntimeError("computeTimePenaltyForSegments: useSANI feature mode not configured")
 	return result
 
+def applyExactTimeActivationConstraint(featureNeuronsTargetActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex):
+	result = featureNeuronsTargetActivation
+	if(inferenceUseNeuronFeaturePropertiesTimeExact):
+		if(not inferenceUseNeuronFeaturePropertiesTime):
+			raise RuntimeError("applyExactTimeActivationConstraint: inferenceUseNeuronFeaturePropertiesTime is required")
+		if(not useSANI):
+			raise RuntimeError("applyExactTimeActivationConstraint: useSANI is required")
+		if(globalFeatureNeuronsTime is None):
+			raise RuntimeError("applyExactTimeActivationConstraint: globalFeatureNeuronsTime is None")
+		activationSparse = featureNeuronsTargetActivation
+		wasDense = False
+		if(not activationSparse.is_sparse):
+			activationSparse = activationSparse.to_sparse_coo()
+			wasDense = True
+		activationSparse = activationSparse.coalesce()
+		if(activationSparse._nnz() == 0):
+			result = activationSparse
+		else:
+			indices = activationSparse.indices()
+			values = activationSparse.values()
+			segmentIndices = indices[1]
+			requiresCheck = pt.zeros((segmentIndices.shape[0],), dtype=pt.bool, device=segmentIndices.device)
+			if(useSANIfeaturesAndColumns):
+				featureMask = segmentIndices >= arrayNumberOfSegmentsColumnDistance
+				columnMask = ~featureMask
+				if(columnMask.any()):
+					requiresCheck = requiresCheck | (columnMask & (segmentIndices > 0))
+				if(featureMask.any()):
+					requiresCheck = requiresCheck | (featureMask & (segmentIndices > arrayNumberOfSegmentsColumnDistance))
+			else:
+				requiresCheck = segmentIndices > 0
+			allowedMask = pt.ones((segmentIndices.shape[0],), dtype=pt.bool, device=segmentIndices.device)
+			if(requiresCheck.any()):
+				checkIndices = pt.nonzero(requiresCheck, as_tuple=False).view(-1)
+				localSegmentIndices = segmentIndices.index_select(0, checkIndices)
+				prevIndices = indices.index_select(1, checkIndices).clone()
+				prevSegmentIndices = localSegmentIndices - 1
+				prevIndices[1] = prevSegmentIndices
+				prevStoredTimes = gatherSparseTensorValuesAtIndices(globalFeatureNeuronsTime, prevIndices, values.dtype)
+				currentTimeValues = pt.zeros_like(prevStoredTimes)
+				if(useSANIfeaturesAndColumns):
+					featureMaskCheck = localSegmentIndices >= arrayNumberOfSegmentsColumnDistance
+					if(featureMaskCheck.any()):
+						currentTimeValues[featureMaskCheck] = float(sequenceWordIndex)
+					if((~featureMaskCheck).any()):
+						if(sequenceColumnIndex is None):
+							raise RuntimeError("applyExactTimeActivationConstraint: sequenceColumnIndex is required for column segments")
+						currentTimeValues[~featureMaskCheck] = float(sequenceColumnIndex)
+				elif(useSANIfeatures):
+					currentTimeValues = pt.full_like(prevStoredTimes, float(sequenceWordIndex))
+				elif(useSANIcolumns):
+					if(sequenceColumnIndex is None):
+						raise RuntimeError("applyExactTimeActivationConstraint: sequenceColumnIndex is required for column segments")
+					currentTimeValues = pt.full_like(prevStoredTimes, float(sequenceColumnIndex))
+				else:
+					raise RuntimeError("applyExactTimeActivationConstraint: useSANI feature mode not configured")
+				allowedMask[checkIndices] = (currentTimeValues - prevStoredTimes) == 1
+			keepIndices = pt.nonzero(allowedMask, as_tuple=False).view(-1)
+			if(keepIndices.numel() == 0):
+				emptyIndices = pt.empty((indices.shape[0], 0), dtype=indices.dtype, device=indices.device)
+				emptyValues = pt.empty((0,), dtype=values.dtype, device=values.device)
+				result = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=activationSparse.size(), device=activationSparse.device).coalesce()
+			else:
+				keptIndices = indices.index_select(1, keepIndices)
+				keptValues = values.index_select(0, keepIndices)
+				result = pt.sparse_coo_tensor(keptIndices, keptValues, size=activationSparse.size(), device=activationSparse.device).coalesce()
+		if(wasDense):
+			result = result.to_dense()
+	return result
+
 def applyTimeBasedActivationModifier(globalFeatureNeuronsActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex):
 	result = globalFeatureNeuronsActivation
 	if(inferenceUseNeuronFeaturePropertiesTime):
@@ -227,7 +297,10 @@ def applyTimeBasedActivationModifier(globalFeatureNeuronsActivation, globalFeatu
 		if(not activationSparse.is_sparse):
 			activationSparse = activationSparse.to_sparse_coo()
 		activationSparse = activationSparse.coalesce()
-		if(activationSparse._nnz() == 0):
+		if(inferenceUseNeuronFeaturePropertiesTimeExact):
+			# spec step (b): skipped when inferenceUseNeuronFeaturePropertiesTimeExact is enabled.
+			result = activationSparse
+		elif(activationSparse._nnz() == 0):
 			result = activationSparse
 		else:
 			indices = activationSparse.indices()
@@ -236,15 +309,6 @@ def applyTimeBasedActivationModifier(globalFeatureNeuronsActivation, globalFeatu
 			segmentIndices = indices[1]
 			penaltyValues = computeTimePenaltyForSegments(segmentIndices, storedTimes, sequenceWordIndex, sequenceColumnIndex)
 			modifiedValues = values - penaltyValues
-			if(inferenceUseNeuronFeaturePropertiesTimeExact):
-				# spec step (b): require exact time match for all segments of a neuron when inferenceUseNeuronFeaturePropertiesTimeExact is enabled.
-				groupIndices = indices[[0, 2, 3], :].t()
-				uniqueGroups, groupInverse = pt.unique(groupIndices, dim=0, return_inverse=True)
-				mismatchValues = (penaltyValues != 0).to(pt.int64)
-				groupMismatch = pt.zeros((uniqueGroups.shape[0],), dtype=mismatchValues.dtype, device=mismatchValues.device)
-				groupMismatch.index_add_(0, groupInverse, mismatchValues)
-				groupExactMask = groupMismatch == 0
-				modifiedValues = values * groupExactMask[groupInverse].to(values.dtype)
 			if(debugInferenceUseNeuronFeaturePropertiesTime and sequenceWordIndex >= debugInferenceUseNeuronFeaturePropertiesTimeMinSequenceWordIndex):
 				# spec step (b): debug time-based activation modifier per segment.
 				penaltyMin = float(penaltyValues.min().item())
@@ -436,6 +500,9 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 		#print("featureNeuronsTargetActivation = ", featureNeuronsTargetActivation)
 	else:
 		featureNeuronsTargetActivation = featureNeuronsTargetActivation*j1
+	if(inferenceUseNeuronFeaturePropertiesTimeExact):
+		# spec step (a): only allow segment activation when the time difference to the previous segment is exactly 1.
+		featureNeuronsTargetActivation = applyExactTimeActivationConstraint(featureNeuronsTargetActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
 
 	featureNeuronsTargetActivationApplied = featureNeuronsTargetActivation
 

@@ -35,6 +35,7 @@ debugInferenceUseNeuronFeaturePropertiesTimeTargeted = False
 debugInferenceUseNeuronFeaturePropertiesTimeTargetSequenceWordIndex = 19	#16
 debugInferenceUseNeuronFeaturePropertiesTimeTargetColumnName = "movement"
 debugInferenceUseNeuronFeaturePropertiesTimeTargetFeatureNames = ["has", "flourished"]
+debugInferenceUseNeuronFeaturePropertiesTime2 = False
 
 
 #Train/inference mode selection:

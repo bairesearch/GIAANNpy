@@ -61,11 +61,18 @@ def loadFeatureNeuronsGlobalFile():
 
 def adjustPropertyDimensions(tensor, tensorName):
 	propertyCount = tensor.shape[0]
+	result = tensor
 	if(propertyCount == arrayNumberOfProperties):
-		return tensor
-	if(arrayIndexPropertiesActivationCreate and not arrayIndexPropertiesActivation and propertyCount == arrayNumberOfProperties - 1):
-		return insertPropertyDimension(tensor, arrayIndexPropertiesActivationIndex, arrayNumberOfProperties)
-	raise RuntimeError(f"{tensorName} property dimension mismatch: expected {arrayNumberOfProperties}, got {propertyCount}")
+		result = tensor
+	elif(arrayIndexPropertiesActivationCreate and arrayIndexPropertiesActivationIndex is not None and propertyCount == arrayIndexPropertiesActivationIndex and propertyCount < arrayNumberOfProperties):
+		result = insertPropertyDimension(tensor, arrayIndexPropertiesActivationIndex, arrayNumberOfProperties)
+	elif(arrayIndexPropertiesTimeCreate and arrayIndexPropertiesTimeIndex is not None and propertyCount == arrayIndexPropertiesTimeIndex and propertyCount < arrayNumberOfProperties):
+		result = insertPropertyDimension(tensor, arrayIndexPropertiesTimeIndex, arrayNumberOfProperties)
+	elif(arrayIndexPropertiesActivationCreate and not arrayIndexPropertiesActivation and propertyCount == arrayNumberOfProperties - 1):
+		result = insertPropertyDimension(tensor, arrayIndexPropertiesActivationIndex, arrayNumberOfProperties)
+	else:
+		raise RuntimeError(f"{tensorName} property dimension mismatch: expected {arrayNumberOfProperties}, got {propertyCount}")
+	return result
 
 def insertPropertyDimension(tensor, insertIndex, targetPropertyCount):
 	if(tensor.is_sparse):

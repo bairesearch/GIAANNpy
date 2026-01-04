@@ -367,6 +367,7 @@ v1g (Codex IDE GPT-5.2-Codex):
 			- timeValue = sequenceWordIndex (current sequence word index)
 		- pseudo code for column segment time calculation (useSANIcolumns or useSANIfeaturesAndColumns and segmentIndex < arrayNumberOfSegmentsColumnDistance):
 			- timeValue = sequenceColumnIndex (current sequence column index = the number of consecutive columns that have been activated in the sequence)
+		- if inferenceUseNeuronFeaturePropertiesTimeExact: only allow segment activation when the time difference between the current timeValue and the previous segment timeValue is exactly 1.
 	b) use arrayIndexPropertiesTime to temporarily modify the activation of each branch (multipleDendriticBranches) segment (useSANI) when selecting the next feature node to activate (during both standard inference and beam search).
 		- calculate timeValue (use same function above).
 		- each branch segment activation is temporarily modified based on how closely the last time it was activated (arrayIndexPropertiesTime) maps to its segmentIndex.
@@ -376,7 +377,7 @@ v1g (Codex IDE GPT-5.2-Codex):
 			modifiedActivation = currentActivation - abs(currentTimeValue-arrayIndexPropertiesTime - (numberColumnSegments-columnSegmentIndex))
 		- ensure the code is executed vectorised across segmentIndex (do not use python for loop for each segmentIndex).
 		- if useSANIfeaturesAndColumns: feature and column segments should be processed separately using the same function (the pseudo code is same in both cases; only segment indices differ).
-		- if inferenceUseNeuronFeaturePropertiesTimeExact: only allow segment activations when the time penalty is 0 (exact match for each segmentIndex).
+		- if inferenceUseNeuronFeaturePropertiesTimeExact: skip inferenceUseNeuronFeaturePropertiesTime step b.
 		- ensure that all time modifications are applied to activations after inferenceSegmentActivationsBoolean is already applied to segments (ie time modification is always applied).
 	When implementing inferenceUseNeuronFeaturePropertiesTime, ensure to add comments referencing the precise specification step (a - b).
 MANUAL; - remove old inferenceUseNeuronFeaturePropertiesTime=True (inference time record) and inferenceUseNeuronFeaturePropertiesTime=False (train time record) implementations.
@@ -384,3 +385,8 @@ MANUAL; - remove old inferenceUseNeuronFeaturePropertiesTime=True (inference tim
 - update processColumnInferencePrediction - throw runtime error when no conceptColumnsIndicesPred.
 - implement option inferenceUseNeuronFeaturePropertiesTimeExact - only fire neurons if the last times recorded were ideal (ie exact times expected for each segment index).
 - implement option randomlyAssignBranches - for each feature in the train sequence randomly select a branch to be trained.
+- update the inferenceUseNeuronFeaturePropertiesTimeExact implementation as follows: 
+	in step a) if inferenceUseNeuronFeaturePropertiesTimeExact: only allow segment activation when the time difference between the current timeValue and the previous segment timeValue is exactly 1.
+	in step b) if inferenceUseNeuronFeaturePropertiesTimeExact: skip specification step b. Only fire a neuron if the last segment time is ideal (ie exact time expected for the last segment index). This is redundant, as it is necessarily true (as the neuron fires when the last segment is activated).
+	This update is being applied because earlier segment times may be overwritten before the neuron fires thereby compromising their use in a final segment time array check (b).
+- patch inferenceUseNeuronFeaturePropertiesTime (and inferenceUseNeuronFeaturePropertiesTimeExact) so seed-phase activation/time segment updates follow the same rules as prediction-phase updates.
