@@ -13,14 +13,10 @@ source activate pytorchsenv
 conda install python=3.12
 pip install networkx
 pip install matplotlib
-pip install yattag
 pip install torch
-pip install torch_geometric
-pip install nltk spacy
+pip install spacy
 pip install datasets
-python3 -m spacy download spacyModelName (default:en_core_web_trf, orig: en_core_web_sm)
-pip install benepar
-pip install sortedcontainers
+python -m spacy download spacyModelName (default:en_core_web_trf, orig: en_core_web_sm)
 
 # Usage:
 source activate pytorchsenv
@@ -268,7 +264,7 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 					
 				if(drawNetworkDuringTrain):
 					# Visualize the complete graph every time a new sequence is parsed by the application.
-					GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumns, False, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+str(sequenceIndex))
+					GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumns, False, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+generateDrawSequenceIndex(sequenceIndex))
 
 	# Break if we've reached the maximum number of sequences
 	sequenceCount += 1

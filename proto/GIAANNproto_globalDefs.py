@@ -38,7 +38,6 @@ debugInferenceUseNeuronFeaturePropertiesTimeTargetFeatureNames = ["has", "flouri
 debugInferenceUseNeuronFeaturePropertiesTime2 = False
 
 debugDrawRelationTypesTrain = False
-debugmultipleDendriticBranchesDisable = False
 
 
 #Train/inference mode selection;
@@ -52,9 +51,9 @@ numSeedTokensInference = 5	#default: 5 (or 8)
 
 
 #Dataset;
-maxSequenceLength = 100	#default:100	#orig:10000		#in words	#depends on CPU/GPU RAM availability during train 
 databaseFolder = "../database/" #default: "../database/"	#performance: "/media/user/ssddata/GIAANN/database/"	#orig: ""
-trainMaxSequences = 10000		#debug: 10, 500, 10000, 34286 	#default: 100000000	  #adjust as needed	#max sequences for train or inference (if inferenceTrainPredictiveNetworkAllSequences=True)	#requires useMaxSequences
+trainMaxSequences = 10		#debug: 10, 500, 10000, 34286 	#default: 100000000	  #adjust as needed	#max sequences for train or inference (if inferenceTrainPredictiveNetworkAllSequences=True)	#requires useMaxSequences
+maxSequenceLength = 100	#default:100	#orig:10000		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 
 
@@ -107,20 +106,21 @@ inhibitoryConnectionStrengthIncrement = 1.0	#default increment applied when wiri
 
 
 #Array properties (disable to optimise train speed/RAM during train);
-arrayIndexPropertiesEfficient = True	#default: True	#orig: False (required for drawing pos types)
+arrayIndexPropertiesEfficient = False	#default: True	#orig: False (required for drawing pos types)
 if(arrayIndexPropertiesEfficient):
 	arrayIndexPropertiesStrength = True
 	arrayIndexPropertiesPermanence = False
-	arrayIndexPropertiesActivation = False	#automatically enabled during inference (see arrayIndexPropertiesActivationCreate)
-	arrayIndexPropertiesTime = False	#automatically enabled during inference (see arrayIndexPropertiesTimeCreate)
+	arrayIndexPropertiesActivation = False	#inference only (see arrayIndexPropertiesActivationCreate)
+	arrayIndexPropertiesTime = False	#inference only (see arrayIndexPropertiesTimeCreate)
 	arrayIndexPropertiesPos = False
 else:
 	arrayIndexPropertiesStrength = True
 	arrayIndexPropertiesPermanence = True
-	arrayIndexPropertiesActivation = True
-	arrayIndexPropertiesTime = True
+	arrayIndexPropertiesActivation = True	#FUTURE: will be deprecated during train (inference only) once seed code is replaced with standard inference code - set False
+	arrayIndexPropertiesTime = True 	#FUTURE: will be deprecated during train (inference only) once seed code is replaced with standard inference code - set False
 	arrayIndexPropertiesPos = True
-
+arrayIndexPropertiesActivationCreate = arrayIndexPropertiesActivation or useInference
+arrayIndexPropertiesTimeCreate = arrayIndexPropertiesTime or inferenceUseNeuronFeaturePropertiesTime
 
 #SANI;
 useSANI = True	#default: True	#orig: False	#sequentially activated neuronal input
@@ -326,20 +326,20 @@ else:
 if(useInference):
 	drawSequenceObservedColumns = False	#mandatory
 	drawAllColumns = False	#mandatory
-	drawNetworkDuringTrainSave = False
-	drawNetworkDuringInferenceSave = False	#True is only for debug
+	drawNetworkDuringTrainSave = False	#default: False
+	drawNetworkDuringInferenceSave = True	#True is only for debug
 	if(SANIconceptNeurons):
 		print("SANIconceptNeurons:useInference warning: there are too many SANI concept neuron (ie non-noun tuple) features per column to perform production level GIAANN inference on a conventional system; eg 100m phrases")
 else:
-	drawSequenceObservedColumns = False	#optional	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !trainSequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns	#optional (will affect which network changes can be visualised)
-	drawAllColumns = False	#optional	#draw all columns in network (only used for automated visualisation; drawNetworkDuringTrainSave)	#requires !drawSequenceObservedColumns
+	drawSequenceObservedColumns = False	#default: False	#optional	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !trainSequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns	#optional (will affect which network changes can be visualised)
+	drawAllColumns = False	#default: False	#optional	#draw all columns in network (only used for automated visualisation; drawNetworkDuringTrainSave)	#requires !drawSequenceObservedColumns
 	if(drawAllColumns):
 		assert not trainSequenceObservedColumnsUseSequenceFeaturesOnly
-	drawNetworkDuringTrainSave = False
+	drawNetworkDuringTrainSave = False	#default: False
 
 drawSegments = False and useSANI	#optional
 drawBranches = False and multipleDendriticBranches	#optional
-drawRelationTypes = False and not arrayIndexPropertiesEfficient
+drawRelationTypes = True and not arrayIndexPropertiesEfficient	#optional
 
 drawBranchesTrain = False	#derived
 drawBranchesInference = False	#derived
@@ -548,8 +548,6 @@ if(arrayIndexPropertiesStrength):
 if(arrayIndexPropertiesPermanence):
 	arrayIndexPropertiesPermanenceIndex = len(arrayPropertiesList)
 	arrayPropertiesList.append(arrayIndexPropertiesPermanenceIndex)
-arrayIndexPropertiesActivationCreate = arrayIndexPropertiesActivation or useInference
-arrayIndexPropertiesTimeCreate = arrayIndexPropertiesTime or inferenceUseNeuronFeaturePropertiesTime
 if(arrayIndexPropertiesActivationCreate):
 	arrayIndexPropertiesActivationIndex = len(arrayPropertiesList)
 	arrayPropertiesList.append(arrayIndexPropertiesActivationIndex)
@@ -735,3 +733,6 @@ def compareDenseArrayDiff(array1, array2):
 
 def getTensorSizeInMB(tensor):
 	return tensor.element_size() * tensor.nelement() / (1024 ** 2)
+
+def generateDrawSequenceIndex(sequenceWordIndex):
+	return str(sequenceWordIndex).zfill(3)

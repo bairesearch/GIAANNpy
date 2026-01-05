@@ -489,12 +489,17 @@ class SequenceObservedColumns:
 		featureConnectionsDeltaSparse = featureConnectionsDelta.to_sparse()
 		featureNeuronsCurrentSparse = None
 		featureConnectionsCurrentSparse = None
-		replacePropertiesEnabled = arrayIndexPropertiesActivationCreate or arrayIndexPropertiesTime or arrayIndexPropertiesPos
+
+		replacePropertiesEnabled = arrayIndexPropertiesActivationCreate or arrayIndexPropertiesTimeCreate	#TODO: replacePropertiesEnabled is not robust to duplicate features
 		addPropertiesEnabled = arrayIndexPropertiesStrength or arrayIndexPropertiesPermanence
+		
 		if(replacePropertiesEnabled):
 			featureNeuronsCurrentSparse = self.featureNeurons.to_sparse()
 			featureConnectionsCurrentSparse = self.featureConnections.to_sparse()
 		elif(arrayIndexPropertiesMinWordDistance):
+			featureConnectionsCurrentSparse = self.featureConnections.to_sparse()
+		elif(arrayIndexPropertiesPos):
+			featureNeuronsCurrentSparse = self.featureNeurons.to_sparse()
 			featureConnectionsCurrentSparse = self.featureConnections.to_sparse()
 		if(performRedundantCoalesce):
 			featureNeuronsDeltaSparse = featureNeuronsDeltaSparse.coalesce()
@@ -519,6 +524,12 @@ class SequenceObservedColumns:
 				addPropertyIndicesList.append(arrayIndexPropertiesPermanenceIndex)
 			addPropertyIndices = pt.tensor(addPropertyIndicesList, dtype=pt.long)
 			addPropertyMaskLookup = self.buildMaskLookup(arrayNumberOfProperties, addPropertyIndices.to(featureNeuronsDeltaSparse.device), featureNeuronsDeltaSparse.device)
+		posPropertyMaskLookupFeature = None
+		posPropertyMaskLookupConnection = None
+		posPropertyIndices = None
+		if(arrayIndexPropertiesPos):
+			posPropertyIndices = pt.tensor([arrayIndexPropertiesPosIndex], dtype=pt.long)
+			posPropertyMaskLookupFeature = self.buildMaskLookup(arrayNumberOfProperties, posPropertyIndices.to(featureNeuronsDeltaSparse.device), featureNeuronsDeltaSparse.device)
 		if(replacePropertiesEnabled):
 			replacePropertyMaskLookup = None
 			replacePropertyIndicesList = []
@@ -526,8 +537,6 @@ class SequenceObservedColumns:
 				replacePropertyIndicesList.append(arrayIndexPropertiesActivationIndex)
 			if(arrayIndexPropertiesTime):
 				replacePropertyIndicesList.append(arrayIndexPropertiesTimeIndex)
-			if(arrayIndexPropertiesPos):
-				replacePropertyIndicesList.append(arrayIndexPropertiesPosIndex)
 			replacePropertyIndices = pt.tensor(replacePropertyIndicesList, dtype=pt.long)
 			replacePropertyMaskLookup = self.buildMaskLookup(arrayNumberOfProperties, replacePropertyIndices.to(featureNeuronsDeltaSparse.device), featureNeuronsDeltaSparse.device)
 		if(arrayIndexPropertiesMinWordDistance):
@@ -546,6 +555,8 @@ class SequenceObservedColumns:
 		sequenceConceptIndices = self.conceptIndicesInSequenceObservedTensor.to(connectionDevice)
 		sequenceConceptIndicesUnique = pt.unique(sequenceConceptIndices)
 		sequenceConceptMaskLookup = self.buildMaskLookup(self.databaseNetworkObject.c, sequenceConceptIndicesUnique, connectionDevice)
+		if(arrayIndexPropertiesPos):
+			posPropertyMaskLookupConnection = self.buildMaskLookup(arrayNumberOfProperties, posPropertyIndices.to(connectionDevice), connectionDevice)
 
 		if not lowMem:
 			globalFeatureNeurons = self.databaseNetworkObject.globalFeatureNeurons.coalesce()
@@ -563,11 +574,15 @@ class SequenceObservedColumns:
 			else:
 				featureTargetSparse = globalFeatureNeurons
 				featureTargetSize = featureTargetSparse.size()
+			featureUpdatesPos = None
+			connectionUpdatesPos = None
 
 			if(addPropertiesEnabled):
 				featureUpdatesAdd = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsDeltaSparse, addPropertyMaskLookup, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if lowMem else conceptIndex)
 			if(replacePropertiesEnabled):
 				featureUpdatesReplace = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsCurrentSparse, replacePropertyMaskLookup, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if lowMem else conceptIndex)
+			if(arrayIndexPropertiesPos):
+				featureUpdatesPos = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsCurrentSparse, posPropertyMaskLookupFeature, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if lowMem else conceptIndex)
 
 				activationUpdateBranches = None
 				preserveActivationOnReplace = False
@@ -611,6 +626,8 @@ class SequenceObservedColumns:
 			else:
 				combinedFeatureUpdates = featureUpdatesAdd
 			featureTargetSparse = self.addSparseUpdate(featureTargetSparse, combinedFeatureUpdates)
+			if(arrayIndexPropertiesPos):
+				featureTargetSparse = self.applySparseMaxUpdate(featureTargetSparse, featureUpdatesPos)
 
 			if lowMem:
 				observedColumn.featureNeurons = featureTargetSparse
@@ -623,6 +640,8 @@ class SequenceObservedColumns:
 				connectionUpdatesAdd = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsDeltaSparse, addPropertyMaskLookup, sequenceFeatureMaskLookup, connectionTargetSize)
 			if(replacePropertiesEnabled):
 				connectionUpdatesReplace = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsCurrentSparse, replacePropertyMaskLookup, sequenceFeatureMaskLookup, connectionTargetSize)
+			if(arrayIndexPropertiesPos):
+				connectionUpdatesPos = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsCurrentSparse, posPropertyMaskLookupConnection, sequenceFeatureMaskLookup, connectionTargetSize)
 			if(arrayIndexPropertiesMinWordDistance):
 				connectionUpdatesMin = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsCurrentSparse, minPropertyMaskLookup, sequenceFeatureMaskLookup, connectionTargetSize)
 			if(replacePropertiesEnabled):
@@ -644,6 +663,8 @@ class SequenceObservedColumns:
 				observedColumn.featureConnections = self.addSparseUpdate(observedColumn.featureConnections, combinedConnectionUpdates)
 			if(arrayIndexPropertiesMinWordDistance):
 				observedColumn.featureConnections = self.applySparseMinUpdate(observedColumn.featureConnections, connectionUpdatesMin)
+			if(arrayIndexPropertiesPos):
+				observedColumn.featureConnections = self.applySparseMaxUpdate(observedColumn.featureConnections, connectionUpdatesPos)
 
 		if not lowMem:
 			self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
@@ -915,6 +936,46 @@ class SequenceObservedColumns:
 				matchedTargetIndices = sortOrder[matchedPositions]
 				updatedTargetValues = targetValues.clone()
 				updatedTargetValues[matchedTargetIndices] = pt.minimum(updatedTargetValues[matchedTargetIndices], updateValues[matchMask])
+
+			nonMatchMask = pt.logical_not(matchMask)
+			if(nonMatchMask.any()):
+				newIndices = updateIndices[:, nonMatchMask]
+				newValues = updateValues[nonMatchMask]
+				combinedIndices = pt.cat([targetIndices, newIndices], dim=1)
+				combinedValues = pt.cat([updatedTargetValues, newValues], dim=0)
+			else:
+				combinedIndices = targetIndices
+				combinedValues = updatedTargetValues
+
+			updatedSparse = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=updatedSparse.size(), dtype=arrayType, device=deviceSparse)
+		return updatedSparse
+
+	def applySparseMaxUpdate(self, targetSparse, updateSparse):
+		updatedSparse = targetSparse.coalesce()
+		updateSparse = updateSparse.coalesce()
+		targetIndices = updatedSparse.indices()
+		targetValues = updatedSparse.values()
+		updateIndices = updateSparse.indices()
+		updateValues = updateSparse.values()
+		if(updateIndices.numel() > 0):
+			targetLinear = self.flattenSparseIndices(targetIndices, updatedSparse.size())
+			updateLinear = self.flattenSparseIndices(updateIndices, updatedSparse.size())
+			sortedTargetLinear, sortOrder = pt.sort(targetLinear)
+			if(sortedTargetLinear.numel() > 0):
+				updatePos = pt.searchsorted(sortedTargetLinear, updateLinear)
+				inBounds = updatePos < sortedTargetLinear.numel()
+				clampedPos = updatePos.clamp(max=sortedTargetLinear.numel()-1)
+				matchMask = inBounds & (sortedTargetLinear[clampedPos] == updateLinear)
+			else:
+				updatePos = pt.zeros_like(updateLinear, dtype=pt.long)
+				matchMask = pt.zeros_like(updateLinear, dtype=pt.bool)
+
+			updatedTargetValues = targetValues
+			if(matchMask.any()):
+				matchedPositions = updatePos[matchMask]
+				matchedTargetIndices = sortOrder[matchedPositions]
+				updatedTargetValues = targetValues.clone()
+				updatedTargetValues[matchedTargetIndices] = pt.maximum(updatedTargetValues[matchedTargetIndices], updateValues[matchMask])
 
 			nonMatchMask = pt.logical_not(matchMask)
 			if(nonMatchMask.any()):

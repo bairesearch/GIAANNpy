@@ -19,20 +19,16 @@ source activate pytorchsenv
 conda install python=3.12
 pip install networkx
 pip install matplotlib
-pip install yattag
 pip install torch
-pip install torch_geometric
-pip install nltk spacy
+pip install spacy
 pip install datasets
-python3 -m spacy download en_core_web_sm
-pip install benepar
-pip install sortedcontainers
+python -m spacy download spacyModelName (default:en_core_web_trf, orig: en_core_web_sm)
 ```
 
 ### Execution
 ```
 source activate pytorchsenv
-python3 GIAANNproto_main.py
+python GIAANNproto_main.py
 ```
 
 ### Overview
@@ -47,9 +43,15 @@ GIA ANN creates an entirely excitatory database network formed by feature neuron
 
 Typically the neurons in GIA ANN are segmented into compartments (SANI: Sequentially/Segmentally Activated Neuronal Input), have multiple branches (dendrites), and are sensitive to the timing of their activated segments.
 
+![GIAANNdemo-trainDemo-SMALL.gif](https://github.com/bairesearch/GIAANNpy/releases/download/assets/GIAANNdemo-trainDemo-SMALL.gif)
+
+![GIAANNdemo-trainDemo-allColumns-SMALL.gif](https://github.com/bairesearch/GIAANNpy/releases/download/assets/GIAANNdemo-trainDemo-allColumns-SMALL.gif)
+
 ##### Inference
 
 GIA ANN seeds the prompt provided and sequentially predicts next features in the network.
+
+![GIAANNdemo-inferenceDemo-SMALL.gif](https://github.com/bairesearch/GIAANNpy/releases/download/assets/GIAANNdemo-inferenceDemo-SMALL.gif)
 
 ##### Implementation
 
@@ -162,6 +164,16 @@ Settings for inference. See:
 * drawBranches - draw independent branches (connections and features) in different colours.
 * drawRelationTypes - draw feature POS types (and their connections) in different colours.
 * default - draw concept/feature node types in different colours (if useInference=True and in inferenceMode then will draw activation status of network).
+
+##### drawSegments
+![GIAANNdemo-drawSegments-SMALL.png](https://github.com/bairesearch/GIAANNpy/releases/download/assets/GIAANNdemo-drawSegments-SMALL.png)
+
+##### drawBranches
+![GIAANNdemo-drawBranches-SMALL.png](https://github.com/bairesearch/GIAANNpy/releases/download/assets/GIAANNdemo-drawBranches-SMALL.png)
+
+##### drawRelationTypes
+![GIAANNdemo-drawRelationTypes-SMALL.png](https://github.com/bairesearch/GIAANNpy/releases/download/assets/GIAANNdemo-drawRelationTypes-SMALL.png)
+
 
 #### Algorithm preferences (normalisation, permanence etc)
 

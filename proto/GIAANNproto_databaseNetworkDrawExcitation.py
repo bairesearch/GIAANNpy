@@ -123,16 +123,18 @@ if(drawRelationTypesTrain):
 	haveAuxiliaries = ["have", "has", "had", "having"]
 	doAuxiliaries = ["do", "does", "did", "doing"]
 
-	def generateFeatureNeuronColour(databaseNetworkObject, posFloatTorch, word, internalConnection=False):
+	def generateFeatureNeuronColour(databaseNetworkObject, posFloatTorch, word, internalConnection=False, drawFeatureNodes=False):
 		#print("posFloatTorch = ", posFloatTorch)
 		posInt = posFloatTorch.int().item()
 		posString = posIntToPosString(databaseNetworkObject.nlp, posInt)
 		if(posString):
 			if(posString in neuronPosToRelationTypeDict):
-				print("OK: word = ", word, ", posString = ", posString)
+				if(debugDrawRelationTypesTrain and drawFeatureNodes):
+					print("OK: word = ", word, ", posString = ", posString, ", posInt = ", posInt)
 				colour = neuronPosToRelationTypeDict[posString]
 			else:
-				print("FAIL: word = ", word, ", posString = ", posString)
+				if(debugDrawRelationTypesTrain and drawFeatureNodes):
+					print("FAIL: word = ", word, ", posString = ", posString, ", posInt = ", posInt)
 				colour = relationTypeOtherCol
 				
 			#special cases;
@@ -151,9 +153,39 @@ if(drawRelationTypesTrain):
 					colour = relationTypePartPropertyCol
 		else:
 			colour = relationTypeOtherCol
-			#print("generateFeatureNeuronColour error; pos int = 0")
+			if(debugDrawRelationTypesTrain and drawFeatureNodes):
+				print("FAIL: word = ", word, ", posString = ", posString, ", posInt = ", posInt)
 			
 		return colour
+
+def getFeaturePosValue(featureNeurons, featureIndexInObservedColumn, segmentIndex):
+	posValue = 0.0
+	if(arrayIndexPropertiesPosIndex is not None):
+		posTensor = featureNeurons[arrayIndexPropertiesPosIndex]
+		if(useSANI):
+			if(posTensor.is_sparse):
+				posTensor = posTensor.coalesce()
+				indices = posTensor.indices()
+				values = posTensor.values()
+				if(indices.numel() > 0):
+					mask = indices[1] == featureIndexInObservedColumn
+					if(mask.any()):
+						posValue = float(values[mask].max().item())
+			else:
+				posValue = float(posTensor[:, featureIndexInObservedColumn].max().item())
+		else:
+			if(posTensor.is_sparse):
+				posTensor = posTensor.coalesce()
+				indices = posTensor.indices()
+				values = posTensor.values()
+				if(indices.numel() > 0):
+					mask = (indices[0] == segmentIndex) & (indices[1] == featureIndexInObservedColumn)
+					if(mask.any()):
+						posValue = float(values[mask].max().item())
+			else:
+				posValue = float(posTensor[segmentIndex, featureIndexInObservedColumn].item())
+	posTensorValue = pt.tensor(posValue, dtype=arrayType)
+	return posTensorValue
 
 
 # Initialize NetworkX graph for visualization
@@ -309,7 +341,8 @@ if(drawSparseArrays):
 							else:
 								segmentIndex = arrayIndexSegmentLast
 							if(arrayIndexPropertiesPosIndex is not None):
-								neuronColor = generateFeatureNeuronColour(databaseNetworkObject, featureNeurons[arrayIndexPropertiesPosIndex, segmentIndex, featureIndexInObservedColumn], featureWord)
+								posValue = getFeaturePosValue(featureNeurons, featureIndexInObservedColumn, segmentIndex)
+								neuronColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, drawFeatureNodes=True)
 					elif(featureActive):
 						if(conceptNeuronFeature):
 							neuronColor = 'lightskyblue'
@@ -659,7 +692,8 @@ else:
 							else:
 								segmentIndex = arrayIndexSegmentLast
 							if(arrayIndexPropertiesPosIndex is not None):
-								neuronColor = generateFeatureNeuronColour(databaseNetworkObject, featureNeurons[arrayIndexPropertiesPosIndex, segmentIndex, featureIndexInObservedColumn], featureWord)
+								posValue = getFeaturePosValue(featureNeurons, featureIndexInObservedColumn, segmentIndex)
+								neuronColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, drawFeatureNodes=True)
 					elif(featureActive):
 						if(conceptNeuronFeature):
 							neuronColor = 'lightskyblue'

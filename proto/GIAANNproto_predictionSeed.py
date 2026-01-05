@@ -154,7 +154,7 @@ def seedNetworkToken(sequenceObservedColumns, sequenceIndex, sequence, firstSeed
 	
 	if(drawNetworkDuringInferenceSeed):
 		sequenceObservedColumns.updateObservedColumnsWrapper(inference=True)
-		GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumns, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+str(firstSeedTokenIndex))
+		GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumns, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+generateDrawSequenceIndex(firstSeedTokenIndex))
 
 def identifySeedIndices(sequenceObservedColumns, sequenceIndex, startIndices, endIndices, sequence, tokens, conceptIndices, firstSeedTokenIndex, numSeedTokens):
 	firstSeedConceptIndex = None
