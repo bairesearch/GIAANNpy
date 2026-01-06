@@ -44,7 +44,6 @@ debugDrawRelationTypesTrain = False
 useInference = True  #default: True	#support inference mode else train (inferenceTrainFirstSequences: only) mode
 drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
 if(useInference):
-	drawNetworkDuringInferenceSeed = False	#default: False
 	drawNetworkDuringInferencePredict = False	#default: False
 	inferenceTrainFirstSequences = True	#default: True	#orig: True	#True: trains first sequences in inference_prompt.txt, performs inference only on last sequence; False: run inference on every sequence as independent seed/target prompts	#assumes inferenceTrainPredictiveNetworkAllSequences=False
 numSeedTokensInference = 5	#default: 5 (or 8)
@@ -106,7 +105,7 @@ inhibitoryConnectionStrengthIncrement = 1.0	#default increment applied when wiri
 
 
 #Array properties (disable to optimise train speed/RAM during train);
-arrayIndexPropertiesEfficient = False	#default: True	#orig: False (required for drawing pos types)
+arrayIndexPropertiesEfficient = True	#default: True	#orig: False (required for drawing pos types)
 if(arrayIndexPropertiesEfficient):
 	arrayIndexPropertiesStrength = True
 	arrayIndexPropertiesPermanence = False
@@ -116,11 +115,12 @@ if(arrayIndexPropertiesEfficient):
 else:
 	arrayIndexPropertiesStrength = True
 	arrayIndexPropertiesPermanence = True
-	arrayIndexPropertiesActivation = True	#FUTURE: will be deprecated during train (inference only) once seed code is replaced with standard inference code - set False
-	arrayIndexPropertiesTime = True 	#FUTURE: will be deprecated during train (inference only) once seed code is replaced with standard inference code - set False
+	arrayIndexPropertiesActivation = False	#inference only (see arrayIndexPropertiesActivationCreate)
+	arrayIndexPropertiesTime = False 	#inference only (see arrayIndexPropertiesTimeCreate)
 	arrayIndexPropertiesPos = True
 arrayIndexPropertiesActivationCreate = arrayIndexPropertiesActivation or useInference
 arrayIndexPropertiesTimeCreate = arrayIndexPropertiesTime or inferenceUseNeuronFeaturePropertiesTime
+
 
 #SANI;
 useSANI = True	#default: True	#orig: False	#sequentially activated neuronal input
@@ -236,7 +236,6 @@ if(useInference):
 		else:
 			inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True	#True: next token predictions are used to activate the next column features (rather than prediction targets)	#set to False only to compare predictive performance with inferencePredictiveNetwork
 
-	inferenceIncrementallySeedNetwork = True	#default:True	#orig:False	#incremental seeding is used to match the inference prediction phase algorithm (for consistency in activation method)	#requires inferenceSeedNetwork
 	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	transformerUseInputConnections = False	#initialise (dependent var)
 	if(useSANI):
@@ -258,11 +257,6 @@ if(useInference):
 	else:
 		inferenceSeedNetwork = False	#default: False	#True is only for debug
 		inferenceBurstAllPredictionsOrTargetsInSequence = True	#default: True	#orig: True
-	if(inferenceSeedNetwork):
-		if(inferenceIncrementallySeedNetwork):
-			inferenceSeedTargetActivationsGlobalFeatureArrays = False	#optional	#default:True	#orig:False	
-		else:
-			inferenceSeedTargetActivationsGlobalFeatureArrays = False	#not supported
 else:
 	inferenceActivationFunction = False
 if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
@@ -308,18 +302,13 @@ if(useInference):
 #Train optimisations;
 #trainSequenceObservedColumnsUseSequenceFeaturesOnly can be upgraded so only a limited amount of data is ever loaded to GPU during train (it currently temporarily masks entire feature arrays in GPU during transfer phase)
 if(useInference):
-	trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised	#if used during seed phase will bias prediction towards target sequence words
-	if(inferenceSeedNetwork):	
-		if(inferenceSeedTargetActivationsGlobalFeatureArrays):
-			trainSequenceObservedColumnsUseSequenceFeaturesOnly = False	#mandatory	#global feature arrays are directly written to during inference seed phase
 	lowMem = False		#mandatory
-	trainSequenceObservedColumnsMatchSequenceWords = True	#mantatory	#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
 else:
 	lowMem = False		 #default: False	#orig: True	#currently required to be False for inference compatibility	#optional
-	trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
-	trainSequenceObservedColumnsMatchSequenceWords = True	#mantatory		#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
-	if(SANIconceptNeurons):
-		assert trainSequenceObservedColumnsUseSequenceFeaturesOnly	#required to significantly decrease GPU RAM during training
+trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
+trainSequenceObservedColumnsMatchSequenceWords = True	#mantatory		#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
+if(SANIconceptNeurons):
+	assert trainSequenceObservedColumnsUseSequenceFeaturesOnly	#required to significantly decrease GPU RAM during training
 
 
 #Draw;
@@ -327,7 +316,7 @@ if(useInference):
 	drawSequenceObservedColumns = False	#mandatory
 	drawAllColumns = False	#mandatory
 	drawNetworkDuringTrainSave = False	#default: False
-	drawNetworkDuringInferenceSave = True	#True is only for debug
+	drawNetworkDuringInferenceSave = False	#True is only for debug
 	if(SANIconceptNeurons):
 		print("SANIconceptNeurons:useInference warning: there are too many SANI concept neuron (ie non-noun tuple) features per column to perform production level GIAANN inference on a conventional system; eg 100m phrases")
 else:
@@ -392,7 +381,6 @@ else:
 
 
 #Mandatory vars;
-performRedundantCoalesce = False	#additional redundant coalesce operations #CHECKTHIS
 useSaveData = True	#save data is required to allow consecutive sequence training and inference (because connection data are stored in observed columns, which are refreshed every sequence)
 usePOS = True		 # usePOS mode	#mandatory
 useParallelProcessing = True	#mandatory (else restore original code pre-GIAANNproto1b3a)
@@ -461,11 +449,6 @@ if(useInference):
 		inferenceDecrementActivationsNonlinear = True
 		activationDecrementPerPredictedToken = 0.1	#0.05	#CHECKTHIS
 		activationDecrementPerPredictedSequence = 0.5
-		if(inferenceSeedNetwork):
-			if(inferenceIncrementallySeedNetwork):
-				activationDecrementSeed = activationDecrementPerPredictedToken
-			else:
-				activationDecrementSeed = activationDecrementPerPredictedSequence
 	
 	if(inferenceSeedNetwork):
 		numSeedTokens = numSeedTokensInference	#default: 5	#number of seed tokens in last sequence of inference prompt (remaining tokens will be prediction tokens)

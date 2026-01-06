@@ -230,8 +230,6 @@ def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=
 
 	if not lowMem:
 		global globalFeatureNeurons
-		if(performRedundantCoalesce):
-			globalFeatureNeurons = globalFeatureNeurons.coalesce()
 
 	excitatoryNodeMap = drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, drawRelationTypes, drawSegments, drawBranches, inferenceMode)
 	if(trainInhibitoryNeurons):
@@ -281,10 +279,6 @@ if(drawSparseArrays):
 		xOffset = 0
 		for lemma, observedColumn in observedColumnsDict.items():
 			conceptIndex = observedColumn.conceptIndex
-			
-			if(performRedundantCoalesce):
-				if lowMem:
-					observedColumn.featureNeurons = observedColumn.featureNeurons.coalesce()
 			
 			if(drawSequenceObservedColumns):
 				featureWordToIndex = sequenceObservedColumns.featureWordToIndex
@@ -423,10 +417,7 @@ if(drawSparseArrays):
 
 		# Draw connections
 		for lemma, observedColumn in observedColumnsDict.items():
-		
-			if(performRedundantCoalesce):
-				observedColumn.featureConnections = observedColumn.featureConnections.coalesce()
-						
+				
 			conceptIndex = observedColumn.conceptIndex
 			if(drawSequenceObservedColumns):
 				featureWordToIndex = sequenceObservedColumns.featureWordToIndex
@@ -633,10 +624,6 @@ else:
 		for lemma, observedColumn in observedColumnsDict.items():
 			conceptIndex = observedColumn.conceptIndex
 			
-			if(performRedundantCoalesce):
-				if lowMem:
-					observedColumn.featureNeurons = observedColumn.featureNeurons.coalesce()
-			
 			if(drawSequenceObservedColumns):
 				featureWordToIndex = sequenceObservedColumns.featureWordToIndex
 				yOffset = 1 + 1	#reserve space at bottom of column for feature concept neuron
@@ -725,10 +712,7 @@ else:
 
 		# Draw connections
 		for lemma, observedColumn in observedColumnsDict.items():
-		
-			if(performRedundantCoalesce):
-				observedColumn.featureConnections = observedColumn.featureConnections.coalesce()
-						
+			
 			conceptIndex = observedColumn.conceptIndex
 			if(drawSequenceObservedColumns):
 				featureWordToIndex = sequenceObservedColumns.featureWordToIndex

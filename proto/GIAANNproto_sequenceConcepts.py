@@ -54,8 +54,6 @@ def firstPass(databaseNetworkObject, sequence):
 			# Expand global feature neuron arrays
 			if databaseNetworkObject.globalFeatureNeurons.shape[3] < databaseNetworkObject.c:
 				newShape = (databaseNetworkObject.globalFeatureNeurons.shape[0], databaseNetworkObject.globalFeatureNeurons.shape[1], databaseNetworkObject.globalFeatureNeurons.shape[2], databaseNetworkObject.c, databaseNetworkObject.globalFeatureNeurons.shape[4])
-				if(performRedundantCoalesce):
-					databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons.coalesce()
 				databaseNetworkObject.globalFeatureNeurons = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeurons._indices(), databaseNetworkObject.globalFeatureNeurons._values(), size=newShape, dtype=arrayType, device=deviceSparse)
 				
 	return conceptsFound, conceptMask

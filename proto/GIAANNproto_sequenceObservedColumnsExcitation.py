@@ -490,7 +490,8 @@ class SequenceObservedColumns:
 		featureNeuronsCurrentSparse = None
 		featureConnectionsCurrentSparse = None
 
-		replacePropertiesEnabled = arrayIndexPropertiesActivationCreate or arrayIndexPropertiesTimeCreate	#TODO: replacePropertiesEnabled is not robust to duplicate features
+		replacePropertiesEnabled = arrayIndexPropertiesActivation or arrayIndexPropertiesTime	
+		assert not replacePropertiesEnabled, "replacePropertiesEnabled is not robust to duplicate features"
 		addPropertiesEnabled = arrayIndexPropertiesStrength or arrayIndexPropertiesPermanence
 		
 		if(replacePropertiesEnabled):
@@ -501,13 +502,6 @@ class SequenceObservedColumns:
 		elif(arrayIndexPropertiesPos):
 			featureNeuronsCurrentSparse = self.featureNeurons.to_sparse()
 			featureConnectionsCurrentSparse = self.featureConnections.to_sparse()
-		if(performRedundantCoalesce):
-			featureNeuronsDeltaSparse = featureNeuronsDeltaSparse.coalesce()
-			featureConnectionsDeltaSparse = featureConnectionsDeltaSparse.coalesce()
-			if(featureNeuronsCurrentSparse is not None):
-				featureNeuronsCurrentSparse = featureNeuronsCurrentSparse.coalesce()
-			if(featureConnectionsCurrentSparse is not None):
-				featureConnectionsCurrentSparse = featureConnectionsCurrentSparse.coalesce()
 		if not useGPUsparse:
 			featureNeuronsDeltaSparse = featureNeuronsDeltaSparse.to(deviceSparse)
 			featureConnectionsDeltaSparse = featureConnectionsDeltaSparse.to(deviceSparse)
@@ -584,6 +578,7 @@ class SequenceObservedColumns:
 			if(arrayIndexPropertiesPos):
 				featureUpdatesPos = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsCurrentSparse, posPropertyMaskLookupFeature, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if lowMem else conceptIndex)
 
+			if(replacePropertiesEnabled):
 				activationUpdateBranches = None
 				preserveActivationOnReplace = False
 				if(self.debugInferenceActive and multipleDendriticBranches and updateCount is not None and updateCount > 1 and arrayIndexPropertiesActivationIndex is not None):
@@ -678,9 +673,6 @@ class SequenceObservedColumns:
 
 		featureNeuronsDeltaSparse = featureNeuronsDelta.to_sparse()
 		featureConnectionsDeltaSparse = featureConnectionsDelta.to_sparse()
-		if(performRedundantCoalesce):
-			featureNeuronsDeltaSparse = featureNeuronsDeltaSparse.coalesce()
-			featureConnectionsDeltaSparse = featureConnectionsDeltaSparse.coalesce()
 		if not useGPUsparse:
 			featureNeuronsDeltaSparse = featureNeuronsDeltaSparse.to(deviceSparse)
 			featureConnectionsDeltaSparse = featureConnectionsDeltaSparse.to(deviceSparse)
@@ -717,8 +709,6 @@ class SequenceObservedColumns:
 		if(arrayIndexPropertiesMinWordDistance):
 			connectionMin = self.featureConnections[arrayIndexPropertiesMinWordDistanceIndex]
 			connectionMinSparse = connectionMin.to_sparse()
-			if(performRedundantCoalesce):
-				connectionMinSparse = connectionMinSparse.coalesce()
 			if not useGPUsparse:
 				connectionMinSparse = connectionMinSparse.to(deviceSparse)
 			connectionMinIndices = connectionMinSparse.indices()

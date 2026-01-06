@@ -148,8 +148,6 @@ def saveData(databaseNetworkObject, observedColumnsDict):
 
 	# Save global feature neuron arrays if not lowMem
 	if not lowMem:
-		if(performRedundantCoalesce):
-			databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons.coalesce()
 		saveTensor(databaseNetworkObject.globalFeatureNeurons, databaseFolder, globalFeatureNeuronsFile)
 
 	saveDictFile(conceptColumnsDictFile, databaseNetworkObject.conceptColumnsDict)
@@ -179,14 +177,8 @@ def observedColumnSaveToDisk(self):
 	with open(os.path.join(observedColumnsDir, f"{self.conceptIndex}_data.pkl"), 'wb') as f:
 		pickle.dump(data, f)
 	# Save the tensors using pt.save
-	if(performRedundantCoalesce):
-		self.featureConnections = self.featureConnections.coalesce()
-		print("self.featureConnections = ", self.featureConnections)
 	saveTensor(self.featureConnections, observedColumnsDir, f"{self.conceptIndex}_featureConnections")
 	if lowMem:
-		if(performRedundantCoalesce):
-			self.featureNeurons = self.featureNeurons.coalesce()
-			print("self.featureNeurons = ", self.featureNeurons)
 		saveTensor(self.featureNeurons, observedColumnsDir, f"{self.conceptIndex}_featureNeurons")
 
 def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i):

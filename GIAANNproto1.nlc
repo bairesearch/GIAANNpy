@@ -255,9 +255,156 @@ MANUAL; - rename agent_instructions.md to AGENTS.md standard
 - update useSANIcolumns:enforceActivationAcrossSegments:enforceLastSegmentMustBeActive to ignore final (ie internal) segment, as some feature neurons do not have internal column inputs
 MANUAL; - add option enforceSequentialActivationAcrossSegments:enforceSequentialActivation=False
 MANUAL; - rename doNotEnforceSequentialityAcrossSegments/enforceSequentialActivationAcrossSegments->doNotEnforceActivationAcrossSegments/enforceActivationAcrossSegments
-- split bool useSANIcolumns=True/False into 3 options; useSANIcolumns, useSANIfeatures, useSANIfeaturesAndColumns - where useSANIfeaturesAndColumns applies 5 segments to the nearest 5 features and the next 2 segments to the nearest 2 columns (internal column excluded). useSANIcolumns and useSANIfeatures are already defined by useSANIcolumns=True/False respectively.
+- split bool useSANIcolumns=True/False into 3 options; useSANIcolumns, useSANIfeatures, useSANIfeaturesAndColumns - where useSANIfeaturesAndColumns applies arrayNumberOfSegmentsColumnDistance segments to the nearest arrayNumberOfSegmentsColumnDistance columns (internal column excluded), and arrayNumberOfSegmentsFeatureDistance segments to the nearest arrayNumberOfSegmentsFeatureDistance features. useSANIcolumns and useSANIfeatures are already defined by useSANIcolumns=True/False respectively.
 - add option trainConnectionStrengthLimitTanh - which thresholds each connection strength using a tanh function at the end of the train process.
 - add option trainConnectionStrengthLimitMax - which thresholds each connection strength using a simple celing (1.0) throughout the training process.
 - patch useSANIfeaturesAndColumns - assign column segments first, then feature segments. OK then, we have identified an issue with your implementation of useSANIfeaturesAndColumns. The segments must be assigned to the columns first, then the nearest features. The reason this is required is because of the way enforceSequentialActivation works; segments are only ever activated if a previous segment is activated; and earlier segments in the trace (ie column segments) get activated first. Please update the useSANIfeaturesAndColumns implementation to assign column segments first, then feature segments.
 - patch case useSANIfeaturesAndColumns=True so that the first feature segment (ie at arrayNumberOfSegmentsFeatureDistance from target, stored at index arrayNumberOfSegmentsColumnDistance in the segment array) only captures connections at that specific distance, instead of at this distance or any greater distance.
 - patch processFeaturesActiveTrain:createFeatureConnectionsActiveTrain - unify SANI training across segments by aggregating per-segment activations instead of only using arrayIndexSegmentLast, ensuring every distance bucket contributes to connection building and permanence updates.
+
+---
+v1e (Codex IDE GPT-5.1-Codex->GPT-5.2-Codex):
+- add proto GIAANNproto1e1a - start useInhibitoryNeurons
+	implement option useInhibitoryNeurons:trainInhibitoryNeurons=True in GIAANNproto_databaseNetworkTrainInhibition.py:processFeaturesInactiveTrain():
+		- [A] For each new feature declared in a concept column, declare an inhibitory neuron (maintains approx same number of excitatory and inhibitory neurons).
+		- [B] Declare temp sequenceObservedInhibitoryNeurons list
+		- [C] For each trained feature neuron in sequence:
+			1. identify all alternate prediction candidate features in network - i.e. all direct (if enforceDirectConnections=True) connection targets of previous feature neuron in trained sequence except for current feature neuron in trained sequence.
+			2. select the inhibitory neuron associated with that feature node (ie same column index and feature index as the trained excitatory neuron).
+			3. Add (or update the weight) a connection between the inhibitory neuron and each of the identified alternate prediction candidate features.
+			4. add the identified inhibitory neuron to sequenceObservedInhibitoryNeurons
+		- [D] Train all the inhibitory neuron source connections exactly the same way as the excitatory (i.e. feature) neuron source connections: upgrade and execute processFeaturesActiveTrain(). i.e. for each excitatory target feature trained in source sequence, an inhibitory target feature is also trained.
+		Store all excitatory neurons and connections in separate database structures and database files to inhibitory neurons and connections. Ensure that there is absolutely zero modification of the original excitatory database structures, files, and code.
+MANUAL; - patch loadFeatureNeuronsGlobal - if pathExists(globalFeatureNeuronsFileFull)
+MANUAL; - add option !inferencePredictiveNetwork:inferenceDecrementActivations = True
+MANUAL; - restore patch case useSANIfeaturesAndColumns=True so that the first feature segment only captures connections at that specific distance
+- upgrade trainInhibitoryNeurons step "1. identify all alternate prediction candidate features in network" to support option enforceDirectConnections (either method enforceDirectConnectionsSANI or method enforceDirectConnectionsMinWordDistance) - i.e. all direct (if enforceDirectConnections=True) connection targets of previous feature neuron in trained sequence except for current feature neuron in trained sequence.
+MANUAL; - update enforceDirectConnectionsSANI to use existing useSANI defaults
+- implement the option inferenceInhibitoryNeurons=True - for every prediction step (predicted feature):
+	1. the network inhibitory neurons are activated (via their input connections) using exactly the same code as the excitatory neurons (share existing code do not replicate code for this step). 
+	2. the network excitatory feature neurons have their activations modulated (downregulated) by the inhibitory output signal of the inhibitory neurons (via their output connections).
+	3. the next feature predictions are thus modified by this inhibition signal.
+MANUAL; - extract common excitatory/inhibitory code insertSequenceObservedColumnIntoObservedColumnFeatures/insertSequenceObservedColumnIntoObservedColumnConnection
+MANUAL; - extract GIAANNproto_sequenceObservedColumnsInhibition/GIAANNproto_databaseNetworkFilesInhibition/GIAANNproto_databaseNetworkInhibition/GIAANNproto_databaseNetworkTrainInhibition
+MANUAL; - restore option enforceDirectConnectionsSANIminimal - use useSANIfeatures and arrayNumberOfSegments=2 and enforceSequentialActivation=False
+MANUAL; - rename GIAANNproto_sequenceObservedColumnsExcitation/GIAANNproto_databaseNetworkFilesExcitation/GIAANNproto_databaseNetworkExcitation/GIAANNproto_databaseNetworkTrainExcitation/GIAANNproto_databaseNetworkDrawExcitation, extract GIAANNproto_databaseNetworkDrawInhibition
+- Please upgrade option trainInhibitoryNeurons to ensure a unique inhibitory node is assigned for every excitatory node in the network. Change specification step 2 from "identify an inhibitory neuron in the column that is not connected to the trained feature" to select the inhibitory node associated for that feature node (ie same column index and feature index). When drawing the inhibitory nodes (GIAANNproto_databaseNetworkDrawInhibition), the inhibitory neurons should be named according to their corresponding excitatory feature node name. For reference, this is how you originally implemented the trainInhibitoryNeurons algorithm, as it is the most basic interpretation.
+- There is an issue with the implementation of trainInhibitoryNeurons - please re-read the specification (in GIAANNproto1e.nlc). Please ensure that;
+	[D]. The input connections of each inhibitory neuron in the sequence should be trained exactly the same as the excitatory neurons in the sequence (executes the same code processFeaturesActiveTrain) - ie each inhibitory neuron should have input connections added for every prior excitatory node in the sequence. 
+	[C3]. The output connections of each inhibitory neuron should only be added for its identified alternate prediction candidate features [C1.]. If no alternate prediction candidate features are identified, no output connections should be added to the inhibitory node.
+- update inferenceInhibitoryNeurons inhibitory neuron firing:
+	- 1. the network inhibitory neurons are activated (via their input connections) using exactly the same code as the excitatory neurons (share existing code do not replicate code for this step). As the inhibitory input connections are identical to the excitatory input connections, the inhibitory neuron that should be selected to fire should be exactly the same neuron as the excitatory neuron that fires. a) verify that this is the case, and b) add a printe statement to catch when this does not occur.
+	- 2. add option inferenceInhibitoryNeuronsOptimised=True - which skips the standard inhibitory neuron activation calculation (1.) and simply selects the inhibitory neuron to fire that is associated with the excitatory feature neuron that fired. This should be close to a single line of code. if inferenceInhibitoryNeuronsOptimised=False, then revert to method 1.
+- update GIAANNproto_databaseNetworkTrainInhibition to support detection of alternate prediction candidates external to the trained sequence
+- add options inferenceDeactivateNeuronsUponPredictionInhibitory/inferenceDecrementActivationsInhibitory
+[GPT-5.2-Codex:]
+- patch inference seeding to use any active segment features for seed connections
+- patch inferenceDeactivateNeuronsUponPredictionInhibitory/inferenceDecrementActivationsInhibitory
+- enable useSANI+inferenceConnectionsStrengthBoolean+inferenceSegmentActivationsBoolean
+- sync arrayNumberOfSegments with numSeedTokensInference
+- every feature that fires must deactivate when fired if inferenceDeactivateNeuronsUponPrediction = True, even during seed phase.
+- every next predicted token must have minimum distance=1 from the last predicted token when enforceDirectConnectionsMinWordDistance=True - this constraint must be enforced always (even just after completing the seed phase).
+- when useSANI:enforceSequentialActivation=True the connection target node segments of the a) seeded and b) predicted nodes must activate according to the algorithmMatrixSANImethod="enforceActivationAcrossSegments rules: only activate a segment if previous segments active - see processFeaturesActivePredict(). Please patch this issue; both a) and b), and add a comment describing the issue being patched.
+- when useSANI:algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive=True; during prediction (including the first predicted node after seed), a node can only be selected to fire if its last segment is active - see neuronActivationSparse(). If this requirement is not being enforced, then apply a patch and add a comment.
+- implement option inferenceSourceActivationsBoolean - during inference each neuron that is selected to fire uses a source activation signal of 1 (irrespective of whether useSANI=True/False).
+- implement option inferenceSegmentActivationsBooleanFeatureSegmentsOnly - which only converts target segment activations into a boolean 1/0 value if they are feature segments (not concept segments). It restricts inferenceActivationStrengthBoolean to a) case useSANIfeatures or b) case useSANIfeaturesAndColumns last arrayNumberOfSegmentsFeatureDistance segments.
+- patch useSANIfeaturesAndColumns - segment activation is based on a) concept column index (for first arrayNumberOfSegmentsColumnDistance segments), and then b) word index (for last arrayNumberOfSegmentsFeatureDistance segments).
+- patch useSANIfeaturesAndColumns:assignFeatureConnectionsToTargetSegments - feature segments are assigned for any column (not just the internal column).
+- update option useSANIfeaturesAndColumns - concept segments also include internal column segment (not just external column segments).
+- update option useSANIfeaturesAndColumns - make enforceSequentialActivation independent for concept segments and feature segments (i.e. will accumulate concept and feature segments independently).
+- Rather than a) performing sequence training (processFeaturesActiveTrain) by extracting dense sequence tensors from the sparse feature/connection database network tensors (via populateArray), train the dense tensors, and then inserted the trained dense tensors back into sparse feature/connection database network tensors (via updateObservedColumns), b) initialise the sequence dense tensors as all zeros for training (remove populateArray), train the dense tensors, and then insert the trained dense tensors back into sparse feature/connection database network tensors (via updateObservedColumns). Update the observed columns sparse connections tensor properties (via updateObservedColumns) efficiently using these rules; arrayIndexPropertiesStrengthIndex (addition), arrayIndexPropertiesPermanenceIndex (addition), arrayIndexPropertiesActivationIndex (replace: eg clear then add), arrayIndexPropertiesTimeIndex (replace: eg clear then add), arrayIndexPropertiesPosIndex (replace; eg clear then add), arrayIndexPropertiesMinWordDistanceIndex (take minimum). It is very important that you focus on optimising the efficiency of this update function. 
+- add option drawSparseArrays - can draw sequences contained within much larger databases without running out of memory (due to densifying arrays).
+- Boolean option arrayIndexPropertiesMinWordDistance=True/False currently controls whether the train process (eg processFeaturesActiveTrain(), updateObservedColumns()) trains arrayIndexPropertiesMinWordDistanceIndex. All other arrayIndexProperties are currently implemented in the train process without the ability to switch them off. Please implement options arrayIndexPropertiesStrength=False, arrayIndexPropertiesPermanence=False, arrayIndexPropertiesActivation=False, arrayIndexPropertiesTime=False, arrayIndexPropertiesPos=False. The only code that should change is the addition of these boolean if statements, nothing else should change (eg processFeaturesActiveTrain(), updateObservedColumns()). When these options are disabled, it is important that there is no redudant code executed in the train process that would unnecessarily slow down the train process (eg processFeaturesActiveTrain(), updateObservedColumns()).
+- verify that the featureNeurons and featureConnections arrays (including globalFeatureNeurons) are only ever created with the properties defined in GIAANNproto_globalDefs (i.e. arrayIndexPropertiesStrength, arrayIndexPropertiesPermanence, arrayIndexPropertiesActivation, arrayIndexPropertiesTime, arrayIndexPropertiesPos, arrayIndexPropertiesMinWordDistance). The only exception to this rule is during inference (useInference=True), where arrayIndexPropertiesActivationIndex is always created for featureNeurons (or globalFeatureNeurons), but still never trained when arrayIndexPropertiesActivation=False. The file save process will likewise only save the featureNeurons and featureConnections (including globalFeatureNeurons) array properties defined in GIAANNproto_globalDefs - this should happen automatically and no changes should be required to the file save code. Please go ahead and implement this upgrade. In GIAANNproto_globalDefs, make sure to dynamically set arrayIndexPropertiesStrengthIndex, arrayIndexPropertiesPermanenceIndex, arrayIndexPropertiesActivationIndex, arrayIndexPropertiesTimeIndex, arrayIndexPropertiesPosIndex, arrayIndexPropertiesMinWordDistanceIndex, based on the values of arrayIndexPropertiesStrength, arrayIndexPropertiesPermanence, arrayIndexPropertiesActivation, arrayIndexPropertiesTime, arrayIndexPropertiesPos, arrayIndexPropertiesMinWordDistance.
+- patch enforceDirectConnectionsSANI:algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive" to perform direct connection detection before they become prediction candidates (like enforceDirectConnectionsMinWordDistance).
+MANUAL; - add option arrayIndexPropertiesEfficient:arrayIndexPropertiesStrength=True
+MANUAL; - set !useInference:useGPUsparse=True
+MANUAL; - move inactive code to archive (GIAANNproto_predictionNetwork*, GIAANNproto_*Inhibition)
+- improve the speed of the arrayIndexPropertiesEfficient:arrayIndexPropertiesStrength addition operation (eg in updateObservedColumns) during train, that is used to insert the trained dense sequence neuron/connection strengths back into the sparse database network neuron/connection arrays. Please upgrade the train code to create a separate path for arrayIndexPropertiesEfficient=True only (while leaving the existing implentation unchanged within case arrayIndexPropertiesEfficient=False). Implement all your recommended optimisations within the arrayIndexPropertiesEfficient=True context. Currently focus on the optimisations that you think will provide the most significant performance boost. Assume the strength values being added are always non-negative.
+
+---
+v1f (Codex IDE GPT-5.2-Codex):
+- add proto GIAANNproto1f1a - upgrade GIAANN to support option multipleDendriticBranches=True:
+	a) add a dendriticBranch dimension to the featureNeurons and featureConnection arrays (including global arrays) before the arrayNumberOfSegments dimension. Upgrade the entire codebase to support this change.
+	b) when multipleDendriticBranches=True: declare numberOfDendriticBranches=5, else: declare numberOfDendriticBranches=1 in global defs.
+	c) When multipleDendriticBranches=True: detect any repeated column features instances detected in a trained sequence. train each repeated column feature instance in a separate branch (its source feature connection branch and target feature node branch). When multipleDendriticBranches=False, assign all connections to the first branch.
+	d) When multipleDendriticBranches=True: during inference only deactivate the specific activated branch after a neuron fires (leave the segment activations of all other branches unchanged). When multipleDendriticBranches=False, effectively collapse/ignore the branch dimension during inference.
+	When multipleDendriticBranches=False, the code should therefore execute exactly as is (no changes should observed). All multipleDendriticBranches=True specific code should be contained within an if(multipleDendriticBranches) context.
+- implement option inferenceTrainFirstSequences = False - interprets all sequences in inference_prompt.txt as independent prediction seed/target sequences. Note option inferenceTrainFirstSequences=True is already implemented (trains first sequences in inference_prompt.txt, then performs inference only on last sequence).
+- add option attachTrailingTokensToLastConcept - attach tokens after the final concept to that last column.
+- remove summing across branches during selection - selection is performed based on the most activated branch across all neurons in the network (that satisfy the algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive" requirements).
+MANUAL; - update readme
+MANUAL; - sort global defs
+MANUAL; - print inferenceTrainFirstSequences phase
+MANUAL; - move inactive code to archive (GIAANNproto_sequenceSANIconceptNeurons/GIAANNproto_predictionInhibition)
+MANUAL; - patch useSANIfeaturesAndColumns parameters
+- add fallback when no concept feature found within seed (throw warning)
+- implement debugPrintTrainSequenceDelimiters, which prints the "Processing sequenceCount" statement with the delimiter types (non, deterministic, indeterministic) of each token.
+- upgrade the concept assignment token segmentation algorithm as follows: a) use the right most deterministic delimiter between two concept tokens if existent, else b) use the right most indeterministic delimiter between two concept tokens existent, else c) throw a warning ("no delimiter detected between concept tokens") and skip training the sequence. 
+- implement debugPrintTrainSentenceConceptAssignment - print each sequence token with the name of its associated concept column in brackets.
+- update seed phase (including getTokenConceptFeatureIndex) to use the known concept columns from the complete full seed+target sequence. The issue relates to the fact during a seed it is technically not known what column a token succeeding the last concept feature (or its nearest delimiter) belongs to - even though this information is embedded in the inference seed+target sequence. During the development phase of GIA however will assume that the correct concept column is known during seed - to simplify the process and speed up development.
+MANUAL; - add '(' to detectReferenceSetDelimitersBetweenNounsWordTypes - allow isolated bracketed nouns to occur after other nouns
+- implement options drawBranchesTrain/drawBranchesInference (drawBranches in visualizeGraph).
+- Each sequence (either 1 sentence or multiple sentences if multisentencePredictions enabled) must be pos tagged independently.
+- add debugPrintSequenceObservedColumnsConnections - debug connections with multiple concept column references during train sequences
+MANUAL; - add debugPrintTrainSequenceConceptAssignmentByLine - display each column on a new line
+- patch secondPass to not overwrite observedColumnsDict[lemma]
+- patch assignment of repeated features to independent dendritic branches
+- add debugOnlyDrawBranchIndexConnections
+- patch updateObservedColumnsVerbose() - repeated concept multi-branch training/inference merges (for inference)
+- patch processArticle spacy - skip whitespace-only sequences before re-running spaCy on sentence spans
+- patch createFeatureConnectionsActiveTrain - adjusted repeated-feature mapping so inference keeps branch-specific occurrences when loading observed column
+- add option debugTerminateInferenceOnPredictionTargetMismatch
+- patch featurePredictionTargetMatch to still match concept features when the token lemmas are the same but their words are different - concept features should be ambivalent to their morphology (eg plural noun vs singular noun)
+MANUAL; - update processColumnInferencePrediction - always calculate featurePredictionTargetMatch
+MANUAL; - remove debugPrintSequenceObservedColumnsConnections/debugPrintInferencePredictionIssue/debugTerminateInferenceOnPredictionTargetMismatch
+
+---
+v1g (Codex IDE GPT-5.2-Codex):
+- add proto GIAANNproto1g1a - upgrade the GIAANN inferenceUseNeuronFeaturePropertiesTime=True implementation:
+	a) store the last timeValue a branch (multipleDendriticBranches) segment (useSANI) was activated in its arrayIndexPropertiesTime property (during each prediction step).
+		- pseudo code for feature segment time calculation (useSANIfeatures or useSANIfeaturesAndColumns and segmentIndex >= arrayNumberOfSegmentsColumnDistance): 
+			- timeValue = sequenceWordIndex (current sequence word index)
+		- pseudo code for column segment time calculation (useSANIcolumns or useSANIfeaturesAndColumns and segmentIndex < arrayNumberOfSegmentsColumnDistance):
+			- timeValue = sequenceColumnIndex (current sequence column index = the number of consecutive columns that have been activated in the sequence)
+		- if inferenceUseNeuronFeaturePropertiesTimeExact: only allow segment activation when the time difference between the current timeValue and the previous segment timeValue is exactly 1.
+	b) use arrayIndexPropertiesTime to temporarily modify the activation of each branch (multipleDendriticBranches) segment (useSANI) when selecting the next feature node to activate (during both standard inference and beam search).
+		- calculate timeValue (use same function above).
+		- each branch segment activation is temporarily modified based on how closely the last time it was activated (arrayIndexPropertiesTime) maps to its segmentIndex.
+		- pseudo code for feature segments (useSANIfeatures or useSANIfeaturesAndColumns and segmentIndex >= arrayNumberOfSegmentsColumnDistance): 
+			modifiedActivation = currentActivation - abs(currentTimeValue-arrayIndexPropertiesTime - (numberFeatureSegments-featureSegmentIndex)) 
+		- pseudo code for column segments (useSANIcolumns or useSANIfeaturesAndColumns and segmentIndex < arrayNumberOfSegmentsColumnDistance):
+			modifiedActivation = currentActivation - abs(currentTimeValue-arrayIndexPropertiesTime - (numberColumnSegments-columnSegmentIndex))
+		- ensure the code is executed vectorised across segmentIndex (do not use python for loop for each segmentIndex).
+		- if useSANIfeaturesAndColumns: feature and column segments should be processed separately using the same function (the pseudo code is same in both cases; only segment indices differ).
+		- if inferenceUseNeuronFeaturePropertiesTimeExact: skip inferenceUseNeuronFeaturePropertiesTime step b.
+		- ensure that all time modifications are applied to activations after inferenceSegmentActivationsBoolean is already applied to segments (ie time modification is always applied).
+	When implementing inferenceUseNeuronFeaturePropertiesTime, ensure to add comments referencing the precise specification step (a - b).
+MANUAL; - remove old inferenceUseNeuronFeaturePropertiesTime=True (inference time record) and inferenceUseNeuronFeaturePropertiesTime=False (train time record) implementations.
+- restore inferenceUseNeuronFeaturePropertiesTime to the original spec - store the last timeValue a branch (multipleDendriticBranches) segment (useSANI) was activated in its arrayIndexPropertiesTime property (during each prediction step).
+- update processColumnInferencePrediction - throw runtime error when no conceptColumnsIndicesPred.
+- implement option inferenceUseNeuronFeaturePropertiesTimeExact - only fire neurons if the last times recorded were ideal (ie exact times expected for each segment index).
+- implement option randomlyAssignBranches - for each feature in the train sequence randomly select a branch to be trained.
+- update the inferenceUseNeuronFeaturePropertiesTimeExact implementation as follows: 
+	in step a) if inferenceUseNeuronFeaturePropertiesTimeExact: only allow segment activation when the time difference between the current timeValue and the previous segment timeValue is exactly 1.
+	in step b) if inferenceUseNeuronFeaturePropertiesTimeExact: skip specification step b. Only fire a neuron if the last segment time is ideal (ie exact time expected for the last segment index). This is redundant, as it is necessarily true (as the neuron fires when the last segment is activated).
+	This update is being applied because earlier segment times may be overwritten before the neuron fires thereby compromising their use in a final segment time array check (b).
+- patch inferenceUseNeuronFeaturePropertiesTime (and inferenceUseNeuronFeaturePropertiesTimeExact) so seed-phase activation/time segment updates follow the same rules as prediction-phase updates.
+- patch the node drawing path to stop collapsing to branch 0 when randomlyAssignBranches=True
+- define !multipleDendriticBranches:randomlyAssignBranches = False
+- update readme
+- patch updateObservedColumnsVerbose - arrayIndexPropertiesPos use applySparseMaxUpdate (instead of replace)
+- patch drawRelationTypes - execute getFeaturePosValue
+- patch updateObservedColumnsVerbose - set replacePropertiesEnabled = arrayIndexPropertiesActivationCreate or arrayIndexPropertiesTimeCreate
+- add graphs
+
+---
+v1h (Codex IDE GPT-5.2-Codex):
+
+- add proto GIAANNproto1h1a - upgrade seed phase:
+	The seed phase of inference is being upgraded to use exactly the same code and logic as the non-seed prediction phase of inference.
+	I have moved the old GIAANNproto_predictionSeed.py independent seed implementation to archive. Please upgrade GIAANNproto_prediction.py:processConceptWordsInference() to perform seed by executing processColumnInferencePrediction(seedPhase=True). The only difference between the prediction phase and the seed phase is that in the seed phase the feature which is selected to fire is always the target feature (not the predicted feature) - ie inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures is always overridden to False during the seed phase.
+	ensure that the seed phase does not execute standard selection or beam search selection. It fires its first seed token (target), calculates updated segments of network, then automatically selects the next seed token (target), etc - for each seed token. The seed phase is a subset of the prediction phase (controlled by seedPhase=True).
+- update arrayIndexPropertiesEfficient: set arrayIndexPropertiesActivation/arrayIndexPropertiesTime to inference only
+- remove option performRedundantCoalesce
+- patch updateObservedColumnsVerbose():replacePropertiesEnabled context (and deprecate replacePropertiesEnabled)
