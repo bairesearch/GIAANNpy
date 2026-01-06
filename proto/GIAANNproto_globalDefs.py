@@ -312,6 +312,12 @@ if(SANIconceptNeurons):
 
 
 #Draw;
+#select a single draw method (colouring scheme);
+drawSegments = False and useSANI	#optional
+drawBranches = False and multipleDendriticBranches	#optional
+drawRelationTypes = False and not arrayIndexPropertiesEfficient	#optional
+drawDelimiters = False and conceptColumnsDelimitByPOS	#optional
+drawDefault = True	#optional
 if(useInference):
 	drawSequenceObservedColumns = False	#mandatory
 	drawAllColumns = False	#mandatory
@@ -324,28 +330,34 @@ else:
 	drawAllColumns = False	#default: False	#optional	#draw all columns in network (only used for automated visualisation; drawNetworkDuringTrainSave)	#requires !drawSequenceObservedColumns
 	if(drawAllColumns):
 		assert not trainSequenceObservedColumnsUseSequenceFeaturesOnly
-	drawNetworkDuringTrainSave = False	#default: False
-
-drawSegments = False and useSANI	#optional
-drawBranches = False and multipleDendriticBranches	#optional
-drawRelationTypes = True and not arrayIndexPropertiesEfficient	#optional
-
-drawBranchesTrain = False	#derived
-drawBranchesInference = False	#derived
+	drawNetworkDuringTrainSave = True	#default: False
 drawSegmentsTrain = False	#derived
 drawSegmentsInference = False	#derived
+drawBranchesTrain = False	#derived
+drawBranchesInference = False	#derived
 drawRelationTypesTrain = False	#derived
 drawRelationTypesInference = False	#derived
+drawDelimitersTrain = False	#derived
+drawDelimitersInference = False	#derived
+drawDefaultTrain = False	#derived
+drawDefaultInference = False	#derived
 if(drawSegments):
 	drawSegmentsTrain = True 	#draws connection colours based on their target node incoming segment index
-	drawSegmentsInference = True
+	drawSegmentsInference = False	#False: draw activation status
 elif(drawBranches):
 	drawBranchesTrain = True 	#draws connection colours based on their target node incoming dendritic branch index
-	drawBranchesInference = True 
+	drawBranchesInference = False 	#False: draw activation status
 elif(drawRelationTypes):
-	drawRelationTypesTrain = True	#True: draw feature neuron and connection relation types in different colours
+	drawRelationTypesTrain = True	#draws feature neuron and connection relation types in different colours
 	drawRelationTypesInference = False	#False: draw activation status
-
+elif(drawDelimiters):
+	drawDelimitersTrain = True	#draws feature neuron column delimiters (and their external connections) in different colours
+	drawDelimitersInference = False		#False: draw activation status
+elif(drawDefault):
+	drawDefaultTrain = True	#standard colours (concept neurons in blue and feature neurons in cyan)
+	drawDefaultInference = False	#False: draw activation status
+else:
+	print("warning: draw scheme not defined")
 drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSequenceIndex"
 drawNetworkDuringInferenceSaveFilenamePrepend = "GIAANNproto1cSequenceObservedColumnsInferenceTokenIndex"
 drawHighResolutionFigure = True	#required for inference debug

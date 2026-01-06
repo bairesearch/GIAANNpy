@@ -400,7 +400,6 @@ MANUAL; - remove old inferenceUseNeuronFeaturePropertiesTime=True (inference tim
 
 ---
 v1h (Codex IDE GPT-5.2-Codex):
-
 - add proto GIAANNproto1h1a - upgrade seed phase:
 	The seed phase of inference is being upgraded to use exactly the same code and logic as the non-seed prediction phase of inference.
 	I have moved the old GIAANNproto_predictionSeed.py independent seed implementation to archive. Please upgrade GIAANNproto_prediction.py:processConceptWordsInference() to perform seed by executing processColumnInferencePrediction(seedPhase=True). The only difference between the prediction phase and the seed phase is that in the seed phase the feature which is selected to fire is always the target feature (not the predicted feature) - ie inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures is always overridden to False during the seed phase.
@@ -408,3 +407,5 @@ v1h (Codex IDE GPT-5.2-Codex):
 - update arrayIndexPropertiesEfficient: set arrayIndexPropertiesActivation/arrayIndexPropertiesTime to inference only
 - remove option performRedundantCoalesce
 - patch updateObservedColumnsVerbose():replacePropertiesEnabled context (and deprecate replacePropertiesEnabled)
+- implement option drawDelimiters=True (drawDelimitersTrain/drawDelimitersInference) - draws deterministic and probabilistic ref set delimiters (in red and pink respectively). All other neurons are drawn in drawDefault colours (concept feature neurons in blue and all other feature neurons in turquoise). When drawDelimiters=True, also draw the (outgoing) external connections of delimiter neurons in delimiterColourDeterministic/delimiterColourProbabilistic (ie red/pink).
+- update readme

@@ -28,39 +28,15 @@ import GIAANNproto_databaseNetworkExcitation
 if(trainInhibitoryNeurons):
 	import GIAANNproto_databaseNetworkDrawInhibition
 
-def selectDrawBranch(tensor, drawBranches):
-	if(tensor is None):
-		return tensor
-	if(tensor.dim() > 1 and tensor.size(1) == numberOfDendriticBranches):
-		if(drawBranches):
-			return tensor
-		if(tensor.is_sparse):
-			return GIAANNproto_sparseTensors.sliceSparseTensor(tensor, 1, 0)
-		return tensor[:, 0]
-	return tensor
 
-def collapseBranchDimensionForNodes(tensor, drawBranches):
-	result = tensor
-	if(drawBranches and multipleDendriticBranches):
-		if(tensor is None):
-			raise RuntimeError("collapseBranchDimensionForNodes error: tensor is None while drawBranches enabled")
-		if(tensor.dim() <= 1):
-			raise RuntimeError("collapseBranchDimensionForNodes error: tensor rank missing branch dimension")
-		if(tensor.size(1) != numberOfDendriticBranches):
-			raise RuntimeError("collapseBranchDimensionForNodes error: branch dimension mismatch")
-		if(tensor.is_sparse):
-			tensorCoalesced = tensor.coalesce()
-			indices = tensorCoalesced.indices()
-			values = tensorCoalesced.values()
-			reorderedIndices = pt.cat([indices[1:2], indices[0:1], indices[2:]], dim=0)
-			reorderedSize = (tensorCoalesced.size(1), tensorCoalesced.size(0)) + tensorCoalesced.size()[2:]
-			reorderedTensor = pt.sparse_coo_tensor(reorderedIndices, values, size=reorderedSize, device=tensorCoalesced.device).coalesce()
-			result = GIAANNproto_sparseTensors.reduceSparseBranchMax(reorderedTensor)
-		else:
-			result = tensor.max(dim=1).values
-	return result
-
-if(drawSegmentsTrain):
+#if(drawDefault):
+defaultColourConceptFeature = 'blue'
+defaultColourFeature = 'turquoise'
+defaultColourConceptFeatureActive = 'lightskyblue'
+defaultColourFeatureActive = 'cyan'
+defaultConnectionColourInternal = 'yellow'
+defaultConnectionColourExternal = 'orange'
+if(drawSegments):
 	segmentColoursBase = ['red', 'green', 'blue', 'yellow', 'magenta', 'cyan']
 	segmentColours = segmentColoursBase
 	if(arrayNumberOfSegments > len(segmentColoursBase)):
@@ -68,7 +44,7 @@ if(drawSegmentsTrain):
 		segmentColours = (segmentColoursBase * repeats)[:arrayNumberOfSegments]
 	else:
 		segmentColours = segmentColoursBase[:arrayNumberOfSegments]
-if(drawBranchesTrain):
+elif(drawBranches):
 	branchColoursBase = ['red', 'green', 'blue', 'yellow', 'magenta', 'cyan']
 	branchColours = branchColoursBase
 	if(numberOfDendriticBranches > len(branchColoursBase)):
@@ -76,8 +52,7 @@ if(drawBranchesTrain):
 		branchColours = (branchColoursBase * repeats)[:numberOfDendriticBranches]
 	else:
 		branchColours = branchColoursBase[:numberOfDendriticBranches]
-
-if(drawRelationTypesTrain):
+elif(drawRelationTypes):
 	relationTypeConceptPos1 = 'NOUN'
 	relationTypeConceptPos2 = 'PROPN'
 	relationTypeActionPos = 'VERB'
@@ -157,6 +132,42 @@ if(drawRelationTypesTrain):
 				print("FAIL: word = ", word, ", posString = ", posString, ", posInt = ", posInt)
 			
 		return colour
+elif(drawDelimiters):
+	delimiterColourDeterministic = 'red'
+	delimiterColourProbabilistic = 'pink'
+
+
+def selectDrawBranch(tensor, drawBranches):
+	if(tensor is None):
+		return tensor
+	if(tensor.dim() > 1 and tensor.size(1) == numberOfDendriticBranches):
+		if(drawBranches):
+			return tensor
+		if(tensor.is_sparse):
+			return GIAANNproto_sparseTensors.sliceSparseTensor(tensor, 1, 0)
+		return tensor[:, 0]
+	return tensor
+
+def collapseBranchDimensionForNodes(tensor, drawBranches):
+	result = tensor
+	if(drawBranches and multipleDendriticBranches):
+		if(tensor is None):
+			raise RuntimeError("collapseBranchDimensionForNodes error: tensor is None while drawBranches enabled")
+		if(tensor.dim() <= 1):
+			raise RuntimeError("collapseBranchDimensionForNodes error: tensor rank missing branch dimension")
+		if(tensor.size(1) != numberOfDendriticBranches):
+			raise RuntimeError("collapseBranchDimensionForNodes error: branch dimension mismatch")
+		if(tensor.is_sparse):
+			tensorCoalesced = tensor.coalesce()
+			indices = tensorCoalesced.indices()
+			values = tensorCoalesced.values()
+			reorderedIndices = pt.cat([indices[1:2], indices[0:1], indices[2:]], dim=0)
+			reorderedSize = (tensorCoalesced.size(1), tensorCoalesced.size(0)) + tensorCoalesced.size()[2:]
+			reorderedTensor = pt.sparse_coo_tensor(reorderedIndices, values, size=reorderedSize, device=tensorCoalesced.device).coalesce()
+			result = GIAANNproto_sparseTensors.reduceSparseBranchMax(reorderedTensor)
+		else:
+			result = tensor.max(dim=1).values
+	return result
 
 def getFeaturePosValue(featureNeurons, featureIndexInObservedColumn, segmentIndex):
 	posValue = 0.0
@@ -205,16 +216,35 @@ def floatToString(value):
 	#result = str(round(value, 2))
 	return result
 
+def getDelimiterFeatureColour(databaseNetworkObject, featureWord):
+	delimiterColour = None
+	if(conceptColumnsDelimitByPOS):
+		featureIndex = databaseNetworkObject.conceptFeaturesDict.get(featureWord)
+		if(featureIndex is not None):
+			if(detectReferenceSetDelimitersBetweenNouns):
+				if(featureIndex < len(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterDeterministicList) and databaseNetworkObject.conceptFeaturesReferenceSetDelimiterDeterministicList[featureIndex]):
+					delimiterColour = delimiterColourDeterministic
+				elif(featureIndex < len(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList) and databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex]):
+					delimiterColour = delimiterColourProbabilistic
+			else:
+				if(featureIndex < len(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList) and databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList[featureIndex]):
+					delimiterColour = delimiterColourDeterministic
+	return delimiterColour
+
 def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=None):
 
 	if(inferenceMode):
-		drawRelationTypes = drawRelationTypesInference
 		drawSegments = drawSegmentsInference
 		drawBranches = drawBranchesInference
+		drawRelationTypes = drawRelationTypesInference
+		drawDelimiters = drawDelimitersInference
+		drawDefault = drawDefaultInference
 	else:
-		drawRelationTypes = drawRelationTypesTrain
 		drawSegments = drawSegmentsTrain
 		drawBranches = drawBranchesTrain
+		drawRelationTypes = drawRelationTypesTrain
+		drawDelimiters = drawDelimitersTrain
+		drawDefault = drawDefaultTrain
 
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 	G.clear()
@@ -231,7 +261,7 @@ def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=
 	if not lowMem:
 		global globalFeatureNeurons
 
-	excitatoryNodeMap = drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, drawRelationTypes, drawSegments, drawBranches, inferenceMode)
+	excitatoryNodeMap = drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, drawRelationTypes, drawSegments, drawBranches, drawDelimiters, drawDefault, inferenceMode)
 	if(trainInhibitoryNeurons):
 		GIAANNproto_databaseNetworkDrawInhibition.drawInhibitoryFeatureNeurons(plt, G, sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, conceptIndexToLemma, drawSegments, excitatoryNodeMap)
 
@@ -271,7 +301,7 @@ def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=
 		plt.show()
 
 if(drawSparseArrays):
-	def drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, drawRelationTypes, drawSegments, drawBranches, inferenceMode):
+	def drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, drawRelationTypes, drawSegments, drawBranches, drawDelimiters, drawDefault, inferenceMode):
 
 		# Draw concept columns
 		posDict = {}
@@ -307,15 +337,15 @@ if(drawSparseArrays):
 				conceptNeuronFeature = False
 				if(useDedicatedConceptNames and useDedicatedConceptNames2):
 					if featureWord == variableConceptNeuronFeatureName:
-						neuronColor = 'blue'
+						neuronColor = defaultColourConceptFeature
 						neuronName = observedColumn.conceptName
 						conceptNeuronFeature = True
 						#print("\nvisualizeGraph: conceptNeuronFeature neuronName = ", neuronName)
 					else:
-						neuronColor = 'turquoise'
+						neuronColor = defaultColourFeature
 						neuronName = featureWord
 				else:
-					neuronColor = 'turqoise'
+					neuronColor = defaultColourFeature
 					neuronName = featureWord
 
 				fIdx = featureIndexInObservedColumn	#not used
@@ -337,11 +367,17 @@ if(drawSparseArrays):
 							if(arrayIndexPropertiesPosIndex is not None):
 								posValue = getFeaturePosValue(featureNeurons, featureIndexInObservedColumn, segmentIndex)
 								neuronColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, drawFeatureNodes=True)
-					elif(featureActive):
-						if(conceptNeuronFeature):
-							neuronColor = 'lightskyblue'
-						else:
-							neuronColor = 'cyan'
+					elif(drawDelimiters):
+						if not conceptNeuronFeature:
+							delimiterColour = getDelimiterFeatureColour(databaseNetworkObject, featureWord)
+							if(delimiterColour is not None):
+								neuronColor = delimiterColour
+					elif(drawDefault):
+						if(featureActive):
+							if(conceptNeuronFeature):
+								neuronColor = defaultColourConceptFeatureActive
+							else:
+								neuronColor = defaultColourFeatureActive
 
 					if(inferenceMode):	
 						if(debugDrawNeuronActivations):
@@ -483,8 +519,17 @@ if(drawSparseArrays):
 					elif(drawRelationTypes):
 						posValueTensor = pt.tensor(entry["pos"])
 						connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValueTensor, sourceFeatureWord, internalConnection=internalConnection)
-					else:
-						connectionColor = 'yellow' if internalConnection else 'orange'
+					elif(drawDelimiters):
+						if(internalConnection):
+							connectionColor = defaultConnectionColourInternal
+						else:
+							delimiterColour = getDelimiterFeatureColour(databaseNetworkObject, sourceFeatureWord)
+							if(delimiterColour is not None):
+								connectionColor = delimiterColour
+							else:
+								connectionColor = defaultConnectionColourExternal
+					elif(drawDefault):
+						connectionColor = defaultConnectionColourInternal if internalConnection else defaultConnectionColourExternal
 					G.add_edge(sourceNode, targetNode, color=connectionColor)
 			else:
 				hasBranchDim = featureConnections.dim() == 6
@@ -558,9 +603,11 @@ if(drawSparseArrays):
 												if(arrayIndexPropertiesPosIndex is not None):
 													connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[arrayIndexPropertiesPosIndex, fIdx, cIdx, otherFIdx], featureWord, internalConnection=True)
 												else:
-													connectionColor = 'orange'
-											else:
-												connectionColor = 'yellow'
+													connectionColor = defaultConnectionColourExternal
+											elif(drawDelimiters):
+												connectionColor = defaultConnectionColourInternal
+											elif(drawDefault):
+												connectionColor = defaultConnectionColourInternal
 												
 											if(featurePresent):
 												G.add_edge(sourceNode, targetNode, color=connectionColor)
@@ -607,15 +654,21 @@ if(drawSparseArrays):
 												if(arrayIndexPropertiesPosIndex is not None):
 													connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[arrayIndexPropertiesPosIndex, fIdx, otherCIdx, otherFIdx], featureWord, internalConnection=False)
 												else:
-													connectionColor = 'orange'
-											else:
-												connectionColor = 'orange'
+													connectionColor = defaultConnectionColourExternal
+											elif(drawDelimiters):
+												delimiterColour = getDelimiterFeatureColour(databaseNetworkObject, featureWord)
+												if(delimiterColour is not None):
+													connectionColor = delimiterColour
+												else:
+													connectionColor = defaultConnectionColourExternal
+											elif(drawDefault):
+												connectionColor = defaultConnectionColourExternal
 												
 											if(featurePresent):
 												G.add_edge(sourceNode, targetNode, color=connectionColor)
 		return nodeNameMap
 else:
-	def drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, drawRelationTypes, drawSegments, drawBranches, inferenceMode):
+	def drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, drawRelationTypes, drawSegments, drawBranches, drawDelimiters, drawDefault, inferenceMode):
 
 		# Draw concept columns
 		posDict = {}
@@ -651,15 +704,15 @@ else:
 				conceptNeuronFeature = False
 				if(useDedicatedConceptNames and useDedicatedConceptNames2):
 					if featureWord == variableConceptNeuronFeatureName:
-						neuronColor = 'blue'
+						neuronColor = defaultColourConceptFeature
 						neuronName = observedColumn.conceptName
 						conceptNeuronFeature = True
 						#print("\nvisualizeGraph: conceptNeuronFeature neuronName = ", neuronName)
 					else:
-						neuronColor = 'turquoise'
+						neuronColor = defaultColourFeature
 						neuronName = featureWord
 				else:
-					neuronColor = 'turqoise'
+					neuronColor = defaultColourFeature
 					neuronName = featureWord
 
 				fIdx = featureIndexInObservedColumn	#not used
@@ -681,11 +734,17 @@ else:
 							if(arrayIndexPropertiesPosIndex is not None):
 								posValue = getFeaturePosValue(featureNeurons, featureIndexInObservedColumn, segmentIndex)
 								neuronColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, drawFeatureNodes=True)
-					elif(featureActive):
-						if(conceptNeuronFeature):
-							neuronColor = 'lightskyblue'
-						else:
-							neuronColor = 'cyan'
+					elif(drawDelimiters):
+						if not conceptNeuronFeature:
+							delimiterColour = getDelimiterFeatureColour(databaseNetworkObject, featureWord)
+							if(delimiterColour is not None):
+								neuronColor = delimiterColour
+					elif(drawDefault):
+						if(featureActive):
+							if(conceptNeuronFeature):
+								neuronColor = defaultColourConceptFeatureActive
+							else:
+								neuronColor = defaultColourFeatureActive
 
 					if(inferenceMode):	
 						if(debugDrawNeuronActivations):
@@ -800,9 +859,11 @@ else:
 											if(arrayIndexPropertiesPosIndex is not None):
 												connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[arrayIndexPropertiesPosIndex, fIdx, cIdx, otherFIdx], featureWord, internalConnection=True)
 											else:
-												connectionColor = 'orange'
-										else:
-											connectionColor = 'yellow'
+												connectionColor = defaultConnectionColourExternal
+										elif(drawDelimiters):
+											connectionColor = defaultConnectionColourInternal
+										elif(drawDefault):
+											connectionColor = defaultConnectionColourInternal
 											
 										if(featurePresent):
 											G.add_edge(sourceNode, targetNode, color=connectionColor)
@@ -849,9 +910,15 @@ else:
 											if(arrayIndexPropertiesPosIndex is not None):
 												connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[arrayIndexPropertiesPosIndex, fIdx, otherCIdx, otherFIdx], featureWord, internalConnection=False)
 											else:
-												connectionColor = 'orange'
-										else:
-											connectionColor = 'orange'
+												connectionColor = defaultConnectionColourExternal
+										elif(drawDelimiters):
+											delimiterColour = getDelimiterFeatureColour(databaseNetworkObject, featureWord)
+											if(delimiterColour is not None):
+												connectionColor = delimiterColour
+											else:
+												connectionColor = defaultConnectionColourExternal
+										elif(drawDefault):
+											connectionColor = defaultConnectionColourExternal
 											
 										if(featurePresent):
 											G.add_edge(sourceNode, targetNode, color=connectionColor)

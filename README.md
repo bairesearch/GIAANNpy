@@ -67,7 +67,7 @@ GIA ANN is designed to be a biologically feasible algorithm, and exhibits these 
 * unlimited context windows.
 * biologically feasible circuitry and learning algorithm (no backpropagation).
 
-It likwise supports a number features of classical artificial neural networks such as autoregressive training/prediction and reinforcement learning.
+It likewise supports a number features of classical artificial neural networks such as autoregressive training/prediction and reinforcement learning.
 
 ### Configuration
 
@@ -114,19 +114,19 @@ The prompt_inference.txt provided is taken from the first sentences from the fir
 
 #### Inhibitory neurons
 
-* Deprecated - inhibition is already simulated using during topk selection during inference
+* Deprecated - inhibition is already simulated during topk selection during inference
 
 #### Array properties
 
-* set arrayIndexPropertiesEfficient=True to reduce train time/RAM (not compatible with drawRelationTypesTrain)
+* set arrayIndexPropertiesEfficient=True to reduce train time/RAM (not compatible with drawRelationTypes)
 
 #### SANI
 
-* set useSANI = True - enables sequentially activated neuronal input
+* set useSANI=True - enables sequentially activated neuronal input
 
 #### Immediate (direct) connections
 
-* set enforceDirectConnections = True (by default it uses useSANI to enforce direct connections between predicted features).
+* set enforceDirectConnections=True (by default it uses useSANI to enforce direct connections between predicted features).
 
 #### Concept column delimiters
 
@@ -138,7 +138,7 @@ The prompt_inference.txt provided is taken from the first sentences from the fir
 
 #### Beam search
 
-* Executes inference by identifying the best beam path
+* set inferenceBeamSearch=True - executes inference by identifying the best beam path
 
 #### SANI concept neuron
 
@@ -155,15 +155,16 @@ Settings for inference. See:
 
 #### Train optimisations
 
-* trainSequenceObservedColumnsUseSequenceFeaturesOnly=True - only loads sequence features into dense tensors for train. Currently uses dense tensors (typically in GPU RAM) however to generate these. Can be upgraded so only a limited amount of data is ever loaded to GPU during train (it currently temporarily masks entire feature arrays in GPU during transfer phase).
-* trainSequenceObservedColumnsMatchSequenceWords=True is now mandatory (originally GIAANN proto did not independently train a feature for every token instance in the sequence).
+* trainSequenceObservedColumnsUseSequenceFeaturesOnly=True - only loads sequence features into dense tensors for train. Currently uses dense tensors (typically in GPU RAM) however to merge these with database network. Can be upgraded so only a limited amount of data is ever loaded to GPU during train (it currently temporarily masks entire feature arrays in GPU during transfer phase).
+* trainSequenceObservedColumnsMatchSequenceWords=True is now mandatory (originally GIAANN proto was not guaranteed to independently train a feature for every token instance in the sequence).
 
 #### Draw
 
 * drawSegments - draw independent segments (connections) in different colours.
 * drawBranches - draw independent branches (connections and features) in different colours.
 * drawRelationTypes - draw feature POS types (and their connections) in different colours.
-* default - draw concept/feature node types in different colours (if useInference=True and in inferenceMode then will draw activation status of network).
+* drawDelimiters - draws feature neuron column delimiters (and their external connections) in different colours.
+* drawDefault - draws concept/feature node types (and their internal/external connections) in different colours. If useInference=True and in inferenceMode then will draw activation status of network.
 
 ##### drawSegments
 ![GIAANNdemo-drawSegments-SMALL.png](https://github.com/bairesearch/GIAANNpy/releases/download/assets/GIAANNdemo-drawSegments-SMALL.png)
@@ -173,6 +174,12 @@ Settings for inference. See:
 
 ##### drawRelationTypes
 ![GIAANNdemo-drawRelationTypes-SMALL.png](https://github.com/bairesearch/GIAANNpy/releases/download/assets/GIAANNdemo-drawRelationTypes-SMALL.png)
+
+##### drawDelimiterTypes
+![GIAANNdemo-drawDelimiters-SMALL.png](https://github.com/bairesearch/GIAANNpy/releases/download/assets/GIAANNdemo-drawDelimiters-SMALL.png)
+
+##### drawDefault
+![GIAANNdemo-drawDefault-SMALL.png](https://github.com/bairesearch/GIAANNpy/releases/download/assets/GIAANNdemo-drawDefault-SMALL.png)
 
 
 #### Algorithm preferences (normalisation, permanence etc)
