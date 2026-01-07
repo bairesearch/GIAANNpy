@@ -599,7 +599,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		#process features (activate global target neurons);
 		activationSequenceWordIndex = sequenceWordIndex
 		activationSequenceColumnIndex = sequenceColumnIndex
-		if(inferenceUseNeuronFeaturePropertiesTime and inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures and (not seedPhase)):
+		if(inferenceUseNeuronFeaturePropertiesTime and inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures and sequenceWordIndex > 0):
 			activationSequenceWordIndex = sequenceWordIndex - 1
 			if(activationSequenceWordIndex < 0):
 				raise RuntimeError("processColumnInferencePrediction: activationSequenceWordIndex out of range")
