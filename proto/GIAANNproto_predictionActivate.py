@@ -309,49 +309,6 @@ def applyTimeBasedActivationModifier(globalFeatureNeuronsActivation, globalFeatu
 			segmentIndices = indices[1]
 			penaltyValues = computeTimePenaltyForSegments(segmentIndices, storedTimes, sequenceWordIndex, sequenceColumnIndex)
 			modifiedValues = values - penaltyValues
-			if(debugInferenceUseNeuronFeaturePropertiesTime and sequenceWordIndex >= debugInferenceUseNeuronFeaturePropertiesTimeMinSequenceWordIndex):
-				# spec step (b): debug time-based activation modifier per segment.
-				penaltyMin = float(penaltyValues.min().item())
-				penaltyMean = float(penaltyValues.mean().item())
-				penaltyMax = float(penaltyValues.max().item())
-				modifiedMin = float(modifiedValues.min().item())
-				modifiedMean = float(modifiedValues.mean().item())
-				modifiedMax = float(modifiedValues.max().item())
-				print(f"debugInferenceUseNeuronFeaturePropertiesTime: sequenceWordIndex={sequenceWordIndex}, sequenceColumnIndex={sequenceColumnIndex}, nnz={int(values.shape[0])}, penaltyMin={penaltyMin}, penaltyMean={penaltyMean}, penaltyMax={penaltyMax}, modifiedMin={modifiedMin}, modifiedMean={modifiedMean}, modifiedMax={modifiedMax}")
-				offsetValues = pt.zeros_like(storedTimes)
-				currentTimeValues = pt.zeros_like(storedTimes)
-				if(useSANIfeaturesAndColumns):
-					featureMask = segmentIndices >= arrayNumberOfSegmentsColumnDistance
-					if(featureMask.any()):
-						localSegmentIndex = (segmentIndices[featureMask] - arrayNumberOfSegmentsColumnDistance).to(storedTimes.dtype)
-						offsetValues[featureMask] = float(arrayNumberOfSegmentsFeatureDistance) - localSegmentIndex
-						currentTimeValues[featureMask] = float(sequenceWordIndex)
-					if((~featureMask).any()):
-						localSegmentIndex = segmentIndices[~featureMask].to(storedTimes.dtype)
-						offsetValues[~featureMask] = float(arrayNumberOfSegmentsColumnDistance) - localSegmentIndex
-						currentTimeValues[~featureMask] = float(sequenceColumnIndex)
-				elif(useSANIfeatures):
-					localSegmentIndex = segmentIndices.to(storedTimes.dtype)
-					offsetValues = float(arrayNumberOfSegments) - localSegmentIndex
-					currentTimeValues = pt.full_like(storedTimes, float(sequenceWordIndex))
-				elif(useSANIcolumns):
-					localSegmentIndex = segmentIndices.to(storedTimes.dtype)
-					offsetValues = float(arrayNumberOfSegments) - localSegmentIndex
-					currentTimeValues = pt.full_like(storedTimes, float(sequenceColumnIndex))
-				else:
-					raise RuntimeError("applyTimeBasedActivationModifier: useSANI feature mode not configured")
-				sampleIndex = int(pt.argmax(penaltyValues).item())
-				sampleBranch = int(indices[0, sampleIndex].item())
-				sampleSegment = int(segmentIndices[sampleIndex].item())
-				sampleColumn = int(indices[2, sampleIndex].item())
-				sampleFeature = int(indices[3, sampleIndex].item())
-				sampleActivation = float(values[sampleIndex].item())
-				sampleStoredTime = float(storedTimes[sampleIndex].item())
-				sampleCurrentTime = float(currentTimeValues[sampleIndex].item())
-				sampleOffset = float(offsetValues[sampleIndex].item())
-				samplePenalty = float(penaltyValues[sampleIndex].item())
-				sampleModified = float(modifiedValues[sampleIndex].item())
-				print(f"debugInferenceUseNeuronFeaturePropertiesTime: sample=penaltyMax, branch={sampleBranch}, segment={sampleSegment}, column={sampleColumn}, feature={sampleFeature}, activation={sampleActivation}, storedTime={sampleStoredTime}, currentTime={sampleCurrentTime}, offset={sampleOffset}, penalty={samplePenalty}, modified={sampleModified}")
 			result = pt.sparse_coo_tensor(indices, modifiedValues, size=activationSparse.size(), device=activationSparse.device).coalesce()
 	return result
 
@@ -452,33 +409,6 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 		featureConnectionsStrength = applyConnectionStrengthPOSdependenceInference(databaseNetworkObject, featureConnectionsStrength, featureConnectionsPos, sourceConceptIndex)
 	if(inferenceConnectionsStrengthBoolean):
 		featureConnectionsStrength = featureConnectionsStrength.bool().float()
-	if(inferenceUseNeuronFeaturePropertiesTime and debugInferenceUseNeuronFeaturePropertiesTimeTargeted):
-		debugSequenceWordIndex = debugInferenceUseNeuronFeaturePropertiesTimeTargetSequenceWordIndex
-		if(debugSequenceWordIndex is None or sequenceWordIndex == debugSequenceWordIndex):
-			if(debugInferenceUseNeuronFeaturePropertiesTimeTargetColumnName is None or debugInferenceUseNeuronFeaturePropertiesTimeTargetFeatureNames is None):
-				raise RuntimeError("processFeaturesActivePredict: debug target column/feature names not configured")
-			if(debugInferenceUseNeuronFeaturePropertiesTimeTargetColumnName not in databaseNetworkObject.conceptColumnsList):
-				raise RuntimeError("processFeaturesActivePredict: debug target column not found")
-			debugTargetColumnIndex = databaseNetworkObject.conceptColumnsList.index(debugInferenceUseNeuronFeaturePropertiesTimeTargetColumnName)
-			if(sourceConceptIndex == debugTargetColumnIndex and sourceFeatureIndex == featureIndexConceptNeuron):
-				debugTargetFeatureIndices = [databaseNetworkObject.conceptFeaturesList.index(featureName) if featureName in databaseNetworkObject.conceptFeaturesList else -1 for featureName in debugInferenceUseNeuronFeaturePropertiesTimeTargetFeatureNames]
-				if(-1 in debugTargetFeatureIndices):
-					raise RuntimeError("processFeaturesActivePredict: debug target feature not found")
-				debugDevice = featureConnectionsStrength.device
-				debugBranchCount = numberOfDendriticBranches if multipleDendriticBranches else 1
-				debugBranchRange = pt.arange(debugBranchCount, dtype=pt.long, device=debugDevice)
-				debugSegmentRange = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=debugDevice)
-				debugBranchIndices = debugBranchRange.repeat_interleave(arrayNumberOfSegments)
-				debugSegmentIndices = debugSegmentRange.repeat(debugBranchCount)
-				debugValueDtype = featureConnectionsStrength.values().dtype if featureConnectionsStrength.is_sparse else featureConnectionsStrength.dtype
-				for debugFeatureIndex, debugFeatureName in zip(debugTargetFeatureIndices, debugInferenceUseNeuronFeaturePropertiesTimeTargetFeatureNames):
-					debugColumnIndices = pt.full_like(debugSegmentIndices, debugTargetColumnIndex)
-					debugFeatureIndices = pt.full_like(debugSegmentIndices, debugFeatureIndex)
-					debugIndices = pt.stack([debugBranchIndices, debugSegmentIndices, debugColumnIndices, debugFeatureIndices], dim=0)
-					debugConnectionValues = gatherSparseTensorValuesAtIndices(featureConnectionsStrength, debugIndices, debugValueDtype)
-					debugConnectionByBranch = debugConnectionValues.view(debugBranchCount, arrayNumberOfSegments).sum(dim=1)
-					debugConnectionBySegment = debugConnectionValues.view(debugBranchCount, arrayNumberOfSegments).max(dim=0).values
-					print(f"debugInferenceUseNeuronFeaturePropertiesTimeTargetSource: sequenceWordIndex={sequenceWordIndex}, sourceColumn={debugInferenceUseNeuronFeaturePropertiesTimeTargetColumnName}({debugTargetColumnIndex}), sourceFeature={sourceFeatureIndex}, targetFeature={debugFeatureName}({debugFeatureIndex}), connectionByBranch={debugConnectionByBranch.tolist()}, connectionBySegmentMax={debugConnectionBySegment.tolist()}")
 	
 	if(featureNeuronsActive.dim() > 0):
 		featureNeuronsActive = featureNeuronsActive.reshape(-1)

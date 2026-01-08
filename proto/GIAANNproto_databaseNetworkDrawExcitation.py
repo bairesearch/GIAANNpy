@@ -104,12 +104,8 @@ elif(drawRelationTypes):
 		posString = posIntToPosString(databaseNetworkObject.nlp, posInt)
 		if(posString):
 			if(posString in neuronPosToRelationTypeDict):
-				if(debugDrawRelationTypesTrain and drawFeatureNodes):
-					print("OK: word = ", word, ", posString = ", posString, ", posInt = ", posInt)
 				colour = neuronPosToRelationTypeDict[posString]
 			else:
-				if(debugDrawRelationTypesTrain and drawFeatureNodes):
-					print("FAIL: word = ", word, ", posString = ", posString, ", posInt = ", posInt)
 				colour = relationTypeOtherCol
 				
 			#special cases;
@@ -128,8 +124,6 @@ elif(drawRelationTypes):
 					colour = relationTypePartPropertyCol
 		else:
 			colour = relationTypeOtherCol
-			if(debugDrawRelationTypesTrain and drawFeatureNodes):
-				print("FAIL: word = ", word, ", posString = ", posString, ", posInt = ", posInt)
 			
 		return colour
 elif(drawDelimiters):

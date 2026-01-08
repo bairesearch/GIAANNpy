@@ -29,16 +29,6 @@ debugPrintTrainSequenceDelimiters = False
 debugPrintTrainSequencePOS = True	#print each training sentence with POS tags
 debugTerminateInferenceOnPredictionTargetMismatch = True
 
-debugInferenceUseNeuronFeaturePropertiesTime = False
-debugInferenceUseNeuronFeaturePropertiesTimeMinSequenceWordIndex = 18	#14
-debugInferenceUseNeuronFeaturePropertiesTimeTargeted = False
-debugInferenceUseNeuronFeaturePropertiesTimeTargetSequenceWordIndex = 19	#16
-debugInferenceUseNeuronFeaturePropertiesTimeTargetColumnName = "movement"
-debugInferenceUseNeuronFeaturePropertiesTimeTargetFeatureNames = ["has", "flourished"]
-debugInferenceUseNeuronFeaturePropertiesTime2 = False
-
-debugDrawRelationTypesTrain = False
-
 
 #Train/inference mode selection;
 useInference = True  #default: True	#support inference mode else train (inferenceTrainFirstSequences: only) mode
@@ -46,12 +36,12 @@ drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype 
 if(useInference):
 	drawNetworkDuringInferencePredict = False	#default: False
 	inferenceTrainFirstSequences = True	#default: True	#orig: True	#True: trains first sequences in inference_prompt.txt, performs inference only on last sequence; False: run inference on every sequence as independent seed/target prompts	#assumes inferenceTrainPredictiveNetworkAllSequences=False
-numSeedTokensInference = 5	#default: 5 (or 8)
+numSeedTokensInference = 8	#default: 5 (or 8)
 
 
 #Dataset;
 databaseFolder = "../database/" #default: "../database/"	#performance: "/media/user/ssddata/GIAANN/database/"	#orig: ""
-trainMaxSequences = 10		#debug: 10, 500, 10000, 34286 	#default: 100000000	  #adjust as needed	#max sequences for train or inference (if inferenceTrainPredictiveNetworkAllSequences=True)	#requires useMaxSequences
+trainMaxSequences = 5000		#dev: 10, 500, 5000, 10000 	#default: 100000000	  #adjust as needed	#max sequences for train or inference (if inferenceTrainPredictiveNetworkAllSequences=True)	#requires useMaxSequences
 maxSequenceLength = 100	#default:100	#orig:10000		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 
@@ -73,8 +63,8 @@ useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/ML
 
 #Segment activation time;
 if(useInference):
-	inferenceUseNeuronFeaturePropertiesTime = False	#optional	#orig:False
-	inferenceUseNeuronFeaturePropertiesTimeExact = False	#optional	#orig:False
+	inferenceUseNeuronFeaturePropertiesTime = True	#optional	#orig:False
+	inferenceUseNeuronFeaturePropertiesTimeExact = True	#optional	#orig:False
 else:
 	inferenceUseNeuronFeaturePropertiesTime = False
 	inferenceUseNeuronFeaturePropertiesTimeExact = False
@@ -567,8 +557,8 @@ if(useSANI):
 		useSANIfeaturesAndColumns = False
 	else:
 		useSANIcolumns = False	#assign segments by concept column proximity to connection target during train (includes internal concept column)
-		useSANIfeatures = True	#assign segments by feature proximity to connection target during train
-		useSANIfeaturesAndColumns = False	#assign segments by column proximity first then feature proximity
+		useSANIfeatures = False	#assign segments by feature proximity to connection target during train
+		useSANIfeaturesAndColumns = True	#assign segments by column proximity first then feature proximity
 
 	if(useSANIfeaturesAndColumns):
 		useSANIfeaturesAndColumnsInternal = True	#default: True	#orig: False	#also include internal columns in column segments (not just external columns)

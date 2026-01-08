@@ -41,43 +41,6 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 	if(inferenceUseNeuronFeaturePropertiesTime):
 		if(useSANIcolumns or useSANIfeaturesAndColumns):
 			sequenceColumnIndex = GIAANNproto_predictionActivate.calculateSequenceColumnIndex(conceptMask, sequenceWordIndex)
-	if(inferenceUseNeuronFeaturePropertiesTime and debugInferenceUseNeuronFeaturePropertiesTimeTargeted):
-		if(debugInferenceUseNeuronFeaturePropertiesTimeTargetSequenceWordIndex is None or sequenceWordIndex == debugInferenceUseNeuronFeaturePropertiesTimeTargetSequenceWordIndex):
-			if(debugInferenceUseNeuronFeaturePropertiesTimeTargetColumnName is None or debugInferenceUseNeuronFeaturePropertiesTimeTargetFeatureNames is None):
-				raise RuntimeError("beamSearchPredictNextFeature: debug target column/feature names not configured")
-			if(debugInferenceUseNeuronFeaturePropertiesTimeTargetColumnName not in databaseNetworkObject.conceptColumnsList):
-				raise RuntimeError("beamSearchPredictNextFeature: debug target column not found")
-			if(globalFeatureNeuronsActivation is None):
-				raise RuntimeError("beamSearchPredictNextFeature: globalFeatureNeuronsActivation is None")
-			if(globalFeatureNeuronsTime is None):
-				raise RuntimeError("beamSearchPredictNextFeature: globalFeatureNeuronsTime is None")
-			debugTargetColumnIndex = databaseNetworkObject.conceptColumnsList.index(debugInferenceUseNeuronFeaturePropertiesTimeTargetColumnName)
-			debugTargetFeatureIndices = [databaseNetworkObject.conceptFeaturesList.index(featureName) if featureName in databaseNetworkObject.conceptFeaturesList else -1 for featureName in debugInferenceUseNeuronFeaturePropertiesTimeTargetFeatureNames]
-			if(-1 in debugTargetFeatureIndices):
-				raise RuntimeError("beamSearchPredictNextFeature: debug target feature not found")
-			debugDevice = globalFeatureNeuronsActivation.device if globalFeatureNeuronsActivation is not None else deviceSparse
-			debugBranchCount = numberOfDendriticBranches if multipleDendriticBranches else 1
-			debugBranchRange = pt.arange(debugBranchCount, dtype=pt.long, device=debugDevice)
-			debugSegmentRange = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=debugDevice)
-			debugBranchIndices = debugBranchRange.repeat_interleave(arrayNumberOfSegments)
-			debugSegmentIndices = debugSegmentRange.repeat(debugBranchCount)
-			debugValueDtype = globalFeatureNeuronsActivation.values().dtype if globalFeatureNeuronsActivation.is_sparse else globalFeatureNeuronsActivation.dtype
-			for debugFeatureIndex, debugFeatureName in zip(debugTargetFeatureIndices, debugInferenceUseNeuronFeaturePropertiesTimeTargetFeatureNames):
-				debugColumnIndices = pt.full_like(debugSegmentIndices, debugTargetColumnIndex)
-				debugFeatureIndices = pt.full_like(debugSegmentIndices, debugFeatureIndex)
-				debugIndices = pt.stack([debugBranchIndices, debugSegmentIndices, debugColumnIndices, debugFeatureIndices], dim=0)
-				debugActivationValues = GIAANNproto_predictionActivate.gatherSparseTensorValuesAtIndices(globalFeatureNeuronsActivation, debugIndices, debugValueDtype)
-				debugStoredTimes = GIAANNproto_predictionActivate.gatherSparseTensorValuesAtIndices(globalFeatureNeuronsTime, debugIndices, debugValueDtype)
-				debugPenaltyValues = GIAANNproto_predictionActivate.computeTimePenaltyForSegments(debugSegmentIndices, debugStoredTimes, sequenceWordIndex, sequenceColumnIndex)
-				debugModifiedValues = debugActivationValues - debugPenaltyValues
-				debugActivationByBranch = debugActivationValues.view(debugBranchCount, arrayNumberOfSegments).sum(dim=1)
-				debugPenaltyByBranch = debugPenaltyValues.view(debugBranchCount, arrayNumberOfSegments).sum(dim=1)
-				debugModifiedByBranch = debugModifiedValues.view(debugBranchCount, arrayNumberOfSegments).sum(dim=1)
-				debugActivationBySegment = debugActivationValues.view(debugBranchCount, arrayNumberOfSegments).max(dim=0).values
-				debugPenaltyBySegment = debugPenaltyValues.view(debugBranchCount, arrayNumberOfSegments).max(dim=0).values
-				debugModifiedBySegment = debugModifiedValues.view(debugBranchCount, arrayNumberOfSegments).max(dim=0).values
-				debugStoredTimeBySegment = debugStoredTimes.view(debugBranchCount, arrayNumberOfSegments).max(dim=0).values
-				print(f"debugInferenceUseNeuronFeaturePropertiesTimeTarget: sequenceWordIndex={sequenceWordIndex}, sequenceColumnIndex={sequenceColumnIndex}, column={debugInferenceUseNeuronFeaturePropertiesTimeTargetColumnName}({debugTargetColumnIndex}), feature={debugFeatureName}({debugFeatureIndex}), activationByBranch={debugActivationByBranch.tolist()}, penaltyByBranch={debugPenaltyByBranch.tolist()}, modifiedByBranch={debugModifiedByBranch.tolist()}, activationBySegmentMax={debugActivationBySegment.tolist()}, penaltyBySegmentMax={debugPenaltyBySegment.tolist()}, modifiedBySegmentMax={debugModifiedBySegment.tolist()}, storedTimeBySegmentMax={debugStoredTimeBySegment.tolist()}")
 	initialConstraintState = createConstraintStateForBeam(allowedColumns, constraintMode)
 	initialState = initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState)
 	beams = [{"score": 0.0, "state": initialState, "sequence": [], "constraintState": initialConstraintState, "connectedColumns": connectedColumnsConstraint, "connectedColumnsFeatures": connectedColumnsFeatures}]

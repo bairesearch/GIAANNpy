@@ -546,22 +546,6 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		connectedColumnsConstraint = None
 		connectedColumnsFeatureMap = None
 	if((predictionEnsureConnectedToPreviousPrediction or enforceDirectConnectionsMinWordDistance) and (inferenceSeedNetwork and sequenceWordIndex > 0) and connectedColumnsConstraint is not None and connectedColumnsConstraint.numel() == 0):
-		if(debugInferenceUseNeuronFeaturePropertiesTime2):
-			debugRowCount = conceptColumnsIndices.shape[0]
-			for debugRowIndex in range(debugRowCount):
-				debugSourceColumnIndex = int(conceptColumnsIndices[debugRowIndex].item())
-				debugRowTensor = conceptColumnsFeatureIndices[debugRowIndex]
-				if(debugRowTensor is None or debugRowTensor.numel() == 0):
-					print(f"debugInferenceUseNeuronFeaturePropertiesTime2: no source features for columnIndex={debugSourceColumnIndex}")
-				else:
-					debugFeatureValues = debugRowTensor.detach().view(-1).tolist()
-					for debugFeatureValue in debugFeatureValues:
-						debugObservedColumn = getObservedColumnForIndex(databaseNetworkObject, observedColumnsDict, debugSourceColumnIndex)
-						if(debugObservedColumn is None):
-							print(f"debugInferenceUseNeuronFeaturePropertiesTime2: missing observedColumn for columnIndex={debugSourceColumnIndex}")
-						else:
-							debugTargets, debugTargetFeatureMap = getConnectedColumnsForFeature(debugObservedColumn, int(debugFeatureValue), includeFeatureDetails=True)
-							print(f"debugInferenceUseNeuronFeaturePropertiesTime2: sourceColumnIndex={debugSourceColumnIndex}, sourceFeatureIndex={int(debugFeatureValue)}, targets={debugTargets}, targetFeatureMap={debugTargetFeatureMap}")
 		raisePredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "previous prediction has no outgoing connections")
 		
 	if(sequenceWordIndex > 0):

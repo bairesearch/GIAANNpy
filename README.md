@@ -35,7 +35,9 @@ python GIAANNproto_main.py
 
 #### Algorithm
 
-GIA ANN is a General Intelligence Algorithm Artificial Neural Network.
+GIA ANN is a General Intelligence Algorithm Artificial Neural Network (a neural network implementation of GIA).
+
+GIA ANN Prototype ("proto") is a language model.
 
 ##### Train
 
@@ -203,7 +205,7 @@ Settings for inference. See:
 
 GIAANN proto currently uses a POS tagger for 'reference set delimiter' identification (token column assignment), which itself may rely on machine learning technology, although this can be replaced with a more rudimentary algorithm.
 
-Current implementation experiences significant slow-down during inference as the size of the trained database network increases (due to SSD data i/o and sparse tensor hardware acceleration limitations).
+Current implementation experiences significant slow-down and RAM usage during inference as the size of the trained database network increases (due to SSD data i/o and sparse tensor hardware acceleration limitations).
 
 
 ### References
