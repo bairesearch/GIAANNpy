@@ -177,7 +177,7 @@ if(trainConnectionStrengthPOSdependence or inferenceConnectionStrengthPOSdepende
 
 #Beam search;
 if(useInference):
-	inferenceBeamSearch = True	#default: True	#orig: False
+	inferenceBeamSearch = False	#default: False	#orig: False
 	inferenceBeamSearchConceptColumns = False
 	inferenceBeamScoreStrategy = "nodeActivation"	#options: "nodeActivation", "activation_connection", "connection"
 	inferenceBeamConceptColumnNodeActivationThreshold = 0.0
@@ -186,8 +186,8 @@ if(useInference):
 	inferenceBeamInstancePreferInternalConnectivity = False      #optional: prioritise columns with stronger internal connectivity between active nodes
 	inferenceBeamInstancePreferAdjacentOverlap = False           #optional: prioritise columns sharing active features with adjacent columns
 	if(inferenceBeamSearchConceptColumns):
-		inferenceBeamWidth = 3
-		inferenceBeamDepth = 3
+		inferenceBeamWidth = 3	#orig: 3
+		inferenceBeamDepth = 3	#orig: 3
 	else:
 		inferenceBeamWidth = 3	#orig: 3
 		inferenceBeamDepth = 6	#orig: 6

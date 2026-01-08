@@ -287,3 +287,52 @@ def getFeatureName(databaseNetworkObject, featureIndex):
 	if(featureIndex < 0 or featureIndex >= len(databaseNetworkObject.conceptFeaturesList)):
 		return f"<feature_{featureIndex}>"
 	return databaseNetworkObject.conceptFeaturesList[featureIndex]
+
+
+def storeInhibitoryActivations(databaseNetworkObject, globalFeatureNeuronsActivation, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext):
+	globalFeatureNeuronsActivation = GIAANNproto_predictionInhibition.applyInferenceInhibition(databaseNetworkObject, globalFeatureNeuronsActivation, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext)
+	#persist the inhibited activations so the next prediction step observes the updated state
+	databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivationIndex)
+	if(inferenceDecrementActivationsInhibitory):
+		globalInhibitoryActivation = getattr(databaseNetworkObject, "globalInhibitoryNeuronsActivation", None)
+		if(globalInhibitoryActivation is not None):
+			globalInhibitoryActivation = GIAANNproto_predictionActivate.decrementActivation(globalInhibitoryActivation, activationDecrementPerPredictedToken)
+			databaseNetworkObject.globalInhibitoryNeuronsActivation = globalInhibitoryActivation
+	if(inferenceDeactivateNeuronsUponPredictionInhibitory):
+		deactivatePredictedInhibitoryNeurons(databaseNetworkObject, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext)
+
+def deactivatePredictedInhibitoryNeurons(databaseNetworkObject, conceptColumnsIndices, conceptColumnsFeatureIndices):
+	indicesToUpdate = buildInhibitoryIndices(conceptColumnsIndices, conceptColumnsFeatureIndices)
+	if(indicesToUpdate is None):
+		return
+	globalInhibitoryActivation = getattr(databaseNetworkObject, "globalInhibitoryNeuronsActivation", None)
+	if(globalInhibitoryActivation is None):
+		return
+	globalInhibitoryActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalInhibitoryActivation, indicesToUpdate, 0, multiply=False)
+	databaseNetworkObject.globalInhibitoryNeuronsActivation = globalInhibitoryActivation
+
+def buildInhibitoryIndices(conceptColumnsIndices, conceptColumnsFeatureIndices):
+	if(conceptColumnsIndices is None or conceptColumnsFeatureIndices is None):
+		return None
+	if(conceptColumnsIndices.numel() == 0 or conceptColumnsFeatureIndices.numel() == 0):
+		return None
+	indicesToUpdateList = []
+	for rowIndex in range(conceptColumnsIndices.shape[0]):
+		columnTensor = conceptColumnsIndices[rowIndex]
+		branchTensor = pt.tensor(0, device=columnTensor.device)
+		rowFeatures = conceptColumnsFeatureIndices[rowIndex]
+		if(rowFeatures is None or rowFeatures.numel() == 0):
+			continue
+		featureValues = rowFeatures.reshape(-1)
+		for featureTensor in featureValues:
+			if(useSANI):
+				for segmentIndex in range(arrayNumberOfSegments):
+					indexToUpdate = pt.stack([branchTensor, pt.tensor(segmentIndex, device=columnTensor.device), columnTensor, featureTensor], dim=0)
+					indicesToUpdateList.append(indexToUpdate)
+			else:
+				indexToUpdate = pt.stack([branchTensor, pt.tensor(arrayIndexSegmentFirst, device=columnTensor.device), columnTensor, featureTensor], dim=0)
+				indicesToUpdateList.append(indexToUpdate)
+	if(len(indicesToUpdateList) == 0):
+		return None
+	return pt.stack(indicesToUpdateList, dim=0)
+

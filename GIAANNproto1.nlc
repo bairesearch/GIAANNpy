@@ -412,4 +412,6 @@ MANUAL; - update readme
 - patch time indexing between seed and prediction (inferenceUseNeuronFeaturePropertiesTime)
 MANUAL; - set numSeedTokensInference=8, inferenceUseNeuronFeaturePropertiesTimeExact, useSANIfeaturesAndColumns
 MANUAL; - remove debugInferenceUseNeuronFeaturePropertiesTime, debugDrawRelationTypesTrain
-
+- consolidate shared standard inference/beamsearch code to GIAANNproto_predictionConstraints.py
+- update inferenceBeamSearch=False to use beamSearchSelectSingleStepFeature()
+MANUAL; - disable inferenceBeamSearch

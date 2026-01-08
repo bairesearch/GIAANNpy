@@ -80,6 +80,7 @@ All settings are located in GIAANNproto_globalDefs.py.
 ##### Quick execution (demo)
 For quick execution (train/inference);
 * set useInference=True and inferenceTrainFirstSequences=True (and optionally drawNetworkDuringTrain=True). 
+* set numSeedTokensInference - the number of tokens used for the seed (vs prediction) phase of inference.
 
 This will;
 * train the database using all sequences in "database/prompt_inference.txt" except for the last (*numSentencesPerSequence) sequences, and then;
@@ -94,12 +95,13 @@ The prompt_inference.txt provided is taken from the first sentences from the fir
 #### Dataset
 
 * maxSequenceLength = 100 - depends on CPU/GPU RAM availability during train 
-* set trainMaxSequences = 10000 - max sequences for train or inference
+* set trainMaxSequences = 5000 - max sequences for train
 * databaseFolder = "../database/" - set to local SSD for fast i/o
 
 #### Multisentence predictions
 
 * set multisentencePredictions - each sequence comprises multiple sentences
+* set numSentencesPerSequence - the number of sentences per sequence
 
 #### RAM
 
@@ -112,7 +114,8 @@ The prompt_inference.txt provided is taken from the first sentences from the fir
 
 #### Dendritic branches
 
-* set multipleDendriticBranches=True to support cases where a trained sequence has repeated references to a column feature.
+* set multipleDendriticBranches=True to support cases where a trained sequence has repeated references to a column feature 
+* set randomlyAssignBranches to support increasingly conflicting reuse of phrases throughout dataset
 
 #### Inhibitory neurons
 
@@ -140,7 +143,9 @@ The prompt_inference.txt provided is taken from the first sentences from the fir
 
 #### Beam search
 
-* set inferenceBeamSearch=True - executes inference by identifying the best beam path
+* set inferenceBeamSearch - executes inference by identifying the best beam path
+* set inferenceBeamWidth - width of beam search
+* set inferenceBeamDepth - depth of beam search
 
 #### SANI concept neuron
 
