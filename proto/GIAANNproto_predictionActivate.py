@@ -73,6 +73,98 @@ if(inferenceSegmentActivationsBoolean):
 		else:
 			return globalFeatureNeuronsActivation.bool().float()
 
+def applySequentialActivationDense(globalFeatureNeuronsActivation, featureNeuronsTargetActivation):
+	globalFeatureNeuronsActivationDense = globalFeatureNeuronsActivation.to_dense()
+	featureNeuronsTargetActivationDense = featureNeuronsTargetActivation
+	if(featureNeuronsTargetActivationDense.is_sparse):
+		featureNeuronsTargetActivationDense = featureNeuronsTargetActivationDense.to_dense()
+	featureNeuronsTargetActivationAppliedDense = pt.zeros_like(featureNeuronsTargetActivationDense)
+	for branchIndex in range(globalFeatureNeuronsActivationDense.shape[0]):
+		branchActivation = globalFeatureNeuronsActivationDense[branchIndex]
+		branchTargetActivation = featureNeuronsTargetActivationDense[branchIndex]
+		branchTargetActivationApplied = featureNeuronsTargetActivationAppliedDense[branchIndex]
+		if(useSANIfeaturesAndColumns):
+			# For useSANIfeaturesAndColumns, enforce sequential activation independently for:
+			# a) concept/column segments and b) feature segments.
+			featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
+			assert featureSegmentsOffset >= 0 and featureSegmentsOffset < arrayNumberOfSegments
+			previousConceptChannelActivation = branchActivation[:featureSegmentsOffset-1] > 0 if featureSegmentsOffset > 1 else None
+			previousFeatureChannelActivation = branchActivation[featureSegmentsOffset:arrayNumberOfSegments-1] > 0 if featureSegmentsOffset+1 < arrayNumberOfSegments else None
+			if(previousConceptChannelActivation is not None):
+				branchActivation[1:featureSegmentsOffset] += branchTargetActivation[1:featureSegmentsOffset] * previousConceptChannelActivation
+				branchTargetActivationApplied[1:featureSegmentsOffset] = branchTargetActivation[1:featureSegmentsOffset] * previousConceptChannelActivation
+			if(previousFeatureChannelActivation is not None):
+				branchActivation[featureSegmentsOffset+1:] += branchTargetActivation[featureSegmentsOffset+1:] * previousFeatureChannelActivation
+				branchTargetActivationApplied[featureSegmentsOffset+1:] = branchTargetActivation[featureSegmentsOffset+1:] * previousFeatureChannelActivation
+			branchActivation[0] += branchTargetActivation[0]
+			branchActivation[featureSegmentsOffset] += branchTargetActivation[featureSegmentsOffset]
+			branchTargetActivationApplied[0] = branchTargetActivation[0]
+			branchTargetActivationApplied[featureSegmentsOffset] = branchTargetActivation[featureSegmentsOffset]
+		else:
+			previousChannelActivation = branchActivation[:-1] > 0
+			branchActivation[1:] += branchTargetActivation[1:] * previousChannelActivation
+			branchActivation[0] += branchTargetActivation[0]
+			branchTargetActivationApplied[1:] = branchTargetActivation[1:] * previousChannelActivation
+			branchTargetActivationApplied[0] = branchTargetActivation[0]
+		globalFeatureNeuronsActivationDense[branchIndex] = branchActivation
+		featureNeuronsTargetActivationAppliedDense[branchIndex] = branchTargetActivationApplied
+	resultActivation = globalFeatureNeuronsActivationDense.to_sparse_coo()
+	if(featureNeuronsTargetActivation.is_sparse):
+		featureNeuronsTargetActivationApplied = featureNeuronsTargetActivationAppliedDense.to_sparse_coo()
+	else:
+		featureNeuronsTargetActivationApplied = featureNeuronsTargetActivationAppliedDense
+	return resultActivation, featureNeuronsTargetActivationApplied
+
+def applySequentialActivationSparse(globalFeatureNeuronsActivation, featureNeuronsTargetActivation):
+	resultActivation = globalFeatureNeuronsActivation
+	featureNeuronsTargetActivationApplied = featureNeuronsTargetActivation
+	if(featureNeuronsTargetActivation is None):
+		raise RuntimeError("applySequentialActivationSparse: featureNeuronsTargetActivation is None")
+	if(not globalFeatureNeuronsActivation.is_sparse):
+		raise RuntimeError("applySequentialActivationSparse: globalFeatureNeuronsActivation must be sparse")
+	activationSparse = globalFeatureNeuronsActivation.coalesce()
+	targetSparse = featureNeuronsTargetActivation
+	if(not targetSparse.is_sparse):
+		targetSparse = targetSparse.to_sparse_coo()
+	targetSparse = targetSparse.coalesce()
+	if(targetSparse._nnz() == 0):
+		featureNeuronsTargetActivationApplied = targetSparse
+	else:
+		indices = targetSparse.indices()
+		values = targetSparse.values()
+		segmentIndices = indices[1]
+		allowedMask = pt.ones((segmentIndices.shape[0],), dtype=pt.bool, device=segmentIndices.device)
+		if(useSANIfeaturesAndColumns):
+			featureSegmentStart = arrayNumberOfSegmentsColumnDistance
+			if(featureSegmentStart < 0 or featureSegmentStart >= arrayNumberOfSegments):
+				raise RuntimeError("applySequentialActivationSparse: featureSegmentStart out of range")
+			requireCheck = (segmentIndices != 0) & (segmentIndices != featureSegmentStart)
+			if(requireCheck.any()):
+				checkIndices = pt.nonzero(requireCheck, as_tuple=False).view(-1)
+				prevIndices = indices.index_select(1, checkIndices).clone()
+				prevIndices[1] = prevIndices[1] - 1
+				prevValues = gatherSparseTensorValuesAtIndices(activationSparse, prevIndices, values.dtype)
+				allowedMask[checkIndices] = prevValues > 0
+		else:
+			requireCheck = segmentIndices > 0
+			if(requireCheck.any()):
+				checkIndices = pt.nonzero(requireCheck, as_tuple=False).view(-1)
+				prevIndices = indices.index_select(1, checkIndices).clone()
+				prevIndices[1] = prevIndices[1] - 1
+				prevValues = gatherSparseTensorValuesAtIndices(activationSparse, prevIndices, values.dtype)
+				allowedMask[checkIndices] = prevValues > 0
+		if(allowedMask.any()):
+			allowedIndices = indices[:, allowedMask]
+			allowedValues = values[allowedMask]
+			featureNeuronsTargetActivationApplied = pt.sparse_coo_tensor(allowedIndices, allowedValues, size=targetSparse.size(), device=targetSparse.device).coalesce()
+		else:
+			emptyIndices = pt.empty((indices.shape[0], 0), dtype=indices.dtype, device=indices.device)
+			emptyValues = pt.empty((0,), dtype=values.dtype, device=values.device)
+			featureNeuronsTargetActivationApplied = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=targetSparse.size(), device=targetSparse.device).coalesce()
+	resultActivation = activationSparse + featureNeuronsTargetActivationApplied
+	resultActivation = resultActivation.coalesce()
+	return resultActivation, featureNeuronsTargetActivationApplied
+
 def calculateSequenceColumnIndex(conceptMask, sequenceWordIndex):
 	result = None
 	if(conceptMask is None):
@@ -440,45 +532,10 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 	if(useSANI):
 		if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
 			if(enforceSequentialActivation):
-				globalFeatureNeuronsActivationDense = globalFeatureNeuronsActivation.to_dense()
-				featureNeuronsTargetActivationDense = featureNeuronsTargetActivation
-				if(featureNeuronsTargetActivationDense.is_sparse):
-					featureNeuronsTargetActivationDense = featureNeuronsTargetActivationDense.to_dense()
-				featureNeuronsTargetActivationAppliedDense = pt.zeros_like(featureNeuronsTargetActivationDense)
-				for branchIndex in range(globalFeatureNeuronsActivationDense.shape[0]):
-					branchActivation = globalFeatureNeuronsActivationDense[branchIndex]
-					branchTargetActivation = featureNeuronsTargetActivationDense[branchIndex]
-					branchTargetActivationApplied = featureNeuronsTargetActivationAppliedDense[branchIndex]
-					if(useSANIfeaturesAndColumns):
-						# For useSANIfeaturesAndColumns, enforce sequential activation independently for:
-						# a) concept/column segments and b) feature segments.
-						featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
-						assert featureSegmentsOffset >= 0 and featureSegmentsOffset < arrayNumberOfSegments
-						previousConceptChannelActivation = branchActivation[:featureSegmentsOffset-1] > 0 if featureSegmentsOffset > 1 else None
-						previousFeatureChannelActivation = branchActivation[featureSegmentsOffset:arrayNumberOfSegments-1] > 0 if featureSegmentsOffset+1 < arrayNumberOfSegments else None
-						if(previousConceptChannelActivation is not None):
-							branchActivation[1:featureSegmentsOffset] += branchTargetActivation[1:featureSegmentsOffset] * previousConceptChannelActivation
-							branchTargetActivationApplied[1:featureSegmentsOffset] = branchTargetActivation[1:featureSegmentsOffset] * previousConceptChannelActivation
-						if(previousFeatureChannelActivation is not None):
-							branchActivation[featureSegmentsOffset+1:] += branchTargetActivation[featureSegmentsOffset+1:] * previousFeatureChannelActivation
-							branchTargetActivationApplied[featureSegmentsOffset+1:] = branchTargetActivation[featureSegmentsOffset+1:] * previousFeatureChannelActivation
-						branchActivation[0] += branchTargetActivation[0]
-						branchActivation[featureSegmentsOffset] += branchTargetActivation[featureSegmentsOffset]
-						branchTargetActivationApplied[0] = branchTargetActivation[0]
-						branchTargetActivationApplied[featureSegmentsOffset] = branchTargetActivation[featureSegmentsOffset]
-					else:
-						previousChannelActivation = branchActivation[:-1] > 0
-						branchActivation[1:] += branchTargetActivation[1:] * previousChannelActivation
-						branchActivation[0] += branchTargetActivation[0]
-						branchTargetActivationApplied[1:] = branchTargetActivation[1:] * previousChannelActivation
-						branchTargetActivationApplied[0] = branchTargetActivation[0]
-					globalFeatureNeuronsActivationDense[branchIndex] = branchActivation
-					featureNeuronsTargetActivationAppliedDense[branchIndex] = branchTargetActivationApplied
-				globalFeatureNeuronsActivation = globalFeatureNeuronsActivationDense.to_sparse_coo()
-				if(featureNeuronsTargetActivation.is_sparse):
-					featureNeuronsTargetActivationApplied = featureNeuronsTargetActivationAppliedDense.to_sparse_coo()
+				if(inferenceApplySequentialActivationSparse):
+					globalFeatureNeuronsActivation, featureNeuronsTargetActivationApplied = applySequentialActivationSparse(globalFeatureNeuronsActivation, featureNeuronsTargetActivation)
 				else:
-					featureNeuronsTargetActivationApplied = featureNeuronsTargetActivationAppliedDense
+					globalFeatureNeuronsActivation, featureNeuronsTargetActivationApplied = applySequentialActivationDense(globalFeatureNeuronsActivation, featureNeuronsTargetActivation)
 			else:
 				globalFeatureNeuronsActivation += featureNeuronsTargetActivation
 		elif(algorithmMatrixSANImethod=="doNotEnforceActivationAcrossSegments"):

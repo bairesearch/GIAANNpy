@@ -235,6 +235,7 @@ if(useInference):
 	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	transformerUseInputConnections = False	#initialise (dependent var)
 	if(useSANI):
+		inferenceApplySequentialActivationSparse = True	#default: True	#orig: False
 		inferenceConnectionsStrengthBoolean = True	#default: True	#do not overweight by common features (e.g. determiners)
 		inferenceSegmentActivationsBoolean = True	#default: True	#do not overweight by common features (e.g. determiners)
 		if(inferenceSegmentActivationsBoolean):
@@ -396,22 +397,20 @@ randomiseColumnFeatureXposition = True	#shuffle x position of column internal fe
 
 
 #Debug vars;
-debugConnectNodesToNextNodesInSequenceOnly = False
 printPredictionsDuringInferencePredict = True
 printPredictionsDuringInferencePredictBeamSearch = False
 debugPrintInferenceInhibition = False
 debugPrintMinWordDistanceDetails = False
-debugSANIfeaturesAndColumns = False
 debugOnlyDrawBranchIndexConnections = False
 debugOnlyDrawBranchIndexX = 0
 #older;
+debugConnectNodesToNextNodesInSequenceOnly = False
 debugConnectColumnsToNextColumnsInSequenceOnly = False
 debugSmallDataset = False	#required if huggingface Wikipedia dataset is offline
 debugDrawNeuronActivations = False
 if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
 	debugDrawNeuronActivations = True
 debugReloadGlobalFeatureNeuronsEverySequence = False
-debugInferencePredictionActivationAccumulation = False	#monitor exponential runaway of activations negatively affects predictionNetwork loss optimisation (go to nan)	 #see inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures for comparison	#solved by inferenceActivationFunction
 
 
 #Concept/feature names;

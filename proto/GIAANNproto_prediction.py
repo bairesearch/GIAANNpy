@@ -337,21 +337,6 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = GIAANNproto_predictionActivate.processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex)
 		if(inferenceUseNeuronFeaturePropertiesTime):
 			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTimeIndex)
-		if(debugSANIfeaturesAndColumns and useSANIfeaturesAndColumns):
-			if(globalFeatureNeuronsActivation.is_sparse):
-				featureNeuronsActivationDense = globalFeatureNeuronsActivation.to_dense()
-			else:
-				featureNeuronsActivationDense = globalFeatureNeuronsActivation
-			conceptIndexLookup = sequenceObservedColumns.conceptIndicesInSequenceObservedTensor.to(featureNeuronsActivationDense.device)
-			featureIndexLookup = sequenceObservedColumns.featureIndicesInObservedTensor.to(featureNeuronsActivationDense.device)
-			if(conceptIndexLookup.numel() == 0 or featureIndexLookup.numel() == 0):
-				segmentFeatureActivations = [[] for _ in range(arrayNumberOfSegments)]
-			else:
-				featureNeuronsActivationDense = featureNeuronsActivationDense.index_select(2, conceptIndexLookup)
-				featureNeuronsActivationDense = featureNeuronsActivationDense.index_select(3, featureIndexLookup)
-				segmentFeatureActivations = featureNeuronsActivationDense.sum(dim=(0, 2)).to("cpu").tolist()
-			print("\tdebugSANIfeaturesAndColumns: predict segmentFeatureActivations={0}".format(segmentFeatureActivations))
-
 	else:
 		#activation targets have already been activated
 		sequenceObservedColumnsPrediction = SequenceObservedColumnsDraw(databaseNetworkObject, observedColumnsDict)
@@ -388,10 +373,6 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 			if(predictionColumnsMustActivateConceptFeature):
 				conceptActivationState = updateConceptActivationState(conceptActivationState, conceptColumnsIndices, conceptColumnsFeatureIndicesActivation)
 	
-	if(debugInferencePredictionActivationAccumulation):
-		globalFeatureNeuronsTemp = databaseNetworkObject.globalFeatureNeurons.to_dense()
-		print("globalFeatureNeuronsTemp = ", globalFeatureNeuronsTemp)
-
 	if(seedPhase):
 		targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 		multipleSourcesNext = targetMultipleSources
