@@ -652,3 +652,26 @@ def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivat
 		kc = conceptColumnsIndicesNext.shape[0]
 		
 	return conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex
+
+class InferenceStopSequenceNoPredictionCandidatesAvailable(Exception):
+	pass
+
+def raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, reason):
+	if(debugTerminateInferenceOnNoPredictionCandidatesAvailable):
+		raisePredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, reason)
+	targetWord = getTargetWordForSequenceIndex(tokensSequence, sequenceWordIndex)
+	message = f"predictionEnsureConnectedToPreviousPrediction violation: {reason}. sequenceWordIndex={sequenceWordIndex}, wordPredictionIndex={wordPredictionIndex}, targetWord='{targetWord}'"
+	print(message)
+	raise InferenceStopSequenceNoPredictionCandidatesAvailable(message)
+
+def raisePredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, reason):
+	targetWord = getTargetWordForSequenceIndex(tokensSequence, sequenceWordIndex)
+	message = f"predictionEnsureConnectedToPreviousPrediction violation: {reason}. sequenceWordIndex={sequenceWordIndex}, wordPredictionIndex={wordPredictionIndex}, targetWord='{targetWord}'"
+	raise RuntimeError(message)
+
+def getTargetWordForSequenceIndex(tokensSequence, sequenceWordIndex):
+	if(tokensSequence is None):
+		return "<unknown>"
+	if(sequenceWordIndex < 0 or sequenceWordIndex >= len(tokensSequence)):
+		return "<unknown>"
+	return tokensSequence[sequenceWordIndex].word

@@ -415,3 +415,6 @@ MANUAL; - remove debugInferenceUseNeuronFeaturePropertiesTime, debugDrawRelation
 - consolidate shared standard inference/beamsearch code to GIAANNproto_predictionConstraints.py
 - update inferenceBeamSearch=False to use beamSearchSelectSingleStepFeature()
 MANUAL; - disable inferenceBeamSearch
+add option debugTerminateInferenceOnNoPredictionCandidatesAvailable=False 
+MANUAL; - add option debugPrintTrainSequenceRaw
+MANUAL; - add option debugPrintConfiguration

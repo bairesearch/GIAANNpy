@@ -23,11 +23,15 @@ import sys
 
 
 #Recent debug vars;
-debugPrintTrainSequenceConceptAssignment = True
-debugPrintTrainSequenceConceptAssignmentByLine = True	#display each column on a new line
+debugPrintTrainSequenceConceptAssignment = False
+debugPrintTrainSequenceConceptAssignmentByLine = False	#display each column on a new line
 debugPrintTrainSequenceDelimiters = False
-debugPrintTrainSequencePOS = True	#print each training sentence with POS tags
-debugTerminateInferenceOnPredictionTargetMismatch = True
+debugPrintTrainSequencePOS = False	#print each training sentence with POS tags
+debugTerminateInferenceOnPredictionTargetMismatch = False
+debugTerminateInferenceOnNoPredictionCandidatesAvailable = False
+debugPrintConceptColumnsDelimitByPOSwarnings = False
+debugPrintTrainSequenceRaw = False
+debugPrintConfiguration = True
 
 
 #Train/inference mode selection;
@@ -40,16 +44,18 @@ numSeedTokensInference = 8	#default: 5 (or 8)
 
 
 #Dataset;
-databaseFolder = "../database/" #default: "../database/"	#performance: "/media/user/ssddata/GIAANN/database/"	#orig: ""
+databaseFolder = "../database/"	#default: "../database/"	#performance: "/media/user/ssddata/GIAANN/database/"	#orig: ""
 trainMaxSequences = 5000		#dev: 10, 500, 5000, 10000 	#default: 100000000	  #adjust as needed	#max sequences for train or inference (if inferenceTrainPredictiveNetworkAllSequences=True)	#requires useMaxSequences
 maxSequenceLength = 100	#default:100	#orig:10000		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 
 
-#Multisentence predictions - each sequence comprises multiple sentences;
+#Multisentence predictions;
 multisentencePredictions = False	#default: False	#each sequence comprises multiple sentences	#requires higher GPU RAM for train
 if(multisentencePredictions):
 	numSentencesPerSequence = 3	#default: 3
+else:
+	numSentencesPerSequence = 1
 
 
 #RAM;
@@ -562,16 +568,11 @@ if(useSANI):
 
 	if(useSANIfeaturesAndColumns):
 		useSANIfeaturesAndColumnsInternal = True	#default: True	#orig: False	#also include internal columns in column segments (not just external columns)
-		print("useSANIfeaturesAndColumns:")
 		#these are highly dependent on numSeedTokensInference and the specific seed text (ie number of features per column);
-		print("numSeedTokensInference =", numSeedTokensInference)
 		arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#min number of concept/column segments (if useSANIfeaturesAndColumnsInternal, includes internal column segment)
 		arrayNumberOfSegmentsFeatureDistance = math.ceil(numSeedTokensInference / 2) + 1 	#number of nearest features to target node
 		arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance + arrayNumberOfSegmentsFeatureDistance
-		print("arrayNumberOfSegmentsColumnDistance = ", arrayNumberOfSegmentsColumnDistance)
-		print("arrayNumberOfSegmentsFeatureDistance = ", arrayNumberOfSegmentsFeatureDistance)
 	elif(useSANIcolumns):
-		print("useSANIcolumns:")
 		if(multisentencePredictions):
 			arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#* numSentencesPerSequence 	#default: 5	#min number of external and internal column connections to target node (note first segment captures all other external columns)
 		else:
@@ -580,12 +581,10 @@ if(useSANI):
 				#note if arrayNumberOfSegments=3 then;	sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: all other column connections
 				#must be less than the (total number of concepts in a sequence - total number of concepts in effective predictive seed sequence)
 	elif(useSANIfeatures):
-		print("useSANIfeatures:")
 		if(enforceDirectConnectionsSANIminimal):
 			arrayNumberOfSegments = 2
 		else:
 			arrayNumberOfSegments = numSeedTokensInference	#default: 5	#min number of nearest features to target node (note first segment captures all other features)
-	print("arrayNumberOfSegments = ", arrayNumberOfSegments)
 
 	algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment under conditions
 	#algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI
@@ -721,3 +720,79 @@ def getTensorSizeInMB(tensor):
 
 def generateDrawSequenceIndex(sequenceWordIndex):
 	return str(sequenceWordIndex).zfill(3)
+
+
+#debugPrintConfiguration;
+if(debugPrintConfiguration): 
+	print("***** debugPrintConfiguration: ***** ")
+	print("")
+	print("#Train/inference mode selection;")
+	print("useInference:", useInference)
+	print("drawNetworkDuringTrain:", drawNetworkDuringTrain)
+	if(useInference):
+		print("drawNetworkDuringInferencePredict:", drawNetworkDuringInferencePredict)
+		print("inferenceTrainFirstSequences:", inferenceTrainFirstSequences)
+	print("numSeedTokensInference:", numSeedTokensInference)
+	print("")
+	print("#Dataset;")
+	print("databaseFolder:", databaseFolder)
+	print("trainMaxSequences:", trainMaxSequences)
+	print("maxSequenceLength:", maxSequenceLength)
+	print("numberEpochs:", numberEpochs)
+	print("")
+	print("#Multisentence predictions;")
+	print("multisentencePredictions:", multisentencePredictions)
+	print("numSentencesPerSequence:", numSentencesPerSequence)
+	print("")
+	print("#RAM;")
+	print("useGPUdense:", useGPUdense)
+	print("useGPUsparse:", useGPUsparse)
+	print("")
+	print("#Segment activation time;")
+	print("inferenceUseNeuronFeaturePropertiesTime:", inferenceUseNeuronFeaturePropertiesTime)
+	print("inferenceUseNeuronFeaturePropertiesTimeExact:", inferenceUseNeuronFeaturePropertiesTimeExact)
+	print("")
+	print("#Dendritic branches;")
+	print("multipleDendriticBranches:", multipleDendriticBranches)
+	print("numberOfDendriticBranches:", numberOfDendriticBranches)
+	print("randomlyAssignBranches:", randomlyAssignBranches)
+	print("")
+	print("#arrayIndexPropertiesEfficient;")
+	print("arrayIndexPropertiesEfficient:", arrayIndexPropertiesEfficient)
+	print("")
+	print("#SANI;")
+	print("useSANI:", useSANI)
+	print("")
+	print("#Immediate (direct) connections;")
+	print("enforceDirectConnections:", enforceDirectConnections)
+	print("enforceDirectConnectionsSANI:", enforceDirectConnectionsSANI)
+	print("enforceDirectConnectionsMinWordDistance:", enforceDirectConnectionsMinWordDistance)
+	print("")
+	print("#Beam search;")
+	if(useInference):
+		print("inferenceBeamSearch:", inferenceBeamSearch)
+		print("inferenceBeamWidth:", inferenceBeamWidth)
+		print("inferenceBeamDepth:", inferenceBeamDepth)
+	print("")
+	print("#Draw;")
+	print("drawSegments:", drawSegments)
+	print("drawBranches:", drawBranches)
+	print("drawRelationTypes:", drawRelationTypes)
+	print("drawDelimiters:", drawDelimiters)
+	print("drawDefault:", drawDefault)
+	print("drawNetworkDuringTrainSave:", drawNetworkDuringTrainSave)
+	if(useInference):
+		print("drawNetworkDuringInferenceSave:", drawNetworkDuringInferenceSave)
+	print("")
+	print("#SANI settings;")
+	if(useSANI):
+		print("useSANIcolumns:", useSANIcolumns)
+		print("useSANIfeatures:", useSANIfeatures)
+		print("useSANIfeaturesAndColumns:", useSANIfeaturesAndColumns)
+		if(useSANIfeaturesAndColumns):
+			print("arrayNumberOfSegmentsColumnDistance: ", arrayNumberOfSegmentsColumnDistance)
+			print("arrayNumberOfSegmentsFeatureDistance: ", arrayNumberOfSegmentsFeatureDistance)
+		print("arrayNumberOfSegments: ", arrayNumberOfSegments)
+	print("")
+	print("************************************ ")
+	

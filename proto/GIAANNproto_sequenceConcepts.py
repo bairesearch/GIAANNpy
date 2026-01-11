@@ -308,9 +308,10 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 						delimiterIndices.append(rightmostIndeterministic)
 					else:
 						noDelimiterDetectedBetweenConceptTokens = True
-						print("warning: no delimiter detected between concept tokens:")
-						print("\tconcept #1: conceptPosition = ", conceptPosition, ", conceptIndex = ", leftIndex, ", conceptName = ", getTokenDisplayText(tokens[leftIndex]))
-						print("\tconcept #2: conceptPosition = ", conceptPosition+1, ", conceptIndex = ", rightIndex, ", conceptName = ", getTokenDisplayText(tokens[rightIndex]))						
+						if(debugPrintConceptColumnsDelimitByPOSwarnings):
+							print("warning: no delimiter detected between concept tokens:")
+							print("\tconcept #1: conceptPosition = ", conceptPosition, ", conceptIndex = ", leftIndex, ", conceptName = ", getTokenDisplayText(tokens[leftIndex]))
+							print("\tconcept #2: conceptPosition = ", conceptPosition+1, ", conceptIndex = ", rightIndex, ", conceptName = ", getTokenDisplayText(tokens[rightIndex]))						
 						#return None
 						delimiterIndices.append(leftIndex)	#or rightIndex	#append dummy so that sequence can still be printed
 				startIndices = pt.zeros_like(conceptIndicesSorted)

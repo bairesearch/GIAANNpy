@@ -137,9 +137,10 @@ def processArticle(text, articleIndex):
 		text = text.replace('\n', ' ')
 	textParsed = nlp(text)
 	sentences = list(textParsed.sents)
+	sequences = []
+	sequencesRaw = []
 
 	if(multisentencePredictions):
-		sequences = []
 		for i in range(0, len(sentences), numSentencesPerSequence):
 			startIndex = sentences[i].start
 			endIndex = sentences[min(i + numSentencesPerSequence, len(sentences)) - 1].end
@@ -151,8 +152,8 @@ def processArticle(text, articleIndex):
 			if(len(sequenceParsed) == 0):
 				continue
 			sequences.append(sequenceParsed)
+			sequencesRaw.append(sequencesRaw)
 	else:
-		sequences = []
 		for sentence in sentences:
 			sequenceText = sentence.text
 			if(not sequenceText.strip()):
@@ -161,9 +162,11 @@ def processArticle(text, articleIndex):
 			if(len(sequenceParsed) == 0):
 				continue
 			sequences.append(sequenceParsed)
-	
+			sequencesRaw.append(sequenceText)
+
 	numberOfSequences = len(sequences)
 	for sequenceIndex, sequence in enumerate(sequences):
+		sequenceRaw = sequencesRaw[sequenceIndex]
 		lastSequenceInPrompt = False
 		if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
 			if(inferenceTrainFirstSequences):
@@ -178,11 +181,11 @@ def processArticle(text, articleIndex):
 					print("\n!inferenceTrainFirstSequences: executing inference:")
 				lastSequenceInPrompt = True
 		if(len(sequence) <= maxSequenceLength):
-			processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
+			processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, lastSequenceInPrompt)
 		if(sequenceCount == trainMaxSequences and useMaxSequences):
 			break
 			
-def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt):
+def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, lastSequenceInPrompt):
 	global sequenceCount
 	global drawRelationTypes
 
@@ -239,8 +242,10 @@ def processSequence(articleIndex, sequenceIndex, sequence, lastSequenceInPrompt)
 			print(f"Processing sequenceCount: {sequenceCount}, {sentenceWithDelimiters}")	#article: {articleIndex}, sequence: {sequenceIndex}
 		elif(debugPrintTrainSequenceConceptAssignment):
 			pass
+		elif(debugPrintTrainSequenceRaw):
+			print(sequenceRaw)
 		else:
-			print(f"Processing sequenceCount: {sequenceCount}, {sequence.text}")	#article: {articleIndex}, sequence: {sequenceIndex}
+			print(f"Processing sequenceCount: {sequenceCount}, {sequence.text}")	#"{sequence.text}"	#"Processing sequenceCount: {sequenceCount}, {sequence.text}"	#article: {articleIndex}, sequence: {sequenceIndex}
 
 		# Second pass: Create observed_columns_dict
 		observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNproto_sequenceConcepts.secondPass(databaseNetworkObject, tokens)

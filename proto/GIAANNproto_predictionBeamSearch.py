@@ -102,7 +102,6 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 def beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, conceptActivationState=None, connectedColumnsConstraint=None, connectedColumnsFeatures=None):
 	#single-step beam candidate selection (no beam depth expansion)
 	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
-	errorType = None
 	errorMessage = None
 	result = None
 
@@ -117,8 +116,7 @@ def beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkOb
 	candidateLimit = 1	#inferenceBeamWidth
 	candidates = selectBeamCandidates(globalFeatureNeuronsActivation, globalFeatureNeuronsTime, strengthLookup, candidateLimit, databaseNetworkObject, constraintState, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatures, sequenceWordIndex, sequenceColumnIndex)
 	if(len(candidates) == 0):
-		errorType = RuntimeError
-		errorMessage = "beamSearchSelectSingleStepFeature: no candidates available"
+		GIAANNproto_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "beamSearchSelectSingleStepFeature: no candidates available")
 	else:
 		bestCandidate = None
 		bestScore = None
@@ -131,8 +129,7 @@ def beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkOb
 				bestScore = candidateScore
 		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = convertNodesToPrediction(bestCandidate["nodes"])
 		if(conceptColumnsIndicesNext is None or conceptColumnsIndicesNext.shape[0] == 0):
-			errorType = RuntimeError
-			errorMessage = "beamSearchSelectSingleStepFeature: no prediction nodes available after selection"
+			GIAANNproto_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "beamSearchSelectSingleStepFeature: no prediction nodes available after selection")
 		else:
 			multipleSourcesNext = conceptColumnsIndicesNext.shape[0] > 1
 			kc = conceptColumnsIndicesNext.shape[0]
@@ -140,10 +137,7 @@ def beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkOb
 			conceptColumnsFeatureIndicesPred = conceptColumnsFeatureIndicesNext.clone()
 			result = (conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex)
 	
-	if(errorType is not None):
-		raise errorType(errorMessage)
 	return result
-
 
 def initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState):
 	state = {"features": globalFeatureNeuronsActivation.clone()}
