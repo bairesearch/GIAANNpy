@@ -353,7 +353,6 @@ def buildConnectedColumnsLookupForBeamNodes(databaseNetworkObject, observedColum
 		return None, None
 	return buildConnectedColumnsLookup(databaseNetworkObject, observedColumnsDict, nodes, deviceSparse, pt.long)
 
-
 def getFirstFeatureValue(conceptColumnsFeatureIndicesPred, rowIndex):
 	featureValue = None
 	if(conceptColumnsFeatureIndicesPred is not None):

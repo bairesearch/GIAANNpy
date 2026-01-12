@@ -33,7 +33,6 @@ debugPrintConceptColumnsDelimitByPOSwarnings = False
 debugPrintTrainSequenceRaw = False
 debugPrintConfiguration = True
 
-
 #Train/inference mode selection;
 useInference = True  #default: True	#support inference mode else train (inferenceTrainFirstSequences: only) mode
 drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
@@ -154,17 +153,19 @@ if(conceptColumnsDelimitByPOS):
 	detectReferenceSetDelimitersBetweenNouns = True	#default: assign reference set delimiters if they appear between two nouns (without designated reference set delimiter types)
 	if(detectReferenceSetDelimitersBetweenNouns):
 		detectReferenceSetDelimitersBetweenNounsPOStypes = ['CCONJ', 'SCONJ']	#probabilistic reference set delimiters (GIA logical conditions) - only assign if they are detected inbetween nouns (without intermediate deterministic delimiters)
-		detectReferenceSetDelimitersBetweenNounsWordTypes = ['is', 'are', ',', '(']	#eg a dog is an animal / dogs are animals
+		detectReferenceSetDelimitersBetweenNounsWordTypes = ['is', 'are', ',', '(']	#eg a dog is an animal / dogs are animals	#'-'
 		detectReferenceSetDelimitersBetweenNounsTagTypes = []
 	detectIsolatedReferenceSetDelimiters = True	#default: True	#orig: False	#assign isolated reference set delimiters to the next concept column
 	if(detectIsolatedReferenceSetDelimiters):
 		detectIsolatedReferenceSetDelimitersPOStypes = [ 'ADP']
 	predictionColumnsMustActivateConceptFeature = True	#default: True	#orig: False
 	pretrainCombineConsecutiveNouns = True #default: True	#orig: False
+	pretrainCombineHyphenatedNouns = True	#default: True	#orig: False
 	predictionEnsureConnectedToPreviousPrediction = True	#default: True	#ensure every new prediction connects to previous node
 else:
 	predictionColumnsMustActivateConceptFeature = False
 	pretrainCombineConsecutiveNouns = False
+	pretrainCombineHyphenatedNouns = False #default: False	#combine nouns separated by "-" during pretrainCombineConsecutiveNouns
 	predictionEnsureConnectedToPreviousPrediction = False
 
 

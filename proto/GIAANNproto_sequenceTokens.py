@@ -92,6 +92,8 @@ def preprocessSequence(sequence):
 	return pretrain(sequence)
 
 def pretrain(sequence):
+	if(pretrainCombineHyphenatedNouns):
+		sequence = pretrainCombineConsecutiveNounHyphenated(sequence)
 	if(pretrainCombineConsecutiveNouns):
 		sequence = pretrainCombineConsecutiveNoun(sequence)
 	return sequence
@@ -139,6 +141,75 @@ if(pretrainCombineConsecutiveNouns):
 		combinedTag = tokens[0].tag_
 		return PreprocessedToken(combinedText, combinedLemma, combinedPos, combinedTag)
 
+if(pretrainCombineHyphenatedNouns):
+
+	def pretrainCombineConsecutiveNounHyphenated(sequence):
+		result = None
+		sequence = ensure_preprocessed_sequence(sequence)
+		preprocessedTokens = []
+		buffer = []
+		bufferJoiners = []
+		pendingJoiner = None
+		def flush_buffer():
+			nonlocal buffer, preprocessedTokens, bufferJoiners, pendingJoiner
+			if(len(buffer) > 0):
+				preprocessedTokens.append(createCombinedTokenWithJoiners(buffer, bufferJoiners))
+			buffer = []
+			bufferJoiners = []
+			pendingJoiner = None
+		sequenceTokens = sequence.tokens
+		sequenceTokenCount = len(sequenceTokens)
+		for tokenIndex, token in enumerate(sequenceTokens):
+			if(token.pos_ in nounPos):
+				if(len(buffer) > 0):
+					if(pendingJoiner is None):
+						bufferJoiners.append("_")
+					else:
+						bufferJoiners.append(pendingJoiner)
+					pendingJoiner = None
+				buffer.append(token)
+			elif(isHyphenToken(token) and len(buffer) > 0 and tokenIndex + 1 < sequenceTokenCount and sequenceTokens[tokenIndex + 1].pos_ in nounPos):
+				pendingJoiner = "-"
+			else:
+				flush_buffer()
+				preprocessedTokens.append(token)
+		flush_buffer()
+		result = PreprocessedSequence(preprocessedTokens)
+		return result
+
+	def createCombinedTokenWithJoiners(tokens, joiners):
+		result = None
+		if(len(tokens) == 1):
+			result = createSinglePreprocessedToken(tokens[0])
+		else:
+			joinerCount = len(tokens) - 1
+			joinersLocal = joiners if (joiners is not None and len(joiners) == joinerCount) else ["_"] * joinerCount
+			combinedText = buildCombinedTokenString(tokens, joinersLocal, False)
+			combinedLemma = buildCombinedTokenString(tokens, joinersLocal, True)
+			combinedPos = tokens[0].pos_
+			combinedTag = tokens[0].tag_
+			result = PreprocessedToken(combinedText, combinedLemma, combinedPos, combinedTag)
+		return result
+
+	def buildCombinedTokenString(tokens, joiners, useLemma):
+		combined = None
+		parts = []
+		for tokenIndex, token in enumerate(tokens):
+			tokenText = token.lemma_ if useLemma else token.text
+			if(tokenIndex == 0):
+				parts.append(tokenText)
+			else:
+				parts.append(joiners[tokenIndex - 1])
+				parts.append(tokenText)
+		combined = "".join(parts)
+		return combined
+
+	def isHyphenToken(token):
+		result = False
+		if(token.text == "-" or token.lemma_ == "-"):
+			result = True
+		return result
+
 def isConcept(token):
 	result = False
 	if token.pos in nounPos:
@@ -146,4 +217,3 @@ def isConcept(token):
 	if token.tag in nounTags:
 		result = True
 	return result
-

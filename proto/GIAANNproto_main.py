@@ -139,6 +139,7 @@ def processArticle(text, articleIndex):
 	sentences = list(textParsed.sents)
 	sequences = []
 	sequencesRaw = []
+	minSequenceLength = numSeedTokensInference + 1
 
 	if(multisentencePredictions):
 		for i in range(0, len(sentences), numSentencesPerSequence):
@@ -148,18 +149,24 @@ def processArticle(text, articleIndex):
 			sequenceText = span.text
 			if(not sequenceText.strip()):
 				continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
+			sequenceText = sequenceText.lstrip()	#CHECKTHIS
 			sequenceParsed = nlp(sequenceText)
 			if(len(sequenceParsed) == 0):
 				continue
+			if(len(sequenceParsed) < minSequenceLength):
+				continue
 			sequences.append(sequenceParsed)
-			sequencesRaw.append(sequencesRaw)
+			sequencesRaw.append(sequenceText)
 	else:
 		for sentence in sentences:
 			sequenceText = sentence.text
 			if(not sequenceText.strip()):
 				continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
+			sequenceText = sequenceText.lstrip()
 			sequenceParsed = nlp(sequenceText)
 			if(len(sequenceParsed) == 0):
+				continue
+			if(len(sequenceParsed) < minSequenceLength):
 				continue
 			sequences.append(sequenceParsed)
 			sequencesRaw.append(sequenceText)

@@ -420,3 +420,6 @@ MANUAL; - add option debugPrintTrainSequenceRaw
 MANUAL; - add option debugPrintConfiguration
 - add inferenceApplySequentialActivationSparse:applySequentialActivationSparse - switched the sequential-activation gating in inference to stay sparse so the global activation tensor is no longer densified.
 MANUAL; - remove debugSANIfeaturesAndColumns, debugInferencePredictionActivationAccumulation
+- remove white space from the start of sequences.
+- add option pretrainCombineHyphenatedNouns - combine nouns with a "-" between them.
+- update processArticle to remove all sequences with less than numSeedTokensInference+1 tokens.
