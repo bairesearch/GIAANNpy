@@ -23,6 +23,7 @@ pip install torch
 pip install spacy
 pip install datasets
 python -m spacy download spacyModelName (default:en_core_web_trf, orig: en_core_web_sm)
+pip install nltk
 ```
 
 ### Execution

@@ -21,19 +21,28 @@ import torch as pt
 
 from GIAANNproto_globalDefs import *
 
+if(usePOS):
+	import GIAANNproto_sequencePOS
+
+def loadPOSdatabase():
+	GIAANNproto_sequencePOS.loadPOSdatabase()
+
 def isTokenReferenceSetDelimiterDeterministic(token):
-	if(token.pos in conceptColumnsDelimiterPOStypes or token.word in conceptColumnsDelimiterWordTypes or token.tag in conceptColumnsDelimiterTagTypes):
-		return True
-	else:
-		return False
+	result = False
+	if(token.word in conceptColumnsDelimiterWordTypes or token.tag in conceptColumnsDelimiterTagTypes):
+		result = True
+	elif(GIAANNproto_sequencePOS.isWordEverInPOStypeList(token.word, conceptColumnsDelimiterPOStypes)):
+		result = True
+	return result
 	
 def isTokenReferenceSetDelimiterProbabilistic(token):
-	if(token.pos in detectReferenceSetDelimitersBetweenNounsPOStypes or token.word in detectReferenceSetDelimitersBetweenNounsWordTypes or token.tag in detectReferenceSetDelimitersBetweenNounsTagTypes):
-		return True
-	else:
-		return False
+	result = False
+	if(token.word in detectReferenceSetDelimitersBetweenNounsWordTypes or token.tag in detectReferenceSetDelimitersBetweenNounsTagTypes):
+		result = True
+	elif(GIAANNproto_sequencePOS.isWordEverInPOStypeList(token.word, detectReferenceSetDelimitersBetweenNounsPOStypes)):
+		result = True
+	return result
 	
-
 
 class SequenceToken:
 	def __init__(self, word, lemma, pos, tag):

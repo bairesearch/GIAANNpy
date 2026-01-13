@@ -23,15 +23,19 @@ import sys
 
 
 #Recent debug vars;
-debugPrintTrainSequenceConceptAssignment = False
+debugPrintConfiguration = True	#print common global defs configuration
+
+debugPrintTrainSequenceDefault = True	#default: True	#orig: True
+debugPrintTrainSequenceRaw = False	#print each training sequence raw text (suitable for inference_prompt.txt generation)
+debugPrintTrainSequenceConceptAssignment = False	#print each training sequence split by column assignment
 debugPrintTrainSequenceConceptAssignmentByLine = False	#display each column on a new line
-debugPrintTrainSequenceDelimiters = False
-debugPrintTrainSequencePOS = False	#print each training sentence with POS tags
+debugPrintTrainSequenceDelimiters = False	#print each training sequence with delimiters
+debugPrintTrainSequencePOS = False	#print each training sequence with POS tags
+
 debugTerminateInferenceOnPredictionTargetMismatch = False
 debugTerminateInferenceOnNoPredictionCandidatesAvailable = False
 debugPrintConceptColumnsDelimitByPOSwarnings = False
-debugPrintTrainSequenceRaw = False
-debugPrintConfiguration = True
+
 
 #Train/inference mode selection;
 useInference = True  #default: True	#support inference mode else train (inferenceTrainFirstSequences: only) mode
@@ -155,9 +159,6 @@ if(conceptColumnsDelimitByPOS):
 		detectReferenceSetDelimitersBetweenNounsPOStypes = ['CCONJ', 'SCONJ']	#probabilistic reference set delimiters (GIA logical conditions) - only assign if they are detected inbetween nouns (without intermediate deterministic delimiters)
 		detectReferenceSetDelimitersBetweenNounsWordTypes = ['is', 'are', ',', '(']	#eg a dog is an animal / dogs are animals	#'-'
 		detectReferenceSetDelimitersBetweenNounsTagTypes = []
-	detectIsolatedReferenceSetDelimiters = True	#default: True	#orig: False	#assign isolated reference set delimiters to the next concept column
-	if(detectIsolatedReferenceSetDelimiters):
-		detectIsolatedReferenceSetDelimitersPOStypes = [ 'ADP']
 	predictionColumnsMustActivateConceptFeature = True	#default: True	#orig: False
 	pretrainCombineConsecutiveNouns = True #default: True	#orig: False
 	pretrainCombineHyphenatedNouns = True	#default: True	#orig: False
@@ -523,7 +524,8 @@ if(conceptColumnsDelimitByPOS):
 if not lowMem:
 	globalFeatureNeuronsFile = 'globalFeatureNeurons'
 	globalFeatureNeuronsFileFull = databaseFolder + globalFeatureNeuronsFile + pytorchTensorFileExtension
-
+posFolder = databaseFolder + "POS/"
+posDictFile = "everPos.wordnet.pkl.gz"
 
 #Common array indices;
 arrayIndexPropertiesStrengthIndex = None
@@ -757,7 +759,7 @@ if(debugPrintConfiguration):
 	print("numberOfDendriticBranches:", numberOfDendriticBranches)
 	print("randomlyAssignBranches:", randomlyAssignBranches)
 	print("")
-	print("#arrayIndexPropertiesEfficient;")
+	print("#Array properties;")
 	print("arrayIndexPropertiesEfficient:", arrayIndexPropertiesEfficient)
 	print("")
 	print("#SANI;")

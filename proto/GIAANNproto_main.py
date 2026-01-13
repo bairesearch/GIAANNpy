@@ -17,6 +17,7 @@ pip install torch
 pip install spacy
 pip install datasets
 python -m spacy download spacyModelName (default:en_core_web_trf, orig: en_core_web_sm)
+pip install nltk
 
 # Usage:
 source activate pytorchsenv
@@ -57,6 +58,8 @@ databaseNetworkObject.nlp = nlp	#used by posStringToPosInt
 
 def main():
 	global sequenceCount
+	if(usePOS):
+		GIAANNproto_sequenceTokens.loadPOSdatabase()
 	GIAANNproto_databaseNetworkFilesExcitation.initialiseDatabaseFiles()
 	ensurePredictiveInferenceDatabaseReady()
 	if(useInference):
@@ -244,14 +247,12 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, lastSequ
 		if(debugPrintTrainSequencePOS):
 			sentenceWithPOS = " ".join(f"{token.text} ({tokenIndex}:{token.pos_})" for tokenIndex, token in enumerate(sequence))
 			print(f"Processing sequenceCount: {sequenceCount}, {sentenceWithPOS}")	#article: {articleIndex}, sequence: {sequenceIndex}
-		elif(debugPrintTrainSequenceDelimiters):
+		if(debugPrintTrainSequenceDelimiters):
 			sentenceWithDelimiters = buildSequenceWithDelimiters(sequence, tokens)
 			print(f"Processing sequenceCount: {sequenceCount}, {sentenceWithDelimiters}")	#article: {articleIndex}, sequence: {sequenceIndex}
-		elif(debugPrintTrainSequenceConceptAssignment):
-			pass
-		elif(debugPrintTrainSequenceRaw):
+		if(debugPrintTrainSequenceRaw):
 			print(sequenceRaw)
-		else:
+		if(debugPrintTrainSequenceDefault):
 			print(f"Processing sequenceCount: {sequenceCount}, {sequence.text}")	#"{sequence.text}"	#"Processing sequenceCount: {sequenceCount}, {sequence.text}"	#article: {articleIndex}, sequence: {sequenceIndex}
 
 		# Second pass: Create observed_columns_dict
