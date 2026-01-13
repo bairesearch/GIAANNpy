@@ -424,3 +424,7 @@ MANUAL; - remove debugSANIfeaturesAndColumns, debugInferencePredictionActivation
 - add option pretrainCombineHyphenatedNouns - combine nouns with a "-" between them.
 - update processArticle to remove all sequences with less than numSeedTokensInference+1 tokens.
 - upgrade isTokenReferenceSetDelimiterDeterministic/isTokenReferenceSetDelimiterProbabilistic to use predetermined pos types (GIAANNproto_sequencePOS).
+- upgrade isTokenReferenceSetDelimiterDeterministic/isTokenReferenceSetDelimiterProbabilistic to use lemma-based POS checks for delimiter detection.
+MANUAL; - rename debugPrintConceptColumnsDelimitByPOSwarnings to debugTerminateOnConceptColumnsDelimitByPOSerror - always print processConceptWords concept columns delimit by POS errors.
+MANUAL; - remove legacy column assignment code from getTokenConceptFeatureIndex().
+- skip inference when noDelimiterDetectedBetweenConceptTokens detected (train already skipped).

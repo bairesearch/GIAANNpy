@@ -33,6 +33,8 @@ def isTokenReferenceSetDelimiterDeterministic(token):
 		result = True
 	elif(GIAANNproto_sequencePOS.isWordEverInPOStypeList(token.word, conceptColumnsDelimiterPOStypes)):
 		result = True
+	elif(token.lemma is not None and GIAANNproto_sequencePOS.isWordEverInPOStypeList(token.lemma, conceptColumnsDelimiterPOStypes)):
+		result = True
 	return result
 	
 def isTokenReferenceSetDelimiterProbabilistic(token):
@@ -40,6 +42,8 @@ def isTokenReferenceSetDelimiterProbabilistic(token):
 	if(token.word in detectReferenceSetDelimitersBetweenNounsWordTypes or token.tag in detectReferenceSetDelimitersBetweenNounsTagTypes):
 		result = True
 	elif(GIAANNproto_sequencePOS.isWordEverInPOStypeList(token.word, detectReferenceSetDelimitersBetweenNounsPOStypes)):
+		result = True
+	elif(token.lemma is not None and GIAANNproto_sequencePOS.isWordEverInPOStypeList(token.lemma, detectReferenceSetDelimitersBetweenNounsPOStypes)):
 		result = True
 	return result
 	

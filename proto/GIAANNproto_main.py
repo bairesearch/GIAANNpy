@@ -262,8 +262,11 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, lastSequ
 		sequenceObservedColumns = GIAANNproto_sequenceObservedColumnsExcitation.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict)
 
 		if(useInference and (inferenceTrainPredictiveNetworkAllSequences or lastSequenceInPrompt)):
-			# Process each concept word in the sequence (predict)
-			GIAANNproto_prediction.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens)
+			if(conceptColumnsDelimitByPOS and sequenceObservedColumns.noDelimiterDetectedBetweenConceptTokens):
+				print("warning: inference skipped due to missing concept column delimiter detection in sequence")
+			else:
+				# Process each concept word in the sequence (predict)
+				GIAANNproto_prediction.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens)
 		else:
 			# Process each concept word in the sequence (train)
 			trained = GIAANNproto_databaseNetworkTrainExcitation.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)

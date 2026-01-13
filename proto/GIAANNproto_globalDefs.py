@@ -34,7 +34,7 @@ debugPrintTrainSequencePOS = False	#print each training sequence with POS tags
 
 debugTerminateInferenceOnPredictionTargetMismatch = False
 debugTerminateInferenceOnNoPredictionCandidatesAvailable = False
-debugPrintConceptColumnsDelimitByPOSwarnings = False
+debugTerminateOnConceptColumnsDelimitByPOSerror = False
 
 
 #Train/inference mode selection;
@@ -646,10 +646,12 @@ def posStringToPosInt(nlp, posString):
 
 
 #Error report;
+ERROR_SIGNAL = 1
+def exitWithError():
+	sys.exit(ERROR_SIGNAL)
 def printe(str):
 	print(str)
-	sys.exit()
-
+	exitWithError()
 
 #Devices;
 if(useGPUdense):

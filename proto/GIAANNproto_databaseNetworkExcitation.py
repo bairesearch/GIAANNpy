@@ -292,39 +292,10 @@ def getTokenConceptFeatureIndex(sequenceObservedColumns, tokensSequence, concept
 		assignedColumnIndex = assignedColumns[sequenceWordIndex]
 		if(assignedColumnIndex is not None):
 			return False, assignedColumnIndex, None, targetFeatureIndex
-	sequenceLen = conceptMask.shape[0]
-	foundFeature = False
-	conceptFeature = False
-	targetFoundNextColumnIndex = False
-	targetPreviousColumnIndex = None
-	targetNextColumnIndex = None
-	foundPreviousColumn = False
-	for i in range(sequenceLen):
-		if(foundFeature):
-			if(not conceptFeature):
-				if(not targetFoundNextColumnIndex):
-					if(conceptMask[i] != 0):
-						targetNextColumnIndex = columnsIndexSequenceWordIndexDict[i]
-						targetFoundNextColumnIndex = True
 		else:
-			if(conceptMask[i] != 0):
-				targetPreviousColumnIndex = columnsIndexSequenceWordIndexDict[i]
-				foundPreviousColumn = True
-		if(i == sequenceWordIndex):
-			foundFeature = True
-			if(conceptMask[i] != 0):
-				conceptFeature = True
-				targetPreviousColumnIndex = columnsIndexSequenceWordIndexDict[i]
-				foundPreviousColumn = True
-
-	if(not foundPreviousColumn):
-		print("warning: no concept feature found within seed length; using next concept column within target sequence")
-		if(targetFoundNextColumnIndex):
-			targetPreviousColumnIndex = targetNextColumnIndex
-		else:
-			targetPreviousColumnIndex = 0
-	
-	return targetFoundNextColumnIndex, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex
+			printe("tokenConceptColumnIndexList has not been generated")
+	else:
+		printe("tokenConceptColumnIndexList has not been generated")
 
 def isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, featureIndex):
 	if(conceptColumnsDelimitByPOS):

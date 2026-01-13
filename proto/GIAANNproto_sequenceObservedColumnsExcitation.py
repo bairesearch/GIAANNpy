@@ -45,6 +45,7 @@ class SequenceObservedColumns:
 		self.databaseNetworkObject = databaseNetworkObject
 		self.observedColumnsDict = observedColumnsDict	# key: lemma, value: ObservedColumn
 		self.observedColumnsSequenceWordIndexDict = observedColumnsSequenceWordIndexDict	# key: sequence word index, value: ObservedColumn
+		self.noDelimiterDetectedBetweenConceptTokens = False
 
 		if(trainSequenceObservedColumnsMatchSequenceWords):
 			self.cs = len(observedColumnsSequenceWordIndexDict)
