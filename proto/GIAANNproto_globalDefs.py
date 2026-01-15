@@ -35,6 +35,7 @@ debugPrintTrainSequencePOS = False	#print each training sequence with POS tags
 debugTerminateInferenceOnPredictionTargetMismatch = False
 debugTerminateInferenceOnNoPredictionCandidatesAvailable = False
 debugTerminateOnConceptColumnsDelimitByPOSerror = False
+debugDeleteGPUcache = True
 
 
 #Train/inference mode selection;
@@ -49,7 +50,7 @@ numSeedTokensInference = 8	#default: 5 (or 8)
 #Dataset;
 databaseFolder = "../database/"	#default: "../database/"	#performance: "/media/user/ssddata/GIAANN/database/"	#orig: ""
 trainMaxSequences = 5000		#dev: 10, 500, 5000, 10000 	#default: 100000000	  #adjust as needed	#max sequences for train or inference (if inferenceTrainPredictiveNetworkAllSequences=True)	#requires useMaxSequences
-maxSequenceLength = 100	#default:100	#orig:10000		#in words	#depends on CPU/GPU RAM availability during train 
+maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 
 
@@ -64,10 +65,13 @@ else:
 #RAM;
 useGPUdense = True	#default: True
 if(useInference):
-	useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors
+	useGPUsparse = True	#default: False	#orig: True	#inference requires high RAM to store sparse tensors
 else:
 	useGPUsparse = True		#default: True	#orig: False	#slight performance increase during train (does not use significant additional GPU ram during train)
 useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/MLP predictive network model
+useGPUsparseStrict = True	#orig: False	#enforce strict sparse device during transfer to/from dense tensors
+inferenceOnlyRetainPredictedTargetObservedColumn = False	#default: False	#orig: False	#load/evict one observed column per prediction step	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
+inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch = False	#default: False	#orig: False	#True: retain only current beam-search target(s); False: retain all beam-search targets	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
 
 
 #Segment activation time;
@@ -147,7 +151,7 @@ minimumPredictionActivationThreshold = 0.0	#explicit threshold application not r
 
 #Concept column delimiters:
 conceptColumnsDelimitByPOS = True	#default: True	#orig: False	#closer to original GIA specification	#FUTURE: still requires working for edge cases
-conceptColumnsDelimitByConceptFeaturesStart = False #default: False	#orig: True	#Constrain column feature detection to be after concept feature detection	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
+conceptColumnsDelimitByConceptFeaturesStart = False #default: False	#orig: True	#Constrain column feature detection to be after prime concept feature detection	#enables higher performance prediction without training (ie before learning appropriate column feature associations by forgetting features belonging to external columns)
 conceptColumnsDelimitByConceptFeaturesMid = False	#default: True	#default: False
 if(conceptColumnsDelimitByPOS):
 	conceptColumnsDelimiterPOStypes = ['VERB', 'ADP']	#deterministic reference set delimiters (GIA actions/conditions)
@@ -198,13 +202,13 @@ if(useInference):
 		inferenceBeamDepth = 3	#orig: 3
 	else:
 		inferenceBeamWidth = 3	#orig: 3
-		inferenceBeamDepth = 6	#orig: 6
+		inferenceBeamDepth = 3	#orig: 6
 
 
 #SANI concept neuron;
 SANIconceptNeurons = False	#execute preprocessor to allocate neurons to non-noun tuples for each concept	#similar to SANIHFNLP algorithmMatrixSANI - emulate DendriticSANIbiologicalSimulationSimple	#these are effectively concept neurons but not specific to a particular concept
 if(SANIconceptNeurons):
-	SANIconceptNeuronsAllocateConceptFeatureWordNeuron = True	 #allocate a separate neuron for the concept feature neuron	#currently required for implementation
+	SANIconceptNeuronsAllocatePrimeConceptFeatureWordNeuron = True	 #allocate a separate neuron for the prime concept feature neuron	#currently required for implementation
 	SANIconceptNeuronsAllocateWordNeurons = False	#still allocate original individual word neurons (create word connnections along with concept connections)
 	SANIconceptNeuronsAllocateForPartialSubsequences = True	#assign SANI concept neurons for partial subsequences (2, 3, 4, etc word tuples; not just x word tupes where x is the length of the non-noun word tuple)
 	if(SANIconceptNeuronsAllocateForPartialSubsequences):
@@ -212,7 +216,7 @@ if(SANIconceptNeurons):
 		SANIconceptNeuronsAllocateForPartialSubsequencesMaxTupleSize = 5
 		SANIconceptNeuronsAllocateForPartialSubsequencesMinWeight = 1	#number of times a tuple instance must occur in corpus before a SANIconceptNeuron is assigned to the database network concept column
 		SANIconceptNeuronsAllocateForPartialSubsequencesWeightIncrement = 1
-	assert SANIconceptNeuronsAllocateConceptFeatureWordNeuron, "!SANIconceptNeuronsAllocateConceptFeatureWordNeuron not yet coded; need to update entire codebase to ensure only token.lemma or token.pos=NOUN is used to detect concept features and only token.word is used to generate a feature neuron name"
+	assert SANIconceptNeuronsAllocatePrimeConceptFeatureWordNeuron, "!SANIconceptNeuronsAllocatePrimeConceptFeatureWordNeuron not yet coded; need to update entire codebase to ensure only token.lemma or token.pos=NOUN is used to detect prime concept features and only token.word is used to generate a feature neuron name"
 	debugSANIconceptNeurons = True
 
 
@@ -353,7 +357,7 @@ elif(drawDelimiters):
 	drawDelimitersTrain = True	#draws feature neuron column delimiters (and their external connections) in different colours
 	drawDelimitersInference = False		#False: draw activation status
 elif(drawDefault):
-	drawDefaultTrain = True	#standard colours (concept neurons in blue and feature neurons in cyan)
+	drawDefaultTrain = True	#standard colours (prime concept feature neurons in blue and instance feature neurons in cyan)
 	drawDefaultInference = False	#False: draw activation status
 else:
 	print("warning: draw scheme not defined")
@@ -424,12 +428,12 @@ useDedicatedConceptNames2 = False
 if usePOS:
 	useDedicatedConceptNames = True
 	if(useDedicatedConceptNames):
-		#same word can have different pos making it classed as an instance feature or concept feature
+		#same word can have different pos making it classed as an instance feature or prime concept feature
 		useDedicatedConceptNames2 = True	#mandatory
-#if usePOS: same word can have different pos making it classed as an instance feature or concept feature
-variableConceptNeuronFeatureName = "variableConceptNeuronFeature"
-variableConceptNeuronFeatureNameAbbreviation = "VCNF"
-featureIndexConceptNeuron = 0
+#if usePOS: same word can have different pos making it classed as an instance feature or prime concept feature
+variablePrimeConceptFeatureNeuronName = "variablePrimeConceptFeatureNeuron"
+variablePrimeConceptFeatureNeuronNameAbbreviation = "VPCFN"
+featureIndexPrimeConceptNeuron = 0
 
 
 #Inference prediction selection;
@@ -473,7 +477,7 @@ if(useInference):
 	elif(conceptColumnsDelimitByConceptFeaturesStart):
 		kcNetwork = 1	#number of topk columns to target
 	elif(conceptColumnsDelimitByConceptFeaturesMid):
-		kcNetwork = 2	#number of topk columns to target	#it is unknown which exact column a token belongs to (unless it corresponds to a concept feature/noun)
+		kcNetwork = 2	#number of topk columns to target	#it is unknown which exact column a token belongs to (unless it corresponds to a prime concept feature/noun)
 			
 	if(inferencePredictiveNetwork):
 		if(conceptColumnsDelimitByPOS):
@@ -751,6 +755,9 @@ if(debugPrintConfiguration):
 	print("#RAM;")
 	print("useGPUdense:", useGPUdense)
 	print("useGPUsparse:", useGPUsparse)
+	print("useGPUsparseStrict:", useGPUsparseStrict)
+	print("inferenceOnlyRetainPredictedTargetObservedColumn:", inferenceOnlyRetainPredictedTargetObservedColumn)
+	print("inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch:", inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch)
 	print("")
 	print("#Segment activation time;")
 	print("inferenceUseNeuronFeaturePropertiesTime:", inferenceUseNeuronFeaturePropertiesTime)

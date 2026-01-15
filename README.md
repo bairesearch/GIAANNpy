@@ -21,7 +21,7 @@ pip install networkx
 pip install matplotlib
 pip install torch
 pip install spacy
-pip install datasets
+pip install "datasets<3" "fsspec==2024.6.1" "gcsfs==2024.6.1"
 python -m spacy download spacyModelName (default:en_core_web_trf, orig: en_core_web_sm)
 pip install nltk
 ```
@@ -106,7 +106,7 @@ The prompt_inference.txt provided is taken from the first sentences from the fir
 
 #### RAM
 
-* set useGPUdense=True (and useGPUsparse=True) during train
+* set useGPUdense=True (and optionally useGPUsparse=True) during train
 * set useGPUsparse=False during inference if CPU has more RAM
 
 #### Segment activation time
@@ -163,7 +163,7 @@ Settings for inference. See:
 
 #### Train optimisations
 
-* trainSequenceObservedColumnsUseSequenceFeaturesOnly=True - only loads sequence features into dense tensors for train. Currently uses dense tensors (typically in GPU RAM) however to merge these with database network. Can be upgraded so only a limited amount of data is ever loaded to GPU during train (it currently temporarily masks entire feature arrays in GPU during transfer phase).
+* trainSequenceObservedColumnsUseSequenceFeaturesOnly=True - only loads sequence features into dense tensors for train.
 * trainSequenceObservedColumnsMatchSequenceWords=True is now mandatory (originally GIAANN proto was not guaranteed to independently train a feature for every token instance in the sequence).
 
 #### Draw
@@ -172,7 +172,7 @@ Settings for inference. See:
 * drawBranches - draw independent branches (connections and features) in different colours.
 * drawRelationTypes - draw feature POS types (and their connections) in different colours.
 * drawDelimiters - draws feature neuron column delimiters (and their external connections) in different colours.
-* drawDefault - draws concept/feature node types (and their internal/external connections) in different colours. If useInference=True and in inferenceMode then will draw activation status of network.
+* drawDefault - draws prime concept feature/instance feature node types (and their internal/external connections) in different colours. If useInference=True and in inferenceMode then will draw activation status of network.
 
 ##### drawSegments
 ![GIAANNdemo-drawSegments-SMALL.png](https://github.com/bairesearch/GIAANNpy/releases/download/assets/GIAANNdemo-drawSegments-SMALL.png)
@@ -209,10 +209,9 @@ Settings for inference. See:
 
 ### Limitations
 
-GIAANN proto currently uses a POS tagger for 'reference set delimiter' identification (token column assignment), which itself may rely on machine learning technology, although this can be replaced with a more rudimentary algorithm.
+GIAANN proto currently uses various NLP POS tools for a) prime concept feature identification and b) 'reference set delimiter' identification (token column assignment) - see word-POS dictionary generation (GIAANNproto_sequencePOS). These may rely on classical machine learning technology, although can be replaced with a more rudimentary algorithm.
 
 Current implementation experiences significant slow-down and RAM usage during inference as the size of the trained database network increases (due to SSD data i/o and sparse tensor hardware acceleration limitations).
-
 
 ### References
 

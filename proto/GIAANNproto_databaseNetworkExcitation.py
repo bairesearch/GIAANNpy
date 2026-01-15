@@ -101,15 +101,15 @@ def initialiseDatabaseNetwork():
 				conceptFeaturesReferenceSetDelimiterList = list(conceptFeaturesReferenceSetDelimiterDict.values())
 	else:
 		if(useDedicatedConceptNames):
-			# Add dummy feature for concept neuron (different per concept column)
-			conceptFeaturesList.append(variableConceptNeuronFeatureName)
-			conceptFeaturesDict[variableConceptNeuronFeatureName] = len(conceptFeaturesDict)
+			# Add dummy feature for prime concept neuron (different per concept column)
+			conceptFeaturesList.append(variablePrimeConceptFeatureNeuronName)
+			conceptFeaturesDict[variablePrimeConceptFeatureNeuronName] = len(conceptFeaturesDict)
 			f += 1  # Will be updated dynamically based on c
 
 		if useDedicatedFeatureLists:
 			print("error: useDedicatedFeatureLists case not yet coded - need to set f and populate concept_features_list/conceptFeaturesDict etc")
 			exit()
-			# f = max_num_non_nouns + 1  # Maximum number of non-nouns in an English dictionary, plus the concept neuron of each column
+			# f = max_num_non_nouns + 1  # Maximum number of non-nouns in an English dictionary, plus the prime concept neuron of each column
 
 		if(conceptColumnsDelimitByPOS):
 			#initialise for concept feature;
@@ -150,10 +150,10 @@ class ObservedColumn:
 		self.featureWordToIndex = {}  # Maps feature words to indices
 		self.featureIndexToWord = {}  # Maps indices to feature words
 		if(useDedicatedConceptNames):
-			self.nextFeatureIndex = 1  # Start from 1 since index 0 is reserved for concept neuron
+			self.nextFeatureIndex = 1  # Start from 1 since index 0 is reserved for prime concept neuron
 			if(useDedicatedConceptNames2):
-				self.featureWordToIndex[variableConceptNeuronFeatureName] = featureIndexConceptNeuron
-				self.featureIndexToWord[featureIndexConceptNeuron] = variableConceptNeuronFeatureName
+				self.featureWordToIndex[variablePrimeConceptFeatureNeuronName] = featureIndexPrimeConceptNeuron
+				self.featureIndexToWord[featureIndexPrimeConceptNeuron] = variablePrimeConceptFeatureNeuronName
 			
 		# Store all connections for each source column in a list of integer feature connection arrays, each of size f * c * f, where c is the length of the dictionary of columns, and f is the maximum number of feature neurons.
 		self.featureConnections = self.initialiseFeatureConnections(databaseNetworkObject.c, databaseNetworkObject.f) 
@@ -208,6 +208,16 @@ class ObservedColumn:
 		return GIAANNproto_databaseNetworkFilesExcitation.observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i)
 		
 
+class ObservedColumnStub:
+	"""
+	Minimal observed column placeholder for inference-only sequence indexing.
+	"""
+	def __init__(self, databaseNetworkObject, conceptIndex, lemma, i):
+		self.databaseNetworkObject = databaseNetworkObject
+		self.conceptIndex = conceptIndex
+		self.conceptName = lemma
+		self.conceptSequenceWordIndex = i
+
 def addConceptToConceptColumnsDict(databaseNetworkObject, lemma, conceptsFound, newConceptsAdded):
 	conceptsFound = True
 	if lemma not in databaseNetworkObject.conceptColumnsDict:
@@ -256,7 +266,7 @@ def loadAllColumns(databaseNetworkObject):
 def getTokenConceptFeatureIndexForSequenceConceptIndex(sequence_observed_columns, words_sequence, concept_mask, sequenceConceptIndex, sequenceWordIndex):
 	conceptIndex = sequence_observed_columns.sequence_observed_columns_dict[sequenceConceptIndex].conceptIndex
 	if(concept_mask[sequenceWordIndex]):
-		feature_index = featureIndexConceptNeuron
+		feature_index = featureIndexPrimeConceptNeuron
 	else:
 		feature_index = sequence_observed_columns.featureWordToIndex[words_sequence[sequenceWordIndex]]
 	return conceptIndex, feature_index
@@ -283,7 +293,7 @@ def getTokenConceptFeatureIndex(sequenceObservedColumns, tokensSequence, concept
 	columnsIndexSequenceWordIndexDict = sequenceObservedColumns.columnsIndexSequenceWordIndexDict
 	
 	if(conceptMask[sequenceWordIndex]):
-		targetFeatureIndex = featureIndexConceptNeuron
+		targetFeatureIndex = featureIndexPrimeConceptNeuron
 	else:
 		word = tokensSequence[sequenceWordIndex].word
 		targetFeatureIndex = databaseNetworkObject.conceptFeaturesDict[word]

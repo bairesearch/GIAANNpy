@@ -179,6 +179,10 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 		observedColumn = observedColumnsDict[lemma]
 	else:
 		observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, columnIndex, lemma, sequenceWordIndex)
+	if(inferenceOnlyRetainPredictedTargetObservedColumn and inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch):
+		if(observedColumnsDict is None):
+			raise RuntimeError("executeBeamNodeActivation error: observedColumnsDict is None")
+		observedColumnsDict.clear()
 	observedColumnsDict[lemma] = observedColumn
 	featureConnections = observedColumn.featureConnections
 	conceptColumnsIndicesSource = pt.tensor([columnIndex], dtype=pt.long, device=deviceSparse)
@@ -238,7 +242,7 @@ def describeBeamNodes(databaseNetworkObject, nodes):
 	nodeDescriptions = []
 	for nodeColumn, nodeFeature in nodes:
 		columnName = databaseNetworkObject.conceptColumnsList[nodeColumn]
-		if(nodeFeature == featureIndexConceptNeuron):
+		if(nodeFeature == featureIndexPrimeConceptNeuron):
 			nodeName = f"{columnName} (concept)"
 		elif(nodeFeature < len(databaseNetworkObject.conceptFeaturesList)):
 			nodeName = databaseNetworkObject.conceptFeaturesList[nodeFeature]
@@ -265,7 +269,7 @@ def debugDescribeColumnFeatureName(databaseNetworkObject, columnIndex, featureIn
 		columnName = databaseNetworkObject.conceptColumnsList[columnIndex]
 	else:
 		columnName = f"<invalid:{columnIndex}>"
-	if(featureIndex == featureIndexConceptNeuron):
+	if(featureIndex == featureIndexPrimeConceptNeuron):
 		featureName = "conceptNeuron"
 	elif(0 <= featureIndex < len(databaseNetworkObject.conceptFeaturesList)):
 		featureName = databaseNetworkObject.conceptFeaturesList[featureIndex]
@@ -281,7 +285,7 @@ def debugDescribeAllowedBeamFeatures(databaseNetworkObject, connectedColumnsTens
 		return "[]"
 	elements = []
 	for columnValue in connectedColumnsTensor.cpu().tolist():
-		columnName, _ = debugDescribeColumnFeatureName(databaseNetworkObject, columnValue, featureIndexConceptNeuron)
+		columnName, _ = debugDescribeColumnFeatureName(databaseNetworkObject, columnValue, featureIndexPrimeConceptNeuron)
 		if(connectedColumnsFeatures is not None and columnValue in connectedColumnsFeatures):
 			featureList = []
 			for featureIndex in sorted(connectedColumnsFeatures[columnValue]):

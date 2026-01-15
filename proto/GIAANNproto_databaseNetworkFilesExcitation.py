@@ -204,6 +204,9 @@ def saveTensor(tensor, folderName, fileName):
 	pt.save(tensor, os.path.join(folderName, fileName+pytorchTensorFileExtension))
 
 def loadTensor(folderName, fileName):
-	tensor = pt.load(os.path.join(folderName, fileName+pytorchTensorFileExtension))	#does not work: , map_location=deviceSparse
+	if(useGPUsparseStrict and not useGPUsparse):
+		tensor = pt.load(os.path.join(folderName, fileName+pytorchTensorFileExtension), map_location=deviceSparse)
+	else:
+		tensor = pt.load(os.path.join(folderName, fileName+pytorchTensorFileExtension))
 	tensor = tensor.to(deviceSparse)
 	return tensor

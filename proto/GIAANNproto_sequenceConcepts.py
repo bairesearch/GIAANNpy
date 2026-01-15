@@ -68,6 +68,23 @@ def secondPass(databaseNetworkObject, tokens):
 		if usePOS:
 			if GIAANNproto_sequenceTokens.isConcept(token):
 				conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
+				if(useInference and inferenceOnlyRetainPredictedTargetObservedColumn):
+					observedColumn = GIAANNproto_databaseNetworkExcitation.ObservedColumnStub(databaseNetworkObject, conceptIndex, lemma, i)
+					observedColumnsSequenceWordIndexDict[i] = observedColumn
+				else:
+					# Load observed column from disk or create new one (reuse per-lemma instance for multi-occurrence concepts)
+					if(lemma in observedColumnsDict):
+						observedColumn = observedColumnsDict[lemma]
+					else:
+						observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
+						observedColumnsDict[lemma] = observedColumn
+					observedColumnsSequenceWordIndexDict[i] = observedColumn
+		else:
+			conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
+			if(useInference and inferenceOnlyRetainPredictedTargetObservedColumn):
+				observedColumn = GIAANNproto_databaseNetworkExcitation.ObservedColumnStub(databaseNetworkObject, conceptIndex, lemma, i)
+				observedColumnsSequenceWordIndexDict[i] = observedColumn
+			else:
 				# Load observed column from disk or create new one (reuse per-lemma instance for multi-occurrence concepts)
 				if(lemma in observedColumnsDict):
 					observedColumn = observedColumnsDict[lemma]
@@ -75,15 +92,6 @@ def secondPass(databaseNetworkObject, tokens):
 					observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
 					observedColumnsDict[lemma] = observedColumn
 				observedColumnsSequenceWordIndexDict[i] = observedColumn
-		else:
-			conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
-			# Load observed column from disk or create new one (reuse per-lemma instance for multi-occurrence concepts)
-			if(lemma in observedColumnsDict):
-				observedColumn = observedColumnsDict[lemma]
-			else:
-				observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
-				observedColumnsDict[lemma] = observedColumn
-			observedColumnsSequenceWordIndexDict[i] = observedColumn
 	return observedColumnsDict, observedColumnsSequenceWordIndexDict
 
 
@@ -222,7 +230,7 @@ def has_next_reference_delimiter(token_index, sequenceLength, sequenceReferenceS
 
 def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 	"""
-	For every concept word (lemma) in the sequence, identify every feature neuron in that column that occurs q words before or after the concept word in the sequence, including the concept neuron. This function has been parallelized using PyTorch array operations.
+	For every concept word (lemma) in the sequence, identify every feature neuron in that column that occurs q words before or after the concept word in the sequence, including the prime concept neuron. This function has been parallelized using PyTorch array operations.
 	"""
 
 	noDelimiterDetectedBetweenConceptTokens = False
@@ -541,7 +549,7 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 					sequenceConceptWordIndex = j
 					columnsWordOrder[sequenceConceptIndex] = sequenceConceptIndex
 					if(useDedicatedConceptNames2):
-						sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[variableConceptNeuronFeatureName]
+						sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[variablePrimeConceptFeatureNeuronName]
 					else:
 						sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[featureLemma]
 					branchIndex = 0

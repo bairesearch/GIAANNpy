@@ -15,7 +15,7 @@ pip install networkx
 pip install matplotlib
 pip install torch
 pip install spacy
-pip install datasets
+pip install "datasets<3" "fsspec==2024.6.1" "gcsfs==2024.6.1"
 python -m spacy download spacyModelName (default:en_core_web_trf, orig: en_core_web_sm)
 pip install nltk
 
@@ -48,7 +48,8 @@ if(useInference):
 	import GIAANNproto_prediction
 
 # Load the Wikipedia dataset using Hugging Face datasets
-dataset = load_dataset('wikipedia', '20220301.en', split='train', streaming=True)
+#dataset = load_dataset("wikimedia/wikipedia", "20220301.en", split="train", streaming=True, trust_remote_code=True)
+dataset = load_dataset('wikipedia', '20220301.en', split='train', streaming=True, trust_remote_code=True)
 
 # Initialize spaCy model
 nlp = spacy.load(spacyModelName)
@@ -281,6 +282,10 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, lastSequ
 				if(drawNetworkDuringTrain):
 					# Visualize the complete graph every time a new sequence is parsed by the application.
 					GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumns, False, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+generateDrawSequenceIndex(sequenceIndex))
+
+		if(debugDeleteGPUcache):
+			if(pt.cuda.is_available()):
+				pt.cuda.empty_cache()
 
 	# Break if we've reached the maximum number of sequences
 	sequenceCount += 1

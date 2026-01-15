@@ -306,7 +306,7 @@ if(drawSparseArrays):
 			
 			if(drawSequenceObservedColumns):
 				featureWordToIndex = sequenceObservedColumns.featureWordToIndex
-				yOffset = 1 + 1	#reserve space at bottom of column for feature concept neuron
+				yOffset = 1 + 1	#reserve space at bottom of column for prime concept feature neuron
 				cIdx = sequenceObservedColumns.conceptNameToIndex[lemma]
 				featureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons, drawBranches)
 				if(drawBranches):
@@ -328,13 +328,13 @@ if(drawSparseArrays):
 			
 			# Draw feature neurons
 			for featureWord, featureIndexInObservedColumn in featureWordToIndex.items():
-				conceptNeuronFeature = False
+				primeConceptNeuronFeature = False
 				if(useDedicatedConceptNames and useDedicatedConceptNames2):
-					if featureWord == variableConceptNeuronFeatureName:
+					if featureWord == variablePrimeConceptFeatureNeuronName:
 						neuronColor = defaultColourConceptFeature
 						neuronName = observedColumn.conceptName
-						conceptNeuronFeature = True
-						#print("\nvisualizeGraph: conceptNeuronFeature neuronName = ", neuronName)
+						primeConceptNeuronFeature = True
+						#print("\nvisualizeGraph: primeConceptNeuronFeature neuronName = ", neuronName)
 					else:
 						neuronColor = defaultColourFeature
 						neuronName = featureWord
@@ -353,7 +353,7 @@ if(drawSparseArrays):
 					
 				if(featurePresent):
 					if(drawRelationTypes):
-						if not conceptNeuronFeature:
+						if not primeConceptNeuronFeature:
 							if(useSANI and useSANIcolumns):
 								segmentIndex = arrayIndexSegmentAdjacentColumn #arrayIndexSegmentAdjacentColumn has a higher probability of being filled than arrayIndexSegmentLast
 							else:
@@ -362,13 +362,13 @@ if(drawSparseArrays):
 								posValue = getFeaturePosValue(featureNeurons, featureIndexInObservedColumn, segmentIndex)
 								neuronColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, drawFeatureNodes=True)
 					elif(drawDelimiters):
-						if not conceptNeuronFeature:
+						if not primeConceptNeuronFeature:
 							delimiterColour = getDelimiterFeatureColour(databaseNetworkObject, featureWord)
 							if(delimiterColour is not None):
 								neuronColor = delimiterColour
 					elif(drawDefault):
 						if(featureActive):
-							if(conceptNeuronFeature):
+							if(primeConceptNeuronFeature):
 								neuronColor = defaultColourConceptFeatureActive
 							else:
 								neuronColor = defaultColourFeatureActive
@@ -378,16 +378,16 @@ if(drawSparseArrays):
 							neuronName = createNeuronLabelWithActivation(neuronName, neuronActivationString(featureNeurons, arrayIndexPropertiesActivationIndex, featureIndexInObservedColumn))
 
 					featureNode = f"{lemma}_{featureWord}_{fIdx}"
-					if(randomiseColumnFeatureXposition and not conceptNeuronFeature):
+					if(randomiseColumnFeatureXposition and not primeConceptNeuronFeature):
 						xOffsetShuffled = xOffset + random.uniform(-0.5, 0.5)
 					else:
 						xOffsetShuffled = xOffset
-					if(drawSequenceObservedColumns and conceptNeuronFeature):
+					if(drawSequenceObservedColumns and primeConceptNeuronFeature):
 						yOffsetPrev = yOffset
 						yOffset = 1
 					G.add_node(featureNode, pos=(xOffsetShuffled, yOffset), color=neuronColor, label=neuronName)
 					nodeNameMap[(lemma, featureIndexInObservedColumn)] = featureNode
-					if(drawSequenceObservedColumns and conceptNeuronFeature):
+					if(drawSequenceObservedColumns and primeConceptNeuronFeature):
 						yOffset = yOffsetPrev
 					else:
 						yOffset += 1
@@ -673,7 +673,7 @@ else:
 			
 			if(drawSequenceObservedColumns):
 				featureWordToIndex = sequenceObservedColumns.featureWordToIndex
-				yOffset = 1 + 1	#reserve space at bottom of column for feature concept neuron
+				yOffset = 1 + 1	#reserve space at bottom of column for prime concept feature neuron
 				cIdx = sequenceObservedColumns.conceptNameToIndex[lemma]
 				featureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons, drawBranches)
 				if(drawBranches):
@@ -695,13 +695,13 @@ else:
 			
 			# Draw feature neurons
 			for featureWord, featureIndexInObservedColumn in featureWordToIndex.items():
-				conceptNeuronFeature = False
+				primeConceptNeuronFeature = False
 				if(useDedicatedConceptNames and useDedicatedConceptNames2):
-					if featureWord == variableConceptNeuronFeatureName:
+					if featureWord == variablePrimeConceptFeatureNeuronName:
 						neuronColor = defaultColourConceptFeature
 						neuronName = observedColumn.conceptName
-						conceptNeuronFeature = True
-						#print("\nvisualizeGraph: conceptNeuronFeature neuronName = ", neuronName)
+						primeConceptNeuronFeature = True
+						#print("\nvisualizeGraph: primeConceptNeuronFeature neuronName = ", neuronName)
 					else:
 						neuronColor = defaultColourFeature
 						neuronName = featureWord
@@ -720,7 +720,7 @@ else:
 					
 				if(featurePresent):
 					if(drawRelationTypes):
-						if not conceptNeuronFeature:
+						if not primeConceptNeuronFeature:
 							if(useSANI and useSANIcolumns):
 								segmentIndex = arrayIndexSegmentAdjacentColumn #arrayIndexSegmentAdjacentColumn has a higher probability of being filled than arrayIndexSegmentLast
 							else:
@@ -729,13 +729,13 @@ else:
 								posValue = getFeaturePosValue(featureNeurons, featureIndexInObservedColumn, segmentIndex)
 								neuronColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, drawFeatureNodes=True)
 					elif(drawDelimiters):
-						if not conceptNeuronFeature:
+						if not primeConceptNeuronFeature:
 							delimiterColour = getDelimiterFeatureColour(databaseNetworkObject, featureWord)
 							if(delimiterColour is not None):
 								neuronColor = delimiterColour
 					elif(drawDefault):
 						if(featureActive):
-							if(conceptNeuronFeature):
+							if(primeConceptNeuronFeature):
 								neuronColor = defaultColourConceptFeatureActive
 							else:
 								neuronColor = defaultColourFeatureActive
@@ -745,16 +745,16 @@ else:
 							neuronName = createNeuronLabelWithActivation(neuronName, neuronActivationString(featureNeurons, arrayIndexPropertiesActivationIndex, featureIndexInObservedColumn))
 
 					featureNode = f"{lemma}_{featureWord}_{fIdx}"
-					if(randomiseColumnFeatureXposition and not conceptNeuronFeature):
+					if(randomiseColumnFeatureXposition and not primeConceptNeuronFeature):
 						xOffsetShuffled = xOffset + random.uniform(-0.5, 0.5)
 					else:
 						xOffsetShuffled = xOffset
-					if(drawSequenceObservedColumns and conceptNeuronFeature):
+					if(drawSequenceObservedColumns and primeConceptNeuronFeature):
 						yOffsetPrev = yOffset
 						yOffset = 1
 					G.add_node(featureNode, pos=(xOffsetShuffled, yOffset), color=neuronColor, label=neuronName)
 					nodeNameMap[(lemma, featureIndexInObservedColumn)] = featureNode
-					if(drawSequenceObservedColumns and conceptNeuronFeature):
+					if(drawSequenceObservedColumns and primeConceptNeuronFeature):
 						yOffset = yOffsetPrev
 					else:
 						yOffset += 1

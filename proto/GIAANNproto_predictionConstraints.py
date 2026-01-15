@@ -189,7 +189,7 @@ def rowHasAllowedFeature(conceptColumnsFeatureIndicesPred, rowIndex, allowedFeat
 		if(conceptColumnsFeatureIndicesPred.dim() == 1):
 			if(rowIndex < conceptColumnsFeatureIndicesPred.shape[0]):
 				featureValue = int(conceptColumnsFeatureIndicesPred[rowIndex].item())
-				if(featureValue == featureIndexConceptNeuron or featureValue in allowedFeaturesSet):
+				if(featureValue == featureIndexPrimeConceptNeuron or featureValue in allowedFeaturesSet):
 					allowed = True
 		else:
 			if(rowIndex < conceptColumnsFeatureIndicesPred.shape[0]):
@@ -198,7 +198,7 @@ def rowHasAllowedFeature(conceptColumnsFeatureIndicesPred, rowIndex, allowedFeat
 					rowValues = rowTensor.view(-1)
 					for value in rowValues:
 						featureValue = int(value.item())
-						if(featureValue == featureIndexConceptNeuron or featureValue in allowedFeaturesSet):
+						if(featureValue == featureIndexPrimeConceptNeuron or featureValue in allowedFeaturesSet):
 							allowed = True
 	return allowed
 
@@ -244,14 +244,24 @@ def applyConnectedColumnsConstraint(conceptColumnsIndicesPred, conceptColumnsFea
 
 
 def getObservedColumn(databaseNetworkObject, observedColumnsDict, columnIndex):
+	result = None
 	if(columnIndex < 0 or columnIndex >= len(databaseNetworkObject.conceptColumnsList)):
-		return None
-	columnLemma = databaseNetworkObject.conceptColumnsList[columnIndex]
-	if(columnLemma in observedColumnsDict):
-		return observedColumnsDict[columnLemma]
-	observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, columnIndex, columnLemma, columnIndex)
-	observedColumnsDict[columnLemma] = observedColumn
-	return observedColumn
+		result = None
+	else:
+		columnLemma = databaseNetworkObject.conceptColumnsList[columnIndex]
+		observedColumn = observedColumnsDict.get(columnLemma)
+		if(observedColumn is None):
+			observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, columnIndex, columnLemma, columnIndex)
+		clearObservedColumns = inferenceOnlyRetainPredictedTargetObservedColumn
+		if(clearObservedColumns and inferenceBeamSearch and not inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch):
+			clearObservedColumns = False
+		if(clearObservedColumns):
+			if(observedColumnsDict is None):
+				raise RuntimeError("getObservedColumn error: observedColumnsDict is None")
+			observedColumnsDict.clear()
+		observedColumnsDict[columnLemma] = observedColumn
+		result = observedColumn
+	return result
 
 
 def getConnectedColumnsForFeature(observedColumn, featureIndex, includeFeatureDetails=False):

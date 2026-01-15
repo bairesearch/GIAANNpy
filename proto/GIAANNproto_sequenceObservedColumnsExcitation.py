@@ -81,38 +81,56 @@ class SequenceObservedColumns:
 			
 		# Collect all feature words from observed columns
 		self.tokens = tokens
-		#identify feature indices from complete ObservedColumns.featureNeurons or globalFeatureNeurons feature lists currently stored in SequenceObservedColumns.featureNeurons	#required for useInference
-		observedColumn = list(observedColumnsDict.values())[0]	#all features (including words) are identical per observed column
-		self.featureWords, self.featureIndicesInObservedTensor, self.fIdxTensor = self.identifyObservedColumnFeatureWords(tokens, observedColumn)
+		skipObservedColumnArrays = useInference and inferenceOnlyRetainPredictedTargetObservedColumn
+		if(not skipObservedColumnArrays):
+			#identify feature indices from complete ObservedColumns.featureNeurons or globalFeatureNeurons feature lists currently stored in SequenceObservedColumns.featureNeurons	#required for useInference
+			observedColumn = list(observedColumnsDict.values())[0]	#all features (including words) are identical per observed column
+			self.featureWords, self.featureIndicesInObservedTensor, self.fIdxTensor = self.identifyObservedColumnFeatureWords(tokens, observedColumn)
 
-		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-			self.fs = self.featureIndicesInObservedTensor.shape[0]
-		else:
-			self.fs = len(self.featureWords)
-		self.featureWordToIndex = {}
-		self.indexToFeatureWord = {}
-		for idx, featureWord in enumerate(self.featureWords):
-			self.featureWordToIndex[featureWord] = idx
-			self.indexToFeatureWord[idx] = featureWord
-
-		self.columnStartIndicesTensor = None
-		self.columnEndIndicesTensor = None
-		self.columnFeatureLocalIndices = None
-		self.computeColumnLocalFeatureMaps(tokens)
-
-		# Initialize arrays
-		self.featureNeurons = self.initialiseFeatureNeuronsSequence(self.cs, self.fs)
-		self.featureConnections = self.initialiseFeatureConnectionsSequence(self.cs, self.fs)
-
-		self.featureNeuronsOriginal = self.featureNeurons.clone()
-		self.featureConnectionsOriginal = self.featureConnections.clone()
-
-		# Populate arrays with data from observedColumnsDict (required for inference)
-		if(useInference):
-			if(trainSequenceObservedColumnsMatchSequenceWords):
-				self.populateArrays(tokens, self.sequenceObservedColumnsDict)
+			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
+				self.fs = self.featureIndicesInObservedTensor.shape[0]
 			else:
-				self.populateArrays(tokens, self.observedColumnsDict2)
+				self.fs = len(self.featureWords)
+			self.featureWordToIndex = {}
+			self.indexToFeatureWord = {}
+			for idx, featureWord in enumerate(self.featureWords):
+				self.featureWordToIndex[featureWord] = idx
+				self.indexToFeatureWord[idx] = featureWord
+
+			self.columnStartIndicesTensor = None
+			self.columnEndIndicesTensor = None
+			self.columnFeatureLocalIndices = None
+			self.computeColumnLocalFeatureMaps(tokens)
+
+			# Initialize arrays
+			self.featureNeurons = self.initialiseFeatureNeuronsSequence(self.cs, self.fs)
+			self.featureConnections = self.initialiseFeatureConnectionsSequence(self.cs, self.fs)
+
+			self.featureNeuronsOriginal = self.featureNeurons.clone()
+			self.featureConnectionsOriginal = self.featureConnections.clone()
+
+			# Populate arrays with data from observedColumnsDict (required for inference)
+			if(useInference):
+				if(trainSequenceObservedColumnsMatchSequenceWords):
+					self.populateArrays(tokens, self.sequenceObservedColumnsDict)
+				else:
+					self.populateArrays(tokens, self.observedColumnsDict2)
+		else:
+			self.featureWords = []
+			self.featureIndicesInObservedTensor = pt.empty((0,), dtype=pt.long)
+			self.fIdxTensor = pt.empty((0,), dtype=pt.long)
+			self.fs = 0
+			self.featureWordToIndex = {}
+			self.indexToFeatureWord = {}
+			self.columnStartIndicesTensor = None
+			self.columnEndIndicesTensor = None
+			self.columnFeatureLocalIndices = None
+			if(conceptColumnsDelimitByPOS):
+				GIAANNproto_sequenceConcepts.processConceptWords(self, 0, tokens, tokens)
+			self.featureNeurons = None
+			self.featureConnections = None
+			self.featureNeuronsOriginal = None
+			self.featureConnectionsOriginal = None
 
 			
 	def identifyObservedColumnFeatureWords(self, tokens, observedColumn):
@@ -125,9 +143,9 @@ class SequenceObservedColumns:
 				featureLemma = token.lemma
 				if(useDedicatedConceptNames and wordIndex in self.observedColumnsSequenceWordIndexDict):	
 					if(useDedicatedConceptNames2):
-						#only provide 1 observedColumn to identifyObservedColumnFeatureWords (therefore this condition will only be triggered once when when featureLemma == observedColumn.conceptName of some arbitrary concept column. Once triggered a singular artificial variableConceptNeuronFeatureName will be added)
-						featureWords.append(variableConceptNeuronFeatureName)
-					featureIndicesInObserved.append(featureIndexConceptNeuron)
+						#only provide 1 observedColumn to identifyObservedColumnFeatureWords (therefore this condition will only be triggered once when when featureLemma == observedColumn.conceptName of some arbitrary concept column. Once triggered a singular artificial variablePrimeConceptFeatureNeuronName will be added)
+						featureWords.append(variablePrimeConceptFeatureNeuronName)
+					featureIndicesInObserved.append(featureIndexPrimeConceptNeuron)
 					#print("concept node found = ", featureLemma)
 				elif(featureWord in observedColumn.featureWordToIndex):
 					featureWords.append(featureWord)
@@ -251,6 +269,9 @@ class SequenceObservedColumns:
 
 		for cIdx, observedColumn in sequenceObservedColumnsDict.items():
 			featureIndicesInObserved, fIdxTensor = self.getObservedColumnFeatureIndices()
+			if(useGPUsparseStrict and not useGPUsparse):
+				featureIndicesInObserved = featureIndicesInObserved.to(deviceSparse)
+				fIdxTensor = fIdxTensor.to(deviceSparse)
 			numFeatures = len(fIdxTensor)
 
 			cIdxList.append(pt.full((numFeatures,), cIdx, dtype=pt.long))
@@ -262,7 +283,7 @@ class SequenceObservedColumns:
 				# Slice the globalFeatureNeurons as before
 				featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(self.databaseNetworkObject.globalFeatureNeurons, 3, observedColumn.conceptIndex)
 
-			if (useGPUdense and not useGPUsparse):
+			if(not useGPUsparseStrict and useGPUdense and not useGPUsparse):
 				featureNeurons = featureNeurons.to(deviceDense)
 
 			indices = featureNeurons.indices()  # [4, n_entries] for a 4D sparse tensor: (property, branch, segment, feature_idx)
@@ -322,10 +343,13 @@ class SequenceObservedColumns:
 
 		for cIdx, observedColumn in sequenceObservedColumnsDict.items():
 			featureIndicesInObserved, fIdxTensor = self.getObservedColumnFeatureIndices()
+			if(useGPUsparseStrict and not useGPUsparse):
+				featureIndicesInObserved = featureIndicesInObserved.to(deviceSparse)
+				fIdxTensor = fIdxTensor.to(deviceSparse)
 
 			# Get indices and values from the sparse tensor
 			featureConnections = observedColumn.featureConnections.coalesce()
-			if not useGPUsparse:
+			if(not useGPUsparseStrict and not useGPUsparse):
 				featureConnections = featureConnections.to(deviceDense)
 
 			indices = featureConnections.indices()  # shape [6, n_entries]
@@ -338,6 +362,9 @@ class SequenceObservedColumns:
 			# For each other column
 			for otherCIdx, otherObservedColumn in sequenceObservedColumnsDict.items():
 				otherFeatureIndicesInObserved, otherFIdxTensor = self.getObservedColumnFeatureIndices()
+				if(useGPUsparseStrict and not useGPUsparse):
+					otherFeatureIndicesInObserved = otherFeatureIndicesInObserved.to(deviceSparse)
+					otherFIdxTensor = otherFIdxTensor.to(deviceSparse)
 				otherConceptIndex = otherObservedColumn.conceptIndex
 
 				# Sort otherFeatureIndicesInObserved and otherFIdxTensor if not sorted
@@ -485,6 +512,9 @@ class SequenceObservedColumns:
 		inferenceConceptUpdateCounts = self.inferenceConceptUpdateCounts if getattr(self, "debugInferenceActive", False) else None
 		featureNeuronsDelta = self.featureNeurons - self.featureNeuronsOriginal
 		featureConnectionsDelta = self.featureConnections - self.featureConnectionsOriginal
+		if(useGPUsparseStrict and not useGPUsparse):
+			featureNeuronsDelta = featureNeuronsDelta.to(deviceSparse)
+			featureConnectionsDelta = featureConnectionsDelta.to(deviceSparse)
 
 		featureNeuronsDeltaSparse = featureNeuronsDelta.to_sparse()
 		featureConnectionsDeltaSparse = featureConnectionsDelta.to_sparse()
@@ -671,6 +701,9 @@ class SequenceObservedColumns:
 
 		featureNeuronsDelta = self.featureNeurons[arrayIndexPropertiesStrengthIndex] - self.featureNeuronsOriginal[arrayIndexPropertiesStrengthIndex]
 		featureConnectionsDelta = self.featureConnections[arrayIndexPropertiesStrengthIndex] - self.featureConnectionsOriginal[arrayIndexPropertiesStrengthIndex]
+		if(useGPUsparseStrict and not useGPUsparse):
+			featureNeuronsDelta = featureNeuronsDelta.to(deviceSparse)
+			featureConnectionsDelta = featureConnectionsDelta.to(deviceSparse)
 
 		featureNeuronsDeltaSparse = featureNeuronsDelta.to_sparse()
 		featureConnectionsDeltaSparse = featureConnectionsDelta.to_sparse()
