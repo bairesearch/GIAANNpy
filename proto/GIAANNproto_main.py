@@ -150,25 +150,25 @@ def processArticle(text, articleIndex):
 	numberOfSequences = len(sequences)
 	for sequenceIndex, sequence in enumerate(sequences):
 		sequenceRaw = sequencesRaw[sequenceIndex]
-		lastSequenceInPrompt = False
+		inferenceSequenceInPrompt = False
 		if(useInference):
 			if(inferenceTrainFirstSequences):
 				if(sequenceIndex == numberOfSequences-1):
 					print("\ninferenceTrainFirstSequences: executing inference:")
-					lastSequenceInPrompt = True
+					inferenceSequenceInPrompt = True
 				else:
 					if(sequenceIndex==0):
 						print("\ninferenceTrainFirstSequences: executing train:")
 			else:
 				if(sequenceIndex==0):
 					print("\n!inferenceTrainFirstSequences: executing inference:")
-				lastSequenceInPrompt = True
+				inferenceSequenceInPrompt = True
 		if(len(sequence) <= maxSequenceLength):
-			processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, lastSequenceInPrompt)
+			processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenceSequenceInPrompt)
 		if(sequenceCount == trainMaxSequences and useMaxSequences):
 			break
 			
-def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, lastSequenceInPrompt):
+def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenceSequenceInPrompt):
 	global sequenceCount
 	global drawRelationTypes
 
@@ -189,8 +189,8 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, lastSequ
 	observedColumnsDict = {}  # key: lemma, value: ObservedColumn
 	observedColumnsSequenceWordIndexDict = {}  # key: sequence word index, value: ObservedColumn
 	
-	if(useInference and lastSequenceInPrompt):
-		if(lastSequenceInPrompt):
+	if(useInference and inferenceSequenceInPrompt):
+		if(inferenceSequenceInPrompt):
 			if(numSeedTokens >= len(sequence)):
 				return
 		sequenceSeed = sequence[0:numSeedTokens]	#prompt
@@ -217,12 +217,13 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, lastSequ
 		print(f"Processing sequenceCount: {sequenceCount}, {sequence.text}")	#"{sequence.text}"	#"Processing sequenceCount: {sequenceCount}, {sequence.text}"	#article: {articleIndex}, sequence: {sequenceIndex}
 
 	# Second pass: Create observed_columns_dict
-	observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNproto_sequenceConcepts.secondPass(databaseNetworkObject, tokens)
+	inferenceMode = useInference and inferenceSequenceInPrompt
+	observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNproto_sequenceConcepts.secondPass(databaseNetworkObject, tokens, inferenceMode)
 
 	# Create the sequence observed columns object
-	sequenceObservedColumns = GIAANNproto_sequenceObservedColumnsExcitation.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict)
+	sequenceObservedColumns = GIAANNproto_sequenceObservedColumnsExcitation.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict, inferenceMode)
 
-	if(useInference and lastSequenceInPrompt):
+	if(useInference and inferenceSequenceInPrompt):
 		if(conceptColumnsDelimitByPOS and sequenceObservedColumns.noDelimiterDetectedBetweenConceptTokens):
 			print("warning: inference skipped due to missing concept column delimiter detection in sequence")
 		else:

@@ -27,10 +27,7 @@ import GIAANNproto_predictionConstraints
 
 def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, conceptActivationState=None, connectedColumnsConstraint=None, connectedColumnsFeatures=None):
 	#generate targets for debug/analysis output
-	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
-
-	if(inferenceBeamDepth <= 0 or inferenceBeamWidth <= 0):
-		return GIAANNproto_predictionConstraints.selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatures)
+	targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 
 	strengthLookup = None
 	if(globalFeatureNeuronsStrength is not None):
@@ -45,6 +42,7 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 	completedBeams = []
 	beamDepth = max(1, inferenceBeamDepth)
 	beamWidthLimit = max(1, inferenceBeamWidth)
+	result = None
 
 	for depthIndex in range(beamDepth):
 		newBeams = []
@@ -67,8 +65,6 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 					if(inferenceUseNeuronFeaturePropertiesTime):
 						# spec step (b): score beam nodes using time-modified activation.
 						activationGain = candidate.get("activationValue", activationGain)
-					elif(inferenceBeamSearchConceptColumns):
-						activationGain = candidate.get("activationValue", activationGain)
 				candidateScore = computeBeamNodeScore(activationGain, candidate["connectionValue"])
 				newScore = beam["score"] + candidateScore
 				newConstraintState = updateConstraintStateAfterNodes(databaseNetworkObject, beam.get("constraintState"), candidate["nodes"])
@@ -81,27 +77,32 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 
 	if(len(beams) == 0):
 		beams = completedBeams
-	if(len(beams) == 0 or len(beams[0]["sequence"]) == 0):
-		return selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatures)
 
-	allBeams = beams + completedBeams
-	bestBeam = max(allBeams, key=lambda item: item["score"])
-	bestAction = bestBeam["sequence"][0]
-	conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = convertNodesToPrediction(bestAction["nodes"])
-	if(conceptColumnsIndicesNext.shape[0] == 0):
-		return GIAANNproto_predictionConstraints.selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns, constraintMode, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatures)
-	multipleSourcesNext = conceptColumnsIndicesNext.shape[0] > 1
-	kc = conceptColumnsIndicesNext.shape[0]
-	if(printPredictionsDuringInferencePredict):
-		printBestBeamPath(bestBeam, databaseNetworkObject)
-	conceptColumnsIndicesPred = conceptColumnsIndicesNext.clone()
-	conceptColumnsFeatureIndicesPred = conceptColumnsFeatureIndicesNext.clone()
-	return conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex
+	if(result is None):
+		allBeams = beams + completedBeams
+		if(len(allBeams) == 0):
+			raise RuntimeError("beamSearchPredictNextFeature error: no beams available")
+		bestBeam = max(allBeams, key=lambda item: item["score"])
+		bestAction = bestBeam["sequence"][0]
+		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = convertNodesToPrediction(bestAction["nodes"])
+		if(result is None):
+			if(conceptColumnsIndicesNext is None or conceptColumnsFeatureIndicesNext is None or conceptColumnsIndicesNext.numel() == 0 or conceptColumnsFeatureIndicesNext.numel() == 0):
+				raise RuntimeError("beamSearchPredictNextFeature error: no prediction candidates available")
+			if(conceptColumnsIndicesNext.numel() != 1 or conceptColumnsFeatureIndicesNext.numel() != 1):
+				raise RuntimeError("beamSearchPredictNextFeature error: multiple prediction candidates not supported")
+			if(printPredictionsDuringInferencePredict):
+				printBestBeamPath(bestBeam, databaseNetworkObject)
+			conceptColumnIndexPred = int(conceptColumnsIndicesNext.squeeze().item())
+			conceptColumnFeatureIndexPred = int(conceptColumnsFeatureIndicesNext.squeeze().item())
+			result = (conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex)
+	if(result is None):
+		raise RuntimeError("beamSearchPredictNextFeature error: no prediction result available")
+	return result
 
 
 def beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, conceptActivationState=None, connectedColumnsConstraint=None, connectedColumnsFeatures=None):
 	#single-step beam candidate selection (no beam depth expansion)
-	targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
+	targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 	errorMessage = None
 	result = None
 
@@ -128,15 +129,17 @@ def beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkOb
 				bestCandidate = candidate
 				bestScore = candidateScore
 		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = convertNodesToPrediction(bestCandidate["nodes"])
-		if(conceptColumnsIndicesNext is None or conceptColumnsIndicesNext.shape[0] == 0):
+		if(conceptColumnsIndicesNext is None or conceptColumnsFeatureIndicesNext is None or conceptColumnsIndicesNext.shape[0] == 0 or conceptColumnsFeatureIndicesNext.shape[0] == 0):
 			GIAANNproto_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "beamSearchSelectSingleStepFeature: no prediction nodes available after selection")
 		else:
-			multipleSourcesNext = conceptColumnsIndicesNext.shape[0] > 1
-			kc = conceptColumnsIndicesNext.shape[0]
-			conceptColumnsIndicesPred = conceptColumnsIndicesNext.clone()
-			conceptColumnsFeatureIndicesPred = conceptColumnsFeatureIndicesNext.clone()
-			result = (conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, multipleSourcesNext, kc, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex)
+			if(conceptColumnsIndicesNext.numel() != 1 or conceptColumnsFeatureIndicesNext.numel() != 1):
+				raise RuntimeError("beamSearchSelectSingleStepFeature error: multiple prediction candidates not supported")
+			conceptColumnIndexPred = int(conceptColumnsIndicesNext.squeeze().item())
+			conceptColumnFeatureIndexPred = int(conceptColumnsFeatureIndicesNext.squeeze().item())
+			result = (conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex)
 	
+	if(result is None):
+		raise RuntimeError("beamSearchSelectSingleStepFeature error: no prediction result available")
 	return result
 
 def initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState):
@@ -185,9 +188,7 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 		observedColumnsDict.clear()
 	observedColumnsDict[lemma] = observedColumn
 	featureConnections = observedColumn.featureConnections
-	conceptColumnsIndicesSource = pt.tensor([columnIndex], dtype=pt.long, device=deviceSparse)
-	conceptColumnsFeatureIndicesSource = pt.tensor([[featureIndex]], dtype=pt.long, device=deviceSparse)
-	state["features"], state["connections"], state["time"] = GIAANNproto_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, state["features"], state["connections"], featureConnections, conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource, columnIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex)
+	state["features"], state["connections"], state["time"] = GIAANNproto_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, state["features"], state["connections"], featureConnections, columnIndex, featureIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex)
 	applyBeamNodePredictionEffects(state, columnIndex, featureIndex, sequenceWordIndex)
 	if(predictionColumnsMustActivateConceptFeature):
 		conceptState = state.get("conceptActivations")
@@ -230,11 +231,6 @@ def buildBeamNodeIndices(device, columnIndex, featureIndex, branchIndex=0):
 
 
 def describeBeamCandidate(databaseNetworkObject, candidate):
-	if(inferenceBeamSearchConceptColumns):
-		columnIndex = candidate["columnIndex"]
-		columnName = databaseNetworkObject.conceptColumnsList[columnIndex]
-		nodeIndices = [nodeFeature for _, nodeFeature in candidate["nodes"]]
-		return f"column {columnIndex} ({columnName}), node indices {nodeIndices}"
 	return describeBeamNodes(databaseNetworkObject, candidate["nodes"])
 
 
@@ -326,10 +322,7 @@ def selectBeamCandidates(stateFeatures, stateTime, strengthLookup, candidateLimi
 	columnIndices, featureIndices, activationValues = GIAANNproto_predictionConstraints.filterColumnFeatureCandidatesByConnectedColumns(columnIndices, featureIndices, activationValues, connectedColumnsTensor, connectedColumnsFeatures)
 	if(columnIndices is None):
 		return []
-	if(inferenceBeamSearchConceptColumns):
-		return selectBeamCandidatesConceptColumns(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, databaseNetworkObject.f, databaseNetworkObject, constraintState, conceptActivationState)
-	else:
-		return selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, databaseNetworkObject.f, databaseNetworkObject, constraintState, conceptActivationState)
+	return selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, databaseNetworkObject.f, databaseNetworkObject, constraintState, conceptActivationState)
 
 
 def filterCandidatesByLastSegment(columnIndices, featureIndices, activationValues, stateFeatures, maxFeatures):

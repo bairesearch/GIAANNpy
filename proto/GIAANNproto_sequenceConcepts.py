@@ -59,7 +59,7 @@ def firstPass(databaseNetworkObject, sequence):
 	return conceptsFound, conceptMask
 
 				
-def secondPass(databaseNetworkObject, tokens):
+def secondPass(databaseNetworkObject, tokens, inferenceMode):
 	observedColumnsDict = {}
 	observedColumnsSequenceWordIndexDict = {}
 	for i, token in enumerate(tokens):
@@ -68,7 +68,7 @@ def secondPass(databaseNetworkObject, tokens):
 		if usePOS:
 			if GIAANNproto_sequenceTokens.isConcept(token):
 				conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
-				if(useInference and inferenceOnlyRetainPredictedTargetObservedColumn):
+				if(inferenceMode and inferenceOnlyRetainPredictedTargetObservedColumn):
 					observedColumn = GIAANNproto_databaseNetworkExcitation.ObservedColumnStub(databaseNetworkObject, conceptIndex, lemma, i)
 					observedColumnsSequenceWordIndexDict[i] = observedColumn
 				else:
@@ -81,7 +81,7 @@ def secondPass(databaseNetworkObject, tokens):
 					observedColumnsSequenceWordIndexDict[i] = observedColumn
 		else:
 			conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
-			if(useInference and inferenceOnlyRetainPredictedTargetObservedColumn):
+			if(inferenceMode and inferenceOnlyRetainPredictedTargetObservedColumn):
 				observedColumn = GIAANNproto_databaseNetworkExcitation.ObservedColumnStub(databaseNetworkObject, conceptIndex, lemma, i)
 				observedColumnsSequenceWordIndexDict[i] = observedColumn
 			else:

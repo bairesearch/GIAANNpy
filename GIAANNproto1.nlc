@@ -445,5 +445,10 @@ v1i (Codex IDE GPT-5.2-Codex):
 	MANUAL; - remove support for conceptColumnsDelimitByPOS=False
 	MANUAL; - remove support for SANIconceptNeurons=True (SANI concept neurons)
 	MANUAL; - remove support for useInhibitoryNeurons=True (inhibitory neurons)
-
+- remove support for multiple prediction column/feature pairs
+MANUAL; - remove option inferenceBeamSearchConceptColumns
+MANUAL; - remove beamSearchPredictNextFeature():debugBeamSearchFallback (selectMostActiveFeature)
+- patch inferenceOnlyRetainPredictedTargetObservedColumn for inferenceTrainFirstSequences=True
+- rename lastSequenceInPrompt to inferenceSequenceInPrompt
+MANUAL; - update beamSearchSelectSingleStepFeature/beamSearchPredictNextFeature to only return prediction targets
 

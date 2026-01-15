@@ -35,6 +35,7 @@ debugPrintTrainSequencePOS = False	#print each training sequence with POS tags
 debugTerminateInferenceOnPredictionTargetMismatch = False
 debugTerminateInferenceOnNoPredictionCandidatesAvailable = False
 debugTerminateOnConceptColumnsDelimitByPOSerror = False
+
 debugDeleteGPUcache = True
 
 
@@ -68,7 +69,6 @@ if(useInference):
 	useGPUsparse = True	#default: False	#orig: True	#inference requires high RAM to store sparse tensors
 else:
 	useGPUsparse = True		#default: True	#orig: False	#slight performance increase during train (does not use significant additional GPU ram during train)
-useGPUpredictiveNetworkModel = True	#orig: True	#use GPU to train transformer/MLP predictive network model
 useGPUsparseStrict = True	#orig: False	#enforce strict sparse device during transfer to/from dense tensors
 inferenceOnlyRetainPredictedTargetObservedColumn = False	#default: False	#orig: False	#load/evict one observed column per prediction step	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
 inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch = False	#default: False	#orig: False	#True: retain only current beam-search target(s); False: retain all beam-search targets	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
@@ -169,19 +169,14 @@ if(trainConnectionStrengthPOSdependence or inferenceConnectionStrengthPOSdepende
 #Beam search;
 if(useInference):
 	inferenceBeamSearch = False	#default: False	#orig: False
-	inferenceBeamSearchConceptColumns = False
 	inferenceBeamScoreStrategy = "nodeActivation"	#options: "nodeActivation", "activation_connection", "connection"
 	inferenceBeamConceptColumnNodeActivationThreshold = 0.0
 	inferenceBeamInstanceNodeActivationThreshold = 0.0
 	inferenceBeamInstancePreferActiveNodeCounts = False		  #optional: prioritise columns with more active nodes (count-based)
 	inferenceBeamInstancePreferInternalConnectivity = False      #optional: prioritise columns with stronger internal connectivity between active nodes
 	inferenceBeamInstancePreferAdjacentOverlap = False           #optional: prioritise columns sharing active features with adjacent columns
-	if(inferenceBeamSearchConceptColumns):
-		inferenceBeamWidth = 3	#orig: 3
-		inferenceBeamDepth = 3	#orig: 3
-	else:
-		inferenceBeamWidth = 3	#orig: 3
-		inferenceBeamDepth = 3	#orig: 6
+	inferenceBeamWidth = 3	#orig: 3
+	inferenceBeamDepth = 3	#orig: 6
 
 
 #Inference;
@@ -213,7 +208,7 @@ else:
 #Train optimisations;
 #trainSequenceObservedColumnsUseSequenceFeaturesOnly can be upgraded so only a limited amount of data is ever loaded to GPU during train (it currently temporarily masks entire feature arrays in GPU during transfer phase)
 if(useInference):
-	lowMem = False		#mandatory
+	lowMem = False		#mandatory: False	#if lowMem=False use global feature neuron tensors, else use feature neuron tensors in observed columns (note feature connection tensors are always in observed columns)
 else:
 	lowMem = False		 #default: False	#orig: True	#currently required to be False for inference compatibility	#optional
 trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
@@ -307,7 +302,6 @@ randomiseColumnFeatureXposition = True	#shuffle x position of column internal fe
 #Debug vars;
 printPredictionsDuringInferencePredict = True
 printPredictionsDuringInferencePredictBeamSearch = False
-debugPrintInferenceInhibition = False
 debugPrintMinWordDistanceDetails = False
 debugOnlyDrawBranchIndexConnections = False
 debugOnlyDrawBranchIndexX = 0
@@ -362,13 +356,8 @@ if(useInference):
 inferencePromptFile = databaseFolder + 'inference_prompt.txt'
 conceptColumnsDictFile = databaseFolder + 'conceptColumnsDict.pkl'
 conceptFeaturesDictFile = databaseFolder + 'conceptFeaturesDict.pkl'
-conceptInhibitoryFeaturesDictFile = databaseFolder + 'conceptInhibitoryFeaturesDict.pkl'
 observedColumnsDir = databaseFolder + 'observedColumns'
-inhibitoryObservedColumnsDir = databaseFolder + "observedColumnsInhibitory"
 pytorchTensorFileExtension = ".pt"
-predictiveNetworkFolder = "."
-predictiveNetworkFileName = "predictiveNetworkModel.pt"
-SANIconceptNeuronWeightsListFile = databaseFolder + 'SANIconceptNeuronWeightsList.pkl'
 if(conceptColumnsDelimitByPOS):
 	if(detectReferenceSetDelimitersBetweenNouns):
 		conceptFeaturesReferenceSetDelimiterDeterministicListFile = databaseFolder + 'conceptFeaturesReferenceSetDelimiterDeterministicList.pkl'
@@ -380,6 +369,7 @@ if not lowMem:
 	globalFeatureNeuronsFileFull = databaseFolder + globalFeatureNeuronsFile + pytorchTensorFileExtension
 posFolder = databaseFolder + "POS/"
 posDictFile = "everPos.wordnet.pkl.gz"
+
 
 #Common array indices;
 arrayIndexPropertiesStrengthIndex = None
@@ -523,13 +513,6 @@ if(useGPUsparse):
 		printe("useGPUsparse and !pt.cuda.is_available")
 else:
 	deviceSparse = pt.device("cpu")
-if(useGPUpredictiveNetworkModel):
-	if pt.cuda.is_available():
-		devicePredictiveNetworkModel = pt.device("cuda")
-	else:
-		printe("useGPUmodel and !pt.cuda.is_available")
-else:
-	devicePredictiveNetworkModel = pt.device("cpu")
 
 
 #Dedicated feature lists (non-dynamic);

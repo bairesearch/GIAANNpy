@@ -39,7 +39,7 @@ class SequenceObservedColumns:
 	"""
 	Contains sequence observed columns object arrays which stack a feature subset of the observed columns object arrays for the current sequence.
 	"""
-	def __init__(self, databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict):
+	def __init__(self, databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict, inferenceMode):
 		#note cs may be slightly longer than number of unique columns in the sequence, if there are multiple instances of the same concept/noun lemma in the sequence
 	
 		self.databaseNetworkObject = databaseNetworkObject
@@ -81,7 +81,7 @@ class SequenceObservedColumns:
 			
 		# Collect all feature words from observed columns
 		self.tokens = tokens
-		skipObservedColumnArrays = useInference and inferenceOnlyRetainPredictedTargetObservedColumn
+		skipObservedColumnArrays = inferenceMode and inferenceOnlyRetainPredictedTargetObservedColumn
 		if(not skipObservedColumnArrays):
 			#identify feature indices from complete ObservedColumns.featureNeurons or globalFeatureNeurons feature lists currently stored in SequenceObservedColumns.featureNeurons	#required for useInference
 			observedColumn = list(observedColumnsDict.values())[0]	#all features (including words) are identical per observed column

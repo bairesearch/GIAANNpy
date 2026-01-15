@@ -271,13 +271,12 @@ def getTokenConceptFeatureIndexForSequenceConceptIndex(sequence_observed_columns
 '''
 
 def getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcMax):
+	if(kcMax != 1):
+		raise RuntimeError("getTokenConceptFeatureIndexTensor error: kcMax must be 1")
 	targetFoundNextColumnIndex, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = getTokenConceptFeatureIndex(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex)
+	result = (targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex)
+	return result
 
-	targetConceptColumnsIndices = pt.tensor(targetPreviousColumnIndex).unsqueeze(0)
-	targetConceptColumnsFeatureIndices = pt.tensor(targetFeatureIndex).unsqueeze(0).unsqueeze(0)
-	targetMultipleSources = False
-	
-	return targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices
 
 def getTokenConceptFeatureIndex(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex):
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject

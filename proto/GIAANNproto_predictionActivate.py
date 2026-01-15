@@ -428,30 +428,19 @@ def updateTimeValuesFromActivation(globalFeatureNeuronsTime, featureNeuronsTarge
 				result = replaceSparseTensorValuesAtIndices(globalFeatureNeuronsTime, updateIndices, updateValues)
 	return result
 
-#first dim cs1 restricted to a candiate set of tokens.
-def processFeaturesActivePredictMulti(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndices, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None):
-	#print("processFeaturesActivePredictMulti:")
-	for conceptIndex in range(conceptColumnsIndices.shape[0]):
-		conceptColumnsIndicesSource = conceptColumnsIndices[conceptIndex].unsqueeze(dim=0)
-		conceptColumnsFeatureIndicesSource = conceptColumnsFeatureIndices[conceptIndex].unsqueeze(dim=0)
-		sourceConceptIndexValue = conceptColumnsIndicesSource.squeeze().item()
-		featureConnections = GIAANNproto_sparseTensors.sliceSparseTensor(sequenceObservedColumnsPrediction.featureConnections, 3, conceptIndex)	#sequence concept index dimension	#CHECKTHIS
-		globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndicesSource, conceptColumnsFeatureIndicesSource, sourceConceptIndexValue, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
-	
-	return globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime
-	
-#first dim cs1 restricted to a single token
-def processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnsIndices, conceptColumnsFeatureIndices, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None):
-	featureConnections = GIAANNproto_sparseTensors.sliceSparseTensor(sequenceObservedColumnsPrediction.featureConnections, 3, 0)	#sequence concept index dimension
-	sourceConceptIndexValue = conceptColumnsIndices.squeeze().item()
-	return processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndices, conceptColumnsFeatureIndices, sourceConceptIndexValue, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
 
-def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnsIndices, conceptColumnsFeatureIndices, sourceConceptIndex=None, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None):
+#first dim cs1 restricted to a single token
+def processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None):
+	featureConnections = GIAANNproto_sparseTensors.sliceSparseTensor(sequenceObservedColumnsPrediction.featureConnections, 3, 0)	#sequence concept index dimension
+	result = processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
+	return result
+
+def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None):
 		
 	featureNeuronsActive = GIAANNproto_sparseTensors.neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANImethod)
 	
-	sourceColumnIndex = conceptColumnsIndices.squeeze().item()
-	sourceFeatureIndex = conceptColumnsFeatureIndices.squeeze().squeeze().item()
+	sourceColumnIndex = int(sourceColumnIndex)
+	sourceFeatureIndex = int(sourceFeatureIndex)
 	if(featureNeuronsActive.is_sparse):
 		featureNeuronsActive = featureNeuronsActive.coalesce()
 		if(featureNeuronsActive.dim() == 3):
@@ -496,7 +485,7 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 	featureConnectionsStrength = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsStrength, 2, sourceFeatureIndex)
 	if(inferenceConnectionStrengthPOSdependence):
 		featureConnectionsPos = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsPos, 2, sourceFeatureIndex)
-		featureConnectionsStrength = applyConnectionStrengthPOSdependenceInference(databaseNetworkObject, featureConnectionsStrength, featureConnectionsPos, sourceConceptIndex)
+		featureConnectionsStrength = applyConnectionStrengthPOSdependenceInference(databaseNetworkObject, featureConnectionsStrength, featureConnectionsPos, sourceColumnIndex)
 	if(inferenceConnectionsStrengthBoolean):
 		featureConnectionsStrength = featureConnectionsStrength.bool().float()
 	
