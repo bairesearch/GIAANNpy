@@ -586,14 +586,7 @@ def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivat
 		if(columnIndexLookup.numel() == 0):
 			columnIndexLookup = pt.arange(conceptColumnsActivation.shape[0], dtype=pt.long, device=conceptColumnsActivation.device)
 			columnActivationValues = conceptColumnsActivation
-		if(kcDynamic):
-			activeMask = columnActivationValues > kcActivationThreshold
-			columnActivationValues = columnActivationValues[activeMask]
-			columnIndexLookup = columnIndexLookup[activeMask]
 		kcAvailable = columnActivationValues.shape[0]
-		if(kcDynamic and kcAvailable < 1):
-			print("selectMostActiveFeature kcDynamic error: kc < 1; cannot continue to predict columns; consider disabling kcDynamic for debug")
-			exit()
 		if(kcAvailable == 0):
 			columnIndexLookup = pt.arange(conceptColumnsActivation.shape[0], dtype=pt.long, device=conceptColumnsActivation.device)
 			columnActivationValues = conceptColumnsActivation
@@ -605,13 +598,8 @@ def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivat
 		kc = len(conceptColumnsActivationTopkConcepts.indices)
 		selectedColumnIndices = columnIndexLookup.index_select(0, conceptColumnsActivationTopkConcepts.indices)
 	else:
-		if(kcDynamic):
-			conceptColumnsActivation = conceptColumnsActivation[conceptColumnsActivation > kcActivationThreshold]	#select kcMax columns above threshold
 		conceptColumnsActivationTopkConcepts = pt.topk(conceptColumnsActivation, kcMax)
 		kc = len(conceptColumnsActivationTopkConcepts.indices)
-		if(kcDynamic and kc < 1):
-			print("selectMostActiveFeature kcDynamic error: kc < 1; cannot continue to predict columns; consider disabling kcDynamic for debug")
-			exit()
 		selectedColumnIndices = conceptColumnsActivationTopkConcepts.indices
 
 	#top feature selection;
@@ -636,23 +624,13 @@ def selectMostActiveFeature(sequenceObservedColumns, globalFeatureNeuronsActivat
 	conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = enforceMinimumPredictionActivationThreshold(conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, topkConceptColumnsActivationTopkFeatures.values)
 	conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred = applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, allowedColumns, constraintMode, connectedColumns, connectedColumnsFeatures)
 	
-	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
-		conceptColumnsIndicesNext = conceptColumnsIndicesPred
-		conceptColumnsFeatureIndicesNext = conceptColumnsFeatureIndicesPred
-		if(kc > 1 or kf > 1):
-			multipleSourcesNext = True
-		else:
-			multipleSourcesNext = False
+	conceptColumnsIndicesNext = conceptColumnsIndicesPred
+	conceptColumnsFeatureIndicesNext = conceptColumnsFeatureIndicesPred
+	if(kc > 1 or kf > 1):
+		multipleSourcesNext = True
 	else:
-		#while exclusively training predictive network; use targets rather than next token predictions when activating database network
-		conceptColumnsIndicesNext = targetConceptColumnsIndices
-		conceptColumnsFeatureIndicesNext = targetConceptColumnsFeatureIndices
-		multipleSourcesNext = targetMultipleSources
-		if(multipleSourcesNext):
-			kc = 2
-		else:
-			kc = 1
-		assert kf==1
+		multipleSourcesNext = False
+
 	conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext, allowedColumns, constraintMode, connectedColumns, connectedColumnsFeatures)
 	if(conceptColumnsIndicesNext is None or conceptColumnsIndicesNext.numel() == 0):
 		multipleSourcesNext = False

@@ -493,8 +493,6 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 	featureConnectionsStrength = featureConnections[arrayIndexPropertiesStrengthIndex]
 	if(inferenceConnectionStrengthPOSdependence):
 		featureConnectionsPos = featureConnections[arrayIndexPropertiesPosIndex]
-	if(inferencePredictiveNetwork and not useGPUsparse):
-		conceptColumnsFeatureIndices = conceptColumnsFeatureIndices.to(deviceSparse)
 	featureConnectionsStrength = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsStrength, 2, sourceFeatureIndex)
 	if(inferenceConnectionStrengthPOSdependence):
 		featureConnectionsPos = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsPos, 2, sourceFeatureIndex)

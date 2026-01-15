@@ -36,8 +36,6 @@ class DatabaseNetworkClass():
 		self.conceptFeaturesList = conceptFeaturesList
 		self.globalFeatureNeurons = globalFeatureNeurons
 		self.globalFeatureConnections = None #transformerUseInputConnections: initialised during prediction phase
-		if(inferenceInhibitoryNeurons):
-			self.globalInhibitoryNeuronsActivation = None
 		if(conceptColumnsDelimitByPOS):
 			if(detectReferenceSetDelimitersBetweenNouns):
 				self.conceptFeaturesReferenceSetDelimiterDeterministicList = conceptFeaturesReferenceSetDelimiterDeterministicList
@@ -275,17 +273,10 @@ def getTokenConceptFeatureIndexForSequenceConceptIndex(sequence_observed_columns
 def getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcMax):
 	targetFoundNextColumnIndex, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = getTokenConceptFeatureIndex(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex)
 
-	if(kcMax == 1 or not targetFoundNextColumnIndex):
-		targetConceptColumnsIndices = pt.tensor(targetPreviousColumnIndex).unsqueeze(0)
-		targetConceptColumnsFeatureIndices = pt.tensor(targetFeatureIndex).unsqueeze(0).unsqueeze(0)
-		targetMultipleSources = False
-	elif(kcMax == 2 and targetFoundNextColumnIndex): 
-		targetConceptColumnsIndices = pt.tensor([targetPreviousColumnIndex, targetNextColumnIndex])
-		targetConceptColumnsFeatureIndices = pt.stack([pt.tensor(targetFeatureIndex).unsqueeze(0), pt.tensor(targetFeatureIndex).unsqueeze(0)], dim=0)
-		targetMultipleSources = True
-	else:
-		printe("getTokenConceptFeatureIndexTensor currently requires kcMax == 1 or 2; corresponding to the number of target columns per token; check conceptColumnsDelimitByConceptFeaturesStart/multipleTargets")
-
+	targetConceptColumnsIndices = pt.tensor(targetPreviousColumnIndex).unsqueeze(0)
+	targetConceptColumnsFeatureIndices = pt.tensor(targetFeatureIndex).unsqueeze(0).unsqueeze(0)
+	targetMultipleSources = False
+	
 	return targetMultipleSources, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetConceptColumnsIndices, targetConceptColumnsFeatureIndices
 
 def getTokenConceptFeatureIndex(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex):
@@ -314,7 +305,7 @@ def isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, feat
 		else:
 			isDelimiter = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList[featureIndex]
 	else:
-		isDelimiter = False
+		printe("conceptColumnsDelimitByPOS is required")
 	return isDelimiter
 
 def isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, featureIndex):
@@ -324,5 +315,5 @@ def isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, feat
 		else:
 			isDelimiterProbabilistic = False
 	else:
-		isDelimiterProbabilistic = False
+		printe("conceptColumnsDelimitByPOS is required")
 	return isDelimiterProbabilistic

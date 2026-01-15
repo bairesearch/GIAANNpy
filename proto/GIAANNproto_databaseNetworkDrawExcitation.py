@@ -25,8 +25,6 @@ import GIAANNproto_sparseTensors
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_databaseNetworkExcitation
-if(trainInhibitoryNeurons):
-	import GIAANNproto_databaseNetworkDrawInhibition
 
 
 #if(drawDefault):
@@ -223,6 +221,8 @@ def getDelimiterFeatureColour(databaseNetworkObject, featureWord):
 			else:
 				if(featureIndex < len(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList) and databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList[featureIndex]):
 					delimiterColour = delimiterColourDeterministic
+	else:
+		printe("conceptColumnsDelimitByPOS is required")
 	return delimiterColour
 
 def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=None):
@@ -256,8 +256,6 @@ def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=
 		global globalFeatureNeurons
 
 	excitatoryNodeMap = drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, drawRelationTypes, drawSegments, drawBranches, drawDelimiters, drawDefault, inferenceMode)
-	if(trainInhibitoryNeurons):
-		GIAANNproto_databaseNetworkDrawInhibition.drawInhibitoryFeatureNeurons(plt, G, sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, conceptIndexToLemma, drawSegments, excitatoryNodeMap)
 
 								
 	# Get positions and colors for drawing

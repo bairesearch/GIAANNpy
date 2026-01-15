@@ -22,9 +22,7 @@ import torch as pt
 from GIAANNproto_globalDefs import *
 import GIAANNproto_sparseTensors
 import GIAANNproto_sequenceConcepts
-if(trainInhibitoryNeurons):
-	import GIAANNproto_databaseNetworkTrainInhibition
-	import GIAANNproto_sequenceObservedColumnsInhibition
+
 	
 def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 	result = GIAANNproto_sequenceConcepts.processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens)
@@ -39,15 +37,6 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 
 	featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex)
 
-	if(trainInhibitoryNeurons):
-		inhibitoryResult = GIAANNproto_databaseNetworkTrainInhibition.processFeaturesInactiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex, featureConnectionsActive, featureConnectionsSegmentMask)
-		if(inhibitoryResult is not None):
-			featureNeuronsActiveInhibitory, featureNeuronsWordOrderInhibitory, featureNeuronsPosInhibitory, inhibitionBuffer, sequenceObservedInhibitoryNeurons = inhibitoryResult
-			if(sequenceObservedInhibitoryNeurons):
-				inhibitionBuffer.switchConnectionMode("input")
-				processFeaturesActiveTrain(inhibitionBuffer, featureNeuronsActiveInhibitory, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrderInhibitory, featureNeuronsPosInhibitory, featureNeuronsSegmentMask, sequenceIndex)
-				inhibitionBuffer.switchConnectionMode("output")
-			GIAANNproto_sequenceObservedColumnsInhibition.applySequenceUpdates(sequenceObservedColumns, inhibitionBuffer)
 	return True
 
 #first dim cs1 pertains to every concept node in sequence

@@ -433,3 +433,17 @@ MANUAL; - set maxSequenceLength=80 to reduce max GPU memory during train.
 MANUAL; - rename concept feature neuron to prime concept feature neuron (disambiguate with instance concept features).
  - add option inferenceOnlyRetainPredictedTargetObservedColumn - only load/evict one observed column per prediction step.
  - add option inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch - only retain currently predicted targets during beam search (else retains all predicted targets during beam search). If inferenceOnlyRetainPredictedTargetObservedColumn=True and inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch=False, it will clear all beam search targets after beam search is finished.
+
+---
+v1i (Codex IDE GPT-5.2-Codex):
+- add proto GIAANNproto1i1a - remove support for deprecated features:
+	MANUAL; - remove support for inferencePredictiveNetwork=True (predictive network)
+	MANUAL; - remove support for inferenceTrainPredictiveNetworkAllSequences=True
+	MANUAL; - remove support for inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=False
+	MANUAL; - remove support for conceptColumnsDelimitByConceptFeaturesStart=True/conceptColumnsDelimitByConceptFeaturesMid=True
+	MANUAL; - remove support for kcDynamic=True
+	MANUAL; - remove support for conceptColumnsDelimitByPOS=False
+	MANUAL; - remove support for SANIconceptNeurons=True (SANI concept neurons)
+	MANUAL; - remove support for useInhibitoryNeurons=True (inhibitory neurons)
+
+

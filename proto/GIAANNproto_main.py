@@ -38,8 +38,6 @@ import GIAANNproto_sparseTensors
 import GIAANNproto_databaseNetworkExcitation
 import GIAANNproto_databaseNetworkFilesExcitation
 import GIAANNproto_databaseNetworkDrawExcitation
-if(SANIconceptNeurons):
-	import GIAANNproto_sequenceSANIconceptNeurons
 import GIAANNproto_sequenceTokens
 import GIAANNproto_sequenceConcepts
 import GIAANNproto_sequenceObservedColumnsExcitation
@@ -62,49 +60,21 @@ def main():
 	if(usePOS):
 		GIAANNproto_sequenceTokens.loadPOSdatabase()
 	GIAANNproto_databaseNetworkFilesExcitation.initialiseDatabaseFiles()
-	ensurePredictiveInferenceDatabaseReady()
 	if(useInference):
-		if(inferenceTrainPredictiveNetworkAllSequences):
-			if(inferencePredictiveNetwork):
-				GIAANNproto_predictionNetwork.initialisePredictiveNetwork(databaseNetworkObject)
+		if(not inferenceTrainFirstSequences):
 			GIAANNproto_databaseNetworkExcitation.backupGlobalArrays(databaseNetworkObject)
-		else:
-			if(not inferenceTrainFirstSequences):
-				GIAANNproto_databaseNetworkExcitation.backupGlobalArrays(databaseNetworkObject)
-	if(SANIconceptNeurons):
-		GIAANNproto_sequenceSANIconceptNeurons.initialiseSANIconceptNeurons()
 		
 	for epochIndex in range(numberEpochs):
 		print("\nepochIndex = ", epochIndex)
 		# Start processing the dataset
 		sequenceCount = 0
-		if((useInference and not inferenceTrainPredictiveNetworkAllSequences) or debugSmallDataset):
+		if(useInference or debugSmallDataset):
 			processPrompt()
 		else:
 			processDataset(dataset)
-		
-	if(useInference and inferencePredictiveNetwork and inferenceTrainPredictiveNetworkAllSequences and inferenceSavePredictiveNetwork):
-		GIAANNproto_predictionNetwork.inferenceSavePredictiveNetwork()
-	if(SANIconceptNeurons):
-		GIAANNproto_sequenceSANIconceptNeurons.finaliseSANIconceptNeurons()
-
-def ensurePredictiveInferenceDatabaseReady():
-	if(useInference and inferenceTrainPredictiveNetworkAllSequences):
-		missingFiles = []
-		if not GIAANNproto_databaseNetworkFilesExcitation.pathExists(conceptColumnsDictFile):
-			missingFiles.append(conceptColumnsDictFile)
-		if not GIAANNproto_databaseNetworkFilesExcitation.pathExists(conceptFeaturesDictFile):
-			missingFiles.append(conceptFeaturesDictFile)
-		if missingFiles:
-			print("error: inferenceTrainPredictiveNetworkAllSequences expects the database network to have been trained with useInference=False on all sequences.")
-			print("missing database files:", ", ".join(missingFiles))
-			print("precondition: expects database network to have been completely trained (with !useInference on all sequences).")
-			raise SystemExit(1)
 
 def buildSequenceWithDelimiters(sequence, tokens):
-	if(not conceptColumnsDelimitByPOS):
-		delimiterTypes = ["non"] * len(tokens)
-	else:
+	if(conceptColumnsDelimitByPOS):
 		delimiterTypes = []
 		for tokenIndex, token in enumerate(tokens):
 			_, isDelimiterDeterministic, isDelimiterProbabilistic = GIAANNproto_sequenceConcepts.isFeaturePOSreferenceSetDelimiterType(token.word, token, tokens, tokenIndex)
@@ -116,6 +86,8 @@ def buildSequenceWithDelimiters(sequence, tokens):
 				delimiterTypes.append("C")	#concept
 			else:
 				delimiterTypes.append("")	#non
+	else:
+		printe("conceptColumnsDelimitByPOS is required")
 	sentenceWithDelimiters = " ".join(
 		f"{token.text} ({tokenIndex}:{delimiterTypes[tokenIndex]})"
 		for tokenIndex, token in enumerate(sequence)
@@ -179,7 +151,7 @@ def processArticle(text, articleIndex):
 	for sequenceIndex, sequence in enumerate(sequences):
 		sequenceRaw = sequencesRaw[sequenceIndex]
 		lastSequenceInPrompt = False
-		if(useInference and not inferenceTrainPredictiveNetworkAllSequences):
+		if(useInference):
 			if(inferenceTrainFirstSequences):
 				if(sequenceIndex == numberOfSequences-1):
 					print("\ninferenceTrainFirstSequences: executing inference:")
@@ -207,12 +179,8 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, lastSequ
 		if(not lowMem):
 			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_databaseNetworkExcitation.initialiseFeatureNeuronsGlobal(databaseNetworkObject.c, databaseNetworkObject.f)
 	if(useInference):
-		if(inferenceTrainPredictiveNetworkAllSequences):
-			if(not inferenceRetainActivationsAcrossMultipleSequences or sequenceIndex==0):	#or (articleIndex==0 and sequenceIndex==0)
-				GIAANNproto_databaseNetworkExcitation.restoreGlobalArrays(databaseNetworkObject)	#restore global arrays (reset activation and time etc properties between inferencePredictiveNetworkTrainAcrossMultipleSequences:articles/sequences)
-		else:
-			if(not inferenceTrainFirstSequences):
-				GIAANNproto_databaseNetworkExcitation.restoreGlobalArrays(databaseNetworkObject)	#reset activations so each prompt sequence is independent
+		if(not inferenceTrainFirstSequences):
+			GIAANNproto_databaseNetworkExcitation.restoreGlobalArrays(databaseNetworkObject)	#reset activations so each prompt sequence is independent
 	
 	databaseNetworkObject.articleIndexDebug = articleIndex
 	databaseNetworkObject.sequenceIndexDebug = sequenceIndex
@@ -221,7 +189,7 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, lastSequ
 	observedColumnsDict = {}  # key: lemma, value: ObservedColumn
 	observedColumnsSequenceWordIndexDict = {}  # key: sequence word index, value: ObservedColumn
 	
-	if(useInference and (inferenceTrainPredictiveNetworkAllSequences or lastSequenceInPrompt)):
+	if(useInference and lastSequenceInPrompt):
 		if(lastSequenceInPrompt):
 			if(numSeedTokens >= len(sequence)):
 				return
@@ -230,62 +198,54 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, lastSequ
 
 	# First pass: Extract words, lemmas, pos, tags, and update concept_columns_dict and c
 	conceptsFound, conceptMask = GIAANNproto_sequenceConcepts.firstPass(databaseNetworkObject, sequence)
-	
-	SANIconceptNeuronSequenceList = []
-	if(conceptsFound):
-		if(SANIconceptNeurons):
-			SANIconceptNeuronSequenceList = GIAANNproto_sequenceSANIconceptNeurons.generateSANIsequenceList(sequence, conceptMask, nlp)
-		else:
-			SANIconceptNeuronSequenceList.append(sequence)
 		
-	for sequence in SANIconceptNeuronSequenceList:
-		tokens = GIAANNproto_sequenceTokens.getTokens(sequence)
+	tokens = GIAANNproto_sequenceTokens.getTokens(sequence)
 
-		# When usePOS is enabled, detect all possible new features in the sequence
-		if not (useDedicatedFeatureLists):
-			GIAANNproto_sequenceConcepts.detectNewFeatures(databaseNetworkObject, tokens)
+	# When usePOS is enabled, detect all possible new features in the sequence
+	if not (useDedicatedFeatureLists):
+		GIAANNproto_sequenceConcepts.detectNewFeatures(databaseNetworkObject, tokens)
 
-		if(debugPrintTrainSequencePOS):
-			sentenceWithPOS = " ".join(f"{token.text} ({tokenIndex}:{token.pos_})" for tokenIndex, token in enumerate(sequence))
-			print(f"Processing sequenceCount: {sequenceCount}, {sentenceWithPOS}")	#article: {articleIndex}, sequence: {sequenceIndex}
-		if(debugPrintTrainSequenceDelimiters):
-			sentenceWithDelimiters = buildSequenceWithDelimiters(sequence, tokens)
-			print(f"Processing sequenceCount: {sequenceCount}, {sentenceWithDelimiters}")	#article: {articleIndex}, sequence: {sequenceIndex}
-		if(debugPrintTrainSequenceRaw):
-			print(sequenceRaw)
-		if(debugPrintTrainSequenceDefault):
-			print(f"Processing sequenceCount: {sequenceCount}, {sequence.text}")	#"{sequence.text}"	#"Processing sequenceCount: {sequenceCount}, {sequence.text}"	#article: {articleIndex}, sequence: {sequenceIndex}
+	if(debugPrintTrainSequencePOS):
+		sentenceWithPOS = " ".join(f"{token.text} ({tokenIndex}:{token.pos_})" for tokenIndex, token in enumerate(sequence))
+		print(f"Processing sequenceCount: {sequenceCount}, {sentenceWithPOS}")	#article: {articleIndex}, sequence: {sequenceIndex}
+	if(debugPrintTrainSequenceDelimiters):
+		sentenceWithDelimiters = buildSequenceWithDelimiters(sequence, tokens)
+		print(f"Processing sequenceCount: {sequenceCount}, {sentenceWithDelimiters}")	#article: {articleIndex}, sequence: {sequenceIndex}
+	if(debugPrintTrainSequenceRaw):
+		print(sequenceRaw)
+	if(debugPrintTrainSequenceDefault):
+		print(f"Processing sequenceCount: {sequenceCount}, {sequence.text}")	#"{sequence.text}"	#"Processing sequenceCount: {sequenceCount}, {sequence.text}"	#article: {articleIndex}, sequence: {sequenceIndex}
 
-		# Second pass: Create observed_columns_dict
-		observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNproto_sequenceConcepts.secondPass(databaseNetworkObject, tokens)
+	# Second pass: Create observed_columns_dict
+	observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNproto_sequenceConcepts.secondPass(databaseNetworkObject, tokens)
 
-		# Create the sequence observed columns object
-		sequenceObservedColumns = GIAANNproto_sequenceObservedColumnsExcitation.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict)
+	# Create the sequence observed columns object
+	sequenceObservedColumns = GIAANNproto_sequenceObservedColumnsExcitation.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict)
 
-		if(useInference and (inferenceTrainPredictiveNetworkAllSequences or lastSequenceInPrompt)):
-			if(conceptColumnsDelimitByPOS and sequenceObservedColumns.noDelimiterDetectedBetweenConceptTokens):
-				print("warning: inference skipped due to missing concept column delimiter detection in sequence")
-			else:
-				# Process each concept word in the sequence (predict)
-				GIAANNproto_prediction.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens)
+	if(useInference and lastSequenceInPrompt):
+		if(conceptColumnsDelimitByPOS and sequenceObservedColumns.noDelimiterDetectedBetweenConceptTokens):
+			print("warning: inference skipped due to missing concept column delimiter detection in sequence")
 		else:
-			# Process each concept word in the sequence (train)
-			trained = GIAANNproto_databaseNetworkTrainExcitation.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)
-			if(trained):
-				# Update observed columns from sequence observed columns
-				sequenceObservedColumns.updateObservedColumnsWrapper()
+			# Process each concept word in the sequence (predict)
+			GIAANNproto_prediction.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens)
+	else:
+		# Process each concept word in the sequence (train)
+		trained = GIAANNproto_databaseNetworkTrainExcitation.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)
+		if(trained):
+			# Update observed columns from sequence observed columns
+			sequenceObservedColumns.updateObservedColumnsWrapper()
 
-				# Save observed columns to disk
-				if(useSaveData):
-					GIAANNproto_databaseNetworkFilesExcitation.saveData(databaseNetworkObject, observedColumnsDict)
-					
-				if(drawNetworkDuringTrain):
-					# Visualize the complete graph every time a new sequence is parsed by the application.
-					GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumns, False, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+generateDrawSequenceIndex(sequenceIndex))
+			# Save observed columns to disk
+			if(useSaveData):
+				GIAANNproto_databaseNetworkFilesExcitation.saveData(databaseNetworkObject, observedColumnsDict)
 
-		if(debugDeleteGPUcache):
-			if(pt.cuda.is_available()):
-				pt.cuda.empty_cache()
+			if(drawNetworkDuringTrain):
+				# Visualize the complete graph every time a new sequence is parsed by the application.
+				GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumns, False, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+generateDrawSequenceIndex(sequenceIndex))
+
+	if(debugDeleteGPUcache):
+		if(pt.cuda.is_available()):
+			pt.cuda.empty_cache()
 
 	# Break if we've reached the maximum number of sequences
 	sequenceCount += 1

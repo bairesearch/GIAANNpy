@@ -118,10 +118,6 @@ The prompt_inference.txt provided is taken from the first sentences from the fir
 * set multipleDendriticBranches=True to support cases where a trained sequence has repeated references to a column feature 
 * set randomlyAssignBranches to support increasingly conflicting reuse of phrases throughout dataset
 
-#### Inhibitory neurons
-
-* Deprecated - inhibition is already simulated during topk selection during inference
-
 #### Array properties
 
 * set arrayIndexPropertiesEfficient=True to reduce train time/RAM (not compatible with drawRelationTypes)
@@ -148,18 +144,10 @@ The prompt_inference.txt provided is taken from the first sentences from the fir
 * set inferenceBeamWidth - width of beam search
 * set inferenceBeamDepth - depth of beam search
 
-#### SANI concept neuron
-
-* Deprecated - execute preprocessor to allocate neurons to non-noun tuples for each concept
-
 #### Inference
 
 Settings for inference. See:
 * inferenceConnectionsStrengthBoolean, inferenceSegmentActivationsBoolean, inferenceSourceActivationsBoolean
-
-#### Predictive network
-
-* Deprecated - maintain separate neural network for prediction phase
 
 #### Train optimisations
 

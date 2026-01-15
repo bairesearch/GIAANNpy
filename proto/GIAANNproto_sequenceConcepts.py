@@ -163,7 +163,7 @@ def isFeaturePOSreferenceSetDelimiterType(nodeNameString, token, tokens, tokenIn
 			isDelimiterProbabilistic = detectProbabilisticReferenceSetDelimiterBetweenNouns(nodeWordLower, token, tokens, tokenIndex)
 		isDelimiter = isDelimiterDeterministic or isDelimiterProbabilistic
 	else:
-		isDelimiter = False
+		printe("conceptColumnsDelimitByPOS is required")
 	return isDelimiter, isDelimiterDeterministic, isDelimiterProbabilistic
 
 
@@ -328,20 +328,8 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 					endIndices[conceptPosition] = delimiterIndex + 1
 					startIndices[conceptPosition + 1] = delimiterIndex + 1
 			conceptIndices = conceptIndicesSorted
-	elif(conceptColumnsDelimitByConceptFeaturesStart):
-		if usePOS:
-			startIndices = (conceptIndices).clamp(min=0)
-			endIndices = (conceptIndices + distToNextConcept).clamp(max=len(sequence))
-		else:
-			startIndices = (conceptIndices).clamp(min=0)
-			endIndices = (conceptIndices + q + 1).clamp(max=len(sequence))	
-	elif(conceptColumnsDelimitByConceptFeaturesMid):
-		if usePOS:
-			startIndices = (conceptIndices - distToPrevConcept + 1).clamp(min=0)
-			endIndices = (conceptIndices + distToNextConcept).clamp(max=len(sequence))
-		else:
-			startIndices = (conceptIndices - q).clamp(min=0)
-			endIndices = (conceptIndices + q + 1).clamp(max=len(sequence))
+	else:
+		printe("conceptColumnsDelimitByPOS is required")
 	
 	sentenceWithConceptAssignment = buildSequenceConceptAssignment(sequenceObservedColumns, sequence, tokens, conceptIndices, startIndices, endIndices)
 	if(debugPrintTrainSequenceConceptAssignment):

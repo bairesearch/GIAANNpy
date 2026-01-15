@@ -607,24 +607,18 @@ def prepareBeamNodes(databaseNetworkObject, nodes, conceptActivationState, const
 	return preparedNodes, connectionSum
 
 def nodesContainReferenceSetDelimiter(databaseNetworkObject, nodes):
-	if(not conceptColumnsDelimitByPOS):
-		return False
 	for nodeColumn, nodeFeature in nodes:
 		if(GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, nodeFeature)):
 			return True
 	return False
 
 def nodesContainProbabilisticReferenceSetDelimiter(databaseNetworkObject, nodes):
-	if(not conceptColumnsDelimitByPOS or not detectReferenceSetDelimitersBetweenNouns):
-		return False
 	for nodeColumn, nodeFeature in nodes:
 		if(GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, nodeFeature)):
 			return True
 	return False
 
 def updateConstraintStateAfterNodes(databaseNetworkObject, previousConstraintState, nodes):
-	if(not conceptColumnsDelimitByPOS):
-		return None
 	if(len(nodes) == 0):
 		return previousConstraintState
 	newColumns = set(nodeColumn for nodeColumn, _ in nodes)
