@@ -118,8 +118,8 @@ useSANI = True	#default: True	#orig: False	#sequentially activated neuronal inpu
 #Immediate (direct) connections;
 enforceDirectConnections = True	#default: True	#orig: False	#prediction requires a direct connection from previous prediction as observed during training (ie adjacent tokens)
 if(enforceDirectConnections):
-	enforceDirectConnectionsSANI = True	#default: False #orig: False	#enforce activation of first segment (direct feature connection)
-	enforceDirectConnectionsMinWordDistance = False	#default: True #orig: True	#enforce min word distance (=1) during inference
+	enforceDirectConnectionsSANI = True	#default: True #orig: False	#enforce activation of first segment (direct feature connection)
+	enforceDirectConnectionsMinWordDistance = False	#default: False #orig: True	#enforce min word distance (=1) during inference
 else:
 	enforceDirectConnectionsSANI = False
 	enforceDirectConnectionsMinWordDistance = False
@@ -133,6 +133,7 @@ if(enforceDirectConnectionsMinWordDistance):
 else:
 	arrayIndexPropertiesMinWordDistance = False	#optional	#default: False
 minimumPredictionActivationThreshold = 0.0	#explicit threshold application not required (for verification only)
+predictionEnsureConnectedToPreviousPrediction = True	#default: True	#ensure every new prediction connects to previous node (requirement is independent of enforceDirectConnections)
 
 
 #Concept column delimiters:
@@ -147,10 +148,9 @@ if(conceptColumnsDelimitByPOS):
 		detectReferenceSetDelimitersBetweenNounsPOStypes = ['CCONJ', 'SCONJ']	#probabilistic reference set delimiters (GIA logical conditions) - only assign if they are detected inbetween nouns (without intermediate deterministic delimiters)
 		detectReferenceSetDelimitersBetweenNounsWordTypes = ['is', 'are', ',', '(']	#eg a dog is an animal / dogs are animals	#'-'
 		detectReferenceSetDelimitersBetweenNounsTagTypes = []
-	predictionColumnsMustActivateConceptFeature = True	#default: True	#orig: False
+	predictionColumnsMustActivateConceptFeature = False	#default: False	#orig: False
 	pretrainCombineConsecutiveNouns = True #default: True	#orig: False
 	pretrainCombineHyphenatedNouns = True	#default: True	#orig: False
-	predictionEnsureConnectedToPreviousPrediction = True	#default: True	#ensure every new prediction connects to previous node
 
 
 #Connection strength modifiers;
@@ -196,7 +196,6 @@ if(useInference):
 		inferenceSourceActivationsBoolean = True	#default: True	#orig: False (theoretically effectively True)
 
 	inferenceSeedNetwork = True	#default: True
-	inferenceBurstAllPredictionsOrTargetsInSequence = False	#default: False	#orig: False
 else:
 	inferenceActivationFunction = False
 if(useInference):
@@ -334,7 +333,6 @@ featureIndexPrimeConceptNeuron = 0
 
 #Inference prediction selection;
 if(useInference):
-	inferenceInvertNeuronActivationUponPrediction = False
 	inferenceDeactivateNeuronsUponPrediction = True	#default: True
 	inferenceDecrementActivations = False	#default: False - CHECKTHIS #orig: False
 	if(inferenceDecrementActivations):
@@ -348,6 +346,7 @@ if(useInference):
 	kcNetwork = 1	#number of topk columns to target
 	kcMax = 1 	#topk next concept column prediction
 	kf = 1
+	assert kcNetwork==1 and kf==1 and kcMax==1, "multiple prediction column/feature pairs not supported"
 	assert not lowMem, "useInference: global feature neuron lists are required" 
 	assert useSaveData,  "useInference: useSaveData is required" 
 

@@ -451,4 +451,7 @@ MANUAL; - remove beamSearchPredictNextFeature():debugBeamSearchFallback (selectM
 - patch inferenceOnlyRetainPredictedTargetObservedColumn for inferenceTrainFirstSequences=True
 - rename lastSequenceInPrompt to inferenceSequenceInPrompt
 MANUAL; - update beamSearchSelectSingleStepFeature/beamSearchPredictNextFeature to only return prediction targets
+MANUAL; - disable redundant option predictionColumnsMustActivateConceptFeature
+MANUAL; - remove option inferenceInvertNeuronActivationUponPrediction
+MANUAL; - remove option inferenceBurstAllPredictionsOrTargetsInSequence
 
