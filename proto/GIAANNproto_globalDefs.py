@@ -53,6 +53,7 @@ databaseFolder = "../database/"	#default: "../database/"	#performance: "/media/u
 trainMaxSequences = 5000		#dev: 10, 500, 5000, 10000 	#default: 100000000	  #adjust as needed	#max sequences for train
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
+datasetsLibrary4plus = False
 
 
 #Multisentence predictions;

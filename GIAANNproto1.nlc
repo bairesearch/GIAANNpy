@@ -454,4 +454,4 @@ MANUAL; - update beamSearchSelectSingleStepFeature/beamSearchPredictNextFeature 
 MANUAL; - disable redundant option predictionColumnsMustActivateConceptFeature
 MANUAL; - remove option inferenceInvertNeuronActivationUponPrediction
 MANUAL; - remove option inferenceBurstAllPredictionsOrTargetsInSequence
-
+MANUAL; - add option datasetsLibrary4plus

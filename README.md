@@ -21,7 +21,7 @@ pip install networkx
 pip install matplotlib
 pip install torch
 pip install spacy
-pip install "datasets<3" "fsspec==2024.6.1" "gcsfs==2024.6.1"
+pip install "datasets<4" "fsspec==2024.6.1" "gcsfs==2024.6.1"
 python -m spacy download spacyModelName (default:en_core_web_trf, orig: en_core_web_sm)
 pip install nltk
 ```
