@@ -456,3 +456,4 @@ MANUAL; - remove option inferenceInvertNeuronActivationUponPrediction
 MANUAL; - remove option inferenceBurstAllPredictionsOrTargetsInSequence
 MANUAL; - add option datasetsLibrary4plus
 MANUAL; - add option useSpacyForConceptNounPOSdetection=False - update isConcept() to use GIAANNproto_sequencePOS predetermined word-POS dictionaries for pos detection
+- patch remove support for SANIconceptNeurons=True - reintroduce the missing conceptsFound guard so sequences with no concept tokens are skipped before building SequenceObservedColumns
