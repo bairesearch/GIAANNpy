@@ -195,11 +195,14 @@ Settings for inference. See:
 * algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive" - only activate neuron if last segment active.
 * enforceSequentialActivation - only activate a segment if previous segment was active.
 
+#### POS
+
+* useSpacyForConceptNounPOSdetection - use spacy for prime concept feature identification (dynamic context dependent pos detection), else use GIAANNproto_sequencePOS.
+* 'reference set delimiter' identification (token column assignment) uses predetermined word-POS dictionary (GIAANNproto_sequencePOS).
+
 ### Limitations
 
-GIAANN proto currently uses various NLP POS tools for a) prime concept feature identification and b) 'reference set delimiter' identification (token column assignment) - see word-POS dictionary generation (GIAANNproto_sequencePOS). These may rely on classical machine learning technology, although can be replaced with a more rudimentary algorithm.
-
-Current implementation experiences significant slow-down and RAM usage during inference as the size of the trained database network increases (due to SSD data i/o and sparse tensor hardware acceleration limitations).
+Current implementation experiences significant slow-down during inference as the size of the trained database network increases (due to SSD data i/o and sparse tensor hardware acceleration limitations).
 
 ### References
 

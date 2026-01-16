@@ -124,7 +124,7 @@ if(pretrainCombineConsecutiveNouns):
 			preprocessedTokens.append(createCombinedToken(buffer))
 			buffer = []
 		for token in sequence.tokens:
-			if(token.pos_ in nounPos):
+			if(isConcept(token, pretrain=True)):
 				buffer.append(token)
 			else:
 				flush_buffer()
@@ -173,7 +173,7 @@ if(pretrainCombineHyphenatedNouns):
 		sequenceTokens = sequence.tokens
 		sequenceTokenCount = len(sequenceTokens)
 		for tokenIndex, token in enumerate(sequenceTokens):
-			if(token.pos_ in nounPos):
+			if(isConcept(token, pretrain=True)):
 				if(len(buffer) > 0):
 					if(pendingJoiner is None):
 						bufferJoiners.append("_")
@@ -181,7 +181,7 @@ if(pretrainCombineHyphenatedNouns):
 						bufferJoiners.append(pendingJoiner)
 					pendingJoiner = None
 				buffer.append(token)
-			elif(isHyphenToken(token) and len(buffer) > 0 and tokenIndex + 1 < sequenceTokenCount and sequenceTokens[tokenIndex + 1].pos_ in nounPos):
+			elif(isHyphenToken(token) and len(buffer) > 0 and tokenIndex + 1 < sequenceTokenCount and isConcept(sequenceTokens[tokenIndex + 1], pretrain=True)):
 				pendingJoiner = "-"
 			else:
 				flush_buffer()
@@ -223,10 +223,27 @@ if(pretrainCombineHyphenatedNouns):
 			result = True
 		return result
 
-def isConcept(token):
+def isConcept(token, pretrain=False):
 	result = False
-	if token.pos in nounPos:
-		result = True
-	if token.tag in nounTags:
-		result = True
+	if(pretrain):
+		tokenPos = token.pos_
+		tokenWord = token.text.lower()
+		tokenLemma = token.lemma_
+	else:
+		tokenPos = token.pos
+		tokenWord = token.word
+		tokenLemma = token.lemma
+	if(useSpacyForConceptNounPOSdetection):
+		if tokenPos in nounPos:
+			result = True
+		#if tokenPos in nounTags:
+		#	result = True
+	else:
+		nounNounCandidateDetected = False
+		if(GIAANNproto_sequencePOS.isWordEverInPOStypeList(tokenWord, nonNounPos)):
+			nounNounCandidateDetected = True
+		elif(tokenLemma is not None and GIAANNproto_sequencePOS.isWordEverInPOStypeList(tokenLemma, nonNounPos)):
+			nounNounCandidateDetected = True
+		if(not nounNounCandidateDetected):
+			result = True
 	return result

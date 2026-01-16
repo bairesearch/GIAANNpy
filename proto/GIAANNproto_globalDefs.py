@@ -475,11 +475,13 @@ arrayType = pt.float32	#pt.long	#pt.float32
 
 
 #POS;
+useSpacyForConceptNounPOSdetection = True	#orig: True	#False: use GIAANNproto_sequencePOS predetermined word-POS dictionaries for all pos detection (never use spacy dynamically assigned pos tags)
 spacyModelName = 'en_core_web_trf'	#orig: 'en_core_web_sm'
 # Define POS tag sets for nouns and non-nouns
 nounPos = {'NOUN', 'PROPN'}
-#nonNounPos = {'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'SCONJ', 'SYM', 'X'}	#now invalid as nounTags can be a subset of these (e.g. PRON: 'PRP', 'WP')
-nounTags = {}	#{'PRP', 'WP'}
+nonNounPos = {'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'PUNCT', 'SCONJ', 'SYM', 'X'}	#incomplete as nounTags can be a subset of these (e.g. PRON: 'PRP', 'WP')
+#nounTags = {}	#{'PRP', 'WP'}
+
 def posIntToPosString(nlp, posInt):
 	if posInt in nlp.vocab.strings:
 		return nlp.vocab[posInt].text
