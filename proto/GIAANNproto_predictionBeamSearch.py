@@ -18,6 +18,7 @@ GIA ANN proto prediction Beam Search
 """
 
 import torch as pt
+import time
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_databaseNetworkExcitation
@@ -25,13 +26,14 @@ import GIAANNproto_sparseTensors
 import GIAANNproto_predictionActivate
 import GIAANNproto_predictionConstraints
 
+
 def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, conceptActivationState=None, connectedColumnsConstraint=None, connectedColumnsFeatures=None):
 	#generate targets for debug/analysis output
 	targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 
 	strengthLookup = None
 	if(globalFeatureNeuronsStrength is not None):
-		strengthLookup = buildStrengthLookup(globalFeatureNeuronsStrength, databaseNetworkObject.f)
+		strengthLookup = buildStrengthLookup(databaseNetworkObject, globalFeatureNeuronsStrength, databaseNetworkObject.f)
 	sequenceColumnIndex = None
 	if(inferenceUseNeuronFeaturePropertiesTime):
 		if(useSANIcolumns or useSANIfeaturesAndColumns):
@@ -102,12 +104,11 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 def beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, conceptActivationState=None, connectedColumnsConstraint=None, connectedColumnsFeatures=None):
 	#single-step beam candidate selection (no beam depth expansion)
 	targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
-	errorMessage = None
 	result = None
 
 	strengthLookup = None
-	if(globalFeatureNeuronsStrength is not None):
-		strengthLookup = buildStrengthLookup(globalFeatureNeuronsStrength, databaseNetworkObject.f)
+	if(globalFeatureNeuronsStrength is not None and not inferenceStrengthLookupBypass):
+		strengthLookup = buildStrengthLookup(databaseNetworkObject, globalFeatureNeuronsStrength, databaseNetworkObject.f)
 	sequenceColumnIndex = None
 	if(inferenceUseNeuronFeaturePropertiesTime):
 		if(useSANIcolumns or useSANIfeaturesAndColumns):
@@ -295,6 +296,8 @@ def filterCandidatesByActivationThreshold(columnIndices, featureIndices, activat
 
 def selectBeamCandidates(stateFeatures, stateTime, strengthLookup, candidateLimit, databaseNetworkObject, constraintState=None, conceptActivationState=None, connectedColumnsTensor=None, connectedColumnsFeatures=None, sequenceWordIndex=None, sequenceColumnIndex=None):
 	candidateLimit = max(1, candidateLimit)
+	debugTimeStart = None
+	debugTimeLast = None
 	if(inferenceUseNeuronFeaturePropertiesTime):
 		# spec step (b): apply time-based activation modifier during beam candidate selection
 		stateFeatures = GIAANNproto_predictionActivate.applyTimeBasedActivationModifier(stateFeatures, stateTime, sequenceWordIndex, sequenceColumnIndex)
@@ -308,7 +311,8 @@ def selectBeamCandidates(stateFeatures, stateTime, strengthLookup, candidateLimi
 	columnIndices, featureIndices, activationValues = GIAANNproto_predictionConstraints.filterColumnFeatureCandidatesByConnectedColumns(columnIndices, featureIndices, activationValues, connectedColumnsTensor, connectedColumnsFeatures)
 	if(columnIndices is None):
 		return []
-	return selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, databaseNetworkObject.f, databaseNetworkObject, constraintState, conceptActivationState)
+	candidates = selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, databaseNetworkObject.f, databaseNetworkObject, constraintState, conceptActivationState)
+	return candidates
 
 def filterCandidatesByLastSegment(columnIndices, featureIndices, activationValues, stateFeatures, maxFeatures):
 	filteredColumns = columnIndices
@@ -613,16 +617,39 @@ def convertNodesToPrediction(nodes):
 	conceptColumnsFeatureIndicesNext = pt.tensor(conceptColumnsFeatureIndicesNextList, dtype=pt.long).unsqueeze(1)
 	return conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext
 
-def buildStrengthLookup(globalFeatureNeuronsStrength, maxFeatures):
+def buildStrengthLookup(databaseNetworkObject, globalFeatureNeuronsStrength, maxFeatures):
+	strengthLookup = None
+	if(inferenceStrengthLookupCache):
+		if(databaseNetworkObject is None):
+			raise RuntimeError("buildStrengthLookup: databaseNetworkObject is None")
+		cacheValid = False
+		if(hasattr(databaseNetworkObject, "strengthLookupCache") and hasattr(databaseNetworkObject, "strengthLookupMaxFeatures") and hasattr(databaseNetworkObject, "strengthLookupMaxColumns")):
+			if(databaseNetworkObject.strengthLookupCache is not None and databaseNetworkObject.strengthLookupMaxFeatures == maxFeatures and databaseNetworkObject.strengthLookupMaxColumns == databaseNetworkObject.c):
+				cacheValid = True
+		if(cacheValid):
+			strengthLookup = databaseNetworkObject.strengthLookupCache
+		else:
+			strengthLookup = buildStrengthLookupInternal(globalFeatureNeuronsStrength, maxFeatures)
+			databaseNetworkObject.strengthLookupCache = strengthLookup
+			databaseNetworkObject.strengthLookupMaxFeatures = maxFeatures
+			databaseNetworkObject.strengthLookupMaxColumns = databaseNetworkObject.c
+	else:
+		strengthLookup = buildStrengthLookupInternal(globalFeatureNeuronsStrength, maxFeatures)
+	return strengthLookup
+
+def buildStrengthLookupInternal(globalFeatureNeuronsStrength, maxFeatures):
+	strengthLookup = None
+	columnIndices = None
+	featureIndices = None
+	values = None
 	columnIndices, featureIndices, values = GIAANNproto_predictionConstraints.aggregateSparseColumnFeatureValues(globalFeatureNeuronsStrength, maxFeatures)
-	if(columnIndices is None):
-		return None
-	strengthLookup = {}
-	for idx in range(columnIndices.shape[0]):
-		columnIndex = columnIndices[idx].item()
-		featureIndex = featureIndices[idx].item()
-		key = columnIndex * maxFeatures + featureIndex
-		strengthLookup[key] = values[idx].item()
+	if(columnIndices is not None):
+		strengthLookup = {}
+		for idx in range(columnIndices.shape[0]):
+			columnIndex = columnIndices[idx].item()
+			featureIndex = featureIndices[idx].item()
+			key = columnIndex * maxFeatures + featureIndex
+			strengthLookup[key] = values[idx].item()
 	return strengthLookup
 
 def getConnectionValue(strengthLookup, columnIndex, featureIndex, maxFeatures):

@@ -18,6 +18,7 @@ GIA ANN proto prediction
 """
 
 import torch as pt
+import time
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_databaseNetworkExcitation
@@ -148,7 +149,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	print("processConceptWordsInference:")
 
 	sequenceWordIndex = 0
-	
+
 	tokensSequence = GIAANNproto_sequenceTokens.getTokens(sequence)
 	conceptMask, conceptIndices, numberConcepts = GIAANNproto_sequenceConcepts.createConceptMask(sequenceObservedColumns, tokensSequence)
 
@@ -201,6 +202,8 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	
 	#intialise function variables;
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
+	debugTimeStart = None
+	debugTimeLast = None
 	if(conceptColumnIndex is None or conceptColumnFeatureIndex is None):
 		raise RuntimeError("processColumnInferencePrediction error: expected single concept/feature prediction pair")
 	conceptColumnIndexTensor = pt.tensor([int(conceptColumnIndex)], dtype=pt.long)
@@ -443,7 +446,4 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	if(drawNetworkDuringInferencePredict):
 		#FUTURE: convert globalFeatureNeuronsActivation back to globalFeatureNeurons for draw
 		GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumnsPrediction, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+generateDrawSequenceIndex(sequenceWordIndex))
-	
 	return featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState
-
-

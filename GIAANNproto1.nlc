@@ -459,3 +459,5 @@ MANUAL; - add option useSpacyForConceptNounPOSdetection=False - update isConcept
 - patch remove support for SANIconceptNeurons=True - reintroduce the missing conceptsFound guard so sequences with no concept tokens are skipped before building SequenceObservedColumns
 - add option combineSparseUpdatesPerSequence - updateObservedColumnsEfficient combines sparse updates per sequence instead of per column (reduces calls to coalesce)
 - add saveGlobalFeatureNeuronsRate - only save the globalFeatureNeurons every x sequences
+- add option inferenceStrengthLookupCache - cache strength lookup during inference
+- add option inferenceStrengthLookupBypass - bypass cache strength lookup during inference (when inferenceBeamSearch=False)

@@ -200,10 +200,6 @@ Settings for inference. See:
 * useSpacyForConceptNounPOSdetection - use spacy for prime concept feature identification (dynamic context dependent pos detection), else use GIAANNproto_sequencePOS.
 * 'reference set delimiter' identification (token column assignment) uses predetermined word-POS dictionary (GIAANNproto_sequencePOS).
 
-### Limitations
-
-Current implementation experiences significant slow-down during inference as the size of the trained database network increases (due to SSD data i/o and sparse tensor hardware acceleration limitations).
-
 ### References
 
 * General Artificial Intelligence Method and Computer System (AU provisional) - 28 Mar 2012 (App No. 2012901230) - [Text](https://sourceforge.net/projects/opengia/files/algorithm/BAI_GeneralAIPatentAUProv1b_TextOnly_9Mar2012.pdf)/[Figures](https://sourceforge.net/projects/opengia/files/algorithm/BAI_GeneralAIPatentAUProv1b_FiguresOnly_9Mar2012.pdf)

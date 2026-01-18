@@ -71,6 +71,9 @@ if(useInference):
 else:
 	useGPUsparse = True		#default: True	#orig: False	#slight performance increase during train (does not use significant additional GPU ram during train)
 useGPUsparseStrict = True	#orig: False	#enforce strict sparse device during transfer to/from dense tensors
+
+
+#Optimisations;
 inferenceOnlyRetainPredictedTargetObservedColumn = False	#default: False	#orig: False	#load/evict one observed column per prediction step	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
 inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch = False	#default: False	#orig: False	#True: retain only current beam-search target(s); False: retain all beam-search targets	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
 
@@ -110,7 +113,6 @@ else:
 	arrayIndexPropertiesPos = True
 arrayIndexPropertiesActivationCreate = arrayIndexPropertiesActivation or useInference
 arrayIndexPropertiesTimeCreate = arrayIndexPropertiesTime or inferenceUseNeuronFeaturePropertiesTime
-combineSparseUpdatesPerSequence = True	#updateObservedColumnsEfficient combines sparse updates per sequence instead of per column (reduces calls to coalesce) 
 
 
 #SANI;
@@ -177,8 +179,19 @@ if(useInference):
 	inferenceBeamInstancePreferActiveNodeCounts = False		  #optional: prioritise columns with more active nodes (count-based)
 	inferenceBeamInstancePreferInternalConnectivity = False      #optional: prioritise columns with stronger internal connectivity between active nodes
 	inferenceBeamInstancePreferAdjacentOverlap = False           #optional: prioritise columns sharing active features with adjacent columns
-	inferenceBeamWidth = 3	#orig: 3
-	inferenceBeamDepth = 3	#orig: 6
+	inferenceBeamWidth = 3	#default: 3	#orig: 3
+	inferenceBeamDepth = 3	#default: 3	#orig: 6
+	#optimisations;
+	inferenceStrengthLookupCache = True	#default: True	#orig: False	#cache strength lookup during inference
+	if(inferenceBeamSearch):
+		inferenceStrengthLookupBypass = False	#mandatory: False
+	else:
+		inferenceStrengthLookupBypass = True	#default: True	#bypass cache strength lookup during inference
+	if(inferenceStrengthLookupBypass):
+		assert not inferenceBeamSearch, "beamSearchSelectSingleStepFeature: inferenceStrengthLookupBypass requires inferenceBeamSearch=False"
+		assert inferenceBeamScoreStrategy == "nodeActivation", "beamSearchSelectSingleStepFeature: inferenceStrengthLookupBypass requires inferenceBeamScoreStrategy='nodeActivation'"
+		assert not inferenceBeamInstancePreferInternalConnectivity, "beamSearchSelectSingleStepFeature: inferenceStrengthLookupBypass requires connectivity inferenceBeamInstancePreferInternalConnectivity disabled"
+		assert not inferenceBeamInstancePreferAdjacentOverlap, "beamSearchSelectSingleStepFeature: inferenceStrengthLookupBypass requires connectivity inferenceBeamInstancePreferAdjacentOverlap disabled"
 
 
 #Inference;
@@ -200,6 +213,7 @@ if(useInference):
 	inferenceSeedNetwork = True	#default: True
 else:
 	inferenceActivationFunction = False
+	inferenceStrengthLookupCache = False
 if(useInference):
 	useMaxSequences = False	#False: use all sequences from inference_prompt.txt
 else:
@@ -214,6 +228,7 @@ else:
 	lowMem = False		 #default: False	#orig: True	#currently required to be False for inference compatibility	#optional
 trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
 trainSequenceObservedColumnsMatchSequenceWords = True	#mantatory		#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
+combineSparseUpdatesPerSequence = True	#default: True	#orig: False	#updateObservedColumnsEfficient combines sparse updates per sequence instead of per column (reduces calls to coalesce) 
 
 
 #Draw;
