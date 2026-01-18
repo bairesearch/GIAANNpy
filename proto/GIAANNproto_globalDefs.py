@@ -180,7 +180,7 @@ if(useInference):
 	inferenceBeamInstancePreferInternalConnectivity = False      #optional: prioritise columns with stronger internal connectivity between active nodes
 	inferenceBeamInstancePreferAdjacentOverlap = False           #optional: prioritise columns sharing active features with adjacent columns
 	inferenceBeamWidth = 3	#default: 3	#orig: 3
-	inferenceBeamDepth = 3	#default: 3	#orig: 6
+	inferenceBeamDepth = 6	#default: 3	#orig: 6
 	#optimisations;
 	inferenceStrengthLookupCache = True	#default: True	#orig: False	#cache strength lookup during inference
 	if(inferenceBeamSearch):

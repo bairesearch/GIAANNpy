@@ -34,22 +34,29 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 	strengthLookup = None
 	if(globalFeatureNeuronsStrength is not None):
 		strengthLookup = buildStrengthLookup(databaseNetworkObject, globalFeatureNeuronsStrength, databaseNetworkObject.f)
-	sequenceColumnIndex = None
-	if(inferenceUseNeuronFeaturePropertiesTime):
-		if(useSANIcolumns or useSANIfeaturesAndColumns):
-			sequenceColumnIndex = GIAANNproto_predictionActivate.calculateSequenceColumnIndex(conceptMask, sequenceWordIndex)
 	initialConstraintState = GIAANNproto_predictionConstraints.createConstraintState(allowedColumns, constraintMode)
 	initialState = initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState)
 	beams = [{"score": 0.0, "state": initialState, "sequence": [], "constraintState": initialConstraintState, "connectedColumns": connectedColumnsConstraint, "connectedColumnsFeatures": connectedColumnsFeatures}]
 	completedBeams = []
 	beamDepth = max(1, inferenceBeamDepth)
 	beamWidthLimit = max(1, inferenceBeamWidth)
+	tokensSequenceLength = len(tokensSequence)
+	if(sequenceWordIndex < 0 or sequenceWordIndex >= tokensSequenceLength):
+		raise RuntimeError("beamSearchPredictNextFeature error: sequenceWordIndex out of range")
+	remainingTokens = tokensSequenceLength - sequenceWordIndex
+	if(remainingTokens < beamDepth):
+		beamDepth = remainingTokens
 	result = None
 
 	for depthIndex in range(beamDepth):
+		depthSequenceWordIndex = sequenceWordIndex + depthIndex
+		depthSequenceColumnIndex = None
+		if(inferenceUseNeuronFeaturePropertiesTime):
+			if(useSANIcolumns or useSANIfeaturesAndColumns):
+				depthSequenceColumnIndex = GIAANNproto_predictionActivate.calculateSequenceColumnIndex(conceptMask, depthSequenceWordIndex)
 		newBeams = []
 		for beam in beams:
-			candidates = selectBeamCandidates(beam["state"]["features"], beam["state"].get("time"), strengthLookup, beamWidthLimit, databaseNetworkObject, beam.get("constraintState"), beam["state"].get("conceptActivations"), beam.get("connectedColumns"), beam.get("connectedColumnsFeatures"), sequenceWordIndex, sequenceColumnIndex)
+			candidates = selectBeamCandidates(beam["state"]["features"], beam["state"].get("time"), strengthLookup, beamWidthLimit, databaseNetworkObject, beam.get("constraintState"), beam["state"].get("conceptActivations"), beam.get("connectedColumns"), beam.get("connectedColumnsFeatures"), depthSequenceWordIndex, depthSequenceColumnIndex)
 			if(len(candidates) == 0):
 				completedBeams.append(beam)
 				continue
@@ -60,7 +67,7 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 				oldState = beam["state"]
 				newState = cloneBeamActivationState(oldState)
 				for nodeColumn, nodeFeature in candidate["nodes"]:
-					executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, newState, nodeColumn, nodeFeature, sequenceWordIndex, sequenceColumnIndex)
+					executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, newState, nodeColumn, nodeFeature, depthSequenceWordIndex, depthSequenceColumnIndex)
 				newSequence = beam["sequence"] + [candidate]
 				activationGain = computeCandidateActivationGain(newState["features"], oldState["features"], candidate["nodes"])
 				if(inferenceBeamScoreStrategy == "nodeActivation"):
@@ -84,7 +91,10 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 		allBeams = beams + completedBeams
 		if(len(allBeams) == 0):
 			raise RuntimeError("beamSearchPredictNextFeature error: no beams available")
-		bestBeam = max(allBeams, key=lambda item: item["score"])
+		availableBeams = [beam for beam in allBeams if len(beam["sequence"]) > 0]
+		if(len(availableBeams) == 0):
+			GIAANNproto_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "beamSearchPredictNextFeature: no candidates available")
+		bestBeam = max(availableBeams, key=lambda item: item["score"])
 		bestAction = bestBeam["sequence"][0]
 		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = convertNodesToPrediction(bestAction["nodes"])
 		if(result is None):

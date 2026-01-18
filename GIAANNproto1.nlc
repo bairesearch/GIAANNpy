@@ -461,3 +461,5 @@ MANUAL; - add option useSpacyForConceptNounPOSdetection=False - update isConcept
 - add saveGlobalFeatureNeuronsRate - only save the globalFeatureNeurons every x sequences
 - add option inferenceStrengthLookupCache - cache strength lookup during inference
 - add option inferenceStrengthLookupBypass - bypass cache strength lookup during inference (when inferenceBeamSearch=False)
+- update beam search to advance sequence-time indices per depth so time-based activation constraints and scoring reflect the simulated future steps, instead of reusing the same timestamp for every beam leve
+- patch beam search failure by rejecting empty beam sequences and routing the 'no candidates' case through the existing connectivity error handler (for inferenceSegmentActivationsBooleanFeatureSegmentsOnly=False)
