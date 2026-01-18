@@ -36,7 +36,7 @@ debugTerminateInferenceOnPredictionTargetMismatch = False
 debugTerminateInferenceOnNoPredictionCandidatesAvailable = False
 debugTerminateOnConceptColumnsDelimitByPOSerror = False
 
-debugDeleteGPUcache = True
+debugDeleteGPUcache = False
 
 
 #Train/inference mode selection;
@@ -50,7 +50,7 @@ numSeedTokensInference = 8	#default: 5 (or 8)
 
 #Dataset;
 databaseFolder = "../database/"	#default: "../database/"	#performance: "/media/user/ssddata/GIAANN/database/"	#orig: ""
-trainMaxSequences = 5000		#dev: 10, 500, 5000, 10000 	#default: 100000000	  #adjust as needed	#max sequences for train
+trainMaxSequences = 100000		#dev: 10, 500, 5000, 10000 	#default: 100000000	  #adjust as needed	#max sequences for train
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 datasetsLibrary4plus = False
@@ -110,6 +110,7 @@ else:
 	arrayIndexPropertiesPos = True
 arrayIndexPropertiesActivationCreate = arrayIndexPropertiesActivation or useInference
 arrayIndexPropertiesTimeCreate = arrayIndexPropertiesTime or inferenceUseNeuronFeaturePropertiesTime
+combineSparseUpdatesPerSequence = True	#updateObservedColumnsEfficient combines sparse updates per sequence instead of per column (reduces calls to coalesce) 
 
 
 #SANI;
@@ -369,6 +370,7 @@ if not lowMem:
 	globalFeatureNeuronsFileFull = databaseFolder + globalFeatureNeuronsFile + pytorchTensorFileExtension
 posFolder = databaseFolder + "POS/"
 posDictFile = "everPos.wordnet.pkl.gz"
+saveGlobalFeatureNeuronsRate = 1000
 
 
 #Common array indices;

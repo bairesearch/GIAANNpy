@@ -141,14 +141,17 @@ def expandBranchDimensions(tensor, tensorName, branchCount):
 		return pt.cat([tensor, padTensor], dim=1)
 	raise RuntimeError(f"{tensorName} branch dimension mismatch: expected {branchCount}, got {currentBranches}")
 	
-def saveData(databaseNetworkObject, observedColumnsDict):
+def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount):
 	# Save observed columns to disk
 	for observedColumn in observedColumnsDict.values():
 		observedColumn.saveToDisk()
 
 	# Save global feature neuron arrays if not lowMem
 	if not lowMem:
-		saveTensor(databaseNetworkObject.globalFeatureNeurons, databaseFolder, globalFeatureNeuronsFile)
+		if(saveGlobalFeatureNeuronsRate <= 0):
+			raise RuntimeError("saveData error: saveGlobalFeatureNeuronsRate must be > 0")
+		if((sequenceCount + 1) % saveGlobalFeatureNeuronsRate == 0):
+			saveTensor(databaseNetworkObject.globalFeatureNeurons, databaseFolder, globalFeatureNeuronsFile)
 
 	saveDictFile(conceptColumnsDictFile, databaseNetworkObject.conceptColumnsDict)
 	saveDictFile(conceptFeaturesDictFile, databaseNetworkObject.conceptFeaturesDict)

@@ -457,3 +457,5 @@ MANUAL; - remove option inferenceBurstAllPredictionsOrTargetsInSequence
 MANUAL; - add option datasetsLibrary4plus
 MANUAL; - add option useSpacyForConceptNounPOSdetection=False - update isConcept() to use GIAANNproto_sequencePOS predetermined word-POS dictionaries for pos detection
 - patch remove support for SANIconceptNeurons=True - reintroduce the missing conceptsFound guard so sequences with no concept tokens are skipped before building SequenceObservedColumns
+- add option combineSparseUpdatesPerSequence - updateObservedColumnsEfficient combines sparse updates per sequence instead of per column (reduces calls to coalesce)
+- add saveGlobalFeatureNeuronsRate - only save the globalFeatureNeurons every x sequences

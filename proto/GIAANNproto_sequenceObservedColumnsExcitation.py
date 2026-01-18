@@ -754,6 +754,8 @@ class SequenceObservedColumns:
 
 		if not lowMem:
 			globalFeatureNeurons = self.databaseNetworkObject.globalFeatureNeurons
+			if(combineSparseUpdatesPerSequence):
+				globalFeatureNeuronUpdates = []
 
 		for cIdx, observedColumn in sequenceObservedColumnsDict.items():
 			conceptIndex = observedColumn.conceptIndex
@@ -762,8 +764,11 @@ class SequenceObservedColumns:
 				featureTargetSparse = observedColumn.featureNeurons
 				featureTargetSize = featureTargetSparse.size()
 			else:
-				featureTargetSparse = globalFeatureNeurons
-				featureTargetSize = featureTargetSparse.size()
+				if(combineSparseUpdatesPerSequence):
+					featureTargetSparse = None
+				else:
+					featureTargetSparse = globalFeatureNeurons
+				featureTargetSize = globalFeatureNeurons.size()
 
 			featureRange = featureRanges.get(cIdx)
 			if(featureRange is not None):
@@ -771,12 +776,19 @@ class SequenceObservedColumns:
 				featureUpdateIndices = featureIndicesSorted[:, start:end]
 				featureUpdateValues = featureValuesSorted[start:end]
 				featureUpdates = self.buildFeaturePropertyUpdateSparse(featureUpdateIndices, featureUpdateValues, arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, featureTargetSize, insertConceptIndex=None if lowMem else conceptIndex)
-				featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
+				if lowMem:
+					featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
+				else:
+					if combineSparseUpdatesPerSequence:
+						globalFeatureNeuronUpdates.append(featureUpdates)
+					else:
+						featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
 
 			if lowMem:
 				observedColumn.featureNeurons = featureTargetSparse
 			else:
-				globalFeatureNeurons = featureTargetSparse
+				if not combineSparseUpdatesPerSequence:
+					globalFeatureNeurons = featureTargetSparse
 
 			connectionTargetSparse = observedColumn.featureConnections
 			connectionTargetSize = connectionTargetSparse.size()
@@ -801,6 +813,10 @@ class SequenceObservedColumns:
 			observedColumn.featureConnections = connectionTargetSparse
 
 		if not lowMem:
+			if(combineSparseUpdatesPerSequence):
+				if len(globalFeatureNeuronUpdates) > 0:
+					combinedFeatureUpdates = self.combineSparseUpdatesList(globalFeatureNeuronUpdates, globalFeatureNeurons.size())
+					globalFeatureNeurons = self.addSparseUpdateNonNegative(globalFeatureNeurons, combinedFeatureUpdates)
 			self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
 
 	def buildMaskLookup(self, maskSize, indices, device):
@@ -830,6 +846,31 @@ class SequenceObservedColumns:
 			combinedValues = pt.cat([valuesA, valuesB], dim=0)
 		combinedSparse = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSize, dtype=arrayType, device=deviceSparse)
 		return combinedSparse
+	
+	if(combineSparseUpdatesPerSequence):
+		def combineSparseUpdatesList(self, updatesList, targetSize):
+			combinedIndices = None
+			combinedValues = None
+			if(len(updatesList) > 0):
+				indicesList = []
+				valuesList = []
+				for updateSparse in updatesList:
+					updateSparse = updateSparse.coalesce()
+					indicesList.append(updateSparse.indices())
+					valuesList.append(updateSparse.values())
+				if(len(indicesList) > 0):
+					combinedIndices = pt.cat(indicesList, dim=1)
+				else:
+					combinedIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=deviceSparse)
+				if(len(valuesList) > 0):
+					combinedValues = pt.cat(valuesList, dim=0)
+				else:
+					combinedValues = pt.empty((0,), dtype=arrayType, device=deviceSparse)
+			else:
+				combinedIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=deviceSparse)
+				combinedValues = pt.empty((0,), dtype=arrayType, device=deviceSparse)
+			combinedSparse = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSize, dtype=arrayType, device=deviceSparse)
+			return combinedSparse
 
 	def addSparseUpdate(self, targetSparse, updateSparse):
 		targetSparse = targetSparse.coalesce()
