@@ -38,6 +38,11 @@ debugTerminateOnConceptColumnsDelimitByPOSerror = False
 
 debugDeleteGPUcache = False
 
+debugLimitFeatures = False
+if(debugLimitFeatures):
+	debugLimitFeaturesCMax = 520437
+	debugLimitFeaturesFMax = 80955
+
 
 #Train/inference mode selection;
 useInference = True  #default: True	#support inference mode else train (inferenceTrainFirstSequences: only) mode
@@ -45,12 +50,11 @@ drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype 
 if(useInference):
 	drawNetworkDuringInferencePredict = False	#default: False
 	inferenceTrainFirstSequences = True	#default: True	#orig: True	#True: trains first sequences in inference_prompt.txt, performs inference only on last sequence; False: run inference on every sequence as independent seed/target prompts
-numSeedTokensInference = 8	#default: 5 (or 8)
-
+numSeedTokensInference = 12	#default: 5, 8, 12
 
 #Dataset;
-databaseFolder = "../database/"	#default: "../database/"	#performance: "/media/user/ssddata/GIAANN/database/"	#orig: ""
-trainMaxSequences = 100000		#dev: 10, 500, 5000, 10000 	#default: 100000000	  #adjust as needed	#max sequences for train
+databaseFolder = "../database/"	#default: "../database/"	#performance: "/media/user/ssdpro/GIAANN/database/"	#orig: ""
+trainMaxSequences = 100000		#dev: 10, 500, 5000, 10000, 100000 	#default: 1000000	  #adjust as needed	#max sequences for train
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 datasetsLibrary4plus = False
@@ -90,7 +94,7 @@ else:
 #Dendritic branches;
 multipleDendriticBranches = True	#default: True	#orig: False
 if(multipleDendriticBranches):
-	numberOfDendriticBranches = 5
+	numberOfDendriticBranches = 2	#default: 5, 2	#affects train+inference RAM
 	randomlyAssignBranches = False	#optional	#orig: False
 else:
 	numberOfDendriticBranches = 1

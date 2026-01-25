@@ -140,7 +140,8 @@ def expandBranchDimensions(tensor, tensorName, branchCount):
 		padTensor = pt.zeros(padShape, dtype=tensor.dtype, device=tensor.device)
 		return pt.cat([tensor, padTensor], dim=1)
 	raise RuntimeError(f"{tensorName} branch dimension mismatch: expected {branchCount}, got {currentBranches}")
-	
+
+
 def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount):
 	# Save observed columns to disk
 	for observedColumn in observedColumnsDict.values():
@@ -195,12 +196,22 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 	instance.featureWordToIndex = data['featureWordToIndex']
 	instance.featureIndexToWord = data['featureIndexToWord']
 	instance.nextFeatureIndex = data['nextFeatureIndex']
+	if(debugLimitFeatures):
+		instance.featureWordToIndex, instance.featureIndexToWord = applyDebugLimitFeatureIndexMaps(instance.featureWordToIndex, instance.featureIndexToWord, databaseNetworkObject.f, f"observedColumn.featureIndexMaps[{conceptIndex}]")
+		if(instance.nextFeatureIndex < 0):
+			raise RuntimeError("observedColumnLoadFromDisk error: nextFeatureIndex < 0")
+		if(instance.nextFeatureIndex > databaseNetworkObject.f):
+			instance.nextFeatureIndex = databaseNetworkObject.f
 	# Load the tensors
 	instance.featureConnections = adjustPropertyDimensions(loadTensor(observedColumnsDir, f"{conceptIndex}_featureConnections"), f"observedColumn.featureConnections[{conceptIndex}]")
 	instance.featureConnections = adjustBranchDimensions(instance.featureConnections, f"observedColumn.featureConnections[{conceptIndex}]", expectedRank=6)
+	if(debugLimitFeatures):
+		instance.featureConnections = applyDebugLimitFeatureConnectionsTensor(instance.featureConnections, databaseNetworkObject.c, databaseNetworkObject.f, f"observedColumn.featureConnections[{conceptIndex}]")
 	if lowMem:
 		instance.featureNeurons = adjustPropertyDimensions(loadTensor(observedColumnsDir, f"{conceptIndex}_featureNeurons"), f"observedColumn.featureNeurons[{conceptIndex}]")
 		instance.featureNeurons = adjustBranchDimensions(instance.featureNeurons, f"observedColumn.featureNeurons[{conceptIndex}]", expectedRank=4)
+		if(debugLimitFeatures):
+			instance.featureNeurons = applyDebugLimitFeatureNeuronsTensor(instance.featureNeurons, databaseNetworkObject.f, f"observedColumn.featureNeurons[{conceptIndex}]")
 	return instance
 
 def saveTensor(tensor, folderName, fileName):
@@ -213,3 +224,110 @@ def loadTensor(folderName, fileName):
 		tensor = pt.load(os.path.join(folderName, fileName+pytorchTensorFileExtension))
 	tensor = tensor.to(deviceSparse)
 	return tensor
+
+
+if(debugLimitFeatures):
+	def applyDebugLimitGlobalFeatureNeuronsTensor(tensor, cLimit, fLimit, tensorName):
+		result = tensor
+		if(debugLimitFeatures):
+			if(cLimit <= 0 or fLimit <= 0):
+				raise RuntimeError(f"{tensorName} debug limit requires positive limits")
+			capC = tensor.size(3)
+			capF = tensor.size(4)
+			if(capC > cLimit):
+				capC = cLimit
+			if(capF > fLimit):
+				capF = fLimit
+			if(capC != tensor.size(3) or capF != tensor.size(4)):
+				if(tensor.is_sparse):
+					tensor = tensor.coalesce()
+					indices = tensor.indices()
+					values = tensor.values()
+					mask = (indices[3] < capC) & (indices[4] < capF)
+					indices = indices[:, mask]
+					values = values[mask]
+					newSize = list(tensor.size())
+					newSize[3] = capC
+					newSize[4] = capF
+					result = pt.sparse_coo_tensor(indices, values, size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
+				else:
+					result = tensor[:, :, :, :capC, :capF]
+		return result
+	def applyDebugLimitFeatureConnectionsTensor(tensor, cLimit, fLimit, tensorName):
+		result = tensor
+		if(debugLimitFeatures):
+			if(cLimit <= 0 or fLimit <= 0):
+				raise RuntimeError(f"{tensorName} debug limit requires positive limits")
+			if(tensor.size(3) != tensor.size(5)):
+				raise RuntimeError(f"{tensorName} feature dimension mismatch: {tensor.size(3)} vs {tensor.size(5)}")
+			capF = tensor.size(3)
+			capC = tensor.size(4)
+			if(capF > fLimit):
+				capF = fLimit
+			if(capC > cLimit):
+				capC = cLimit
+			if(capF != tensor.size(3) or capC != tensor.size(4)):
+				if(tensor.is_sparse):
+					tensor = tensor.coalesce()
+					indices = tensor.indices()
+					values = tensor.values()
+					mask = (indices[3] < capF) & (indices[4] < capC) & (indices[5] < capF)
+					indices = indices[:, mask]
+					values = values[mask]
+					newSize = list(tensor.size())
+					newSize[3] = capF
+					newSize[4] = capC
+					newSize[5] = capF
+					result = pt.sparse_coo_tensor(indices, values, size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
+				else:
+					result = tensor[:, :, :, :capF, :capC, :capF]
+		return result
+	def applyDebugLimitFeatureNeuronsTensor(tensor, fLimit, tensorName):
+		result = tensor
+		if(debugLimitFeatures):
+			if(fLimit <= 0):
+				raise RuntimeError(f"{tensorName} debug limit requires positive limits")
+			capF = tensor.size(3)
+			if(capF > fLimit):
+				capF = fLimit
+			if(capF != tensor.size(3)):
+				if(tensor.is_sparse):
+					tensor = tensor.coalesce()
+					indices = tensor.indices()
+					values = tensor.values()
+					mask = indices[3] < capF
+					indices = indices[:, mask]
+					values = values[mask]
+					newSize = list(tensor.size())
+					newSize[3] = capF
+					result = pt.sparse_coo_tensor(indices, values, size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
+				else:
+					result = tensor[:, :, :, :capF]
+		return result
+	def applyDebugLimitFeatureIndexMaps(featureWordToIndex, featureIndexToWord, fLimit, mapName):
+		resultFeatureWordToIndex = featureWordToIndex
+		resultFeatureIndexToWord = featureIndexToWord
+		if(debugLimitFeatures):
+			if(fLimit <= 0):
+				raise RuntimeError(f"{mapName} debug limit requires positive limits")
+			trimmedWordToIndex = {}
+			trimmedIndexToWord = {}
+			for word, index in featureWordToIndex.items():
+				if(index < 0):
+					raise RuntimeError(f"{mapName} index < 0")
+				if(index < fLimit):
+					trimmedWordToIndex[word] = index
+			for index, word in featureIndexToWord.items():
+				if(index < 0):
+					raise RuntimeError(f"{mapName} index < 0")
+				if(index < fLimit):
+					trimmedIndexToWord[index] = word
+			for word, index in trimmedWordToIndex.items():
+				if(trimmedIndexToWord.get(index) != word):
+					raise RuntimeError(f"{mapName} mismatch for index {index}")
+			for index, word in trimmedIndexToWord.items():
+				if(trimmedWordToIndex.get(word) != index):
+					raise RuntimeError(f"{mapName} mismatch for word {word}")
+			resultFeatureWordToIndex = trimmedWordToIndex
+			resultFeatureIndexToWord = trimmedIndexToWord
+		return resultFeatureWordToIndex, resultFeatureIndexToWord

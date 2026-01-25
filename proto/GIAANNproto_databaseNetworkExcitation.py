@@ -63,6 +63,12 @@ if not lowMem:
 	def loadFeatureNeuronsGlobal(c, f):
 		if GIAANNproto_databaseNetworkFilesExcitation.pathExists(globalFeatureNeuronsFileFull):
 			globalFeatureNeurons = GIAANNproto_databaseNetworkFilesExcitation.loadFeatureNeuronsGlobalFile()
+			if(debugLimitFeatures):
+				globalFeatureNeurons = GIAANNproto_databaseNetworkFilesExcitation.applyDebugLimitGlobalFeatureNeuronsTensor(globalFeatureNeurons, c, f, "globalFeatureNeurons")
+				if(globalFeatureNeurons.size(3) < c or globalFeatureNeurons.size(4) < f):
+					print("globalFeatureNeurons.size(3) = ", globalFeatureNeurons.size(3))
+					print("globalFeatureNeurons.size(4) = ", globalFeatureNeurons.size(4))
+					raise RuntimeError("loadFeatureNeuronsGlobal error: debugLimitFeatures requires limits that do not exceed saved globalFeatureNeurons dimensions")
 		else:
 			globalFeatureNeurons = initialiseFeatureNeuronsGlobal(c, f)
 			#print("initialiseFeatureNeuronsGlobal: globalFeatureNeurons = ", globalFeatureNeurons)
@@ -97,6 +103,19 @@ def initialiseDatabaseNetwork():
 			else:
 				conceptFeaturesReferenceSetDelimiterDict = GIAANNproto_databaseNetworkFilesExcitation.loadDictFile(conceptFeaturesReferenceSetDelimiterListFile)
 				conceptFeaturesReferenceSetDelimiterList = list(conceptFeaturesReferenceSetDelimiterDict.values())
+		if(debugLimitFeatures):
+			conceptColumnsDict = applyDebugLimitIndexDict(conceptColumnsDict, debugLimitFeaturesCMax, "conceptColumnsDict")
+			conceptColumnsList = buildIndexListFromDict(conceptColumnsDict, "conceptColumnsDict")
+			c = len(conceptColumnsList)
+			conceptFeaturesDict = applyDebugLimitIndexDict(conceptFeaturesDict, debugLimitFeaturesFMax, "conceptFeaturesDict")
+			conceptFeaturesList = buildIndexListFromDict(conceptFeaturesDict, "conceptFeaturesDict")
+			f = len(conceptFeaturesList)
+			if(conceptColumnsDelimitByPOS):
+				if(detectReferenceSetDelimitersBetweenNouns):
+					conceptFeaturesReferenceSetDelimiterDeterministicList = applyDebugLimitList(conceptFeaturesReferenceSetDelimiterDeterministicList, f, "conceptFeaturesReferenceSetDelimiterDeterministicList")
+					conceptFeaturesReferenceSetDelimiterProbabilisticList = applyDebugLimitList(conceptFeaturesReferenceSetDelimiterProbabilisticList, f, "conceptFeaturesReferenceSetDelimiterProbabilisticList")
+				else:
+					conceptFeaturesReferenceSetDelimiterList = applyDebugLimitList(conceptFeaturesReferenceSetDelimiterList, f, "conceptFeaturesReferenceSetDelimiterList")
 	else:
 		if(useDedicatedConceptNames):
 			# Add dummy feature for prime concept neuron (different per concept column)
@@ -316,3 +335,50 @@ def isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, feat
 	else:
 		printe("conceptColumnsDelimitByPOS is required")
 	return isDelimiterProbabilistic
+
+
+if(debugLimitFeatures):
+	def buildIndexListFromDict(indexDict, dictName):
+		resultList = []
+		maxIndex = -1
+		for index in indexDict.values():
+			if(index > maxIndex):
+				maxIndex = index
+		if(maxIndex >= 0):
+			resultList = [None] * (maxIndex + 1)
+			for name, index in indexDict.items():
+				if(index < 0):
+					raise RuntimeError(f"{dictName} index < 0")
+				if(index >= len(resultList)):
+					raise RuntimeError(f"{dictName} index out of bounds")
+				if(resultList[index] is not None):
+					raise RuntimeError(f"{dictName} duplicate index {index}")
+				resultList[index] = name
+			for name in resultList:
+				if(name is None):
+					raise RuntimeError(f"{dictName} missing index entry")
+		return resultList
+	def applyDebugLimitIndexDict(indexDict, maxCount, dictName):
+		resultDict = indexDict
+		if(debugLimitFeatures):
+			if(maxCount <= 0):
+				raise RuntimeError(f"{dictName} maxCount must be > 0")
+			if(len(indexDict) > maxCount):
+				trimmedDict = {}
+				for name, index in indexDict.items():
+					if(index < 0):
+						raise RuntimeError(f"{dictName} index < 0")
+					if(index < maxCount):
+						trimmedDict[name] = index
+				resultDict = trimmedDict
+		return resultDict
+	def applyDebugLimitList(listObject, maxCount, listName):
+		resultList = listObject
+		if(debugLimitFeatures):
+			if(maxCount <= 0):
+				raise RuntimeError(f"{listName} maxCount must be > 0")
+			if(len(listObject) < maxCount):
+				raise RuntimeError(f"{listName} length {len(listObject)} < expected {maxCount}")
+			if(len(listObject) > maxCount):
+				resultList = listObject[:maxCount]
+		return resultList

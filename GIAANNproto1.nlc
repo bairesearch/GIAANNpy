@@ -462,4 +462,8 @@ MANUAL; - add option useSpacyForConceptNounPOSdetection=False - update isConcept
 - add option inferenceStrengthLookupCache - cache strength lookup during inference
 - add option inferenceStrengthLookupBypass - bypass cache strength lookup during inference (when inferenceBeamSearch=False)
 - update beam search to advance sequence-time indices per depth so time-based activation constraints and scoring reflect the simulated future steps, instead of reusing the same timestamp for every beam leve
-- patch beam search failure by rejecting empty beam sequences and routing the 'no candidates' case through the existing connectivity error handler (for inferenceSegmentActivationsBooleanFeatureSegmentsOnly=False)
+- patch beam search failure by rejecting empty beam sequences and routing the "no candidates" case through the existing connectivity error handler (for inferenceSegmentActivationsBooleanFeatureSegmentsOnly=False)
+MANUAL; - set numSeedTokensInference=12 - higher arrayNumberOfSegments increase inference performance (and increase RAM cost)
+MANUAL; - set numberOfDendriticBranches=2 - high branch counts are not beneficial with randomlyAssignBranches=False (with respect to RAM cost)
+- add option debugLimitFeatures - can be used to recover database for inference if run out of ram during training
+MANUAL; - recommend CUDA 12.8+ for current generation Nvidia

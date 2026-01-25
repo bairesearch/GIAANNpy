@@ -11,9 +11,10 @@ MIT License
 conda create -n pytorchsenv
 source activate pytorchsenv
 conda install python=3.12
+python -m pip install --upgrade pip
 pip install networkx
 pip install matplotlib
-pip install torch
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 pip install spacy
 pip install "datasets<4" "fsspec==2024.6.1" "gcsfs==2024.6.1"
 python -m spacy download spacyModelName (default:en_core_web_trf, orig: en_core_web_sm)
