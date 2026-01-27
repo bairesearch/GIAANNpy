@@ -467,3 +467,8 @@ MANUAL; - set numSeedTokensInference=12 - higher arrayNumberOfSegments increase 
 MANUAL; - set numberOfDendriticBranches=2 - high branch counts are not beneficial with randomlyAssignBranches=False (with respect to RAM cost)
 - add option debugLimitFeatures - can be used to recover database for inference if run out of ram during training
 MANUAL; - recommend CUDA 12.8+ for current generation Nvidia
+- implement option useLocalDataset=True;
+	1) downloads the wikipedia dataset files to folder datasetFolder (see datasetName and datasetCfg for specific version downloaded).
+	2) loads these local dataset files on demand (no online streaming)
+- implement option useLocalDatasetDownloadManual=True, which manually downloads the dataset files
+- manually set the dataset cache folder name (processed_dataset_cache), instead of it being randomly generated (e.g. "default-edd5ee2c28550939")

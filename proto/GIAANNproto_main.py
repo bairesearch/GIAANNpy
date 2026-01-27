@@ -16,7 +16,7 @@ pip install networkx
 pip install matplotlib
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 pip install spacy
-pip install "datasets<4" "fsspec==2024.6.1" "gcsfs==2024.6.1"
+datasetsLibrary4plus=False: pip install "datasets<4" "fsspec==2024.6.1" "gcsfs==2024.6.1"
 python -m spacy download spacyModelName (default:en_core_web_trf, orig: en_core_web_sm)
 pip install nltk
 
@@ -32,9 +32,9 @@ GIA ANN proto main
 # Import necessary libraries
 import torch as pt
 import spacy
-from datasets import load_dataset
 
 from GIAANNproto_globalDefs import *
+import GIAANNproto_datasets
 import GIAANNproto_sparseTensors
 import GIAANNproto_databaseNetworkExcitation
 import GIAANNproto_databaseNetworkFilesExcitation
@@ -47,10 +47,7 @@ if(useInference):
 	import GIAANNproto_prediction
 
 # Load the Wikipedia dataset using Hugging Face datasets
-if(datasetsLibrary4plus):
-	dataset = load_dataset("wikimedia/wikipedia", "20231101.en", split="train", streaming=True, trust_remote_code=True)
-else:
-	dataset = load_dataset('wikipedia', '20220301.en', split='train', streaming=True, trust_remote_code=True)
+dataset = GIAANNproto_datasets.loadWikipediaDataset()
 
 # Initialize spaCy model
 nlp = spacy.load(spacyModelName)

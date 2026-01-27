@@ -25,24 +25,6 @@ import sys
 #Recent debug vars;
 debugPrintConfiguration = True	#print common global defs configuration
 
-debugPrintTrainSequenceDefault = True	#default: True	#orig: True
-debugPrintTrainSequenceRaw = False	#print each training sequence raw text (suitable for inference_prompt.txt generation)
-debugPrintTrainSequenceConceptAssignment = False	#print each training sequence split by column assignment
-debugPrintTrainSequenceConceptAssignmentByLine = False	#display each column on a new line
-debugPrintTrainSequenceDelimiters = False	#print each training sequence with delimiters
-debugPrintTrainSequencePOS = False	#print each training sequence with POS tags
-
-debugTerminateInferenceOnPredictionTargetMismatch = False
-debugTerminateInferenceOnNoPredictionCandidatesAvailable = False
-debugTerminateOnConceptColumnsDelimitByPOSerror = False
-
-debugDeleteGPUcache = False
-
-debugLimitFeatures = False
-if(debugLimitFeatures):
-	debugLimitFeaturesCMax = 520437
-	debugLimitFeaturesFMax = 80955
-
 
 #Train/inference mode selection;
 useInference = True  #default: True	#support inference mode else train (inferenceTrainFirstSequences: only) mode
@@ -52,12 +34,30 @@ if(useInference):
 	inferenceTrainFirstSequences = True	#default: True	#orig: True	#True: trains first sequences in inference_prompt.txt, performs inference only on last sequence; False: run inference on every sequence as independent seed/target prompts
 numSeedTokensInference = 12	#default: 5, 8, 12
 
-#Dataset;
+
+#Database;
 databaseFolder = "../database/"	#default: "../database/"	#performance: "/media/user/ssdpro/GIAANN/database/"	#orig: ""
 trainMaxSequences = 100000		#dev: 10, 500, 5000, 10000, 100000 	#default: 1000000	  #adjust as needed	#max sequences for train
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
-datasetsLibrary4plus = False
+
+
+#Dataset;
+datasetsLibrary4plus = False	#default: False	#orig: False	#set False during dev to maintain benchmark consistency
+if(datasetsLibrary4plus):
+	datasetName = "wikimedia/wikipedia"
+	datasetCfg = "20231101.en"
+else:
+	datasetName = "wikipedia"
+	datasetCfg = "20220301.en"
+useLocalDataset = True	#default: True	#orig: False (stream)	#use local dataset	#automatic huggingface access to dataset is unreliable
+if(useLocalDataset):
+	datasetFolder = "../../dataset/"
+	useLocalDatasetDownloadManual = True	#default: True	#manual download dataset files into datasetFolder	#automatic huggingface access to dataset is unreliable
+	datasetProcessedCacheFolderName = "processed_dataset_cache"	#manual name for processed dataset cache
+	datasetProcessedCacheFolder = datasetFolder + datasetProcessedCacheFolderName + "/"
+else:
+	useLocalDatasetDownloadManual = False
 
 
 #Multisentence predictions;
@@ -320,12 +320,29 @@ randomiseColumnFeatureXposition = True	#shuffle x position of column internal fe
 
 
 #Debug vars;
+debugPrintTrainSequenceDefault = True	#default: True	#orig: True
+debugPrintTrainSequenceRaw = False	#print each training sequence raw text (suitable for inference_prompt.txt generation)
+debugPrintTrainSequenceConceptAssignment = False	#print each training sequence split by column assignment
+debugPrintTrainSequenceConceptAssignmentByLine = False	#display each column on a new line
+debugPrintTrainSequenceDelimiters = False	#print each training sequence with delimiters
+debugPrintTrainSequencePOS = False	#print each training sequence with POS tags
+
+debugTerminateInferenceOnPredictionTargetMismatch = False
+debugTerminateInferenceOnNoPredictionCandidatesAvailable = False
+debugTerminateOnConceptColumnsDelimitByPOSerror = False
+debugDeleteGPUcache = False
+
+debugLimitFeatures = False
+if(debugLimitFeatures):
+	debugLimitFeaturesCMax = 520437
+	debugLimitFeaturesFMax = 80955
+
 printPredictionsDuringInferencePredict = True
 printPredictionsDuringInferencePredictBeamSearch = False
 debugPrintMinWordDistanceDetails = False
 debugOnlyDrawBranchIndexConnections = False
 debugOnlyDrawBranchIndexX = 0
-#older;
+
 debugConnectNodesToNextNodesInSequenceOnly = False
 debugConnectColumnsToNextColumnsInSequenceOnly = False
 debugSmallDataset = False	#required if huggingface Wikipedia dataset is offline
@@ -436,14 +453,14 @@ if(useSANI):
 	if(useSANIfeaturesAndColumns):
 		useSANIfeaturesAndColumnsInternal = True	#default: True	#orig: False	#also include internal columns in column segments (not just external columns)
 		#these are highly dependent on numSeedTokensInference and the specific seed text (ie number of features per column);
-		arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#min number of concept/column segments (if useSANIfeaturesAndColumnsInternal, includes internal column segment)
+		arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#orig: + 1	#min number of concept/column segments (if useSANIfeaturesAndColumnsInternal, includes internal column segment)
 		arrayNumberOfSegmentsFeatureDistance = math.ceil(numSeedTokensInference / 2) + 1 	#number of nearest features to target node
 		arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance + arrayNumberOfSegmentsFeatureDistance
 	elif(useSANIcolumns):
 		if(multisentencePredictions):
-			arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#* numSentencesPerSequence 	#default: 5	#min number of external and internal column connections to target node (note first segment captures all other external columns)
+			arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#orig: + 1	#* numSentencesPerSequence 	#default: 5	#min number of external and internal column connections to target node (note first segment captures all other external columns)
 		else:
-			arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#default: 2	#orig:3		#min number of external and internal column connections to target node (note first segment captures all other external columns)
+			arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#orig: + 1	#default: 2	#orig:3		#min number of external and internal column connections to target node (note first segment captures all other external columns)
 				#max number of SANI segments per sequence (= max number of concept columns per sequence - 1)
 				#note if arrayNumberOfSegments=3 then;	sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: all other column connections
 				#must be less than the (total number of concepts in a sequence - total number of concepts in effective predictive seed sequence)

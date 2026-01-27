@@ -7,10 +7,10 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_prediction.py
+see GIAANNproto_main.py
 
 # Usage:
-see GIAANNproto_prediction.py
+see GIAANNproto_main.py
 
 # Description:
 GIA ANN proto prediction

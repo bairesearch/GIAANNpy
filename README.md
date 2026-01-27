@@ -24,7 +24,7 @@ pip install networkx
 pip install matplotlib
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 pip install spacy
-pip install "datasets<4" "fsspec==2024.6.1" "gcsfs==2024.6.1"
+datasetsLibrary4plus=False: pip install "datasets<4" "fsspec==2024.6.1" "gcsfs==2024.6.1"
 python -m spacy download spacyModelName (default:en_core_web_trf, orig: en_core_web_sm)
 pip install nltk
 ```
@@ -96,11 +96,19 @@ The prompt_inference.txt provided is taken from the first sentences from the fir
 * to train the network from a huggingface (current: Wikipedia) database set useInference=False.
 * to perform inference on a seeded prompt (prompt_inference.txt) set useInference=True and inferenceTrainFirstSequences=False.
 
+#### Database
+
+* maxSequenceLength - depends on CPU/GPU RAM availability during train 
+* set trainMaxSequences - max sequences for train
+* databaseFolder - set to local SSD for fast i/o
+
 #### Dataset
 
-* maxSequenceLength = 100 - depends on CPU/GPU RAM availability during train 
-* set trainMaxSequences = 5000 - max sequences for train
-* databaseFolder = "../database/" - set to local SSD for fast i/o
+* datasetsLibrary4plus - selects compatible dataset for datasets library
+* datasetName - wikipedia dataset name
+* datasetCfg - wikipedia dataset cfg
+* useLocalDataset - use local dataset (else stream)
+* datasetFolder - folder to store dataset
 
 #### Multisentence predictions
 
