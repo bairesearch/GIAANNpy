@@ -284,10 +284,21 @@ def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=
 	plt.axis('off')  # Hide the axes
 	
 	if(save):
-		if(highResolutionFigure):
-			plt.savefig(fileName, dpi=saveFigDPI)
+		if(drawNetworkSaveFormatVector):
+			if(fileName.endswith(".png")):
+				fileName = fileName[:-4] + ".svg"
+			elif(not fileName.endswith(".svg")):
+				fileName = fileName + ".svg"
+		if(drawNetworkSaveFormatVector):
+			if(highResolutionFigure):
+				plt.savefig(fileName, dpi=saveFigDPI, format="svg")
+			else:
+				plt.savefig(fileName, format="svg")
 		else:
-			plt.savefig(fileName)
+			if(highResolutionFigure):
+				plt.savefig(fileName, dpi=saveFigDPI)
+			else:
+				plt.savefig(fileName)
 		plt.clf()	
 	else:
 		plt.show()
@@ -461,7 +472,28 @@ if(drawSparseArrays):
 				otherFeatureWordToIndex = observedColumn.featureWordToIndex
 				cIdx = databaseNetworkObject.conceptColumnsDict[lemma]
 				featureConnections = selectDrawBranch(observedColumn.featureConnections, drawBranches)
-			
+			if(drawRelationTypesConnectionsFromSource):
+				sourceFeatureNeurons = None
+				if(drawRelationTypes):
+					relationSegmentIndex = arrayIndexSegmentLast
+					if(useSANI and useSANIcolumns):
+						relationSegmentIndex = arrayIndexSegmentAdjacentColumn
+					if(arrayIndexPropertiesPosIndex is not None):
+						if(drawSequenceObservedColumns):
+							sourceFeatureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons, drawBranches)
+							if(drawBranches):
+								sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
+							sourceFeatureNeurons = sourceFeatureNeurons[:, :, cIdx]
+						else:
+							if lowMem:
+								sourceFeatureNeurons = selectDrawBranch(observedColumn.featureNeurons, drawBranches)
+								if(drawBranches):
+									sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
+							else:
+								sourceFeatureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 3, conceptIndex)
+								sourceFeatureNeurons = selectDrawBranch(sourceFeatureNeurons, drawBranches)
+								if(drawBranches):
+									sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
 			useSparseConnections = featureConnections.is_sparse and not drawSequenceObservedColumns
 			if(useSparseConnections):
 				hasBranchDim = featureConnections.dim() == 6
@@ -509,8 +541,15 @@ if(drawSparseArrays):
 					elif(drawBranches):
 						connectionColor = branchColours[branchIndex]
 					elif(drawRelationTypes):
-						posValueTensor = pt.tensor(entry["pos"])
-						connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValueTensor, sourceFeatureWord, internalConnection=internalConnection)
+						if(drawRelationTypesConnectionsFromSource):
+							if(sourceFeatureNeurons is not None):
+								posValue = getFeaturePosValue(sourceFeatureNeurons, fIdx, relationSegmentIndex)
+								connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, sourceFeatureWord, internalConnection=internalConnection)
+							else:
+								connectionColor = relationTypeOtherCol
+						else:
+							posValueTensor = pt.tensor(entry["pos"])
+							connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValueTensor, sourceFeatureWord, internalConnection=internalConnection)
 					elif(drawDelimiters):
 						if(internalConnection):
 							connectionColor = defaultConnectionColourInternal
@@ -592,10 +631,17 @@ if(drawSparseArrays):
 											elif(drawBranches):
 												connectionColor = branchColours[branchIndex]
 											elif(drawRelationTypes):
-												if(arrayIndexPropertiesPosIndex is not None):
-													connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[arrayIndexPropertiesPosIndex, fIdx, cIdx, otherFIdx], featureWord, internalConnection=True)
+												if(drawRelationTypesConnectionsFromSource):
+													if(sourceFeatureNeurons is not None):
+														posValue = getFeaturePosValue(sourceFeatureNeurons, fIdx, relationSegmentIndex)
+														connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, internalConnection=True)
+													else:
+														connectionColor = relationTypeOtherCol
 												else:
-													connectionColor = defaultConnectionColourExternal
+													if(arrayIndexPropertiesPosIndex is not None):
+														connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[arrayIndexPropertiesPosIndex, fIdx, cIdx, otherFIdx], featureWord, internalConnection=True)
+													else:
+														connectionColor = defaultConnectionColourExternal
 											elif(drawDelimiters):
 												connectionColor = defaultConnectionColourInternal
 											elif(drawDefault):
@@ -643,10 +689,17 @@ if(drawSparseArrays):
 											elif(drawBranches):
 												connectionColor = branchColours[branchIndex]
 											elif(drawRelationTypes):
-												if(arrayIndexPropertiesPosIndex is not None):
-													connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[arrayIndexPropertiesPosIndex, fIdx, otherCIdx, otherFIdx], featureWord, internalConnection=False)
+												if(drawRelationTypesConnectionsFromSource):
+													if(sourceFeatureNeurons is not None):
+														posValue = getFeaturePosValue(sourceFeatureNeurons, fIdx, relationSegmentIndex)
+														connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, internalConnection=False)
+													else:
+														connectionColor = relationTypeOtherCol
 												else:
-													connectionColor = defaultConnectionColourExternal
+													if(arrayIndexPropertiesPosIndex is not None):
+														connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[arrayIndexPropertiesPosIndex, fIdx, otherCIdx, otherFIdx], featureWord, internalConnection=False)
+													else:
+														connectionColor = defaultConnectionColourExternal
 											elif(drawDelimiters):
 												delimiterColour = getDelimiterFeatureColour(databaseNetworkObject, featureWord)
 												if(delimiterColour is not None):
@@ -779,6 +832,28 @@ else:
 				otherFeatureWordToIndex = observedColumn.featureWordToIndex
 				cIdx = databaseNetworkObject.conceptColumnsDict[lemma]
 				featureConnections = selectDrawBranch(observedColumn.featureConnections, drawBranches)
+			if(drawRelationTypesConnectionsFromSource):
+				sourceFeatureNeurons = None
+				if(drawRelationTypes):
+					relationSegmentIndex = arrayIndexSegmentLast
+					if(useSANI and useSANIcolumns):
+						relationSegmentIndex = arrayIndexSegmentAdjacentColumn
+					if(arrayIndexPropertiesPosIndex is not None):
+						if(drawSequenceObservedColumns):
+							sourceFeatureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons, drawBranches)
+							if(drawBranches):
+								sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
+							sourceFeatureNeurons = sourceFeatureNeurons[:, :, cIdx]
+						else:
+							if lowMem:
+								sourceFeatureNeurons = selectDrawBranch(observedColumn.featureNeurons, drawBranches)
+								if(drawBranches):
+									sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
+							else:
+								sourceFeatureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 3, conceptIndex)
+								sourceFeatureNeurons = selectDrawBranch(sourceFeatureNeurons, drawBranches)
+								if(drawBranches):
+									sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
 			
 			hasBranchDim = featureConnections.dim() == 6
 			if(drawSegments):
@@ -848,10 +923,17 @@ else:
 										elif(drawBranches):
 											connectionColor = branchColours[branchIndex]
 										elif(drawRelationTypes):
-											if(arrayIndexPropertiesPosIndex is not None):
-												connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[arrayIndexPropertiesPosIndex, fIdx, cIdx, otherFIdx], featureWord, internalConnection=True)
+											if(drawRelationTypesConnectionsFromSource):
+												if(sourceFeatureNeurons is not None):
+													posValue = getFeaturePosValue(sourceFeatureNeurons, fIdx, relationSegmentIndex)
+													connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, internalConnection=True)
+												else:
+													connectionColor = relationTypeOtherCol
 											else:
-												connectionColor = defaultConnectionColourExternal
+												if(arrayIndexPropertiesPosIndex is not None):
+													connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[arrayIndexPropertiesPosIndex, fIdx, cIdx, otherFIdx], featureWord, internalConnection=True)
+												else:
+													connectionColor = defaultConnectionColourExternal
 										elif(drawDelimiters):
 											connectionColor = defaultConnectionColourInternal
 										elif(drawDefault):
@@ -899,10 +981,17 @@ else:
 										elif(drawBranches):
 											connectionColor = branchColours[branchIndex]
 										elif(drawRelationTypes):
-											if(arrayIndexPropertiesPosIndex is not None):
-												connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[arrayIndexPropertiesPosIndex, fIdx, otherCIdx, otherFIdx], featureWord, internalConnection=False)
+											if(drawRelationTypesConnectionsFromSource):
+												if(sourceFeatureNeurons is not None):
+													posValue = getFeaturePosValue(sourceFeatureNeurons, fIdx, relationSegmentIndex)
+													connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, internalConnection=False)
+												else:
+													connectionColor = relationTypeOtherCol
 											else:
-												connectionColor = defaultConnectionColourExternal
+												if(arrayIndexPropertiesPosIndex is not None):
+													connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[arrayIndexPropertiesPosIndex, fIdx, otherCIdx, otherFIdx], featureWord, internalConnection=False)
+												else:
+													connectionColor = defaultConnectionColourExternal
 										elif(drawDelimiters):
 											delimiterColour = getDelimiterFeatureColour(databaseNetworkObject, featureWord)
 											if(delimiterColour is not None):

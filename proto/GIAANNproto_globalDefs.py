@@ -24,6 +24,7 @@ import sys
 
 #Recent debug vars;
 debugPrintConfiguration = True	#print common global defs configuration
+debugPrintTotalInferenceTokens = False	#print total number of inference tokens in seed phase, prediction phase, and both phases (summed across all sequences) 
 
 
 #Train/inference mode selection;
@@ -71,7 +72,7 @@ else:
 #RAM;
 useGPUdense = True	#default: True
 if(useInference):
-	useGPUsparse = True	#default: False	#orig: True	#inference requires high RAM to store sparse tensors
+	useGPUsparse = True	#default: True	#orig: True	#inference requires high RAM to store sparse tensors
 else:
 	useGPUsparse = True		#default: True	#orig: False	#slight performance increase during train (does not use significant additional GPU ram during train)
 useGPUsparseStrict = True	#orig: False	#enforce strict sparse device during transfer to/from dense tensors
@@ -253,6 +254,7 @@ else:
 	if(drawAllColumns):
 		assert not trainSequenceObservedColumnsUseSequenceFeaturesOnly
 	drawNetworkDuringTrainSave = True	#default: False
+drawNetworkSaveFormatVector = True	#default: False	#orig: False	#True: save matplotlib network images as svg instead of png
 drawSegmentsTrain = False	#derived
 drawSegmentsInference = False	#derived
 drawBranchesTrain = False	#derived
@@ -288,6 +290,7 @@ drawSparseArrays = False	#default: False	#orig: False	#can draw sequences contai
 if(trainSequenceObservedColumnsMatchSequenceWords):
 	#sumChangesToConceptNeuronSequenceInstances = True	#mandatory	#for multiple instances of concept in sequence, need to take the sum of the changes between the existing and modified arrays for each instance of a same concept in the sequence
 	assert not drawSequenceObservedColumns, "trainSequenceObservedColumnsMatchSequenceWords does not currently support drawSequenceObservedColumns; requires concept_name_to_index (i.e. one-to-one mapping between name and feature index in SequenceObservedColumns arrays) etc"
+drawRelationTypesConnectionsFromSource = True	#orig: False	#required for useSANIfeaturesAndColumns only
 
 
 #Algorithm preferences (normalisation, permanence etc);
@@ -330,6 +333,7 @@ debugPrintTrainSequencePOS = False	#print each training sequence with POS tags
 debugTerminateInferenceOnPredictionTargetMismatch = False
 debugTerminateInferenceOnNoPredictionCandidatesAvailable = False
 debugTerminateOnConceptColumnsDelimitByPOSerror = False
+debugTerminateOnConceptColumnsDelimitByPOSwarning = True	#default: True
 debugDeleteGPUcache = False
 
 debugLimitFeatures = False
@@ -615,11 +619,19 @@ if(debugPrintConfiguration):
 		print("inferenceTrainFirstSequences:", inferenceTrainFirstSequences)
 	print("numSeedTokensInference:", numSeedTokensInference)
 	print("")
-	print("#Dataset;")
+	print("#Database;")
 	print("databaseFolder:", databaseFolder)
 	print("trainMaxSequences:", trainMaxSequences)
 	print("maxSequenceLength:", maxSequenceLength)
 	print("numberEpochs:", numberEpochs)
+	print("")
+	print("#Dataset;")
+	print("datasetsLibrary4plus:", datasetsLibrary4plus)
+	print("datasetName:", datasetName)
+	print("datasetCfg:", datasetCfg)
+	print("useLocalDataset:", useLocalDataset)
+	if(useLocalDataset):
+		print("datasetFolder:", datasetFolder)
 	print("")
 	print("#Multisentence predictions;")
 	print("multisentencePredictions:", multisentencePredictions)
@@ -664,9 +676,11 @@ if(debugPrintConfiguration):
 	print("drawRelationTypes:", drawRelationTypes)
 	print("drawDelimiters:", drawDelimiters)
 	print("drawDefault:", drawDefault)
-	print("drawNetworkDuringTrainSave:", drawNetworkDuringTrainSave)
+	if(not useInference or inferenceTrainFirstSequences):
+		print("drawNetworkDuringTrainSave:", drawNetworkDuringTrainSave)
 	if(useInference):
 		print("drawNetworkDuringInferenceSave:", drawNetworkDuringInferenceSave)
+	print("drawNetworkSaveFormatVector:", drawNetworkSaveFormatVector)
 	print("")
 	print("#SANI settings;")
 	if(useSANI):

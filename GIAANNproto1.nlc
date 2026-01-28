@@ -472,3 +472,7 @@ MANUAL; - recommend CUDA 12.8+ for current generation Nvidia
 	2) loads these local dataset files on demand (no online streaming)
 - implement option useLocalDatasetDownloadManual=True, which manually downloads the dataset files
 - manually set the dataset cache folder name (processed_dataset_cache), instead of it being randomly generated (e.g. "default-edd5ee2c28550939")
+- add option drawNetworkSaveFormatVector=True (for both drawNetworkDuringTrainSave and drawNetworkDuringInferenceSave), which saves the matplotlib network images in svg format rather than png format.
+- implement option debugPrintTotalInferenceTokens=True - print total number of inference tokens in seed phase, prediction phase, and both phases (summed across all sequences) 
+- add option useSANIfeaturesAndColumnsInternal:drawRelationTypesConnectionsFromSource - updated drawRelationTypes edge coloring to use the source feature neuron POS via getFeaturePosValue(...), instead of connection POS values (which can be invalid after segment/branch aggregation). Added per column setup for relationSegmentIndex (adjacent column vs last segment when useSANIcolumns) and retrieval of source feature neurons (sequence or observed/global).
+- update readme - add GIAANN-paper-WIP

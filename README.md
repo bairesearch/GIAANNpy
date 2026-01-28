@@ -117,8 +117,8 @@ The prompt_inference.txt provided is taken from the first sentences from the fir
 
 #### RAM
 
-* set useGPUdense=True (and optionally useGPUsparse=True) during train
-* set useGPUsparse=False during inference if CPU has more RAM
+* set useGPUdense=True (and optionally useGPUsparse=True) during train (sequence size dependent)
+* set useGPUsparse=True during inference if sufficient GPU RAM available (network size dependent)
 
 #### Segment activation time
 
@@ -210,6 +210,10 @@ Settings for inference. See:
 
 * useSpacyForConceptNounPOSdetection - use spacy for prime concept feature identification (dynamic context dependent pos detection), else use GIAANNproto_sequencePOS.
 * 'reference set delimiter' identification (token column assignment) uses predetermined word-POS dictionary (GIAANNproto_sequencePOS).
+
+### Paper
+
+[GIAANN paper (PDF) - WIP](https://github.com/bairesearch/GIAANNpy/releases/download/assets/GIAANN-paper-WIP.pdf)
 
 ### References
 

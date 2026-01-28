@@ -32,6 +32,40 @@ import GIAANNproto_predictionActivate
 import GIAANNproto_predictionConstraints
 
 
+if(debugPrintTotalInferenceTokens):
+	totalInferenceTokensSeed = 0
+	totalInferenceTokensPrediction = 0
+	totalInferenceTokensAll = 0
+
+def resetTotalInferenceTokens():
+	if(debugPrintTotalInferenceTokens):
+		global totalInferenceTokensSeed
+		global totalInferenceTokensPrediction
+		global totalInferenceTokensAll
+		totalInferenceTokensSeed = 0
+		totalInferenceTokensPrediction = 0
+		totalInferenceTokensAll = 0
+	return
+
+def addTotalInferenceTokens(seedTokensCount, predictionTokensCount):
+	if(debugPrintTotalInferenceTokens):
+		if(seedTokensCount is None or predictionTokensCount is None):
+			raise RuntimeError("addTotalInferenceTokens error: token counts are None")
+		if(seedTokensCount < 0 or predictionTokensCount < 0):
+			raise RuntimeError("addTotalInferenceTokens error: token counts must be non-negative")
+		global totalInferenceTokensSeed
+		global totalInferenceTokensPrediction
+		global totalInferenceTokensAll
+		totalInferenceTokensSeed += int(seedTokensCount)
+		totalInferenceTokensPrediction += int(predictionTokensCount)
+		totalInferenceTokensAll += int(seedTokensCount) + int(predictionTokensCount)
+	return
+
+def printTotalInferenceTokens():
+	if(debugPrintTotalInferenceTokens):
+		print("debugPrintTotalInferenceTokens: seedPhaseTokens = ", totalInferenceTokensSeed, ", predictionPhaseTokens = ", totalInferenceTokensPrediction, ", totalInferenceTokens = ", totalInferenceTokensAll)
+	return
+
 if(inferenceOnlyRetainPredictedTargetObservedColumn):
 	def loadObservedColumnInference(databaseNetworkObject, observedColumnsDict, conceptIndex, sequenceWordIndex):
 		lemma = databaseNetworkObject.conceptColumnsList[conceptIndex]
@@ -174,6 +208,8 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	observedColumnsDict = sequenceObservedColumns.observedColumnsDict  # key: lemma, value: ObservedColumn	#every observed column in inference (seed and prediction phases)
 	if(inferenceOnlyRetainPredictedTargetObservedColumn):
 		observedColumnsDict = {}
+	seedTokensProcessed = 0
+	predictionTokensProcessed = 0
 
 	try:
 		#seed first tokens;
@@ -183,6 +219,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 			featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, seedPhase=True)
 			conceptColumnIndex = int(conceptColumnIndexNext)
 			conceptColumnFeatureIndex = int(conceptColumnFeatureIndexNext)
+			seedTokensProcessed += 1
 
 		#predict next tokens;
 		for wordPredictionIndex in range(numPredictionTokens):
@@ -190,6 +227,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 			featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState)
 			conceptColumnIndex = int(conceptColumnIndexNext)
 			conceptColumnFeatureIndex = int(conceptColumnFeatureIndexNext)
+			predictionTokensProcessed += 1
 			if(not featurePredictionTargetMatch):
 				print("warning: featurePredictionTargetMatch=False")
 				if(debugTerminateInferenceOnPredictionTargetMismatch):
@@ -197,6 +235,8 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 					break
 	except GIAANNproto_predictionConstraints.InferenceStopSequenceNoPredictionCandidatesAvailable:
 		pass
+	if(debugPrintTotalInferenceTokens):
+		addTotalInferenceTokens(seedTokensProcessed, predictionTokensProcessed)
 
 def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, seedPhase=False):
 	

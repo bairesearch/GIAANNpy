@@ -316,7 +316,8 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 						delimiterIndices.append(rightmostIndeterministic)
 					else:
 						noDelimiterDetectedBetweenConceptTokens = True
-						print("warning: no delimiter detected between concept tokens: concept #1: Position = ", conceptPosition, ", Index = ", leftIndex, ", Name = ", getTokenDisplayText(tokens[leftIndex]), ". concept #2: Position = ", conceptPosition+1, ", Index = ", rightIndex, ", Name = ", getTokenDisplayText(tokens[rightIndex]), ".")						
+						if(debugTerminateOnConceptColumnsDelimitByPOSwarning):
+							print("warning: no delimiter detected between concept tokens: concept #1: Position = ", conceptPosition, ", Index = ", leftIndex, ", Name = ", getTokenDisplayText(tokens[leftIndex]), ". concept #2: Position = ", conceptPosition+1, ", Index = ", rightIndex, ", Name = ", getTokenDisplayText(tokens[rightIndex]), ".")						
 						if(debugTerminateOnConceptColumnsDelimitByPOSerror):
 							exitWithError()
 						#sequenceObservedColumns.noDelimiterDetectedBetweenConceptTokens = True

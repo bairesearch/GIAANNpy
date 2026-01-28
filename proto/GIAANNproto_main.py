@@ -68,10 +68,14 @@ def main():
 		print("\nepochIndex = ", epochIndex)
 		# Start processing the dataset
 		sequenceCount = 0
+		if(useInference and debugPrintTotalInferenceTokens):
+			GIAANNproto_prediction.resetTotalInferenceTokens()
 		if(useInference or debugSmallDataset):
 			processPrompt()
 		else:
 			processDataset(dataset)
+		if(useInference and debugPrintTotalInferenceTokens):
+			GIAANNproto_prediction.printTotalInferenceTokens()
 
 def buildSequenceWithDelimiters(sequence, tokens):
 	if(conceptColumnsDelimitByPOS):
