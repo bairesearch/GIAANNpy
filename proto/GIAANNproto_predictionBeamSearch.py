@@ -154,10 +154,7 @@ def beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkOb
 
 def initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState):
 	state = {"features": globalFeatureNeuronsActivation.clone()}
-	if(transformerUseInputConnections and globalFeatureConnectionsActivation is not None):
-		state["connections"] = globalFeatureConnectionsActivation.clone()
-	else:
-		state["connections"] = None
+	state["connections"] = None
 	if(inferenceUseNeuronFeaturePropertiesTime and globalFeatureNeuronsTime is not None):
 		state["time"] = globalFeatureNeuronsTime.clone()
 	else:
@@ -170,10 +167,7 @@ def initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureC
 
 def cloneBeamActivationState(state):
 	clonedState = {"features": state["features"].clone()}
-	if(transformerUseInputConnections and state.get("connections") is not None):
-		clonedState["connections"] = state["connections"].clone()
-	else:
-		clonedState["connections"] = None
+	clonedState["connections"] = None
 	if(inferenceUseNeuronFeaturePropertiesTime and state.get("time") is not None):
 		clonedState["time"] = state["time"].clone()
 	else:

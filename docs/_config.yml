@@ -1,0 +1,5 @@
+theme: minima
+title: GIAANNpy
+description: Research code and notes for the GIAANN project.
+url: https://bairesearch.github.io
+baseurl: /GIAANNpy

@@ -25,13 +25,14 @@ import sys
 #Recent debug vars;
 debugPrintConfiguration = True	#print common global defs configuration
 debugPrintTotalInferenceTokens = False	#print total number of inference tokens in seed phase, prediction phase, and both phases (summed across all sequences) 
+debugPrintTotalFeatures = False	#print c+f upon load
 
 
 #Train/inference mode selection;
 useInference = True  #default: True	#support inference mode else train (inferenceTrainFirstSequences: only) mode
 drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
 if(useInference):
-	drawNetworkDuringInferencePredict = False	#default: False
+	drawNetworkDuringInference = False	#default: False
 	inferenceTrainFirstSequences = True	#default: True	#orig: True	#True: trains first sequences in inference_prompt.txt, performs inference only on last sequence; False: run inference on every sequence as independent seed/target prompts
 numSeedTokensInference = 12	#default: 5, 8, 12
 
@@ -72,7 +73,7 @@ else:
 #RAM;
 useGPUdense = True	#default: True
 if(useInference):
-	useGPUsparse = True	#default: True	#orig: True	#inference requires high RAM to store sparse tensors
+	useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors
 else:
 	useGPUsparse = True		#default: True	#orig: False	#slight performance increase during train (does not use significant additional GPU ram during train)
 useGPUsparseStrict = True	#orig: False	#enforce strict sparse device during transfer to/from dense tensors
@@ -199,10 +200,9 @@ if(useInference):
 		assert not inferenceBeamInstancePreferAdjacentOverlap, "beamSearchSelectSingleStepFeature: inferenceStrengthLookupBypass requires connectivity inferenceBeamInstancePreferAdjacentOverlap disabled"
 
 
-#Inference;
+#Inference activations;
 if(useInference):
 	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
-	transformerUseInputConnections = False	#initialise (dependent var)
 	if(useSANI):
 		inferenceApplySequentialActivationSparse = True	#default: True	#orig: False
 		inferenceConnectionsStrengthBoolean = True	#default: True	#do not overweight by common features (e.g. determiners)
@@ -615,7 +615,7 @@ if(debugPrintConfiguration):
 	print("useInference:", useInference)
 	print("drawNetworkDuringTrain:", drawNetworkDuringTrain)
 	if(useInference):
-		print("drawNetworkDuringInferencePredict:", drawNetworkDuringInferencePredict)
+		print("drawNetworkDuringInference:", drawNetworkDuringInference)
 		print("inferenceTrainFirstSequences:", inferenceTrainFirstSequences)
 	print("numSeedTokensInference:", numSeedTokensInference)
 	print("")

@@ -35,7 +35,7 @@ class DatabaseNetworkClass():
 		self.conceptFeaturesDict = conceptFeaturesDict
 		self.conceptFeaturesList = conceptFeaturesList
 		self.globalFeatureNeurons = globalFeatureNeurons
-		self.globalFeatureConnections = None #transformerUseInputConnections: initialised during prediction phase
+		self.globalFeatureConnections = None
 		if(conceptColumnsDelimitByPOS):
 			if(detectReferenceSetDelimitersBetweenNouns):
 				self.conceptFeaturesReferenceSetDelimiterDeterministicList = conceptFeaturesReferenceSetDelimiterDeterministicList
@@ -144,6 +144,9 @@ def initialiseDatabaseNetwork():
 	p = arrayNumberOfProperties
 		
 	databaseNetworkObject = DatabaseNetworkClass(c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList, conceptFeaturesReferenceSetDelimiterDeterministicList, conceptFeaturesReferenceSetDelimiterProbabilisticList)
+	if(useInference and debugPrintTotalFeatures):
+		print("c = ", databaseNetworkObject.c)
+		print("f = ", databaseNetworkObject.f)
 	
 	return databaseNetworkObject
 	

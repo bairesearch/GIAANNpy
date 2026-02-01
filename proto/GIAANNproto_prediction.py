@@ -187,12 +187,6 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	tokensSequence = GIAANNproto_sequenceTokens.getTokens(sequence)
 	conceptMask, conceptIndices, numberConcepts = GIAANNproto_sequenceConcepts.createConceptMask(sequenceObservedColumns, tokensSequence)
 
-	if(inferenceOnlyRetainPredictedTargetObservedColumn and transformerUseInputConnections):
-		raise RuntimeError("processConceptWordsInference error: inferenceOnlyRetainPredictedTargetObservedColumn requires transformerUseInputConnections=False")
-	
-	if(transformerUseInputConnections):
-		GIAANNproto_databaseNetworkExcitation.generateGlobalFeatureConnections(sequenceObservedColumns.databaseNetworkObject)
-		
 	numPredictionTokens = len(sequencePredict)	#set numPredictionTokens (dynamic)
 				
 	#identify first activated column(s) in seed phase:
@@ -275,10 +269,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	if(inferenceUseNeuronFeaturePropertiesTime):
 		if(useSANIcolumns or useSANIfeaturesAndColumns):
 			sequenceColumnIndex = GIAANNproto_predictionActivate.calculateSequenceColumnIndex(conceptMask, sequenceWordIndex)
-	if(transformerUseInputConnections):
-		globalFeatureConnectionsActivation = databaseNetworkObject.globalFeatureConnections[arrayIndexPropertiesActivationIndex]
-	else:
-		globalFeatureConnectionsActivation = None
+	globalFeatureConnectionsActivation = None
 
 	#set constraintModePrediction;
 	allowedColumnsConstraint = None
@@ -346,8 +337,6 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		if(inferenceDecrementActivations):
 			#decrement activation after each prediction interval
 			globalFeatureNeuronsActivation = GIAANNproto_predictionActivate.decrementActivation(globalFeatureNeuronsActivation, activationDecrementPerPredictedToken)
-			if(transformerUseInputConnections):
-				globalFeatureConnectionsActivation = GIAANNproto_predictionActivate.decrementActivation(globalFeatureConnectionsActivation, activationDecrementPerPredictedToken)
 			#if(inferenceUseNeuronFeaturePropertiesTime):	#OLD
 			#	globalFeatureNeuronsTime = GIAANNproto_predictionActivate.decrementActivation(globalFeatureNeuronsTime, inferenceUseNeuronFeaturePropertiesTimeDecrement)
 
@@ -397,8 +386,6 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 			globalFeatureNeuronsActivationOrig = globalFeatureNeuronsActivation
 			globalFeatureNeuronsActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsActivation, indicesToUpdate, modifier, multiply=False)
 			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivationIndex)
-			if(transformerUseInputConnections):
-				databaseNetworkObject.globalFeatureConnections = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureConnections, globalFeatureConnectionsActivation, arrayIndexPropertiesActivationIndex)
 			if(inferenceUseNeuronFeaturePropertiesTime):
 				databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTimeIndex)
 			if(predictionColumnsMustActivateConceptFeature):
@@ -483,7 +470,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		loadObservedColumnInference(databaseNetworkObject, observedColumnsDict, int(conceptColumnIndexPred), sequenceWordIndex)
 	
 	#draw network; 
-	if(drawNetworkDuringInferencePredict):
+	if(drawNetworkDuringInference):
 		#FUTURE: convert globalFeatureNeuronsActivation back to globalFeatureNeurons for draw
 		GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumnsPrediction, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+generateDrawSequenceIndex(sequenceWordIndex))
 	return featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState

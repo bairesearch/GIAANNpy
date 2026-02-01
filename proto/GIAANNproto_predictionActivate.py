@@ -535,11 +535,6 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 		# spec step (a): store last timeValue for activated segments during each prediction step
 		globalFeatureNeuronsTime = updateTimeValuesFromActivation(globalFeatureNeuronsTime, featureNeuronsTargetActivationApplied, sequenceWordIndex, sequenceColumnIndex)
 		
-	if(transformerUseInputConnections):
-		featureNeuronsTargetActivation = GIAANNproto_sparseTensors.expand_sparse_tensor(featureNeuronsTargetActivation, 2, conceptColumnsIndices.squeeze(), new_dim_size=databaseNetworkObject.c)
-		featureNeuronsTargetActivation = GIAANNproto_sparseTensors.expand_sparse_tensor(featureNeuronsTargetActivation, 3, conceptColumnsFeatureIndices.squeeze(), new_dim_size=databaseNetworkObject.f)
-		globalFeatureConnectionsActivation = globalFeatureConnectionsActivation + featureNeuronsTargetActivation
-
 	return globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime
 
 def selectActivatedBranchIndex(globalFeatureNeuronsActivation, columnIndex, featureIndex):

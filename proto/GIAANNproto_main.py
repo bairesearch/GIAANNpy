@@ -17,7 +17,7 @@ pip install matplotlib
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 pip install spacy
 datasetsLibrary4plus=False: pip install "datasets<4" "fsspec==2024.6.1" "gcsfs==2024.6.1"
-python -m spacy download spacyModelName (default:en_core_web_trf, orig: en_core_web_sm)
+python -m spacy download en_core_web_trf [spacyModelName]
 pip install nltk
 
 # Usage:
