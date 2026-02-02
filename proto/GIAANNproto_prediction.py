@@ -284,6 +284,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 	debugTimeStart = None
 	debugTimeLast = None
+	predictionCandidatesAvailable = True
 	if(conceptColumnIndex is None or conceptColumnFeatureIndex is None):
 		raise RuntimeError("processColumnInferencePrediction error: expected single concept/feature prediction pair")
 	conceptColumnIndexTensor = pt.tensor([int(conceptColumnIndex)], dtype=pt.long)
@@ -349,7 +350,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	else:
 		connectedColumnsConstraint = None
 		connectedColumnsFeatureMap = None
-	if((predictionEnsureConnectedToPreviousPrediction or enforceDirectConnectionsMinWordDistance) and (inferenceSeedNetwork and sequenceWordIndex > 0) and connectedColumnsConstraint is not None and connectedColumnsConstraint.numel() == 0):
+	if((predictionEnsureConnectedToPreviousPrediction or enforceDirectConnectionsMinWordDistance) and (inferenceSeedNetwork and sequenceWordIndex > 0) and connectedColumnsConstraint is not None and connectedColumnsConstraint.numel() == 0 and inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		GIAANNproto_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "previous prediction has no outgoing connections")
 		
 	if(sequenceWordIndex > 0):
@@ -468,13 +469,29 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	else:	
 		#predictionPhase;
 		if(inferenceBeamSearch):
-			conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex = GIAANNproto_predictionBeamSearch.beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap)
-			if(inferenceOnlyRetainPredictedTargetObservedColumn and not inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch):
-				if(observedColumnsDict is None):
-					raise RuntimeError("processColumnInferencePrediction error: observedColumnsDict is None")
-				observedColumnsDict.clear()
+			try:
+				conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex = GIAANNproto_predictionBeamSearch.beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap)
+				if(inferenceOnlyRetainPredictedTargetObservedColumn and not inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch):
+					if(observedColumnsDict is None):
+						raise RuntimeError("processColumnInferencePrediction error: observedColumnsDict is None")
+					observedColumnsDict.clear()
+			except GIAANNproto_predictionConstraints.InferenceStopSequenceNoPredictionCandidatesAvailable:
+				if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+					raise
+				predictionCandidatesAvailable = False
+				targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
+				conceptColumnIndexPred = int(targetPreviousColumnIndex)
+				conceptColumnFeatureIndexPred = int(targetFeatureIndex)
 		else:
-			conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex = GIAANNproto_predictionBeamSearch.beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap)
+			try:
+				conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex = GIAANNproto_predictionBeamSearch.beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap)
+			except GIAANNproto_predictionConstraints.InferenceStopSequenceNoPredictionCandidatesAvailable:
+				if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+					raise
+				predictionCandidatesAvailable = False
+				targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
+				conceptColumnIndexPred = int(targetPreviousColumnIndex)
+				conceptColumnFeatureIndexPred = int(targetFeatureIndex)
 		if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 			conceptColumnIndexNext = conceptColumnIndexPred	#use prediction as next selected feature
 			conceptColumnFeatureIndexNext = conceptColumnFeatureIndexPred	#use prediction as next selected feature
@@ -484,18 +501,17 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 			conceptColumnFeatureIndexNext = int(targetFeatureIndex)
 			conceptColumnIndexNextTensor = pt.tensor([conceptColumnIndexNext], dtype=pt.long)
 			conceptColumnFeatureIndexNextTensor = pt.tensor([conceptColumnFeatureIndexNext], dtype=pt.long)
-			conceptColumnIndexNextTensor, conceptColumnFeatureIndexNextTensor = GIAANNproto_predictionConstraints.applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnIndexNextTensor, conceptColumnFeatureIndexNextTensor, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap)
+			constraintModeTarget = constraintModePrediction
+			if(constraintModeTarget == "delimiter"):
+				constraintModeTarget = None
+			conceptColumnIndexNextTensor, conceptColumnFeatureIndexNextTensor = GIAANNproto_predictionConstraints.applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnIndexNextTensor, conceptColumnFeatureIndexNextTensor, allowedColumnsConstraint, constraintModeTarget, None, None)
 			if(conceptColumnIndexNextTensor is None or conceptColumnFeatureIndexNextTensor is None or conceptColumnIndexNextTensor.numel() == 0 or conceptColumnFeatureIndexNextTensor.numel() == 0):
 				GIAANNproto_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no prediction candidates available")
 			if(conceptColumnIndexNextTensor.numel() != 1 or conceptColumnFeatureIndexNextTensor.numel() != 1):
 				raise RuntimeError("processColumnInferencePrediction error: multiple prediction candidates not supported")
 			conceptColumnIndexNext = int(conceptColumnIndexNextTensor.squeeze().item())
 			conceptColumnFeatureIndexNext = int(conceptColumnFeatureIndexNextTensor.squeeze().item())
-			if((predictionEnsureConnectedToPreviousPrediction or enforceDirectConnectionsMinWordDistance) and connectedColumnsConstraint is not None):
-				if(conceptColumnIndexNext is None):
-					GIAANNproto_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected predictions available for current step")
-				if(conceptColumnIndexNext is None):
-					GIAANNproto_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected activations available for next step")
+			#connected predictions constraint is not applied in target-driven activation
 	if(conceptColumnIndexPred is None or conceptColumnFeatureIndexPred is None):
 		GIAANNproto_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no prediction candidates available")
 
@@ -507,22 +523,32 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	targetIsConceptFeature = bool(conceptMask[sequenceWordIndex].item())
 	#compare topk column/feature predictions to sequencePredict (target words);
 	#implementation limitation; only works with kf = 1;
-	columnName = databaseNetworkObject.conceptColumnsList[conceptColumnIndexPred]
-	observedColumnFeatureIndex = conceptColumnFeatureIndexPred
-	predictedIsConceptFeature = (observedColumnFeatureIndex == featureIndexPrimeConceptNeuron)
-	if(predictedIsConceptFeature):
-		predictedWord = columnName
+	predictedWord = None
+	predictedColumnName = None
+	if(predictionCandidatesAvailable):
+		columnName = databaseNetworkObject.conceptColumnsList[conceptColumnIndexPred]
+		observedColumnFeatureIndex = conceptColumnFeatureIndexPred
+		predictedIsConceptFeature = (observedColumnFeatureIndex == featureIndexPrimeConceptNeuron)
+		if(predictedIsConceptFeature):
+			predictedWord = columnName
+		else:
+			predictedWord = databaseNetworkObject.conceptFeaturesList[observedColumnFeatureIndex]
+		predictedColumnName = columnName
+		if(targetNextColumnIndex is None):
+			targetColumnName = databaseNetworkObject.conceptColumnsList[targetPreviousColumnIndex]
+		else:
+			targetColumnName = databaseNetworkObject.conceptColumnsList[targetPreviousColumnIndex] + "/" + databaseNetworkObject.conceptColumnsList[targetNextColumnIndex]
+		if(targetWord == predictedWord):
+			featurePredictionTargetMatch = True
+		elif(targetIsConceptFeature and predictedIsConceptFeature and targetLemma == predictedColumnName and targetColumnName == predictedColumnName):
+			featurePredictionTargetMatch = True
 	else:
-		predictedWord = databaseNetworkObject.conceptFeaturesList[observedColumnFeatureIndex]
-	predictedColumnName = columnName
-	if(targetNextColumnIndex is None):
-		targetColumnName = databaseNetworkObject.conceptColumnsList[targetPreviousColumnIndex]
-	else:
-		targetColumnName = databaseNetworkObject.conceptColumnsList[targetPreviousColumnIndex] + "/" + databaseNetworkObject.conceptColumnsList[targetNextColumnIndex]
-	if(targetWord == predictedWord):
-		featurePredictionTargetMatch = True
-	elif(targetIsConceptFeature and predictedIsConceptFeature and targetLemma == predictedColumnName and targetColumnName == predictedColumnName):
-		featurePredictionTargetMatch = True
+		predictedWord = "<no prediction>"
+		predictedColumnName = "<no prediction>"
+		if(targetNextColumnIndex is None):
+			targetColumnName = databaseNetworkObject.conceptColumnsList[targetPreviousColumnIndex]
+		else:
+			targetColumnName = databaseNetworkObject.conceptColumnsList[targetPreviousColumnIndex] + "/" + databaseNetworkObject.conceptColumnsList[targetNextColumnIndex]
 
 	#print prediction; 
 	if(printPredictionsDuringInferencePredict):

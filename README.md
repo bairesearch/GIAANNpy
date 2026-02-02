@@ -84,7 +84,6 @@ All settings are located in GIAANNproto_globalDefs.py.
 ##### Quick execution (demo)
 For quick execution (train/inference);
 * set useInference=True and inferenceTrainFirstSequences=True (and optionally drawNetworkDuringTrain=True). 
-* set numSeedTokensInference - the number of tokens used for the seed (vs prediction) phase of inference.
 
 This will;
 * train the database using all sequences in "database/prompt_inference.txt" except for the last (*numSentencesPerSequence) sequences, and then;
@@ -95,6 +94,10 @@ The prompt_inference.txt provided is taken from the first sentences from the fir
 ##### Standard execution
 * to train the network from a huggingface (current: Wikipedia) database set useInference=False.
 * to perform inference on a seeded prompt (prompt_inference.txt) set useInference=True and inferenceTrainFirstSequences=False.
+
+Additional parameters;
+* set numSeedTokensInference - the number of tokens used for the seed (vs prediction) phase of inference. Note arrayNumberOfSegments is derived from this parameter.
+* set inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures - for standard inference set True (Predictions), for benchmarking top-1 accuracy set False (Targets).
 
 #### Database
 
