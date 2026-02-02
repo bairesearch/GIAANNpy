@@ -37,6 +37,11 @@ if(debugPrintTotalInferenceTokens):
 	totalInferenceTokensPrediction = 0
 	totalInferenceTokensAll = 0
 
+totalInferenceTop1Matches = 0
+totalInferenceTop1Tokens = 0
+totalInferenceTop1PredictionMatches = 0
+totalInferenceTop1PredictionTokens = 0
+
 def resetTotalInferenceTokens():
 	if(debugPrintTotalInferenceTokens):
 		global totalInferenceTokensSeed
@@ -64,6 +69,45 @@ def addTotalInferenceTokens(seedTokensCount, predictionTokensCount):
 def printTotalInferenceTokens():
 	if(debugPrintTotalInferenceTokens):
 		print("debugPrintTotalInferenceTokens: seedPhaseTokens = ", totalInferenceTokensSeed, ", predictionPhaseTokens = ", totalInferenceTokensPrediction, ", totalInferenceTokens = ", totalInferenceTokensAll)
+	return
+
+def resetInferenceTop1AccuracyCounts():
+	global totalInferenceTop1Matches
+	global totalInferenceTop1Tokens
+	global totalInferenceTop1PredictionMatches
+	global totalInferenceTop1PredictionTokens
+	totalInferenceTop1Matches = 0
+	totalInferenceTop1Tokens = 0
+	totalInferenceTop1PredictionMatches = 0
+	totalInferenceTop1PredictionTokens = 0
+	return
+
+def addInferenceTop1AccuracyCount(featurePredictionTargetMatch, seedPhase):
+	if(not inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+		if(featurePredictionTargetMatch):
+			matchValue = 1
+		else:
+			matchValue = 0
+		global totalInferenceTop1Matches
+		global totalInferenceTop1Tokens
+		global totalInferenceTop1PredictionMatches
+		global totalInferenceTop1PredictionTokens
+		totalInferenceTop1Matches += matchValue
+		totalInferenceTop1Tokens += 1
+		if(not seedPhase):
+			totalInferenceTop1PredictionMatches += matchValue
+			totalInferenceTop1PredictionTokens += 1
+	return
+
+def printInferenceTop1Accuracy():
+	if(not inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+		if(totalInferenceTop1Tokens <= 0):
+			raise RuntimeError("printInferenceTop1Accuracy error: no inference tokens recorded")
+		if(totalInferenceTop1PredictionTokens <= 0):
+			raise RuntimeError("printInferenceTop1Accuracy error: no prediction tokens recorded")
+		predictionAccuracy = totalInferenceTop1PredictionMatches / totalInferenceTop1PredictionTokens
+		inferenceAccuracy = totalInferenceTop1Matches / totalInferenceTop1Tokens
+		print("averageTop1Accuracy: predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
 	return
 
 if(inferenceOnlyRetainPredictedTargetObservedColumn):
@@ -214,6 +258,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 			conceptColumnIndex = int(conceptColumnIndexNext)
 			conceptColumnFeatureIndex = int(conceptColumnFeatureIndexNext)
 			seedTokensProcessed += 1
+			addInferenceTop1AccuracyCount(featurePredictionTargetMatch, True)
 
 		#predict next tokens;
 		for wordPredictionIndex in range(numPredictionTokens):
@@ -222,6 +267,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 			conceptColumnIndex = int(conceptColumnIndexNext)
 			conceptColumnFeatureIndex = int(conceptColumnFeatureIndexNext)
 			predictionTokensProcessed += 1
+			addInferenceTop1AccuracyCount(featurePredictionTargetMatch, False)
 			if(not featurePredictionTargetMatch):
 				print("warning: featurePredictionTargetMatch=False")
 				if(debugTerminateInferenceOnPredictionTargetMismatch):
@@ -429,8 +475,27 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 				observedColumnsDict.clear()
 		else:
 			conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex = GIAANNproto_predictionBeamSearch.beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap)
-		conceptColumnIndexNext = conceptColumnIndexPred	#use prediction as next selected feature
-		conceptColumnFeatureIndexNext = conceptColumnFeatureIndexPred	#use prediction as next selected feature
+		if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+			conceptColumnIndexNext = conceptColumnIndexPred	#use prediction as next selected feature
+			conceptColumnFeatureIndexNext = conceptColumnFeatureIndexPred	#use prediction as next selected feature
+		else:
+			targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
+			conceptColumnIndexNext = int(targetPreviousColumnIndex)
+			conceptColumnFeatureIndexNext = int(targetFeatureIndex)
+			conceptColumnIndexNextTensor = pt.tensor([conceptColumnIndexNext], dtype=pt.long)
+			conceptColumnFeatureIndexNextTensor = pt.tensor([conceptColumnFeatureIndexNext], dtype=pt.long)
+			conceptColumnIndexNextTensor, conceptColumnFeatureIndexNextTensor = GIAANNproto_predictionConstraints.applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnIndexNextTensor, conceptColumnFeatureIndexNextTensor, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap)
+			if(conceptColumnIndexNextTensor is None or conceptColumnFeatureIndexNextTensor is None or conceptColumnIndexNextTensor.numel() == 0 or conceptColumnFeatureIndexNextTensor.numel() == 0):
+				GIAANNproto_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no prediction candidates available")
+			if(conceptColumnIndexNextTensor.numel() != 1 or conceptColumnFeatureIndexNextTensor.numel() != 1):
+				raise RuntimeError("processColumnInferencePrediction error: multiple prediction candidates not supported")
+			conceptColumnIndexNext = int(conceptColumnIndexNextTensor.squeeze().item())
+			conceptColumnFeatureIndexNext = int(conceptColumnFeatureIndexNextTensor.squeeze().item())
+			if((predictionEnsureConnectedToPreviousPrediction or enforceDirectConnectionsMinWordDistance) and connectedColumnsConstraint is not None):
+				if(conceptColumnIndexNext is None):
+					GIAANNproto_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected predictions available for current step")
+				if(conceptColumnIndexNext is None):
+					GIAANNproto_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected activations available for next step")
 	if(conceptColumnIndexPred is None or conceptColumnFeatureIndexPred is None):
 		GIAANNproto_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no prediction candidates available")
 

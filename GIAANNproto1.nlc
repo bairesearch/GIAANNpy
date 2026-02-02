@@ -480,3 +480,4 @@ MANUAL; -update readme - add GIAANN-paper-WIP
 - in useInference=True mode, if debugPrintTotalFeatures=True, print c and f at start
 MANUAL; - remove deprecated transformerUseInputConnections
 MANUAL; - rename drawNetworkDuringInferencePredict to drawNetworkDuringInference
+Reimplemented inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures False mode to drive next-column activation from targets and report top-1 accuracy across prediction and inference tokens.

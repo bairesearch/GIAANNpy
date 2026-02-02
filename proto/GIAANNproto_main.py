@@ -70,12 +70,16 @@ def main():
 		sequenceCount = 0
 		if(useInference and debugPrintTotalInferenceTokens):
 			GIAANNproto_prediction.resetTotalInferenceTokens()
+		if(useInference):
+			GIAANNproto_prediction.resetInferenceTop1AccuracyCounts()
 		if(useInference or debugSmallDataset):
 			processPrompt()
 		else:
 			processDataset(dataset)
 		if(useInference and debugPrintTotalInferenceTokens):
 			GIAANNproto_prediction.printTotalInferenceTokens()
+		if(useInference):
+			GIAANNproto_prediction.printInferenceTop1Accuracy()
 
 def buildSequenceWithDelimiters(sequence, tokens):
 	if(conceptColumnsDelimitByPOS):
