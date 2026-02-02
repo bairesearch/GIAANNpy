@@ -37,7 +37,33 @@ def loadWikipediaDataset():
 			dataset = load_dataset(datasetName, datasetCfg, split="train", streaming=False, trust_remote_code=True, cache_dir=datasetFolder)
 	else:
 		dataset = load_dataset(datasetName, datasetCfg, split="train", streaming=True, trust_remote_code=True)
+	if(trainTestSet):
+		dataset = applyTrainTestSetOffset(dataset)
 	return dataset
+
+def applyTrainTestSetOffset(dataset):
+	updatedDataset = dataset
+	if(trainTestSet):
+		if(not isinstance(testSetRatio, float) and not isinstance(testSetRatio, int)):
+			raise RuntimeError("applyTrainTestSetOffset error: testSetRatio is not a float or int")
+		if(testSetRatio <= 0 or testSetRatio >= 1):
+			raise RuntimeError("applyTrainTestSetOffset error: testSetRatio must be > 0 and < 1 when trainTestSet is True")
+		try:
+			datasetLength = len(updatedDataset)
+		except Exception as e:
+			raise RuntimeError("applyTrainTestSetOffset error: failed to read dataset length for dynamic trainTestSetArticleOffset") from e
+		if(datasetLength <= 0):
+			raise RuntimeError("applyTrainTestSetOffset error: dataset length <= 0")
+		trainTestSetArticleOffset = int(float(datasetLength) * (1.0 - float(testSetRatio)))
+		if(trainTestSetArticleOffset <= 0 or trainTestSetArticleOffset >= datasetLength):
+			raise RuntimeError("applyTrainTestSetOffset error: computed trainTestSetArticleOffset is out of range (" + str(trainTestSetArticleOffset) + " of " + str(datasetLength) + ")")
+		if(hasattr(updatedDataset, "skip")):
+			updatedDataset = updatedDataset.skip(trainTestSetArticleOffset)
+		elif(hasattr(updatedDataset, "select")):
+			updatedDataset = updatedDataset.select(range(trainTestSetArticleOffset, datasetLength))
+		else:
+			raise RuntimeError("applyTrainTestSetOffset error: dataset does not support skip or select")
+	return updatedDataset
 
 if(useLocalDatasetDownloadManual):
 

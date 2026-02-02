@@ -40,7 +40,7 @@ numSeedTokensInference = 12	#default: 5, 8, 12	#this is also set during train ph
 
 #Database;
 databaseFolder = "../database/"	#default: "../database/"	#performance: "/media/user/ssdpro/GIAANN/database/"	#orig: ""
-trainMaxSequences = 100		#dev: 10, 500, 5000, 10000, 100000 	#default: 1000000	  #adjust as needed	#max sequences for train
+trainMaxSequences = 100000		#dev: 10, 500, 5000, 10000, 100000 	#default: 1000000	  #adjust as needed	#max sequences for train
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 
@@ -61,7 +61,10 @@ if(useLocalDataset):
 	datasetProcessedCacheFolder = datasetFolder + datasetProcessedCacheFolderName + "/"
 else:
 	useLocalDatasetDownloadManual = False
-
+trainTestSet = False	#default: False	#only set True to generate an inference test set (with debugPrintTrainSequenceRaw=True)
+if(trainTestSet):
+	testSetRatio = 0.1	#ratio of articles in dataset to be used for test (vs train) set - taken from end of dataset
+	assert useLocalDataset	#required for efficiency
 
 #Multisentence predictions;
 multisentencePredictions = False	#default: False	#each sequence comprises multiple sentences	#requires higher GPU RAM for train
@@ -74,7 +77,7 @@ else:
 #RAM;
 useGPUdense = True	#default: True
 if(useInference):
-	useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors
+	useGPUsparse = True	#default: False	#orig: True	#inference requires high RAM to store sparse tensors
 else:
 	useGPUsparse = True		#default: True	#orig: False	#slight performance increase during train (does not use significant additional GPU ram during train)
 useGPUsparseStrict = True	#orig: False	#enforce strict sparse device during transfer to/from dense tensors
@@ -334,7 +337,10 @@ debugPrintTrainSequencePOS = False	#print each training sequence with POS tags
 debugTerminateInferenceOnPredictionTargetMismatch = False
 debugTerminateInferenceOnNoPredictionCandidatesAvailable = False
 debugTerminateOnConceptColumnsDelimitByPOSerror = False
-debugTerminateOnConceptColumnsDelimitByPOSwarning = True	#default: True
+if(debugPrintTrainSequenceRaw):
+	debugTerminateOnConceptColumnsDelimitByPOSwarning = False
+else:
+	debugTerminateOnConceptColumnsDelimitByPOSwarning = True
 debugDeleteGPUcache = False
 
 debugLimitFeatures = False
