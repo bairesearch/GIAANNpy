@@ -25,7 +25,7 @@ import GIAANNproto_databaseNetworkExcitation
 import GIAANNproto_sequenceTokens
 
 
-def firstPass(databaseNetworkObject, sequence):
+def firstPass(databaseNetworkObject, sequence, allowNewFeatures):
 	newConceptsAdded = False
 	conceptsFound = False
 	conceptMask = []
@@ -43,7 +43,12 @@ def firstPass(databaseNetworkObject, sequence):
 			conceptFound = True
 		
 		if(conceptFound):
-			conceptsFound, newConceptsAdded = GIAANNproto_databaseNetworkExcitation.addConceptToConceptColumnsDict(databaseNetworkObject, token.lemma, conceptsFound, newConceptsAdded)
+			if(allowNewFeatures):
+				conceptsFound, newConceptsAdded = GIAANNproto_databaseNetworkExcitation.addConceptToConceptColumnsDict(databaseNetworkObject, token.lemma, conceptsFound, newConceptsAdded)
+			else:
+				if(token.lemma not in databaseNetworkObject.conceptColumnsDict):
+					raise RuntimeError("firstPass error: concept lemma not found while allowNewFeatures is False (" + token.lemma + ")")
+				conceptsFound = True
 			conceptMask.append(True)
 		else:
 			conceptMask.append(False)
@@ -95,7 +100,7 @@ def secondPass(databaseNetworkObject, tokens, inferenceMode):
 	return observedColumnsDict, observedColumnsSequenceWordIndexDict
 
 
-def detectNewFeatures(databaseNetworkObject, tokens):
+def detectNewFeatures(databaseNetworkObject, tokens, allowNewFeatures):
 	"""
 	When usePOS mode is enabled, detect all possible new features in the sequence
 	by searching for all new non-nouns in the sequence.
@@ -106,21 +111,22 @@ def detectNewFeatures(databaseNetworkObject, tokens):
 
 	numNewFeatures = 0
 	for tokenIndex, token in enumerate(tokens):
-		if(processFeatureDetection(databaseNetworkObject, tokenIndex, token, tokens)):
+		if(processFeatureDetection(databaseNetworkObject, tokenIndex, token, tokens, allowNewFeatures)):
 			numNewFeatures += 1
-
+	
 	# After processing all features, update f
-	databaseNetworkObject.f += numNewFeatures
-
+	if(allowNewFeatures):
+		databaseNetworkObject.f += numNewFeatures
+	
 	# Now, expand arrays accordingly
-	if not lowMem:
+	if(allowNewFeatures and not lowMem):
 		if databaseNetworkObject.f > databaseNetworkObject.globalFeatureNeurons.shape[4]:
 			extraCols = databaseNetworkObject.f - databaseNetworkObject.globalFeatureNeurons.shape[4]
 			newShape = (databaseNetworkObject.globalFeatureNeurons.shape[0], databaseNetworkObject.globalFeatureNeurons.shape[1], databaseNetworkObject.globalFeatureNeurons.shape[2], databaseNetworkObject.globalFeatureNeurons.shape[3], databaseNetworkObject.f)
 			databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons.coalesce()
 			databaseNetworkObject.globalFeatureNeurons = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeurons.indices(), databaseNetworkObject.globalFeatureNeurons.values(), size=newShape, dtype=arrayType, device=deviceSparse)
 
-def processFeatureDetection(databaseNetworkObject, tokenIndex, token, tokens):
+def processFeatureDetection(databaseNetworkObject, tokenIndex, token, tokens, allowNewFeatures):
 	"""
 	Helper function to detect new features prior to processing concept words.
 	"""
@@ -131,6 +137,8 @@ def processFeatureDetection(databaseNetworkObject, tokenIndex, token, tokens):
 		return False  # Skip nouns as features
 	else:
 		if featureWord not in databaseNetworkObject.conceptFeaturesDict:
+			if(not allowNewFeatures):
+				raise RuntimeError("processFeatureDetection error: feature word not found while allowNewFeatures is False (" + featureWord + ")")
 			featureIndex = len(databaseNetworkObject.conceptFeaturesDict)
 			databaseNetworkObject.conceptFeaturesDict[featureWord] = featureIndex
 			databaseNetworkObject.conceptFeaturesList.append(featureWord)

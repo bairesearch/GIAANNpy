@@ -36,6 +36,7 @@ if(useInference):
 	inferenceTrainFirstSequences = True	#default: True	#orig: True	#True: trains first sequences in inference_prompt.txt, performs inference only on last sequence; False: run inference on every sequence as independent seed/target prompts
 	inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True	#True: activate next column features using current prediction; False: use current target (top-1 accuracy measurement)
 numSeedTokensInference = 12	#default: 5, 8, 12	#this is also set during train phase only so that the derived numberOfSegments always matches inference phase
+inferenceAddNewFeatures = True	#default: True	#orig: False	#run a controlled expansion pass during inference to add missing columns/features without training updates
 
 
 #Database;
@@ -65,6 +66,7 @@ trainTestSet = False	#default: False	#only set True to generate an inference tes
 if(trainTestSet):
 	testSetRatio = 0.1	#ratio of articles in dataset to be used for test (vs train) set - taken from end of dataset
 	assert useLocalDataset	#required for efficiency
+
 
 #Multisentence predictions;
 multisentencePredictions = False	#default: False	#each sequence comprises multiple sentences	#requires higher GPU RAM for train
@@ -134,6 +136,7 @@ enforceDirectConnections = True	#default: True	#orig: False	#prediction requires
 if(enforceDirectConnections):
 	enforceDirectConnectionsSANI = True	#default: True #orig: False	#enforce activation of first segment (direct feature connection)
 	enforceDirectConnectionsMinWordDistance = False	#default: False #orig: True	#enforce min word distance (=1) during inference
+	enforceDirectConnectionsIgnoreSeed = True	#default: True #orig: False
 else:
 	enforceDirectConnectionsSANI = False
 	enforceDirectConnectionsMinWordDistance = False

@@ -47,7 +47,8 @@ if(useInference):
 	import GIAANNproto_prediction
 
 # Load the Wikipedia dataset using Hugging Face datasets
-dataset = GIAANNproto_datasets.loadWikipediaDataset()
+if(not useInference):
+	dataset = GIAANNproto_datasets.loadWikipediaDataset()
 
 # Initialize spaCy model
 nlp = spacy.load(spacyModelName)
@@ -108,6 +109,21 @@ def processPrompt():
 		text = file.read()
 	articleIndex = 0
 	processArticle(text, articleIndex)
+
+def expandSequenceForInference(databaseNetworkObject, sequence):
+	conceptsFound = False
+	conceptMask = None
+	tokens = None
+	observedColumnsDict = None
+	observedColumnsSequenceWordIndexDict = None
+	conceptsFound, conceptMask = GIAANNproto_sequenceConcepts.firstPass(databaseNetworkObject, sequence, True)
+	if(conceptsFound):
+		tokens = GIAANNproto_sequenceTokens.getTokens(sequence)
+		if not (useDedicatedFeatureLists):
+			GIAANNproto_sequenceConcepts.detectNewFeatures(databaseNetworkObject, tokens, True)
+		observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNproto_sequenceConcepts.secondPass(databaseNetworkObject, tokens, False)
+	GIAANNproto_databaseNetworkExcitation.ensureGlobalFeatureNeuronsSize(databaseNetworkObject, True)
+	return
 	
 def processDataset(dataset):
 	for articleIndex, article in enumerate(dataset):
@@ -203,16 +219,22 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenc
 				return
 		sequenceSeed = sequence[0:numSeedTokens]	#prompt
 		sequencePredict = sequence[numSeedTokens:]
+	
+	inferenceMode = useInference and inferenceSequenceInPrompt
+	allowNewFeatures = True
+	if(inferenceMode and inferenceAddNewFeatures):
+		expandSequenceForInference(databaseNetworkObject, sequence)
+		allowNewFeatures = False
 
 	# First pass: Extract words, lemmas, pos, tags, and update concept_columns_dict and c
-	conceptsFound, conceptMask = GIAANNproto_sequenceConcepts.firstPass(databaseNetworkObject, sequence)
+	conceptsFound, conceptMask = GIAANNproto_sequenceConcepts.firstPass(databaseNetworkObject, sequence, allowNewFeatures)
 	
 	if(conceptsFound):
 		tokens = GIAANNproto_sequenceTokens.getTokens(sequence)
 
 		# When usePOS is enabled, detect all possible new features in the sequence
 		if not (useDedicatedFeatureLists):
-			GIAANNproto_sequenceConcepts.detectNewFeatures(databaseNetworkObject, tokens)
+			GIAANNproto_sequenceConcepts.detectNewFeatures(databaseNetworkObject, tokens, allowNewFeatures)
 
 		if(debugPrintTrainSequencePOS):
 			sentenceWithPOS = " ".join(f"{token.text} ({tokenIndex}:{token.pos_})" for tokenIndex, token in enumerate(sequence))
@@ -226,7 +248,6 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenc
 			print(f"Processing sequenceCount: {sequenceCount}, {sequence.text}")	#"{sequence.text}"	#"Processing sequenceCount: {sequenceCount}, {sequence.text}"	#article: {articleIndex}, sequence: {sequenceIndex}
 
 		# Second pass: Create observed_columns_dict
-		inferenceMode = useInference and inferenceSequenceInPrompt
 		observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNproto_sequenceConcepts.secondPass(databaseNetworkObject, tokens, inferenceMode)
 
 		# Create the sequence observed columns object

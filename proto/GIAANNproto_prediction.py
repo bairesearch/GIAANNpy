@@ -101,13 +101,12 @@ def addInferenceTop1AccuracyCount(featurePredictionTargetMatch, seedPhase):
 
 def printInferenceTop1Accuracy():
 	if(not inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
-		if(totalInferenceTop1Tokens <= 0):
-			raise RuntimeError("printInferenceTop1Accuracy error: no inference tokens recorded")
-		if(totalInferenceTop1PredictionTokens <= 0):
-			raise RuntimeError("printInferenceTop1Accuracy error: no prediction tokens recorded")
-		predictionAccuracy = totalInferenceTop1PredictionMatches / totalInferenceTop1PredictionTokens
-		inferenceAccuracy = totalInferenceTop1Matches / totalInferenceTop1Tokens
-		print("averageTop1Accuracy: predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
+		if(totalInferenceTop1Tokens <= 0 or totalInferenceTop1PredictionTokens <= 0):
+			print("printInferenceTop1Accuracy: no prediction tokens recorded; skipping accuracy")
+		else:
+			predictionAccuracy = totalInferenceTop1PredictionMatches / totalInferenceTop1PredictionTokens
+			inferenceAccuracy = totalInferenceTop1Matches / totalInferenceTop1Tokens
+			print("averageTop1Accuracy: predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
 	return
 
 if(inferenceOnlyRetainPredictedTargetObservedColumn):
@@ -295,7 +294,9 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	conceptColumnFeatureIndexTensorActivation = conceptColumnFeatureIndexTensor
 	
 	if(predictionEnsureConnectedToPreviousPrediction or enforceDirectConnectionsMinWordDistance):
-		ensurePredictionStateAvailable(conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected context available before prediction")
+		if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+			if(not (seedPhase and enforceDirectConnectionsIgnoreSeed)):
+				ensurePredictionStateAvailable(conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected context available before prediction")
 
 	#burst the initial seed in the sequence;
 	if(sequenceWordIndex==0):
@@ -344,7 +345,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		constraintModePrediction = None
 	
 	#set predictionEnsureConnectedToPreviousPrediction connectedColumnsConstraint/connectedColumnsFeatureMap;
-	if((predictionEnsureConnectedToPreviousPrediction or enforceDirectConnectionsMinWordDistance) and (inferenceSeedNetwork and sequenceWordIndex > 0)):
+	if((predictionEnsureConnectedToPreviousPrediction or enforceDirectConnectionsMinWordDistance) and (inferenceSeedNetwork and sequenceWordIndex > 0) and not (seedPhase and enforceDirectConnectionsIgnoreSeed)):
 		#limit prediction candidates to columns directly connected to previously predicted nodes
 		connectedColumnsConstraint, connectedColumnsFeatureMap = GIAANNproto_predictionConstraints.buildConnectedColumnsLookupFromPrediction(databaseNetworkObject, observedColumnsDict, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor)
 	else:

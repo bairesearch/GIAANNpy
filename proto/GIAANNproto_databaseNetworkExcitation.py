@@ -36,6 +36,8 @@ class DatabaseNetworkClass():
 		self.conceptFeaturesList = conceptFeaturesList
 		self.globalFeatureNeurons = globalFeatureNeurons
 		self.globalFeatureConnections = None
+		self.globalFeatureNeuronsBackup = None
+		self.globalFeatureConnectionsBackup = None
 		if(conceptColumnsDelimitByPOS):
 			if(detectReferenceSetDelimitersBetweenNouns):
 				self.conceptFeaturesReferenceSetDelimiterDeterministicList = conceptFeaturesReferenceSetDelimiterDeterministicList
@@ -53,6 +55,25 @@ def backupGlobalArrays(databaseNetworkObject):
 def restoreGlobalArrays(databaseNetworkObject):
 	databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeuronsBackup
 	databaseNetworkObject.globalFeatureConnections = databaseNetworkObject.globalFeatureConnectionsBackup
+
+def ensureGlobalFeatureNeuronsSize(databaseNetworkObject, updateBackup):
+	expanded = False
+	if(lowMem):
+		raise RuntimeError("ensureGlobalFeatureNeuronsSize error: lowMem must be False")
+	if(databaseNetworkObject.globalFeatureNeurons is None):
+		raise RuntimeError("ensureGlobalFeatureNeuronsSize error: globalFeatureNeurons is None")
+	if(databaseNetworkObject.globalFeatureNeurons.shape[3] < databaseNetworkObject.c or databaseNetworkObject.globalFeatureNeurons.shape[4] < databaseNetworkObject.f):
+		newShape = (arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
+		databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons.coalesce()
+		databaseNetworkObject.globalFeatureNeurons = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeurons.indices(), databaseNetworkObject.globalFeatureNeurons.values(), size=newShape, dtype=arrayType, device=deviceSparse)
+		expanded = True
+	if(updateBackup and databaseNetworkObject.globalFeatureNeuronsBackup is not None):
+		if(databaseNetworkObject.globalFeatureNeuronsBackup.shape[3] < databaseNetworkObject.c or databaseNetworkObject.globalFeatureNeuronsBackup.shape[4] < databaseNetworkObject.f):
+			newBackupShape = (arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
+			databaseNetworkObject.globalFeatureNeuronsBackup = databaseNetworkObject.globalFeatureNeuronsBackup.coalesce()
+			databaseNetworkObject.globalFeatureNeuronsBackup = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeuronsBackup.indices(), databaseNetworkObject.globalFeatureNeuronsBackup.values(), size=newBackupShape, dtype=arrayType, device=deviceSparse)
+			expanded = True
+	return expanded
 
 # Initialize global feature neuron arrays if lowMem is disabled
 if not lowMem:
