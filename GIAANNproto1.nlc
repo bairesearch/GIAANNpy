@@ -496,3 +496,6 @@ v1j (Codex IDE GPT-5.3-Codex):
 	- update GIAANNproto_main - wrap inference in pt.no_grad() to eliminate autograd allocations without triggering sparse inference-tensor version-counter errors.
 	- add option runtimeReleaseGPUMemory - runtime GPU cleanup feature that executes releaseRuntimeGpuMemory(sequenceCount) after each processed sequence (processSequence)
 	- update activation/time sparse slices locally and removing per-token full global sparse tensor rewrites
+- update processColumnInferencePrediction() - split all marked sections into subfunctions
+- make debugPrintInferenceTop1Accuracy independent of inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures
+- patch processConceptWordsInference() so top-1 accounting is padded with zero-accuracy entries for any unprocessed seed/prediction tokens after premature termination

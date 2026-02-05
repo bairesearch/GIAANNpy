@@ -80,7 +80,7 @@ def main():
 			processDataset(dataset)
 		if(useInference and debugPrintTotalInferenceTokens):
 			GIAANNproto_prediction.printTotalInferenceTokens()
-		if(useInference):
+		if(useInference and debugPrintInferenceTop1Accuracy):
 			GIAANNproto_prediction.printInferenceTop1Accuracy()
 
 def releaseRuntimeGpuMemory(sequenceCount):

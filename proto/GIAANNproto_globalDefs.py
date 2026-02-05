@@ -26,6 +26,7 @@ import sys
 debugPrintConfiguration = True	#print common global defs configuration
 debugPrintTotalInferenceTokens = False	#print total number of inference tokens in seed phase, prediction phase, and both phases (summed across all sequences) 
 debugPrintTotalFeatures = False	#print c+f upon load
+debugPrintInferenceTop1Accuracy = True	#print inference top-1 accuracy
 
 
 #Train/inference mode selection;
@@ -34,7 +35,7 @@ drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype 
 if(useInference):
 	drawNetworkDuringInference = False	#default: False
 	inferenceTrainFirstSequences = True	#default: True	#orig: True	#True: trains first sequences in inference_prompt.txt, performs inference only on last sequence; False: run inference on every sequence as independent seed/target prompts
-	inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True	#True: activate next column features using current prediction; False: use current target (top-1 accuracy measurement)
+	inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True	#True: activate next column features using current prediction; False: use current target (default top-1 accuracy measurement)
 numSeedTokensInference = 12	#default: 5, 8, 12	#this is also set during train phase only so that the derived numberOfSegments always matches inference phase
 inferenceAddNewFeatures = True	#default: True	#orig: False	#run a controlled expansion pass during inference to add missing columns/features without training updates
 
