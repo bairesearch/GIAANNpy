@@ -30,6 +30,7 @@ GIA ANN proto main
 """
 
 # Import necessary libraries
+import gc
 import torch as pt
 import spacy
 
@@ -81,6 +82,24 @@ def main():
 			GIAANNproto_prediction.printTotalInferenceTokens()
 		if(useInference):
 			GIAANNproto_prediction.printInferenceTop1Accuracy()
+
+def releaseRuntimeGpuMemory(sequenceCount):
+	if(sequenceCount < 0):
+		raise RuntimeError("releaseRuntimeGpuMemory error: sequenceCount must be >= 0")
+	releaseGpuMemory = False
+	if(runtimeReleaseGPUMemory):
+		if(runtimeReleaseGPUMemoryEverySequenceCount <= 0):
+			raise RuntimeError("releaseRuntimeGpuMemory error: runtimeReleaseGPUMemoryEverySequenceCount must be > 0")
+		if((sequenceCount % runtimeReleaseGPUMemoryEverySequenceCount) == 0):
+			releaseGpuMemory = True
+	if(debugDeleteGPUcache):
+		releaseGpuMemory = True
+	if(releaseGpuMemory):
+		if(pt.cuda.is_available()):
+			gc.collect()
+			pt.cuda.empty_cache()
+			pt.cuda.ipc_collect()
+	return
 
 def buildSequenceWithDelimiters(sequence, tokens):
 	if(conceptColumnsDelimitByPOS):
@@ -258,7 +277,8 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenc
 				print("warning: inference skipped due to missing concept column delimiter detection in sequence")
 			else:
 				# Process each concept word in the sequence (predict)
-				GIAANNproto_prediction.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens)
+				with pt.no_grad():
+					GIAANNproto_prediction.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens)
 		else:
 			# Process each concept word in the sequence (train)
 			trained = GIAANNproto_databaseNetworkTrainExcitation.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)
@@ -274,9 +294,7 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenc
 					# Visualize the complete graph every time a new sequence is parsed by the application.
 					GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumns, False, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+generateDrawSequenceIndex(sequenceIndex))
 
-		if(debugDeleteGPUcache):
-			if(pt.cuda.is_available()):
-				pt.cuda.empty_cache()
+		releaseRuntimeGpuMemory(sequenceCount)
 
 	# Break if we've reached the maximum number of sequences
 	sequenceCount += 1

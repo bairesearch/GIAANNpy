@@ -240,6 +240,11 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	conceptColumnIndex = int(targetPreviousColumnIndex)
 	conceptColumnFeatureIndex = int(targetFeatureIndex)
 	conceptActivationState = None
+	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
+	globalFeatureNeuronsActivation = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivationIndex]
+	globalFeatureNeuronsTime = None
+	if(inferenceUseNeuronFeaturePropertiesTime):
+		globalFeatureNeuronsTime = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesTimeIndex]
 	if(predictionColumnsMustActivateConceptFeature):
 		conceptActivationState = initialiseConceptActivationState(conceptColumnIndex, conceptColumnFeatureIndex)
 	observedColumnsDict = sequenceObservedColumns.observedColumnsDict  # key: lemma, value: ObservedColumn	#every observed column in inference (seed and prediction phases)
@@ -253,7 +258,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 		for wordSeedIndex in range(numSeedTokens):
 			sequenceWordIndex = wordSeedIndex
 			wordPredictionIndex = wordSeedIndex
-			featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, seedPhase=True)
+			featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, seedPhase=True)
 			conceptColumnIndex = int(conceptColumnIndexNext)
 			conceptColumnFeatureIndex = int(conceptColumnFeatureIndexNext)
 			seedTokensProcessed += 1
@@ -262,7 +267,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 		#predict next tokens;
 		for wordPredictionIndex in range(numPredictionTokens):
 			sequenceWordIndex = numSeedTokens + wordPredictionIndex
-			featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState)
+			featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime)
 			conceptColumnIndex = int(conceptColumnIndexNext)
 			conceptColumnFeatureIndex = int(conceptColumnFeatureIndexNext)
 			predictionTokensProcessed += 1
@@ -276,8 +281,12 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 		pass
 	if(debugPrintTotalInferenceTokens):
 		addTotalInferenceTokens(seedTokensProcessed, predictionTokensProcessed)
+	if(drawNetworkDuringInference):
+		databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivationIndex)
+		if(inferenceUseNeuronFeaturePropertiesTime):
+			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTimeIndex)
 
-def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, seedPhase=False):
+def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, seedPhase=False):
 	
 	#intialise function variables;
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
@@ -286,6 +295,8 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	predictionCandidatesAvailable = True
 	if(conceptColumnIndex is None or conceptColumnFeatureIndex is None):
 		raise RuntimeError("processColumnInferencePrediction error: expected single concept/feature prediction pair")
+	if(globalFeatureNeuronsActivation is None):
+		raise RuntimeError("processColumnInferencePrediction error: globalFeatureNeuronsActivation is None")
 	conceptColumnIndexTensor = pt.tensor([int(conceptColumnIndex)], dtype=pt.long)
 	conceptColumnFeatureIndexTensor = pt.tensor([int(conceptColumnFeatureIndex)], dtype=pt.long)
 	conceptColumnIndexActivation = int(conceptColumnIndex)
@@ -303,16 +314,12 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		#activate source token (incremental seed during train)
 			#if(wordPredictionIndex == 1) will reactivate first seed token column feature (as it was not saved during wordPredictionIndex==0)
 		branchIndex = 0
-		indicesToUpdateList = [arrayIndexPropertiesActivationIndex, branchIndex, arrayIndexSegmentLast, int(conceptColumnIndex), int(conceptColumnFeatureIndex)]
-		databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.addElementValueToSparseTensor(databaseNetworkObject.globalFeatureNeurons, indicesToUpdateList, j1)
+		indicesToUpdateList = [branchIndex, arrayIndexSegmentLast, int(conceptColumnIndex), int(conceptColumnFeatureIndex)]
+		globalFeatureNeuronsActivation = GIAANNproto_sparseTensors.addElementValueToSparseTensor(globalFeatureNeuronsActivation, indicesToUpdateList, j1)
 	
-	#set globalFeatureNeuronsActivation;
-	globalFeatureNeuronsActivation = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivationIndex]
-	#print("1 globalFeatureNeuronsActivation = ", globalFeatureNeuronsActivation)
 	globalFeatureNeuronsStrength = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesStrengthIndex]
-	globalFeatureNeuronsTime = None
-	if(inferenceUseNeuronFeaturePropertiesTime):
-		globalFeatureNeuronsTime = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesTimeIndex]
+	if(inferenceUseNeuronFeaturePropertiesTime and globalFeatureNeuronsTime is None):
+		raise RuntimeError("processColumnInferencePrediction error: globalFeatureNeuronsTime is None while inferenceUseNeuronFeaturePropertiesTime")
 	sequenceColumnIndex = None
 	if(inferenceUseNeuronFeaturePropertiesTime):
 		if(useSANIcolumns or useSANIfeaturesAndColumns):
@@ -404,12 +411,8 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 			observedColumn = loadObservedColumnInference(databaseNetworkObject, observedColumnsDict, sourceConceptIndexValue, sequenceWordIndex)
 			featureConnections = observedColumn.featureConnections
 			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = GIAANNproto_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex)
-			if(inferenceUseNeuronFeaturePropertiesTime):
-				databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTimeIndex)
 		else:
 			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = GIAANNproto_predictionActivate.processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex)
-			if(inferenceUseNeuronFeaturePropertiesTime):
-				databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTimeIndex)
 	else:
 		#activation targets have already been activated
 		sequenceObservedColumnsPrediction = SequenceObservedColumnsDraw(databaseNetworkObject, observedColumnsDict)
@@ -433,9 +436,6 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 				modifier = 0
 			globalFeatureNeuronsActivationOrig = globalFeatureNeuronsActivation
 			globalFeatureNeuronsActivation = GIAANNproto_sparseTensors.modifySparseTensor(globalFeatureNeuronsActivation, indicesToUpdate, modifier, multiply=False)
-			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivationIndex)
-			if(inferenceUseNeuronFeaturePropertiesTime):
-				databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTimeIndex)
 			if(predictionColumnsMustActivateConceptFeature):
 				conceptActivationState = updateConceptActivationState(conceptActivationState, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation)
 	
@@ -462,9 +462,8 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		conceptColumnIndexSource = int(conceptColumnIndexNext)
 		conceptColumnFeatureIndexSource = int(conceptColumnFeatureIndexNext)
 		branchIndex = 0
-		indicesToUpdateList = [arrayIndexPropertiesActivationIndex, branchIndex, arrayIndexSegmentLast, conceptColumnIndexSource, conceptColumnFeatureIndexSource]
-		databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.addElementValueToSparseTensor(databaseNetworkObject.globalFeatureNeurons, indicesToUpdateList, j1)
-		globalFeatureNeuronsActivation = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivationIndex]
+		indicesToUpdateList = [branchIndex, arrayIndexSegmentLast, conceptColumnIndexSource, conceptColumnFeatureIndexSource]
+		globalFeatureNeuronsActivation = GIAANNproto_sparseTensors.addElementValueToSparseTensor(globalFeatureNeuronsActivation, indicesToUpdateList, j1)
 		conceptColumnIndexPred = conceptColumnIndexNext	#temporarily assign prediction from seed target for print only
 		conceptColumnFeatureIndexPred = conceptColumnFeatureIndexNext	#temporarily assign prediction from seed target for print only
 	else:	
@@ -564,5 +563,8 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	#draw network; 
 	if(drawNetworkDuringInference):
 		#FUTURE: convert globalFeatureNeuronsActivation back to globalFeatureNeurons for draw
+		databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivationIndex)
+		if(inferenceUseNeuronFeaturePropertiesTime):
+			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTimeIndex)
 		GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumnsPrediction, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+generateDrawSequenceIndex(sequenceWordIndex))
-	return featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState
+	return featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime

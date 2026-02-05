@@ -83,6 +83,11 @@ if(useInference):
 else:
 	useGPUsparse = True		#default: True	#orig: False	#slight performance increase during train (does not use significant additional GPU ram during train)
 useGPUsparseStrict = True	#orig: False	#enforce strict sparse device during transfer to/from dense tensors
+runtimeReleaseGPUMemory = False	#default: True	#aggressively release cached CUDA memory after sequence processing
+runtimeReleaseGPUMemoryEverySequenceCount = 1	#default: 1	#only apply release every N processed sequences
+if(runtimeReleaseGPUMemory):
+	if(runtimeReleaseGPUMemoryEverySequenceCount <= 0):
+		raise RuntimeError("runtimeReleaseGPUMemoryEverySequenceCount must be > 0")
 
 
 #Optimisations;
@@ -404,7 +409,7 @@ if(useInference):
 
 
 #Database save paths;
-inferencePromptFile = databaseFolder + 'inference_prompt.txt'
+inferencePromptFile = databaseFolder + 'inference_prompt.txt'	#inference_prompt.txt
 conceptColumnsDictFile = databaseFolder + 'conceptColumnsDict.pkl'
 conceptFeaturesDictFile = databaseFolder + 'conceptFeaturesDict.pkl'
 observedColumnsDir = databaseFolder + 'observedColumns'
@@ -652,6 +657,8 @@ if(debugPrintConfiguration):
 	print("useGPUdense:", useGPUdense)
 	print("useGPUsparse:", useGPUsparse)
 	print("useGPUsparseStrict:", useGPUsparseStrict)
+	print("runtimeReleaseGPUMemory:", runtimeReleaseGPUMemory)
+	print("runtimeReleaseGPUMemoryEverySequenceCount:", runtimeReleaseGPUMemoryEverySequenceCount)
 	print("inferenceOnlyRetainPredictedTargetObservedColumn:", inferenceOnlyRetainPredictedTargetObservedColumn)
 	print("inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch:", inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch)
 	print("")

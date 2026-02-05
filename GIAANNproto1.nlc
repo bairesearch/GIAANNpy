@@ -487,3 +487,12 @@ MANUAL; - rename drawNetworkDuringInferencePredict to drawNetworkDuringInference
 - implement option inferenceAddNewFeatures=True - add a controlled "expansion" phase [to support inference on test set when it contains concept columns/features that are not present in the train set]. Run a short additional training pass on the test set without updating connection strengths/permanence (only build missing columns/features), then run inference.
 - if inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=False, then never execute ensurePredictionStateAvailable:raisePredictionConnectivityError, as it is always using the target not the prediction as sequence input - during both the seed and target phase of inference.
 - implement option enforceDirectConnectionsIgnoreSeed=True - ignore predictionEnsureConnectedToPreviousPrediction and ensurePredictionStateAvailable checks during the seed phase of inference.
+
+---
+v1j (Codex IDE GPT-5.3-Codex):
+- add proto GIAANNproto1j1a - reduce inference VRAM (for useInference:useGPUsparse=True):
+	- update GIAANNproto_sequenceObservedColumnsExcitation - skip dense SequenceObservedColumns arrays during inference when drawing is disabled to avoid large to_dense() allocations.
+	- update GIAANNproto_databaseNetworkExcitation - store globalFeatureNeuronsBackup (and connections, if present) on CPU and restore to GPU only when needed. This removes the GPU-resident backup copy.
+	- update GIAANNproto_main - wrap inference in pt.no_grad() to eliminate autograd allocations without triggering sparse inference-tensor version-counter errors.
+	- add option runtimeReleaseGPUMemory - runtime GPU cleanup feature that executes releaseRuntimeGpuMemory(sequenceCount) after each processed sequence (processSequence)
+	- update activation/time sparse slices locally and removing per-token full global sparse tensor rewrites

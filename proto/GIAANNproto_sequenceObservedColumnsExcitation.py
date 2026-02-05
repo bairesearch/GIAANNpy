@@ -81,7 +81,7 @@ class SequenceObservedColumns:
 			
 		# Collect all feature words from observed columns
 		self.tokens = tokens
-		skipObservedColumnArrays = inferenceMode and inferenceOnlyRetainPredictedTargetObservedColumn
+		skipObservedColumnArrays = inferenceMode and (inferenceOnlyRetainPredictedTargetObservedColumn or (not drawNetworkDuringInference and not drawSequenceObservedColumns and not drawAllColumns))
 		if(not skipObservedColumnArrays):
 			#identify feature indices from complete ObservedColumns.featureNeurons or globalFeatureNeurons feature lists currently stored in SequenceObservedColumns.featureNeurons	#required for useInference
 			observedColumn = list(observedColumnsDict.values())[0]	#all features (including words) are identical per observed column

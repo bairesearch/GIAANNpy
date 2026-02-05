@@ -46,15 +46,23 @@ class DatabaseNetworkClass():
 				self.conceptFeaturesReferenceSetDelimiterList = conceptFeaturesReferenceSetDelimiterList
 
 def backupGlobalArrays(databaseNetworkObject):
-	databaseNetworkObject.globalFeatureNeuronsBackup = databaseNetworkObject.globalFeatureNeurons.clone()
+	if(databaseNetworkObject.globalFeatureNeurons is None):
+		raise RuntimeError("backupGlobalArrays error: globalFeatureNeurons is None")
+	backupDevice = pt.device("cpu")
+	databaseNetworkObject.globalFeatureNeuronsBackup = databaseNetworkObject.globalFeatureNeurons.coalesce().to(backupDevice)
 	if(databaseNetworkObject.globalFeatureConnections is not None):
-		databaseNetworkObject.globalFeatureConnectionsBackup = databaseNetworkObject.globalFeatureConnections.clone()
+		databaseNetworkObject.globalFeatureConnectionsBackup = databaseNetworkObject.globalFeatureConnections.coalesce().to(backupDevice)
 	else:
 		databaseNetworkObject.globalFeatureConnectionsBackup = None
 		
 def restoreGlobalArrays(databaseNetworkObject):
-	databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeuronsBackup
-	databaseNetworkObject.globalFeatureConnections = databaseNetworkObject.globalFeatureConnectionsBackup
+	if(databaseNetworkObject.globalFeatureNeuronsBackup is None):
+		raise RuntimeError("restoreGlobalArrays error: globalFeatureNeuronsBackup is None")
+	databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeuronsBackup.to(deviceSparse)
+	if(databaseNetworkObject.globalFeatureConnectionsBackup is not None):
+		databaseNetworkObject.globalFeatureConnections = databaseNetworkObject.globalFeatureConnectionsBackup.to(deviceSparse)
+	else:
+		databaseNetworkObject.globalFeatureConnections = None
 
 def ensureGlobalFeatureNeuronsSize(databaseNetworkObject, updateBackup):
 	expanded = False
@@ -71,7 +79,8 @@ def ensureGlobalFeatureNeuronsSize(databaseNetworkObject, updateBackup):
 		if(databaseNetworkObject.globalFeatureNeuronsBackup.shape[3] < databaseNetworkObject.c or databaseNetworkObject.globalFeatureNeuronsBackup.shape[4] < databaseNetworkObject.f):
 			newBackupShape = (arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
 			databaseNetworkObject.globalFeatureNeuronsBackup = databaseNetworkObject.globalFeatureNeuronsBackup.coalesce()
-			databaseNetworkObject.globalFeatureNeuronsBackup = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeuronsBackup.indices(), databaseNetworkObject.globalFeatureNeuronsBackup.values(), size=newBackupShape, dtype=arrayType, device=deviceSparse)
+			backupDevice = databaseNetworkObject.globalFeatureNeuronsBackup.device
+			databaseNetworkObject.globalFeatureNeuronsBackup = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeuronsBackup.indices(), databaseNetworkObject.globalFeatureNeuronsBackup.values(), size=newBackupShape, dtype=arrayType, device=backupDevice)
 			expanded = True
 	return expanded
 
