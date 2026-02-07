@@ -499,3 +499,5 @@ v1j (Codex IDE GPT-5.3-Codex):
 - update processColumnInferencePrediction() - split all marked sections into subfunctions
 - make debugPrintInferenceTop1Accuracy independent of inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures
 - patch processConceptWordsInference() so top-1 accounting is padded with zero-accuracy entries for any unprocessed seed/prediction tokens after premature termination
+- add option datasetOscar
+- patch inferenceBeamSearch indentation (inactive execution path)

@@ -35,37 +35,58 @@ drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype 
 if(useInference):
 	drawNetworkDuringInference = False	#default: False
 	inferenceTrainFirstSequences = True	#default: True	#orig: True	#True: trains first sequences in inference_prompt.txt, performs inference only on last sequence; False: run inference on every sequence as independent seed/target prompts
-	inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True	#True: activate next column features using current prediction; False: use current target (default top-1 accuracy measurement)
+	inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: True	#orig: True	#True: activate next column features using current prediction; False: use current target (default top-1 accuracy measurement)
 numSeedTokensInference = 12	#default: 5, 8, 12	#this is also set during train phase only so that the derived numberOfSegments always matches inference phase
 inferenceAddNewFeatures = True	#default: True	#orig: False	#run a controlled expansion pass during inference to add missing columns/features without training updates
 
 
 #Database;
 databaseFolder = "../database/"	#default: "../database/"	#performance: "/media/user/ssdpro/GIAANN/database/"	#orig: ""
-trainMaxSequences = 100000		#dev: 10, 500, 5000, 10000, 100000 	#default: 1000000	  #adjust as needed	#max sequences for train
+trainMaxSequences = 100		#dev: 10, 500, 5000, 10000, 100000 	#default: 1000000	  #adjust as needed	#max sequences for train
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 
 
-#Dataset;
+#Dataset;	
+datasetOscar = False
+datasetWikipedia = True	#default: True	#orig: True
 datasetsLibrary4plus = False	#default: False	#orig: False	#set False during dev to maintain benchmark consistency
-if(datasetsLibrary4plus):
-	datasetName = "wikimedia/wikipedia"
-	datasetCfg = "20231101.en"
+if(datasetOscar):
+	datasetName = "oscar-corpus/OSCAR-2201"
+	datasetCfg = "en"
+	datasetsLibrary4plus = True
+	useLocalDataset = False	#not supported
+elif(datasetWikipedia):
+	if(datasetsLibrary4plus):
+		datasetName = "wikimedia/wikipedia"
+		datasetCfg = "20231101.en"
+	else:
+		datasetName = "wikipedia"
+		datasetCfg = "20220301.en"
+	useLocalDataset = True	#default: True	#orig: False (stream)	#use local dataset	#automatic huggingface access to dataset is unreliable
 else:
-	datasetName = "wikipedia"
-	datasetCfg = "20220301.en"
-useLocalDataset = True	#default: True	#orig: False (stream)	#use local dataset	#automatic huggingface access to dataset is unreliable
+	raise RuntimeError("Dataset selection error: enable either datasetOscar or datasetWikipedia")
 if(useLocalDataset):
 	datasetFolder = "../../dataset/"
-	useLocalDatasetDownloadManual = True	#default: True	#manual download dataset files into datasetFolder	#automatic huggingface access to dataset is unreliable
+	if(datasetWikipedia):
+		useLocalDatasetDownloadManual = True	#default: True	#manual download dataset files into datasetFolder	#automatic huggingface access to dataset is unreliable
+	elif(datasetOscar):
+		useLocalDatasetDownloadManual = False	#OSCAR2201 uses custom HF dataset code and non-parquet source files; do not use manual parquet downloader
+	else:
+		raise RuntimeError("Dataset selection error: unsupported dataset for useLocalDatasetDownloadManual configuration")
 	datasetProcessedCacheFolderName = "processed_dataset_cache"	#manual name for processed dataset cache
 	datasetProcessedCacheFolder = datasetFolder + datasetProcessedCacheFolderName + "/"
 else:
 	useLocalDatasetDownloadManual = False
 trainTestSet = False	#default: False	#only set True to generate an inference test set (with debugPrintTrainSequenceRaw=True)
 if(trainTestSet):
-	testSetRatio = 0.1	#ratio of articles in dataset to be used for test (vs train) set - taken from end of dataset
+	if(datasetWikipedia):
+		testSetRatio = 0.1	#ratio of articles in dataset to be used for test (vs train) set - taken from end of dataset
+	elif(datasetOscar):
+		testSetStartOffset = 0	#start offset of entries to include in test set
+		testSetSize = 1000	#number of entries to include in test set
+	else:
+		raise RuntimeError("trainTestSet configuration error: unsupported dataset selection")
 	assert useLocalDataset	#required for efficiency
 
 
@@ -146,6 +167,7 @@ if(enforceDirectConnections):
 else:
 	enforceDirectConnectionsSANI = False
 	enforceDirectConnectionsMinWordDistance = False
+	enforceDirectConnectionsIgnoreSeed = False
 if(enforceDirectConnectionsSANI):
 	useSANI = True	#sequentially activated neuronal input (divide dendrites into segments)	#override
 	enforceDirectConnectionsSANIminimal = False	#default: False	#orig: True
@@ -352,7 +374,7 @@ else:
 	debugTerminateOnConceptColumnsDelimitByPOSwarning = True
 debugDeleteGPUcache = False
 
-debugLimitFeatures = False
+debugLimitFeatures = False	#can be used to recover database for inference if run out of ram during training
 if(debugLimitFeatures):
 	debugLimitFeaturesCMax = 520437
 	debugLimitFeaturesFMax = 80955

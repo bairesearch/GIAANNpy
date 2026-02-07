@@ -47,9 +47,9 @@ import GIAANNproto_databaseNetworkTrainExcitation
 if(useInference):
 	import GIAANNproto_prediction
 
-# Load the Wikipedia dataset using Hugging Face datasets
+# Load the selected dataset using Hugging Face datasets
 if(not useInference):
-	dataset = GIAANNproto_datasets.loadWikipediaDataset()
+	dataset = GIAANNproto_datasets.loadDataset()
 
 # Initialize spaCy model
 nlp = spacy.load(spacyModelName)
@@ -145,8 +145,9 @@ def expandSequenceForInference(databaseNetworkObject, sequence):
 	return
 	
 def processDataset(dataset):
-	for articleIndex, article in enumerate(dataset):
-		processArticle(article['text'], articleIndex)
+	for articleIndex, datasetEntry in enumerate(dataset):
+		text = GIAANNproto_datasets.getDatasetEntryText(datasetEntry, articleIndex)
+		processArticle(text, articleIndex)
 		if(sequenceCount == trainMaxSequences and useMaxSequences):
 			break
 

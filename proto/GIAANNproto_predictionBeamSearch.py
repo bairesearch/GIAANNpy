@@ -463,7 +463,7 @@ def selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationV
 			nodes, adjustedConnection = prepareBeamNodes(databaseNetworkObject, nodes, conceptActivationState, constraintState, strengthLookup, maxFeatures)
 			if(len(nodes) == 0):
 				continue
-				candidates.append({"columnIndex": nodes[0][0], "featureIndex": nodes[0][1], "nodes": nodes, "connectionValue": adjustedConnection, "activationValue": value})
+			candidates.append({"columnIndex": nodes[0][0], "featureIndex": nodes[0][1], "nodes": nodes, "connectionValue": adjustedConnection, "activationValue": value})
 			break
 		if(len(candidates) == candidateLimit):
 			break
