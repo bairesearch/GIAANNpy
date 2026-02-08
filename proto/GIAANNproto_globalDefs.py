@@ -35,14 +35,14 @@ drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype 
 if(useInference):
 	drawNetworkDuringInference = False	#default: False
 	inferenceTrainFirstSequences = True	#default: True	#orig: True	#True: trains first sequences in inference_prompt.txt, performs inference only on last sequence; False: run inference on every sequence as independent seed/target prompts
-	inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: True	#orig: True	#True: activate next column features using current prediction; False: use current target (default top-1 accuracy measurement)
+	inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True	#True: activate next column features using current prediction; False: use current target (default top-1 accuracy measurement)
 numSeedTokensInference = 12	#default: 5, 8, 12	#this is also set during train phase only so that the derived numberOfSegments always matches inference phase
 inferenceAddNewFeatures = True	#default: True	#orig: False	#run a controlled expansion pass during inference to add missing columns/features without training updates
 
 
 #Database;
 databaseFolder = "../database/"	#default: "../database/"	#performance: "/media/user/ssdpro/GIAANN/database/"	#orig: ""
-trainMaxSequences = 100		#dev: 10, 500, 5000, 10000, 100000 	#default: 1000000	  #adjust as needed	#max sequences for train
+trainMaxSequences = 100000		#dev: 10, 500, 5000, 10000, 100000 	#default: 1000000	  #adjust as needed	#max sequences for train
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 
@@ -93,7 +93,7 @@ if(trainTestSet):
 #Multisentence predictions;
 multisentencePredictions = False	#default: False	#each sequence comprises multiple sentences	#requires higher GPU RAM for train
 if(multisentencePredictions):
-	numSentencesPerSequence = 3	#default: 3
+	numSentencesPerSequence = 3 #default: 3
 else:
 	numSentencesPerSequence = 1
 
@@ -185,7 +185,7 @@ predictionEnsureConnectedToPreviousPrediction = True	#default: True	#ensure ever
 conceptColumnsDelimitByPOS = True	#mandatory: True	#orig: False	#closer to original GIA specification	#FUTURE: still requires working for edge cases
 if(conceptColumnsDelimitByPOS):
 	conceptColumnsDelimiterPOStypes = ['VERB', 'ADP']	#deterministic reference set delimiters (GIA actions/conditions)
-	conceptColumnsDelimiterWordTypes = [';', ':', '.', '?', '!']	#deterministic reference set delimiters (GIA logical conditions)
+	conceptColumnsDelimiterWordTypes = [';', ':', '.', '?', '!', '.']	#deterministic reference set delimiters (GIA logical conditions)
 	conceptColumnsDelimiterTagTypes = ['POS']	#eg possessive apostrophe "'s" (singular) or "'" (plural) -> pos: PART, tag: POS.
 	attachTrailingTokensToLastConcept = True	#default: False	#attach tokens after the final concept to that last column
 	detectReferenceSetDelimitersBetweenNouns = True	#default: assign reference set delimiters if they appear between two nouns (without designated reference set delimiter types)
@@ -732,6 +732,9 @@ if(debugPrintConfiguration):
 			print("arrayNumberOfSegmentsColumnDistance: ", arrayNumberOfSegmentsColumnDistance)
 			print("arrayNumberOfSegmentsFeatureDistance: ", arrayNumberOfSegmentsFeatureDistance)
 		print("arrayNumberOfSegments: ", arrayNumberOfSegments)
+		if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
+			print("algorithmMatrixSANIenforceRequirement: ", algorithmMatrixSANIenforceRequirement)
+		print("enforceSequentialActivation: ", enforceSequentialActivation)
 	print("")
 	print("************************************ ")
 	
