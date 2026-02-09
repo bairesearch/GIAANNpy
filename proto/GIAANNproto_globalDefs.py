@@ -25,7 +25,6 @@ import sys
 #Recent debug vars;
 debugPrintConfiguration = True	#print common global defs configuration
 debugPrintTotalInferenceTokens = False	#print total number of inference tokens in seed phase, prediction phase, and both phases (summed across all sequences) 
-debugPrintTotalFeatures = False	#print c+f upon load
 debugPrintInferenceTop1Accuracy = True	#print inference top-1 accuracy
 
 
@@ -82,12 +81,15 @@ trainTestSet = False	#default: False	#only set True to generate an inference tes
 if(trainTestSet):
 	if(datasetWikipedia):
 		testSetRatio = 0.1	#ratio of articles in dataset to be used for test (vs train) set - taken from end of dataset
+		assert useLocalDataset	#required for efficiency
 	elif(datasetOscar):
-		testSetStartOffset = 0	#start offset of entries to include in test set
+		trainMaxSequencesEver = 1000000	#highest value of trainMaxSequences expected during current dev (using this instead of a much high value closer to 1-testSetRatio because testSetStartOffset takes time to load)
+		numSentencesPerSequenceEver = 3
+		datasetOscarAverageEligibleSentencesPerArticle = 32	#measured across 1m raw sentences (therefore appropriate for trainMaxSequencesEver=1m)
+		testSetStartOffset = int(trainMaxSequencesEver / datasetOscarAverageEligibleSentencesPerArticle)*numSentencesPerSequenceEver
 		testSetSize = 1000	#number of entries to include in test set
 	else:
 		raise RuntimeError("trainTestSet configuration error: unsupported dataset selection")
-	assert useLocalDataset	#required for efficiency
 
 
 #Multisentence predictions;
@@ -129,8 +131,11 @@ else:
 #Dendritic branches;
 multipleDendriticBranches = True	#default: True	#orig: False
 if(multipleDendriticBranches):
-	numberOfDendriticBranches = 2	#default: 5, 2	#affects train+inference RAM
 	randomlyAssignBranches = False	#optional	#orig: False
+	if(randomlyAssignBranches):
+		numberOfDendriticBranches = 5
+	else:
+		numberOfDendriticBranches = 2	#default: 5, 2	#affects train+inference RAM
 else:
 	numberOfDendriticBranches = 1
 	randomlyAssignBranches = False
@@ -364,6 +369,7 @@ debugPrintTrainSequenceConceptAssignment = False	#print each training sequence s
 debugPrintTrainSequenceConceptAssignmentByLine = False	#display each column on a new line
 debugPrintTrainSequenceDelimiters = False	#print each training sequence with delimiters
 debugPrintTrainSequencePOS = False	#print each training sequence with POS tags
+debugPrintTrainSequenceCount = False	#print each training sequence count
 
 debugTerminateInferenceOnPredictionTargetMismatch = False
 debugTerminateInferenceOnNoPredictionCandidatesAvailable = False
@@ -374,10 +380,11 @@ else:
 	debugTerminateOnConceptColumnsDelimitByPOSwarning = True
 debugDeleteGPUcache = False
 
+debugPrintTotalFeatures = False	#print c+f upon load
 debugLimitFeatures = False	#can be used to recover database for inference if run out of ram during training
 if(debugLimitFeatures):
-	debugLimitFeaturesCMax = 520437
-	debugLimitFeaturesFMax = 80955
+	debugLimitFeaturesCMax = 207910
+	debugLimitFeaturesFMax = 50089
 
 printPredictionsDuringInferencePredict = True
 printPredictionsDuringInferencePredictBeamSearch = False
@@ -522,7 +529,9 @@ if(useSANI):
 			enforceSequentialActivation = False
 		else:
 			enforceSequentialActivation = True	#optional	#default: True #orig: True	#only activation next segment if previous segment activated
-	
+	else:
+		enforceSequentialActivation = False
+
 	enforceActivationAcrossSegmentsIgnoreInternalColumn = False
 	if(useSANIcolumns):	
 		enforceActivationAcrossSegmentsIgnoreInternalColumn = True	#ignore internal column as this column features do not necessarily have an input from the current column

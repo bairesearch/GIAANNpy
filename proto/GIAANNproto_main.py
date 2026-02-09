@@ -266,7 +266,9 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenc
 			print(sequenceRaw)
 		if(debugPrintTrainSequenceDefault):
 			print(f"Processing sequenceCount: {sequenceCount}, {sequence.text}")	#"{sequence.text}"	#"Processing sequenceCount: {sequenceCount}, {sequence.text}"	#article: {articleIndex}, sequence: {sequenceIndex}
-
+		if(debugPrintTrainSequenceCount):
+			print(f"Processing sequenceCount: {sequenceCount}")	
+			
 		# Second pass: Create observed_columns_dict
 		observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNproto_sequenceConcepts.secondPass(databaseNetworkObject, tokens, inferenceMode)
 

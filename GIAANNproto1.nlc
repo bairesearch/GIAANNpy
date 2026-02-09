@@ -502,3 +502,4 @@ v1j (Codex IDE GPT-5.3-Codex):
 - add option datasetOscar
 - patch inferenceBeamSearch indentation (inactive execution path)
 - add fullstop to conceptColumnsDelimiterWordTypes (required for multisentencePredictions)
+- update datasetOscar:testSetStartOffset
