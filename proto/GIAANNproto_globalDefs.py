@@ -26,6 +26,7 @@ import sys
 debugPrintConfiguration = True	#print common global defs configuration
 debugPrintTotalInferenceTokens = False	#print total number of inference tokens in seed phase, prediction phase, and both phases (summed across all sequences) 
 debugPrintInferenceTop1Accuracy = True	#print inference top-1 accuracy
+debugWorkaroundPreviousUngatedShutdownSaveBug = False
 
 
 #Train/inference mode selection;
@@ -117,7 +118,7 @@ if(runtimeReleaseGPUMemory):
 #Optimisations;
 inferenceOnlyRetainPredictedTargetObservedColumn = False	#default: False	#orig: False	#load/evict one observed column per prediction step	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
 inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch = False	#default: False	#orig: False	#True: retain only current beam-search target(s); False: retain all beam-search targets	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
-
+trainStoreFeatureMapsGlobally = True	#default: True	#True: avoid per-column persistence of global feature index maps; False: preserve legacy per-column map persistence
 
 #Segment activation time;
 if(useInference):

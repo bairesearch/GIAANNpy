@@ -72,6 +72,7 @@ GIA ANN is designed to be a biologically feasible algorithm, and exhibits these 
 * continuous learning (dynamic update of network knowledge without compromising prior learning).
 * unlimited context windows.
 * biologically feasible circuitry and learning algorithm (no backpropagation).
+* robustness to hallucination.
 
 It likewise supports a number features of classical artificial neural networks such as autoregressive training/prediction and reinforcement learning.
 

@@ -142,6 +142,8 @@ def processFeatureDetection(databaseNetworkObject, tokenIndex, token, tokens, al
 			featureIndex = len(databaseNetworkObject.conceptFeaturesDict)
 			databaseNetworkObject.conceptFeaturesDict[featureWord] = featureIndex
 			databaseNetworkObject.conceptFeaturesList.append(featureWord)
+			if(trainStoreFeatureMapsGlobally):
+				databaseNetworkObject.conceptFeaturesIndexToWordDict[featureIndex] = featureWord
 			isDelimiter, isDelimiterDeterministic, isDelimiterProbabilistic = isFeaturePOSreferenceSetDelimiterType(featureWord, token, tokens, tokenIndex)
 			if(conceptColumnsDelimitByPOS):
 				databaseNetworkObject.sequenceReferenceSetDelimiterList[tokenIndex] = isDelimiter

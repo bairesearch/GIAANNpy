@@ -62,6 +62,16 @@ def loadFeatureNeuronsGlobalFile():
 def adjustPropertyDimensions(tensor, tensorName):
 	propertyCount = tensor.shape[0]
 	result = tensor
+	if(debugWorkaroundPreviousUngatedShutdownSaveBug):
+		legacyTimePropertyIndex = None
+		if(arrayIndexPropertiesStrength):
+			legacyTimePropertyIndex = 1
+		else:
+			legacyTimePropertyIndex = 0
+		if(arrayIndexPropertiesPermanence):
+			legacyTimePropertyIndex += 1
+		if(arrayIndexPropertiesActivationCreate):
+			legacyTimePropertyIndex += 1
 	if(propertyCount == arrayNumberOfProperties):
 		result = tensor
 	elif(arrayIndexPropertiesActivationCreate and arrayIndexPropertiesActivationIndex is not None and propertyCount == arrayIndexPropertiesActivationIndex and propertyCount < arrayNumberOfProperties):
@@ -70,6 +80,8 @@ def adjustPropertyDimensions(tensor, tensorName):
 		result = insertPropertyDimension(tensor, arrayIndexPropertiesTimeIndex, arrayNumberOfProperties)
 	elif(arrayIndexPropertiesActivationCreate and not arrayIndexPropertiesActivation and propertyCount == arrayNumberOfProperties - 1):
 		result = insertPropertyDimension(tensor, arrayIndexPropertiesActivationIndex, arrayNumberOfProperties)
+	elif(debugWorkaroundPreviousUngatedShutdownSaveBug and (not arrayIndexPropertiesTimeCreate) and (legacyTimePropertyIndex is not None) and propertyCount == (arrayNumberOfProperties + 1)):
+		result = removePropertyDimension(tensor, legacyTimePropertyIndex, arrayNumberOfProperties, tensorName)
 	else:
 		raise RuntimeError(f"{tensorName} property dimension mismatch: expected {arrayNumberOfProperties}, got {propertyCount}")
 	return result
@@ -90,6 +102,30 @@ def insertPropertyDimension(tensor, insertIndex, targetPropertyCount):
 	zerosShape[0] = 1
 	zerosTensor = pt.zeros(zerosShape, dtype=tensor.dtype, device=tensor.device)
 	return pt.cat([tensor[:insertIndex], zerosTensor, tensor[insertIndex:]], dim=0)
+
+if(debugWorkaroundPreviousUngatedShutdownSaveBug):
+	def removePropertyDimension(tensor, removeIndex, targetPropertyCount, tensorName):
+		result = tensor
+		if(removeIndex < 0 or removeIndex >= tensor.shape[0]):
+			raise RuntimeError(f"{tensorName} property remove index out of range: {removeIndex}")
+		if(tensor.is_sparse):
+			tensor = tensor.coalesce()
+			indices = tensor.indices()
+			values = tensor.values()
+			keepMask = indices[0] != removeIndex
+			filteredIndices = indices[:, keepMask]
+			filteredValues = values[keepMask]
+			if(filteredIndices.numel() > 0):
+				filteredIndices = filteredIndices.clone()
+				shiftMask = filteredIndices[0] > removeIndex
+				if(shiftMask.any()):
+					filteredIndices[0, shiftMask] -= 1
+			newSize = list(tensor.size())
+			newSize[0] = targetPropertyCount
+			result = pt.sparse_coo_tensor(filteredIndices, filteredValues, size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
+		else:
+			result = pt.cat([tensor[:removeIndex], tensor[removeIndex+1:]], dim=0)
+		return result
 
 def adjustBranchDimensions(tensor, tensorName, expectedRank, branchCount=numberOfDendriticBranches):
 	if tensor.dim() == expectedRank:
@@ -142,41 +178,47 @@ def expandBranchDimensions(tensor, tensorName, branchCount):
 	raise RuntimeError(f"{tensorName} branch dimension mismatch: expected {branchCount}, got {currentBranches}")
 
 
-def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount):
-	# Save observed columns to disk
-	for observedColumn in observedColumnsDict.values():
-		observedColumn.saveToDisk()
+def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSaveGlobalState=False):
+	if not forceSaveGlobalState:
+		# Save observed columns to disk
+		for observedColumn in observedColumnsDict.values():
+			observedColumn.saveToDisk()
 
-	# Save global feature neuron arrays if not lowMem
-	if not lowMem:
-		if(saveGlobalFeatureNeuronsRate <= 0):
-			raise RuntimeError("saveData error: saveGlobalFeatureNeuronsRate must be > 0")
-		if((sequenceCount + 1) % saveGlobalFeatureNeuronsRate == 0):
+	saveGlobalState = ((sequenceCount + 1) % saveGlobalFeatureNeuronsRate == 0) or forceSaveGlobalState
+	if(saveGlobalState):
+		# Save global feature neuron arrays if not lowMem
+		if not lowMem:
 			saveTensor(databaseNetworkObject.globalFeatureNeurons, databaseFolder, globalFeatureNeuronsFile)
 
-	saveDictFile(conceptColumnsDictFile, databaseNetworkObject.conceptColumnsDict)
-	saveDictFile(conceptFeaturesDictFile, databaseNetworkObject.conceptFeaturesDict)
+		saveDictFile(conceptColumnsDictFile, databaseNetworkObject.conceptColumnsDict)
+		saveDictFile(conceptFeaturesDictFile, databaseNetworkObject.conceptFeaturesDict)
 
-	if(conceptColumnsDelimitByPOS):
-		if(detectReferenceSetDelimitersBetweenNouns):
-			conceptFeaturesReferenceSetDelimiterProbabilisticDict = dict(enumerate(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList))
-			saveDictFile(conceptFeaturesReferenceSetDelimiterProbabilisticListFile, conceptFeaturesReferenceSetDelimiterProbabilisticDict)
-			conceptFeaturesReferenceSetDelimiterDeterministicDict = dict(enumerate(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterDeterministicList))
-			saveDictFile(conceptFeaturesReferenceSetDelimiterDeterministicListFile, conceptFeaturesReferenceSetDelimiterDeterministicDict)
-		else:
-			conceptFeaturesReferenceSetDelimiterDict = dict(enumerate(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList))
-			saveDictFile(conceptFeaturesReferenceSetDelimiterListFile, conceptFeaturesReferenceSetDelimiterDict)
+		if(conceptColumnsDelimitByPOS):
+			if(detectReferenceSetDelimitersBetweenNouns):
+				conceptFeaturesReferenceSetDelimiterProbabilisticDict = dict(enumerate(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList))
+				saveDictFile(conceptFeaturesReferenceSetDelimiterProbabilisticListFile, conceptFeaturesReferenceSetDelimiterProbabilisticDict)
+				conceptFeaturesReferenceSetDelimiterDeterministicDict = dict(enumerate(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterDeterministicList))
+				saveDictFile(conceptFeaturesReferenceSetDelimiterDeterministicListFile, conceptFeaturesReferenceSetDelimiterDeterministicDict)
+			else:
+				conceptFeaturesReferenceSetDelimiterDict = dict(enumerate(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList))
+				saveDictFile(conceptFeaturesReferenceSetDelimiterListFile, conceptFeaturesReferenceSetDelimiterDict)
 		
 def observedColumnSaveToDisk(self):
 	"""
 	Save the observed column data to disk.
 	"""
-	data = {
-		'conceptIndex': self.conceptIndex,
-		'featureWordToIndex': self.featureWordToIndex,
-		'featureIndexToWord': self.featureIndexToWord,
-		'nextFeatureIndex': self.nextFeatureIndex
-	}
+	if(trainStoreFeatureMapsGlobally):
+		data = {
+			'conceptIndex': self.conceptIndex,
+			'nextFeatureIndex': self.nextFeatureIndex
+		}
+	else:
+		data = {
+			'conceptIndex': self.conceptIndex,
+			'featureWordToIndex': self.featureWordToIndex,
+			'featureIndexToWord': self.featureIndexToWord,
+			'nextFeatureIndex': self.nextFeatureIndex
+		}
 	# Save the data dictionary using pickle
 	with open(os.path.join(observedColumnsDir, f"{self.conceptIndex}_data.pkl"), 'wb') as f:
 		pickle.dump(data, f)
@@ -193,15 +235,20 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 	with open(os.path.join(observedColumnsDir, f"{conceptIndex}_data.pkl"), 'rb') as f:
 		data = pickle.load(f)
 	instance = cls(databaseNetworkObject, conceptIndex, lemma, i)
-	instance.featureWordToIndex = data['featureWordToIndex']
-	instance.featureIndexToWord = data['featureIndexToWord']
-	instance.nextFeatureIndex = data['nextFeatureIndex']
-	if(debugLimitFeatures):
-		instance.featureWordToIndex, instance.featureIndexToWord = applyDebugLimitFeatureIndexMaps(instance.featureWordToIndex, instance.featureIndexToWord, databaseNetworkObject.f, f"observedColumn.featureIndexMaps[{conceptIndex}]")
-		if(instance.nextFeatureIndex < 0):
-			raise RuntimeError("observedColumnLoadFromDisk error: nextFeatureIndex < 0")
-		if(instance.nextFeatureIndex > databaseNetworkObject.f):
-			instance.nextFeatureIndex = databaseNetworkObject.f
+	if(trainStoreFeatureMapsGlobally):
+		instance.featureWordToIndex = databaseNetworkObject.conceptFeaturesDict
+		instance.featureIndexToWord = databaseNetworkObject.conceptFeaturesIndexToWordDict
+		instance.nextFeatureIndex = len(databaseNetworkObject.conceptFeaturesDict) - 1
+	else:
+		instance.featureWordToIndex = data['featureWordToIndex']
+		instance.featureIndexToWord = data['featureIndexToWord']
+		instance.nextFeatureIndex = data['nextFeatureIndex']
+		if(debugLimitFeatures):
+			instance.featureWordToIndex, instance.featureIndexToWord = applyDebugLimitFeatureIndexMaps(instance.featureWordToIndex, instance.featureIndexToWord, databaseNetworkObject.f, f"observedColumn.featureIndexMaps[{conceptIndex}]")
+			if(instance.nextFeatureIndex < 0):
+				raise RuntimeError("observedColumnLoadFromDisk error: nextFeatureIndex < 0")
+			if(instance.nextFeatureIndex > databaseNetworkObject.f):
+				instance.nextFeatureIndex = databaseNetworkObject.f
 	# Load the tensors
 	instance.featureConnections = adjustPropertyDimensions(loadTensor(observedColumnsDir, f"{conceptIndex}_featureConnections"), f"observedColumn.featureConnections[{conceptIndex}]")
 	instance.featureConnections = adjustBranchDimensions(instance.featureConnections, f"observedColumn.featureConnections[{conceptIndex}]", expectedRank=6)

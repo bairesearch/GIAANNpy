@@ -503,3 +503,5 @@ v1j (Codex IDE GPT-5.3-Codex):
 - patch inferenceBeamSearch indentation (inactive execution path)
 - add fullstop to conceptColumnsDelimiterWordTypes (required for multisentencePredictions)
 - update datasetOscar:testSetStartOffset
+- add option trainStoreFeatureMapsGlobally - store feature maps once globally, not in every *_data.pkl (ensure database scales linearly with trained sequences)
+- only ever execute saveData() dictionary saves if((sequenceCount + 1) % saveGlobalFeatureNeuronsRate == 0)

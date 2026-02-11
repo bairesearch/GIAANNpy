@@ -82,6 +82,10 @@ def main():
 			GIAANNproto_prediction.printTotalInferenceTokens()
 		if(useInference and debugPrintInferenceTop1Accuracy):
 			GIAANNproto_prediction.printInferenceTop1Accuracy()
+	if(not useInference or inferenceTrainFirstSequences):
+		if(useSaveData):
+			GIAANNproto_databaseNetworkFilesExcitation.saveData(databaseNetworkObject, {}, sequenceCount, forceSaveGlobalState=True)
+			#only required if trainMaxSequences%saveGlobalFeatureNeuronsRate != 0
 
 def releaseRuntimeGpuMemory(sequenceCount):
 	if(sequenceCount < 0):

@@ -34,6 +34,7 @@ class DatabaseNetworkClass():
 		self.conceptColumnsList = conceptColumnsList
 		self.conceptFeaturesDict = conceptFeaturesDict
 		self.conceptFeaturesList = conceptFeaturesList
+		self.conceptFeaturesIndexToWordDict = dict(enumerate(conceptFeaturesList))
 		self.globalFeatureNeurons = globalFeatureNeurons
 		self.globalFeatureConnections = None
 		self.globalFeatureNeuronsBackup = None
@@ -197,23 +198,29 @@ class ObservedColumn:
 			self.featureNeurons = self.initialiseFeatureNeurons(databaseNetworkObject.f)
 
 		# Map from feature words to indices in feature neurons
-		self.featureWordToIndex = {}  # Maps feature words to indices
-		self.featureIndexToWord = {}  # Maps indices to feature words
-		if(useDedicatedConceptNames):
-			self.nextFeatureIndex = 1  # Start from 1 since index 0 is reserved for prime concept neuron
-			if(useDedicatedConceptNames2):
-				self.featureWordToIndex[variablePrimeConceptFeatureNeuronName] = featureIndexPrimeConceptNeuron
-				self.featureIndexToWord[featureIndexPrimeConceptNeuron] = variablePrimeConceptFeatureNeuronName
+		if(trainStoreFeatureMapsGlobally):
+			self.featureWordToIndex = databaseNetworkObject.conceptFeaturesDict
+			self.featureIndexToWord = databaseNetworkObject.conceptFeaturesIndexToWordDict
+			self.nextFeatureIndex = len(databaseNetworkObject.conceptFeaturesDict) - 1
+		else:
+			self.featureWordToIndex = {}  # Maps feature words to indices
+			self.featureIndexToWord = {}  # Maps indices to feature words
+			if(useDedicatedConceptNames):
+				self.nextFeatureIndex = 1  # Start from 1 since index 0 is reserved for prime concept neuron
+				if(useDedicatedConceptNames2):
+					self.featureWordToIndex[variablePrimeConceptFeatureNeuronName] = featureIndexPrimeConceptNeuron
+					self.featureIndexToWord[featureIndexPrimeConceptNeuron] = variablePrimeConceptFeatureNeuronName
 			
 		# Store all connections for each source column in a list of integer feature connection arrays, each of size f * c * f, where c is the length of the dictionary of columns, and f is the maximum number of feature neurons.
 		self.featureConnections = self.initialiseFeatureConnections(databaseNetworkObject.c, databaseNetworkObject.f) 
 
-		self.nextFeatureIndex = 0
-		for featureIndex in range(1, databaseNetworkObject.f, 1):
-			featureWord = databaseNetworkObject.conceptFeaturesList[featureIndex]
-			self.featureWordToIndex[featureWord] = featureIndex
-			self.featureIndexToWord[featureIndex] = featureWord
-			self.nextFeatureIndex += 1
+		if(not trainStoreFeatureMapsGlobally):
+			self.nextFeatureIndex = 0
+			for featureIndex in range(1, databaseNetworkObject.f, 1):
+				featureWord = databaseNetworkObject.conceptFeaturesList[featureIndex]
+				self.featureWordToIndex[featureWord] = featureIndex
+				self.featureIndexToWord[featureIndex] = featureWord
+				self.nextFeatureIndex += 1
 					
 	@staticmethod
 	def initialiseFeatureNeurons(f):
@@ -244,11 +251,14 @@ class ObservedColumn:
 				self.featureNeurons = self.featureNeurons.coalesce()
 				self.featureNeurons = pt.sparse_coo_tensor(self.featureNeurons.indices(), self.featureNeurons.values(), size=expandedSizeNeurons, dtype=arrayType, device=deviceSparse)
 
-			for featureIndex in range(loadF, newF):
-				featureWord = self.databaseNetworkObject.conceptFeaturesList[featureIndex]
-				self.featureWordToIndex[featureWord] = featureIndex
-				self.featureIndexToWord[featureIndex] = featureWord
-				self.nextFeatureIndex += 1
+			if(trainStoreFeatureMapsGlobally):
+				self.nextFeatureIndex = len(self.databaseNetworkObject.conceptFeaturesDict) - 1
+			else:
+				for featureIndex in range(loadF, newF):
+					featureWord = self.databaseNetworkObject.conceptFeaturesList[featureIndex]
+					self.featureWordToIndex[featureWord] = featureIndex
+					self.featureIndexToWord[featureIndex] = featureWord
+					self.nextFeatureIndex += 1
 
 	def saveToDisk(self):
 		GIAANNproto_databaseNetworkFilesExcitation.observedColumnSaveToDisk(self)
