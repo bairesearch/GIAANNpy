@@ -20,6 +20,7 @@ GIA ANN proto database Network Files Excitation
 import torch as pt
 import pickle
 import os
+import time
 
 from GIAANNproto_globalDefs import *
 
@@ -179,10 +180,18 @@ def expandBranchDimensions(tensor, tensorName, branchCount):
 
 
 def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSaveGlobalState=False):
+	saveDataStartTime = None
+	saveObservedColumnsStartTime = None
+	if(debugPrintTrainSectionTimes):
+		saveDataStartTime = time.perf_counter()
 	if not forceSaveGlobalState:
 		# Save observed columns to disk
+		if(debugPrintTrainSectionTimes):
+			saveObservedColumnsStartTime = time.perf_counter()
 		for observedColumn in observedColumnsDict.values():
 			observedColumn.saveToDisk()
+		if(debugPrintTrainSectionTimes):
+			debugTrainSectionTimesAdd(databaseNetworkObject, "saveData.observedColumn.saveToDisk", time.perf_counter() - saveObservedColumnsStartTime)
 
 	saveGlobalState = ((sequenceCount + 1) % saveGlobalFeatureNeuronsRate == 0) or forceSaveGlobalState
 	if(saveGlobalState):
@@ -202,6 +211,8 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 			else:
 				conceptFeaturesReferenceSetDelimiterDict = dict(enumerate(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList))
 				saveDictFile(conceptFeaturesReferenceSetDelimiterListFile, conceptFeaturesReferenceSetDelimiterDict)
+	if(debugPrintTrainSectionTimes):
+		debugTrainSectionTimesAdd(databaseNetworkObject, "saveData.total", time.perf_counter() - saveDataStartTime)
 		
 def observedColumnSaveToDisk(self):
 	"""

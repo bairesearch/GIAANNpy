@@ -18,10 +18,13 @@ GIA ANN proto sequence Observed Columns Excitation
 """
 
 import torch as pt
+import time
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_sparseTensors
 import GIAANNproto_sequenceConcepts
+if(useCUDAObservedColumnUpdateKernel):
+	import GIAANNproto_cudaObservedColumnUpdate
 
 def debugPrintConnectionSamples(label, indices, values, maxSamples=5):
 	numEntries = indices.shape[1]
@@ -502,7 +505,12 @@ class SequenceObservedColumns:
 			
 	def updateObservedColumns(self, sequenceObservedColumnsDict, inference, mode):
 		if(arrayIndexPropertiesEfficient and not inference):
+			updateObservedColumnsEfficientStartTime = None
+			if(debugPrintTrainSectionTimes):
+				updateObservedColumnsEfficientStartTime = time.perf_counter()
 			self.updateObservedColumnsEfficient(sequenceObservedColumnsDict, mode)
+			if(debugPrintTrainSectionTimes):
+				debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient", time.perf_counter() - updateObservedColumnsEfficientStartTime)
 		else:
 			self.updateObservedColumnsVerbose(sequenceObservedColumnsDict, mode)
 	
@@ -887,21 +895,78 @@ class SequenceObservedColumns:
 			targetSparse.values().clamp_(min=0)
 		return targetSparse
 
+	def validateCUDAObservedColumnUpdateInputs(self, targetSparse, updateSparse):
+		if(useCUDAObservedColumnUpdateKernel):
+			if(targetSparse.device.type != "cuda"):
+				raise RuntimeError("validateCUDAObservedColumnUpdateInputs error: targetSparse must be CUDA tensor")
+			if(updateSparse.device.type != "cuda"):
+				raise RuntimeError("validateCUDAObservedColumnUpdateInputs error: updateSparse must be CUDA tensor")
+			if(targetSparse.dtype != pt.float32):
+				raise RuntimeError("validateCUDAObservedColumnUpdateInputs error: targetSparse dtype must be float32")
+			if(updateSparse.dtype != pt.float32):
+				raise RuntimeError("validateCUDAObservedColumnUpdateInputs error: updateSparse dtype must be float32")
+			if(targetSparse.layout != pt.sparse_coo):
+				raise RuntimeError("validateCUDAObservedColumnUpdateInputs error: targetSparse must be sparse COO tensor")
+			if(updateSparse.layout != pt.sparse_coo):
+				raise RuntimeError("validateCUDAObservedColumnUpdateInputs error: updateSparse must be sparse COO tensor")
+			if(targetSparse.dim() != updateSparse.dim()):
+				raise RuntimeError("validateCUDAObservedColumnUpdateInputs error: targetSparse and updateSparse must have matching rank")
+		else:
+			raise RuntimeError("validateCUDAObservedColumnUpdateInputs error: useCUDAObservedColumnUpdateKernel is disabled")
+		return
+
+	def recordCUDAObservedColumnUpdateStats(self, stats):
+		if(useCUDAObservedColumnUpdateKernel):
+			if(not hasattr(self.databaseNetworkObject, "cudaObservedColumnUpdateInstrumentation")):
+				self.databaseNetworkObject.cudaObservedColumnUpdateInstrumentation = {"hashHitCount": 0, "overflowCount": 0, "rebuildCount": 0, "updateCalls": 0, "averageUpdateLatencySeconds": 0.0, "hashHitRate": 0.0}
+			instrumentation = self.databaseNetworkObject.cudaObservedColumnUpdateInstrumentation
+			instrumentation["hashHitCount"] = instrumentation["hashHitCount"] + int(stats["hash_hit_count"])
+			instrumentation["overflowCount"] = instrumentation["overflowCount"] + int(stats["overflow_count"])
+			instrumentation["rebuildCount"] = instrumentation["rebuildCount"] + int(stats["rebuild_count"])
+			instrumentation["updateCalls"] = instrumentation["updateCalls"] + int(stats["update_calls"])
+			instrumentation["averageUpdateLatencySeconds"] = float(stats["average_update_latency_seconds"])
+			instrumentation["hashHitRate"] = float(stats["hash_hit_rate"])
+		return
+
+	def addSparseUpdateNonNegativeCUDA(self, targetSparse, updateSparse):
+		resultSparse = targetSparse
+		if(useCUDAObservedColumnUpdateKernel):
+			if not targetSparse.is_coalesced():
+				targetSparse = targetSparse.coalesce()
+			if not updateSparse.is_coalesced():
+				updateSparse = updateSparse.coalesce()
+			self.validateCUDAObservedColumnUpdateInputs(targetSparse, updateSparse)
+			targetNNZ = max(1, int(targetSparse._nnz()))
+			updateNNZ = int(updateSparse._nnz())
+			overflowCapacityMultiplier = max(1.0, float(updateNNZ) / float(targetNNZ))
+			accumulator = GIAANNproto_cudaObservedColumnUpdate.build_sparse_accumulator(targetSparse.indices(), targetSparse.values(), targetSparse.size(), overflowCapacityMultiplier=overflowCapacityMultiplier)
+			accumulator = GIAANNproto_cudaObservedColumnUpdate.accumulate_sparse_updates(accumulator, updateSparse.indices(), updateSparse.values())
+			exportIndices, exportValues, exportStats = GIAANNproto_cudaObservedColumnUpdate.export_coo(accumulator)
+			self.recordCUDAObservedColumnUpdateStats(exportStats)
+			resultSparse = pt.sparse_coo_tensor(exportIndices, exportValues, size=targetSparse.size(), dtype=arrayType, device=targetSparse.device)
+		else:
+			raise RuntimeError("addSparseUpdateNonNegativeCUDA error: useCUDAObservedColumnUpdateKernel is disabled")
+		return resultSparse
+
 	def addSparseUpdateNonNegative(self, targetSparse, updateSparse):
-		if(updateSparse._nnz() == 0):
-			return targetSparse
-		if not targetSparse.is_coalesced():
-			targetSparse = targetSparse.coalesce()
-		if not updateSparse.is_coalesced():
-			updateSparse = updateSparse.coalesce()
-		indicesTarget = targetSparse.indices()
-		valuesTarget = targetSparse.values()
-		indicesUpdate = updateSparse.indices()
-		valuesUpdate = updateSparse.values()
-		combinedIndices = pt.cat([indicesTarget, indicesUpdate], dim=1)
-		combinedValues = pt.cat([valuesTarget, valuesUpdate], dim=0)
-		combinedSparse = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSparse.size(), dtype=arrayType, device=deviceSparse)
-		return combinedSparse.coalesce()
+		resultSparse = targetSparse
+		if(updateSparse._nnz() > 0):
+			if(useCUDAObservedColumnUpdateKernel):
+				resultSparse = self.addSparseUpdateNonNegativeCUDA(targetSparse, updateSparse)
+			else:
+				if not targetSparse.is_coalesced():
+					targetSparse = targetSparse.coalesce()
+				if not updateSparse.is_coalesced():
+					updateSparse = updateSparse.coalesce()
+				indicesTarget = targetSparse.indices()
+				valuesTarget = targetSparse.values()
+				indicesUpdate = updateSparse.indices()
+				valuesUpdate = updateSparse.values()
+				combinedIndices = pt.cat([indicesTarget, indicesUpdate], dim=1)
+				combinedValues = pt.cat([valuesTarget, valuesUpdate], dim=0)
+				combinedSparse = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSparse.size(), dtype=arrayType, device=deviceSparse)
+				resultSparse = combinedSparse.coalesce()
+		return resultSparse
 
 	def filterSparseByFeatureMask(self, indices, values, featureMaskLookup, featureDims):
 		if(featureMaskLookup is None or indices.numel() == 0):

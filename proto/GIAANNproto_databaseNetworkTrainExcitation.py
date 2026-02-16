@@ -18,6 +18,7 @@ GIA ANN proto database Network Train Excitation
 """
 
 import torch as pt
+import time
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_sparseTensors
@@ -25,6 +26,9 @@ import GIAANNproto_sequenceConcepts
 
 	
 def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
+	trainConceptWordsStartTime = None
+	if(debugPrintTrainSectionTimes):
+		trainConceptWordsStartTime = time.perf_counter()
 	result = GIAANNproto_sequenceConcepts.processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens)
 	if(debugPrintTrainSequenceConceptAssignment):
 		print(f"Processing sequenceCount: {sequenceIndex}, {sequenceObservedColumns.sentenceWithConceptAssignment}")	
@@ -36,11 +40,16 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 	featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask = GIAANNproto_sequenceConcepts.processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices)
 
 	featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex)
+	if(debugPrintTrainSectionTimes):
+		debugTrainSectionTimesAdd(sequenceObservedColumns.databaseNetworkObject, "trainConceptWords", time.perf_counter() - trainConceptWordsStartTime)
 
 	return True
 
 #first dim cs1 pertains to every concept node in sequence
 def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex):
+	processFeaturesActiveTrainStartTime = None
+	if(debugPrintTrainSectionTimes):
+		processFeaturesActiveTrainStartTime = time.perf_counter()
 	featureNeuronsInactive = 1 - featureNeuronsActive
 	if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections and arrayIndexPropertiesPermanence):
 		featureNeuronsActiveUnion = featureNeuronsActive.amax(dim=(0, 1))
@@ -130,6 +139,8 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 
 	if(arrayIndexPropertiesStrength):
 		applyTrainConnectionStrengthLimits(sequenceObservedColumns)
+	if(debugPrintTrainSectionTimes):
+		debugTrainSectionTimesAdd(sequenceObservedColumns.databaseNetworkObject, "processFeaturesActiveTrain", time.perf_counter() - processFeaturesActiveTrainStartTime)
 
 	return featureConnectionsActive, featureConnectionsSegmentMask
 

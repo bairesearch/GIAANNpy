@@ -31,6 +31,7 @@ GIA ANN proto main
 
 # Import necessary libraries
 import gc
+import time
 import torch as pt
 import spacy
 
@@ -219,8 +220,18 @@ def processArticle(text, articleIndex):
 def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenceSequenceInPrompt):
 	global sequenceCount
 	global drawRelationTypes
+	trainMode = not (useInference and inferenceSequenceInPrompt)
+	sequenceTrainTotalStartTime = None
+	if(debugPrintTrainSectionTimes and trainMode):
+		debugTrainSectionTimesReset(databaseNetworkObject, sequenceCount)
+		sequenceTrainTotalStartTime = time.perf_counter()
+	preprocessSequenceStartTime = None
+	if(debugPrintTrainSectionTimes and trainMode):
+		preprocessSequenceStartTime = time.perf_counter()
 
 	sequence = GIAANNproto_sequenceTokens.preprocessSequence(sequence)
+	if(debugPrintTrainSectionTimes and trainMode):
+		debugTrainSectionTimesAdd(databaseNetworkObject, "preprocessSequence", time.perf_counter() - preprocessSequenceStartTime)
 	
 	if(debugReloadGlobalFeatureNeuronsEverySequence):
 		initialiseDatabaseNetwork()
@@ -251,14 +262,29 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenc
 		allowNewFeatures = False
 
 	# First pass: Extract words, lemmas, pos, tags, and update concept_columns_dict and c
+	firstPassStartTime = None
+	if(debugPrintTrainSectionTimes and trainMode):
+		firstPassStartTime = time.perf_counter()
 	conceptsFound, conceptMask = GIAANNproto_sequenceConcepts.firstPass(databaseNetworkObject, sequence, allowNewFeatures)
+	if(debugPrintTrainSectionTimes and trainMode):
+		debugTrainSectionTimesAdd(databaseNetworkObject, "firstPass", time.perf_counter() - firstPassStartTime)
 	
 	if(conceptsFound):
+		getTokensStartTime = None
+		if(debugPrintTrainSectionTimes and trainMode):
+			getTokensStartTime = time.perf_counter()
 		tokens = GIAANNproto_sequenceTokens.getTokens(sequence)
+		if(debugPrintTrainSectionTimes and trainMode):
+			debugTrainSectionTimesAdd(databaseNetworkObject, "getTokens", time.perf_counter() - getTokensStartTime)
 
 		# When usePOS is enabled, detect all possible new features in the sequence
+		detectNewFeaturesStartTime = None
 		if not (useDedicatedFeatureLists):
+			if(debugPrintTrainSectionTimes and trainMode):
+				detectNewFeaturesStartTime = time.perf_counter()
 			GIAANNproto_sequenceConcepts.detectNewFeatures(databaseNetworkObject, tokens, allowNewFeatures)
+			if(debugPrintTrainSectionTimes and trainMode):
+				debugTrainSectionTimesAdd(databaseNetworkObject, "detectNewFeatures", time.perf_counter() - detectNewFeaturesStartTime)
 
 		if(debugPrintTrainSequencePOS):
 			sentenceWithPOS = " ".join(f"{token.text} ({tokenIndex}:{token.pos_})" for tokenIndex, token in enumerate(sequence))
@@ -274,10 +300,20 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenc
 			print(f"Processing sequenceCount: {sequenceCount}")	
 			
 		# Second pass: Create observed_columns_dict
+		secondPassStartTime = None
+		if(debugPrintTrainSectionTimes and trainMode):
+			secondPassStartTime = time.perf_counter()
 		observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNproto_sequenceConcepts.secondPass(databaseNetworkObject, tokens, inferenceMode)
+		if(debugPrintTrainSectionTimes and trainMode):
+			debugTrainSectionTimesAdd(databaseNetworkObject, "secondPass", time.perf_counter() - secondPassStartTime)
 
 		# Create the sequence observed columns object
+		sequenceObservedColumnsInitStartTime = None
+		if(debugPrintTrainSectionTimes and trainMode):
+			sequenceObservedColumnsInitStartTime = time.perf_counter()
 		sequenceObservedColumns = GIAANNproto_sequenceObservedColumnsExcitation.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict, inferenceMode)
+		if(debugPrintTrainSectionTimes and trainMode):
+			debugTrainSectionTimesAdd(databaseNetworkObject, "SequenceObservedColumns.__init__", time.perf_counter() - sequenceObservedColumnsInitStartTime)
 
 		if(useInference and inferenceSequenceInPrompt):
 			if(conceptColumnsDelimitByPOS and sequenceObservedColumns.noDelimiterDetectedBetweenConceptTokens):
@@ -291,7 +327,12 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenc
 			trained = GIAANNproto_databaseNetworkTrainExcitation.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)
 			if(trained):
 				# Update observed columns from sequence observed columns
+				updateObservedColumnsWrapperStartTime = None
+				if(debugPrintTrainSectionTimes and trainMode):
+					updateObservedColumnsWrapperStartTime = time.perf_counter()
 				sequenceObservedColumns.updateObservedColumnsWrapper()
+				if(debugPrintTrainSectionTimes and trainMode):
+					debugTrainSectionTimesAdd(databaseNetworkObject, "updateObservedColumnsWrapper", time.perf_counter() - updateObservedColumnsWrapperStartTime)
 
 				# Save observed columns to disk
 				if(useSaveData):
@@ -301,7 +342,16 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenc
 					# Visualize the complete graph every time a new sequence is parsed by the application.
 					GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumns, False, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+generateDrawSequenceIndex(sequenceIndex))
 
+		releaseRuntimeGpuMemoryStartTime = None
+		if(debugPrintTrainSectionTimes and trainMode):
+			releaseRuntimeGpuMemoryStartTime = time.perf_counter()
 		releaseRuntimeGpuMemory(sequenceCount)
+		if(debugPrintTrainSectionTimes and trainMode):
+			debugTrainSectionTimesAdd(databaseNetworkObject, "releaseRuntimeGpuMemory", time.perf_counter() - releaseRuntimeGpuMemoryStartTime)
+
+	if(debugPrintTrainSectionTimes and trainMode):
+		debugTrainSectionTimesAdd(databaseNetworkObject, "totalSequenceTrain", time.perf_counter() - sequenceTrainTotalStartTime)
+		debugTrainSectionTimesPrint(databaseNetworkObject)
 
 	# Break if we've reached the maximum number of sequences
 	sequenceCount += 1

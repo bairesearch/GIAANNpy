@@ -505,3 +505,6 @@ v1j (Codex IDE GPT-5.3-Codex):
 - update datasetOscar:testSetStartOffset
 - add option trainStoreFeatureMapsGlobally - store feature maps once globally, not in every *_data.pkl (ensure database scales linearly with trained sequences)
 - only ever execute saveData() dictionary saves if((sequenceCount + 1) % saveGlobalFeatureNeuronsRate == 0)
+- generate CUDA_UPDATE_OBSERVED_COLUMNS_PLAN.md: think of a way of significantly optimising (Performance x10) updateObservedColumnsEfficient() using a designated CUDA kernel. The function adds dense matrix values into observed columns sparse tensors. The coalesce is causing significant slow down.
+- implement option useCUDAObservedColumnUpdateKernel - CUDA_UPDATE_OBSERVED_COLUMNS_PLAN.md ### Option 1 (recommended): C++/CUDA extension via `torch.utils.cpp_extension`
+- add option debugPrintTrainSectionTimes - print per-sequence timing breakdown for key train sections

@@ -27,6 +27,7 @@ debugPrintConfiguration = True	#print common global defs configuration
 debugPrintTotalInferenceTokens = False	#print total number of inference tokens in seed phase, prediction phase, and both phases (summed across all sequences) 
 debugPrintInferenceTop1Accuracy = True	#print inference top-1 accuracy
 debugWorkaroundPreviousUngatedShutdownSaveBug = False
+debugPrintTrainSectionTimes = False	#print per-sequence timing breakdown for key train sections
 
 
 #Train/inference mode selection;
@@ -275,6 +276,12 @@ else:
 trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
 trainSequenceObservedColumnsMatchSequenceWords = True	#mantatory		#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
 combineSparseUpdatesPerSequence = True	#default: True	#orig: False	#updateObservedColumnsEfficient combines sparse updates per sequence instead of per column (reduces calls to coalesce) 
+useCUDAObservedColumnUpdateKernel = False	#default: False	#use custom CUDA sparse accumulator for updateObservedColumnsEfficient strength updates
+if(useCUDAObservedColumnUpdateKernel):
+	if(not useGPUsparse):
+		raise RuntimeError("useCUDAObservedColumnUpdateKernel requires useGPUsparse=True")
+	if(not useGPUsparseStrict):
+		raise RuntimeError("useCUDAObservedColumnUpdateKernel requires useGPUsparseStrict=True")
 
 
 #Draw;
@@ -654,6 +661,28 @@ def getTensorSizeInMB(tensor):
 def generateDrawSequenceIndex(sequenceWordIndex):
 	return str(sequenceWordIndex).zfill(3)
 
+def debugTrainSectionTimesReset(databaseNetworkObject, sequenceCount):
+	if(debugPrintTrainSectionTimes):
+		databaseNetworkObject.debugTrainSectionTimes = {}
+		databaseNetworkObject.debugTrainSectionSequenceCount = sequenceCount
+	return
+
+def debugTrainSectionTimesAdd(databaseNetworkObject, sectionName, sectionDuration):
+	if(debugPrintTrainSectionTimes):
+		if(not hasattr(databaseNetworkObject, "debugTrainSectionTimes")):
+			databaseNetworkObject.debugTrainSectionTimes = {}
+		currentDuration = databaseNetworkObject.debugTrainSectionTimes.get(sectionName, 0.0)
+		databaseNetworkObject.debugTrainSectionTimes[sectionName] = currentDuration + sectionDuration
+	return
+
+def debugTrainSectionTimesPrint(databaseNetworkObject):
+	if(debugPrintTrainSectionTimes):
+		sequenceCountDebug = getattr(databaseNetworkObject, "debugTrainSectionSequenceCount", -1)
+		print(f"debugTrainSectionTimes: sequenceCount={sequenceCountDebug}")
+		for sectionName, sectionDuration in databaseNetworkObject.debugTrainSectionTimes.items():
+			print(f"\t{sectionName}: {sectionDuration:.6f}s")
+	return
+
 
 #debugPrintConfiguration;
 if(debugPrintConfiguration): 
@@ -694,6 +723,7 @@ if(debugPrintConfiguration):
 	print("runtimeReleaseGPUMemoryEverySequenceCount:", runtimeReleaseGPUMemoryEverySequenceCount)
 	print("inferenceOnlyRetainPredictedTargetObservedColumn:", inferenceOnlyRetainPredictedTargetObservedColumn)
 	print("inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch:", inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch)
+	print("useCUDAObservedColumnUpdateKernel:", useCUDAObservedColumnUpdateKernel)
 	print("")
 	print("#Segment activation time;")
 	print("inferenceUseNeuronFeaturePropertiesTime:", inferenceUseNeuronFeaturePropertiesTime)
