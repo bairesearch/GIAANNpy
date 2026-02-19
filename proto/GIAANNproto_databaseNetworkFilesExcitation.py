@@ -184,6 +184,7 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 	saveObservedColumnsStartTime = None
 	if(debugPrintTrainSectionTimes):
 		saveDataStartTime = time.perf_counter()
+
 	if not forceSaveGlobalState:
 		# Save observed columns to disk
 		if(debugPrintTrainSectionTimes):
@@ -211,6 +212,7 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 			else:
 				conceptFeaturesReferenceSetDelimiterDict = dict(enumerate(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList))
 				saveDictFile(conceptFeaturesReferenceSetDelimiterListFile, conceptFeaturesReferenceSetDelimiterDict)
+	
 	if(debugPrintTrainSectionTimes):
 		debugTrainSectionTimesAdd(databaseNetworkObject, "saveData.total", time.perf_counter() - saveDataStartTime)
 		

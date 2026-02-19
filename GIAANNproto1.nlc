@@ -491,9 +491,9 @@ MANUAL; - rename drawNetworkDuringInferencePredict to drawNetworkDuringInference
 ---
 v1j (Codex IDE GPT-5.3-Codex):
 - add proto GIAANNproto1j1a - reduce inference VRAM (for useInference:useGPUsparse=True):
-	- update GIAANNproto_sequenceObservedColumnsExcitation - skip dense SequenceObservedColumns arrays during inference when drawing is disabled to avoid large to_dense() allocations.
-	- update GIAANNproto_databaseNetworkExcitation - store globalFeatureNeuronsBackup (and connections, if present) on CPU and restore to GPU only when needed. This removes the GPU-resident backup copy.
-	- update GIAANNproto_main - wrap inference in pt.no_grad() to eliminate autograd allocations without triggering sparse inference-tensor version-counter errors.
+	- [GPT-5.2-Codex:] update GIAANNproto_sequenceObservedColumnsExcitation - skip dense SequenceObservedColumns arrays during inference when drawing is disabled to avoid large to_dense() allocations.
+	- [GPT-5.2-Codex:] update GIAANNproto_databaseNetworkExcitation - store globalFeatureNeuronsBackup (and connections, if present) on CPU and restore to GPU only when needed. This removes the GPU-resident backup copy.
+	- [GPT-5.2-Codex:] update GIAANNproto_main - wrap inference in pt.no_grad() to eliminate autograd allocations without triggering sparse inference-tensor version-counter errors.
 	- add option runtimeReleaseGPUMemory - runtime GPU cleanup feature that executes releaseRuntimeGpuMemory(sequenceCount) after each processed sequence (processSequence)
 	- update activation/time sparse slices locally and removing per-token full global sparse tensor rewrites
 - update processColumnInferencePrediction() - split all marked sections into subfunctions
@@ -508,3 +508,6 @@ v1j (Codex IDE GPT-5.3-Codex):
 - generate CUDA_UPDATE_OBSERVED_COLUMNS_PLAN.md: think of a way of significantly optimising (Performance x10) updateObservedColumnsEfficient() using a designated CUDA kernel. The function adds dense matrix values into observed columns sparse tensors. The coalesce is causing significant slow down.
 - implement option useCUDAObservedColumnUpdateKernel - CUDA_UPDATE_OBSERVED_COLUMNS_PLAN.md ### Option 1 (recommended): C++/CUDA extension via `torch.utils.cpp_extension`
 - add option debugPrintTrainSectionTimes - print per-sequence timing breakdown for key train sections
+- [GPT-5.2-Codex:] implement option storeDatabaseInRam=True;
+	1. if useInference=False (or useInference=True and inferenceSequenceInPrompt=False), then keep all observed columns in RAM during train. Only write to disk at the end of the train phase: complete main() "#TODO save all observed columns to disk". If useGPUdatabase=True, then the database observed columns should be stored in GPU ram, else in CPU ram.
+	2. if useInference=True and inferenceTrainFirstSequences=False, then load all observed columns from disk into RAM at the start of the inference phase: complete main() "#TODO load all observed columns from disk".

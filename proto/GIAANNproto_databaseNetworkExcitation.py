@@ -39,6 +39,8 @@ class DatabaseNetworkClass():
 		self.globalFeatureConnections = None
 		self.globalFeatureNeuronsBackup = None
 		self.globalFeatureConnectionsBackup = None
+		self.observedColumnsDictRAM = {} if storeDatabaseInRam else None
+		self.observedColumnsRAMLoaded = False if storeDatabaseInRam else None
 		if(conceptColumnsDelimitByPOS):
 			if(detectReferenceSetDelimitersBetweenNouns):
 				self.conceptFeaturesReferenceSetDelimiterDeterministicList = conceptFeaturesReferenceSetDelimiterDeterministicList
@@ -291,17 +293,35 @@ def addConceptToConceptColumnsDict(databaseNetworkObject, lemma, conceptsFound, 
 	
 def loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i):
 	observedColumnFile = observedColumnsDir + '/' + f"{conceptIndex}_data.pkl"
-	if GIAANNproto_databaseNetworkFilesExcitation.pathExists(observedColumnFile):
-		observedColumn = ObservedColumn.loadFromDisk(databaseNetworkObject, conceptIndex, lemma, i)
-		# Resize connection arrays if c has increased
+	observedColumn = None
+	if(storeDatabaseInRam):
+		if(databaseNetworkObject.observedColumnsDictRAM is None):
+			databaseNetworkObject.observedColumnsDictRAM = {}
+		if(lemma in databaseNetworkObject.observedColumnsDictRAM):
+			observedColumn = databaseNetworkObject.observedColumnsDictRAM[lemma]
+		else:
+			if(databaseNetworkObject.observedColumnsRAMLoaded):
+				observedColumn = ObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
+			else:
+				if GIAANNproto_databaseNetworkFilesExcitation.pathExists(observedColumnFile):
+					observedColumn = ObservedColumn.loadFromDisk(databaseNetworkObject, conceptIndex, lemma, i)
+				else:
+					observedColumn = ObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
+			databaseNetworkObject.observedColumnsDictRAM[lemma] = observedColumn
 		observedColumn.resizeConceptArrays(databaseNetworkObject.c)
-		# Also expand feature arrays if f has increased
 		observedColumn.expandFeatureArrays(databaseNetworkObject.f)
 	else:
-		observedColumn = ObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
-		# Initialize connection arrays with correct size
-		observedColumn.resizeConceptArrays(databaseNetworkObject.c)
-		observedColumn.expandFeatureArrays(databaseNetworkObject.f)
+		if GIAANNproto_databaseNetworkFilesExcitation.pathExists(observedColumnFile):
+			observedColumn = ObservedColumn.loadFromDisk(databaseNetworkObject, conceptIndex, lemma, i)
+			# Resize connection arrays if c has increased
+			observedColumn.resizeConceptArrays(databaseNetworkObject.c)
+			# Also expand feature arrays if f has increased
+			observedColumn.expandFeatureArrays(databaseNetworkObject.f)
+		else:
+			observedColumn = ObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
+			# Initialize connection arrays with correct size
+			observedColumn.resizeConceptArrays(databaseNetworkObject.c)
+			observedColumn.expandFeatureArrays(databaseNetworkObject.f)
 	return observedColumn
 
 def generateGlobalFeatureConnections(databaseNetworkObject):
@@ -321,6 +341,25 @@ def loadAllColumns(databaseNetworkObject):
 		conceptColumn = loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
 		observedColumnsDict[lemma] = conceptColumn
 	return observedColumnsDict
+
+def loadAllObservedColumnsToRam(databaseNetworkObject):
+	if(storeDatabaseInRam):
+		observedColumnsDict = loadAllColumns(databaseNetworkObject)
+		databaseNetworkObject.observedColumnsDictRAM = observedColumnsDict
+		databaseNetworkObject.observedColumnsRAMLoaded = True
+	else:
+		raise RuntimeError("loadAllObservedColumnsToRam error: storeDatabaseInRam is False")
+	return
+
+def saveAllObservedColumnsToDisk(databaseNetworkObject):
+	if(storeDatabaseInRam):
+		if(databaseNetworkObject.observedColumnsDictRAM is None):
+			raise RuntimeError("saveAllObservedColumnsToDisk error: observedColumnsDictRAM is None")
+		for observedColumn in databaseNetworkObject.observedColumnsDictRAM.values():
+			observedColumn.saveToDisk()
+	else:
+		raise RuntimeError("saveAllObservedColumnsToDisk error: storeDatabaseInRam is False")
+	return
 
 '''
 def getTokenConceptFeatureIndexForSequenceConceptIndex(sequence_observed_columns, words_sequence, concept_mask, sequenceConceptIndex, sequenceWordIndex):

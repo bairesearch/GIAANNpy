@@ -66,6 +66,8 @@ def main():
 	if(useInference):
 		if(not inferenceTrainFirstSequences):
 			GIAANNproto_databaseNetworkExcitation.backupGlobalArrays(databaseNetworkObject)
+			if(storeDatabaseInRam):
+				GIAANNproto_databaseNetworkExcitation.loadAllObservedColumnsToRam(databaseNetworkObject)
 		
 	for epochIndex in range(numberEpochs):
 		print("\nepochIndex = ", epochIndex)
@@ -85,6 +87,8 @@ def main():
 			GIAANNproto_prediction.printInferenceTop1Accuracy()
 	if(not useInference or inferenceTrainFirstSequences):
 		if(useSaveData):
+			if(storeDatabaseInRam):
+				GIAANNproto_databaseNetworkExcitation.saveAllObservedColumnsToDisk(databaseNetworkObject)
 			GIAANNproto_databaseNetworkFilesExcitation.saveData(databaseNetworkObject, {}, sequenceCount, forceSaveGlobalState=True)
 			#only required if trainMaxSequences%saveGlobalFeatureNeuronsRate != 0
 
@@ -257,6 +261,9 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenc
 	
 	inferenceMode = useInference and inferenceSequenceInPrompt
 	allowNewFeatures = True
+	if(storeDatabaseInRam):
+		if(inferenceMode and not databaseNetworkObject.observedColumnsRAMLoaded):
+			GIAANNproto_databaseNetworkExcitation.loadAllObservedColumnsToRam(databaseNetworkObject)
 	if(inferenceMode and inferenceAddNewFeatures):
 		expandSequenceForInference(databaseNetworkObject, sequence)
 		allowNewFeatures = False
@@ -336,7 +343,8 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenc
 
 				# Save observed columns to disk
 				if(useSaveData):
-					GIAANNproto_databaseNetworkFilesExcitation.saveData(databaseNetworkObject, observedColumnsDict, sequenceCount)
+					if(not storeDatabaseInRam):
+						GIAANNproto_databaseNetworkFilesExcitation.saveData(databaseNetworkObject, observedColumnsDict, sequenceCount)
 
 				if(drawNetworkDuringTrain):
 					# Visualize the complete graph every time a new sequence is parsed by the application.
