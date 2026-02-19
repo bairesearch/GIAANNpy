@@ -128,7 +128,7 @@ def addInferenceTop1AccuracyCountPadding(numSeedTokens, numPredictionTokens, see
 if(inferenceOnlyRetainPredictedTargetObservedColumn):
 	def loadObservedColumnInference(databaseNetworkObject, observedColumnsDict, conceptIndex, sequenceWordIndex):
 		lemma = databaseNetworkObject.conceptColumnsList[conceptIndex]
-		observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, sequenceWordIndex)
+		observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, sequenceWordIndex, deviceLoadColumnInference, deviceLoadColumnInferenceCopy)
 		if(inferenceOnlyRetainPredictedTargetObservedColumn):
 			if(observedColumnsDict is None):
 				raise RuntimeError("loadObservedColumnInference error: observedColumnsDict is None")
@@ -467,7 +467,7 @@ def createSequenceObservedColumnsPrediction(databaseNetworkObject, observedColum
 		observedColumnsSequenceCandidateIndexDict = {}
 		lemma = databaseNetworkObject.conceptColumnsList[int(conceptColumnIndex)]
 		# Load observed column from disk or create new one
-		observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, int(conceptColumnIndex), lemma, sequenceWordIndex)
+		observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, int(conceptColumnIndex), lemma, sequenceWordIndex, deviceLoadColumnInference, deviceLoadColumnInferenceCopy)
 		observedColumnsDict[lemma] = observedColumn
 		observedColumnsSequenceCandidateIndexDict[0] = observedColumn
 		sequenceObservedColumnsPrediction = SequenceObservedColumnsInferencePrediction(databaseNetworkObject, observedColumnsDict, observedColumnsSequenceCandidateIndexDict)

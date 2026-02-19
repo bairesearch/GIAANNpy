@@ -350,6 +350,9 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenc
 					# Visualize the complete graph every time a new sequence is parsed by the application.
 					GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumns, False, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+generateDrawSequenceIndex(sequenceIndex))
 
+		if(storeDatabaseInRam):
+			GIAANNproto_databaseNetworkExcitation.moveObservedColumnsDictConnectionsToDatabaseAfterTrain(observedColumnsDict, inferenceSequenceInPrompt)
+
 		releaseRuntimeGpuMemoryStartTime = None
 		if(debugPrintTrainSectionTimes and trainMode):
 			releaseRuntimeGpuMemoryStartTime = time.perf_counter()

@@ -280,6 +280,19 @@ class ObservedColumnStub:
 		self.conceptName = lemma
 		self.conceptSequenceWordIndex = i
 
+class ObservedColumnProxy:
+	"""
+	Observed column proxy with copied tensors and shared feature maps.
+	"""
+	def __init__(self, databaseNetworkObject, observedColumn, lemma, i):
+		self.databaseNetworkObject = databaseNetworkObject
+		self.conceptIndex = observedColumn.conceptIndex
+		self.conceptName = lemma
+		self.conceptSequenceWordIndex = i
+		self.featureWordToIndex = observedColumn.featureWordToIndex
+		self.featureIndexToWord = observedColumn.featureIndexToWord
+		self.nextFeatureIndex = observedColumn.nextFeatureIndex
+
 def addConceptToConceptColumnsDict(databaseNetworkObject, lemma, conceptsFound, newConceptsAdded):
 	conceptsFound = True
 	if lemma not in databaseNetworkObject.conceptColumnsDict:
@@ -291,7 +304,7 @@ def addConceptToConceptColumnsDict(databaseNetworkObject, lemma, conceptsFound, 
 		newConceptsAdded = True
 	return conceptsFound, newConceptsAdded
 	
-def loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i):
+def loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, targetDevice=None, createDeviceCopy=False):
 	observedColumnFile = observedColumnsDir + '/' + f"{conceptIndex}_data.pkl"
 	observedColumn = None
 	if(storeDatabaseInRam):
@@ -322,7 +335,21 @@ def loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i):
 			# Initialize connection arrays with correct size
 			observedColumn.resizeConceptArrays(databaseNetworkObject.c)
 			observedColumn.expandFeatureArrays(databaseNetworkObject.f)
-	return observedColumn
+	resultObservedColumn = observedColumn
+	if(createDeviceCopy):
+		if(not storeDatabaseInRam):
+			raise RuntimeError("loadOrCreateObservedColumn error: createDeviceCopy requires storeDatabaseInRam")
+		if(targetDevice is None):
+			raise RuntimeError("loadOrCreateObservedColumn error: createDeviceCopy requires targetDevice")
+		resultObservedColumn = cloneObservedColumnToDevice(databaseNetworkObject, observedColumn, lemma, i, targetDevice)
+	else:
+		if(targetDevice is None):
+			if(storeDatabaseInRam and useGPUdatabase != useGPUsparse):
+				targetDevice = deviceDatabase
+		if(targetDevice is not None):
+			if(observedColumn.featureConnections.device != targetDevice):
+				observedColumn.featureConnections = observedColumn.featureConnections.to(targetDevice)
+	return resultObservedColumn
 
 def generateGlobalFeatureConnections(databaseNetworkObject):
 	conceptColumnsListTemp = []
@@ -349,6 +376,25 @@ def loadAllObservedColumnsToRam(databaseNetworkObject):
 		databaseNetworkObject.observedColumnsRAMLoaded = True
 	else:
 		raise RuntimeError("loadAllObservedColumnsToRam error: storeDatabaseInRam is False")
+	return
+
+def cloneObservedColumnToDevice(databaseNetworkObject, observedColumn, lemma, i, targetDevice):
+	if(not storeDatabaseInRam):
+		raise RuntimeError("cloneObservedColumnToDevice error: storeDatabaseInRam is False")
+	if(targetDevice is None):
+		raise RuntimeError("cloneObservedColumnToDevice error: targetDevice is None")
+	copiedObservedColumn = ObservedColumnProxy(databaseNetworkObject, observedColumn, lemma, i)
+	copiedObservedColumn.featureConnections = observedColumn.featureConnections.to(targetDevice)
+	if(lowMem):
+		copiedObservedColumn.featureNeurons = observedColumn.featureNeurons.to(targetDevice)
+	return copiedObservedColumn
+
+def moveObservedColumnsDictConnectionsToDatabaseAfterTrain(observedColumnsDict, inferenceSequenceInPrompt):
+	if(useGPUdatabase != useGPUsparse):
+		if(not inferenceSequenceInPrompt):
+			for observedColumn in observedColumnsDict.values():
+				if(observedColumn.featureConnections.device != deviceDatabase):
+					observedColumn.featureConnections = observedColumn.featureConnections.to(deviceDatabase)
 	return
 
 def saveAllObservedColumnsToDisk(databaseNetworkObject):

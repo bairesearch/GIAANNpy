@@ -114,9 +114,9 @@ runtimeReleaseGPUMemoryEverySequenceCount = 1	#default: 1	#only apply release ev
 if(runtimeReleaseGPUMemory):
 	if(runtimeReleaseGPUMemoryEverySequenceCount <= 0):
 		raise RuntimeError("runtimeReleaseGPUMemoryEverySequenceCount must be > 0")
-storeDatabaseInRam = False	#default: False	#orig: False
+storeDatabaseInRam = True	#default: False	#orig: False
 if(storeDatabaseInRam):
-	useGPUdatabase = useGPUsparse	#this constraint is currently required
+	useGPUdatabase = False	#default: False
 
 
 #Optimisations;
@@ -616,6 +616,17 @@ if(useGPUsparse):
 		printe("useGPUsparse and !pt.cuda.is_available")
 else:
 	deviceSparse = pt.device("cpu")
+if(storeDatabaseInRam):
+	if(useGPUdatabase):
+		if(not pt.cuda.is_available()):
+			printe("useGPUdatabase and !pt.cuda.is_available")
+		deviceDatabase = pt.device("cuda")
+	else:
+		deviceDatabase = pt.device("cpu")
+else:
+	deviceDatabase = deviceSparse
+deviceLoadColumnInference = deviceSparse if (storeDatabaseInRam and useGPUdatabase != useGPUsparse) else None
+deviceLoadColumnInferenceCopy = storeDatabaseInRam and useGPUdatabase != useGPUsparse
 
 
 #Dedicated feature lists (non-dynamic);
@@ -725,9 +736,14 @@ if(debugPrintConfiguration):
 	print("useGPUsparseStrict:", useGPUsparseStrict)
 	print("runtimeReleaseGPUMemory:", runtimeReleaseGPUMemory)
 	print("runtimeReleaseGPUMemoryEverySequenceCount:", runtimeReleaseGPUMemoryEverySequenceCount)
+	print("storeDatabaseInRam:", storeDatabaseInRam)
+	if(storeDatabaseInRam):
+		print("useGPUdatabase:", useGPUdatabase)
+	print("")
+	print("#Optimisations;")
 	print("inferenceOnlyRetainPredictedTargetObservedColumn:", inferenceOnlyRetainPredictedTargetObservedColumn)
 	print("inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch:", inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch)
-	print("useCUDAObservedColumnUpdateKernel:", useCUDAObservedColumnUpdateKernel)
+	print("trainStoreFeatureMapsGlobally:", trainStoreFeatureMapsGlobally)
 	print("")
 	print("#Segment activation time;")
 	print("inferenceUseNeuronFeaturePropertiesTime:", inferenceUseNeuronFeaturePropertiesTime)
@@ -754,6 +770,12 @@ if(debugPrintConfiguration):
 		print("inferenceBeamSearch:", inferenceBeamSearch)
 		print("inferenceBeamWidth:", inferenceBeamWidth)
 		print("inferenceBeamDepth:", inferenceBeamDepth)
+	print("")
+	print("Train optimisations;")
+	print("trainSequenceObservedColumnsUseSequenceFeaturesOnly:", trainSequenceObservedColumnsUseSequenceFeaturesOnly)
+	print("trainSequenceObservedColumnsMatchSequenceWords:", trainSequenceObservedColumnsMatchSequenceWords)
+	print("combineSparseUpdatesPerSequence:", combineSparseUpdatesPerSequence)
+	print("useCUDAObservedColumnUpdateKernel:", useCUDAObservedColumnUpdateKernel)
 	print("")
 	print("#Draw;")
 	print("drawSegments:", drawSegments)
