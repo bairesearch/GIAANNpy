@@ -35,6 +35,8 @@ import time
 import torch as pt
 import spacy
 
+pt.set_grad_enabled(False)
+
 from GIAANNproto_globalDefs import *
 import GIAANNproto_datasets
 import GIAANNproto_sparseTensors
@@ -59,6 +61,8 @@ databaseNetworkObject = GIAANNproto_databaseNetworkExcitation.initialiseDatabase
 databaseNetworkObject.nlp = nlp	#used by posStringToPosInt
 
 def main():
+	if(debugCountTotalParameters):
+		GIAANNproto_databaseNetworkExcitation.debugCountTotalParametersRun(databaseNetworkObject)
 	global sequenceCount
 	if(usePOS):
 		GIAANNproto_sequenceTokens.loadPOSdatabase()
@@ -327,8 +331,7 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenc
 				print("warning: inference skipped due to missing concept column delimiter detection in sequence")
 			else:
 				# Process each concept word in the sequence (predict)
-				with pt.no_grad():
-					GIAANNproto_prediction.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens)
+				GIAANNproto_prediction.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens)
 		else:
 			# Process each concept word in the sequence (train)
 			trained = GIAANNproto_databaseNetworkTrainExcitation.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)
@@ -367,6 +370,7 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenc
 	# Break if we've reached the maximum number of sequences
 	sequenceCount += 1
 	#note sequenceCount can be used as sequenceIndex (independent of index in sequenceList) because sequenceIndex is only used to index sequence time (same for all sequences in sequenceList)
-		
+
 if __name__ == "__main__":
-	main()
+	with pt.no_grad():
+		main()

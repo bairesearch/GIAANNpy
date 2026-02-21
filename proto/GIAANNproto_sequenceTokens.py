@@ -109,7 +109,45 @@ def pretrain(sequence):
 		sequence = pretrainCombineConsecutiveNounHyphenated(sequence)
 	if(pretrainCombineConsecutiveNouns):
 		sequence = pretrainCombineConsecutiveNoun(sequence)
+	if(pretrainConceptColumnsDelimitByPOSenforce):
+		sequence = pretrainConceptColumnsDelimitByPOSenforce(sequence)
 	return sequence
+
+if(pretrainConceptColumnsDelimitByPOSenforce):
+	
+	def pretrainConceptColumnsDelimitByPOSenforce(sequence):
+		result = None
+		sequenceLocal = sequence if isinstance(sequence, PreprocessedSequence) else PreprocessedSequence([PreprocessedToken(token.text, token.lemma_, token.pos_, token.tag_) for token in sequence])
+		if(not usePOS):
+			printe("pretrainConceptColumnsDelimitByPOSenforce requires usePOS")
+		if(not useSpacyForConceptNounPOSdetection):
+			printe("pretrainConceptColumnsDelimitByPOSenforce requires useSpacyForConceptNounPOSdetection")
+		conceptIndices = [tokenIndex for tokenIndex, token in enumerate(sequenceLocal.tokens) if isConcept(token, pretrain=True)]
+		numConcepts = len(conceptIndices)
+		demoteIndices = set()
+		if(numConcepts > 1):
+			sequenceTokens = [convertPreprocessedTokenToSequenceToken(token) for token in sequenceLocal.tokens]
+			conceptIndicesSorted = sorted(conceptIndices)
+			for conceptPosition in range(numConcepts - 1):
+				leftIndex = conceptIndicesSorted[conceptPosition]
+				rightIndex = conceptIndicesSorted[conceptPosition + 1]
+				rightmostDeterministic = None
+				rightmostIndeterministic = None
+				for tokenIndex in range(leftIndex + 1, rightIndex):
+					token = sequenceTokens[tokenIndex]
+					if(isTokenReferenceSetDelimiterDeterministic(token)):
+						rightmostDeterministic = tokenIndex
+					elif(detectReferenceSetDelimitersBetweenNouns and isTokenReferenceSetDelimiterProbabilistic(token) and not isTokenReferenceSetDelimiterDeterministic(token)):
+						rightmostIndeterministic = tokenIndex
+				if(rightmostDeterministic is None and rightmostIndeterministic is None):
+					for tokenIndex in range(leftIndex, rightIndex):
+						demoteIndices.add(tokenIndex)
+		if(len(demoteIndices) > 0):
+			nonConceptPos = "X"
+			for tokenIndex in demoteIndices:
+				sequenceLocal.tokens[tokenIndex].pos_ = nonConceptPos
+		result = sequenceLocal
+		return result
 
 if(pretrainCombineConsecutiveNouns):
 
@@ -219,7 +257,8 @@ if(pretrainCombineHyphenatedNouns):
 
 	def isHyphenToken(token):
 		result = False
-		if(token.text == "-" or token.lemma_ == "-"):
+		hyphenChars = ("-", "–")
+		if(token.text in hyphenChars or token.lemma_ in hyphenChars):
 			result = True
 		return result
 

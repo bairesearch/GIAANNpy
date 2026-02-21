@@ -140,6 +140,14 @@ def addAuxWordsToPosDicts(posDicts: Dict[str, Set[str]]) -> Dict[str, Set[str]]:
 		result["AUX"].add(word)
 	return result
 
+def addManualPosOverrides(posDicts: Dict[str, Set[str]]) -> Dict[str, Set[str]]:
+	result = posDicts
+	overrides = {"ADP": set(("towards", "afterwards",)),}
+	for posType, words in overrides.items():
+		if(posType in result):
+			result[posType].update(words)
+	return result
+
 def isNumericWord(word: str) -> bool:
 	result = False
 	if word:
@@ -191,6 +199,7 @@ def buildEverPosDicts() -> Dict[str, Set[str]]:
 		taggedWords = getTaggedWordsFromCorpus(corpusName)
 		posDicts = addTaggedWordsToPosDicts(posDicts, taggedWords)
 	posDicts = ensurePosDictsComplete(posDicts)
+	posDicts = addManualPosOverrides(posDicts)
 	return posDicts
 
 

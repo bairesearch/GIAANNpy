@@ -28,6 +28,7 @@ debugPrintTotalInferenceTokens = False	#print total number of inference tokens i
 debugPrintInferenceTop1Accuracy = True	#print inference top-1 accuracy
 debugWorkaroundPreviousUngatedShutdownSaveBug = False
 debugPrintTrainSectionTimes = False	#print per-sequence timing breakdown for key train sections
+debugCountTotalParameters = False	#count number of connections in network
 
 
 #Train/inference mode selection;
@@ -37,7 +38,7 @@ if(useInference):
 	drawNetworkDuringInference = False	#default: False
 	inferenceTrainFirstSequences = True	#default: True	#orig: True	#True: trains first sequences in inference_prompt.txt, performs inference only on last sequence; False: run inference on every sequence as independent seed/target prompts
 	inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True	#True: activate next column features using current prediction; False: use current target (default top-1 accuracy measurement)
-numSeedTokensInference = 16	#default: 5, 8, 12, 16	#this is also set during train phase only so that the derived numberOfSegments always matches inference phase
+numSeedTokensInference = 12	#default: 5, 8, 12, 16	#this is also set during train phase only so that the derived numberOfSegments always matches inference phase
 inferenceAddNewFeatures = True	#default: True	#orig: False	#run a controlled expansion pass during inference to add missing columns/features without training updates
 
 
@@ -207,7 +208,7 @@ if(conceptColumnsDelimitByPOS):
 	predictionColumnsMustActivateConceptFeature = False	#default: False	#orig: False
 	pretrainCombineConsecutiveNouns = True #default: True	#orig: False
 	pretrainCombineHyphenatedNouns = True	#default: True	#orig: False
-
+	pretrainConceptColumnsDelimitByPOSenforce = True	#default: True	#orig: False	#disable when debugging debugTerminateOnConceptColumnsDelimitByPOSwarning	#when consecutive concepts are detected without a delimiter between them, it modifies all tokens to the left of the right most concept token (noun) as ordinary non-concept (non-noun) tokens.
 
 #Connection strength modifiers;
 trainConnectionStrengthPOSdependence = False	#default: False	#orig: False
@@ -385,11 +386,15 @@ debugPrintTrainSequenceCount = False	#print each training sequence count
 
 debugTerminateInferenceOnPredictionTargetMismatch = False
 debugTerminateInferenceOnNoPredictionCandidatesAvailable = False
-debugTerminateOnConceptColumnsDelimitByPOSerror = False
-if(debugPrintTrainSequenceRaw):
-	debugTerminateOnConceptColumnsDelimitByPOSwarning = False
-else:
+if(pretrainConceptColumnsDelimitByPOSenforce):
+	debugTerminateOnConceptColumnsDelimitByPOSerror = False
 	debugTerminateOnConceptColumnsDelimitByPOSwarning = True
+else:
+	debugTerminateOnConceptColumnsDelimitByPOSerror = False
+	if(debugPrintTrainSequenceRaw):
+		debugTerminateOnConceptColumnsDelimitByPOSwarning = False
+	else:
+		debugTerminateOnConceptColumnsDelimitByPOSwarning = True
 debugDeleteGPUcache = False
 
 debugPrintTotalFeatures = False	#print c+f upon load
