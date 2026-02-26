@@ -17,7 +17,7 @@ pip install matplotlib
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 pip install spacy
 datasetsLibrary4plus=False: pip install "datasets<4" "fsspec==2024.6.1" "gcsfs==2024.6.1"
-python -m spacy download en_core_web_trf [spacyModelName]
+python -m spacy download en_core_web_sm [spacyModelName]
 pip install nltk
 
 # Usage:
@@ -54,16 +54,45 @@ if(useInference):
 if(not useInference):
 	dataset = GIAANNproto_datasets.loadDataset()
 
+if(debugPrintSpacySectionTimes):
+	processArticlePart1totalTime = 0
+	processArticlePart2totalTime = 0
+	processArticlePart1count = 0
+	processArticlePart2count = 0
+
 # Initialize spaCy model
-nlp = spacy.load(spacyModelName)
+if(spacyPipelineSingleParse):
+	if(spacyPipelineMinimalComponents or spacyPipelineLightweightSentenceSegmentation):
+		spacyArticleDisableComponents = []
+		if(spacyPipelineMinimalComponents):
+			spacyArticleDisableComponents.append("ner")
+		nlpArticle = spacy.load(spacyModelName, disable=spacyArticleDisableComponents)
+	else:
+		nlpArticle = spacy.load(spacyModelName)
+	nlpSequence = nlpArticle
+else:
+	if(spacyPipelineLightweightSentenceSegmentation):
+		nlpArticle = spacy.blank("en")
+		nlpArticle.add_pipe("sentencizer")
+		if(spacyPipelineMinimalComponents):
+			nlpSequence = spacy.load(spacyModelName, disable=["ner", "parser"])
+		else:
+			nlpSequence = spacy.load(spacyModelName)
+	else:
+		if(spacyPipelineMinimalComponents):
+			nlpArticle = spacy.load(spacyModelName, disable=["ner"])
+			nlpSequence = spacy.load(spacyModelName, disable=["ner", "parser"])
+		else:
+			nlpArticle = spacy.load(spacyModelName)
+			nlpSequence = nlpArticle
+
 
 databaseNetworkObject = GIAANNproto_databaseNetworkExcitation.initialiseDatabaseNetwork()
-databaseNetworkObject.nlp = nlp	#used by posStringToPosInt
+databaseNetworkObject.nlp = nlpSequence	#used by posStringToPosInt
 
 def main():
 	if(debugCountTotalParameters):
 		GIAANNproto_databaseNetworkExcitation.debugCountTotalParametersRun(databaseNetworkObject)
-	global sequenceCount
 	if(usePOS):
 		GIAANNproto_sequenceTokens.loadPOSdatabase()
 	GIAANNproto_databaseNetworkFilesExcitation.initialiseDatabaseFiles()
@@ -82,13 +111,19 @@ def main():
 		if(useInference):
 			GIAANNproto_prediction.resetInferenceTop1AccuracyCounts()
 		if(useInference or debugSmallDataset):
-			processPrompt()
+			sequenceCount = processPrompt(sequenceCount)
 		else:
-			processDataset(dataset)
+			sequenceCount = processDataset(sequenceCount, dataset)
 		if(useInference and debugPrintTotalInferenceTokens):
 			GIAANNproto_prediction.printTotalInferenceTokens()
 		if(useInference and debugPrintInferenceTop1Accuracy):
 			GIAANNproto_prediction.printInferenceTop1Accuracy()
+
+	if(debugPrintSpacySectionTimes):
+		processArticlePart1averageTime = processArticlePart1totalTime/processArticlePart1count
+		processArticlePart2averageTime = processArticlePart2totalTime/processArticlePart2count
+		print(f"debugPrintSpacySectionTimes: processArticlePart1averageTime={processArticlePart1averageTime:.6f} processArticlePart2averageTime={processArticlePart2averageTime:.6f}")
+
 	if(not useInference or inferenceTrainFirstSequences):
 		if(useSaveData):
 			if(storeDatabaseInRam):
@@ -136,11 +171,12 @@ def buildSequenceWithDelimiters(sequence, tokens):
 	return sentenceWithDelimiters
 
 			
-def processPrompt():
+def processPrompt(sequenceCount):
 	with open(inferencePromptFile, 'r', encoding='utf-8') as file:
 		text = file.read()
 	articleIndex = 0
-	processArticle(text, articleIndex)
+	sequenceCount = processArticle(sequenceCount, text, articleIndex)
+	return sequenceCount
 
 def expandSequenceForInference(databaseNetworkObject, sequence):
 	conceptsFound = False
@@ -157,52 +193,43 @@ def expandSequenceForInference(databaseNetworkObject, sequence):
 	GIAANNproto_databaseNetworkExcitation.ensureGlobalFeatureNeuronsSize(databaseNetworkObject, True)
 	return
 	
-def processDataset(dataset):
+def processDataset(sequenceCount, dataset):
 	for articleIndex, datasetEntry in enumerate(dataset):
+		if(debugPrintSpacySectionTimes):
+			getDatasetEntryTextStartTime = None
+			getDatasetEntryTextDuration = 0.0
+			getDatasetEntryTextStartTime = time.perf_counter()
 		text = GIAANNproto_datasets.getDatasetEntryText(datasetEntry, articleIndex)
-		processArticle(text, articleIndex)
+		if(debugPrintSpacySectionTimes):
+			getDatasetEntryTextDuration = time.perf_counter() - getDatasetEntryTextStartTime
+			print(f"debugPrintSpacySectionTimes: articleIndex={articleIndex} sequenceCount={sequenceCount} sequenceCount={sequenceCount} datasetEntryTextSeconds={getDatasetEntryTextDuration:.6f}")
+		sequenceCount = processArticle(sequenceCount, text, articleIndex)
 		if(sequenceCount == trainMaxSequences and useMaxSequences):
 			break
+	return sequenceCount
 
-def processArticle(text, articleIndex):
+def processArticle(sequenceCount, text, articleIndex):
 	#sequences = sent_tokenize(text)
+	if(debugPrintSpacySectionTimes):
+		processArticlePart1StartTime = None
+		processArticlePart1Duration = 0.0
+		processArticlePart1StartTime = time.perf_counter()
+
 	if(ignoreNewlineCharacters):
 		text = text.replace('\n', ' ')
-	textParsed = nlp(text)
-	sentences = list(textParsed.sents)
-	sequences = []
-	sequencesRaw = []
-	minSequenceLength = numSeedTokensInference + 1
-
-	if(multisentencePredictions):
-		for i in range(0, len(sentences), numSentencesPerSequence):
-			startIndex = sentences[i].start
-			endIndex = sentences[min(i + numSentencesPerSequence, len(sentences)) - 1].end
-			span = textParsed[startIndex:endIndex]
-			sequenceText = span.text
-			if(not sequenceText.strip()):
-				continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
-			sequenceText = sequenceText.lstrip()	#CHECKTHIS
-			sequenceParsed = nlp(sequenceText)
-			if(len(sequenceParsed) == 0):
-				continue
-			if(len(sequenceParsed) < minSequenceLength):
-				continue
-			sequences.append(sequenceParsed)
-			sequencesRaw.append(sequenceText)
+	textParsed = nlpArticle(text)
+	
+	if(trainTestSet):
+		skipMode = False
 	else:
-		for sentence in sentences:
-			sequenceText = sentence.text
-			if(not sequenceText.strip()):
-				continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
-			sequenceText = sequenceText.lstrip()
-			sequenceParsed = nlp(sequenceText)
-			if(len(sequenceParsed) == 0):
-				continue
-			if(len(sequenceParsed) < minSequenceLength):
-				continue
-			sequences.append(sequenceParsed)
-			sequencesRaw.append(sequenceText)
+		skipMode = (sequenceCount < (trainSetStartOffsetSequences-maxSentencesPerArticle))
+	sequences, sequencesRaw = generateSeqencesBatchOrSerial(textParsed, skipMode)
+
+	if(debugPrintSpacySectionTimes):
+		processArticlePart1Duration = time.perf_counter() - processArticlePart1StartTime
+		processArticlePart2StartTime = None
+		processArticlePart2Duration = 0.0
+		processArticlePart2StartTime = time.perf_counter()
 
 	numberOfSequences = len(sequences)
 	for sequenceIndex, sequence in enumerate(sequences):
@@ -221,13 +248,88 @@ def processArticle(text, articleIndex):
 					print("\n!inferenceTrainFirstSequences: executing inference:")
 				inferenceSequenceInPrompt = True
 		if(len(sequence) <= maxSequenceLength):
-			processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenceSequenceInPrompt)
+			if(sequenceCount >= trainSetStartOffsetSequences):
+				processSequence(sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw, inferenceSequenceInPrompt)
+			else:
+				#if(debugPrintTrainSequenceCount):
+				print(f"(sequenceCount < trainSetStartOffsetSequences: Processing sequenceCount: {sequenceCount}")	
+			sequenceCount += 1
 		if(sequenceCount == trainMaxSequences and useMaxSequences):
 			break
-			
-def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenceSequenceInPrompt):
-	global sequenceCount
-	global drawRelationTypes
+
+	if(debugPrintSpacySectionTimes):
+		processArticlePart2Duration = time.perf_counter() - processArticlePart2StartTime
+		print(f"debugPrintSpacySectionTimes: articleIndex={articleIndex} sequenceCount={sequenceCount} processArticlePart1Seconds={processArticlePart1Duration:.6f} processArticlePart2Seconds={processArticlePart2Duration:.6f}")
+		global processArticlePart1totalTime
+		global processArticlePart2totalTime
+		global processArticlePart1count
+		global processArticlePart2count
+		processArticlePart1totalTime += processArticlePart1Duration
+		processArticlePart2totalTime += processArticlePart2Duration
+		processArticlePart1count += 1
+		processArticlePart2count += 1
+
+	return sequenceCount
+
+def generateSeqencesBatchOrSerial(textParsed, skipMode):
+	sentences = list(textParsed.sents)
+	minSequenceLength = numSeedTokensInference + 1
+	sequences = []
+	sequencesRaw = []
+	sequencesText = []
+	if(multisentencePredictions):
+		for i in range(0, len(sentences), numSentencesPerSequence):
+			startIndex = sentences[i].start
+			endIndex = sentences[min(i + numSentencesPerSequence, len(sentences)) - 1].end
+			span = textParsed[startIndex:endIndex]
+			sequenceText = span.text
+			if(not sequenceText.strip()):
+				continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
+			sequenceText = sequenceText.lstrip()
+			if(not spacyPipelineBatchSequences):
+				if(spacyPipelineSingleParse or skipMode):
+					sequenceParsed = span.as_doc()
+				else:
+					sequenceParsed = nlpSequence(sequenceText)
+				if(len(sequenceParsed) == 0):
+					continue
+				if(len(sequenceParsed) < minSequenceLength):
+					continue
+				sequences.append(sequenceParsed)
+				sequencesRaw.append(sequenceText)
+			else:
+				sequencesText.append(sequenceText)
+	else:
+		for sentence in sentences:
+			sequenceText = sentence.text
+			if(not sequenceText.strip()):
+				continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
+			sequenceText = sequenceText.lstrip()
+			if(not spacyPipelineBatchSequences):
+				if(spacyPipelineSingleParse or skipMode):
+					sequenceParsed = sentence.as_doc()
+				else:
+					sequenceParsed = nlpSequence(sequenceText)
+				if(len(sequenceParsed) == 0):
+					continue
+				if(len(sequenceParsed) < minSequenceLength):
+					continue
+				sequences.append(sequenceParsed)
+				sequencesRaw.append(sequenceText)
+			else:
+				sequencesText.append(sequenceText)
+	if(spacyPipelineBatchSequences):
+		for sequenceIndex, sequenceParsed in enumerate(nlpSequence.pipe(sequencesText)):
+			if(len(sequenceParsed) == 0):
+				continue
+			if(len(sequenceParsed) < minSequenceLength):
+				continue
+			sequences.append(sequenceParsed)
+			sequencesRaw.append(sequencesText[sequenceIndex])
+	return sequences, sequencesRaw
+
+
+def processSequence(sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw, inferenceSequenceInPrompt):
 	trainMode = not (useInference and inferenceSequenceInPrompt)
 	sequenceTrainTotalStartTime = None
 	if(debugPrintTrainSectionTimes and trainMode):
@@ -367,8 +469,6 @@ def processSequence(articleIndex, sequenceIndex, sequence, sequenceRaw, inferenc
 		debugTrainSectionTimesAdd(databaseNetworkObject, "totalSequenceTrain", time.perf_counter() - sequenceTrainTotalStartTime)
 		debugTrainSectionTimesPrint(databaseNetworkObject)
 
-	# Break if we've reached the maximum number of sequences
-	sequenceCount += 1
 	#note sequenceCount can be used as sequenceIndex (independent of index in sequenceList) because sequenceIndex is only used to index sequence time (same for all sequences in sequenceList)
 
 if __name__ == "__main__":

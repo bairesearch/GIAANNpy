@@ -29,6 +29,7 @@ debugPrintInferenceTop1Accuracy = True	#print inference top-1 accuracy
 debugWorkaroundPreviousUngatedShutdownSaveBug = False
 debugPrintTrainSectionTimes = False	#print per-sequence timing breakdown for key train sections
 debugCountTotalParameters = False	#count number of connections in network
+debugPrintSpacySectionTimes = False	#print spacy preprocessing times
 
 
 #Train/inference mode selection;
@@ -42,6 +43,14 @@ numSeedTokensInference = 12	#default: 5, 8, 12, 16	#this is also set during trai
 inferenceAddNewFeatures = True	#default: True	#orig: False	#run a controlled expansion pass during inference to add missing columns/features without training updates
 
 
+#Benchmarking;
+useBenchmarkDefaults = False	#default: False	#orig: True
+if(useBenchmarkDefaults):
+	spacyPipelineOptimisations = False	#default: False
+else:
+	spacyPipelineOptimisations = True	#default: True
+	
+
 #Database;
 databaseFolder = "../database/"	#default: "../database/"	#performance: "/media/user/ssdpro/GIAANN/database/"	#orig: ""
 trainMaxSequences = 100000		#dev: 10, 500, 5000, 10000, 100000 	#default: 1000000	  #adjust as needed	#max sequences for train
@@ -53,6 +62,7 @@ numberEpochs = 1	#default: 1
 datasetOscar = False
 datasetWikipedia = True	#default: True	#orig: True
 datasetsLibrary4plus = False	#default: False	#orig: False	#set False during dev to maintain benchmark consistency
+trainTestSet = False	#default: False	#only set True to generate an inference test set (with debugPrintTrainSequenceRaw=True)
 if(datasetOscar):
 	datasetName = "oscar-corpus/OSCAR-2201"
 	datasetCfg = "en"
@@ -80,7 +90,6 @@ if(useLocalDataset):
 	datasetProcessedCacheFolder = datasetFolder + datasetProcessedCacheFolderName + "/"
 else:
 	useLocalDatasetDownloadManual = False
-trainTestSet = False	#default: False	#only set True to generate an inference test set (with debugPrintTrainSequenceRaw=True)
 if(trainTestSet):
 	if(datasetWikipedia):
 		testSetRatio = 0.1	#ratio of articles in dataset to be used for test (vs train) set - taken from end of dataset
@@ -93,6 +102,12 @@ if(trainTestSet):
 		testSetSize = 1000	#number of entries to include in test set
 	else:
 		raise RuntimeError("trainTestSet configuration error: unsupported dataset selection")
+else:
+	trainSetStartOffsetSequences = 0	#default: 0	#orig: 0	
+	if(datasetOscar):
+		maxSentencesPerArticle = 100	#CHECKTHIS
+	else:
+		maxSentencesPerArticle = 1000	#CHECKTHIS
 
 
 #Multisentence predictions;
@@ -117,7 +132,7 @@ if(runtimeReleaseGPUMemory):
 		raise RuntimeError("runtimeReleaseGPUMemoryEverySequenceCount must be > 0")
 storeDatabaseInRam = True	#default: False	#orig: False
 if(storeDatabaseInRam):
-	useGPUdatabase = False	#default: False
+	useGPUdatabase = False	#False	#default: False
 
 
 #Optimisations;
@@ -208,7 +223,11 @@ if(conceptColumnsDelimitByPOS):
 	predictionColumnsMustActivateConceptFeature = False	#default: False	#orig: False
 	pretrainCombineConsecutiveNouns = True #default: True	#orig: False
 	pretrainCombineHyphenatedNouns = True	#default: True	#orig: False
-	pretrainConceptColumnsDelimitByPOSenforce = True	#default: True	#orig: False	#disable when debugging debugTerminateOnConceptColumnsDelimitByPOSwarning	#when consecutive concepts are detected without a delimiter between them, it modifies all tokens to the left of the right most concept token (noun) as ordinary non-concept (non-noun) tokens.
+	if(useBenchmarkDefaults):
+		pretrainConceptColumnsDelimitByPOSenforce = False	
+	else:
+		pretrainConceptColumnsDelimitByPOSenforce = True	#default: True	#orig: False	#disable when debugging debugTerminateOnConceptColumnsDelimitByPOSwarning	#when consecutive concepts are detected without a delimiter between them, it modifies all tokens to the left of the right most concept token (noun) as ordinary non-concept (non-noun) tokens.
+
 
 #Connection strength modifiers;
 trainConnectionStrengthPOSdependence = False	#default: False	#orig: False
@@ -397,7 +416,7 @@ else:
 		debugTerminateOnConceptColumnsDelimitByPOSwarning = True
 debugDeleteGPUcache = False
 
-debugPrintTotalFeatures = False	#print c+f upon load
+debugPrintTotalFeatures = True	#print c+f upon load
 debugLimitFeatures = False	#can be used to recover database for inference if run out of ram during training
 if(debugLimitFeatures):
 	debugLimitFeaturesCMax = 207910
@@ -582,7 +601,22 @@ arrayType = pt.float32	#pt.long	#pt.float32
 
 #POS;
 useSpacyForConceptNounPOSdetection = True	#orig: True	#False: use GIAANNproto_sequencePOS predetermined word-POS dictionaries for all pos detection (never use spacy dynamically assigned pos tags)
-spacyModelName = 'en_core_web_trf'	#orig: 'en_core_web_sm'
+if(spacyPipelineOptimisations):
+	spacyModelName = 'en_core_web_sm'	#default: en_core_web_sm
+	spacyPipelineSingleParse = False	#default: False	#Avoid re-parsing each sentence: reuse the original Doc and create sequence docs with Span.as_doc() (or operate directly on spans) instead of nlp(sequenceText).	#parsing sequences individually helps alignment of train/test parsing for dev
+	if(spacyPipelineSingleParse):
+		spacyPipelineBatchSequences = False
+		spacyPipelineLightweightSentenceSegmentation = False
+	else:
+		spacyPipelineBatchSequences = True	#default: True		#batch second pass: collect sequenceText and run nlp.pipe(...) with batch_size (and n_process if CPU) to amortize overhead.
+		spacyPipelineLightweightSentenceSegmentation = True	#default: True	#Use sentence segmentation only on a lightweight pipeline (sentencizer), then run full nlp.pipe only for sequences that pass quick length/whitespace filters.	
+	spacyPipelineMinimalComponents = True	#default: True		#Disable unused pipeline components at spacy.load(...) (e.g., ner) if you don't use them downstream. 
+else:
+	spacyModelName = 'en_core_web_trf'	#default: en_core_web_trf
+	spacyPipelineSingleParse = False	#default: False #orig: True	#parsing sequences individually helps alignment of train/test parsing for dev
+	spacyPipelineBatchSequences = False	
+	spacyPipelineLightweightSentenceSegmentation = False
+	spacyPipelineMinimalComponents = False
 # Define POS tag sets for nouns and non-nouns
 nounPos = {'NOUN', 'PROPN'}
 nonNounPos = {'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'PUNCT', 'SCONJ', 'SYM', 'X'}	#incomplete as nounTags can be a subset of these (e.g. PRON: 'PRP', 'WP')

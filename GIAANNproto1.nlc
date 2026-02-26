@@ -519,3 +519,13 @@ v1j (Codex IDE GPT-5.3-Codex):
 - [GPT-5.2-Codex:] add addManualPosOverrides to accept all real ADP "wards" variants - "towards", "afterwards".
 - [GPT-5.2-Codex:] add option debugCountTotalParameters - count number of connections in network
 - [GPT-5.2-Codex:] apply pt.no_grad() to main()
+- MANUAL; - upgrade trainTestSet=False to support option trainSetStartOffsetSequences, where trainSetStartOffsetSequences=0 by default. It simply skips the number of sequences (trainSetStartOffsetSequences) as measured by sequenceCount. So it will not train any sequence until sequenceCount is reached.
+- MANUAL; - add pretrainConceptColumnsDelimitByPOSenforce to useBenchmarkDefaults=False
+- MANUAL; - add spacyModelName = en_core_web_sm to useBenchmarkDefaults=False:spacyPipelineOptimisations=True
+- [GPT-5.2-Codex:] implement these spacyPipelineOptimisations=True options for useBenchmarkDefaults=False;
+	spacyPipelineSingleParse - Avoid re-parsing each sentence: reuse the original Doc and create sequence docs with Span.as_doc() (or operate directly on spans) instead of nlp(sequenceText).
+	spacyPipelineBatchSequences - batch second pass: collect sequenceText and run nlp.pipe(...) with batch_size (and n_process if CPU) to amortize overhead.
+	spacyPipelineMinimalComponents - Disable unused pipeline components at spacy.load(...) (e.g., ner) if you do not use them downstream.
+	spacyPipelineLightweightSentenceSegmentation - Use sentence segmentation only on a lightweight pipeline (sentencizer), then run full nlp.pipe only for sequences that pass quick length/whitespace filters.
+- [GPT-5.2-Codex:] - implement option debugPrintSpacySectionTimes=True: for every sequence print the execution time of a) GIAANNproto_datasets.getDatasetEntryText(), b) the first part of processArticle, and c) the second part of processArticle
+- MANUAL; -  move cuda_observed_column_update_ext to archive

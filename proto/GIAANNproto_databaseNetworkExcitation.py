@@ -177,9 +177,8 @@ def initialiseDatabaseNetwork():
 	p = arrayNumberOfProperties
 		
 	databaseNetworkObject = DatabaseNetworkClass(c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList, conceptFeaturesReferenceSetDelimiterDeterministicList, conceptFeaturesReferenceSetDelimiterProbabilisticList)
-	if(useInference and debugPrintTotalFeatures):
-		print("c = ", databaseNetworkObject.c)
-		print("f = ", databaseNetworkObject.f)
+	if(debugPrintTotalFeatures):
+		print("initialiseDatabaseNetwork: c = ", databaseNetworkObject.c, ", f = ", databaseNetworkObject.f)
 	
 	return databaseNetworkObject
 	
@@ -532,36 +531,38 @@ if(debugCountTotalParameters):
 			observedColumnDataFile = observedColumnsDir + '/' + f"{conceptIndex}_data.pkl"
 			observedColumnConnectionsFile = observedColumnsDir + '/' + f"{conceptIndex}_featureConnections" + pytorchTensorFileExtension
 			if(not GIAANNproto_databaseNetworkFilesExcitation.pathExists(observedColumnDataFile)):
-				raise RuntimeError("debugCountTotalParametersRun error: missing observed column data file = " + observedColumnDataFile)
-			if(not GIAANNproto_databaseNetworkFilesExcitation.pathExists(observedColumnConnectionsFile)):
-				raise RuntimeError("debugCountTotalParametersRun error: missing observed column connections file = " + observedColumnConnectionsFile)
-			observedColumn = ObservedColumn.loadFromDisk(databaseNetworkObject, conceptIndex, lemma, columnIndex)
-			featureConnections = observedColumn.featureConnections
-			if(featureConnections is None):
-				raise RuntimeError("debugCountTotalParametersRun error: featureConnections is None for conceptIndex = " + str(conceptIndex))
-			if(arrayIndexPropertiesStrengthIndex < 0 or arrayIndexPropertiesStrengthIndex >= featureConnections.shape[0]):
-				raise RuntimeError("debugCountTotalParametersRun error: arrayIndexPropertiesStrengthIndex out of range")
-			columnConnections = countNonZero(featureConnections)
-			'''
-			#your original codex original code:
-			if(featureConnections.is_sparse):
-				featureConnections = featureConnections.coalesce()
-				strengthConnections = featureConnections[arrayIndexPropertiesStrengthIndex].coalesce()
-				columnConnections = int(strengthConnections.values().numel())
+				pass	#support for older versions of GIAANN (pre-trainStoreFeatureMapsGlobally/pre-pretrainConceptColumnsDelimitByPOSenforce)  
+				#raise RuntimeError("debugCountTotalParametersRun error: missing observed column data file = " + observedColumnDataFile)
 			else:
-				strengthConnections = featureConnections[arrayIndexPropertiesStrengthIndex]
-				columnConnections = int(pt.count_nonzero(strengthConnections).item())
-			'''
-			totalConnections += columnConnections
-			del observedColumn
-			del featureConnections
-			'''
-			#your original codex original code:
-			gc.collect()
-			if(pt.cuda.is_available()):
-				pt.cuda.empty_cache()
-				pt.cuda.ipc_collect()
-			'''
+				if(not GIAANNproto_databaseNetworkFilesExcitation.pathExists(observedColumnConnectionsFile)):
+					raise RuntimeError("debugCountTotalParametersRun error: missing observed column connections file = " + observedColumnConnectionsFile)
+				observedColumn = ObservedColumn.loadFromDisk(databaseNetworkObject, conceptIndex, lemma, columnIndex)
+				featureConnections = observedColumn.featureConnections
+				if(featureConnections is None):
+					raise RuntimeError("debugCountTotalParametersRun error: featureConnections is None for conceptIndex = " + str(conceptIndex))
+				if(arrayIndexPropertiesStrengthIndex < 0 or arrayIndexPropertiesStrengthIndex >= featureConnections.shape[0]):
+					raise RuntimeError("debugCountTotalParametersRun error: arrayIndexPropertiesStrengthIndex out of range")
+				columnConnections = countNonZero(featureConnections)
+				'''
+				#your original codex original code:
+				if(featureConnections.is_sparse):
+					featureConnections = featureConnections.coalesce()
+					strengthConnections = featureConnections[arrayIndexPropertiesStrengthIndex].coalesce()
+					columnConnections = int(strengthConnections.values().numel())
+				else:
+					strengthConnections = featureConnections[arrayIndexPropertiesStrengthIndex]
+					columnConnections = int(pt.count_nonzero(strengthConnections).item())
+				'''
+				totalConnections += columnConnections
+				del observedColumn
+				del featureConnections
+				'''
+				#your original codex original code:
+				gc.collect()
+				if(pt.cuda.is_available()):
+					pt.cuda.empty_cache()
+					pt.cuda.ipc_collect()
+				'''
 		print("debugCountTotalParameters totalConnections = ", totalConnections)
 		print("debugCountTotalParameters totalColumns = ", totalColumns)
 		return

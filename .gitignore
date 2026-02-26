@@ -4,4 +4,4 @@
 .hf_modules/
 .hf_modules_cache/
 .vscode/
-proto/cuda_observed_column_update_ext/build/
+archive/cuda_observed_column_update_ext/build/
