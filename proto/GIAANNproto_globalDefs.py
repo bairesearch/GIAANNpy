@@ -55,7 +55,7 @@ inferenceReportTokenAccuracyConstrainByColumn = False	#default: False	#orig: Fal
 
 #Database;
 databaseFolder = "../database/"	#default: "../database/"	#performance: "/media/user/ssdpro/GIAANN/database/"	#orig: ""
-trainMaxSequences = 100000		#dev: 10, 500, 5000, 10000, 100000 	#default: 1000000	  #adjust as needed	#max sequences for train
+trainMaxSequences = 1000000		#dev: 10, 500, 5000, 10000, 100000 	#default: 1000000	  #adjust as needed	#max sequences for train
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 
@@ -401,13 +401,18 @@ randomiseColumnFeatureXposition = True	#shuffle x position of column internal fe
 
 
 #Debug vars;
-debugPrintTrainSequenceDefault = True	#default: True	#orig: True
+debugPrintTrainSequenceDefault = False	#default: True	#orig: True
 debugPrintTrainSequenceRaw = False	#print each training sequence raw text (suitable for inference_prompt.txt generation)
 debugPrintTrainSequenceConceptAssignment = False	#print each training sequence split by column assignment
 debugPrintTrainSequenceConceptAssignmentByLine = False	#display each column on a new line
 debugPrintTrainSequenceDelimiters = False	#print each training sequence with delimiters
 debugPrintTrainSequencePOS = False	#print each training sequence with POS tags
 debugPrintTrainSequenceCount = False	#print each training sequence count
+if(datasetOscar):
+	debugPrintTrainSequenceCount = True	#non-visible characters affect terminal print consistency
+elif(datasetWikipedia):
+	debugPrintTrainSequenceDefault = True
+
 
 debugTerminateInferenceOnPredictionTargetMismatch = False
 debugTerminateInferenceOnNoPredictionCandidatesAvailable = False

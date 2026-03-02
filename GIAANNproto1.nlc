@@ -531,4 +531,5 @@ v1j (Codex IDE GPT-5.3-Codex):
 - MANUAL; -  move cuda_observed_column_update_ext to archive
 - [GPT-5.2-Codex:] - implement option inferenceReportTokenAccuracyConstrainByColumn = True to calculateInferencePredictionMatch() which only accepts a predicted token as matching the target if it resides in the target column.
 - [GPT-5.2-Codex:] - implement option SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=False (for both SANIfeatures and useSANIfeaturesAndColumns). SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=True is currently enabled by default. With both useSANIfeatures and useSANIfeaturesAndColumns, the first f segment is designated to accept predictions from all prior sequence tokens during train (when SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=True), and the remaining f segments are designated to accept predictions from exactly f tokens prior to the predicted sequence token during train. This means the the last f segment is always designated to accept predictions only from adjacent sequence tokens during train, which is used as a natural enforceDirectConnectionsSANI constraint.
-
+- MANUAL; - add paper/GIAANN-paper-WIP latex
+- MANUAL; - remove archive/*.*

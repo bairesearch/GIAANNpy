@@ -1,0 +1,77 @@
+\section{Algorithm}
+
+The GIA ANN prototype is a concept--feature neural database that learns from text sequences and predicts next tokens by activating connected features. It treats nouns as concept columns, and every other token as a feature neuron within those columns. The algorithm is designed for online, unbatched learning, and stores most of its state in sparse tensors for scalability.
+
+\begin{center}
+\includesvg[width=\linewidth]{demo/GIAANNproto1cAllColumnsTrainSequenceIndex005}
+\par\smallskip
+\refstepcounter{figure}\label{fig:giaannproto1c_allcolumns_train_005}
+\textbf{Figure~\thefigure:} Example all-columns network visualisation during training.
+\end{center}
+
+\subsection{Core Data Structures}
+\begin{itemize}
+	\item \textbf{Concept columns:} a dynamic dictionary mapping concept lemmas to column indices ($c$). Each column has a prime concept neuron at a fixed feature index.
+	\item \textbf{Feature dictionary:} a dynamic dictionary mapping feature words to feature indices ($f$). Features are words (not lemmas) and are shared across columns.
+	\item \textbf{Observed columns:} per-sequence objects that hold the sparse feature neuron tensors and feature connection tensors for each concept column seen in the sequence.
+	\item \textbf{SequenceObservedColumns:} a per-sequence view that stacks the observed columns into dense or sparse tensors of shape (properties$\times$branches$\times$segments$\times$columns$\times$features), plus a matching feature--connection tensor.
+	\item \textbf{Properties:} strength, permanence, activation, time, POS, and optional minimum word distance. Which properties exist is controlled by configuration.
+	\item \textbf{SANI segments:} each dendritic branch is segmented to encode sequential ordering. Segment indices are assigned by column distance, feature distance, or both.
+\end{itemize}
+
+\subsection{Preprocessing and Column Segmentation}
+\begin{enumerate}
+	\item \textbf{Sequence construction:} text is parsed with spaCy; sequences are either single sentences or multi-sentence bundles. Empty or too-short sequences are skipped.
+	\item \textbf{Token normalisation:} tokens are lowercased, lemmatised, and optionally preprocessed to combine consecutive nouns or hyphenated noun phrases.
+	\item \textbf{Concept detection:} nouns are detected via POS rules (or the full POS dictionary); these lemmas define concept columns.
+	\item \textbf{Delimiter detection:} reference set delimiters are detected by POS, tag, or word lists. Deterministic delimiters take priority over probabilistic ones.
+	\item \textbf{Column assignment:} tokens are assigned to concept columns by choosing the rightmost delimiter between adjacent concept tokens. If no delimiter exists, the sequence is skipped (training) or inference is aborted (prediction).
+\end{enumerate}
+
+\subsection{Training Algorithm}
+\begin{enumerate}
+	\item \textbf{First pass (concept growth):} scan the sequence and add new concept lemmas to the concept column dictionary. If $c$ grows, resize global feature tensors.
+	\item \textbf{Feature discovery:} scan the sequence for non-concept tokens and add new feature words to the feature dictionary. If $f$ grows, expand all feature tensors.
+	\item \textbf{Observed column loading:} for each concept in the sequence, load or create its observed column object and refresh its arrays to the current $c$ and $f$.
+	\item \textbf{Column segmentation:} compute per-concept token spans and build a token-to-column assignment list.
+	\item \textbf{Feature activation tensor:} for each concept instance, mark active feature neurons inside the column span. Assign dendritic branches (optionally randomized) and SANI segments based on column or feature distance.
+	\item \textbf{Connection activation tensor:} create directed connections between active features, enforcing forward word order and column order. Optionally enforce direct connections (adjacent tokens only).
+	\item \textbf{Update rule:}
+	\begin{itemize}
+		\item Strength is incremented for active features and connections (with optional normalisation and POS-dependent scaling).
+		\item Permanence is incremented for active features/connections and can be decremented for inactive ones.
+		\item Activation traces and time properties are reset or updated as configured.
+		\item POS and minimum word distance properties are recorded for active items.
+	\end{itemize}
+	\item \textbf{Commit:} merge sequence tensors back into observed columns, save updated columns and dictionaries to disk, and optionally draw the network.
+\end{enumerate}
+
+\subsection{Inference Algorithm (Seed + Prediction)}
+\begin{enumerate}
+	\item \textbf{Seed phase:} use the same prediction pipeline as normal inference, but force the selected feature to be the target token. This seeds the activation state.
+	\item \textbf{Activation state:} use global sparse activation tensors (and optional connection tensors) as the working state for predictions.
+	\item \textbf{Sequential gating (SANI):} apply sequential activation rules so a segment can only fire if the previous segment is active.
+	\item \textbf{Delimiter constraints:} if the current active node is a reference-set delimiter, constrain the next prediction to delimiter-compatible nodes or external columns.
+	\item \textbf{Time-based biasing:} optionally adjust segment activations based on last activation time relative to the expected segment index.
+	\item \textbf{Candidate selection:}
+	\begin{itemize}
+		\item If beam search is enabled, expand beams to a fixed depth and width, scoring by activation and connection strength.
+		\item Otherwise, select the single best node from the current activation map.
+	\end{itemize}
+	\item \textbf{State update:} activate the chosen node, update activation traces and time properties, and propagate its outgoing connections to update the next step.
+	\item \textbf{Evaluation:} optionally compare predictions to the target token and log mismatches.
+\end{enumerate}
+
+\subsection{Beam Search (Optional)}
+\begin{itemize}
+	\item Each beam holds a cloned activation state (feature activations, optional connection activations, and time properties).
+	\item Candidate nodes are filtered by constraint mode, connected-column constraints, and activation thresholds.
+	\item Beam scoring can use activation gain, connection strength, or both. The final prediction is the first action of the highest-scoring beam.
+\end{itemize}
+
+\subsection{Persistence and Visualisation}
+\begin{itemize}
+	\item Each observed column is stored on disk with its sparse tensors and feature mappings.
+	\item Global feature neuron tensors and concept/feature dictionaries are saved at configurable intervals.
+	\item The visualiser renders concept columns, feature nodes, and connections with colour schemes for segments, branches, POS types, or delimiters.
+\end{itemize}

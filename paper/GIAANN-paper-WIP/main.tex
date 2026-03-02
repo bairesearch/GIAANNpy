@@ -1,0 +1,58 @@
+\documentclass[11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{svg}
+\usepackage{caption}
+\captionsetup[figure]{name=Figure,labelsep=colon}
+\usepackage[section]{placeins}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage[nameinlink,noabbrev]{cleveref}
+\usepackage[numbers]{natbib}
+
+\title{GIAANN Proto: A General Intelligence Algorithm Artificial Neural Network for Language Modeling}
+\author{\textbf{Richard Baxter}\\\small BAI Research \\\small \texttt{richard.baxter@baxterai.com}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+GIAANN Proto is an experimental implementation of a General Intelligence Algorithm Artificial Neural Network (GIA ANN) for language modeling.
+The system constructs an excitatory database network of feature neurons organised into concept columns, incrementally updates that network during training, and performs autoregressive inference by predicting subsequent features conditioned on a seeded prompt.
+This paper summarises the core ideas and provides an implementation-oriented description intended to accompany the released code.
+\end{abstract}
+
+\section{Summary}
+Neural language models are commonly trained with gradient-based backpropagation and fixed-context attention mechanisms.
+GIAANN explores an alternative design: an online, dynamically growing network of features and connections intended to support continuous learning and effectively unbounded context via a persistent database network.
+
+This paper is a \emph{companion} to the codebase \texttt{github.com/bairesearch/GIAANNpy}.
+
+\section{Background and Goals}
+The project targets properties motivated by biological plausibility and continual learning, including online learning, continuous updates without catastrophic forgetting, a bias toward concept-level generalisation, and robustness to hallucination.
+
+\input{intro}
+
+\input{discussion}
+
+\input{algorithm}
+
+\input{implementation}
+
+\input{experiments}
+
+\section{Conclusion}
+GIAANN Proto provides an experimental platform for exploring a persistent database-network approach to language modeling.
+Future work should prioritise standardised evaluation metrics, scaling studies, and comparisons to strong modern baselines. Likewise, to move beyond self-supervised learning, reinforcement learning should be tested within the GIAANN architecture.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

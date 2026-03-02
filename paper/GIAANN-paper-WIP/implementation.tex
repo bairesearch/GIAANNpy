@@ -1,0 +1,155 @@
+\section{Implementation}
+
+\subsection{GIAANNproto\_globalDefs.py}
+\begin{itemize}
+	\item Central configuration for all training, inference, memory, and visualisation options (e.g., \texttt{useInference}, \texttt{useSANI}, \texttt{conceptColumnsDelimitByPOS}).
+	\item Defines tensor property layout (strength, permanence, activation, time, POS, min-distance) and derives array indices and segment counts from seed length and SANI settings.
+	\item Sets dataset, device, and performance toggles, plus debug and draw flags used across the codebase.
+\end{itemize}
+
+\subsection{GIAANNproto\_main.py}
+\begin{itemize}
+	\item Entry point that loads the dataset, initialises spaCy, and orchestrates training vs. inference loops.
+	\item Implements the per-article and per-sequence pipeline: preprocessing, concept detection, observed column loading, sequence tensor construction, training or inference execution, and optional visualisation.
+	\item Handles inference modes (train-first vs. inference-only), sequence length checks, and debug output selection.
+\end{itemize}
+
+\subsection{GIAANNproto\_datasets.py}
+\begin{itemize}
+	\item Loads the Wikipedia dataset from Hugging Face, either streamed or local-disk cached.
+	\item Supports manual dataset download into a deterministic cache folder to avoid unreliable streaming.
+	\item Enforces hard failures on missing datasets or incorrect paths.
+\end{itemize}
+
+\subsection{GIAANNproto\_sequenceTokens.py}
+\begin{itemize}
+	\item Defines lightweight token structures and preprocessing utilities (lemmatisation, POS/tag extraction, lowercasing).
+	\item Implements concept detection and delimiter detection using POS, tag, and word-type rules.
+	\item Provides noun-combining pretraining helpers (consecutive nouns and hyphenated noun phrases).
+\end{itemize}
+
+\subsection{GIAANNproto\_sequencePOS.py}
+\begin{itemize}
+	\item Builds and caches ``ever-POS'' dictionaries using WordNet and NLTK corpora to determine which POS tags a word can take.
+	\item Exposes fast POS membership checks used for concept detection and delimiter detection.
+	\item Provides persistent storage for POS dictionaries under the configured POS cache folder.
+\end{itemize}
+
+\subsection{GIAANNproto\_sequenceConcepts.py}
+\begin{itemize}
+	\item First-pass concept growth: add new concept lemmas to the global concept column dictionary and expand global tensors.
+	\item Feature discovery: add new feature words, maintain delimiter flags, and expand feature tensors when $f$ grows.
+	\item Column segmentation: compute concept indices, delimiters, and token-to-column assignments; builds per-column spans for training/inference.
+	\item Feature activation construction: creates feature activation tensors with branch and segment assignment, POS values, and word order metadata.
+\end{itemize}
+
+\subsection{GIAANNproto\_sequenceObservedColumnsExcitation.py}
+\begin{itemize}
+	\item Defines \texttt{SequenceObservedColumns}, the per-sequence tensor view used for both training and inference.
+	\item Extracts the sequence-specific feature subset, builds local feature mappings, and initialises feature/connection tensors.
+	\item Populates sequence tensors from observed columns and supports efficient mapping between global and local feature indices.
+\end{itemize}
+
+\subsection{GIAANNproto\_databaseNetworkExcitation.py}
+\begin{itemize}
+	\item Defines the persistent database network state (concept columns, feature dictionaries, global feature tensors).
+	\item Implements \texttt{ObservedColumn} for per-concept storage of feature neurons and feature connections, with resize/expand logic.
+	\item Provides helpers for concept insertion, observed column loading/creation, and conversion utilities used in inference.
+\end{itemize}
+
+\subsection{GIAANNproto\_databaseNetworkFilesExcitation.py}
+\begin{itemize}
+	\item Handles all on-disk persistence: concept/feature dictionaries, observed column metadata, and sparse tensors.
+	\item Provides robust tensor shape adjustment for property and branch dimensions across versions.
+	\item Enforces hard validation for missing files, inconsistent tensor ranks, or invalid configuration.
+\end{itemize}
+
+\subsection{GIAANNproto\_databaseNetworkTrainExcitation.py}
+\begin{itemize}
+	\item Executes the training update rule by turning feature activations into connection activations and updating properties.
+	\item Applies POS-dependent strength scaling, context-length normalisation, and optional permanence decay.
+	\item Assigns SANI segments for connections and enforces word/column order constraints.
+\end{itemize}
+
+\subsection{GIAANNproto\_predictionActivate.py}
+\begin{itemize}
+	\item Implements activation updates during inference, including sequential (SANI) gating and activation decrement.
+	\item Provides sparse tensor utilities for reading and replacing activation values at specific indices.
+	\item Computes sequence column indices used for time-based activation constraints.
+\end{itemize}
+
+\subsection{GIAANNproto\_predictionConstraints.py}
+\begin{itemize}
+	\item Encapsulates inference constraints for delimiter handling, internal/external column selection, and connectivity filtering.
+	\item Aggregates sparse activations into candidate (column, feature) lists and filters them by constraint state.
+	\item Raises or stops inference when connectivity constraints yield no valid candidates.
+\end{itemize}
+
+\subsection{GIAANNproto\_predictionBeamSearch.py}
+\begin{itemize}
+	\item Implements beam search over activation states with depth/width control and multiple scoring strategies.
+	\item Clones activation, connection, and time state per beam to avoid cross-beam interference.
+	\item Converts best-scoring beam actions into the single-step prediction used by the main inference loop.
+\end{itemize}
+
+\subsection{GIAANNproto\_prediction.py}
+\begin{itemize}
+	\item Implements the full inference loop, including the seed phase and per-token prediction phase.
+	\item Applies delimiter constraints, direct-connection enforcement, and optional beam search selection.
+	\item Updates global activation/time tensors and optionally draws or logs prediction diagnostics.
+\end{itemize}
+
+\subsection{GIAANNproto\_databaseNetworkDrawExcitation.py}
+\begin{itemize}
+	\item Renders the network graph using NetworkX/Matplotlib, supporting multiple colour schemes (segments, branches, POS, delimiters).
+	\item Extracts active feature and connection subsets from sparse tensors to visualise only non-empty structure.
+	\item Supports saving vector or raster outputs and inference-time activation highlighting.
+\end{itemize}
+
+\subsubsection{drawSegments}
+\begin{center}
+\includesvg[width=\linewidth]{demo/GIAANNdemo-drawSegments}
+\par\smallskip
+\refstepcounter{figure}\label{fig:drawSegments}
+\textbf{Figure~\thefigure:} Network visualisation with segments enabled (\texttt{drawSegments=True}).
+\end{center}
+
+\subsubsection{drawBranches}
+\begin{center}
+\includesvg[width=\linewidth]{demo/GIAANNdemo-drawBranches}
+\par\smallskip
+\refstepcounter{figure}\label{fig:drawBranches}
+\textbf{Figure~\thefigure:} Network visualisation with dendritic branches enabled (\texttt{drawBranches=True}).
+\end{center}
+
+\subsubsection{drawRelationTypes}
+\begin{center}
+\includesvg[width=\linewidth]{demo/GIAANNdemo-drawRelations}
+\par\smallskip
+\refstepcounter{figure}\label{fig:drawRelationTypes}
+\textbf{Figure~\thefigure:} Network visualisation with relation/POS types enabled (\texttt{drawRelationTypes=True}).
+\end{center}
+
+\subsubsection{drawDelimiterTypes}
+\begin{center}
+\includesvg[width=\linewidth]{demo/GIAANNdemo-drawDelimiters}
+\par\smallskip
+\refstepcounter{figure}\label{fig:drawDelimiterTypes}
+\textbf{Figure~\thefigure:} Network visualisation highlighting delimiter types (\texttt{drawDelimiters=True}).
+\end{center}
+
+\subsubsection{drawDefault}
+\begin{center}
+\includesvg[width=\linewidth]{demo/GIAANNdemo-drawDefault}
+\par\smallskip
+\refstepcounter{figure}\label{fig:drawDefault}
+\textbf{Figure~\thefigure:} Default network visualisation (\texttt{drawDefault=True}).
+\end{center}
+
+
+\subsection{GIAANNproto\_sparseTensors.py}
+\begin{itemize}
+	\item Provides shared sparse tensor utilities (create, slice, merge, index updates, branch reduction).
+	\item Implements branch-aware reductions and sparse index operations used in both training and inference.
+	\item Centralises sparse arithmetic for activation and strength updates.
+\end{itemize}

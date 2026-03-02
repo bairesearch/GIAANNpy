@@ -1,0 +1,264 @@
+\section{Introduction}\label{sec:litreview}
+
+\subsection{Semantic Networks and Relational Graphs}
+Early AI systems used semantic networks (knowledge graphs) to represent relationships between concepts as nodes and links \citep{sowa_semnet}.
+A semantic network is essentially a graph of interconnected nodes (concepts) and labeled edges (relations), providing a structured representation of knowledge \citep{sowa_semnet}.
+Such relational graph structures enable reasoning about how entities relate to each other.
+Modern approaches build on this idea with knowledge graphs and graph neural networks, which propagate information along graph edges to learn distributed representations that respect relational structure \citep{battaglia2018relational}.
+This relational inductive bias allows neural models to encode entities and their relationships explicitly, improving reasoning over structured data \citep{battaglia2018relational}.
+
+BAI’s General Intelligence Algorithm (GIA) leveraged semantic network principles.
+The original GIA system constructed a relational graph of concepts from input (e.g. natural language), using methods like part-of-speech patterns and semantic relation extraction to link concepts \citep{baxterai_gia,bairesearch2022GIA}.
+By pre-defining certain grammatical or semantic link types, GIA built a graph where each node (neuron or concept) connected to others based on learned relations \citep{baxterai_gia}.
+
+\paragraph{Relevance to GIAANN.}
+
+This explicit semantic network forms the backbone of knowledge in the GIA ANN.
+In the GIAANN prototype, each neuron is associated with a specific concept or feature, and connections between neurons reflect probabilistic semantic or relational links (similar to edges in a knowledge graph).
+This design allows the network to perform relational reasoning: when one concept neuron activates, related concept neurons can be contextually co-activated via the graph connections, mimicking how a semantic network spreads activation.
+
+The semantic network framework provides GIAANN with a way to encode knowledge structure.
+GIAANN inherits the idea of a graph-based knowledge representation, ensuring that its neural activations respect meaningful relationships rather than just statistical correlations.
+In essence, GIAANN’s architecture can be seen as a neural implementation of a semantic network, where neurons are nodes and synaptic weights encode relation strengths.
+This helps the model achieve more interpretable and modular knowledge representation, a key step toward general intelligence \citep{baxterai_gia,bairesearch2022GIA}.
+It also means GIAANN can inherently perform relational reasoning by traversing these neural graph connections, aligning with decades of AI research on semantic networks and relational knowledge representation.
+
+\subsection{Hopfield Networks and Emergent Sequence Prediction}
+A Hopfield network is a form of recurrent neural network that serves as a content-addressable memory system \citep{wiki_hopfield_network}.
+In a Hopfield net, all neurons are recurrently connected with symmetric weights, and the network dynamics settle to stable patterns (attractors) that represent stored memories \citep{wiki_hopfield_network}.
+\citet{hopfield1982neural} showed how patterns can be stored and retrieved by the network settling to the nearest attractor state, effectively recalling a memory from partial input via energy minimisation.
+A key outcome is auto-associative recall: given a cue, the network’s iterative updates cause an emergent pattern completion, retrieving the most similar stored pattern.
+This emergent recall is robust to noise or incomplete data \citep{amit1985spinGlassNeuralNetworks}.
+Hopfield’s work illustrated how collective dynamics of simple neuron-like units could yield memory and predictive completion of patterns without an external controller.
+
+BAI’s Hopfield Natural Language Processing (HFNLP) is a precursor algorithm that applied a Hopfield-like associative memory to sequences (e.g. for next-word or next-neuron prediction) \citep{bairesearch2024HFNLPpy}.
+In HFNLP, each ``neuron'' representing a lexical or semantic element was connected to others in a recurrent fashion.
+When a concept was activated, the network would iteratively converge to the next likely concept through Hopfield dynamics.
+Thus, the ``next neuron prediction'' emerged from the network’s own energy landscape: the system would settle on whichever neuron had the strongest associative link, analogous to how Hopfield nets retrieve the closest matching memory pattern.
+This approach did not require a sequential control flow; instead, the sequence of activations was driven by the network’s attractor dynamics.
+It is conceptually similar to Hopfield nets retrieving a sequence one item at a time, as each retrieved state provides the cue for the next.
+Notably, classical Hopfield networks are static memories, but HFNLP introduced mechanisms (or iterative recall steps) to produce a temporal sequence of activations, bridging associative memory with sequence generation.
+
+In the literature, modern developments like modern Hopfield networks (e.g. Krotov \& Hopfield 2020) and continuous Hopfield variants have increased capacity and introduced continuous states, renewing interest in Hopfield dynamics for pattern completion and even transformer-style attention mechanisms.
+These works show that Hopfield associative memory can be scaled up and made differentiable, pointing toward relevance in current deep learning.
+HFNLP anticipated this trend by leveraging Hopfield principles for NLP tasks.
+
+\paragraph{Relevance to GIAANN.}
+GIAANN incorporates Hopfield-like associative recall at its core.
+The prototype’s neuron activations are determined in part by an energy-minimisation principle: given the current context (neuron activation levels), the next neuron to fire is the one that best satisfies the learned constraints (minimal ``energy'') of the network.
+This means GIAANN can predict the next concept feature neuron in a chain without an explicit sequence model, purely by the emergent dynamics of its recurrent connections (much as a Hopfield net recalls the next part of a memory) \citep{hopfield1982neural}.
+The result is that sequence generation (for reasoning or language) in GIAANN is an emergent property of the network’s learned attractor states rather than a predetermined program.
+This is a distinguishing feature: whereas typical RNN/Transformer models explicitly advance time-steps, GIAANN’s sequential processing falls out from iterative relaxation to attractors.
+HFNLP demonstrated a simplified version of this idea (without concept modularity), and GIAANN extends it with greater structure (as discussed below).
+In summary, Hopfield’s legacy provides GIAANN a way to store and retrieve knowledge in a distributed manner and to have the next activation ``pop out'' from the network’s associative memory---a powerful form of prediction grounded in neurodynamic principles \citep{hopfield1982neural,amit1985spinGlassNeuralNetworks}.
+
+\subsection{Sequential Activation and Multi-Compartment Neurons (SANI)}
+
+\subsubsection{Sequential Neuron Activation}
+
+Biological neural circuits often transmit information through spike sequences, where neurons activate one after another in precise temporal patterns.
+This inspired a core property of BAI’s Sequentially Activated Neuronal Input (SANI) neural network model, the independent processesing of chains of neuron activations, as opposed to whole layers being processed sequentially \citep{bairesearch2022SANI}.
+SANI networks are designed so that each neuron’s firing triggers a next neuron, creating a traversing path of activation that represents a thought or computation.
+This sequential firing is more akin to how neurons in the brain might sequentially activate in a synfire chain or in language parsing (word-by-word).
+An early SANI demonstration, for instance, implemented unsupervised learning of syntactic patterns, where a sequence of neuron activations corresponded to the parsed structure of a sentence (each neuron firing in turn for each word or phrase) \citep{bairesearch2022SANI, bairesearch2022SANINLPtf}.
+This is in contrast to typical ANN architectures where an entire layer of neurons updates simultaneously.
+The sequential activation approach enforces a temporal order and sparsity to the processing---at any given moment, only a subset of neurons is active, which then activates the next, and so on.
+
+\subsubsection{Sequential Neuronal Input Activation}
+
+One advantage of sequential network activation is that it mirrors the brain’s efficient use of spikes: information is carried in the timing of discrete events rather than in continuous high-dimensional vector operations.
+This can be energy-efficient and interpretable (each activation is a discrete step in a reasoning chain).
+However, achieving complex computation with such sparse, temporally extended activity often requires neurons to be more powerful individually---which leads to the idea of multi-compartment neuron models.
+In biology, a single neuron is not a simple point neuron: it has dendritic branches that perform non-linear integrations of inputs.
+These dendrites can act as semi-independent subunits, giving a single neuron the ability to detect specific spatio-temporal input patterns (almost like a tiny network within a neuron) \citep{london2005dendriticComputation}.
+Recent neuromorphic research by \citet{leugering2020spiking} explicitly leveraged this, showing that multi-compartment spiking neurons (with simplified dendritic subunits) can achieve the same functionality with far fewer spikes \citep{leugering2020spiking}.
+Because each neuron can do more complex processing internally, the network as a whole can fire less often: ``multi-compartment neuron models can become selective to highly specific input patterns, and thus learn to produce informative yet sparse spiking codes'' \citep{leugering2020spiking}.
+In other words, a neuron with dendritic sub-components can wait until a very particular combination of signals arrives before it fires, thereby reducing unnecessary spikes while still conveying rich information per spike.
+
+The SANI approach anticipated this benefit by effectively giving neurons more complex activation logic (sequential gating, mimicking dendritic conditions) so that only the right neuron fires at each step.
+
+\subsubsection{Multiple Dendritic Branches}
+
+Multi-compartment models typically also employ multiple dendritic branches, to process multiple input streams or conditions before firing \citep{leugering2020spiking, leugering2023dendritic} (see Simulated Dendritic Branches section below).
+
+\subsubsection{Dynamically Generated Networks}
+
+SANI also introduced dynamic generated networks \citep{bairesearch2022SANI, bairesearch2025EISANIpt} whereby neuron connectivity is dynamically generated rather established by modifying a randomly initialised network (as is common in extant artificial neural nets). This enables for a more efficient simulation of a biological substrate, restricting both memory and computation to these dynamically generated sparsely connected features.
+
+\paragraph{Relevance to GIAANN.}
+GIAANN implements SANI by incorporating multi-compartment neuron designs.
+This aligns with best practices for spiking efficiency: reducing firing rate without sacrificing information is critical for energy-efficient networks \citep{leugering2020spiking}, and complex neurons provide a solution. GIAANN also incorporates dynamically generated networks, enabling for more efficient simulation of a biological substrate. Likewise, GIAANN improves on initial SANI architecture by incorporating multiple dendritic branches.
+
+In GIAANN, each neuron’s activation may depend on converging evidence (from multiple concept connections) such that it fires only when a specific combination is met, much like a multi-compartment neuron requiring coincident inputs on its dendrites. This makes the sequential chain of activation more reliable and meaningful, as each step is a high-information event.
+
+The sequential activation paradigm gives GIAANN a brain-like temporal dimension---processing unfolds as a series of concept neuron activations, allowing intermediate results to be interpreted step by step.
+This is fundamentally different from feedforward nets and brings it closer to spiking neural networks and symbolic reasoning sequences.
+By adopting multi-compartment neuron models, GIAANN’s neurons are more ``intelligent,'' each capable of complex input discrimination.
+This means GIAANN can afford to have extremely sparse activity (e.g. only one neuron firing at a time) without losing computational power.
+The literature on multi-compartment spiking neurons confirms that such designs can maintain performance while drastically cutting down spike events \citep{leugering2020spiking}.
+GIAANN thus stands at the intersection of sequential processing (inspired by SANI and brain spike trains) and advanced neuron models (inspired by dendritic computation research), which together enable efficient, interpretable propagation of thoughts or computations one step at a time.
+
+\subsection{Excitatory Cortical Networks and Assemblies}
+Cortical neural circuits are characterised by dense recurrent excitation among nearby pyramidal neurons, forming local networks that can sustain and propagate activity.
+In the absence of strong global synchronising forces, these local excitatory networks are believed to underlie the brain’s capability for pattern completion, memory replay, and sequential activation.
+Experimental and theoretical studies of cortical tissue (especially in the hippocampus and neocortex) have shown that groups of excitatory neurons often form stable assemblies when learning occurs \citep{holtmaat2016assembly}.
+\citet{holtmaat2016assembly} review how learning a task or memory induces specific subsets of excitatory neurons to strengthen mutual synapses, effectively ``wiring together'' into an assembly that encodes that memory or skill \citep{holtmaat2016assembly}.
+Neurons are recruited into these assemblies based on their intrinsic excitability and input drive, and through synaptic plasticity they form new connections or enhance existing ones, while less useful connections are pruned \citep{yu2023synapsePruning}.
+The result is an excitatory subnetwork that can ignite collectively to represent the learned information.
+Such assemblies (sometimes called cell assemblies after Hebb’s theory) provide a mechanism for content-addressable storage in the brain: when a portion of the assembly is stimulated, the rest of the excitatory neurons can activate, retrieving the whole memory or initiating a learned sequence \citep{holtmaat2016assembly}.
+
+Notably, these excitatory assemblies are constrained in space---they often correspond to local clusters of neurons (which could be within a cortical column or distributed across a few columns) that are strongly interconnected.
+This ties into the concept of local connectomes or microcircuits: the specific pattern of connections among a small group of neurons can be as unique as a fingerprint for an individual (as suggested by connectomics studies), and within that local network, highly recurrent excitation plus some inhibitory shaping gives rise to preferred activation sequences.
+For example, synfire chain models posit that excitatory neurons can form feedforward chains where activity propagates in order, which is a special case of an assembly arranged temporally.
+More broadly, recurrent excitatory networks can exhibit attractor dynamics (settling into stable patterns) as well as sequence generation (transitioning through a series of states) depending on how weights are configured.
+
+Evidence suggests neural inhibition rather may play a modulatory role, such as in restricting assembly activation \citep{fleming2024granule_inhibition}.
+
+\paragraph{Relevance to GIAANN.}
+
+In GIAANN, this biological network and assembly concept is reflected in how neurons (within a concept column or across columns) are wired. See the BAI LocalConnectome repository for a detailed analysis of biological network connectivity across organisms \citep{bairesearch2025LocalConnectome}.
+GIAANN emphasises excitatory-to-excitatory connections for driving the main signal flow (with inhibition playing a more modulatory role, such as resetting, normalising, and top-k selection).
+This is analogous to the brain’s cortex where the heavy lifting of representation is done by excitatory pyramidal cells, and inhibitory interneurons mainly regulate timing and prevent runaway activity.
+By using primarily excitatory connections, GIAANN’s dynamics rely on positive feedback loops to sustain and spread activation among related neurons---just as cortical assemblies ignite via recurrent excitation.
+This design enables auto-associative recall within the network: once a partial concept is activated, the strong excitatory links can trigger the rest of the related concepts to fire in turn, completing a thought.
+It also allows sequential transitions: one active neuron can excite the next intended neuron (in the learned sequence or association), enabling the chain of activation central to GIAANN’s operation.
+
+The literature supports the efficacy of such mechanisms: recurrent excitatory circuits are thought to mediate working memory and sequence generation in cortex \citep{holtmaat2016assembly}.
+Moreover, modeling studies (e.g. Hopfield nets, attractor networks, and sequence learning models) often simplify by considering only excitatory units with symmetric weights for memory storage---capturing how excitatory connectivity alone can store multiple stable states.
+GIAANN leverages these principles, effectively operating as an excitatory graph of neurons wherein knowledge is stored in the connectivity.
+By aligning with cortical architecture (lots of excitatory recurrence), GIAANN can achieve neural behaviors like assembly formation (group of concept neurons that commonly co-activate for a memory) and pattern completion (partial activation leads to full activation of an assembly), as described by Holtmaat \& Caroni \citep{holtmaat2016assembly}.
+This biological grounding ensures that GIAANN’s learning rules and activation patterns are compatible with how real neural tissue self-organises during learning, lending plausibility and robustness to the model.
+
+\subsection{Simulated Dendritic Branches in Neural Models}
+Each biological neuron is not a point summation unit but has a complex dendritic tree that gives it computational richness.
+Dendritic branches can act as non-linear subunits: they can individually perform thresholding and even spike on their own (dendritic spikes) before influencing the soma[8].
+This means a single biological neuron can implement a multi-layer computation---effectively a small neural network within itself, where dendrites detect specific features and the soma integrates those results[8].
+Pioneering theoretical work (e.g. by Mel and Poirazi) showed that a model neuron with passive and active dendritic compartments can perform the equivalent of an XOR or other non-linearly separable functions, and can be seen as a two-layer perceptron: inputs to separate dendrites are combined non-linearly in each branch, then the branch outputs sum at the soma (possibly triggering a spike)[8].
+Such multi-compartment neuron models significantly expand the expressiveness of neural networks without adding more neurons---they add complexity within each neuron.
+
+Recent research has explicitly incorporated dendritic computations into artificial neural networks.
+For example, \citet{chavlis2025dendrites} introduced a dendritic artificial neural network where neurons had structured connectivity reflecting dendritic subunits \citep{chavlis2025dendrites}.
+They demonstrated that these dendrite-enabled ANNs could achieve equal or better accuracy than traditional ones on image tasks while using far fewer parameters \citep{chavlis2025dendrites}.
+The dendritic ANN was also more robust to overfitting \citep{chavlis2025dendrites}.
+The authors attribute this to a different learning strategy: ``most of the nodes in dendritic ANNs respond to multiple classes, unlike classical ANNs that strive for class-specificity'' \citep{chavlis2025dendrites}.
+In other words, because a neuron can compartmentalise its responses, it can participate in representing more than one category depending on which dendrite is stimulated, leading to more efficient use of neurons.
+Overall, their findings suggest incorporating dendritic properties makes learning more precise, resilient, and parameter-efficient, bringing ANNs closer to the brain’s efficiency \citep{chavlis2025dendrites}.
+
+Another line of work focuses on nonlinear integration via dendrites to discriminate input patterns.
+For instance, \citet{gidon2020dendritic_ap} showed that active dendritic mechanisms in human L2/3 cortical neurons can support linearly non-separable (XOR-like) computations.
+Additionally, researchers have proposed network models where each neuron has a set of learned subspace detectors (dendritic branches) that collectively determine if the neuron fires---sometimes called dendritic neural networks (e.g. the ``Dendritic CNN'' or ``DendriteNet'' models).
+These models often report that for the same number of neurons, adding dendritic substructure improves task performance and noise robustness, consistent with the findings of \citet{chavlis2025dendrites}.
+
+In addition to these rate-based and compartmentalised ANN approaches, dendrite-inspired temporal mechanisms have been studied in spiking neuron models: \citet{leugering2023dendritic} show that dendritic plateau potentials can process spike sequences across multiple time-scales \citep{leugering2023dendritic}.
+
+In the SDBANNtf (Simulated Dendritic Branch ANN) prototype by BAI (an early TensorFlow implementation focusing on dendrites) \citep{bairesearch2023SDBANNtf}, the idea was to give each artificial neuron multiple internal ``branch'' computations.
+Each branch would receive a subset of inputs and produce a sub-output; the neuron fires only if one or more branches reach a threshold. Related NLP experiments are provided in the SDBNLPpt (Simulated Dendritic Branch NLP) prototype \citep{bairesearch2023SDBNLPpt}.
+This mimics how real neurons might require a strong input to one dendrite (or coincident inputs to that branch) to fire, rather than summing weak inputs from everywhere.
+It creates a more disjunctive or condition-specific firing behavior, as opposed to the purely additive behavior of standard neurons.
+
+\paragraph{Relevance to GIAANN.}
+GIAANN incorporates simulated dendritic branch logic into its neurons, following these research insights.
+Concretely, each concept neuron in GIAANN can have multiple input streams or conditions that must be met---analogous to multiple dendritic branches that each detect a particular conjunction of features.
+This allows GIAANN neurons to be highly selective: they might only activate for a concept if certain context features come into branch A or B, for example. (Although branch interaction is not currently enabled, they could also only activate if certain context features from different branches A and B coincide).
+This selectivity is exactly what multi-compartment neurons enable: ``selective to highly specific input patterns, producing sparse spiking codes''[9].
+Thus GIAANN’s neurons do not fire for every slight stimulus; they await a meaningful pattern, reducing spurious activations.
+As a result, the network’s overall activity is sparse and information-rich, improving efficiency and interpretability.
+
+By using dendritic subunits, GIAANN neurons can participate in multiple representations.
+For instance, the same neuron might contribute to two different concepts depending on which dendrite is activated (similar to how one neuron in dendritic-ANN responded to multiple classes) \citep{chavlis2025dendrites}.
+This aligns with the brain’s reuse of neurons across contexts and helps GIAANN avoid combinatorial explosion of neurons for every concept.
+It also reinforces the idea of concept columns: within a column (see next section), neurons might share input branches for column-specific features, while other branches capture cross-column context, thereby integrating local and global information.
+The literature strongly backs the inclusion of dendritic mechanisms as a path to more powerful and brain-like ANNs, and GIAANN stands on that frontier by explicitly baking in dendritic branch computations into its architecture.
+
+\subsection{Semantic Encoding in Single Neurons}
+One of the striking findings in neuroscience is that single neurons can encode high-level, abstract information---sometimes very specifically.
+Classic examples are the so-called ``concept cells'' discovered in the human medial temporal lobe (MTL).
+\citet{quiroga2005concept} famously reported neurons that respond selectively to different images of the same person (e.g. Jennifer Aniston) and even to the written or spoken name of that person.
+These neurons fire for a particular concept regardless of how it’s presented---a property known as invariant representation.
+The selectivity is extremely sparse (out of tens of millions of neurons, only a handful might fire for that concept) and explicit (the neuron’s firing strongly indicates the presence of that concept) \citep{quianQuiroga2012conceptCells}.
+This led to discussion of ``grandmother cells''---not literally one neuron per concept, but a spectrum where some neurons lie at the explicit end of representation.
+Further research by \citet{quianQuiroga2012conceptCells} reinforced that concept cells are part of a distributed but sparse assembly coding for an item, and they likely play a role in memory (linking concepts together, since the hippocampal formation is involved in memory).
+These findings demonstrated that semantic encoding can be achieved at the single-cell level in a highly selective manner \citep{quiroga2005concept}.
+
+More recently, \citet{jamali2024semantic_encoding} provided unprecedented insight into semantic encoding in the human cortex \citep{jamali2024semantic_encoding}.
+They recorded from single neurons in the language-dominant prefrontal cortex of patients listening to natural speech.
+They found that individual neurons showed selectivity for specific word meanings---for example, a neuron might fire for any word related to a particular semantic category or concept \citep{jamali2024semantic_encoding}.
+These neurons could even distinguish real words from pseudowords, indicating a true semantic discrimination, not just sound or frequency \citep{jamali2024semantic_encoding}.
+Importantly, the firing of these neurons was context-dependent: the same word could elicit different neural responses depending on the sentence context, meaning that neurons were encoding semantic information in a flexible way, sensitive to how meaning changes with context \citep{jamali2024semantic_encoding}.
+They also found that ensembles of such neurons could encode the hierarchical structure of language (words, phrases, sentences) in their firing patterns \citep{jamali2024semantic_encoding}.
+In summary, this study revealed ``a fine-scale cortical representation of semantic information by individual neurons,'' with neurons dynamically reflecting the meaning of words in context \citep{jamali2024semantic_encoding}.
+This is direct evidence of single-neuron semantics in the cortex, complementing the concept cells of MTL with more language-oriented examples in the prefrontal cortex.
+
+These results, combined with earlier findings, suggest a continuum between fully distributed representations (many neurons share in representing a concept) and extremely sparse ones (a neuron or a small set encodes a concept).
+Not all neurons are concept cells, but the existence of such cells implies that a neural system can assign distinct semantics to individual units.
+This is an appealing property for interpretable AI models---if each artificial neuron corresponded to a human-comprehensible concept, the network’s reasoning would be more transparent.
+Traditional deep networks, however, tend to use distributed representations; no single unit cleanly corresponds to a high-level concept (with some exceptions in deep vision models where certain units detect specific objects or features).
+There has been growing interest in disentangled representations in AI---where dimensions or units correspond to meaningful factors of variation.
+The brain’s concept cells are like an existence proof that disentangled (or at least highly sparse localised) representation is possible and useful.
+
+\paragraph{Relevance to GIAANN.}
+GIAANN explicitly embraces the idea of neurons as semantic encoders.
+It is built so that each neuron (or a small coherent group of neurons) represents a distinct concept, feature, or memory element.
+This design is in line with the findings of concept cells and Jamali et al.’s semantic cells.
+By allocating neurons to specific meanings, GIAANN ensures that activation of that neuron signals the presence of that meaning in the current context---much like a concept cell firing signifies a particular person or thing is being thought about \citep{quianQuiroga2012conceptCells,quiroga2005concept}.
+GIAANN’s training and architecture encourage this localisation: learning rules are constrained so that neurons develop sharp selectivity (via sparse Hebbian updates) rather than distributed entangled representations.
+The concept columns in GIAANN (discussed next) also foster this, by grouping neurons by topic/domain which reduces overlap of unrelated features in the same neurons.
+
+By mirroring single-neuron semantic coding, GIAANN gains interpretability (one can inspect which concept neurons fired to understand its ``thought process'') and potentially leverages the brain’s efficient encoding (sparse firing, as only the relevant concept neurons fire, saving energy/computation).
+It also allows contextual modulation of semantics: because GIAANN’s neurons can interact (via lateral modulation), the activation of a concept neuron can reflect context, similar to Jamali et al.’s observation that neuron responses to words depend on sentence context \citep{jamali2024semantic_encoding}.
+For example, a ``bank'' neuron might only fire if disambiguating context indicates finance (and stay quiet if the context is ``river bank'', allowing a different set of neurons to fire).
+This kind of context-sensitive concept representation is exactly what the human neurons exhibited and is a targeted feature for GIAANN.
+
+In summary, neuroscience has shown that single neurons can carry high-level meaning, and GIAANN capitalises on this by structuring its representational scheme around neurons-as-concepts, a departure from most contemporary ANN models. Although its present implementation exhibits limited semantic overloading during training (noun homonymy, e.g. ``bank''), this does not cause significant confliction during inference due to the dominance of contextual neuronal representations.
+
+\subsection{Cortical Columns and Modular Organisation}
+The neocortex is often described as a repetitive lattice of cortical columns---vertically arranged microcircuits ($\sim$50--100\,\textmu{}m wide minicolumns and larger $\sim$0.5--1\,mm macrocolumns) that each perform a sort of canonical computation.
+\citet{mountcastle1997columnar} originally proposed the columnar organisation as a fundamental principle: neurons in a small column respond to similar features or input from the same receptive field.
+More recent theories, like Jeff Hawkins’ Thousand Brains Theory, dramatically expand the role of columns, suggesting that each cortical column learns a complete model of objects or concepts from its perspective \citep{hawkins2011htm}.
+Rather than information being siloed to a single part of the hierarchy, each column creates an internal representation of whole objects and then columns vote or consensus-build to form our singular perception \citep{hawkins2011htm}.
+In this view, intelligence emerges from an army of parallel experts (columns), each of which is modeling the world in slightly different ways (e.g., each column might be anchored to a different sensor or reference frame).
+Long-range horizontal connections allow these columns to synchronise on an agreed interpretation \citep{hawkins2011htm}.
+Hawkins’ Hierarchical Temporal Memory (HTM) algorithm was an attempt to implement key aspects of cortical columns in a computational model.
+HTM uses sparse distributed representations and organises neurons into minicolumns and layers that mimic cortical layering \citep{hawkins2011htm}.
+Notably, in HTM each minicolumn’s cells learn temporal sequences and make predictions: if an input sequence is recognised, one cell in a minicolumn will enter a predictive state (like a guess for the next input) \citep{hawkins2011htm}.
+Only one cell per minicolumn fires for any given context, enforcing a sparse code.
+This is analogous to the idea that in a cortical column, only a small fraction of cells are active at once, representing a particular feature in a particular context.
+
+HTM and related models demonstrate how modular organisation (columns, layers) plus sparse coding and local learning rules (Hebbian, no backprop) can learn sequences and make predictions in a streaming manner \citep{hawkins2011htm,numenta2019_htm_guide}.
+While HTM did not become mainstream in machine learning, it captured brain-like attributes: continuous learning, temporal context, and modular structure.
+It is essentially a column-oriented view of computation, differing from traditional deep networks that use homogeneous layers.
+Another relevant concept from neuroscience is that columns may correspond to functional units or maps (e.g., orientation columns in visual cortex, where each column handles a particular orientation of visual edge).
+Holtmaat \& Caroni’s assembly formation could be seen in the column context: if learning recruits an assembly of neurons, often those neurons are spatially proximate (due to local recurrent connectivity), possibly within a cortical column or a couple of neighboring columns[10].
+Thus, an assembly might actually be a ``column-sized'' group encoding a memory.
+This links columns to the idea of local learning and memory encoding, reinforcing that columns are not just anatomical structures but computational modules that can hold discrete pieces of information.
+
+In modern deep learning, an interesting parallel to cortical columns is the use of dedicated substrate experts such as multiple attention heads in Transformer architectures.
+A Transformer doesn’t have physical columns, but each attention head can be thought of as focusing on a different subspace or aspect of the input.
+\citet{vaswani2017attention} introduced multi-head self-attention specifically to allow the model to capture different relationships in the data simultaneously \citep{vaswani2017attention}.
+``Each attention head learns different projections of Q, K, V, allowing the model to capture different aspects of the relationships between words in the sequence simultaneously'' \citep{vaswani2017attention}.
+In essence, each head is somewhat analogous to a mini-module that extracts a particular kind of pattern (for example, head~1 might attend to syntactic structure, head~2 to coreference, head~3 to anaphora resolution, etc., in an NLP context).
+After processing, the outputs of all heads are combined.
+This bears similarity to the idea of multiple cortical columns each processing the input (or parts of it) in parallel and then integrating their findings.
+The analogy is not perfect---Transformer heads share most of their surrounding network---but conceptually, dividing representational resources into parallel ``columns'' that specialise is a common strategy in both the brain and advanced ANN designs.
+
+\citet{bahdanau2015neural} likewise introduced the idea of dividing a context into distinct subspaces of tokens, whereby the processing of each token can proceed somewhat invariant to the absolute position of the token in its context. While these subspaces may primarily form syntactical priors at lower layers (via attention), and semantic priors at intermediate layers (via attention), they form specific concepts at higher layers and interact with other specific concepts (via attention). As such, this segregated information retentic/combinatory property of the transformer architecture also resembles columnar processing of tokens within sequences.
+
+\paragraph{Relevance to GIAANN.}
+GIAANN explicitly implements a form of concept-wise modularity that can be seen as artificial cortical columns.
+Neurons in GIAANN are organised into concept columns, each column devoted to a group of related features or a domain of knowledge (noun).
+For example, one column might represent dogs, another cats, another trees (analogous to how the brain might have columns or patches for different categories of information).
+Within a concept column, neurons share certain inputs or dendritic branches (the ``common context'' of that column), and they compete or cooperate to represent specific instances of that concept.
+This is much like HTM’s minicolumns where only one cell is active per context---in GIAANN, only one neuron per concept column fires at a time (a winner-take-all style competition; see \citealt{maass2000winnerTakeAll}), representing the specific concept active in the current thought.
+By segregating neurons into columns, GIAANN ensures that unrelated concepts do not directly compete; competition is localised, which simplifies learning (reduces interference) and improves interpretability (one can decode a network state by picking at most one active neuron from each column, yielding a set of active concepts).
+The columnar design also allows GIAANN to scale: new knowledge can be added by adding neurons to existing columns or new columns, without disrupting learned representations in other columns (mitigating catastrophic forgetting via modularity).
+
+GIAANN’s concept columns resonate with Hawkins’ theory---each column holds a model of a piece of the world (like one facet of an object or one type of entity), and collectively these models contribute to a coherent perception or solution.
+The network’s long-range (inter-column) connections let columns influence each other (ensuring consistency, much as cortical long-range fibers enable columns to vote and agree) \citep{hawkins2011htm}.
+This means GIAANN can achieve an ensemble effect: multiple ``experts'' (columns) each supply part of the interpretation of input, and their interaction yields a rich understanding.
+In the context of multi-head attention, GIAANN’s columns can be viewed analogously---each column might attend to a different aspect of the input or context, and by having multiple such columns active (in sequence or in parallel), GIAANN covers a broad combinatorial space of possibilities without conflating them in one monolithic representation \citep{vaswani2017attention}.
+
+Finally, because each column in GIAANN is like a micro-network with its own localised learning, the system aligns with the brain’s developmental and functional segregation---it’s easier to train (each column can self-organise with minimal interference) and it’s robust (damage to one column only affects that aspect of processing, not everything).
+This is a marked difference from prior BAI models like HFNLP \citep{bairesearch2024HFNLPpy}, which lacked this columnar separation and thus had all neurons in one big pool competing.
+GIAANN, by introducing concept columns, moves from a single Hopfield-memory to multiple overlapping Hopfield-like modules, which is a novel synthesis of columnar neuroscience ideas and modern neural network design.
+
+
