@@ -247,26 +247,44 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 		wordOrderTarget = wordOrderTensor.view(1, 1, cs, fs).expand(cs, fs, cs, fs)
 		relativeDistance = (wordOrderTarget - wordOrderSource)
 		relativeDistance = pt.clamp(relativeDistance, min=1)
-		connectionsSegmentIndex = arrayNumberOfSegments - relativeDistance
-		connectionsSegmentIndex = connectionsSegmentIndex.clamp(min=0, max=arrayNumberOfSegments-1).long()
-		featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
-		featureConnectionsSegmentMask.scatter_(0, connectionsSegmentIndex.unsqueeze(0), True)
+		if(SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens):
+			connectionsSegmentIndex = arrayNumberOfSegments - relativeDistance
+			connectionsSegmentIndex = connectionsSegmentIndex.clamp(min=0, max=arrayNumberOfSegments-1).long()
+			featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
+			featureConnectionsSegmentMask.scatter_(0, connectionsSegmentIndex.unsqueeze(0), True)
+		else:
+			validDistanceMask = (relativeDistance <= arrayNumberOfSegments)
+			connectionsSegmentIndex = arrayNumberOfSegments - relativeDistance
+			connectionsSegmentIndex = connectionsSegmentIndex.clamp(min=0, max=arrayNumberOfSegments-1).long()
+			featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
+			featureConnectionsSegmentMask.scatter_(0, connectionsSegmentIndex.unsqueeze(0), True)
+			featureConnectionsSegmentMask = featureConnectionsSegmentMask & validDistanceMask.unsqueeze(0)
 	elif(useSANIfeaturesAndColumns):
 		device = featureConnectionsActive.device
 		wordOrderTensor = featureNeuronsWordOrder.to(device)
 		wordOrderSource = wordOrderTensor.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
 		wordOrderTarget = wordOrderTensor.view(1, 1, cs, fs).expand(cs, fs, cs, fs)
 		relativeDistance = (wordOrderTarget - wordOrderSource)
-		relativeDistance = pt.clamp(relativeDistance, min=1, max=arrayNumberOfSegmentsFeatureDistance)
-		featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
-		featureSegmentIndex = featureSegmentsOffset + arrayNumberOfSegmentsFeatureDistance - relativeDistance
-		featureSegmentIndex = featureSegmentIndex.clamp(min=featureSegmentsOffset, max=arrayNumberOfSegments-1).long()
+		if(SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens):
+			relativeDistance = pt.clamp(relativeDistance, min=1, max=arrayNumberOfSegmentsFeatureDistance)
+			featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
+			featureSegmentIndex = featureSegmentsOffset + arrayNumberOfSegmentsFeatureDistance - relativeDistance
+			featureSegmentIndex = featureSegmentIndex.clamp(min=featureSegmentsOffset, max=arrayNumberOfSegments-1).long()
+			featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
+			featureConnectionsSegmentMask.scatter_(0, featureSegmentIndex.unsqueeze(0), True)
+		else:
+			relativeDistance = pt.clamp(relativeDistance, min=1)
+			validDistanceMask = (relativeDistance <= arrayNumberOfSegmentsFeatureDistance)
+			featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
+			featureSegmentIndex = featureSegmentsOffset + arrayNumberOfSegmentsFeatureDistance - relativeDistance
+			featureSegmentIndex = featureSegmentIndex.clamp(min=featureSegmentsOffset, max=arrayNumberOfSegments-1).long()
+			featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
+			featureConnectionsSegmentMask.scatter_(0, featureSegmentIndex.unsqueeze(0), True)
+			featureConnectionsSegmentMask = featureConnectionsSegmentMask & validDistanceMask.unsqueeze(0)
 
 		conceptNeuronsConceptOrder1d = pt.arange(cs, device=device)
 		conceptNeuronsDistances = pt.abs(conceptNeuronsConceptOrder1d.unsqueeze(1) - conceptNeuronsConceptOrder1d).reshape(cs, cs)
 		conceptNeuronsDistances = conceptNeuronsDistances.view(cs, 1, cs, 1).expand(cs, fs, cs, fs)
-		featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
-		featureConnectionsSegmentMask.scatter_(0, featureSegmentIndex.unsqueeze(0), True)
 		if(arrayNumberOfSegmentsColumnDistance > 0):
 			if(useSANIfeaturesAndColumnsInternal):
 				# Include internal column as the most proximal concept segment.

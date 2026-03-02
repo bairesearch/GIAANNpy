@@ -45,11 +45,13 @@ inferenceAddNewFeatures = True	#default: True	#orig: False	#run a controlled exp
 
 #Benchmarking;
 useBenchmarkDefaults = False	#default: False	#orig: True
+useBenchmarkDefaultsTestSet = False	#default: False	#orig: False
 if(useBenchmarkDefaults):
-	spacyPipelineOptimisations = False	#default: False
+	spacyPipelineOptimisations = True	#default: True	#orig: False	#spacyPipelineOptimisations do not significantly affect test-set accuracies (-0.002)
 else:
 	spacyPipelineOptimisations = True	#default: True
-	
+inferenceReportTokenAccuracyConstrainByColumn = False	#default: False	#orig: False
+
 
 #Database;
 databaseFolder = "../database/"	#default: "../database/"	#performance: "/media/user/ssdpro/GIAANN/database/"	#orig: ""
@@ -102,6 +104,7 @@ if(trainTestSet):
 		testSetSize = 1000	#number of entries to include in test set
 	else:
 		raise RuntimeError("trainTestSet configuration error: unsupported dataset selection")
+	trainSetStartOffsetSequences = 0
 else:
 	trainSetStartOffsetSequences = 0	#default: 0	#orig: 0	
 	if(datasetOscar):
@@ -144,7 +147,10 @@ trainStoreFeatureMapsGlobally = True	#default: True	#True: avoid per-column pers
 #Segment activation time;
 if(useInference):
 	inferenceUseNeuronFeaturePropertiesTime = True	#optional	#orig:False
-	inferenceUseNeuronFeaturePropertiesTimeExact = True	#optional	#orig:False
+	if(useBenchmarkDefaultsTestSet):
+		inferenceUseNeuronFeaturePropertiesTimeExact = False
+	else:
+		inferenceUseNeuronFeaturePropertiesTimeExact = True	#optional	#orig:False
 else:
 	inferenceUseNeuronFeaturePropertiesTime = False
 	inferenceUseNeuronFeaturePropertiesTimeExact = False
@@ -405,15 +411,15 @@ debugPrintTrainSequenceCount = False	#print each training sequence count
 
 debugTerminateInferenceOnPredictionTargetMismatch = False
 debugTerminateInferenceOnNoPredictionCandidatesAvailable = False
+if(debugPrintTrainSequenceRaw):
+	debugTerminateOnConceptColumnsDelimitByPOSwarning = False
+else:
+	debugTerminateOnConceptColumnsDelimitByPOSwarning = True
 if(pretrainConceptColumnsDelimitByPOSenforce):
 	debugTerminateOnConceptColumnsDelimitByPOSerror = False
-	debugTerminateOnConceptColumnsDelimitByPOSwarning = True
 else:
 	debugTerminateOnConceptColumnsDelimitByPOSerror = False
-	if(debugPrintTrainSequenceRaw):
-		debugTerminateOnConceptColumnsDelimitByPOSwarning = False
-	else:
-		debugTerminateOnConceptColumnsDelimitByPOSwarning = True
+
 debugDeleteGPUcache = False
 
 debugPrintTotalFeatures = True	#print c+f upon load
@@ -475,7 +481,8 @@ if(useInference):
 
 
 #Database save paths;
-inferencePromptFile = databaseFolder + 'inference_prompt.txt'	#inference_prompt.txt
+inferencePromptFileName = 'inference_prompt.txt'	#inference_prompt.txt
+inferencePromptFile = databaseFolder + inferencePromptFileName
 conceptColumnsDictFile = databaseFolder + 'conceptColumnsDict.pkl'
 conceptFeaturesDictFile = databaseFolder + 'conceptFeaturesDict.pkl'
 observedColumnsDir = databaseFolder + 'observedColumns'
@@ -526,13 +533,14 @@ arrayNumberOfProperties = len(arrayPropertiesList)
 #SANI settings;
 arrayIndexSegmentFirst = 0
 if(useSANI):
+	SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens = True	#default: True	#orig: True	#first feature segment captures all prior train sequence tokens
 	if(enforceDirectConnectionsSANIminimal):
 		useSANIcolumns = False
 		useSANIfeatures = True
 		useSANIfeaturesAndColumns = False
 	else:
 		useSANIcolumns = False	#assign segments by concept column proximity to connection target during train (includes internal concept column)
-		useSANIfeatures = False	#assign segments by feature proximity to connection target during train
+		useSANIfeatures = False #assign segments by feature proximity to connection target during train
 		useSANIfeaturesAndColumns = True	#assign segments by column proximity first then feature proximity
 
 	if(useSANIfeaturesAndColumns):
@@ -554,9 +562,12 @@ if(useSANI):
 			arrayNumberOfSegments = 2
 		else:
 			arrayNumberOfSegments = numSeedTokensInference	#default: 5	#min number of nearest features to target node (note first segment captures all other features)
-
-	algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment under conditions
-	#algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI
+			#arrayNumberOfSegments = math.ceil(numSeedTokensInference / 2) + 1	#temp for benchmarking compared to useSANIfeaturesAndColumns/useSANIcolumns [remove this]
+			
+	if(useBenchmarkDefaultsTestSet):
+		algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI
+	else:
+		algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment under conditions
 	if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
 		#algorithmMatrixSANIenforceRequirement="enforceAnySegmentMustBeActive"	#activate neuron if any segment is active
 		algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default	#only activate neuron if last segment active
@@ -564,7 +575,10 @@ if(useSANI):
 		if(enforceDirectConnectionsSANIminimal):
 			enforceSequentialActivation = False
 		else:
-			enforceSequentialActivation = True	#optional	#default: True #orig: True	#only activation next segment if previous segment activated
+			if(useBenchmarkDefaultsTestSet):
+				enforceSequentialActivation = False
+			else:
+				enforceSequentialActivation = True	#optional	#default: True #orig: True	#only activation next segment if previous segment activated
 	else:
 		enforceSequentialActivation = False
 
@@ -575,8 +589,8 @@ if(useSANI):
 
 	if(enforceDirectConnectionsSANI):	#min requirements for enforceDirectConnectionsSANI
 		assert not useSANIcolumns	#enforceDirectConnectionsSANI requires last segment to be adjacent feature segment
-		assert arrayNumberOfSegments >= 2		#note if arrayNumberOfSegments=2 then; sIndex=1: sequential segment connections for adjacent feature, sIndex=0: sequential segment connections for all other feature
-		assert enforceSequentialActivation or not enforceSequentialActivation
+		if(SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens):
+			assert arrayNumberOfSegments >= 2		#note if arrayNumberOfSegments=2 then; sIndex=1: sequential segment connections for adjacent feature, sIndex=0: sequential segment connections for all other feature
 		
 	if(useSANIfeaturesAndColumns):
 		arrayIndexSegmentLast = arrayNumberOfSegments-1	#last feature index
@@ -587,10 +601,12 @@ if(useSANI):
 	elif(useSANIfeatures):
 		arrayIndexSegmentLast = arrayNumberOfSegments-1
 
-	if(useInference):
+	'''
+	if(useInference):	#no restrictions with useBenchmarkDefaultsTestSet;
 		#arrayNumberOfSegments must be <= numSeedTokens (eg with numSeedTokens = 5, segment budget = 5)
 		#absolute minimum, for useSANIcolumns (and useSANIfeaturesAndColumns with arrayNumberOfSegmentsColumnDistance>1), arrayNumberOfSegments must be significantly less than numSeedTokens
 		assert arrayNumberOfSegments <= numSeedTokensInference	
+	'''
 else:
 	arrayNumberOfSegments = 1
 	algorithmMatrixSANImethod = "NA"
@@ -827,6 +843,10 @@ if(debugPrintConfiguration):
 	if(useInference):
 		print("drawNetworkDuringInferenceSave:", drawNetworkDuringInferenceSave)
 	print("drawNetworkSaveFormatVector:", drawNetworkSaveFormatVector)
+	print("")
+	print("#Database save paths;")
+	if(useInference):
+		print("inferencePromptFileName:", inferencePromptFileName)
 	print("")
 	print("#SANI settings;")
 	if(useSANI):

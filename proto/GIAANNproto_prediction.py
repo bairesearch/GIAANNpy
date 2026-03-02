@@ -106,7 +106,10 @@ def printInferenceTop1Accuracy():
 		else:
 			predictionAccuracy = totalInferenceTop1PredictionMatches / totalInferenceTop1PredictionTokens
 			inferenceAccuracy = totalInferenceTop1Matches / totalInferenceTop1Tokens
-			print("averageTop1Accuracy: predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
+			if(inferenceReportTokenAccuracyConstrainByColumn):
+				print("averageTop1Accuracy (col): predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
+			else:
+				print("averageTop1Accuracy: predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
 	return
 
 def addInferenceTop1AccuracyCountPadding(numSeedTokens, numPredictionTokens, seedTokensProcessed, predictionTokensProcessed):
@@ -635,6 +638,10 @@ def calculateInferencePredictionMatch(tokensSequence, sequenceWordIndex, concept
 			featurePredictionTargetMatch = True
 		elif(targetIsConceptFeature and predictedIsConceptFeature and targetLemma == predictedColumnName and targetColumnName == predictedColumnName):
 			featurePredictionTargetMatch = True
+		if(inferenceReportTokenAccuracyConstrainByColumn and featurePredictionTargetMatch):
+			if(predictedColumnName != targetColumnName):
+				featurePredictionTargetMatch = False
+				#printe("inferenceReportTokenAccuracyConstrainByColumn: featurePredictionTargetMatch=False")
 	else:
 		predictedWord = "<no prediction>"
 		predictedColumnName = "<no prediction>"
