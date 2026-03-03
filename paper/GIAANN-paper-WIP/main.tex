@@ -31,7 +31,7 @@ This paper summarises the core ideas and provides an implementation-oriented des
 
 \section{Summary}
 Neural language models are commonly trained with gradient-based backpropagation and fixed-context attention mechanisms.
-GIAANN explores an alternative design: an online, dynamically growing network of features and connections intended to support continuous learning and effectively unbounded context via a persistent database network.
+GIAANN explores an alternative associative memory design: an online, dynamically growing network of features and connections intended to support continuous learning and effectively unbounded context via a persistent database network.
 
 This paper is a \emph{companion} to the codebase \texttt{github.com/bairesearch/GIAANNpy}.
 
@@ -49,7 +49,7 @@ The project targets properties motivated by biological plausibility and continua
 \input{experiments}
 
 \section{Conclusion}
-GIAANN Proto provides an experimental platform for exploring a persistent database-network approach to language modeling.
+GIAANN Proto provides an experimental platform for exploring a persistent associative memory database-network approach to language modeling.
 Future work should prioritise standardised evaluation metrics, scaling studies, and comparisons to strong modern baselines. Likewise, to move beyond self-supervised learning, reinforcement learning should be tested within the GIAANN architecture.
 
 \bibliographystyle{plainnat}

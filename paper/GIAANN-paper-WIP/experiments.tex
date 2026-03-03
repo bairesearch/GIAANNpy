@@ -46,36 +46,42 @@ Top-1 accuracy has been calculated as a baseline performance metric.
 
 \subsubsection{Training-set Accuracy}
 
-\Cref{tab:train-top1-accuracy-inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeaturesTrue} contains top-1 training-set accuracy for different numbers of segments and training budgets, with predictions fed as input \\
-(\texttt{inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures}), and segment timing exact. This is a non-standard top-1 accuracy report that is more sensitive to errors and can therefore better differentiate between ablations (it feeds current predictions rather than current targets to input). 
+\Cref{tab:wiki-train-top1-accuracy} contains Wikipedia top-1 training-set accuracy for different numbers of segments and training budgets, with targets/predictions fed as input, and segment timing exact. `top-1 pred' (\texttt{inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=True}) is a non-standard top-1 accuracy report that is more sensitive to errors and can therefore better differentiate between ablations (it feeds current predictions rather than current targets to input).
 
-\Cref{tab:train-top1-accuracy} contains top-1 training-set accuracy for different numbers of segments and training budgets, with targets fed as input, and segment timing exact.
+\Cref{tab:wiki-train-top1-accuracy-segmentLayouts} contains Wikipedia top-1 training-set accuracy for different segment layouts and training budgets, with targets fed as input, and segment timing exact.
 
-\Cref{tab:train-top1-accuracy-segmentLayouts} contains top-1 training-set accuracy for different segment layouts and training budgets, with targets fed as input, and segment timing exact.
-
-\Cref{tab:train-top1-accuracy-time} contains top-1 training-set accuracy for different sequentiality enforcement (\texttt{enforceSequentialActivation}) and segment timing settings (\texttt{inferenceUseNeuronFeaturePropertiesTime/Exact}), with targets fed as input.
+\Cref{tab:wiki-train-top1-accuracy-time} contains Wikipedia top-1 training-set accuracy for different sequentiality enforcement (\texttt{enforceSequentialActivation}) and segment timing settings (\texttt{inferenceUseNeuronFeaturePropertiesTime/Exact}), with targets fed as input.
 
 The number of seed tokens, neuron column (c) segments, neuron feature (f) segments, and training sequences (along with their token top-1 accuracies), is provided in all tables.
 
-The first 136 training-set sequences were used during inference.
+\Cref{tab:oscar-train-top1-accuracy} contains OSCAR-2201 top-1 training-set accuracy for different numbers of segments and training budgets, with targets/predictions fed as input, and segment timing exact.
+
+The first 136 and 98 training-set sequences were used during inference for datasets Wikipedia and OSCAR-2201 respectively. 
+
+A smaller subset of sequences ($\approx 90\%$) were processed by GIAANN during benchmarking, due to formal column segmentation parse rules \texttt{useBenchmarkDefaults: pretrainConceptColumnsDelimitByPOSenforce=False}. However it has been confirmed that top-1 accuracies do not significantly differ with/without these segmentation constraints. For seed length 12 for example, the train-set accuracy difference with \texttt{pretrainConceptColumnsDelimitByPOSenforce=True} is exactly -0.001 and -0.001 for 5000 and 100000 trained sequences respectively.
 
 \begin{table}[H]
 \centering
-\caption{Top-1 training-set accuracy for different numbers of segments, with predictions fed as input.}
-\label{tab:train-top1-accuracy-inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeaturesTrue}
-\begin{tabular}{rrrrr}
+\caption{Wikipedia Top-1 training-set accuracy for different numbers of segments, with targets/predictions fed as input.}
+\label{tab:wiki-train-top1-accuracy}
+\begin{tabular}{rrrrrrrr}
 \toprule
-\textbf{seed} & \textbf{c seg} & \textbf{f seg} & \textbf{sequences} & \textbf{top-1} \\
+\textbf{seed} & \textbf{c seg} & \textbf{f seg} & \textbf{sequences} & \textbf{top-1} & \textbf{top-1 pred} & \textbf{param} & \textbf{db size} \\
 \midrule
-8  & 3 & 5 & 5,000   & 0.968  \\
-8  & 3 & 5 & 100,000 & 0.935 \\
-8  & 3 & 5 & 500,000 & 0.819 \\
-12 & 4 & 7 & 5,000   & 0.983 \\
-12 & 4 & 7 & 100,000 & 0.960 \\
-12 & 4 & 7 & 500,000 & 0.945 \\
-16 & 5 & 9 & 5,000   & 0.999 \\
-16 & 5 & 9 & 100,000 & 0.996 \\
-16 & 5 & 9 & 500,000 & 0.979 \\
+8  & 3 & 5 & 5,000   & 0.985 & 0.968 & 3.0M & 0.2GB \\
+8  & 3 & 5 & 100,000 & 0.984 & 0.935 & 57.0M & 3.3GB \\
+8  & 3 & 5 & 500,000 & 0.973 & 0.819 & 271.2M & 15.1GB \\
+12 & 4 & 7 & 5,000   & 0.982 & 0.983 & 3.2M & 0.2GB \\
+12 & 4 & 7 & 100,000 & 0.982 & 0.960 & 62.0M & 3.6GB \\
+12 & 4 & 7 & 500,000 & 0.977 & 0.945 & 296.8M & 16.8GB \\
+16 & 5 & 9 & 5,000   & 0.997 & 0.999 & 3.5M & 0.2GB \\
+16 & 5 & 9 & 100,000 & 0.996 & 0.996 & 70.2M & 4.2GB \\
+16 & 5 & 9 & 500,000 & 0.993 & 0.979 & 336.6M & 19.5GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%\textbf{seed} & \textbf{c seg} & \textbf{f seg} & \textbf{sequences} & \textbf{top-1 pred tok} & \textbf{top-1 pred seq} & \textbf{param} & \textbf{db size} \\
 %8  & 3 & 5 & 5,000   & 0.978 & 0.975 \\	%orig manual calculations
 %8  & 3 & 5 & 100,000 & 0.956 & 0.936 \\	%orig manual calculations
 %8  & 3 & 5 & 540,000 & 0.882 & 0.817 \\	%orig manual calculations
@@ -86,36 +92,13 @@ The first 136 training-set sequences were used during inference.
 %(8) 12 & 0 & 7 & 100,000 & N/A & 0.946 \\
 %12 & 4 & 0 & 5,000   & N/A & 0.000  \\
 %12 & 4 & 0 & 100,000 & N/A & 0.000 \\
-\bottomrule
-\end{tabular}
-\end{table}
 
-\begin{table}[H]
-\centering
-\caption{Top-1 training-set accuracy for different numbers of segments, with targets fed as input.}
-\label{tab:train-top1-accuracy}
-\begin{tabular}{rrrrrrr}
-\toprule
-\textbf{seed} & \textbf{c seg} & \textbf{f seg} & \textbf{sequences} & \textbf{top-1} & \textbf{param} & \textbf{db size} \\
-\midrule
-8  & 3 & 5 & 5,000   & 0.985 & 3.0M & 0.2GB \\
-8  & 3 & 5 & 100,000 & 0.984 & 57.0M & 3.3GB \\
-8  & 3 & 5 & 500,000 & 0.973 & 271.2M & 15.1GB \\
-12 & 4 & 7 & 5,000   & 0.982 & 3.2M & 0.2GB \\
-12 & 4 & 7 & 100,000 & 0.982 & 62.0M & 3.6GB \\
-12 & 4 & 7 & 500,000 & 0.977 & 296.8M & 16.8GB \\
-16 & 5 & 9 & 5,000   & 0.997 & 3.5M & 0.2GB \\
-16 & 5 & 9 & 100,000 & 0.996 & 70.2M & 4.2GB \\
-16 & 5 & 9 & 500,000 & 0.993 & 336.6M & 19.5GB \\
-\bottomrule
-\end{tabular}
-\end{table}
 
 
 \begin{table}[H]
 \centering
-\caption{Top-1 training-set accuracy for different segment layouts, with targets fed as input.}
-\label{tab:train-top1-accuracy-segmentLayouts}
+\caption{Wikipedia Top-1 training-set accuracy for different segment layouts, with targets fed as input.}
+\label{tab:wiki-train-top1-accuracy-segmentLayouts}
 \begin{tabular}{rrrrr}
 \toprule
 \textbf{seed} & \textbf{c seg} & \textbf{f seg} & \textbf{sequences} & \textbf{top-1} \\
@@ -133,19 +116,19 @@ The first 136 training-set sequences were used during inference.
 
 \begin{table}[H]
 \centering
-\caption{Top-1 training-set accuracy for different sequentiality enforcement and segment timing settings, with targets fed as input.}
-\label{tab:train-top1-accuracy-time}
+\caption{Wikipedia Top-1 training-set accuracy for different sequentiality enforcement and segment timing settings, with targets fed as input.}
+\label{tab:wiki-train-top1-accuracy-time}
 \begin{tabular}{rrrrrrrr}
 \toprule
 \textbf{seed} & \textbf{c seg} & \textbf{f seg} & \textbf{sequentiality} & \textbf{timing} & \textbf{sequences} & \textbf{top-1} \\
 \midrule
-12 & 4 & 7 & enforced & exact & 5,000   & 0.982 \\	%redone: 0.982
+12 & 4 & 7 & enforced & exact & 5,000   & 0.982 \\
 12 & 4 & 7 & enforced & exact & 100,000 & 0.982 \\
 12 & 4 & 7 & enforced & exact & 500,000 & 0.977 \\
-12 & 4 & 7 & enforced & biased & 5,000   & 0.983 \\	%redone: 0.983
+12 & 4 & 7 & enforced & biased & 5,000   & 0.983 \\
 12 & 4 & 7 & enforced & biased & 100,000 & 0.979 \\
 12 & 4 & 7 & enforced & biased & 500,000 & 0.959 \\
-12 & 4 & 7 & enforced & none & 5,000   & 0.982 \\	%redone: 0.982
+12 & 4 & 7 & enforced & none & 5,000   & 0.982 \\
 12 & 4 & 7 & enforced & none & 100,000 & 0.976 \\
 12 & 4 & 7 & enforced & none & 500,000 & 0.941 \\
 12 & 4 & 7 & none & exact & 5,000   & 0.999 \\
@@ -163,8 +146,8 @@ The first 136 training-set sequences were used during inference.
 
 %\begin{table}[H]
 %\centering
-%\caption{Top-1 training-set accuracy for different sequentiality enforcement %and segment timing settings, with predictions fed as input.}
-%\label{tab:train-top1-accuracy-time}
+%\caption{Wikipedia Top-1 training-set accuracy for different sequentiality enforcement %and segment timing settings, with predictions fed as input.}
+%\label{tab:wiki-train-top1-accuracy-time}
 %\begin{tabular}{rrrrrrrr}
 %\toprule
 %\textbf{seed} & \textbf{c seg} & \textbf{f seg} & \textbf{sequentiality} & %\textbf{timing} & \textbf{sequences} & \textbf{top-1} \\
@@ -192,6 +175,28 @@ The first 136 training-set sequences were used during inference.
 %\end{table}
 
 
+\begin{table}[H]
+\centering
+\caption{OSCAR-2201 Top-1 training-set accuracy for different numbers of segments, with targets/predictions fed as input.}
+\label{tab:oscar-train-top1-accuracy}
+\begin{tabular}{rrrrrrrr}
+\toprule
+\textbf{seed} & \textbf{c seg} & \textbf{f seg} & \textbf{sequences} & \textbf{top-1} & \textbf{top-1 pred} & \textbf{param} & \textbf{db size} \\
+\midrule
+8 & 3 & 5 & 5,000   & 0.856 & 0.855 & 2.1M & 0.1GB \\
+8 & 3 & 5 & 200,000 & 0.843 & 0.804 & 71.6M & 4.2GB \\
+8 & 3 & 5 & 400,000 & 0.834 & 0.777 & 137.0M & 8.0GB \\
+12 & 4 & 7 & 5,000   & 0.812 & 0.811 & 2.4M & 0.2GB \\
+12 & 4 & 7 & 200,000 & 0.811 & 0.805 & 85.6M & 5.0GB \\
+12 & 4 & 7 & 400,000 & 0.808 & 0.795 & 166.7M & 10.6GB \\
+16 & 5 & 9 & 5,000   & 0.732 & 0.732 & 2.9M & 0.2GB \\
+16 & 5 & 9 & 200,000 & 0.727 & 0.718 & 103.0M & 6.2GB \\
+16 & 5 & 9 & 400,000 & 0.727 & 0.718 & 198.4M & 11.8GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
 \FloatBarrier
 
 \subsubsection{Test-set Accuracy}
@@ -204,11 +209,15 @@ Furthermore, the Wikipedia dataset cannot easily be used to perform a standardis
 
 Therefore, a number of changes were introduced for test-set accuracy measurement. 1. The \texttt{enforceSequentialActivation} and \\ \texttt{inferenceUseNeuronFeaturePropertiesTimeExact} requirements were relaxed (i.e. disabled) during test-set inference. 2. the OSCAR-2201 dataset was used for both training and test-set accuracy measurement.
 
-\Cref{tab:test-top1-accuracy} contains top-1 test-set accuracy for different numbers of segments, with targets fed as input. \Cref{tab:test-top1-accuracy-spacyPipelineOptimisations} contains an expanded version of the table with \texttt{spacyPipelineOptimisations=True}.
+\Cref{tab:test-top1-accuracy} contains top-1 test-set accuracy for different numbers of segments, and different time constraints, with targets fed as input. The default time constraints used for \texttt{useBenchmarkDefaultsTestSet} (``top-1'') are \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=False} and \\ \texttt{enforceSequentialActivation=False}. It also contains results for these non-default time constraints: \texttt{enforceSequentialActivation=True} (``top-1 seq''), \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=True} + \\  \texttt{enforceSequentialActivation=True} (``top-1 exact''), and \\ \texttt{inferenceUseNeuronFeaturePropertiesTime=False} (``top-1 none'').
+
+\Cref{tab:test-top1-accuracy-spacyPipelineOptimisations} contains an expanded version of the table across a greater selection of segment counts, with \texttt{spacyPipelineOptimisations=True}. It also contains results with \texttt{inferenceReportTokenAccuracyConstrainByColumn=True} (top-1 col).
+
+\Cref{tab:test-top1-accuracy-spacyPipelineOptimisations-trainsize} contains an expanded version of the table across a greater selection of train sizes, with no time constraints, and \texttt{spacyPipelineOptimisations=True}.
 
 Notably, next-token prediction test accuracy is observed as higher with lower segment counts, as they are more likely to match (i.e. successfully continue) shorter subsequences versus longer subsequences, at least when train dataset sizes are relatively small and the probability of seeing known prompts in the test-set is low. This corresponds to an unwillingness to hallucinate syntactically correct but semantically unknown sequences. Only when the test set subsequences have actually being observed in the train set will continuations be successful. Higher perceived generalisation does not necessarily mean higher genuine accuracy, as it could represent hallucination without certainty. 
 
-Next-token prediction accuracy reports are likewise not restricted by column, meaning next token predictions of the correct word within the wrong the column are still reported as accurate. Top-1 test-accurcies have therefore also been reported when constrained by column, with \\ \texttt{inferenceReportTokenAccuracyConstrainByColumn=True} (top-1 col). The results indicate that there is no signficant degredation with this constraint enabled as the vast majority of correct predictions are occuring in the same column.
+Next-token prediction accuracy reports are likewise not restricted by column, meaning next token predictions of the correct word within the wrong the column are still reported as accurate. Top-1 test-accurcies have therefore also been reported when constrained by column, with \\ \texttt{inferenceReportTokenAccuracyConstrainByColumn=True} (``top-1 col'') - see \Cref{tab:test-top1-accuracy-spacyPipelineOptimisations}. The results indicate that there is no signficant degredation with this constraint enabled as the vast majority of correct predictions are occuring in the same column. With 5000 trained sequences for example, the test-set accuracy difference with \texttt{inferenceReportTokenAccuracyConstrainByColumn=True} is exactly 0.000, -0.001, and 0.000 for seed lengths 8, 12, and 16.
 
 To improve evaluation efficency (speed), \texttt{spacyPipelineOptimisations=True} has been set in \Cref{tab:test-top1-accuracy-spacyPipelineOptimisations}, as these optimisations have been confirmed to not significantly affect reported test-set accuracy. With 5000 trained sequences for example, the test-set accuracy difference with \texttt{spacyPipelineOptimisations=True} is exactly -0.002, for seed lengths 8, 12, and 16.
 
@@ -216,24 +225,27 @@ With both useSANIfeatures and useSANIfeaturesAndColumns, the first f segment is 
 
 Based on the results in \Cref{tab:test-top1-accuracy-spacyPipelineOptimisations}, GIAANN Proto is not recognising many of the longer subsequences in the test-set, and the majority of the measured predictive power is coming from detecting short adjacent 1-token subsequences. This predictive accuracy is coming from the last feature segment (\texttt{enforceDirectConnectionsSANI=True}). To illustrate this explicitly, the table includes entries for \texttt{c seg=0}, \texttt{f seg=1}, \\ \texttt{useSANIfeatures=True}, generated using both a) \texttt{enforceDirectConnections=False} and \texttt{SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=True} (its f segment captures predictions from all prior sequence tokens during train), and b) \texttt{enforceDirectConnections=True} and \\ \texttt{SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=False} (its f segment captures only the prior token during train).
 
+149 test-set sequences were used during inference for the OSCAR-2201 dataset (taken from later in the dataset).
+
+\Cref{tab:test-top1-accuracy-spacyPipelineOptimisations} and \Cref{tab:test-top1-accuracy-spacyPipelineOptimisations-trainsize} were generated using a different variation of the \texttt{enforceDirectConnectionsSANI} / \\ \texttt{algorithmMatrixSANImethod="enforceActivationAcrossSegments} / \\ \texttt{algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive} code, which has since been deprecated (patched). It has been confirmed that there is no significant differences between the test-set accuracies with these versions. With 5000 trained sequences for, the test-set accuracy differences with the patch are exactly 0.000, 0.000, 0.000, +0.001, 0.000 for seed lengths  4, 6, 8, 12, 16. With 200000 trained sequences, the test-set accuracy differences with the patch are exactly -0.001, 0.000, -0.001, 0.000, +0.002 for seed lengths 4, 6, 8, 12, 16. This for example explains the discrepancy in reported accurcies when only \texttt{useSANIcolumns=True}; they are exactly 0.000 with the patch.
 
 \begin{table}[H]
 \centering
-\caption{Top-1 test-set accuracy for different numbers of segments, with targets fed as input.}
+\caption{Top-1 test-set accuracy for different numbers of segments, and different time constraints, with targets fed as input.}
 \label{tab:test-top1-accuracy}
-\begin{tabular}{rrrrrrr}
+\begin{tabular}{rrrrrrrrrr}
 \toprule
-\textbf{seed} & \textbf{c seg} & \textbf{f seg} & \textbf{sequences} & \textbf{top-1} & \textbf{param} & \textbf{db size} \\
+\textbf{seed} & \textbf{c seg} & \textbf{f seg} & \textbf{sequences} & \textbf{top-1} & \textbf{t-1 seq} & \textbf{t-1 exact} & \textbf{t-1 none} & \textbf{param} & \textbf{db size} \\
 \midrule
-8 & 3 & 5 & 5,000   & 0.031 & 2.1M & 0.1GB \\
-8 & 3 & 5 & 200,000 & 0.045 & 71.6M & 4.2GB \\
-8 & 3 & 5 & 400,000 & 0.065 & 137.0M & 8.0GB \\
-12 & 4 & 7 & 5,000   & 0.027 & 2.4M & 0.2GB \\
-12 & 4 & 7 & 200,000 & 0.042 & 85.6M & 5.0GB \\
-12 & 4 & 7 & 400,000 & 0.052 & 166.7M & 10.6GB \\
-16 & 5 & 9 & 5,000   & 0.019 & 2.9M & 0.2GB \\
-16 & 5 & 9 & 200,000 & 0.042 & 103.0M & 6.2GB \\
-16 & 5 & 9 & 400,000 & 0.045 & 198.4M & 11.8GB \\
+8 & 3 & 5 & 5,000   & 0.031 & 0.001 & 0.001 & 0.031 & 2.1M & 0.1GB \\
+8 & 3 & 5 & 200,000 & 0.045 & 0.016 & 0.010 & 0.104 & 71.6M & 4.2GB \\
+8 & 3 & 5 & 400,000 & 0.065 & 0.054 & 0.053 & 0.137 & 137.0M & 8.0GB \\
+12 & 4 & 7 & 5,000   & 0.027 & 0.001 & 0.001 & 0.028 & 2.4M & 0.2GB \\
+12 & 4 & 7 & 200,000 & 0.042 & 0.011 & 0.010 & 0.109 & 85.6M & 5.0GB \\
+12 & 4 & 7 & 400,000 & 0.052 & 0.040 & 0.037 & 0.120 & 166.7M & 10.6GB \\
+16 & 5 & 9 & 5,000   & 0.019 & 0.003 & 0.001 & 0.032 & 2.9M & 0.2GB \\
+16 & 5 & 9 & 200,000 & 0.042 & 0.023 & 0.023 & 0.126 & 103.0M & 6.2GB \\
+16 & 5 & 9 & 400,000 & 0.045 & 0.024 & 0.023 & 0.135 & 198.4M & 11.8GB \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -246,7 +258,7 @@ Based on the results in \Cref{tab:test-top1-accuracy-spacyPipelineOptimisations}
 \toprule
 \textbf{seed} & \textbf{c seg} & \textbf{f seg} & \textbf{sequences} & \textbf{top-1} & \textbf{top-1 col} & \textbf{param} & \textbf{db size} \\
 \midrule
-1 & 0 & adj 1 & 5,000   & 0.036	& 0.035 & 0.1M & 0.02GB \\
+1 & 0 & adj 1 & 5,000   & 0.036 & 0.035 & 0.1M & 0.02GB \\
 1 & 0 & adj 1 & 200,000 & 0.095 & 0.093 & 2.1M & 0.5GB \\
 1 & 0 & all 1 & 5,000   & 0.011 & 0.011 & 0.9M & 0.1GB \\
 1 & 0 & all 1 & 200,000 & 0.015 & 0.015 & 32.8M & 2.0GB \\
@@ -256,7 +268,7 @@ Based on the results in \Cref{tab:test-top1-accuracy-spacyPipelineOptimisations}
 2 & 0 & 2 & 200,000 & 0.093 & 0.093 & 33.5M & 2.1GB \\
 1 & 1 & 0 & 5,000   & 0.010 & 0.010 & 0.9M & 0.1GB \\
 1 & 1 & 0 & 200,000 & 0.022 & 0.020 & 32.8M & 2.0GB \\
-1 & 1 & 2 & 5,000   & 0.036	& 0.000 & 1.8M & 0.1GB \\
+1 & 1 & 2 & 5,000   & 0.036 & 0.000 & 1.8M & 0.1GB \\
 1 & 1 & 2 & 200,000 & 0.087 & 0.086 & 65.8M & 3.7GB \\
 2 & 1 & 3 & 5,000   & 0.035 & 0.034 & 1.9M & 0.1GB \\
 2 & 1 & 3 & 200,000 & 0.089 & 0.088 & 66.7M & 3.8GB \\
@@ -274,9 +286,39 @@ Based on the results in \Cref{tab:test-top1-accuracy-spacyPipelineOptimisations}
 \end{tabular}
 \end{table}
 
+%\begin{table}[H]
+%\centering
+%\caption{Top-1 test-set accuracy for different training sizes, with no time constraints, and targets fed as input.}
+%\label{tab:test-top1-accuracy-trainsize}
+%\begin{tabular}{rrrrrrr}
+%\toprule
+%\textbf{seed} & \textbf{c seg} & \textbf{f seg} & \textbf{sequences} & \textbf{top-1 none} & \textbf{param} & \textbf{db size} \\
+%\midrule
+%8 & 3 & 5 & 5,000   & 0.031 & 2.5M & 0.2GB \\
+%8 & 3 & 5 & 200,000 & 0.104 & 88.6M & 5.3GB \\
+%8 & 3 & 5 & 400,000 & 0.137 & 88.6M & 5.3GB \\
+%\bottomrule
+%\end{tabular}
+%\end{table}
+
+
+\begin{table}[H]
+\centering
+\caption{Top-1 test-set accuracy for different training sizes, with no time constraints, and targets fed as input.}
+\label{tab:test-top1-accuracy-spacyPipelineOptimisations-trainsize}
+\begin{tabular}{rrrrrrr}
+\toprule
+\textbf{seed} & \textbf{c seg} & \textbf{f seg} & \textbf{sequences} & \textbf{top-1 none} & \textbf{param} & \textbf{db size} \\
+\midrule
+8 & 3 & 5 & 5,000   & 0.033 & 2.2M & 0.1GB \\
+8 & 3 & 5 & 200,000 & 0.112 & 76.6M & 4.5GB \\
+8 & 3 & 5 & 1,000,000 & 0.130 & 353.7M & 20.3GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
 \FloatBarrier
-
-
 
 \subsection{Ablations}
 Additional ablations (unreported) were conducted over:

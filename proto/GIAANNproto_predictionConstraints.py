@@ -280,7 +280,7 @@ def getConnectedColumnsForFeature(observedColumn, featureIndex, includeFeatureDe
 		if(minWordDistanceMask.sum().item() == 0):
 			return [], {} if includeFeatureDetails else None
 		targetColumnIndices = targetColumnIndices[:, minWordDistanceMask]
-	elif(enforceDirectConnections and enforceDirectConnectionsSANI):
+	elif(algorithmMatrixSANImethod=="enforceActivationAcrossSegments" and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"): #OLD: elif(enforceDirectConnections and enforceDirectConnectionsSANI):
 		lastSegmentMask = targetColumnIndices[1] == arrayIndexSegmentLast
 		targetColumnIndices = targetColumnIndices[:, lastSegmentMask]
 	targetColumns = targetColumnIndices[2].unique()
@@ -299,7 +299,7 @@ def buildConnectedColumnsLookup(databaseNetworkObject, observedColumnsDict, colu
 	if(columnFeaturePairs is None or len(columnFeaturePairs) == 0):
 		return None, None
 	connectedColumnsSet = set()
-	if(debugConnectNodesToNextNodesInSequenceOnly or enforceDirectConnectionsMinWordDistance or enforceDirectConnectionsSANI):
+	if(debugConnectNodesToNextNodesInSequenceOnly or enforceDirectConnectionsMinWordDistance or (algorithmMatrixSANImethod=="enforceActivationAcrossSegments" and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive")):	#OLD: or enforceDirectConnectionsSANI
 		connectedColumnsFeatures = {}
 	else:
 		connectedColumnsFeatures = None

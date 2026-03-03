@@ -142,14 +142,16 @@ if(storeDatabaseInRam):
 inferenceOnlyRetainPredictedTargetObservedColumn = False	#default: False	#orig: False	#load/evict one observed column per prediction step	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
 inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch = False	#default: False	#orig: False	#True: retain only current beam-search target(s); False: retain all beam-search targets	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
 trainStoreFeatureMapsGlobally = True	#default: True	#True: avoid per-column persistence of global feature index maps; False: preserve legacy per-column map persistence
-
+if not trainStoreFeatureMapsGlobally:
+	assert not storeDatabaseInRam
 
 #Segment activation time;
 if(useInference):
-	inferenceUseNeuronFeaturePropertiesTime = True	#optional	#orig:False
 	if(useBenchmarkDefaultsTestSet):
-		inferenceUseNeuronFeaturePropertiesTimeExact = False
+		inferenceUseNeuronFeaturePropertiesTime = False	#default: False	#orig:True
+		inferenceUseNeuronFeaturePropertiesTimeExact = False	#default: False
 	else:
+		inferenceUseNeuronFeaturePropertiesTime = True	#default: True	#orig:False
 		inferenceUseNeuronFeaturePropertiesTimeExact = True	#optional	#orig:False
 else:
 	inferenceUseNeuronFeaturePropertiesTime = False
@@ -568,11 +570,9 @@ if(useSANI):
 		else:
 			arrayNumberOfSegments = numSeedTokensInference	#default: 5	#min number of nearest features to target node (note first segment captures all other features)
 			#arrayNumberOfSegments = math.ceil(numSeedTokensInference / 2) + 1	#temp for benchmarking compared to useSANIfeaturesAndColumns/useSANIcolumns [remove this]
-			
-	if(useBenchmarkDefaultsTestSet):
-		algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI
-	else:
-		algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment under conditions
+	
+	algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment under conditions		
+	#algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI
 	if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
 		#algorithmMatrixSANIenforceRequirement="enforceAnySegmentMustBeActive"	#activate neuron if any segment is active
 		algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default	#only activate neuron if last segment active
@@ -581,7 +581,7 @@ if(useSANI):
 			enforceSequentialActivation = False
 		else:
 			if(useBenchmarkDefaultsTestSet):
-				enforceSequentialActivation = False
+				enforceSequentialActivation = False #default: False
 			else:
 				enforceSequentialActivation = True	#optional	#default: True #orig: True	#only activation next segment if previous segment activated
 	else:
@@ -596,6 +596,8 @@ if(useSANI):
 		assert not useSANIcolumns	#enforceDirectConnectionsSANI requires last segment to be adjacent feature segment
 		if(SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens):
 			assert arrayNumberOfSegments >= 2		#note if arrayNumberOfSegments=2 then; sIndex=1: sequential segment connections for adjacent feature, sIndex=0: sequential segment connections for all other feature
+		assert algorithmMatrixSANImethod=="enforceActivationAcrossSegments", "enforceDirectConnectionsSANI requires enforceActivationAcrossSegments"
+		assert algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive", "enforceDirectConnectionsSANI requires enforceLastSegmentMustBeActive"
 		
 	if(useSANIfeaturesAndColumns):
 		arrayIndexSegmentLast = arrayNumberOfSegments-1	#last feature index
@@ -862,6 +864,7 @@ if(debugPrintConfiguration):
 			print("arrayNumberOfSegmentsColumnDistance: ", arrayNumberOfSegmentsColumnDistance)
 			print("arrayNumberOfSegmentsFeatureDistance: ", arrayNumberOfSegmentsFeatureDistance)
 		print("arrayNumberOfSegments: ", arrayNumberOfSegments)
+		print("algorithmMatrixSANImethod: ", algorithmMatrixSANImethod)
 		if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
 			print("algorithmMatrixSANIenforceRequirement: ", algorithmMatrixSANIenforceRequirement)
 		print("enforceSequentialActivation: ", enforceSequentialActivation)
