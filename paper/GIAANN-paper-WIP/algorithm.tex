@@ -19,6 +19,13 @@ The GIA ANN prototype is a concept--feature neural database that learns from tex
 	\item \textbf{SANI segments:} each dendritic branch is segmented to encode sequential ordering. Segment indices are assigned by column distance, feature distance, or both.
 \end{itemize}
 
+\begin{center}
+\includesvg[width=\linewidth]{demo/GIAANNSANIengine.svg}
+\par\smallskip
+\refstepcounter{figure}\label{fig:GIAANNSANIengine}
+\textbf{Figure~\thefigure:} Illustration of a SANI neuron within GIAANN.
+\end{center}
+
 \subsection{Preprocessing and Column Segmentation}
 \begin{enumerate}
 	\item \textbf{Sequence construction:} text is parsed with spaCy; sequences are either single sentences or multi-sentence bundles. Empty or too-short sequences are skipped.

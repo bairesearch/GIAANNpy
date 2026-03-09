@@ -53,6 +53,8 @@ Typically the neurons in GIA ANN are segmented into compartments (SANI: Sequenti
 
 ![GIAANNdemo-trainDemo-allColumns-SMALL.gif](https://github.com/bairesearch/GIAANNpy/releases/download/assets/GIAANNdemo-trainDemo-allColumns-SMALL.gif)
 
+![understanding_the_SANI_engine_behind_GIAANN.gif](https://github.com/bairesearch/GIAANNpy/releases/download/assets/understanding_the_SANI_engine_behind_GIAANN.gif)
+
 ##### Inference
 
 GIA ANN seeds the prompt provided and sequentially predicts next features in the network.
