@@ -124,18 +124,18 @@ else:
 #RAM;
 useGPUdense = True	#default: True
 if(useInference):
-	useGPUsparse = True	#default: False	#orig: True	#inference requires high RAM to store sparse tensors
+	useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors
 else:
 	useGPUsparse = True		#default: True	#orig: False	#slight performance increase during train (does not use significant additional GPU ram during train)
-useGPUsparseStrict = True	#orig: False	#enforce strict sparse device during transfer to/from dense tensors
+useGPUsparseStrict = True	#default: True	#orig: False	#enforce strict sparse device during transfer to/from dense tensors
 runtimeReleaseGPUMemory = False	#default: True	#aggressively release cached CUDA memory after sequence processing
 runtimeReleaseGPUMemoryEverySequenceCount = 1	#default: 1	#only apply release every N processed sequences
 if(runtimeReleaseGPUMemory):
 	if(runtimeReleaseGPUMemoryEverySequenceCount <= 0):
 		raise RuntimeError("runtimeReleaseGPUMemoryEverySequenceCount must be > 0")
-storeDatabaseInRam = True	#default: False	#orig: False
+storeDatabaseInRam = True	#default: True	#orig: False
 if(storeDatabaseInRam):
-	useGPUdatabase = False	#False	#default: False
+	useGPUdatabase = False	#default: False	#default: False
 
 
 #Optimisations;
@@ -280,9 +280,12 @@ if(useInference):
 	if(useSANI):
 		inferenceApplySequentialActivationSparse = True	#default: True	#orig: False
 		inferenceConnectionsStrengthBoolean = True	#default: True	#do not overweight by common features (e.g. determiners)
-		inferenceSegmentActivationsBoolean = True	#default: True	#do not overweight by common features (e.g. determiners)
+		if(useBenchmarkDefaultsTestSet):
+			inferenceSegmentActivationsBoolean = False	#default: False	#orig: True
+		else:
+			inferenceSegmentActivationsBoolean = True	#default: True	#orig: True	#do not overweight by common features (e.g. determiners)
 		if(inferenceSegmentActivationsBoolean):
-			inferenceSegmentActivationsBooleanFeatureSegmentsOnly = True	#orig: False
+			inferenceSegmentActivationsBooleanFeatureSegmentsOnly = True	#default: True #orig: False
 		inferenceSourceActivationsBoolean = True	#default: True (do not sum SANI segments)	#orig: False
 	else:
 		inferenceConnectionsStrengthBoolean = False	#default: False

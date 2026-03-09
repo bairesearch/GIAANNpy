@@ -535,4 +535,6 @@ v1j (Codex IDE GPT-5.3-Codex):
 - MANUAL; - remove archive/*.*
 - MANUAL; - patch useBenchmarkDefaultsTestSet to set enforceActivationAcrossSegments:enforceLastSegmentMustBeActive
 - MANUAL; - update getConnectedColumnsForFeature/buildConnectedColumnsLookup use algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive" instead of enforceDirectConnectionsSANI for consistency
+- MANUAL; - set useBenchmarkDefaultsTestSet:inferenceUseNeuronFeaturePropertiesTime=False
+- MANUAL; - set useBenchmarkDefaultsTestSet:inferenceSegmentActivationsBoolean=False
 

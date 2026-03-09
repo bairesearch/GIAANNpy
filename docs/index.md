@@ -21,7 +21,7 @@ pip install matplotlib
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 pip install spacy
 datasetsLibrary4plus=False: pip install "datasets<4" "fsspec==2024.6.1" "gcsfs==2024.6.1"
-python -m spacy download en_core_web_trf [spacyModelName]
+python -m spacy download en_core_web_sm [spacyModelName]
 pip install nltk
 ```
 
@@ -34,7 +34,7 @@ python GIAANNproto_main.py
 
 ## Development
 - Review the [GIAANNproto1.nlc](https://github.com/bairesearch/GIAANNpy/blob/main/GIAANNproto1.nlc) specification for GIAANNpy requirements and design notes.
-- The conceptual development of GIAANN from GIA is recorded in the [dev/](https://github.com/bairesearch/GIAANNpy/tree/main/dev) folder
+- The conceptual development of GIAANN from GIA is recorded in the [dev/](https://github.com/bairesearch/GIAANNpy/tree/main/paper/dev) folder
 
 ## Paper
 Read the current paper draft here: [GIAANN paper]({{ "/paper/" | relative_url }}) ([GIAANN-paper-WIP.pdf](https://github.com/bairesearch/GIAANNpy/releases/download/assets/GIAANN-paper-WIP.pdf)).

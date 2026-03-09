@@ -102,9 +102,9 @@ Additional parameters;
 
 #### Database
 
-* maxSequenceLength - depends on CPU/GPU RAM availability during train 
+* set databaseFolder - select local SSD for fast i/o
 * set trainMaxSequences - max sequences for train
-* databaseFolder - set to local SSD for fast i/o
+* set maxSequenceLength - depends on CPU/GPU RAM availability during train 
 
 #### Dataset
 
@@ -122,15 +122,19 @@ Additional parameters;
 #### RAM
 
 * set useGPUdense=True (and optionally useGPUsparse=True) during train (sequence size dependent)
-* set useGPUsparse=True during inference if sufficient GPU RAM available (network size dependent)
-
+* set useGPUsparse=False during inference (network size dependent)
+* set storeDatabaseInRam=True
+* set useGPUdatabase=False (assume CPU has more RAM)
+		
 #### Segment activation time
 
-* set inferenceUseNeuronFeaturePropertiesTime=True (and inferenceUseNeuronFeaturePropertiesTimeExact=True for most strict selection) - record segment activation times and use them to bias feature selection during inference based on their proximity to their ideal (i.e. trained) timings.
+* set inferenceUseNeuronFeaturePropertiesTime - record segment activation times and use them to bias feature selection during inference based on their proximity to their ideal (i.e. trained) timings
+* set inferenceUseNeuronFeaturePropertiesTimeExact - most strict time selection
 
 #### Dendritic branches
 
-* set multipleDendriticBranches=True to support cases where a trained sequence has repeated references to a column feature 
+* set multipleDendriticBranches - support cases where a trained sequence has repeated references to a column feature 
+* set numberOfDendriticBranches - number of dendritic branches
 * set randomlyAssignBranches to support increasingly conflicting reuse of phrases throughout dataset
 
 #### Array properties
