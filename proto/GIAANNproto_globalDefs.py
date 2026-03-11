@@ -51,11 +51,24 @@ if(useBenchmarkDefaults):
 else:
 	spacyPipelineOptimisations = True	#default: True
 inferenceReportTokenAccuracyConstrainByColumn = False	#default: False	#orig: False
-
-
+if(useBenchmarkDefaultsTestSet):
+	inferenceEvaluateTestSet = True
+	#inferenceSegmentTiming = "none"	#optimum
+	inferenceSegmentTiming = "biased"	#default
+	#inferenceSegmentTiming = "exact"
+	#inferenceSegmentTiming = "seq"
+	inferenceActivationsType = "boolf"	#default
+	#inferenceActivationsType = "boolf+c"
+	#inferenceActivationsType = "intf+c" 	#~optimum
+else:
+	inferenceEvaluateTestSet = False
+	inferenceSegmentTiming = "exact"
+	inferenceActivationsType = "boolf"
+	
+	
 #Database;
 databaseFolder = "../database/"	#default: "../database/"	#performance: "/media/user/ssdpro/GIAANN/database/"	#orig: ""
-trainMaxSequences = 1000000		#dev: 10, 500, 5000, 10000, 100000 	#default: 1000000	  #adjust as needed	#max sequences for train
+trainMaxSequences = 1000000		#dev: 10, 500, 5000, 10000, 200000 	#default: 1000000	  #adjust as needed	#max sequences for train
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 
@@ -141,21 +154,31 @@ if(storeDatabaseInRam):
 #Optimisations;
 inferenceOnlyRetainPredictedTargetObservedColumn = False	#default: False	#orig: False	#load/evict one observed column per prediction step	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
 inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch = False	#default: False	#orig: False	#True: retain only current beam-search target(s); False: retain all beam-search targets	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
-trainStoreFeatureMapsGlobally = True	#default: True	#True: avoid per-column persistence of global feature index maps; False: preserve legacy per-column map persistence
+trainStoreFeatureMapsGlobally = True	#default: True	#orig: False	#True: avoid per-column persistence of global feature index maps; False: preserve legacy per-column map persistence
 if not trainStoreFeatureMapsGlobally:
 	assert not storeDatabaseInRam
 
-#Segment activation time;
+
+#Inference segment activation times;
 if(useInference):
-	if(useBenchmarkDefaultsTestSet):
-		inferenceUseNeuronFeaturePropertiesTime = False	#default: False	#orig:True
-		inferenceUseNeuronFeaturePropertiesTimeExact = False	#default: False
+	if(inferenceSegmentTiming=="none"):
+		inferenceUseNeuronFeaturePropertiesTime = False
+		inferenceUseNeuronFeaturePropertiesTimeExact = False
+	elif(inferenceSegmentTiming=="biased"):
+		inferenceUseNeuronFeaturePropertiesTime = True
+		inferenceUseNeuronFeaturePropertiesTimeExact = False	
+	elif(inferenceSegmentTiming=="exact"):
+		inferenceUseNeuronFeaturePropertiesTime = True
+		inferenceUseNeuronFeaturePropertiesTimeExact = True
+	elif(inferenceSegmentTiming=="seq"):
+		inferenceUseNeuronFeaturePropertiesTime = True	#default: True	#orig: True
+		inferenceUseNeuronFeaturePropertiesTimeExact = False
 	else:
-		inferenceUseNeuronFeaturePropertiesTime = True	#default: True	#orig:False
-		inferenceUseNeuronFeaturePropertiesTimeExact = True	#optional	#orig:False
+		print("inferenceSegmentTiming error")
+		sys.exit(1)
 else:
-	inferenceUseNeuronFeaturePropertiesTime = False
-	inferenceUseNeuronFeaturePropertiesTimeExact = False
+	inferenceUseNeuronFeaturePropertiesTime = False	#N/A
+	inferenceUseNeuronFeaturePropertiesTimeExact = False	#N/A
 
 
 #Dendritic branches;
@@ -205,7 +228,7 @@ else:
 	enforceDirectConnectionsIgnoreSeed = False
 if(enforceDirectConnectionsSANI):
 	useSANI = True	#sequentially activated neuronal input (divide dendrites into segments)	#override
-	enforceDirectConnectionsSANIminimal = False	#default: False	#orig: True
+	enforceDirectConnectionsSANIminimal = False	#default: False	#orig: True	#deprecated
 else:
 	enforceDirectConnectionsSANIminimal = False
 if(enforceDirectConnectionsMinWordDistance):
@@ -280,12 +303,17 @@ if(useInference):
 	if(useSANI):
 		inferenceApplySequentialActivationSparse = True	#default: True	#orig: False
 		inferenceConnectionsStrengthBoolean = True	#default: True	#do not overweight by common features (e.g. determiners)
-		if(useBenchmarkDefaultsTestSet):
-			inferenceSegmentActivationsBoolean = False	#default: False	#orig: True
+		if(inferenceActivationsType == "intf+c"):
+			inferenceSegmentActivationsBoolean = False
+		elif(inferenceActivationsType == "boolf"):
+			inferenceSegmentActivationsBoolean = True
+			inferenceSegmentActivationsBooleanFeatureSegmentsOnly = True
+		elif(inferenceActivationsType == "boolf+c"):
+			inferenceSegmentActivationsBoolean = True
+			inferenceSegmentActivationsBooleanFeatureSegmentsOnly = False
 		else:
-			inferenceSegmentActivationsBoolean = True	#default: True	#orig: True	#do not overweight by common features (e.g. determiners)
-		if(inferenceSegmentActivationsBoolean):
-			inferenceSegmentActivationsBooleanFeatureSegmentsOnly = True	#default: True #orig: False
+			print("inferenceActivationsType error")
+			sys.exit(1)
 		inferenceSourceActivationsBoolean = True	#default: True (do not sum SANI segments)	#orig: False
 	else:
 		inferenceConnectionsStrengthBoolean = False	#default: False
@@ -491,8 +519,21 @@ if(useInference):
 
 
 #Database save paths;
-inferencePromptFileName = 'inference_prompt.txt'	#inference_prompt.txt
-inferencePromptFile = databaseFolder + inferencePromptFileName
+if(useInference):
+	if(inferenceTrainFirstSequences):
+		inferencePromptFileName = "inference_prompt.txt"
+	else:
+		if(datasetWikipedia):
+			if(inferenceEvaluateTestSet):
+				inferencePromptFileName = 'inference_prompt.txt.longTestWikipedia'
+			else:
+				inferencePromptFileName = 'inference_prompt.txt.longTrainWikipedia'	
+		elif(datasetOscar):
+			if(inferenceEvaluateTestSet):
+				inferencePromptFileName = 'inference_prompt.txt.longTestOscar'
+			else:
+				inferencePromptFileName = 'inference_prompt.txt.longTrainOscar'
+	inferencePromptFile = databaseFolder + inferencePromptFileName
 conceptColumnsDictFile = databaseFolder + 'conceptColumnsDict.pkl'
 conceptFeaturesDictFile = databaseFolder + 'conceptFeaturesDict.pkl'
 observedColumnsDir = databaseFolder + 'observedColumns'
@@ -583,10 +624,13 @@ if(useSANI):
 		if(enforceDirectConnectionsSANIminimal):
 			enforceSequentialActivation = False
 		else:
-			if(useBenchmarkDefaultsTestSet):
+			if(inferenceSegmentTiming == "none" or inferenceSegmentTiming == "biased"):
 				enforceSequentialActivation = False #default: False
-			else:
+			elif(inferenceSegmentTiming == "exact" or inferenceSegmentTiming == "seq"):
 				enforceSequentialActivation = True	#optional	#default: True #orig: True	#only activation next segment if previous segment activated
+			else:
+				print("inferenceSegmentTiming error")
+				sys.exit(1)
 	else:
 		enforceSequentialActivation = False
 
@@ -835,6 +879,14 @@ if(debugPrintConfiguration):
 		print("inferenceBeamSearch:", inferenceBeamSearch)
 		print("inferenceBeamWidth:", inferenceBeamWidth)
 		print("inferenceBeamDepth:", inferenceBeamDepth)
+	print("")
+	print("#Inference activations;")
+	if(useInference):
+		print("inferenceConnectionsStrengthBoolean:", inferenceConnectionsStrengthBoolean)
+		print("inferenceSegmentActivationsBoolean:", inferenceSegmentActivationsBoolean)
+		if(inferenceSegmentActivationsBoolean):
+			print("inferenceSegmentActivationsBooleanFeatureSegmentsOnly:", inferenceSegmentActivationsBooleanFeatureSegmentsOnly)
+		print("inferenceSourceActivationsBoolean:", inferenceSourceActivationsBoolean)
 	print("")
 	print("Train optimisations;")
 	print("trainSequenceObservedColumnsUseSequenceFeaturesOnly:", trainSequenceObservedColumnsUseSequenceFeaturesOnly)
