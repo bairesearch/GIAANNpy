@@ -539,3 +539,8 @@ v1j (Codex IDE GPT-5.3-Codex):
 - MANUAL; - set useBenchmarkDefaultsTestSet:inferenceSegmentActivationsBoolean=False
 - MANUAL; - update Readme with GIAANNSANIengine figure
 
+---
+v1k (Codex IDE GPT-5.4-Codex):
+- add proto GIAANNproto1k1a - add option useAutoresearch
+	MANUAL; - start option useAutoresearch
+- add option trainLoadExistingDatabase=False, which makes the code not load an existing database; it will clear and overwrite all database files upon startup by executing databaseFolder/clear.sh.  

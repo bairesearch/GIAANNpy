@@ -86,7 +86,7 @@ else:
 			nlpArticle = spacy.load(spacyModelName)
 			nlpSequence = nlpArticle
 
-
+GIAANNproto_databaseNetworkFilesExcitation.prepareDatabaseFilesStartup()
 databaseNetworkObject = GIAANNproto_databaseNetworkExcitation.initialiseDatabaseNetwork()
 databaseNetworkObject.nlp = nlpSequence	#used by posStringToPosInt
 
@@ -95,7 +95,6 @@ def main():
 		GIAANNproto_databaseNetworkExcitation.debugCountTotalParametersRun(databaseNetworkObject)
 	if(usePOS):
 		GIAANNproto_sequenceTokens.loadPOSdatabase()
-	GIAANNproto_databaseNetworkFilesExcitation.initialiseDatabaseFiles()
 	if(useInference):
 		if(not inferenceTrainFirstSequences):
 			GIAANNproto_databaseNetworkExcitation.backupGlobalArrays(databaseNetworkObject)
@@ -103,7 +102,7 @@ def main():
 				GIAANNproto_databaseNetworkExcitation.loadAllObservedColumnsToRam(databaseNetworkObject)
 		
 	for epochIndex in range(numberEpochs):
-		print("\nepochIndex = ", epochIndex)
+		#print("\nepochIndex = ", epochIndex)
 		# Start processing the dataset
 		sequenceCount = 0
 		if(useInference and debugPrintTotalInferenceTokens):
@@ -117,7 +116,7 @@ def main():
 		if(useInference and debugPrintTotalInferenceTokens):
 			GIAANNproto_prediction.printTotalInferenceTokens()
 		if(useInference and debugPrintInferenceTop1Accuracy):
-			GIAANNproto_prediction.printInferenceTop1Accuracy()
+			GIAANNproto_prediction.printInferenceTop1Accuracy(databaseNetworkObject)
 
 	if(debugPrintSpacySectionTimes):
 		processArticlePart1averageTime = processArticlePart1totalTime/processArticlePart1count
@@ -238,14 +237,17 @@ def processArticle(sequenceCount, text, articleIndex):
 		if(useInference):
 			if(inferenceTrainFirstSequences):
 				if(sequenceIndex == numberOfSequences-1):
-					print("\ninferenceTrainFirstSequences: executing inference:")
+					if(printHeaderDuringInferencePredict):
+						print("\ninferenceTrainFirstSequences: executing inference:")
 					inferenceSequenceInPrompt = True
 				else:
 					if(sequenceIndex==0):
-						print("\ninferenceTrainFirstSequences: executing train:")
+						if(printHeaderDuringInferencePredict):
+							print("\ninferenceTrainFirstSequences: executing train:")
 			else:
 				if(sequenceIndex==0):
-					print("\n!inferenceTrainFirstSequences: executing inference:")
+					if(printHeaderDuringInferencePredict):
+						print("\n!inferenceTrainFirstSequences: executing inference:")
 				inferenceSequenceInPrompt = True
 		if(len(sequence) <= maxSequenceLength):
 			if(sequenceCount >= trainSetStartOffsetSequences):

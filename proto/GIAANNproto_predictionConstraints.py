@@ -442,7 +442,8 @@ def raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionInde
 		raisePredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, reason)
 	targetWord = getTargetWordForSequenceIndex(tokensSequence, sequenceWordIndex)
 	message = f"predictionEnsureConnectedToPreviousPrediction violation: {reason}. sequenceWordIndex={sequenceWordIndex}, wordPredictionIndex={wordPredictionIndex}, targetWord='{targetWord}'"
-	print(message)
+	if(debugWarningInferenceOnConnectivityError):
+		print(message)
 	raise InferenceStopSequenceNoPredictionCandidatesAvailable(message)
 
 def raisePredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, reason):

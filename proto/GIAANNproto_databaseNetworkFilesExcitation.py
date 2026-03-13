@@ -21,12 +21,29 @@ import torch as pt
 import pickle
 import os
 import time
+import subprocess
 
 from GIAANNproto_globalDefs import *
 
 
-def initialiseDatabaseFiles():
-	os.makedirs(observedColumnsDir, exist_ok=True)
+def prepareDatabaseFilesStartup():
+	if(os.path.isdir(observedColumnsDir)):
+		if(not trainLoadExistingDatabase):
+			clearDatabaseFiles()
+	else:
+		os.makedirs(observedColumnsDir, exist_ok=True)
+	return
+
+def clearDatabaseFiles():
+	clearScriptPath = os.path.join(databaseFolder, "clear.sh")
+	if(not os.path.isdir(databaseFolder)):
+		raise RuntimeError("clearDatabaseFiles error: missing databaseFolder = " + databaseFolder)
+	if(not os.path.isfile(clearScriptPath)):
+		raise RuntimeError("clearDatabaseFiles error: missing clear.sh = " + clearScriptPath)
+	clearResult = subprocess.run(["bash", clearScriptPath], cwd=databaseFolder, check=False)
+	if(clearResult.returncode != 0):
+		raise RuntimeError("clearDatabaseFiles error: clear.sh failed with return code " + str(clearResult.returncode))
+	return
 
 def pathExists(pathName):
 	if(os.path.exists(pathName)):

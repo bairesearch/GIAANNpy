@@ -23,13 +23,10 @@ import sys
 
 
 #Recent debug vars;
-debugPrintConfiguration = True	#print common global defs configuration
-debugPrintTotalInferenceTokens = False	#print total number of inference tokens in seed phase, prediction phase, and both phases (summed across all sequences) 
-debugPrintInferenceTop1Accuracy = True	#print inference top-1 accuracy
-debugWorkaroundPreviousUngatedShutdownSaveBug = False
-debugPrintTrainSectionTimes = False	#print per-sequence timing breakdown for key train sections
-debugCountTotalParameters = False	#count number of connections in network
-debugPrintSpacySectionTimes = False	#print spacy preprocessing times
+
+
+#Autoresearch;
+useAutoresearch = False
 
 
 #Train/inference mode selection;
@@ -37,8 +34,8 @@ useInference = True  #default: True	#support inference mode else train (inferenc
 drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
 if(useInference):
 	drawNetworkDuringInference = False	#default: False
-	inferenceTrainFirstSequences = True	#default: True	#orig: True	#True: trains first sequences in inference_prompt.txt, performs inference only on last sequence; False: run inference on every sequence as independent seed/target prompts
-	inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True	#True: activate next column features using current prediction; False: use current target (default top-1 accuracy measurement)
+	inferenceTrainFirstSequences = True	#default: False	#orig: True	#True: trains first sequences in inference_prompt.txt, performs inference only on last sequence; False: run inference on every sequence as independent seed/target prompts
+	inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True	#True: activate next column features using current prediction; False: use current target (default top-1 accuracy measurement)
 numSeedTokensInference = 12	#default: 5, 8, 12, 16	#this is also set during train phase only so that the derived numberOfSegments always matches inference phase
 inferenceAddNewFeatures = True	#default: True	#orig: False	#run a controlled expansion pass during inference to add missing columns/features without training updates
 
@@ -65,19 +62,25 @@ else:
 	inferenceSegmentTiming = "exact"
 	inferenceActivationsType = "boolf"
 	
-	
 #Database;
-databaseFolder = "../database/"	#default: "../database/"	#performance: "/media/user/ssdpro/GIAANN/database/"	#orig: ""
-trainMaxSequences = 1000000		#dev: 10, 500, 5000, 10000, 200000 	#default: 1000000	  #adjust as needed	#max sequences for train
+if(useAutoresearch):
+	databaseFolder = "/media/user/ssddata/GIAANN/databaseAutoresearch/"
+else:
+	databaseFolder = "../database/"	#default: "../database/"	#performance: "/media/user/ssdpro/GIAANN/database/"	#orig: ""
+trainMaxSequences = 5000		#dev: 10, 500, 5000, 10000, 200000 	#default: 1000000	  #adjust as needed	#max sequences for train
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 
 
-#Dataset;	
+#Dataset;
 datasetOscar = False
 datasetWikipedia = True	#default: True	#orig: True
 datasetsLibrary4plus = False	#default: False	#orig: False	#set False during dev to maintain benchmark consistency
 trainTestSet = False	#default: False	#only set True to generate an inference test set (with debugPrintTrainSequenceRaw=True)
+if(useAutoresearch and not useInference):
+	trainLoadExistingDatabase = False
+else:
+	trainLoadExistingDatabase = True	#default: True	#orig: True	#loads existing database if existant upon startup
 if(datasetOscar):
 	datasetName = "oscar-corpus/OSCAR-2201"
 	datasetCfg = "en"
@@ -434,6 +437,17 @@ randomiseColumnFeatureXposition = True	#shuffle x position of column internal fe
 
 
 #Debug vars;
+if(useAutoresearch):
+	debugPrintConfiguration = True
+else:
+	debugPrintConfiguration = True	#print common global defs configuration
+debugPrintTotalInferenceTokens = False	#print total number of inference tokens in seed phase, prediction phase, and both phases (summed across all sequences) 
+debugPrintInferenceTop1Accuracy = True	#print inference top-1 accuracy
+debugWorkaroundPreviousUngatedShutdownSaveBug = False
+debugPrintTrainSectionTimes = False	#print per-sequence timing breakdown for key train sections
+debugCountTotalParameters = False	#count number of connections in network
+debugPrintSpacySectionTimes = False	#print spacy preprocessing times
+
 debugPrintTrainSequenceDefault = False	#default: True	#orig: True
 debugPrintTrainSequenceRaw = False	#print each training sequence raw text (suitable for inference_prompt.txt generation)
 debugPrintTrainSequenceConceptAssignment = False	#print each training sequence split by column assignment
@@ -441,18 +455,24 @@ debugPrintTrainSequenceConceptAssignmentByLine = False	#display each column on a
 debugPrintTrainSequenceDelimiters = False	#print each training sequence with delimiters
 debugPrintTrainSequencePOS = False	#print each training sequence with POS tags
 debugPrintTrainSequenceCount = False	#print each training sequence count
-if(datasetOscar):
-	debugPrintTrainSequenceCount = True	#non-visible characters affect terminal print consistency
-elif(datasetWikipedia):
-	debugPrintTrainSequenceDefault = True
+if(not useAutoresearch):
+	if(datasetOscar):
+		debugPrintTrainSequenceCount = True	#non-visible characters affect terminal print consistency
+	elif(datasetWikipedia):
+		debugPrintTrainSequenceDefault = True
 
-
+if(useAutoresearch):
+	debugWarningInferenceOnConnectivityError = False
+	debugWarningInferenceOnPredictionTargetMismatch = False
+else:
+	debugWarningInferenceOnConnectivityError = True
+	debugWarningInferenceOnPredictionTargetMismatch = True
 debugTerminateInferenceOnPredictionTargetMismatch = False
 debugTerminateInferenceOnNoPredictionCandidatesAvailable = False
-if(debugPrintTrainSequenceRaw):
-	debugTerminateOnConceptColumnsDelimitByPOSwarning = False
-else:
-	debugTerminateOnConceptColumnsDelimitByPOSwarning = True
+debugTerminateOnConceptColumnsDelimitByPOSwarning = False
+if(not useAutoresearch):
+	if(not debugPrintTrainSequenceRaw):
+		debugTerminateOnConceptColumnsDelimitByPOSwarning = True
 if(pretrainConceptColumnsDelimitByPOSenforce):
 	debugTerminateOnConceptColumnsDelimitByPOSerror = False
 else:
@@ -460,13 +480,21 @@ else:
 
 debugDeleteGPUcache = False
 
-debugPrintTotalFeatures = True	#print c+f upon load
+if(useAutoresearch):
+	debugPrintTotalFeatures = False
+else:
+	debugPrintTotalFeatures = True	#print c+f upon load
 debugLimitFeatures = False	#can be used to recover database for inference if run out of ram during training
 if(debugLimitFeatures):
 	debugLimitFeaturesCMax = 207910
 	debugLimitFeaturesFMax = 50089
 
-printPredictionsDuringInferencePredict = True
+if(useAutoresearch):
+	printHeaderDuringInferencePredict = False
+	printPredictionsDuringInferencePredict = False
+else:
+	printHeaderDuringInferencePredict = True
+	printPredictionsDuringInferencePredict = True
 printPredictionsDuringInferencePredictBeamSearch = False
 debugPrintMinWordDistanceDetails = False
 debugOnlyDrawBranchIndexConnections = False
@@ -521,7 +549,7 @@ if(useInference):
 #Database save paths;
 if(useInference):
 	if(inferenceTrainFirstSequences):
-		inferencePromptFileName = "inference_prompt.txt"
+		inferencePromptFileName = "inference_prompt.txt.trainAndInference"
 	else:
 		if(datasetWikipedia):
 			if(inferenceEvaluateTestSet):
@@ -529,10 +557,16 @@ if(useInference):
 			else:
 				inferencePromptFileName = 'inference_prompt.txt.longTrainWikipedia'	
 		elif(datasetOscar):
-			if(inferenceEvaluateTestSet):
-				inferencePromptFileName = 'inference_prompt.txt.longTestOscar'
+			if(multisentencePredictions):
+				if(inferenceEvaluateTestSet):
+					inferencePromptFileName = 'inference_prompt.txt.longTestOscarMultiSentence'
+				else:
+					inferencePromptFileName = 'inference_prompt.txt.longTrainOscarMultiSentence'
 			else:
-				inferencePromptFileName = 'inference_prompt.txt.longTrainOscar'
+				if(inferenceEvaluateTestSet):
+					inferencePromptFileName = 'inference_prompt.txt.longTestOscar'
+				else:
+					inferencePromptFileName = 'inference_prompt.txt.longTrainOscar'
 	inferencePromptFile = databaseFolder + inferencePromptFileName
 conceptColumnsDictFile = databaseFolder + 'conceptColumnsDict.pkl'
 conceptFeaturesDictFile = databaseFolder + 'conceptFeaturesDict.pkl'
@@ -823,6 +857,7 @@ if(debugPrintConfiguration):
 	print("")
 	print("#Database;")
 	print("databaseFolder:", databaseFolder)
+	print("trainLoadExistingDatabase:", trainLoadExistingDatabase)
 	print("trainMaxSequences:", trainMaxSequences)
 	print("maxSequenceLength:", maxSequenceLength)
 	print("numberEpochs:", numberEpochs)
@@ -926,3 +961,9 @@ if(debugPrintConfiguration):
 	print("")
 	print("************************************ ")
 	
+	
+if(useAutoresearch):
+	assert trainMaxSequences==5000
+	assert datasetOscar
+	assert useBenchmarkDefaultsTestSet
+	assert useBenchmarkDefaults==False

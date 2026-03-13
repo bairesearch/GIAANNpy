@@ -118,9 +118,10 @@ def initialiseDatabaseNetwork():
 	conceptFeaturesReferenceSetDelimiterList = []
 	conceptFeaturesReferenceSetDelimiterDeterministicList = []
 	conceptFeaturesReferenceSetDelimiterProbabilisticList = []
+	loadExistingDatabase = trainLoadExistingDatabase and GIAANNproto_databaseNetworkFilesExcitation.pathExists(conceptColumnsDictFile)
 
 	# Initialize the concept columns dictionary
-	if(GIAANNproto_databaseNetworkFilesExcitation.pathExists(conceptColumnsDictFile)):
+	if(loadExistingDatabase and GIAANNproto_databaseNetworkFilesExcitation.pathExists(conceptColumnsDictFile)):
 		conceptColumnsDict = GIAANNproto_databaseNetworkFilesExcitation.loadDictFile(conceptColumnsDictFile)
 		c = len(conceptColumnsDict)
 		conceptColumnsList = list(conceptColumnsDict.keys())
@@ -169,7 +170,10 @@ def initialiseDatabaseNetwork():
 			else:
 				conceptFeaturesReferenceSetDelimiterList.append(False)
 	if not lowMem:
-		globalFeatureNeurons = loadFeatureNeuronsGlobal(c, f)
+		if(loadExistingDatabase):
+			globalFeatureNeurons = loadFeatureNeuronsGlobal(c, f)
+		else:
+			globalFeatureNeurons = initialiseFeatureNeuronsGlobal(c, f)
 	else:
 		globalFeatureNeurons = None
 
@@ -511,68 +515,103 @@ if(debugLimitFeatures):
 		return resultList
 
 
-if(debugCountTotalParameters):
-	def debugCountTotalParametersRun(databaseNetworkObject):
-		assert arrayIndexPropertiesEfficient 	#only arrayIndexPropertiesStrengthIndex stored in database, all tensors are coalesced
-		if(databaseNetworkObject is None):
-			raise RuntimeError("debugCountTotalParametersRun error: databaseNetworkObject is None")
-		if(arrayIndexPropertiesStrengthIndex is None):
-			raise RuntimeError("debugCountTotalParametersRun error: arrayIndexPropertiesStrengthIndex is None")
-		totalColumns = len(databaseNetworkObject.conceptColumnsList)
-		if(totalColumns <= 0):
-			raise RuntimeError("debugCountTotalParametersRun error: conceptColumnsList is empty")
-		totalConnections = 0
-		print("debugCountTotalParameters start: totalColumns = ", totalColumns)
-		for columnIndex, lemma in enumerate(databaseNetworkObject.conceptColumnsList):
-			#print("columnIndex = ", columnIndex)
-			conceptIndex = databaseNetworkObject.conceptColumnsDict.get(lemma)
-			if(conceptIndex is None):
-				raise RuntimeError("debugCountTotalParametersRun error: conceptIndex is None for lemma = " + lemma)
-			observedColumnDataFile = observedColumnsDir + '/' + f"{conceptIndex}_data.pkl"
-			observedColumnConnectionsFile = observedColumnsDir + '/' + f"{conceptIndex}_featureConnections" + pytorchTensorFileExtension
-			if(not GIAANNproto_databaseNetworkFilesExcitation.pathExists(observedColumnDataFile)):
-				pass	#support for older versions of GIAANN (pre-trainStoreFeatureMapsGlobally/pre-pretrainConceptColumnsDelimitByPOSenforce)  
-				#raise RuntimeError("debugCountTotalParametersRun error: missing observed column data file = " + observedColumnDataFile)
+#if(debugCountTotalParameters):
+def debugCountTotalParametersRun(databaseNetworkObject):
+	assert arrayIndexPropertiesEfficient 	#only arrayIndexPropertiesStrengthIndex stored in database, all tensors are coalesced
+	if(databaseNetworkObject is None):
+		raise RuntimeError("debugCountTotalParametersRun error: databaseNetworkObject is None")
+	if(arrayIndexPropertiesStrengthIndex is None):
+		raise RuntimeError("debugCountTotalParametersRun error: arrayIndexPropertiesStrengthIndex is None")
+	totalColumns = len(databaseNetworkObject.conceptColumnsList)
+	if(totalColumns <= 0):
+		raise RuntimeError("debugCountTotalParametersRun error: conceptColumnsList is empty")
+	totalConnections = 0
+	for columnIndex, lemma in enumerate(databaseNetworkObject.conceptColumnsList):
+		#print("columnIndex = ", columnIndex)
+		conceptIndex = databaseNetworkObject.conceptColumnsDict.get(lemma)
+		if(conceptIndex is None):
+			raise RuntimeError("debugCountTotalParametersRun error: conceptIndex is None for lemma = " + lemma)
+		observedColumnDataFile = observedColumnsDir + '/' + f"{conceptIndex}_data.pkl"
+		observedColumnConnectionsFile = observedColumnsDir + '/' + f"{conceptIndex}_featureConnections" + pytorchTensorFileExtension
+		if(not GIAANNproto_databaseNetworkFilesExcitation.pathExists(observedColumnDataFile)):
+			pass	#support for older versions of GIAANN (pre-trainStoreFeatureMapsGlobally/pre-pretrainConceptColumnsDelimitByPOSenforce)  
+			#raise RuntimeError("debugCountTotalParametersRun error: missing observed column data file = " + observedColumnDataFile)
+		else:
+			if(not GIAANNproto_databaseNetworkFilesExcitation.pathExists(observedColumnConnectionsFile)):
+				raise RuntimeError("debugCountTotalParametersRun error: missing observed column connections file = " + observedColumnConnectionsFile)
+			observedColumn = ObservedColumn.loadFromDisk(databaseNetworkObject, conceptIndex, lemma, columnIndex)
+			featureConnections = observedColumn.featureConnections
+			if(featureConnections is None):
+				raise RuntimeError("debugCountTotalParametersRun error: featureConnections is None for conceptIndex = " + str(conceptIndex))
+			if(arrayIndexPropertiesStrengthIndex < 0 or arrayIndexPropertiesStrengthIndex >= featureConnections.shape[0]):
+				raise RuntimeError("debugCountTotalParametersRun error: arrayIndexPropertiesStrengthIndex out of range")
+			columnConnections = countNonZero(featureConnections)
+			'''
+			#your original codex original code:
+			if(featureConnections.is_sparse):
+				featureConnections = featureConnections.coalesce()
+				strengthConnections = featureConnections[arrayIndexPropertiesStrengthIndex].coalesce()
+				columnConnections = int(strengthConnections.values().numel())
 			else:
-				if(not GIAANNproto_databaseNetworkFilesExcitation.pathExists(observedColumnConnectionsFile)):
-					raise RuntimeError("debugCountTotalParametersRun error: missing observed column connections file = " + observedColumnConnectionsFile)
-				observedColumn = ObservedColumn.loadFromDisk(databaseNetworkObject, conceptIndex, lemma, columnIndex)
-				featureConnections = observedColumn.featureConnections
-				if(featureConnections is None):
-					raise RuntimeError("debugCountTotalParametersRun error: featureConnections is None for conceptIndex = " + str(conceptIndex))
-				if(arrayIndexPropertiesStrengthIndex < 0 or arrayIndexPropertiesStrengthIndex >= featureConnections.shape[0]):
-					raise RuntimeError("debugCountTotalParametersRun error: arrayIndexPropertiesStrengthIndex out of range")
-				columnConnections = countNonZero(featureConnections)
-				'''
-				#your original codex original code:
-				if(featureConnections.is_sparse):
-					featureConnections = featureConnections.coalesce()
-					strengthConnections = featureConnections[arrayIndexPropertiesStrengthIndex].coalesce()
-					columnConnections = int(strengthConnections.values().numel())
-				else:
-					strengthConnections = featureConnections[arrayIndexPropertiesStrengthIndex]
-					columnConnections = int(pt.count_nonzero(strengthConnections).item())
-				'''
-				totalConnections += columnConnections
-				del observedColumn
-				del featureConnections
-				'''
-				#your original codex original code:
-				gc.collect()
-				if(pt.cuda.is_available()):
-					pt.cuda.empty_cache()
-					pt.cuda.ipc_collect()
-				'''
+				strengthConnections = featureConnections[arrayIndexPropertiesStrengthIndex]
+				columnConnections = int(pt.count_nonzero(strengthConnections).item())
+			'''
+			totalConnections += columnConnections
+			del observedColumn
+			del featureConnections
+			'''
+			#your original codex original code:
+			gc.collect()
+			if(pt.cuda.is_available()):
+				pt.cuda.empty_cache()
+				pt.cuda.ipc_collect()
+			'''
+	database_pt_size_gb = debugCalculateDatabasePtSizeGiB()
+	memory_gb = debugCalculateDatabaseSizeGiB()
+	if(debugCountTotalParameters):
 		print("debugCountTotalParameters totalConnections = ", totalConnections)
 		print("debugCountTotalParameters totalColumns = ", totalColumns)
-		return
-	
-	def countNonZero(t):
-		# Works for sparse COO/CSR/CSC/BSR/BSC and dense tensors
-		if isinstance(t, pt.Tensor):
-			if t.is_sparse or (hasattr(t, "layout") and t.layout in {
-				pt.sparse_coo, pt.sparse_csr, pt.sparse_csc, pt.sparse_bsr, pt.sparse_bsc
-			}):
-				return int(t._nnz())
-			return int(pt.count_nonzero(t).item())
-		return 0
+		print(f"Total .pt size (uncompressed GiB): {database_pt_size_gb:.3f}")
+		print(f"Total database size (uncompressed GiB): {memory_gb:.3f}")
+	return memory_gb
+
+def debugCalculateDatabasePtSizeGiB():
+	if(not os.path.isdir(databaseFolder)):
+		raise RuntimeError("debugCalculateDatabasePtSizeGiB error: missing databaseFolder = " + databaseFolder)
+	totalPtBytesUncompressed = 0
+	for directoryPath, directoryNames, fileNames in os.walk(databaseFolder):
+		if(directoryNames is None):
+			raise RuntimeError("debugCalculateDatabasePtSizeGiB error: directoryNames is None")
+		for fileName in fileNames:
+			filePath = os.path.join(directoryPath, fileName)
+			if(not os.path.isfile(filePath)):
+				raise RuntimeError("debugCalculateDatabasePtSizeGiB error: path is not a file = " + filePath)
+			if(fileName.lower().endswith(pytorchTensorFileExtension.lower())):
+				totalPtBytesUncompressed += os.path.getsize(filePath)
+	totalPtGiB = totalPtBytesUncompressed / (1024 ** 3)
+	return totalPtGiB
+
+def debugCalculateDatabaseSizeGiB():
+	if(not os.path.isdir(databaseFolder)):
+		raise RuntimeError("debugCalculateDatabaseSizeGiB error: missing databaseFolder = " + databaseFolder)
+	totalDatabaseBytesUncompressed = 0
+	for directoryPath, directoryNames, fileNames in os.walk(databaseFolder):
+		if(directoryNames is None):
+			raise RuntimeError("debugCalculateDatabaseSizeGiB error: directoryNames is None")
+		for fileName in fileNames:
+			filePath = os.path.join(directoryPath, fileName)
+			if(not os.path.isfile(filePath)):
+				raise RuntimeError("debugCalculateDatabaseSizeGiB error: path is not a file = " + filePath)
+			totalDatabaseBytesUncompressed += os.path.getsize(filePath)
+	totalDatabaseGiB = totalDatabaseBytesUncompressed / (1024 ** 3)
+	return totalDatabaseGiB
+
+def countNonZero(t):
+	# Works for sparse COO/CSR/CSC/BSR/BSC and dense tensors
+	if isinstance(t, pt.Tensor):
+		if t.is_sparse or (hasattr(t, "layout") and t.layout in {
+			pt.sparse_coo, pt.sparse_csr, pt.sparse_csc, pt.sparse_bsr, pt.sparse_bsc
+		}):
+			return int(t._nnz())
+		return int(pt.count_nonzero(t).item())
+	return 0

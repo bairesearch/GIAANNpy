@@ -99,17 +99,23 @@ def addInferenceTop1AccuracyCount(featurePredictionTargetMatch, seedPhase):
 			totalInferenceTop1PredictionTokens += 1
 	return
 
-def printInferenceTop1Accuracy():
+def printInferenceTop1Accuracy(databaseNetworkObject):
 	if(debugPrintInferenceTop1Accuracy):
 		if(totalInferenceTop1Tokens <= 0 or totalInferenceTop1PredictionTokens <= 0):
 			print("printInferenceTop1Accuracy: no prediction tokens recorded; skipping accuracy")
 		else:
 			predictionAccuracy = totalInferenceTop1PredictionMatches / totalInferenceTop1PredictionTokens
 			inferenceAccuracy = totalInferenceTop1Matches / totalInferenceTop1Tokens
-			if(inferenceReportTokenAccuracyConstrainByColumn):
-				print("averageTop1Accuracy (col): predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
+			if(useAutoresearch):
+				print("---")
+				print("averageTop1Accuracy: ", predictionAccuracy)
+				memory_gb = GIAANNproto_databaseNetworkExcitation.debugCountTotalParametersRun(databaseNetworkObject)
+				print("memory_gb: ", memory_gb)
 			else:
-				print("averageTop1Accuracy: predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
+				if(inferenceReportTokenAccuracyConstrainByColumn):
+					print("averageTop1Accuracy (col): predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
+				else:
+					print("averageTop1Accuracy: predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
 	return
 
 def addInferenceTop1AccuracyCountPadding(numSeedTokens, numPredictionTokens, seedTokensProcessed, predictionTokensProcessed):
@@ -237,7 +243,8 @@ if not drawSequenceObservedColumns:
 			self.observedColumnsDict = observedColumnsDict
 
 def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequence, sequenceSeed, sequencePredict, numSeedTokens):
-	print("processConceptWordsInference:")
+	if(printHeaderDuringInferencePredict):
+		print("processConceptWordsInference:")
 
 	sequenceWordIndex = 0
 
@@ -288,7 +295,8 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 			predictionTokensProcessed += 1
 			addInferenceTop1AccuracyCount(featurePredictionTargetMatch, False)
 			if(not featurePredictionTargetMatch):
-				print("warning: featurePredictionTargetMatch=False")
+				if(debugWarningInferenceOnPredictionTargetMismatch):
+					print("warning: featurePredictionTargetMatch=False")
 				if(debugTerminateInferenceOnPredictionTargetMismatch):
 					print("debugTerminateInferenceOnPredictionTargetMismatch: prematurely terminating inference")
 					inferenceTerminatedPrematurely = True
