@@ -9,7 +9,7 @@ To set up a new experiment, work with the user to:
 1. **Agree on a run tag**: propose a tag based on today's date (e.g. `mar5`). The branch `GIAANNpy/<tag>` must not already exist - this is a fresh run.
 2. **Create the branch**: `git checkout -b GIAANNpy/<tag>` from current main [master].
 3. **Read the in-scope files**: The repo is small. Read these files for full context:
-   - `README.md` - repository context.
+   - `../README.md` - repository summary.
    - `../proto/*.py` - the files you modify. Model architecture, parameters, etc.
 5. **Initialize results.tsv**: Create `results.tsv` with just the header row. The baseline will be recorded after the first run.
 6. **Confirm and go**: Confirm setup looks good.
@@ -24,11 +24,7 @@ You launch train phase, and then inference phase using these commands:
 
 ```
 cd ../proto/
-sed -i 's/^useInference = True/useInference = False/' GIAANNproto_globalDefs.py
 python GIAANNproto_main.py
-sed -i 's/^useInference = False/useInference = True/' GIAANNproto_globalDefs.py
-python GIAANNproto_main.py > ../autoresearch/run.log 2>&1
-sed -i 's/^useInference = True/useInference = False/' GIAANNproto_globalDefs.py
 cd ../autoresearch/
 ```
 
@@ -38,7 +34,7 @@ cd ../autoresearch/
 **What you CANNOT do:**
 - Modify any files not contained in `../proto'.
 - Install new packages or add dependencies. You can only use what's already specified in `../README.md`.
-- Modify the evaluation harness. Top-1 accuracy of datasetOscar is the eval ground truth metric (useBenchmarkDefaultsTestSet=True) after training for trainMaxSequences=5000 sequences (with useAutoresearch=True).
+- Modify the evaluation harness (useAutoresearch=True): Top-1 accuracy of datasetOscar is the eval ground truth metric (useBenchmarkDefaultsTestSet=True) after training for trainMaxSequences=5000 sequences.
 
 **The goal is simple: get the highest top-1 accuracy. Everything is fair game: change the architecture, the hyperparameters, etc. The only constraint is that the code runs without crashing and finishes executing (trainMaxSequences=5000 sequences).
 
@@ -56,9 +52,7 @@ averageTop1Accuracy: 0.8108882521489972
 memory_gb: 2.4
 ```
 
-Note that the code (when useAutoresearch=True) is configured to always train the first 5000 oscar dataset sequences (when useInference=False), and test using the sequences within inference_prompt.txt.longTestOscar (when useInference=True).
-
-Ensure to set useInference between train/inference phase.
+Note that the code (when useAutoresearch=True) is configured to always train the first 5000 oscar dataset sequences, and test using the sequences within inference_prompt.txt.longTestOscar (during inferenceMode).
 
 You can extract the key metric from the log file:
 
@@ -106,11 +100,7 @@ LOOP FOREVER:
 
 ```
 cd ../proto/
-sed -i 's/^useInference = True/useInference = False/' GIAANNproto_globalDefs.py
-python GIAANNproto_main.py
-sed -i 's/^useInference = False/useInference = True/' GIAANNproto_globalDefs.py
 python GIAANNproto_main.py > ../autoresearch/run.log 2>&1
-sed -i 's/^useInference = True/useInference = False/' GIAANNproto_globalDefs.py
 cd ../autoresearch/
 ```
 

@@ -83,7 +83,7 @@ def resetInferenceTop1AccuracyCounts():
 	return
 
 def addInferenceTop1AccuracyCount(featurePredictionTargetMatch, seedPhase):
-	if(debugPrintInferenceTop1Accuracy):
+	if(printInferenceTop1Accuracy):
 		if(featurePredictionTargetMatch):
 			matchValue = 1
 		else:
@@ -100,7 +100,7 @@ def addInferenceTop1AccuracyCount(featurePredictionTargetMatch, seedPhase):
 	return
 
 def printInferenceTop1Accuracy(databaseNetworkObject):
-	if(debugPrintInferenceTop1Accuracy):
+	if(printInferenceTop1Accuracy):
 		if(totalInferenceTop1Tokens <= 0 or totalInferenceTop1PredictionTokens <= 0):
 			print("printInferenceTop1Accuracy: no prediction tokens recorded; skipping accuracy")
 		else:
@@ -119,7 +119,7 @@ def printInferenceTop1Accuracy(databaseNetworkObject):
 	return
 
 def addInferenceTop1AccuracyCountPadding(numSeedTokens, numPredictionTokens, seedTokensProcessed, predictionTokensProcessed):
-	if(debugPrintInferenceTop1Accuracy):
+	if(printInferenceTop1Accuracy):
 		if(numSeedTokens is None or numPredictionTokens is None or seedTokensProcessed is None or predictionTokensProcessed is None):
 			raise RuntimeError("addInferenceTop1AccuracyCountPadding error: token counts are None")
 		if(numSeedTokens < 0 or numPredictionTokens < 0 or seedTokensProcessed < 0 or predictionTokensProcessed < 0):
@@ -262,10 +262,10 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	conceptColumnFeatureIndex = int(targetFeatureIndex)
 	conceptActivationState = None
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
-	globalFeatureNeuronsActivation = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesActivationIndex]
+	globalFeatureNeuronsActivation = databaseNetworkObject.globalFeatureNeurons[databaseNetworkObject.arrayIndexPropertiesActivationIndex]
 	globalFeatureNeuronsTime = None
 	if(inferenceUseNeuronFeaturePropertiesTime):
-		globalFeatureNeuronsTime = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesTimeIndex]
+		globalFeatureNeuronsTime = databaseNetworkObject.globalFeatureNeurons[databaseNetworkObject.arrayIndexPropertiesTimeIndex]
 	if(predictionColumnsMustActivateConceptFeature):
 		conceptActivationState = initialiseConceptActivationState(conceptColumnIndex, conceptColumnFeatureIndex)
 	observedColumnsDict = sequenceObservedColumns.observedColumnsDict  # key: lemma, value: ObservedColumn	#every observed column in inference (seed and prediction phases)
@@ -308,9 +308,9 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	if(debugPrintTotalInferenceTokens):
 		addTotalInferenceTokens(seedTokensProcessed, predictionTokensProcessed)
 	if(drawNetworkDuringInference):
-		databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivationIndex)
+		databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, databaseNetworkObject.arrayIndexPropertiesActivationIndex)
 		if(inferenceUseNeuronFeaturePropertiesTime):
-			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTimeIndex)
+			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, databaseNetworkObject.arrayIndexPropertiesTimeIndex)
 
 def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, seedPhase=False):
 	
@@ -338,7 +338,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	#burst the initial seed in the sequence;
 	globalFeatureNeuronsActivation = activateInitialSeedPredictionIfRequired(sequenceWordIndex, conceptColumnIndex, conceptColumnFeatureIndex, globalFeatureNeuronsActivation)
 	
-	globalFeatureNeuronsStrength = databaseNetworkObject.globalFeatureNeurons[arrayIndexPropertiesStrengthIndex]
+	globalFeatureNeuronsStrength = databaseNetworkObject.globalFeatureNeurons[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 	if(inferenceUseNeuronFeaturePropertiesTime and globalFeatureNeuronsTime is None):
 		raise RuntimeError("processColumnInferencePrediction error: globalFeatureNeuronsTime is None while inferenceUseNeuronFeaturePropertiesTime")
 	sequenceColumnIndex = None
@@ -397,9 +397,9 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	#draw network; 
 	if(drawNetworkDuringInference):
 		#FUTURE: convert globalFeatureNeuronsActivation back to globalFeatureNeurons for draw
-		databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, arrayIndexPropertiesActivationIndex)
+		databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, databaseNetworkObject.arrayIndexPropertiesActivationIndex)
 		if(inferenceUseNeuronFeaturePropertiesTime):
-			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, arrayIndexPropertiesTimeIndex)
+			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, databaseNetworkObject.arrayIndexPropertiesTimeIndex)
 		GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumnsPrediction, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+generateDrawSequenceIndex(sequenceWordIndex))
 	return featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime
 

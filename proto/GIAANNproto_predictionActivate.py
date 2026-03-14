@@ -479,9 +479,9 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 		featureNeuronsActive = featureNeuronsActive.sum()
 
 	#target neuron activation dependence on connection strength;
-	featureConnectionsStrength = featureConnections[arrayIndexPropertiesStrengthIndex]
+	featureConnectionsStrength = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 	if(inferenceConnectionStrengthPOSdependence):
-		featureConnectionsPos = featureConnections[arrayIndexPropertiesPosIndex]
+		featureConnectionsPos = featureConnections[databaseNetworkObject.arrayIndexPropertiesPosIndex]
 	featureConnectionsStrength = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsStrength, 2, sourceFeatureIndex)
 	if(inferenceConnectionStrengthPOSdependence):
 		featureConnectionsPos = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsPos, 2, sourceFeatureIndex)
@@ -634,11 +634,14 @@ def hybridActivation(x, scale=100.0):
 	return f
 
 def computeConnectionMinWordDistanceMask(observedColumn, sourceFeatureIndex, targetIndices, requiredDistance=1.0):
+	if(not hasattr(observedColumn, "databaseNetworkObject") or observedColumn.databaseNetworkObject is None):
+		raise RuntimeError("computeConnectionMinWordDistanceMask error: observedColumn.databaseNetworkObject is required")
+	databaseNetworkObject = observedColumn.databaseNetworkObject
 	if(enforceDirectConnectionsMinWordDistance):
 		if(targetIndices is None or targetIndices.shape[1] == 0):
 			printe("(targetIndices is None or targetIndices.shape[1] == 0)")
 			#return None
-		featureConnectionsMinWordDistance = observedColumn.featureConnections[arrayIndexPropertiesMinWordDistanceIndex]
+		featureConnectionsMinWordDistance = observedColumn.featureConnections[databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex]
 		featureConnectionsMinWordDistance = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsMinWordDistance, 2, sourceFeatureIndex)
 		featureConnectionsMinWordDistance = featureConnectionsMinWordDistance.coalesce()
 		if(featureConnectionsMinWordDistance._nnz() == 0):

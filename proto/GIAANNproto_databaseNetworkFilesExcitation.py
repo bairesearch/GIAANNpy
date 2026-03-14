@@ -71,37 +71,31 @@ def saveListFile(listFileName, listObject):
 	with open(listFileName, 'wb') as fOut:
 		pickle.dump(listObject, fOut)
 
-def loadFeatureNeuronsGlobalFile():
+def loadFeatureNeuronsGlobalFile(inferenceMode):
 	globalFeatureNeurons = loadTensor(databaseFolder, globalFeatureNeuronsFile)
-	globalFeatureNeurons = adjustPropertyDimensions(globalFeatureNeurons, "globalFeatureNeurons")
+	globalFeatureNeurons = adjustPropertyDimensions(inferenceMode, globalFeatureNeurons, "globalFeatureNeurons")
 	globalFeatureNeurons = adjustBranchDimensions(globalFeatureNeurons, "globalFeatureNeurons", expectedRank=5)
 	return globalFeatureNeurons
 
-def adjustPropertyDimensions(tensor, tensorName):
+def adjustPropertyDimensions(inferenceMode, tensor, tensorName):
 	propertyCount = tensor.shape[0]
 	result = tensor
-	if(debugWorkaroundPreviousUngatedShutdownSaveBug):
-		legacyTimePropertyIndex = None
-		if(arrayIndexPropertiesStrength):
-			legacyTimePropertyIndex = 1
+	if(inferenceMode):
+		if(propertyCount == arrayNumberOfPropertiesInference):
+			result = tensor
+		elif(arrayIndexPropertiesActivationCreateInference and arrayIndexPropertiesActivationIndexInference is not None and propertyCount == arrayIndexPropertiesActivationIndexInference and propertyCount < arrayNumberOfPropertiesInference):
+			result = insertPropertyDimension(tensor, arrayIndexPropertiesActivationIndexInference, arrayNumberOfPropertiesInference)
+		elif(arrayIndexPropertiesTimeCreateInference and arrayIndexPropertiesTimeIndexInference is not None and propertyCount == arrayIndexPropertiesTimeIndexInference and propertyCount < arrayNumberOfPropertiesInference):
+			result = insertPropertyDimension(tensor, arrayIndexPropertiesTimeIndexInference, arrayNumberOfPropertiesInference)
+		elif(arrayIndexPropertiesActivationCreateInference and not arrayIndexPropertiesActivation and propertyCount == arrayNumberOfPropertiesInference - 1):
+			result = insertPropertyDimension(tensor, arrayIndexPropertiesActivationIndexInference, arrayNumberOfPropertiesInference)
 		else:
-			legacyTimePropertyIndex = 0
-		if(arrayIndexPropertiesPermanence):
-			legacyTimePropertyIndex += 1
-		if(arrayIndexPropertiesActivationCreate):
-			legacyTimePropertyIndex += 1
-	if(propertyCount == arrayNumberOfProperties):
-		result = tensor
-	elif(arrayIndexPropertiesActivationCreate and arrayIndexPropertiesActivationIndex is not None and propertyCount == arrayIndexPropertiesActivationIndex and propertyCount < arrayNumberOfProperties):
-		result = insertPropertyDimension(tensor, arrayIndexPropertiesActivationIndex, arrayNumberOfProperties)
-	elif(arrayIndexPropertiesTimeCreate and arrayIndexPropertiesTimeIndex is not None and propertyCount == arrayIndexPropertiesTimeIndex and propertyCount < arrayNumberOfProperties):
-		result = insertPropertyDimension(tensor, arrayIndexPropertiesTimeIndex, arrayNumberOfProperties)
-	elif(arrayIndexPropertiesActivationCreate and not arrayIndexPropertiesActivation and propertyCount == arrayNumberOfProperties - 1):
-		result = insertPropertyDimension(tensor, arrayIndexPropertiesActivationIndex, arrayNumberOfProperties)
-	elif(debugWorkaroundPreviousUngatedShutdownSaveBug and (not arrayIndexPropertiesTimeCreate) and (legacyTimePropertyIndex is not None) and propertyCount == (arrayNumberOfProperties + 1)):
-		result = removePropertyDimension(tensor, legacyTimePropertyIndex, arrayNumberOfProperties, tensorName)
+			raise RuntimeError(f"{tensorName} property dimension mismatch: expected {arrayNumberOfPropertiesInference}, got {propertyCount}")
 	else:
-		raise RuntimeError(f"{tensorName} property dimension mismatch: expected {arrayNumberOfProperties}, got {propertyCount}")
+		if(propertyCount == arrayNumberOfPropertiesTrain):
+			result = tensor
+		else:
+			raise RuntimeError(f"{tensorName} property dimension mismatch: expected {arrayNumberOfPropertiesTrain}, got {propertyCount}")
 	return result
 
 def insertPropertyDimension(tensor, insertIndex, targetPropertyCount):
@@ -120,30 +114,6 @@ def insertPropertyDimension(tensor, insertIndex, targetPropertyCount):
 	zerosShape[0] = 1
 	zerosTensor = pt.zeros(zerosShape, dtype=tensor.dtype, device=tensor.device)
 	return pt.cat([tensor[:insertIndex], zerosTensor, tensor[insertIndex:]], dim=0)
-
-if(debugWorkaroundPreviousUngatedShutdownSaveBug):
-	def removePropertyDimension(tensor, removeIndex, targetPropertyCount, tensorName):
-		result = tensor
-		if(removeIndex < 0 or removeIndex >= tensor.shape[0]):
-			raise RuntimeError(f"{tensorName} property remove index out of range: {removeIndex}")
-		if(tensor.is_sparse):
-			tensor = tensor.coalesce()
-			indices = tensor.indices()
-			values = tensor.values()
-			keepMask = indices[0] != removeIndex
-			filteredIndices = indices[:, keepMask]
-			filteredValues = values[keepMask]
-			if(filteredIndices.numel() > 0):
-				filteredIndices = filteredIndices.clone()
-				shiftMask = filteredIndices[0] > removeIndex
-				if(shiftMask.any()):
-					filteredIndices[0, shiftMask] -= 1
-			newSize = list(tensor.size())
-			newSize[0] = targetPropertyCount
-			result = pt.sparse_coo_tensor(filteredIndices, filteredValues, size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
-		else:
-			result = pt.cat([tensor[:removeIndex], tensor[removeIndex+1:]], dim=0)
-		return result
 
 def adjustBranchDimensions(tensor, tensorName, expectedRank, branchCount=numberOfDendriticBranches):
 	if tensor.dim() == expectedRank:
@@ -280,12 +250,12 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 			if(instance.nextFeatureIndex > databaseNetworkObject.f):
 				instance.nextFeatureIndex = databaseNetworkObject.f
 	# Load the tensors
-	instance.featureConnections = adjustPropertyDimensions(loadTensor(observedColumnsDir, f"{conceptIndex}_featureConnections"), f"observedColumn.featureConnections[{conceptIndex}]")
+	instance.featureConnections = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, loadTensor(observedColumnsDir, f"{conceptIndex}_featureConnections"), f"observedColumn.featureConnections[{conceptIndex}]")
 	instance.featureConnections = adjustBranchDimensions(instance.featureConnections, f"observedColumn.featureConnections[{conceptIndex}]", expectedRank=6)
 	if(debugLimitFeatures):
 		instance.featureConnections = applyDebugLimitFeatureConnectionsTensor(instance.featureConnections, databaseNetworkObject.c, databaseNetworkObject.f, f"observedColumn.featureConnections[{conceptIndex}]")
 	if lowMem:
-		instance.featureNeurons = adjustPropertyDimensions(loadTensor(observedColumnsDir, f"{conceptIndex}_featureNeurons"), f"observedColumn.featureNeurons[{conceptIndex}]")
+		instance.featureNeurons = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, loadTensor(observedColumnsDir, f"{conceptIndex}_featureNeurons"), f"observedColumn.featureNeurons[{conceptIndex}]")
 		instance.featureNeurons = adjustBranchDimensions(instance.featureNeurons, f"observedColumn.featureNeurons[{conceptIndex}]", expectedRank=4)
 		if(debugLimitFeatures):
 			instance.featureNeurons = applyDebugLimitFeatureNeuronsTensor(instance.featureNeurons, databaseNetworkObject.f, f"observedColumn.featureNeurons[{conceptIndex}]")

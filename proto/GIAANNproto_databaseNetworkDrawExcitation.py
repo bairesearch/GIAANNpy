@@ -161,10 +161,10 @@ def collapseBranchDimensionForNodes(tensor, drawBranches):
 			result = tensor.max(dim=1).values
 	return result
 
-def getFeaturePosValue(featureNeurons, featureIndexInObservedColumn, segmentIndex):
+def getFeaturePosValue(databaseNetworkObject, featureNeurons, featureIndexInObservedColumn, segmentIndex):
 	posValue = 0.0
-	if(arrayIndexPropertiesPosIndex is not None):
-		posTensor = featureNeurons[arrayIndexPropertiesPosIndex]
+	if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
+		posTensor = featureNeurons[databaseNetworkObject.arrayIndexPropertiesPosIndex]
 		if(useSANI):
 			if(posTensor.is_sparse):
 				posTensor = posTensor.coalesce()
@@ -355,9 +355,9 @@ if(drawSparseArrays):
 			
 				featurePresent = False
 				featureActive = False
-				if(neuronIsActive(featureNeurons, arrayIndexPropertiesStrengthIndex, featureIndexInObservedColumn, "doNotEnforceActivationAcrossSegments")):	#if not useSANI: and neuronIsActive(featureNeurons, arrayIndexPropertiesPermanenceIndex, featureIndexInObservedColumn)
+				if(neuronIsActive(featureNeurons, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndexInObservedColumn, "doNotEnforceActivationAcrossSegments")):	#if not useSANI: and neuronIsActive(featureNeurons, databaseNetworkObject.arrayIndexPropertiesPermanenceIndex, featureIndexInObservedColumn)
 					featurePresent = True
-				if(neuronIsActive(featureNeurons, arrayIndexPropertiesActivationIndex, featureIndexInObservedColumn, "doNotEnforceActivationAcrossSegments")):	#default: algorithmMatrixSANImethod
+				if(neuronIsActive(featureNeurons, databaseNetworkObject.arrayIndexPropertiesActivationIndex, featureIndexInObservedColumn, "doNotEnforceActivationAcrossSegments")):	#default: algorithmMatrixSANImethod
 					featureActive = True
 					
 				if(featurePresent):
@@ -367,8 +367,8 @@ if(drawSparseArrays):
 								segmentIndex = arrayIndexSegmentAdjacentColumn #arrayIndexSegmentAdjacentColumn has a higher probability of being filled than arrayIndexSegmentLast
 							else:
 								segmentIndex = arrayIndexSegmentLast
-							if(arrayIndexPropertiesPosIndex is not None):
-								posValue = getFeaturePosValue(featureNeurons, featureIndexInObservedColumn, segmentIndex)
+							if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
+								posValue = getFeaturePosValue(databaseNetworkObject, featureNeurons, featureIndexInObservedColumn, segmentIndex)
 								neuronColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, drawFeatureNodes=True)
 					elif(drawDelimiters):
 						if not primeConceptNeuronFeature:
@@ -384,7 +384,7 @@ if(drawSparseArrays):
 
 					if(inferenceMode):	
 						if(debugDrawNeuronActivations):
-							neuronName = createNeuronLabelWithActivation(neuronName, neuronActivationString(featureNeurons, arrayIndexPropertiesActivationIndex, featureIndexInObservedColumn))
+							neuronName = createNeuronLabelWithActivation(neuronName, neuronActivationString(featureNeurons, databaseNetworkObject.arrayIndexPropertiesActivationIndex, featureIndexInObservedColumn))
 
 					featureNode = f"{lemma}_{featureWord}_{fIdx}"
 					if(randomiseColumnFeatureXposition and not primeConceptNeuronFeature):
@@ -414,7 +414,7 @@ if(drawSparseArrays):
 			useBranchKey = drawBranches and hasBranchDim
 			for entryIndex in range(values.shape[0]):
 				propertyIndex = int(indices[0, entryIndex].item())
-				if(propertyIndex != arrayIndexPropertiesStrengthIndex and propertyIndex != arrayIndexPropertiesPermanenceIndex and propertyIndex != arrayIndexPropertiesPosIndex):
+				if(propertyIndex != databaseNetworkObject.arrayIndexPropertiesStrengthIndex and propertyIndex != databaseNetworkObject.arrayIndexPropertiesPermanenceIndex and propertyIndex != databaseNetworkObject.arrayIndexPropertiesPosIndex):
 					continue
 				if(hasBranchDim):
 					branchIndex = int(indices[1, entryIndex].item())
@@ -446,9 +446,9 @@ if(drawSparseArrays):
 					entry = {"strength": 0.0, "permanence": 0.0, "pos": 0.0}
 					connectionLookup[key] = entry
 				value = float(values[entryIndex].item())
-				if(propertyIndex == arrayIndexPropertiesStrengthIndex):
+				if(propertyIndex == databaseNetworkObject.arrayIndexPropertiesStrengthIndex):
 					entry["strength"] += value
-				elif(propertyIndex == arrayIndexPropertiesPermanenceIndex):
+				elif(propertyIndex == databaseNetworkObject.arrayIndexPropertiesPermanenceIndex):
 					entry["permanence"] += value
 				else:
 					entry["pos"] += value
@@ -478,7 +478,7 @@ if(drawSparseArrays):
 					relationSegmentIndex = arrayIndexSegmentLast
 					if(useSANI and useSANIcolumns):
 						relationSegmentIndex = arrayIndexSegmentAdjacentColumn
-					if(arrayIndexPropertiesPosIndex is not None):
+					if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
 						if(drawSequenceObservedColumns):
 							sourceFeatureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons, drawBranches)
 							if(drawBranches):
@@ -543,7 +543,7 @@ if(drawSparseArrays):
 					elif(drawRelationTypes):
 						if(drawRelationTypesConnectionsFromSource):
 							if(sourceFeatureNeurons is not None):
-								posValue = getFeaturePosValue(sourceFeatureNeurons, fIdx, relationSegmentIndex)
+								posValue = getFeaturePosValue(databaseNetworkObject, sourceFeatureNeurons, fIdx, relationSegmentIndex)
 								connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, sourceFeatureWord, internalConnection=internalConnection)
 							else:
 								connectionColor = relationTypeOtherCol
@@ -619,11 +619,11 @@ if(drawSparseArrays):
 											otherFIdx = featureWordToIndex[otherFeatureWord]
 											
 											featurePresent = False
-											if(arrayIndexPropertiesPermanenceIndex is not None):
-												if(featureConnectionsSegment[arrayIndexPropertiesStrengthIndex, fIdx, cIdx, otherFIdx] > 0 and featureConnectionsSegment[arrayIndexPropertiesPermanenceIndex, fIdx, cIdx, otherFIdx] > 0):
+											if(databaseNetworkObject.arrayIndexPropertiesPermanenceIndex is not None):
+												if(featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, fIdx, cIdx, otherFIdx] > 0 and featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesPermanenceIndex, fIdx, cIdx, otherFIdx] > 0):
 													featurePresent = True
 											else:
-												if(featureConnectionsSegment[arrayIndexPropertiesStrengthIndex, fIdx, cIdx, otherFIdx] > 0):
+												if(featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, fIdx, cIdx, otherFIdx] > 0):
 													featurePresent = True
 											
 											if(drawSegments):
@@ -633,13 +633,13 @@ if(drawSparseArrays):
 											elif(drawRelationTypes):
 												if(drawRelationTypesConnectionsFromSource):
 													if(sourceFeatureNeurons is not None):
-														posValue = getFeaturePosValue(sourceFeatureNeurons, fIdx, relationSegmentIndex)
+														posValue = getFeaturePosValue(databaseNetworkObject, sourceFeatureNeurons, fIdx, relationSegmentIndex)
 														connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, internalConnection=True)
 													else:
 														connectionColor = relationTypeOtherCol
 												else:
-													if(arrayIndexPropertiesPosIndex is not None):
-														connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[arrayIndexPropertiesPosIndex, fIdx, cIdx, otherFIdx], featureWord, internalConnection=True)
+													if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
+														connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesPosIndex, fIdx, cIdx, otherFIdx], featureWord, internalConnection=True)
 													else:
 														connectionColor = defaultConnectionColourExternal
 											elif(drawDelimiters):
@@ -677,11 +677,11 @@ if(drawSparseArrays):
 									
 											featurePresent = False
 											if(externalConnection):
-												if(arrayIndexPropertiesPermanenceIndex is not None):
-													if(featureConnectionsSegment[arrayIndexPropertiesStrengthIndex, fIdx, otherCIdx, otherFIdx] > 0 and featureConnectionsSegment[arrayIndexPropertiesPermanenceIndex, fIdx, otherCIdx, otherFIdx] > 0):
+												if(databaseNetworkObject.arrayIndexPropertiesPermanenceIndex is not None):
+													if(featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, fIdx, otherCIdx, otherFIdx] > 0 and featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesPermanenceIndex, fIdx, otherCIdx, otherFIdx] > 0):
 														featurePresent = True
 												else:
-													if(featureConnectionsSegment[arrayIndexPropertiesStrengthIndex, fIdx, otherCIdx, otherFIdx] > 0):
+													if(featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, fIdx, otherCIdx, otherFIdx] > 0):
 														featurePresent = True
 
 											if(drawSegments):
@@ -691,13 +691,13 @@ if(drawSparseArrays):
 											elif(drawRelationTypes):
 												if(drawRelationTypesConnectionsFromSource):
 													if(sourceFeatureNeurons is not None):
-														posValue = getFeaturePosValue(sourceFeatureNeurons, fIdx, relationSegmentIndex)
+														posValue = getFeaturePosValue(databaseNetworkObject, sourceFeatureNeurons, fIdx, relationSegmentIndex)
 														connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, internalConnection=False)
 													else:
 														connectionColor = relationTypeOtherCol
 												else:
-													if(arrayIndexPropertiesPosIndex is not None):
-														connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[arrayIndexPropertiesPosIndex, fIdx, otherCIdx, otherFIdx], featureWord, internalConnection=False)
+													if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
+														connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesPosIndex, fIdx, otherCIdx, otherFIdx], featureWord, internalConnection=False)
 													else:
 														connectionColor = defaultConnectionColourExternal
 											elif(drawDelimiters):
@@ -764,9 +764,9 @@ else:
 			
 				featurePresent = False
 				featureActive = False
-				if(neuronIsActive(featureNeurons, arrayIndexPropertiesStrengthIndex, featureIndexInObservedColumn, "doNotEnforceActivationAcrossSegments")):	#if not useSANI: and neuronIsActive(featureNeurons, arrayIndexPropertiesPermanenceIndex, featureIndexInObservedColumn)
+				if(neuronIsActive(featureNeurons, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndexInObservedColumn, "doNotEnforceActivationAcrossSegments")):	#if not useSANI: and neuronIsActive(featureNeurons, databaseNetworkObject.arrayIndexPropertiesPermanenceIndex, featureIndexInObservedColumn)
 					featurePresent = True
-				if(neuronIsActive(featureNeurons, arrayIndexPropertiesActivationIndex, featureIndexInObservedColumn, "doNotEnforceActivationAcrossSegments")):	#default: algorithmMatrixSANImethod
+				if(neuronIsActive(featureNeurons, databaseNetworkObject.arrayIndexPropertiesActivationIndex, featureIndexInObservedColumn, "doNotEnforceActivationAcrossSegments")):	#default: algorithmMatrixSANImethod
 					featureActive = True
 					
 				if(featurePresent):
@@ -776,8 +776,8 @@ else:
 								segmentIndex = arrayIndexSegmentAdjacentColumn #arrayIndexSegmentAdjacentColumn has a higher probability of being filled than arrayIndexSegmentLast
 							else:
 								segmentIndex = arrayIndexSegmentLast
-							if(arrayIndexPropertiesPosIndex is not None):
-								posValue = getFeaturePosValue(featureNeurons, featureIndexInObservedColumn, segmentIndex)
+							if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
+								posValue = getFeaturePosValue(databaseNetworkObject, featureNeurons, featureIndexInObservedColumn, segmentIndex)
 								neuronColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, drawFeatureNodes=True)
 					elif(drawDelimiters):
 						if not primeConceptNeuronFeature:
@@ -793,7 +793,7 @@ else:
 
 					if(inferenceMode):	
 						if(debugDrawNeuronActivations):
-							neuronName = createNeuronLabelWithActivation(neuronName, neuronActivationString(featureNeurons, arrayIndexPropertiesActivationIndex, featureIndexInObservedColumn))
+							neuronName = createNeuronLabelWithActivation(neuronName, neuronActivationString(featureNeurons, databaseNetworkObject.arrayIndexPropertiesActivationIndex, featureIndexInObservedColumn))
 
 					featureNode = f"{lemma}_{featureWord}_{fIdx}"
 					if(randomiseColumnFeatureXposition and not primeConceptNeuronFeature):
@@ -838,7 +838,7 @@ else:
 					relationSegmentIndex = arrayIndexSegmentLast
 					if(useSANI and useSANIcolumns):
 						relationSegmentIndex = arrayIndexSegmentAdjacentColumn
-					if(arrayIndexPropertiesPosIndex is not None):
+					if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
 						if(drawSequenceObservedColumns):
 							sourceFeatureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons, drawBranches)
 							if(drawBranches):
@@ -911,11 +911,11 @@ else:
 										otherFIdx = featureWordToIndex[otherFeatureWord]
 										
 										featurePresent = False
-										if(arrayIndexPropertiesPermanenceIndex is not None):
-											if(featureConnectionsSegment[arrayIndexPropertiesStrengthIndex, fIdx, cIdx, otherFIdx] > 0 and featureConnectionsSegment[arrayIndexPropertiesPermanenceIndex, fIdx, cIdx, otherFIdx] > 0):
+										if(databaseNetworkObject.arrayIndexPropertiesPermanenceIndex is not None):
+											if(featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, fIdx, cIdx, otherFIdx] > 0 and featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesPermanenceIndex, fIdx, cIdx, otherFIdx] > 0):
 												featurePresent = True
 										else:
-											if(featureConnectionsSegment[arrayIndexPropertiesStrengthIndex, fIdx, cIdx, otherFIdx] > 0):
+											if(featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, fIdx, cIdx, otherFIdx] > 0):
 												featurePresent = True
 										
 										if(drawSegments):
@@ -925,13 +925,13 @@ else:
 										elif(drawRelationTypes):
 											if(drawRelationTypesConnectionsFromSource):
 												if(sourceFeatureNeurons is not None):
-													posValue = getFeaturePosValue(sourceFeatureNeurons, fIdx, relationSegmentIndex)
+													posValue = getFeaturePosValue(databaseNetworkObject, sourceFeatureNeurons, fIdx, relationSegmentIndex)
 													connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, internalConnection=True)
 												else:
 													connectionColor = relationTypeOtherCol
 											else:
-												if(arrayIndexPropertiesPosIndex is not None):
-													connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[arrayIndexPropertiesPosIndex, fIdx, cIdx, otherFIdx], featureWord, internalConnection=True)
+												if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
+													connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesPosIndex, fIdx, cIdx, otherFIdx], featureWord, internalConnection=True)
 												else:
 													connectionColor = defaultConnectionColourExternal
 										elif(drawDelimiters):
@@ -969,11 +969,11 @@ else:
 								
 										featurePresent = False
 										if(externalConnection):
-											if(arrayIndexPropertiesPermanenceIndex is not None):
-												if(featureConnectionsSegment[arrayIndexPropertiesStrengthIndex, fIdx, otherCIdx, otherFIdx] > 0 and featureConnectionsSegment[arrayIndexPropertiesPermanenceIndex, fIdx, otherCIdx, otherFIdx] > 0):
+											if(databaseNetworkObject.arrayIndexPropertiesPermanenceIndex is not None):
+												if(featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, fIdx, otherCIdx, otherFIdx] > 0 and featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesPermanenceIndex, fIdx, otherCIdx, otherFIdx] > 0):
 													featurePresent = True
 											else:
-												if(featureConnectionsSegment[arrayIndexPropertiesStrengthIndex, fIdx, otherCIdx, otherFIdx] > 0):
+												if(featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, fIdx, otherCIdx, otherFIdx] > 0):
 													featurePresent = True
 
 										if(drawSegments):
@@ -983,13 +983,13 @@ else:
 										elif(drawRelationTypes):
 											if(drawRelationTypesConnectionsFromSource):
 												if(sourceFeatureNeurons is not None):
-													posValue = getFeaturePosValue(sourceFeatureNeurons, fIdx, relationSegmentIndex)
+													posValue = getFeaturePosValue(databaseNetworkObject, sourceFeatureNeurons, fIdx, relationSegmentIndex)
 													connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, internalConnection=False)
 												else:
 													connectionColor = relationTypeOtherCol
 											else:
-												if(arrayIndexPropertiesPosIndex is not None):
-													connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[arrayIndexPropertiesPosIndex, fIdx, otherCIdx, otherFIdx], featureWord, internalConnection=False)
+												if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
+													connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesPosIndex, fIdx, otherCIdx, otherFIdx], featureWord, internalConnection=False)
 												else:
 													connectionColor = defaultConnectionColourExternal
 										elif(drawDelimiters):

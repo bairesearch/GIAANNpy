@@ -491,9 +491,9 @@ MANUAL; - rename drawNetworkDuringInferencePredict to drawNetworkDuringInference
 ---
 v1j (Codex IDE GPT-5.3-Codex):
 - add proto GIAANNproto1j1a - reduce inference VRAM (for useInference:useGPUsparse=True):
-	- [GPT-5.2-Codex:] update GIAANNproto_sequenceObservedColumnsExcitation - skip dense SequenceObservedColumns arrays during inference when drawing is disabled to avoid large to_dense() allocations.
-	- [GPT-5.2-Codex:] update GIAANNproto_databaseNetworkExcitation - store globalFeatureNeuronsBackup (and connections, if present) on CPU and restore to GPU only when needed. This removes the GPU-resident backup copy.
-	- [GPT-5.2-Codex:] update GIAANNproto_main - wrap inference in pt.no_grad() to eliminate autograd allocations without triggering sparse inference-tensor version-counter errors.
+	[GPT-5.2-Codex:] - update GIAANNproto_sequenceObservedColumnsExcitation - skip dense SequenceObservedColumns arrays during inference when drawing is disabled to avoid large to_dense() allocations.
+	[GPT-5.2-Codex:] - update GIAANNproto_databaseNetworkExcitation - store globalFeatureNeuronsBackup (and connections, if present) on CPU and restore to GPU only when needed. This removes the GPU-resident backup copy.
+	[GPT-5.2-Codex:] - update GIAANNproto_main - wrap inference in pt.no_grad() to eliminate autograd allocations without triggering sparse inference-tensor version-counter errors.
 	- add option runtimeReleaseGPUMemory - runtime GPU cleanup feature that executes releaseRuntimeGpuMemory(sequenceCount) after each processed sequence (processSequence)
 	- update activation/time sparse slices locally and removing per-token full global sparse tensor rewrites
 - update processColumnInferencePrediction() - split all marked sections into subfunctions
@@ -508,39 +508,40 @@ v1j (Codex IDE GPT-5.3-Codex):
 - generate CUDA_UPDATE_OBSERVED_COLUMNS_PLAN.md: think of a way of significantly optimising (Performance x10) updateObservedColumnsEfficient() using a designated CUDA kernel. The function adds dense matrix values into observed columns sparse tensors. The coalesce is causing significant slow down.
 - implement option useCUDAObservedColumnUpdateKernel - CUDA_UPDATE_OBSERVED_COLUMNS_PLAN.md ### Option 1 (recommended): C++/CUDA extension via `torch.utils.cpp_extension`
 - add option debugPrintTrainSectionTimes - print per-sequence timing breakdown for key train sections
-- [GPT-5.2-Codex:] implement option storeDatabaseInRam=True;
+[GPT-5.2-Codex:] - implement option storeDatabaseInRam=True;
 	1. if useInference=False (or useInference=True and inferenceSequenceInPrompt=False), then keep all observed columns in RAM during train. Only write to disk at the end of the train phase: complete main() "#TODO save all observed columns to disk". If useGPUdatabase=True, then the database observed columns should be stored in GPU ram, else in CPU ram.
 	2. if useInference=True and inferenceTrainFirstSequences=False, then load all observed columns from disk into RAM at the start of the inference phase: complete main() "#TODO load all observed columns from disk".
-- [GPT-5.2-Codex:] update storeDatabaseInRam=True to support the situation where useGPUdatabase != useGPUsparse. When an observed column is a) loaded into an observed column sequence during train, or b) selected and loaded during inference, the observed column connections tensor must be copied from the useGPUdatabase device to the useGPUsparse device. During train it is saved back to the useGPUdatabase device after the sequence has been processed (during inference it is not modified).
-- [GPT-5.2-Codex:] after an inference sequence has been completed, a) the deviceSparse data needs to be discarded, and b) the deviceDatabase data needs to be retained.
-- [GPT-5.2-Codex:] implement option pretrainConceptColumnsDelimitByPOSenforce=True, which applies a workaround to avoid the debugTerminateOnConceptColumnsDelimitByPOSwarning case; i.e. when consecutive concepts are detected without a delimiter between them. It modifies all tokens to the left of the right most concept token (noun) in this case as ordinary non-concept (non-noun) tokens. 
+[GPT-5.2-Codex:] - update storeDatabaseInRam=True to support the situation where useGPUdatabase != useGPUsparse. When an observed column is a) loaded into an observed column sequence during train, or b) selected and loaded during inference, the observed column connections tensor must be copied from the useGPUdatabase device to the useGPUsparse device. During train it is saved back to the useGPUdatabase device after the sequence has been processed (during inference it is not modified).
+[GPT-5.2-Codex:] - after an inference sequence has been completed, a) the deviceSparse data needs to be discarded, and b) the deviceDatabase data needs to be retained.
+[GPT-5.2-Codex:] - implement option pretrainConceptColumnsDelimitByPOSenforce=True, which applies a workaround to avoid the debugTerminateOnConceptColumnsDelimitByPOSwarning case; i.e. when consecutive concepts are detected without a delimiter between them. It modifies all tokens to the left of the right most concept token (noun) in this case as ordinary non-concept (non-noun) tokens. 
 	- ensure to use the logic from the processConceptWords() code to detect the debugTerminateOnConceptColumnsDelimitByPOSwarning case: copy the necessary logic to a pretrain pretrainConceptColumnsDelimitByPOSenforce() function.
-- [GPT-5.2-Codex:] upgrade pretrainCombineHyphenatedNouns to support unicode hyphen characters also, ie "–" (not just "-").
-- [GPT-5.2-Codex:] add addManualPosOverrides to accept all real ADP "wards" variants - "towards", "afterwards".
-- [GPT-5.2-Codex:] add option debugCountTotalParameters - count number of connections in network
-- [GPT-5.2-Codex:] apply pt.no_grad() to main()
-- MANUAL; - upgrade trainTestSet=False to support option trainSetStartOffsetSequences, where trainSetStartOffsetSequences=0 by default. It simply skips the number of sequences (trainSetStartOffsetSequences) as measured by sequenceCount. So it will not train any sequence until sequenceCount is reached.
-- MANUAL; - add pretrainConceptColumnsDelimitByPOSenforce to useBenchmarkDefaults=False
-- MANUAL; - add spacyModelName = en_core_web_sm to useBenchmarkDefaults=False:spacyPipelineOptimisations=True
-- [GPT-5.2-Codex:] implement these spacyPipelineOptimisations=True options for useBenchmarkDefaults=False;
+[GPT-5.2-Codex:] - upgrade pretrainCombineHyphenatedNouns to support unicode hyphen characters also, ie "–" (not just "-").
+[GPT-5.2-Codex:] - add addManualPosOverrides to accept all real ADP "wards" variants - "towards", "afterwards".
+[GPT-5.2-Codex:] - add option debugCountTotalParameters - count number of connections in network
+[GPT-5.2-Codex:] - apply pt.no_grad() to main()
+MANUAL; - upgrade trainTestSet=False to support option trainSetStartOffsetSequences, where trainSetStartOffsetSequences=0 by default. It simply skips the number of sequences (trainSetStartOffsetSequences) as measured by sequenceCount. So it will not train any sequence until sequenceCount is reached.
+MANUAL; - add pretrainConceptColumnsDelimitByPOSenforce to useBenchmarkDefaults=False
+MANUAL; - add spacyModelName = en_core_web_sm to useBenchmarkDefaults=False:spacyPipelineOptimisations=True
+[GPT-5.2-Codex:] - implement these spacyPipelineOptimisations=True options for useBenchmarkDefaults=False;
 	spacyPipelineSingleParse - Avoid re-parsing each sentence: reuse the original Doc and create sequence docs with Span.as_doc() (or operate directly on spans) instead of nlp(sequenceText).
 	spacyPipelineBatchSequences - batch second pass: collect sequenceText and run nlp.pipe(...) with batch_size (and n_process if CPU) to amortize overhead.
 	spacyPipelineMinimalComponents - Disable unused pipeline components at spacy.load(...) (e.g., ner) if you do not use them downstream.
 	spacyPipelineLightweightSentenceSegmentation - Use sentence segmentation only on a lightweight pipeline (sentencizer), then run full nlp.pipe only for sequences that pass quick length/whitespace filters.
-- [GPT-5.2-Codex:] - implement option debugPrintSpacySectionTimes=True: for every sequence print the execution time of a) GIAANNproto_datasets.getDatasetEntryText(), b) the first part of processArticle, and c) the second part of processArticle
-- MANUAL; -  move cuda_observed_column_update_ext to archive
-- [GPT-5.2-Codex:] - implement option inferenceReportTokenAccuracyConstrainByColumn = True to calculateInferencePredictionMatch() which only accepts a predicted token as matching the target if it resides in the target column.
-- [GPT-5.2-Codex:] - implement option SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=False (for both SANIfeatures and useSANIfeaturesAndColumns). SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=True is currently enabled by default. With both useSANIfeatures and useSANIfeaturesAndColumns, the first f segment is designated to accept predictions from all prior sequence tokens during train (when SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=True), and the remaining f segments are designated to accept predictions from exactly f tokens prior to the predicted sequence token during train. This means the the last f segment is always designated to accept predictions only from adjacent sequence tokens during train, which is used as a natural enforceDirectConnectionsSANI constraint.
-- MANUAL; - add paper/GIAANN-paper-WIP latex
-- MANUAL; - remove archive/*.*
-- MANUAL; - patch useBenchmarkDefaultsTestSet to set enforceActivationAcrossSegments:enforceLastSegmentMustBeActive
-- MANUAL; - update getConnectedColumnsForFeature/buildConnectedColumnsLookup use algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive" instead of enforceDirectConnectionsSANI for consistency
-- MANUAL; - set useBenchmarkDefaultsTestSet:inferenceUseNeuronFeaturePropertiesTime=False
-- MANUAL; - set useBenchmarkDefaultsTestSet:inferenceSegmentActivationsBoolean=False
-- MANUAL; - update Readme with GIAANNSANIengine figure
+[GPT-5.2-Codex:] - implement option debugPrintSpacySectionTimes=True: for every sequence print the execution time of a) GIAANNproto_datasets.getDatasetEntryText(), b) the first part of processArticle, and c) the second part of processArticle
+MANUAL; -  move cuda_observed_column_update_ext to archive
+[GPT-5.2-Codex:] - implement option inferenceReportTokenAccuracyConstrainByColumn = True to calculateInferencePredictionMatch() which only accepts a predicted token as matching the target if it resides in the target column.
+[GPT-5.2-Codex:] - implement option SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=False (for both SANIfeatures and useSANIfeaturesAndColumns). SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=True is currently enabled by default. With both useSANIfeatures and useSANIfeaturesAndColumns, the first f segment is designated to accept predictions from all prior sequence tokens during train (when SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=True), and the remaining f segments are designated to accept predictions from exactly f tokens prior to the predicted sequence token during train. This means the the last f segment is always designated to accept predictions only from adjacent sequence tokens during train, which is used as a natural enforceDirectConnectionsSANI constraint.
+MANUAL; - add paper/GIAANN-paper-WIP latex
+MANUAL; - remove archive/*.*
+MANUAL; - patch useBenchmarkDefaultsTestSet to set enforceActivationAcrossSegments:enforceLastSegmentMustBeActive
+MANUAL; - update getConnectedColumnsForFeature/buildConnectedColumnsLookup use algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive" instead of enforceDirectConnectionsSANI for consistency
+MANUAL; - set useBenchmarkDefaultsTestSet:inferenceUseNeuronFeaturePropertiesTime=False
+MANUAL; - set useBenchmarkDefaultsTestSet:inferenceSegmentActivationsBoolean=False
+MANUAL; - update Readme with GIAANNSANIengine figure
 
 ---
 v1k (Codex IDE GPT-5.4-Codex):
 - add proto GIAANNproto1k1a - add option useAutoresearch
-	MANUAL; - start option useAutoresearch
+	/MANUAL; - start option useAutoresearch
 - add option trainLoadExistingDatabase=False, which makes the code not load an existing database; it will clear and overwrite all database files upon startup by executing databaseFolder/clear.sh.  
+/MANUAL; - upgrade the code to support train and inference within the same python execution (executionMode="trainAndInference"). useInference is now always set True (it now just pertains to functionality rather than execution). Please reread the proto codebase and verify my upgrade. Note there were some major changes required around arrayIndexProperties. But most of the upgrade was relatively simple as it just required replacing useInference with inferenceMode.

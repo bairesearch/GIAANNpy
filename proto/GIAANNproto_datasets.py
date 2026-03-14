@@ -52,9 +52,9 @@ def loadDataset():
 		if(useLocalDatasetDownloadManual):
 			dataset = loadLocalDatasetManual()
 		else:
-			if(datasetWikipedia):
+			if(datasetType=="wikipedia"):
 				dataset = loadDatasetFromHuggingFace(False, datasetFolder)
-			elif(datasetOscar):
+			elif(datasetType=="oscar"):
 				dataset = loadDatasetFromHuggingFace(True, datasetFolder)
 			else:
 				raise RuntimeError("loadDataset error: unsupported dataset selection for non-manual local loading")
@@ -96,7 +96,7 @@ def getDatasetEntryText(datasetEntry, articleIndex):
 def applyTrainTestSetOffset(dataset):
 	updatedDataset = dataset
 	if(trainTestSet):
-		if(datasetWikipedia):
+		if(datasetType=="wikipedia"):
 			if(not isinstance(testSetRatio, float) and not isinstance(testSetRatio, int)):
 				raise RuntimeError("applyTrainTestSetOffset error: testSetRatio is not a float or int")
 			if(testSetRatio <= 0 or testSetRatio >= 1):
@@ -116,7 +116,7 @@ def applyTrainTestSetOffset(dataset):
 				updatedDataset = updatedDataset.select(range(trainTestSetArticleOffset, datasetLength))
 			else:
 				raise RuntimeError("applyTrainTestSetOffset error: dataset does not support skip or select")
-		elif(datasetOscar):
+		elif(datasetType=="oscar"):
 			if(not isinstance(testSetStartOffset, int)):
 				raise RuntimeError("applyTrainTestSetOffset error: testSetStartOffset is not an int")
 			if(not isinstance(testSetSize, int)):
@@ -160,8 +160,8 @@ if(useLocalDatasetDownloadManual):
 
 	def loadLocalDatasetManual():
 		dataset = None
-		if(not datasetWikipedia):
-			raise RuntimeError("loadLocalDatasetManual error: manual dataset download currently only supports datasetWikipedia=True")
+		if(not datasetType=="wikipedia"):
+			raise RuntimeError("loadLocalDatasetManual error: manual dataset download currently only supports datasetType==\"wikipedia\"")
 		if(datasetProcessedCacheFolder == ""):
 			raise RuntimeError("loadLocalDatasetManual error: datasetProcessedCacheFolder is empty while useLocalDatasetDownloadManual is True")
 		if(os.path.exists(datasetProcessedCacheFolder) and not os.path.isdir(datasetProcessedCacheFolder)):
@@ -234,16 +234,16 @@ if(useLocalDatasetDownloadManual):
 
 	def getDatasetRepoId():
 		repoId = datasetName
-		if(datasetWikipedia and not datasetsLibrary4plus):
+		if(datasetType=="wikipedia" and not datasetsLibrary4plus):
 			repoId = "legacy-datasets/wikipedia"
-		elif(not datasetWikipedia):
-			raise RuntimeError("getDatasetRepoId error: manual dataset download currently only supports datasetWikipedia=True")
+		elif(not datasetType=="wikipedia"):
+			raise RuntimeError("getDatasetRepoId error: manual dataset download currently only supports datasetType==\"wikipedia\"")
 		return repoId
 
 	def getDatasetFilePrefix():
 		filePrefix = "data/" + datasetCfg + "/"
-		if(datasetWikipedia and datasetsLibrary4plus):
+		if(datasetType=="wikipedia" and datasetsLibrary4plus):
 			filePrefix = datasetCfg + "/"
-		elif(not datasetWikipedia):
-			raise RuntimeError("getDatasetFilePrefix error: manual dataset download currently only supports datasetWikipedia=True")
+		elif(not datasetType=="wikipedia"):
+			raise RuntimeError("getDatasetFilePrefix error: manual dataset download currently only supports datasetType==\"wikipedia\"")
 		return filePrefix

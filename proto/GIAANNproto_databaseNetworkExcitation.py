@@ -24,8 +24,15 @@ from GIAANNproto_globalDefs import *
 import GIAANNproto_databaseNetworkFilesExcitation
 import GIAANNproto_sparseTensors
 
+def calculateArrayNumberOfProperties(inferenceMode):
+	if(inferenceMode):
+		arrayNumberOfProperties = arrayNumberOfPropertiesInference
+	else:
+		arrayNumberOfProperties = arrayNumberOfPropertiesTrain
+	return arrayNumberOfProperties
+
 class DatabaseNetworkClass():
-	def __init__(self, c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList, conceptFeaturesReferenceSetDelimiterDeterministicList, conceptFeaturesReferenceSetDelimiterProbabilisticList):
+	def __init__(self, inferenceMode, c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList, conceptFeaturesReferenceSetDelimiterDeterministicList, conceptFeaturesReferenceSetDelimiterProbabilisticList):
 		self.c = c
 		self.f = f
 		self.s = s
@@ -47,7 +54,28 @@ class DatabaseNetworkClass():
 				self.conceptFeaturesReferenceSetDelimiterProbabilisticList = conceptFeaturesReferenceSetDelimiterProbabilisticList
 			else:
 				self.conceptFeaturesReferenceSetDelimiterList = conceptFeaturesReferenceSetDelimiterList
+		self.setArrayIndexProperties(inferenceMode)
+		self.inferenceMode = inferenceMode
 
+	def setArrayIndexProperties(self, inferenceMode):
+		if(inferenceMode):
+			self.arrayNumberOfProperties = arrayNumberOfPropertiesInference
+			self.arrayIndexPropertiesStrengthIndex = arrayIndexPropertiesStrengthIndexInference
+			self.arrayIndexPropertiesPermanenceIndex = arrayIndexPropertiesPermanenceIndexInference
+			self.arrayIndexPropertiesActivationIndex = arrayIndexPropertiesActivationIndexInference
+			self.arrayIndexPropertiesTimeIndex = arrayIndexPropertiesTimeIndexInference
+			self.arrayIndexPropertiesPosIndex = arrayIndexPropertiesPosIndexInference
+			self.arrayIndexPropertiesMinWordDistanceIndex = arrayIndexPropertiesMinWordDistanceIndexInference
+		else:
+			self.arrayNumberOfProperties = arrayNumberOfPropertiesTrain
+			self.arrayIndexPropertiesStrengthIndex = arrayIndexPropertiesStrengthIndexTrain
+			self.arrayIndexPropertiesPermanenceIndex = arrayIndexPropertiesPermanenceIndexTrain
+			self.arrayIndexPropertiesActivationIndex = arrayIndexPropertiesActivationIndexTrain
+			self.arrayIndexPropertiesTimeIndex = arrayIndexPropertiesTimeIndexTrain
+			self.arrayIndexPropertiesPosIndex = arrayIndexPropertiesPosIndexTrain
+			self.arrayIndexPropertiesMinWordDistanceIndex = arrayIndexPropertiesMinWordDistanceIndexTrain
+		return
+		
 def backupGlobalArrays(databaseNetworkObject):
 	if(databaseNetworkObject.globalFeatureNeurons is None):
 		raise RuntimeError("backupGlobalArrays error: globalFeatureNeurons is None")
@@ -74,13 +102,13 @@ def ensureGlobalFeatureNeuronsSize(databaseNetworkObject, updateBackup):
 	if(databaseNetworkObject.globalFeatureNeurons is None):
 		raise RuntimeError("ensureGlobalFeatureNeuronsSize error: globalFeatureNeurons is None")
 	if(databaseNetworkObject.globalFeatureNeurons.shape[3] < databaseNetworkObject.c or databaseNetworkObject.globalFeatureNeurons.shape[4] < databaseNetworkObject.f):
-		newShape = (arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
+		newShape = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
 		databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons.coalesce()
 		databaseNetworkObject.globalFeatureNeurons = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeurons.indices(), databaseNetworkObject.globalFeatureNeurons.values(), size=newShape, dtype=arrayType, device=deviceSparse)
 		expanded = True
 	if(updateBackup and databaseNetworkObject.globalFeatureNeuronsBackup is not None):
 		if(databaseNetworkObject.globalFeatureNeuronsBackup.shape[3] < databaseNetworkObject.c or databaseNetworkObject.globalFeatureNeuronsBackup.shape[4] < databaseNetworkObject.f):
-			newBackupShape = (arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
+			newBackupShape = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
 			databaseNetworkObject.globalFeatureNeuronsBackup = databaseNetworkObject.globalFeatureNeuronsBackup.coalesce()
 			backupDevice = databaseNetworkObject.globalFeatureNeuronsBackup.device
 			databaseNetworkObject.globalFeatureNeuronsBackup = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeuronsBackup.indices(), databaseNetworkObject.globalFeatureNeuronsBackup.values(), size=newBackupShape, dtype=arrayType, device=backupDevice)
@@ -89,13 +117,14 @@ def ensureGlobalFeatureNeuronsSize(databaseNetworkObject, updateBackup):
 
 # Initialize global feature neuron arrays if lowMem is disabled
 if not lowMem:
-	def initialiseFeatureNeuronsGlobal(c, f):
+	def initialiseFeatureNeuronsGlobal(inferenceMode, c, f):
+		arrayNumberOfProperties = calculateArrayNumberOfProperties(inferenceMode)
 		globalFeatureNeurons = GIAANNproto_sparseTensors.createEmptySparseTensor((arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, c, f))
 		return globalFeatureNeurons
 		
-	def loadFeatureNeuronsGlobal(c, f):
+	def loadFeatureNeuronsGlobal(inferenceMode, c, f):
 		if GIAANNproto_databaseNetworkFilesExcitation.pathExists(globalFeatureNeuronsFileFull):
-			globalFeatureNeurons = GIAANNproto_databaseNetworkFilesExcitation.loadFeatureNeuronsGlobalFile()
+			globalFeatureNeurons = GIAANNproto_databaseNetworkFilesExcitation.loadFeatureNeuronsGlobalFile(inferenceMode)
 			if(debugLimitFeatures):
 				globalFeatureNeurons = GIAANNproto_databaseNetworkFilesExcitation.applyDebugLimitGlobalFeatureNeuronsTensor(globalFeatureNeurons, c, f, "globalFeatureNeurons")
 				if(globalFeatureNeurons.size(3) < c or globalFeatureNeurons.size(4) < f):
@@ -103,11 +132,11 @@ if not lowMem:
 					print("globalFeatureNeurons.size(4) = ", globalFeatureNeurons.size(4))
 					raise RuntimeError("loadFeatureNeuronsGlobal error: debugLimitFeatures requires limits that do not exceed saved globalFeatureNeurons dimensions")
 		else:
-			globalFeatureNeurons = initialiseFeatureNeuronsGlobal(c, f)
+			globalFeatureNeurons = initialiseFeatureNeuronsGlobal(inferenceMode, c, f)
 			#print("initialiseFeatureNeuronsGlobal: globalFeatureNeurons = ", globalFeatureNeurons)
 		return globalFeatureNeurons
 		
-def initialiseDatabaseNetwork():
+def initialiseDatabaseNetwork(inferenceMode):
 
 	conceptColumnsDict = {}  # key: lemma, value: index
 	conceptColumnsList = []  # list of concept column names (lemmas)
@@ -118,7 +147,7 @@ def initialiseDatabaseNetwork():
 	conceptFeaturesReferenceSetDelimiterList = []
 	conceptFeaturesReferenceSetDelimiterDeterministicList = []
 	conceptFeaturesReferenceSetDelimiterProbabilisticList = []
-	loadExistingDatabase = trainLoadExistingDatabase and GIAANNproto_databaseNetworkFilesExcitation.pathExists(conceptColumnsDictFile)
+	loadExistingDatabase = inferenceMode or (trainLoadExistingDatabase and GIAANNproto_databaseNetworkFilesExcitation.pathExists(conceptColumnsDictFile))
 
 	# Initialize the concept columns dictionary
 	if(loadExistingDatabase and GIAANNproto_databaseNetworkFilesExcitation.pathExists(conceptColumnsDictFile)):
@@ -171,17 +200,18 @@ def initialiseDatabaseNetwork():
 				conceptFeaturesReferenceSetDelimiterList.append(False)
 	if not lowMem:
 		if(loadExistingDatabase):
-			globalFeatureNeurons = loadFeatureNeuronsGlobal(c, f)
+			globalFeatureNeurons = loadFeatureNeuronsGlobal(inferenceMode, c, f)
 		else:
-			globalFeatureNeurons = initialiseFeatureNeuronsGlobal(c, f)
+			globalFeatureNeurons = initialiseFeatureNeuronsGlobal(inferenceMode, c, f)
 	else:
 		globalFeatureNeurons = None
 
 	s = arrayNumberOfSegments
-	p = arrayNumberOfProperties
+	p = calculateArrayNumberOfProperties(inferenceMode)
 		
-	databaseNetworkObject = DatabaseNetworkClass(c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList, conceptFeaturesReferenceSetDelimiterDeterministicList, conceptFeaturesReferenceSetDelimiterProbabilisticList)
-	if(debugPrintTotalFeatures):
+	databaseNetworkObject = DatabaseNetworkClass(inferenceMode, c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList, conceptFeaturesReferenceSetDelimiterDeterministicList, conceptFeaturesReferenceSetDelimiterProbabilisticList)
+	
+	if(printTotalFeatures):
 		print("initialiseDatabaseNetwork: c = ", databaseNetworkObject.c, ", f = ", databaseNetworkObject.f)
 	
 	return databaseNetworkObject
@@ -227,14 +257,14 @@ class ObservedColumn:
 				self.featureIndexToWord[featureIndex] = featureWord
 				self.nextFeatureIndex += 1
 					
-	@staticmethod
-	def initialiseFeatureNeurons(f):
-		featureNeurons = GIAANNproto_sparseTensors.createEmptySparseTensor((arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, f))
+	#@staticmethod
+	def initialiseFeatureNeurons(self, f):
+		featureNeurons = GIAANNproto_sparseTensors.createEmptySparseTensor((self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, f))
 		return featureNeurons
 
-	@staticmethod
-	def initialiseFeatureConnections(c, f):
-		featureConnections = GIAANNproto_sparseTensors.createEmptySparseTensor((arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, f, c, f))
+	#@staticmethod
+	def initialiseFeatureConnections(self, c, f):
+		featureConnections = GIAANNproto_sparseTensors.createEmptySparseTensor((self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, f, c, f))
 		return featureConnections
 	
 	def resizeConceptArrays(self, newC):
@@ -517,11 +547,11 @@ if(debugLimitFeatures):
 
 #if(debugCountTotalParameters):
 def debugCountTotalParametersRun(databaseNetworkObject):
-	assert arrayIndexPropertiesEfficient 	#only arrayIndexPropertiesStrengthIndex stored in database, all tensors are coalesced
+	assert arrayIndexPropertiesEfficient 	#only databaseNetworkObject.arrayIndexPropertiesStrengthIndex stored in database, all tensors are coalesced
 	if(databaseNetworkObject is None):
 		raise RuntimeError("debugCountTotalParametersRun error: databaseNetworkObject is None")
-	if(arrayIndexPropertiesStrengthIndex is None):
-		raise RuntimeError("debugCountTotalParametersRun error: arrayIndexPropertiesStrengthIndex is None")
+	if(databaseNetworkObject.arrayIndexPropertiesStrengthIndex is None):
+		raise RuntimeError("debugCountTotalParametersRun error: databaseNetworkObject.arrayIndexPropertiesStrengthIndex is None")
 	totalColumns = len(databaseNetworkObject.conceptColumnsList)
 	if(totalColumns <= 0):
 		raise RuntimeError("debugCountTotalParametersRun error: conceptColumnsList is empty")
@@ -543,17 +573,17 @@ def debugCountTotalParametersRun(databaseNetworkObject):
 			featureConnections = observedColumn.featureConnections
 			if(featureConnections is None):
 				raise RuntimeError("debugCountTotalParametersRun error: featureConnections is None for conceptIndex = " + str(conceptIndex))
-			if(arrayIndexPropertiesStrengthIndex < 0 or arrayIndexPropertiesStrengthIndex >= featureConnections.shape[0]):
-				raise RuntimeError("debugCountTotalParametersRun error: arrayIndexPropertiesStrengthIndex out of range")
+			if(databaseNetworkObject.arrayIndexPropertiesStrengthIndex < 0 or databaseNetworkObject.arrayIndexPropertiesStrengthIndex >= featureConnections.shape[0]):
+				raise RuntimeError("debugCountTotalParametersRun error: databaseNetworkObject.arrayIndexPropertiesStrengthIndex out of range")
 			columnConnections = countNonZero(featureConnections)
 			'''
 			#your original codex original code:
 			if(featureConnections.is_sparse):
 				featureConnections = featureConnections.coalesce()
-				strengthConnections = featureConnections[arrayIndexPropertiesStrengthIndex].coalesce()
+				strengthConnections = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex].coalesce()
 				columnConnections = int(strengthConnections.values().numel())
 			else:
-				strengthConnections = featureConnections[arrayIndexPropertiesStrengthIndex]
+				strengthConnections = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 				columnConnections = int(pt.count_nonzero(strengthConnections).item())
 			'''
 			totalConnections += columnConnections

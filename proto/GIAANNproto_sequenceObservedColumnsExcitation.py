@@ -25,7 +25,7 @@ import GIAANNproto_sparseTensors
 import GIAANNproto_sequenceConcepts
 if(useCUDAObservedColumnUpdateKernel):
 	import GIAANNproto_cudaObservedColumnUpdate
-
+	
 def debugPrintConnectionSamples(label, indices, values, maxSamples=5):
 	numEntries = indices.shape[1]
 	print(f"\tsequenceObservedColumns debug: {label}: entries={numEntries}")
@@ -113,7 +113,7 @@ class SequenceObservedColumns:
 			self.featureConnectionsOriginal = self.featureConnections.clone()
 
 			# Populate arrays with data from observedColumnsDict (required for inference)
-			if(useInference):
+			if(inferenceMode):
 				if(trainSequenceObservedColumnsMatchSequenceWords):
 					self.populateArrays(tokens, self.sequenceObservedColumnsDict)
 				else:
@@ -134,7 +134,6 @@ class SequenceObservedColumns:
 			self.featureConnections = None
 			self.featureNeuronsOriginal = None
 			self.featureConnectionsOriginal = None
-
 			
 	def identifyObservedColumnFeatureWords(self, tokens, observedColumn):
 		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
@@ -178,15 +177,15 @@ class SequenceObservedColumns:
 		#python requires ordered sets
 		lst = list(dict.fromkeys(lst))
 		return lst
-				
-	@staticmethod
-	def initialiseFeatureNeuronsSequence(cs, fs):
-		featureNeurons = pt.zeros(arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, dtype=arrayType)
+		
+	#@staticmethod
+	def initialiseFeatureNeuronsSequence(self, cs, fs):
+		featureNeurons = pt.zeros(self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, dtype=arrayType)
 		return featureNeurons
 
-	@staticmethod
-	def initialiseFeatureConnectionsSequence(cs, fs):
-		featureConnections = pt.zeros(arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs, dtype=arrayType)
+	#@staticmethod
+	def initialiseFeatureConnectionsSequence(self, cs, fs):
+		featureConnections = pt.zeros(self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs, dtype=arrayType)
 		return featureConnections
 
 	def computeColumnLocalFeatureMaps(self, tokens):
@@ -262,6 +261,7 @@ class SequenceObservedColumns:
 		return result
 	
 	def populateArrays(self, tokens, sequenceObservedColumnsDict):
+		databaseNetworkObject = self.databaseNetworkObject
 		#print("\n\n\n\n\npopulate_arrays:")
 		
 		# Optimized code for collecting indices and data for feature neurons
@@ -447,7 +447,7 @@ class SequenceObservedColumns:
 			).to_dense()
 			self.featureConnectionsOriginal = self.featureConnections.clone()
 			if(debugDrawNeuronActivations):
-				strengthSum = self.featureConnections[arrayIndexPropertiesStrengthIndex].sum().item()
+				strengthSum = self.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex].sum().item()
 	
 	def updateObservedColumnsWrapper(self, inference=False):
 		self.debugInferenceActive = inference
@@ -459,6 +459,7 @@ class SequenceObservedColumns:
 			self.updateObservedColumns(self.observedColumnsDict2, inference, mode="default")
 
 	def debugPrintPersistedColumnSummary(self, mode):
+		databaseNetworkObject = self.databaseNetworkObject
 		debugEnabled = debugPrintSequenceObservedColumnsConnections
 		if(debugEnabled):
 			targetLemma = "movement"
@@ -466,7 +467,7 @@ class SequenceObservedColumns:
 			if(observedColumn is None):
 				print(f"debugPersistedColumn ({mode}): lemma '{targetLemma}' not in observedColumnsDict")
 			else:
-				connectionsStrength = observedColumn.featureConnections[arrayIndexPropertiesStrengthIndex]
+				connectionsStrength = observedColumn.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 				if(connectionsStrength.is_sparse):
 					connectionsStrength = connectionsStrength.to_dense()
 				outgoingCount = 0
@@ -515,6 +516,7 @@ class SequenceObservedColumns:
 			self.updateObservedColumnsVerbose(sequenceObservedColumnsDict, mode)
 	
 	def updateObservedColumnsVerbose(self, sequenceObservedColumnsDict, mode):
+		databaseNetworkObject = self.databaseNetworkObject
 		# Update observed columns with data from sequence arrays
 
 		inferenceConceptUpdateCounts = self.inferenceConceptUpdateCounts if getattr(self, "debugInferenceActive", False) else None
@@ -552,29 +554,29 @@ class SequenceObservedColumns:
 		if(addPropertiesEnabled):
 			addPropertyIndicesList = []
 			if(arrayIndexPropertiesStrength):
-				addPropertyIndicesList.append(arrayIndexPropertiesStrengthIndex)
+				addPropertyIndicesList.append(databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
 			if(arrayIndexPropertiesPermanence):
-				addPropertyIndicesList.append(arrayIndexPropertiesPermanenceIndex)
+				addPropertyIndicesList.append(databaseNetworkObject.arrayIndexPropertiesPermanenceIndex)
 			addPropertyIndices = pt.tensor(addPropertyIndicesList, dtype=pt.long)
-			addPropertyMaskLookup = self.buildMaskLookup(arrayNumberOfProperties, addPropertyIndices.to(featureNeuronsDeltaSparse.device), featureNeuronsDeltaSparse.device)
+			addPropertyMaskLookup = self.buildMaskLookup(self.databaseNetworkObject.arrayNumberOfProperties, addPropertyIndices.to(featureNeuronsDeltaSparse.device), featureNeuronsDeltaSparse.device)
 		posPropertyMaskLookupFeature = None
 		posPropertyMaskLookupConnection = None
 		posPropertyIndices = None
 		if(arrayIndexPropertiesPos):
-			posPropertyIndices = pt.tensor([arrayIndexPropertiesPosIndex], dtype=pt.long)
-			posPropertyMaskLookupFeature = self.buildMaskLookup(arrayNumberOfProperties, posPropertyIndices.to(featureNeuronsDeltaSparse.device), featureNeuronsDeltaSparse.device)
+			posPropertyIndices = pt.tensor([databaseNetworkObject.arrayIndexPropertiesPosIndex], dtype=pt.long)
+			posPropertyMaskLookupFeature = self.buildMaskLookup(self.databaseNetworkObject.arrayNumberOfProperties, posPropertyIndices.to(featureNeuronsDeltaSparse.device), featureNeuronsDeltaSparse.device)
 		if(replacePropertiesEnabled):
 			replacePropertyMaskLookup = None
 			replacePropertyIndicesList = []
 			if(arrayIndexPropertiesActivationCreate):
-				replacePropertyIndicesList.append(arrayIndexPropertiesActivationIndex)
+				replacePropertyIndicesList.append(databaseNetworkObject.arrayIndexPropertiesActivationIndex)
 			if(arrayIndexPropertiesTime):
-				replacePropertyIndicesList.append(arrayIndexPropertiesTimeIndex)
+				replacePropertyIndicesList.append(databaseNetworkObject.arrayIndexPropertiesTimeIndex)
 			replacePropertyIndices = pt.tensor(replacePropertyIndicesList, dtype=pt.long)
-			replacePropertyMaskLookup = self.buildMaskLookup(arrayNumberOfProperties, replacePropertyIndices.to(featureNeuronsDeltaSparse.device), featureNeuronsDeltaSparse.device)
+			replacePropertyMaskLookup = self.buildMaskLookup(self.databaseNetworkObject.arrayNumberOfProperties, replacePropertyIndices.to(featureNeuronsDeltaSparse.device), featureNeuronsDeltaSparse.device)
 		if(arrayIndexPropertiesMinWordDistance):
-			minPropertyIndices = pt.tensor([arrayIndexPropertiesMinWordDistanceIndex], dtype=pt.long)
-			minPropertyMaskLookup = self.buildMaskLookup(arrayNumberOfProperties, minPropertyIndices.to(featureConnectionsCurrentSparse.device), featureConnectionsCurrentSparse.device)
+			minPropertyIndices = pt.tensor([databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex], dtype=pt.long)
+			minPropertyMaskLookup = self.buildMaskLookup(self.databaseNetworkObject.arrayNumberOfProperties, minPropertyIndices.to(featureConnectionsCurrentSparse.device), featureConnectionsCurrentSparse.device)
 
 		featureIndicesInObserved, fIdxTensor = self.getObservedColumnFeatureIndices()
 		fIdxTensorDevice = fIdxTensor.to(featureNeuronsDeltaSparse.device)
@@ -589,7 +591,7 @@ class SequenceObservedColumns:
 		sequenceConceptIndicesUnique = pt.unique(sequenceConceptIndices)
 		sequenceConceptMaskLookup = self.buildMaskLookup(self.databaseNetworkObject.c, sequenceConceptIndicesUnique, connectionDevice)
 		if(arrayIndexPropertiesPos):
-			posPropertyMaskLookupConnection = self.buildMaskLookup(arrayNumberOfProperties, posPropertyIndices.to(connectionDevice), connectionDevice)
+			posPropertyMaskLookupConnection = self.buildMaskLookup(self.databaseNetworkObject.arrayNumberOfProperties, posPropertyIndices.to(connectionDevice), connectionDevice)
 
 		if not lowMem:
 			globalFeatureNeurons = self.databaseNetworkObject.globalFeatureNeurons.coalesce()
@@ -620,12 +622,12 @@ class SequenceObservedColumns:
 			if(replacePropertiesEnabled):
 				activationUpdateBranches = None
 				preserveActivationOnReplace = False
-				if(self.debugInferenceActive and multipleDendriticBranches and updateCount is not None and updateCount > 1 and arrayIndexPropertiesActivationIndex is not None):
+				if(self.debugInferenceActive and multipleDendriticBranches and updateCount is not None and updateCount > 1 and databaseNetworkObject.arrayIndexPropertiesActivationIndex is not None):
 					preserveActivationOnReplace = True
-				if(self.debugInferenceActive and multipleDendriticBranches and arrayIndexPropertiesActivationIndex is not None):
+				if(self.debugInferenceActive and multipleDendriticBranches and databaseNetworkObject.arrayIndexPropertiesActivationIndex is not None):
 					activationUpdates = featureUpdatesReplace.coalesce()
 					activationUpdateIndices = activationUpdates.indices()
-					activationUpdateMask = (activationUpdateIndices[0] == arrayIndexPropertiesActivationIndex)
+					activationUpdateMask = (activationUpdateIndices[0] == databaseNetworkObject.arrayIndexPropertiesActivationIndex)
 					if(not lowMem):
 						activationUpdateMask = activationUpdateMask & (activationUpdateIndices[3] == conceptIndex)
 					if(activationUpdateMask.any()):
@@ -638,11 +640,11 @@ class SequenceObservedColumns:
 				else:
 					removeMask = replacePropertyMaskLookup[targetIndices[0]] & (targetIndices[3] == conceptIndex) & observedFeatureMaskLookup[targetIndices[4]]
 				if(preserveActivationOnReplace):
-					removeMask = removeMask & (targetIndices[0] != arrayIndexPropertiesActivationIndex)
-				elif(self.debugInferenceActive and multipleDendriticBranches and arrayIndexPropertiesActivationIndex is not None):
+					removeMask = removeMask & (targetIndices[0] != databaseNetworkObject.arrayIndexPropertiesActivationIndex)
+				elif(self.debugInferenceActive and multipleDendriticBranches and databaseNetworkObject.arrayIndexPropertiesActivationIndex is not None):
 					if(activationUpdateBranches is not None and activationUpdateBranches.numel() > 0):
 						activationBranchLookup = self.buildMaskLookup(numberOfDendriticBranches, activationUpdateBranches.to(targetIndices.device), targetIndices.device)
-						activationMask = (targetIndices[0] == arrayIndexPropertiesActivationIndex)
+						activationMask = (targetIndices[0] == databaseNetworkObject.arrayIndexPropertiesActivationIndex)
 						if(lowMem):
 							activationMask = activationMask & observedFeatureMaskLookup[targetIndices[3]]
 						else:
@@ -650,7 +652,7 @@ class SequenceObservedColumns:
 						activationBranchMask = activationMask & activationBranchLookup[targetIndices[1]]
 						removeMask = (removeMask & pt.logical_not(activationMask)) | activationBranchMask
 					else:
-						removeMask = removeMask & (targetIndices[0] != arrayIndexPropertiesActivationIndex)
+						removeMask = removeMask & (targetIndices[0] != databaseNetworkObject.arrayIndexPropertiesActivationIndex)
 				keepMask = pt.logical_not(removeMask)
 				filteredTargetIndices = targetIndices[:, keepMask]
 				filteredTargetValues = targetValues[keepMask]
@@ -704,11 +706,12 @@ class SequenceObservedColumns:
 			self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
 
 	def updateObservedColumnsEfficient(self, sequenceObservedColumnsDict, mode):
+		databaseNetworkObject = self.databaseNetworkObject
 		if not arrayIndexPropertiesStrength:
 			return
 
-		featureNeuronsDelta = self.featureNeurons[arrayIndexPropertiesStrengthIndex] - self.featureNeuronsOriginal[arrayIndexPropertiesStrengthIndex]
-		featureConnectionsDelta = self.featureConnections[arrayIndexPropertiesStrengthIndex] - self.featureConnectionsOriginal[arrayIndexPropertiesStrengthIndex]
+		featureNeuronsDelta = self.featureNeurons[databaseNetworkObject.arrayIndexPropertiesStrengthIndex] - self.featureNeuronsOriginal[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
+		featureConnectionsDelta = self.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex] - self.featureConnectionsOriginal[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 		if(useGPUsparseStrict and not useGPUsparse):
 			featureNeuronsDelta = featureNeuronsDelta.to(deviceSparse)
 			featureConnectionsDelta = featureConnectionsDelta.to(deviceSparse)
@@ -749,7 +752,7 @@ class SequenceObservedColumns:
 		connectionMinIndicesSorted = None
 		connectionMinValuesSorted = None
 		if(arrayIndexPropertiesMinWordDistance):
-			connectionMin = self.featureConnections[arrayIndexPropertiesMinWordDistanceIndex]
+			connectionMin = self.featureConnections[databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex]
 			connectionMinSparse = connectionMin.to_sparse()
 			if not useGPUsparse:
 				connectionMinSparse = connectionMinSparse.to(deviceSparse)
@@ -783,7 +786,7 @@ class SequenceObservedColumns:
 				start, end = featureRange
 				featureUpdateIndices = featureIndicesSorted[:, start:end]
 				featureUpdateValues = featureValuesSorted[start:end]
-				featureUpdates = self.buildFeaturePropertyUpdateSparse(featureUpdateIndices, featureUpdateValues, arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, featureTargetSize, insertConceptIndex=None if lowMem else conceptIndex)
+				featureUpdates = self.buildFeaturePropertyUpdateSparse(featureUpdateIndices, featureUpdateValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, featureTargetSize, insertConceptIndex=None if lowMem else conceptIndex)
 				if lowMem:
 					featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
 				else:
@@ -806,7 +809,7 @@ class SequenceObservedColumns:
 				start, end = connectionRange
 				connectionUpdateIndices = connectionIndicesSorted[:, start:end]
 				connectionUpdateValues = connectionValuesSorted[start:end]
-				connectionUpdates = self.buildConnectionPropertyUpdateSparse(connectionUpdateIndices, connectionUpdateValues, arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesTensor, connectionTargetSize)
+				connectionUpdates = self.buildConnectionPropertyUpdateSparse(connectionUpdateIndices, connectionUpdateValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesTensor, connectionTargetSize)
 				connectionTargetSparse = self.addSparseUpdateNonNegative(connectionTargetSparse, connectionUpdates)
 
 			if(arrayIndexPropertiesMinWordDistance):
@@ -815,7 +818,7 @@ class SequenceObservedColumns:
 					start, end = minRange
 					minUpdateIndices = connectionMinIndicesSorted[:, start:end]
 					minUpdateValues = connectionMinValuesSorted[start:end]
-					minUpdates = self.buildConnectionPropertyUpdateSparse(minUpdateIndices, minUpdateValues, arrayIndexPropertiesMinWordDistanceIndex, featureIndicesObservedConnectionDevice, conceptIndicesTensor, connectionTargetSize)
+					minUpdates = self.buildConnectionPropertyUpdateSparse(minUpdateIndices, minUpdateValues, databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex, featureIndicesObservedConnectionDevice, conceptIndicesTensor, connectionTargetSize)
 					connectionTargetSparse = self.applySparseMinUpdate(connectionTargetSparse, minUpdates)
 
 			observedColumn.featureConnections = connectionTargetSparse

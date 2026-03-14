@@ -265,9 +265,12 @@ def getObservedColumn(databaseNetworkObject, observedColumnsDict, columnIndex):
 
 
 def getConnectedColumnsForFeature(observedColumn, featureIndex, includeFeatureDetails=False):
+	if(not hasattr(observedColumn, "databaseNetworkObject") or observedColumn.databaseNetworkObject is None):
+		raise RuntimeError("getConnectedColumnsForFeature error: observedColumn.databaseNetworkObject is required")
+	databaseNetworkObject = observedColumn.databaseNetworkObject
 	if(featureIndex is None or featureIndex < 0):
 		return [], {} if includeFeatureDetails else None
-	featureConnectionsStrength = observedColumn.featureConnections[arrayIndexPropertiesStrengthIndex]
+	featureConnectionsStrength = observedColumn.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 	featureConnectionsStrength = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsStrength, 2, featureIndex)
 	featureConnectionsStrength = featureConnectionsStrength.coalesce()
 	if(featureConnectionsStrength._nnz() == 0):
