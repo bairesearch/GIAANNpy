@@ -2,6 +2,8 @@
 layout: page
 title: Paper
 permalink: /paper/
+image: assets/giaann-paper-twitter.png
+image_alt: GIAANN Paper (WIP)
 ---
 
 ## GIAANN Paper (WIP)
