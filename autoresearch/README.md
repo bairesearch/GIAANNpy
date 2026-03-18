@@ -11,7 +11,7 @@ The primary GIAANN files used by autoresearch:
 - ** proto/*.py the files the agent edits. Contains the full GIAANN proto model. Everything is fair game: architecture, hyperparameters, etc. **These files are edited and iterated on by the agent**.
 - **`program.md`** baseline instructions for one agent. Point your agent here and let it go. **This file is edited and iterated on by the human**.
 
-By design, training runs for exactly 5000 sequences (**approx 5-minute time budget**). The eval metric is top-1 accuracy (next word prediction).
+By design, training runs for exactly 5000 sequences (**fixed data budget**). The eval metric is top-1 accuracy (next word prediction).
 
 ## Documentation
 
@@ -43,7 +43,7 @@ program.md      agent instructions
 ## Design choices
 
 - **Limited files to modify.** The agent only touches the ../proto files. This keeps the scope manageable and diffs reviewable.
-- **Fixed time budget.** With useAutoresearch=True, training always runs for exactly trainMaxSequences=5000 sequences (approx 5 minutes) and datasetOscar=True, regardless of your specific platform. This means you can expect approx 12 experiments/hour and approx 100 experiments while you sleep. There are two upsides of this design decision. First, this makes experiments directly comparable regardless of what the agent changes (architecture, etc). Second, this means that autoresearch will find the most optimal model for your platform for that input data budget.
+- **Fixed data budget.** With useAutoresearch=True, training always runs for exactly trainMaxSequences=5000 sequences and datasetOscar=True. Taking approx 5 minutes per experiment, this means you can expect approx 12 experiments/hour and approx 100 experiments while you sleep. There are two upsides of this design decision. First, this makes experiments directly comparable regardless of what the agent changes (architecture, etc). Second, this means that autoresearch will find the most optimal model for your platform for that input data budget.
 - **Self-contained.** No external dependencies beyond PyTorch and a few small packages. No distributed training, no complex configs. One GPU, one metric.
 
 ## Platform support

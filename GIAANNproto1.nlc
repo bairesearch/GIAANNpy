@@ -540,8 +540,9 @@ MANUAL; - set useBenchmarkDefaultsTestSet:inferenceSegmentActivationsBoolean=Fal
 MANUAL; - update Readme with GIAANNSANIengine figure
 
 ---
-v1k (Codex IDE GPT-5.4-Codex):
+v1k (Codex IDE GPT-5.4):
 - add proto GIAANNproto1k1a - add option useAutoresearch
 	/MANUAL; - start option useAutoresearch
 - add option trainLoadExistingDatabase=False, which makes the code not load an existing database; it will clear and overwrite all database files upon startup by executing databaseFolder/clear.sh.  
 /MANUAL; - upgrade the code to support train and inference within the same python execution (executionMode="trainAndInference"). useInference is now always set True (it now just pertains to functionality rather than execution). Please reread the proto codebase and verify my upgrade. Note there were some major changes required around arrayIndexProperties. But most of the upgrade was relatively simple as it just required replacing useInference with inferenceMode.
+MANUAL; - update oscar training-set eval inferencePromptFileName

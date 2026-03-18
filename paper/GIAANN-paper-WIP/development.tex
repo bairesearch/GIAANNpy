@@ -1,0 +1,61 @@
+\section{Development}\label{sec:development}
+
+GIAANN was developed as a neuralisation of GIA: the symbolic graph machinery of GIA was retained
+(substance/action/condition structure, reference delimiters, and concept-level composition), but
+execution was shifted from explicit symbolic traversal to sparse neural activation and local synaptic
+updates \citep{baxterai_gia,bairesearch2017GIA}. The objective was to preserve GIA's interpretable
+semantics while introducing brain-inspired mechanisms for continual learning, scalable memory, and
+emergent sequence prediction.
+
+\subsection{GIA History}
+
+The General Intelligence Algorithm (GIA) originated as an explicitly symbolic architecture and was
+released publicly through the original OpenGIA SourceForge codebase in 2012
+\citep{bairesearch2022OpenGIAsourceforge} (and GitHub in 2017 \citep{bairesearch2017GIA}). That implementation established the core representational
+scheme later retained by GIAANN: compositional semantic structures built from substance, action, and
+condition roles; explicit reference delimiters for binding and lookup; and graph-based mechanisms for
+storing and traversing concept/event relations.
+
+The preliminary Australian provisional patent drafts (1B and 1C) documented this early design as a
+general method and computer-system formulation, clarifying the intended scope and operational
+workflow of the algorithm \citep{bairesearch2022giaPatentAUprovisional1B,bairesearch2022giaPatentAUprovisional1C}.
+Together, the released code and patent drafts provide the historical baseline for GIA as a
+semantic-first, interpretable reasoning system, from which the later neuralisation into GIAANN was
+developed.
+
+\subsection{From GIA to a Brain-Inspired Neural Substrate}
+
+The early architecture separated a semantic concept network from an episodic instance network,
+reflecting GIA's distinction between stable concept knowledge and context-bound events. Over
+subsequent revisions, this evolved from a rigid instance ledger toward synaptic event encoding:
+episodes became increasingly represented by connection strengths and activation traces over concept
+neurons. This was a key transition from symbolic storage to neural memory while keeping the same
+conceptual ontology.
+
+Known brain functioning informed each major design choice. Sensory-like feature streams (auditory
+and visual) were treated as lower-level inputs converging into a concept integration pathway.
+Reference generation (binary/temporal coding) played a thalamus-like indexing role for binding
+distributed features into addressable concepts. Later, cortical columnar ideas motivated semantic
+concept columns, and sparse competition with selective firing aligned with winner-take-all and
+dendritic-style conditional integration \citep{mountcastle1997columnar,london2005dendriticComputation,maass2000winnerTakeAll}.
+
+\subsection{Chronological Architecture Milestones (Appendix References)}
+
+The appendix development diagrams show the progression below (oldest to newest):
+
+\begin{itemize}
+    \item \Cref{fig:dev-2017-initial-core}: initial symbolic core with semantic concepts, episodic instances, and binary reference coding over axonal conduits.
+    \item \Cref{fig:dev-2019-event-retrieval}: event retrieval refinement with feedback encoding and rate-coded lookup from partial cues (subject/action/object/place-time subsets).
+    \item \Cref{fig:dev-2021-biomodel-mapping}: explicit bio-model mapping across thalamus, cortex, striatum, and limbic/hippocampal roles, including design rationale and predicted serial-access constraints.
+    \item \Cref{fig:dev-2021-synaptic-encoding}: transition toward storing episodic information in synapses associated with substance/concept neurons, with a consolidated concept-integrator/reference-generator pathway.
+    \item \Cref{fig:dev-2024-columns-routing}: introduction of semantic concept columns and temporary unassociated nodes, with inter-column delimiter features (verbs and prepositions) used as routing constraints.
+    \item \Cref{fig:dev-2024-feature-split-gating}: explicit split between inter-column and intra-column features (e.g., qualities), plus syntactic-validity gating so invalid nodes/links remain weak or temporary.
+\end{itemize}
+
+\subsection{Resulting GIAANN Design}
+
+Across these stages, GIAANN preserved GIA's semantic compositionality while increasingly grounding
+computation in biologically inspired principles: modular columns, sparse competitive activation,
+temporally indexed references, and distributed synaptic memory. The result is not a purely symbolic
+parser and not a standard backpropagation ANN, but a semantic-first, brain-inspired architecture for
+interpretable continual learning and sequence-level reasoning

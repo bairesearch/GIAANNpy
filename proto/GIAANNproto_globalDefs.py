@@ -63,6 +63,7 @@ def printe(str):
 	
 	
 #Benchmarking;
+useBenchmark = False	#default: False	#orig: False	#use benchmark file naming schemes and evals
 useBenchmarkDefaults = False	#default: False	#orig: True
 if(useAutoresearch):
 	useBenchmarkDefaultsTestSet = True	#True: eval test set
@@ -75,7 +76,7 @@ else:
 inferenceReportTokenAccuracyConstrainByColumn = False	#default: False	#orig: False
 if(useBenchmarkDefaultsTestSet):
 	inferenceEvaluateTestSet = True
-	#inferenceSegmentTiming = "none"	#optimum
+	#inferenceSegmentTiming = "none"	#~optimum
 	inferenceSegmentTiming = "biased"	#default
 	#inferenceSegmentTiming = "exact"
 	#inferenceSegmentTiming = "seq"
@@ -84,9 +85,47 @@ if(useBenchmarkDefaultsTestSet):
 	#inferenceActivationsType = "intf+c" 	#~optimum
 else:
 	inferenceEvaluateTestSet = False
-	inferenceSegmentTiming = "exact"
-	inferenceActivationsType = "boolf"
+	#inferenceSegmentTiming = "none"
+	#inferenceSegmentTiming = "biased"
+	inferenceSegmentTiming = "exact"		#default
+	#inferenceSegmentTiming = "seq"
+	inferenceActivationsType = "boolf"	#default
+	#inferenceActivationsType = "boolf+c"
+	#inferenceActivationsType = "intf+c"
 	
+
+#Multisentence predictions;
+multisentencePredictions = False	#default: False	#each sequence comprises multiple sentences	#requires higher GPU RAM for train
+if(multisentencePredictions):
+	numSentencesPerSequence = 3 #default: 3
+else:
+	numSentencesPerSequence = 1
+
+
+#Dendritic branches;
+multipleDendriticBranches = True	#default: True	#orig: False
+if(multipleDendriticBranches):
+	randomlyAssignBranches = False	#optional	#orig: False
+	if(randomlyAssignBranches):
+		numberOfDendriticBranches = 5
+	else:
+		numberOfDendriticBranches = 2	#default: 5, 2	#affects train+inference RAM
+else:
+	numberOfDendriticBranches = 1
+	randomlyAssignBranches = False
+
+
+#Dataset type;
+if(useQuickExecution):
+	datasetType = "textfile"
+elif(useAutoresearch):
+	datasetType = "oscar"
+else:
+	#datasetType = "wikipedia"
+	datasetType = "oscar"
+	#datasetType = "textfile"
+
+
 #Database;
 if(useAutoresearch):
 	trainMaxSequences = 5000
@@ -97,21 +136,29 @@ if(useQuickExecution):
 elif(useAutoresearch):
 	databaseFolder = "/media/user/ssdpro/GIAANN/databaseAutoresearch"
 else:
-	databaseFolder = "/media/user/ssdpro/GIAANN/database" + str(trainMaxSequences) + "-numSeedTokensInference" + str(numSeedTokensInference)
+	if(useBenchmark):
+		#generate benchmark filename:
+		if(multipleDendriticBranches and randomlyAssignBranches):
+			benchmarkAblationText = "-randomlyAssignBranches" + str(numberOfDendriticBranches)
+		elif(multisentencePredictions):
+			benchmarkAblationText = "-multisentencePredictions"
+		elif(spacyPipelineOptimisations):
+			benchmarkAblationText = "-spacyPipelineOptimisations"
+		else:
+			benchmarkAblationText = ""
+		if(datasetType=="wikipedia"):
+			databaseTypeText = "database"
+		elif(datasetType=="oscar"):
+			databaseTypeText = "databaseOscar"
+		databaseFolder = "/media/ssdpro/ssdpro/GIAANN/" + databaseTypeText + str(trainMaxSequences) + "-numSeedTokensInference" + str(numSeedTokensInference) + benchmarkAblationText		#useSANIfeaturesAndColumns
+	else:
+		databaseFolder = "../database"	#default: "../database/"
 databaseFolder += "/"
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 
 
 #Dataset;
-if(useQuickExecution):
-	datasetType = "textfile"
-elif(useAutoresearch):
-	datasetType = "oscar"
-else:
-	datasetType = "wikipedia"
-	#datasetType = "oscar"
-	#datasetType = "textfile"
 datasetsLibrary4plus = False	#default: False	#orig: False	#set False during dev to maintain benchmark consistency
 trainTestSet = False	#default: False	#only set True to generate an inference test set (with printTrainSequenceRaw=True)
 if(useQuickExecution):
@@ -172,13 +219,6 @@ if(not datasetType=="textfile"):
 else:
 	trainSetStartOffsetSequences = 0
 
-#Multisentence predictions;
-multisentencePredictions = False	#default: False	#each sequence comprises multiple sentences	#requires higher GPU RAM for train
-if(multisentencePredictions):
-	numSentencesPerSequence = 3 #default: 3
-else:
-	numSentencesPerSequence = 1
-
 
 #RAM;
 useGPUdense = True	#default: True
@@ -221,19 +261,6 @@ if(useInference):
 		inferenceUseNeuronFeaturePropertiesTimeExact = False
 	else:
 		printe("inferenceSegmentTiming error")
-
-
-#Dendritic branches;
-multipleDendriticBranches = True	#default: True	#orig: False
-if(multipleDendriticBranches):
-	randomlyAssignBranches = False	#optional	#orig: False
-	if(randomlyAssignBranches):
-		numberOfDendriticBranches = 5
-	else:
-		numberOfDendriticBranches = 2	#default: 5, 2	#affects train+inference RAM
-else:
-	numberOfDendriticBranches = 1
-	randomlyAssignBranches = False
 
 
 #Array properties (disable to optimise train speed/RAM during train);
@@ -488,6 +515,7 @@ printTrainSequenceCount = False	#print each training sequence count
 if(not useAutoresearch):
 	if(datasetType=="oscar"):
 		printTrainSequenceCount = True	#non-visible characters affect terminal print consistency
+		#printTrainSequenceRaw = True
 	elif(datasetType=="wikipedia"):
 		printTrainSequenceDefault = True
 		
@@ -589,12 +617,22 @@ if(useInference):
 				if(inferenceEvaluateTestSet):
 					inferencePromptFileName = 'inference_prompt.txt.longTestOscarMultiSentence'
 				else:
-					inferencePromptFileName = 'inference_prompt.txt.longTrainOscarMultiSentence'
+					#ensure within distribution trainset;
+					if(not useBenchmarkDefaults):
+						inferencePromptFileName = 'inference_prompt.txt.longTrainOscarMultiSentence'
+					elif(spacyPipelineOptimisations):
+						printe("datasetType==oscar multisentencePredictions was trained with useBenchmarkDefaults=False")
+					else:
+						printe("datasetType==oscar multisentencePredictions was trained with useBenchmarkDefaults=False")
 			else:
 				if(inferenceEvaluateTestSet):
 					inferencePromptFileName = 'inference_prompt.txt.longTestOscar'
 				else:
-					inferencePromptFileName = 'inference_prompt.txt.longTrainOscar'
+					#ensure within distribution trainset ;
+					if(spacyPipelineOptimisations):
+						inferencePromptFileName = 'inference_prompt.txt.longTrainOscarOptim'
+					else:
+						inferencePromptFileName = 'inference_prompt.txt.longTrainOscar'
 		elif(datasetType=="textfile"):
 			#experimental (untested)
 			trainPromptFileName = datasetName	#"train_prompt.txt"
@@ -913,6 +951,25 @@ if(printConfiguration):
 	if(useInference):
 		print("inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures:", inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures)
 	print("")
+	print("#Benchmarking;")
+	print("useBenchmark:", useBenchmark)
+	print("useBenchmarkDefaults:", useBenchmarkDefaults)
+	print("useBenchmarkDefaultsTestSet:", useBenchmarkDefaultsTestSet)
+	print("spacyPipelineOptimisations:", spacyPipelineOptimisations)
+	print("inferenceReportTokenAccuracyConstrainByColumn:", inferenceReportTokenAccuracyConstrainByColumn)
+	print("inferenceEvaluateTestSet:", inferenceEvaluateTestSet)
+	print("inferenceSegmentTiming:", inferenceSegmentTiming)
+	print("inferenceActivationsType:", inferenceActivationsType)
+	print("")
+	print("#Multisentence predictions;")
+	print("multisentencePredictions:", multisentencePredictions)
+	print("numSentencesPerSequence:", numSentencesPerSequence)
+	print("")
+	print("#Dendritic branches;")
+	print("multipleDendriticBranches:", multipleDendriticBranches)
+	print("numberOfDendriticBranches:", numberOfDendriticBranches)
+	print("randomlyAssignBranches:", randomlyAssignBranches)
+	print("")
 	print("#Database;")
 	print("databaseFolder:", databaseFolder)
 	print("trainLoadExistingDatabase:", trainLoadExistingDatabase)
@@ -929,10 +986,6 @@ if(printConfiguration):
 		print("useLocalDataset:", useLocalDataset)
 		if(useLocalDataset):
 			print("datasetFolder:", datasetFolder)
-	print("")
-	print("#Multisentence predictions;")
-	print("multisentencePredictions:", multisentencePredictions)
-	print("numSentencesPerSequence:", numSentencesPerSequence)
 	print("")
 	print("#RAM;")
 	print("useGPUdense:", useGPUdense)
@@ -952,11 +1005,6 @@ if(printConfiguration):
 	print("#Segment activation time;")
 	print("inferenceUseNeuronFeaturePropertiesTime:", inferenceUseNeuronFeaturePropertiesTime)
 	print("inferenceUseNeuronFeaturePropertiesTimeExact:", inferenceUseNeuronFeaturePropertiesTimeExact)
-	print("")
-	print("#Dendritic branches;")
-	print("multipleDendriticBranches:", multipleDendriticBranches)
-	print("numberOfDendriticBranches:", numberOfDendriticBranches)
-	print("randomlyAssignBranches:", randomlyAssignBranches)
 	print("")
 	print("#Array properties;")
 	print("arrayIndexPropertiesEfficient:", arrayIndexPropertiesEfficient)

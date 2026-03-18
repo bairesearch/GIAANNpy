@@ -29,7 +29,7 @@ cd ../autoresearch/
 ```
 
 **What you CAN do:**
-- Modify all `../proto/*.py` files - these are the only file you edit. Everything is fair game: model architecture, hyperparameters, etc.
+- Modify all `../proto/*.py` files - these are the only files you edit. Everything is fair game: model architecture, hyperparameters, etc.
 
 **What you CANNOT do:**
 - Modify any files not contained in `../proto'.

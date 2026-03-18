@@ -1,0 +1,4540 @@
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"><svg xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" version="1.1" width="3840" height="2160" viewBox="-100 -100 3740 2060" preserveAspectRatio="xMidYMid" fill-rule="evenodd" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<ellipse cx="0" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="-5" y="-20">			ID = 0
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="-5" y="-10">			instance = undefined
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="100" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="95" y="-20">			ID = 1
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="95" y="-10">			instance = conjunction
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="200" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="195" y="-20">			ID = 2
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="195" y="-10">			instance = number
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="300" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="295" y="-20">			ID = 3
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="295" y="-10">			instance = determiner
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="400" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="395" y="-20">			ID = 4
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="395" y="-10">			instance = unknown
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="500" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="495" y="-20">			ID = 5
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="495" y="-10">			instance = predeterminer
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="600" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="595" y="-20">			ID = 6
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="595" y="-10">			instance = possessiveEnding
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="700" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="695" y="-20">			ID = 7
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="695" y="-10">			instance = modalAuxiliary
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="800" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="795" y="-20">			ID = 8
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="795" y="-10">			instance = preposition
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="900" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="895" y="-20">			ID = 9
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="895" y="-10">			instance = adjective
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="1000" cy="0" rx="10" ry="10" fill="rgb(255,255,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="995" y="-20">			ID = 10
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="995" y="-10">			instance = noun
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="1100" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1095" y="-20">			ID = 11
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1095" y="-10">			instance = adverb
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="1200" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1195" y="-20">			ID = 12
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1195" y="-10">			instance = pronounPersonal
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="1300" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1295" y="-20">			ID = 13
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1295" y="-10">			instance = pronounPossessive
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="1400" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1395" y="-20">			ID = 14
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1395" y="-10">			instance = particle
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="1500" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1495" y="-20">			ID = 15
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1495" y="-10">			instance = interjection
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="1600" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1595" y="-20">			ID = 16
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1595" y="-10">			instance = verb
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="1700" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1695" y="-20">			ID = 17
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1695" y="-10">			instance = wh
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="1800" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1795" y="-20">			ID = 18
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1795" y="-10">			instance = punctuationQuote
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="1900" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1895" y="-20">			ID = 19
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1895" y="-10">			instance = punctuationDivision
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="2000" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1995" y="-20">			ID = 20
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1995" y="-10">			instance = punctuationEndOfSentence
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="2100" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2095" y="-20">			ID = 21
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2095" y="-10">			instance = auxiliaryBeing
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="2200" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2195" y="-20">			ID = 22
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2195" y="-10">			instance = auxiliaryHaving
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="2300" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2295" y="-20">			ID = 23
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2295" y="-10">			instance = auxiliaryDoing
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="2400" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2395" y="-20">			ID = 24
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2395" y="-10">			instance = auxiliary
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="2500" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2495" y="-20">			ID = 25
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2495" y="-10">			instance = pronounDemonstrative
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="2600" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2595" y="-20">			ID = 26
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2595" y="-10">			instance = pronounIndefinite
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="2700" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2695" y="-20">			ID = 27
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2695" y="-10">			instance = pronounInterrogative
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="2800" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2795" y="-20">			ID = 28
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2795" y="-10">			instance = pronounPersonalObject
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="2900" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2895" y="-20">			ID = 29
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2895" y="-10">			instance = pronounPersonalSubject
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="3000" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2995" y="-20">			ID = 30
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2995" y="-10">			instance = pronounPossessiveAdjective
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="3100" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3095" y="-20">			ID = 31
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3095" y="-10">			instance = pronounPossessiveAlone
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="3200" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3195" y="-20">			ID = 32
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3195" y="-10">			instance = pronounReflexive
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="3300" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3295" y="-20">			ID = 33
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3295" y="-10">			instance = pronounRelative
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="3400" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3395" y="-20">			ID = 34
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3395" y="-10">			instance = conjunctionCoordinating
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="3500" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3495" y="-20">			ID = 35
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3495" y="-10">			instance = conjunctionSubcoordinating
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="3600" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3595" y="-20">			ID = 36
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3595" y="-10">			instance = conjunctionCorrelativeFirst
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="3700" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3695" y="-20">			ID = 37
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3695" y="-10">			instance = conjunctionCorrelativeSecond
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="3800" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3795" y="-20">			ID = 38
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3795" y="-10">			instance = date
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="3900" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3895" y="-20">			ID = 39
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3895" y="-10">			instance = unit
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="4000" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3995" y="-20">			ID = 40
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3995" y="-10">			instance = money
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="4100" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4095" y="-20">			ID = 41
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4095" y="-10">			instance = title
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="4200" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4195" y="-20">			ID = 42
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4195" y="-10">			instance = propernounFirstMale
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="4300" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4295" y="-20">			ID = 43
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4295" y="-10">			instance = propernounFirstFemale
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="4400" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4395" y="-20">			ID = 44
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4395" y="-10">			instance = propernounFamily
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="4500" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4495" y="-20">			ID = 45
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4495" y="-10">			instance = propernounPlace
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="4600" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4595" y="-20">			ID = 46
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4595" y="-10">			instance = posinserttemplate5
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="4700" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4695" y="-20">			ID = 47
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4695" y="-10">			instance = posinserttemplate6
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="4800" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4795" y="-20">			ID = 48
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4795" y="-10">			instance = posinserttemplate7
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="4900" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4895" y="-20">			ID = 49
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4895" y="-10">			instance = posinserttemplate8
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="5000" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4995" y="-20">			ID = 50
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="4995" y="-10">			instance = posinserttemplate9
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="5100" cy="0" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="5095" y="-20">			ID = 51
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="5095" y="-10">			instance = posinserttemplate10
+			</tspan>
+		</text>
+	</g>
+</g>
+<ellipse cx="600" cy="500" rx="10" ry="10" fill="rgb(255,255,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="595" y="480">			ID = 52
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="595" y="490">			instance = groupIndex:0
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="300" y1="0" x2="600" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="900" y1="0" x2="600" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="700" cy="500" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="695" y="480">			ID = 53
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="695" y="490">			instance = groupIndex:1
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1000" y1="0" x2="700" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="0" x2="700" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="800" cy="500" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="795" y="480">			ID = 54
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="795" y="490">			instance = groupIndex:5
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1600" y1="0" x2="800" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="800" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="900" cy="500" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="895" y="480">			ID = 55
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="895" y="490">			instance = groupIndex:7
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="300" y1="0" x2="900" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="0" x2="900" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="1000" cy="500" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="995" y="480">			ID = 56
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="995" y="490">			instance = groupIndex:10
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="4200" y1="0" x2="1000" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1000" y1="0" x2="1000" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="1100" cy="500" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1095" y="480">			ID = 57
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1095" y="490">			instance = groupIndex:11
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1100" y1="0" x2="1100" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="1100" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="1200" cy="500" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1195" y="480">			ID = 58
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1195" y="490">			instance = groupIndex:13
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="4200" y1="0" x2="1200" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="0" x2="1200" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="1300" cy="500" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1295" y="480">			ID = 59
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1295" y="490">			instance = groupIndex:14
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="4400" y1="0" x2="1300" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1000" y1="0" x2="1300" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="1400" cy="500" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1395" y="480">			ID = 60
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1395" y="490">			instance = groupIndex:15
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="4400" y1="0" x2="1400" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="0" x2="1400" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="1500" cy="500" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1495" y="480">			ID = 61
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1495" y="490">			instance = groupIndex:16
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="300" y1="0" x2="1500" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1000" y1="0" x2="1500" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="1600" cy="500" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1595" y="480">			ID = 62
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1595" y="490">			instance = groupIndex:19
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1900" y1="0" x2="1600" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="0" x2="1600" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="1700" cy="500" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1695" y="480">			ID = 63
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1695" y="490">			instance = groupIndex:33
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="800" y1="0" x2="1700" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="3800" y1="0" x2="1700" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="1800" cy="500" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1795" y="480">			ID = 64
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1795" y="490">			instance = groupIndex:35
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="900" y1="0" x2="1800" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1900" y1="0" x2="1800" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="1900" cy="500" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1895" y="480">			ID = 65
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1895" y="490">			instance = groupIndex:36
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="200" y1="0" x2="1900" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="1900" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="2000" cy="500" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1995" y="480">			ID = 66
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1995" y="490">			instance = groupIndex:54
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1000" y1="0" x2="2000" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2100" y1="0" x2="2000" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="2100" cy="500" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2095" y="480">			ID = 67
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2095" y="490">			instance = groupIndex:57
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="300" y1="0" x2="2100" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2900" y1="0" x2="2100" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="2200" cy="500" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2195" y="480">			ID = 68
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2195" y="490">			instance = groupIndex:58
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="700" y1="0" x2="2200" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1000" y1="0" x2="2200" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="2300" cy="500" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2295" y="480">			ID = 69
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2295" y="490">			instance = groupIndex:66
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1000" y1="0" x2="2300" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="2300" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="2400" cy="500" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2395" y="480">			ID = 70
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2395" y="490">			instance = groupIndex:86
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1100" y1="0" x2="2400" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1000" y1="0" x2="2400" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="2500" cy="500" rx="10" ry="10" fill="rgb(255,255,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2495" y="480">			ID = 71
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2495" y="490">			instance = groupIndex:100
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="900" y1="0" x2="2500" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1000" y1="0" x2="2500" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="2600" cy="500" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2595" y="480">			ID = 72
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2595" y="490">			instance = groupIndex:114
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1000" y1="0" x2="2600" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2400" y1="0" x2="2600" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="2700" cy="500" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2695" y="480">			ID = 73
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2695" y="490">			instance = groupIndex:121
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1100" y1="0" x2="2700" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2100" y1="0" x2="2700" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="2800" cy="500" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2795" y="480">			ID = 74
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2795" y="490">			instance = groupIndex:128
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1100" y1="0" x2="2800" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2400" y1="0" x2="2800" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="2900" cy="500" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2895" y="480">			ID = 75
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2895" y="490">			instance = groupIndex:135
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1500" y1="0" x2="2900" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2100" y1="0" x2="2900" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="3000" cy="500" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2995" y="480">			ID = 76
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2995" y="490">			instance = groupIndex:142
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1500" y1="0" x2="3000" y2="500" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2400" y1="0" x2="3000" y2="500" stroke-width="1"/>
+</g>
+<ellipse cx="500" cy="600" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="495" y="580">			ID = 77
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="495" y="590">			instance = groupIndex:2
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="600" y1="500" x2="500" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="900" y1="500" x2="500" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="700" y1="500" x2="500" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="600" cy="600" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="595" y="580">			ID = 78
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="595" y="590">			instance = groupIndex:4
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="600" y1="500" x2="600" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="0" x2="600" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="700" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="695" y="580">			ID = 79
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="695" y="590">			instance = groupIndex:9
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="900" y1="500" x2="700" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="0" x2="700" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="800" cy="1600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="795" y="1580">			ID = 80
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="795" y="1590">			instance = groupIndex:12
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1000" y1="500" x2="800" y2="1600" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1200" y1="500" x2="800" y2="1600" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1300" y1="500" x2="800" y2="1600" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1400" y1="500" x2="800" y2="1600" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1600" y1="500" x2="800" y2="1600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1100" y1="500" x2="800" y2="1600" stroke-width="1"/>
+</g>
+<ellipse cx="900" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="895" y="580">			ID = 81
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="895" y="590">			instance = groupIndex:17
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1900" y1="0" x2="900" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1500" y1="500" x2="900" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="1000" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="995" y="580">			ID = 82
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="995" y="590">			instance = groupIndex:21
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1500" y1="500" x2="1000" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1900" y1="0" x2="1000" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="1100" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1095" y="580">			ID = 83
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1095" y="590">			instance = groupIndex:29
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="900" y1="500" x2="1100" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1900" y1="0" x2="1100" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="1200" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1195" y="580">			ID = 84
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1195" y="590">			instance = groupIndex:32
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1500" y1="500" x2="1200" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="0" x2="1200" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="1300" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1295" y="580">			ID = 85
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1295" y="590">			instance = groupIndex:37
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1800" y1="500" x2="1300" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1900" y1="500" x2="1300" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="1400" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1395" y="580">			ID = 86
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1395" y="590">			instance = groupIndex:40
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1900" y1="0" x2="1400" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1900" y1="500" x2="1400" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="1500" cy="600" rx="10" ry="10" fill="rgb(255,255,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1495" y="580">			ID = 87
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1495" y="590">			instance = groupIndex:55
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="600" y1="500" x2="1500" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1000" y1="0" x2="1500" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="1600" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1595" y="580">			ID = 88
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1595" y="590">			instance = groupIndex:59
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2100" y1="500" x2="1600" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2200" y1="500" x2="1600" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="1700" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1695" y="580">			ID = 89
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1695" y="590">			instance = groupIndex:63
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="700" y1="0" x2="1700" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="800" y1="500" x2="1700" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="1800" cy="600" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1795" y="580">			ID = 90
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1795" y="590">			instance = groupIndex:71
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2900" y1="0" x2="1800" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2200" y1="500" x2="1800" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="1900" cy="600" rx="10" ry="10" fill="rgb(255,255,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1895" y="580">			ID = 91
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1895" y="590">			instance = groupIndex:85
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="500" x2="1900" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="300" y1="0" x2="1900" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="2000" cy="600" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1995" y="580">			ID = 92
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1995" y="590">			instance = groupIndex:99
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="500" x2="2000" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="3900" y1="0" x2="2000" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="2100" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2095" y="580">			ID = 93
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2095" y="590">			instance = groupIndex:116
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2600" y1="500" x2="2100" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="300" y1="0" x2="2100" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="2200" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2195" y="580">			ID = 94
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2195" y="590">			instance = groupIndex:118
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2600" y1="500" x2="2200" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="3900" y1="0" x2="2200" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="2300" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2295" y="580">			ID = 95
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2295" y="590">			instance = groupIndex:123
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2700" y1="500" x2="2300" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="300" y1="0" x2="2300" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="2400" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2395" y="580">			ID = 96
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2395" y="590">			instance = groupIndex:125
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2700" y1="500" x2="2400" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="3900" y1="0" x2="2400" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="2500" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2495" y="580">			ID = 97
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2495" y="590">			instance = groupIndex:130
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2800" y1="500" x2="2500" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="300" y1="0" x2="2500" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="2600" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2595" y="580">			ID = 98
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2595" y="590">			instance = groupIndex:132
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2800" y1="500" x2="2600" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="3900" y1="0" x2="2600" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="2700" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2695" y="580">			ID = 99
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2695" y="590">			instance = groupIndex:137
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2900" y1="500" x2="2700" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="300" y1="0" x2="2700" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="2800" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2795" y="580">			ID = 100
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2795" y="590">			instance = groupIndex:139
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2900" y1="500" x2="2800" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="3900" y1="0" x2="2800" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="2900" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2895" y="580">			ID = 101
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2895" y="590">			instance = groupIndex:144
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="3000" y1="500" x2="2900" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="300" y1="0" x2="2900" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="3000" cy="600" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2995" y="580">			ID = 102
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2995" y="590">			instance = groupIndex:146
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="3000" y1="500" x2="3000" y2="600" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="3900" y1="0" x2="3000" y2="600" stroke-width="1"/>
+</g>
+<ellipse cx="900" cy="1700" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="895" y="1680">			ID = 103
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="895" y="1690">			instance = groupIndex:3
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="500" y1="600" x2="900" y2="1700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="900" y2="1700" stroke-width="1"/>
+</g>
+<ellipse cx="1000" cy="1700" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="995" y="1680">			ID = 104
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="995" y="1690">			instance = groupIndex:6
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="600" y1="600" x2="1000" y2="1700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="700" y1="600" x2="1000" y2="1700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="800" y1="500" x2="1000" y2="1700" stroke-width="1"/>
+</g>
+<ellipse cx="1100" cy="1700" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1095" y="1680">			ID = 105
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1095" y="1690">			instance = groupIndex:8
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="500" y1="600" x2="1100" y2="1700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="1100" y2="1700" stroke-width="1"/>
+</g>
+<ellipse cx="1200" cy="700" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1195" y="680">			ID = 106
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1195" y="690">			instance = groupIndex:18
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1500" y1="500" x2="1200" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="900" y1="500" x2="1200" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="900" y1="600" x2="1200" y2="700" stroke-width="1"/>
+</g>
+<ellipse cx="1300" cy="700" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1295" y="680">			ID = 107
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1295" y="690">			instance = groupIndex:22
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="900" y1="500" x2="1300" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="800" y1="1600" x2="1300" y2="700" stroke-width="1"/>
+</g>
+<ellipse cx="1400" cy="700" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1395" y="680">			ID = 108
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1395" y="690">			instance = groupIndex:24
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1000" y1="600" x2="1400" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="3900" y1="0" x2="1400" y2="700" stroke-width="1"/>
+</g>
+<ellipse cx="1500" cy="700" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1495" y="680">			ID = 109
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1495" y="690">			instance = groupIndex:25
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1000" y1="0" x2="1500" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="800" y1="1600" x2="1500" y2="700" stroke-width="1"/>
+</g>
+<ellipse cx="1600" cy="700" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1595" y="680">			ID = 110
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1595" y="690">			instance = groupIndex:30
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1100" y1="600" x2="1600" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="3900" y1="0" x2="1600" y2="700" stroke-width="1"/>
+</g>
+<ellipse cx="1700" cy="700" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1695" y="680">			ID = 111
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1695" y="690">			instance = groupIndex:34
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1200" y1="600" x2="1700" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="700" y1="600" x2="1700" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1700" y1="500" x2="1700" y2="700" stroke-width="1"/>
+</g>
+<ellipse cx="1800" cy="700" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1795" y="680">			ID = 112
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1795" y="690">			instance = groupIndex:42
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1200" y1="600" x2="1800" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="900" y1="0" x2="1800" y2="700" stroke-width="1"/>
+</g>
+<ellipse cx="1900" cy="700" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1895" y="680">			ID = 113
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1895" y="690">			instance = groupIndex:43
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="3800" y1="0" x2="1900" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1300" y1="600" x2="1900" y2="700" stroke-width="1"/>
+</g>
+<ellipse cx="2000" cy="700" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1995" y="680">			ID = 114
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1995" y="690">			instance = groupIndex:46
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="3800" y1="0" x2="2000" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1400" y1="600" x2="2000" y2="700" stroke-width="1"/>
+</g>
+<ellipse cx="2100" cy="700" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2095" y="680">			ID = 115
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2095" y="690">			instance = groupIndex:48
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1200" y1="600" x2="2100" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1100" y1="0" x2="2100" y2="700" stroke-width="1"/>
+</g>
+<ellipse cx="2200" cy="700" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2195" y="680">			ID = 116
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2195" y="690">			instance = groupIndex:50
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="700" y1="600" x2="2200" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="900" y1="0" x2="2200" y2="700" stroke-width="1"/>
+</g>
+<ellipse cx="2300" cy="700" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2295" y="680">			ID = 117
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2295" y="690">			instance = groupIndex:52
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="700" y1="600" x2="2300" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1100" y1="0" x2="2300" y2="700" stroke-width="1"/>
+</g>
+<ellipse cx="2400" cy="700" rx="10" ry="10" fill="rgb(255,255,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2395" y="680">			ID = 118
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2395" y="690">			instance = groupIndex:56
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="500" x2="2400" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2600" y1="500" x2="2400" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2700" y1="500" x2="2400" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2800" y1="500" x2="2400" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2900" y1="500" x2="2400" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="3000" y1="500" x2="2400" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1500" y1="600" x2="2400" y2="700" stroke-width="1"/>
+</g>
+<ellipse cx="2500" cy="700" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2495" y="680">			ID = 119
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2495" y="690">			instance = groupIndex:87
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1900" y1="600" x2="2500" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="600" x2="2500" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2100" y1="600" x2="2500" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2200" y1="600" x2="2500" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2300" y1="600" x2="2500" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2400" y1="600" x2="2500" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2500" y1="600" x2="2500" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2600" y1="600" x2="2500" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2700" y1="600" x2="2500" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2800" y1="600" x2="2500" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2900" y1="600" x2="2500" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="3000" y1="600" x2="2500" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2400" y1="500" x2="2500" y2="700" stroke-width="1"/>
+</g>
+<ellipse cx="2600" cy="700" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2595" y="680">			ID = 120
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2595" y="690">			instance = groupIndex:101
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="600" x2="2600" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2200" y1="600" x2="2600" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2400" y1="600" x2="2600" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2600" y1="600" x2="2600" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2800" y1="600" x2="2600" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="3000" y1="600" x2="2600" y2="700" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2500" y1="500" x2="2600" y2="700" stroke-width="1"/>
+</g>
+<ellipse cx="800" cy="1800" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="795" y="1780">			ID = 121
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="795" y="1790">			instance = groupIndex:20
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1200" y1="700" x2="800" y2="1800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="800" y1="1600" x2="800" y2="1800" stroke-width="1"/>
+</g>
+<ellipse cx="900" cy="1800" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="895" y="1780">			ID = 122
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="895" y="1790">			instance = groupIndex:23
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1000" y1="600" x2="900" y2="1800" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1100" y1="600" x2="900" y2="1800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1300" y1="700" x2="900" y2="1800" stroke-width="1"/>
+</g>
+<ellipse cx="1000" cy="1800" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="995" y="1780">			ID = 123
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="995" y="1790">			instance = groupIndex:26
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1400" y1="700" x2="1000" y2="1800" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1600" y1="700" x2="1000" y2="1800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1500" y1="700" x2="1000" y2="1800" stroke-width="1"/>
+</g>
+<ellipse cx="1100" cy="800" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1095" y="780">			ID = 124
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1095" y="790">			instance = groupIndex:27
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1400" y1="700" x2="1100" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="0" x2="1100" y2="800" stroke-width="1"/>
+</g>
+<ellipse cx="1200" cy="800" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1195" y="780">			ID = 125
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1195" y="790">			instance = groupIndex:31
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1600" y1="700" x2="1200" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="0" x2="1200" y2="800" stroke-width="1"/>
+</g>
+<ellipse cx="1300" cy="1800" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1295" y="1780">			ID = 126
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1295" y="1790">			instance = groupIndex:38
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1700" y1="700" x2="1300" y2="1800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1300" y1="600" x2="1300" y2="1800" stroke-width="1"/>
+</g>
+<ellipse cx="1400" cy="800" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1395" y="780">			ID = 127
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1395" y="790">			instance = groupIndex:39
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1700" y1="700" x2="1400" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="3800" y1="0" x2="1400" y2="800" stroke-width="1"/>
+</g>
+<ellipse cx="1500" cy="1800" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1495" y="1780">			ID = 128
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1495" y="1790">			instance = groupIndex:44
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1800" y1="700" x2="1500" y2="1800" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2100" y1="700" x2="1500" y2="1800" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2200" y1="700" x2="1500" y2="1800" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2300" y1="700" x2="1500" y2="1800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1900" y1="700" x2="1500" y2="1800" stroke-width="1"/>
+</g>
+<ellipse cx="1600" cy="800" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1595" y="780">			ID = 129
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1595" y="790">			instance = groupIndex:45
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1800" y1="700" x2="1600" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="3800" y1="0" x2="1600" y2="800" stroke-width="1"/>
+</g>
+<ellipse cx="1700" cy="800" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1695" y="780">			ID = 130
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1695" y="790">			instance = groupIndex:49
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2100" y1="700" x2="1700" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="3800" y1="0" x2="1700" y2="800" stroke-width="1"/>
+</g>
+<ellipse cx="1800" cy="800" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1795" y="780">			ID = 131
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1795" y="790">			instance = groupIndex:51
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2200" y1="700" x2="1800" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="3800" y1="0" x2="1800" y2="800" stroke-width="1"/>
+</g>
+<ellipse cx="1900" cy="800" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1895" y="780">			ID = 132
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1895" y="790">			instance = groupIndex:53
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2300" y1="700" x2="1900" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="3800" y1="0" x2="1900" y2="800" stroke-width="1"/>
+</g>
+<ellipse cx="2000" cy="800" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1995" y="780">			ID = 133
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1995" y="790">			instance = groupIndex:60
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2400" y1="700" x2="2000" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2500" y1="700" x2="2000" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2600" y1="700" x2="2000" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="600" x2="2000" y2="800" stroke-width="1"/>
+</g>
+<ellipse cx="2100" cy="800" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2095" y="780">			ID = 134
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2095" y="790">			instance = groupIndex:62
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2400" y1="700" x2="2100" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2500" y1="700" x2="2100" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2600" y1="700" x2="2100" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2100" y1="500" x2="2100" y2="800" stroke-width="1"/>
+</g>
+<ellipse cx="2200" cy="800" rx="10" ry="10" fill="rgb(255,255,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2195" y="780">			ID = 135
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2195" y="790">			instance = groupIndex:70
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2400" y1="700" x2="2200" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2500" y1="0" x2="2200" y2="800" stroke-width="1"/>
+</g>
+<ellipse cx="2300" cy="800" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2295" y="780">			ID = 136
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2295" y="790">			instance = groupIndex:80
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2400" y1="700" x2="2300" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="3500" y1="0" x2="2300" y2="800" stroke-width="1"/>
+</g>
+<ellipse cx="2400" cy="800" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2395" y="780">			ID = 137
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2395" y="790">			instance = groupIndex:89
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2500" y1="700" x2="2400" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2500" y1="0" x2="2400" y2="800" stroke-width="1"/>
+</g>
+<ellipse cx="2500" cy="800" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2495" y="780">			ID = 138
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2495" y="790">			instance = groupIndex:94
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2500" y1="700" x2="2500" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="3500" y1="0" x2="2500" y2="800" stroke-width="1"/>
+</g>
+<ellipse cx="2600" cy="800" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2595" y="780">			ID = 139
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2595" y="790">			instance = groupIndex:103
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2600" y1="700" x2="2600" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2500" y1="0" x2="2600" y2="800" stroke-width="1"/>
+</g>
+<ellipse cx="2700" cy="800" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2695" y="780">			ID = 140
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2695" y="790">			instance = groupIndex:108
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2600" y1="700" x2="2700" y2="800" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="3500" y1="0" x2="2700" y2="800" stroke-width="1"/>
+</g>
+<ellipse cx="0" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="-5" y="1880">			ID = 141
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="-5" y="1890">			instance = groupIndex:28
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1100" y1="800" x2="0" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1200" y1="800" x2="0" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="800" y1="1600" x2="0" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="100" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="95" y="1880">			ID = 142
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="95" y="1890">			instance = groupIndex:41
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1400" y1="800" x2="100" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1400" y1="600" x2="100" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="200" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="195" y="1880">			ID = 143
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="195" y="1890">			instance = groupIndex:47
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1600" y1="800" x2="200" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1700" y1="800" x2="200" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1800" y1="800" x2="200" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1900" y1="800" x2="200" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="700" x2="200" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="300" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="295" y="1880">			ID = 144
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="295" y="1890">			instance = groupIndex:61
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="300" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="300" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="400" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="395" y="1880">			ID = 145
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="395" y="1890">			instance = groupIndex:64
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2100" y1="800" x2="400" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1700" y1="600" x2="400" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="500" cy="900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="495" y="880">			ID = 146
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="495" y="890">			instance = groupIndex:65
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2100" y1="800" x2="500" y2="900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1000" y1="0" x2="500" y2="900" stroke-width="1"/>
+</g>
+<ellipse cx="600" cy="900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="595" y="880">			ID = 147
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="595" y="890">			instance = groupIndex:69
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2100" y1="800" x2="600" y2="900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="0" x2="600" y2="900" stroke-width="1"/>
+</g>
+<ellipse cx="700" cy="900" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="695" y="880">			ID = 148
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="695" y="890">			instance = groupIndex:72
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2200" y1="800" x2="700" y2="900" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2300" y1="800" x2="700" y2="900" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2400" y1="800" x2="700" y2="900" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2500" y1="800" x2="700" y2="900" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2600" y1="800" x2="700" y2="900" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2700" y1="800" x2="700" y2="900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1800" y1="600" x2="700" y2="900" stroke-width="1"/>
+</g>
+<ellipse cx="800" cy="900" rx="10" ry="10" fill="rgb(255,255,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="795" y="880">			ID = 149
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="795" y="890">			instance = groupIndex:74
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2200" y1="800" x2="800" y2="900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2900" y1="0" x2="800" y2="900" stroke-width="1"/>
+</g>
+<ellipse cx="900" cy="900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="895" y="880">			ID = 150
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="895" y="890">			instance = groupIndex:82
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2300" y1="800" x2="900" y2="900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2900" y1="0" x2="900" y2="900" stroke-width="1"/>
+</g>
+<ellipse cx="1000" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="995" y="1880">			ID = 151
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="995" y="1890">			instance = groupIndex:88
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="1000" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="1000" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="1100" cy="900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1095" y="880">			ID = 152
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1095" y="890">			instance = groupIndex:91
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2400" y1="800" x2="1100" y2="900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2900" y1="0" x2="1100" y2="900" stroke-width="1"/>
+</g>
+<ellipse cx="1200" cy="900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1195" y="880">			ID = 153
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1195" y="890">			instance = groupIndex:96
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2500" y1="800" x2="1200" y2="900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2900" y1="0" x2="1200" y2="900" stroke-width="1"/>
+</g>
+<ellipse cx="1300" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1295" y="1880">			ID = 154
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1295" y="1890">			instance = groupIndex:102
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="1300" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="1300" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="1400" cy="900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1395" y="880">			ID = 155
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1395" y="890">			instance = groupIndex:105
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2600" y1="800" x2="1400" y2="900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2900" y1="0" x2="1400" y2="900" stroke-width="1"/>
+</g>
+<ellipse cx="1500" cy="900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1495" y="880">			ID = 156
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1495" y="890">			instance = groupIndex:110
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2700" y1="800" x2="1500" y2="900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2900" y1="0" x2="1500" y2="900" stroke-width="1"/>
+</g>
+<ellipse cx="1600" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1595" y="1880">			ID = 157
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1595" y="1890">			instance = groupIndex:113
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="1600" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="1600" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="1700" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1695" y="1880">			ID = 158
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1695" y="1890">			instance = groupIndex:115
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="1700" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="1700" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="1800" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1795" y="1880">			ID = 159
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1795" y="1890">			instance = groupIndex:117
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="1800" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="1800" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="1900" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1895" y="1880">			ID = 160
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1895" y="1890">			instance = groupIndex:119
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="1900" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="1900" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="2000" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1995" y="1880">			ID = 161
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1995" y="1890">			instance = groupIndex:120
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="2000" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="2000" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="2100" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2095" y="1880">			ID = 162
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2095" y="1890">			instance = groupIndex:122
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="2100" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="2100" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="2200" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2195" y="1880">			ID = 163
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2195" y="1890">			instance = groupIndex:124
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="2200" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="2200" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="2300" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2295" y="1880">			ID = 164
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2295" y="1890">			instance = groupIndex:126
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="2300" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="2300" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="2400" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2395" y="1880">			ID = 165
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2395" y="1890">			instance = groupIndex:127
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="2400" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="2400" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="2500" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2495" y="1880">			ID = 166
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2495" y="1890">			instance = groupIndex:129
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="2500" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="2500" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="2600" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2595" y="1880">			ID = 167
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2595" y="1890">			instance = groupIndex:131
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="2600" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="2600" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="2700" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2695" y="1880">			ID = 168
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2695" y="1890">			instance = groupIndex:133
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="2700" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="2700" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="2800" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2795" y="1880">			ID = 169
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2795" y="1890">			instance = groupIndex:134
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="2800" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="2800" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="2900" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2895" y="1880">			ID = 170
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2895" y="1890">			instance = groupIndex:136
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="2900" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="2900" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="3000" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2995" y="1880">			ID = 171
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2995" y="1890">			instance = groupIndex:138
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="3000" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="3000" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="3100" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3095" y="1880">			ID = 172
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3095" y="1890">			instance = groupIndex:140
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="3100" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="3100" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="3200" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3195" y="1880">			ID = 173
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3195" y="1890">			instance = groupIndex:141
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="3200" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="3200" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="3300" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3295" y="1880">			ID = 174
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3295" y="1890">			instance = groupIndex:143
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="3300" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="3300" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="3400" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3395" y="1880">			ID = 175
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3395" y="1890">			instance = groupIndex:145
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="3400" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="3400" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="3500" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3495" y="1880">			ID = 176
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3495" y="1890">			instance = groupIndex:147
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="3500" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="3500" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="3600" cy="1900" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3595" y="1880">			ID = 177
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="3595" y="1890">			instance = groupIndex:148
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2000" y1="800" x2="3600" y2="1900" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="3600" y2="1900" stroke-width="1"/>
+</g>
+<ellipse cx="800" cy="2000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="795" y="1980">			ID = 178
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="795" y="1990">			instance = groupIndex:67
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="500" y1="900" x2="800" y2="2000" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="600" y1="900" x2="800" y2="2000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2300" y1="500" x2="800" y2="2000" stroke-width="1"/>
+</g>
+<ellipse cx="900" cy="2000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="895" y="1980">			ID = 179
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="895" y="1990">			instance = groupIndex:68
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="500" y1="900" x2="900" y2="2000" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="600" y1="900" x2="900" y2="2000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="800" y1="500" x2="900" y2="2000" stroke-width="1"/>
+</g>
+<ellipse cx="1000" cy="2000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="995" y="1980">			ID = 180
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="995" y="1990">			instance = groupIndex:73
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="700" y1="900" x2="1000" y2="2000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="1000" y2="2000" stroke-width="1"/>
+</g>
+<ellipse cx="1100" cy="2000" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1095" y="1980">			ID = 181
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1095" y="1990">			instance = groupIndex:75
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="800" y1="900" x2="1100" y2="2000" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="900" y1="900" x2="1100" y2="2000" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1100" y1="900" x2="1100" y2="2000" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1200" y1="900" x2="1100" y2="2000" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1400" y1="900" x2="1100" y2="2000" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1500" y1="900" x2="1100" y2="2000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1700" y1="600" x2="1100" y2="2000" stroke-width="1"/>
+</g>
+<ellipse cx="1200" cy="1000" rx="10" ry="10" fill="rgb(255,255,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1195" y="980">			ID = 182
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1195" y="990">			instance = groupIndex:76
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="800" y1="900" x2="1200" y2="1000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1000" y1="0" x2="1200" y2="1000" stroke-width="1"/>
+</g>
+<ellipse cx="1300" cy="1000" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1295" y="980">			ID = 183
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1295" y="990">			instance = groupIndex:79
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="800" y1="900" x2="1300" y2="1000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="0" x2="1300" y2="1000" stroke-width="1"/>
+</g>
+<ellipse cx="1400" cy="2000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1395" y="1980">			ID = 184
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1395" y="1990">			instance = groupIndex:81
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="700" y1="900" x2="1400" y2="2000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="1400" y2="2000" stroke-width="1"/>
+</g>
+<ellipse cx="1500" cy="1000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1495" y="980">			ID = 185
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1495" y="990">			instance = groupIndex:83
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="900" y1="900" x2="1500" y2="1000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1000" y1="0" x2="1500" y2="1000" stroke-width="1"/>
+</g>
+<ellipse cx="1600" cy="1000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1595" y="980">			ID = 186
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1595" y="990">			instance = groupIndex:84
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="900" y1="900" x2="1600" y2="1000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="0" x2="1600" y2="1000" stroke-width="1"/>
+</g>
+<ellipse cx="1700" cy="2000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1695" y="1980">			ID = 187
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1695" y="1990">			instance = groupIndex:90
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="700" y1="900" x2="1700" y2="2000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="1700" y2="2000" stroke-width="1"/>
+</g>
+<ellipse cx="1800" cy="1000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1795" y="980">			ID = 188
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1795" y="990">			instance = groupIndex:92
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1100" y1="900" x2="1800" y2="1000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1000" y1="0" x2="1800" y2="1000" stroke-width="1"/>
+</g>
+<ellipse cx="1900" cy="1000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1895" y="980">			ID = 189
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1895" y="990">			instance = groupIndex:93
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1100" y1="900" x2="1900" y2="1000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="0" x2="1900" y2="1000" stroke-width="1"/>
+</g>
+<ellipse cx="2000" cy="2000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1995" y="1980">			ID = 190
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1995" y="1990">			instance = groupIndex:95
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="700" y1="900" x2="2000" y2="2000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="2000" y2="2000" stroke-width="1"/>
+</g>
+<ellipse cx="2100" cy="1000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2095" y="980">			ID = 191
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2095" y="990">			instance = groupIndex:97
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1200" y1="900" x2="2100" y2="1000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1000" y1="0" x2="2100" y2="1000" stroke-width="1"/>
+</g>
+<ellipse cx="2200" cy="1000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2195" y="980">			ID = 192
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2195" y="990">			instance = groupIndex:98
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1200" y1="900" x2="2200" y2="1000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="0" x2="2200" y2="1000" stroke-width="1"/>
+</g>
+<ellipse cx="2300" cy="2000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2295" y="1980">			ID = 193
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2295" y="1990">			instance = groupIndex:104
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="700" y1="900" x2="2300" y2="2000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="2300" y2="2000" stroke-width="1"/>
+</g>
+<ellipse cx="2400" cy="1000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2395" y="980">			ID = 194
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2395" y="990">			instance = groupIndex:106
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1400" y1="900" x2="2400" y2="1000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1000" y1="0" x2="2400" y2="1000" stroke-width="1"/>
+</g>
+<ellipse cx="2500" cy="1000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2495" y="980">			ID = 195
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2495" y="990">			instance = groupIndex:107
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1400" y1="900" x2="2500" y2="1000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="0" x2="2500" y2="1000" stroke-width="1"/>
+</g>
+<ellipse cx="2600" cy="2000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2595" y="1980">			ID = 196
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2595" y="1990">			instance = groupIndex:109
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="700" y1="900" x2="2600" y2="2000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2000" y1="0" x2="2600" y2="2000" stroke-width="1"/>
+</g>
+<ellipse cx="2700" cy="1000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2695" y="980">			ID = 197
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2695" y="990">			instance = groupIndex:111
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1500" y1="900" x2="2700" y2="1000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1000" y1="0" x2="2700" y2="1000" stroke-width="1"/>
+</g>
+<ellipse cx="2800" cy="1000" rx="10" ry="10" fill="rgb(0,0,240)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2795" y="980">			ID = 198
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="2795" y="990">			instance = groupIndex:112
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1500" y1="900" x2="2800" y2="1000" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="1600" y1="0" x2="2800" y2="1000" stroke-width="1"/>
+</g>
+<ellipse cx="1700" cy="2100" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1695" y="2080">			ID = 199
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1695" y="2090">			instance = groupIndex:77
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1200" y1="1000" x2="1700" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1300" y1="1000" x2="1700" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1500" y1="1000" x2="1700" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1600" y1="1000" x2="1700" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1800" y1="1000" x2="1700" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1900" y1="1000" x2="1700" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2100" y1="1000" x2="1700" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2200" y1="1000" x2="1700" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2400" y1="1000" x2="1700" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2500" y1="1000" x2="1700" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2700" y1="1000" x2="1700" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2800" y1="1000" x2="1700" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="2300" y1="500" x2="1700" y2="2100" stroke-width="1"/>
+</g>
+<ellipse cx="1800" cy="2100" rx="10" ry="10" fill="rgb(255,96,0)" stroke="black" stroke-width="0.000"/>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1795" y="2080">			ID = 200
+			</tspan>
+		</text>
+	</g>
+</g>
+<g style="font-family:Arial;font-size:5px;font-weight:400">
+	<g style="stroke:none;fill:rgb(0,0,0)">
+		<text>
+			<tspan x="1795" y="2090">			instance = groupIndex:78
+			</tspan>
+		</text>
+	</g>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1200" y1="1000" x2="1800" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1300" y1="1000" x2="1800" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1500" y1="1000" x2="1800" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1600" y1="1000" x2="1800" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1800" y1="1000" x2="1800" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="1900" y1="1000" x2="1800" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2100" y1="1000" x2="1800" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2200" y1="1000" x2="1800" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2400" y1="1000" x2="1800" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2500" y1="1000" x2="1800" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2700" y1="1000" x2="1800" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(112,0,187)">
+	<line x1="2800" y1="1000" x2="1800" y2="2100" stroke-width="1"/>
+</g>
+<g stroke="rgb(255,0,255)">
+	<line x1="800" y1="500" x2="1800" y2="2100" stroke-width="1"/>
+</g></svg>

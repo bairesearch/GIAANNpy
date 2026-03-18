@@ -13,9 +13,18 @@
 \usepackage[section]{placeins}
 \usepackage{float}
 \usepackage{hyperref}
+\usepackage{xurl}
 \usepackage[nameinlink,noabbrev]{cleveref}
 \usepackage[numbers]{natbib}
 \usepackage[scaled=0.7]{beramono}
+
+\urlstyle{tt}
+\makeatletter
+\g@addto@macro\UrlBreaks{\do\=\do\-\do\_\do\:\do\/\do\?\do\&\do\,\do\.\do\+}
+\makeatother
+
+\DeclareRobustCommand{\code}[1]{\begingroup\Urlmuskip=0mu plus 1mu\relax\nolinkurl{#1}\endgroup}
+\renewcommand{\texttt}[1]{\code{#1}}
 
 \title{GIAANN Proto: A General Intelligence Algorithm Artificial Neural Network for Language Modeling}
 \author{\textbf{Richard Baxter}\\\small BAI Research \\\small \texttt{richard.baxter@baxterai.com}}
@@ -25,8 +34,8 @@
 \maketitle
 
 \begin{abstract}
-GIAANN Proto is an experimental implementation of a General Intelligence Algorithm Artificial Neural Network (GIA ANN) for language modeling.
-The system constructs an excitatory database network of feature neurons organised into concept columns, incrementally updates that network during training, and performs autoregressive inference by predicting subsequent features conditioned on a seeded prompt.
+General Intelligence Algorithm Artificial Neural Network (GIAANN) introduces an alternative learning algorithm to backpropagation: a dynamically growing network of features and connections for continuous learning. GIAANN Proto is an experimental implementation for language modeling.
+The system constructs an excitatory database network of feature neurons organised into concept columns, incrementally updates that network during training, and performs autoregressive inference by predicting subsequent features conditioned on a seeded prompt. The neurons are sequentially activated and sensitive to the timing of their input (SANI).
 This paper summarises the core ideas and provides an implementation-oriented description intended to accompany the released code.
 \end{abstract}
 
@@ -43,6 +52,8 @@ The project targets properties motivated by biological plausibility and continua
 
 \input{discussion}
 
+\input{development}
+
 \input{algorithm}
 
 \input{implementation}
@@ -51,9 +62,11 @@ The project targets properties motivated by biological plausibility and continua
 
 \section{Conclusion}
 GIAANN Proto provides an experimental platform for exploring a persistent associative memory database-network approach to language modeling.
-Future work should prioritise standardised evaluation metrics, scaling studies, and comparisons to strong modern baselines. Likewise, to move beyond self-supervised learning, reinforcement learning should be tested within the GIAANN architecture.
+Future work should prioritise standardised evaluation metrics, scaling studies, and comparisons to strong modern baselines. Additional exploration is likewise required to optimise the sequentially activated neuronal input parameters for testset data, and the concept column segmentation. Finally, to move beyond self-supervised learning, reinforcement learning should be tested within the GIAANN architecture.
 
 \bibliographystyle{plainnat}
 \bibliography{references}
+
+\input{appendix}
 
 \end{document}
