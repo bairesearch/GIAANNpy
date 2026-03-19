@@ -515,7 +515,7 @@ v1j (Codex IDE GPT-5.3-Codex):
 [GPT-5.2-Codex:] - after an inference sequence has been completed, a) the deviceSparse data needs to be discarded, and b) the deviceDatabase data needs to be retained.
 [GPT-5.2-Codex:] - implement option pretrainConceptColumnsDelimitByPOSenforce=True, which applies a workaround to avoid the debugTerminateOnConceptColumnsDelimitByPOSwarning case; i.e. when consecutive concepts are detected without a delimiter between them. It modifies all tokens to the left of the right most concept token (noun) in this case as ordinary non-concept (non-noun) tokens. 
 	- ensure to use the logic from the processConceptWords() code to detect the debugTerminateOnConceptColumnsDelimitByPOSwarning case: copy the necessary logic to a pretrain pretrainConceptColumnsDelimitByPOSenforce() function.
-[GPT-5.2-Codex:] - upgrade pretrainCombineHyphenatedNouns to support unicode hyphen characters also, ie "–" (not just "-").
+[GPT-5.2-Codex:] - upgrade pretrainCombineHyphenatedNouns to support unicode hyphen characters also, ie "-" (not just "-").
 [GPT-5.2-Codex:] - add addManualPosOverrides to accept all real ADP "wards" variants - "towards", "afterwards".
 [GPT-5.2-Codex:] - add option debugCountTotalParameters - count number of connections in network
 [GPT-5.2-Codex:] - apply pt.no_grad() to main()
@@ -544,6 +544,7 @@ v1k (Codex IDE GPT-5.4):
 - add proto GIAANNproto1k1a - add option useAutoresearch
 	/MANUAL; - start option useAutoresearch
 - add option trainLoadExistingDatabase=False, which makes the code not load an existing database; it will clear and overwrite all database files upon startup by executing databaseFolder/clear.sh.  
-/MANUAL; - upgrade the code to support train and inference within the same python execution (executionMode="trainAndInference"). useInference is now always set True (it now just pertains to functionality rather than execution). Please reread the proto codebase and verify my upgrade. Note there were some major changes required around arrayIndexProperties. But most of the upgrade was relatively simple as it just required replacing useInference with inferenceMode.
+/MANUAL; - upgrade the code to support train and inference within the same python execution (executionMode="trainAndInference"). useInference is now always set True (it now just pertains to functionality rather than execution). Note there were some major changes required around arrayIndexProperties. But most of the upgrade was relatively simple as it just required replacing useInference with inferenceMode.
 MANUAL; - update oscar training-set eval inferencePromptFileName
 - update docs meta tags
+- add natural language code (nlc) specification to paper

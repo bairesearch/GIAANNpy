@@ -39,9 +39,9 @@ distributed features into addressable concepts. Later, cortical columnar ideas m
 concept columns, and sparse competition with selective firing aligned with winner-take-all and
 dendritic-style conditional integration \citep{mountcastle1997columnar,london2005dendriticComputation,maass2000winnerTakeAll}.
 
-\subsection{Chronological Architecture Milestones (Appendix References)}
+\subsection{Chronological Architecture Milestones}
 
-The appendix development diagrams show the progression below (oldest to newest):
+The Appendix \Cref{subsec:appendix-giaann-development} GIAANN Development diagrams show the progression below (oldest to newest):
 
 \begin{itemize}
     \item \Cref{fig:dev-2017-initial-core}: initial symbolic core with semantic concepts, episodic instances, and binary reference coding over axonal conduits.
@@ -58,4 +58,10 @@ Across these stages, GIAANN preserved GIA's semantic compositionality while incr
 computation in biologically inspired principles: modular columns, sparse competitive activation,
 temporally indexed references, and distributed synaptic memory. The result is not a purely symbolic
 parser and not a standard backpropagation ANN, but a semantic-first, brain-inspired architecture for
-interpretable continual learning and sequence-level reasoning
+interpretable continual learning and sequence-level reasoning.
+
+\subsection{GIAANN Proto Development}
+
+A full prompt-level natural language specification of GIAANN Proto is provided in Appendix \Cref{subsec:appendix-giaann-proto-spec} (\texttt{dev/GIAANNproto1.nlc}). All debugging prompts are omitted (OP is provided). Manually programmed items have prefix \texttt{MANUAL}.
+
+The major public version of the prototype is \texttt{1}, and the minor public versions are alphabetised (e.g. \texttt{1k}). The large language model used to assist programming the natural language code is provided for each minor public version. There was a significant period of time between the release of OpenAI o1 preview \citep{openai2024o1preview} and GPT-5-Codex \citep{openai2025gpt5codex, openai2025gpt51codex} where all programming had to be performed manually due to the complexity of both the algorithm and the codebase. The majority of programming could be performed in natural language with assistance from GPT-5.2-Codex+ \citep{openai2025gpt52codex, openai2026gpt53codex, openai2026gpt54codex}.

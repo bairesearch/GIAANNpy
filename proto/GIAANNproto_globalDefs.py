@@ -150,7 +150,7 @@ else:
 			databaseTypeText = "database"
 		elif(datasetType=="oscar"):
 			databaseTypeText = "databaseOscar"
-		databaseFolder = "/media/ssdpro/ssdpro/GIAANN/" + databaseTypeText + str(trainMaxSequences) + "-numSeedTokensInference" + str(numSeedTokensInference) + benchmarkAblationText		#useSANIfeaturesAndColumns
+		databaseFolder = "/media/user/ssdpro/GIAANN/" + databaseTypeText + str(trainMaxSequences) + "-numSeedTokensInference" + str(numSeedTokensInference) + benchmarkAblationText		#useSANIfeaturesAndColumns
 	else:
 		databaseFolder = "../database"	#default: "../database/"
 databaseFolder += "/"

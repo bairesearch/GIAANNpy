@@ -10,6 +10,7 @@
 \usepackage{svg}
 \usepackage{caption}
 \captionsetup[figure]{name=Figure,labelsep=colon}
+\usepackage{fancyvrb}
 \usepackage[section]{placeins}
 \usepackage{float}
 \usepackage{hyperref}
@@ -17,6 +18,7 @@
 \usepackage[nameinlink,noabbrev]{cleveref}
 \usepackage[numbers]{natbib}
 \usepackage[scaled=0.7]{beramono}
+\usepackage{listings}
 
 \urlstyle{tt}
 \makeatletter
@@ -63,6 +65,10 @@ The project targets properties motivated by biological plausibility and continua
 \section{Conclusion}
 GIAANN Proto provides an experimental platform for exploring a persistent associative memory database-network approach to language modeling.
 Future work should prioritise standardised evaluation metrics, scaling studies, and comparisons to strong modern baselines. Additional exploration is likewise required to optimise the sequentially activated neuronal input parameters for testset data, and the concept column segmentation. Finally, to move beyond self-supervised learning, reinforcement learning should be tested within the GIAANN architecture.
+
+\section{Acknowledgements}
+
+This paper was written with assistance from OpenAI GPT 5.2 Codex \citep{openai2025gpt52codex}, OpenAI Deep Research \citep{openai2025deepresearch}, and OpenAI Prism \citep{openai2026prism}.
 
 \bibliographystyle{plainnat}
 \bibliography{references}
