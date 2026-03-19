@@ -494,6 +494,7 @@ randomiseColumnFeatureXposition = True	#shuffle x position of column internal fe
 
 #Information vars;
 printInferenceTop1Accuracy = True	#print inference top-1 accuracy
+printInferenceTop1AccuracyBitsPerByte = True	#print inference top-1 bits-per-byte instead of token accuracy
 if(useAutoresearch):
 	printTotalFeatures = False
 	printConfiguration = True
