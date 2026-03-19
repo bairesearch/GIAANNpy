@@ -41,6 +41,10 @@ totalInferenceTop1Matches = 0
 totalInferenceTop1Tokens = 0
 totalInferenceTop1PredictionMatches = 0
 totalInferenceTop1PredictionTokens = 0
+totalInferenceTop1MatchedBytes = 0
+totalInferenceTop1Bytes = 0
+totalInferenceTop1PredictionMatchedBytes = 0
+totalInferenceTop1PredictionBytes = 0
 
 def resetTotalInferenceTokens():
 	if(debugPrintTotalInferenceTokens):
@@ -76,46 +80,89 @@ def resetInferenceTop1AccuracyCounts():
 	global totalInferenceTop1Tokens
 	global totalInferenceTop1PredictionMatches
 	global totalInferenceTop1PredictionTokens
+	global totalInferenceTop1MatchedBytes
+	global totalInferenceTop1Bytes
+	global totalInferenceTop1PredictionMatchedBytes
+	global totalInferenceTop1PredictionBytes
 	totalInferenceTop1Matches = 0
 	totalInferenceTop1Tokens = 0
 	totalInferenceTop1PredictionMatches = 0
 	totalInferenceTop1PredictionTokens = 0
+	totalInferenceTop1MatchedBytes = 0
+	totalInferenceTop1Bytes = 0
+	totalInferenceTop1PredictionMatchedBytes = 0
+	totalInferenceTop1PredictionBytes = 0
 	return
 
-def addInferenceTop1AccuracyCount(featurePredictionTargetMatch, seedPhase):
+def calculateInferenceTokenByteCount(targetWord):
+	if(targetWord is None):
+		raise RuntimeError("calculateInferenceTokenByteCount error: targetWord is None")
+	targetWordBytes = len(targetWord.encode('utf-8'))
+	if(targetWordBytes <= 0):
+		raise RuntimeError("calculateInferenceTokenByteCount error: targetWordBytes must be positive")
+	return targetWordBytes
+
+def addInferenceTop1AccuracyCount(featurePredictionTargetMatch, seedPhase, targetWord):
 	if(printInferenceTop1Accuracy):
 		if(featurePredictionTargetMatch):
 			matchValue = 1
 		else:
 			matchValue = 0
+		targetWordBytes = calculateInferenceTokenByteCount(targetWord)
+		matchedBytes = matchValue*targetWordBytes
 		global totalInferenceTop1Matches
 		global totalInferenceTop1Tokens
 		global totalInferenceTop1PredictionMatches
 		global totalInferenceTop1PredictionTokens
+		global totalInferenceTop1MatchedBytes
+		global totalInferenceTop1Bytes
+		global totalInferenceTop1PredictionMatchedBytes
+		global totalInferenceTop1PredictionBytes
 		totalInferenceTop1Matches += matchValue
 		totalInferenceTop1Tokens += 1
+		totalInferenceTop1MatchedBytes += matchedBytes
+		totalInferenceTop1Bytes += targetWordBytes
 		if(not seedPhase):
 			totalInferenceTop1PredictionMatches += matchValue
 			totalInferenceTop1PredictionTokens += 1
+			totalInferenceTop1PredictionMatchedBytes += matchedBytes
+			totalInferenceTop1PredictionBytes += targetWordBytes
 	return
 
 def printInferenceTop1Accuracy(databaseNetworkObject):
 	if(printInferenceTop1Accuracy):
-		if(totalInferenceTop1Tokens <= 0 or totalInferenceTop1PredictionTokens <= 0):
-			print("printInferenceTop1Accuracy: no prediction tokens recorded; skipping accuracy")
-		else:
-			predictionAccuracy = totalInferenceTop1PredictionMatches / totalInferenceTop1PredictionTokens
-			inferenceAccuracy = totalInferenceTop1Matches / totalInferenceTop1Tokens
-			if(useAutoresearch):
-				print("---")
-				print("averageTop1Accuracy: ", predictionAccuracy)
-				memory_gb = GIAANNproto_databaseNetworkExcitation.debugCountTotalParametersRun(databaseNetworkObject)
-				print("memory_gb: ", memory_gb)
+		if(printInferenceTop1AccuracyBitsPerByte):
+			if(totalInferenceTop1Bytes <= 0 or totalInferenceTop1PredictionBytes <= 0):
+				print("printInferenceTop1Accuracy: no prediction bytes recorded; skipping BPB")
 			else:
-				if(inferenceReportTokenAccuracyConstrainByColumn):
-					print("averageTop1Accuracy (col): predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
+				predictionBitsPerByte = (totalInferenceTop1PredictionMatchedBytes*8) / totalInferenceTop1PredictionBytes
+				inferenceBitsPerByte = (totalInferenceTop1MatchedBytes*8) / totalInferenceTop1Bytes
+				if(useAutoresearch):
+					print("---")
+					print("averageTop1BPB: ", predictionBitsPerByte)
+					memory_gb = GIAANNproto_databaseNetworkExcitation.debugCountTotalParametersRun(databaseNetworkObject)
+					print("memory_gb: ", memory_gb)
 				else:
-					print("averageTop1Accuracy: predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
+					if(inferenceReportTokenAccuracyConstrainByColumn):
+						print("averageTop1BPB (col): predictionBytes = ", predictionBitsPerByte, ", inferenceBytes = ", inferenceBitsPerByte)
+					else:
+						print("averageTop1BPB: predictionBytes = ", predictionBitsPerByte, ", inferenceBytes = ", inferenceBitsPerByte)
+		else:
+			if(totalInferenceTop1Tokens <= 0 or totalInferenceTop1PredictionTokens <= 0):
+				print("printInferenceTop1Accuracy: no prediction tokens recorded; skipping accuracy")
+			else:
+				predictionAccuracy = totalInferenceTop1PredictionMatches / totalInferenceTop1PredictionTokens
+				inferenceAccuracy = totalInferenceTop1Matches / totalInferenceTop1Tokens
+				if(useAutoresearch):
+					print("---")
+					print("averageTop1Accuracy: ", predictionAccuracy)
+					memory_gb = GIAANNproto_databaseNetworkExcitation.debugCountTotalParametersRun(databaseNetworkObject)
+					print("memory_gb: ", memory_gb)
+				else:
+					if(inferenceReportTokenAccuracyConstrainByColumn):
+						print("averageTop1Accuracy (col): predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
+					else:
+						print("averageTop1Accuracy: predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
 	return
 
 def addInferenceTop1AccuracyCountPadding(numSeedTokens, numPredictionTokens, seedTokensProcessed, predictionTokensProcessed):
@@ -284,7 +331,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 			conceptColumnIndex = int(conceptColumnIndexNext)
 			conceptColumnFeatureIndex = int(conceptColumnFeatureIndexNext)
 			seedTokensProcessed += 1
-			addInferenceTop1AccuracyCount(featurePredictionTargetMatch, True)
+			addInferenceTop1AccuracyCount(featurePredictionTargetMatch, True, tokensSequence[sequenceWordIndex].word)
 
 		#predict next tokens;
 		for wordPredictionIndex in range(numPredictionTokens):
@@ -293,7 +340,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 			conceptColumnIndex = int(conceptColumnIndexNext)
 			conceptColumnFeatureIndex = int(conceptColumnFeatureIndexNext)
 			predictionTokensProcessed += 1
-			addInferenceTop1AccuracyCount(featurePredictionTargetMatch, False)
+			addInferenceTop1AccuracyCount(featurePredictionTargetMatch, False, tokensSequence[sequenceWordIndex].word)
 			if(not featurePredictionTargetMatch):
 				if(debugWarningInferenceOnPredictionTargetMismatch):
 					print("warning: featurePredictionTargetMatch=False")
