@@ -19,6 +19,7 @@ GIA ANN proto prediction
 
 import torch as pt
 import time
+import math
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_databaseNetworkExcitation
@@ -41,6 +42,10 @@ totalInferenceTop1Matches = 0
 totalInferenceTop1Tokens = 0
 totalInferenceTop1PredictionMatches = 0
 totalInferenceTop1PredictionTokens = 0
+totalInferenceTop1Nats = 0.0
+totalInferenceTop1Bytes = 0
+totalInferenceTop1PredictionNats = 0.0
+totalInferenceTop1PredictionBytes = 0
 
 def resetTotalInferenceTokens():
 	if(debugPrintTotalInferenceTokens):
@@ -76,13 +81,48 @@ def resetInferenceTop1AccuracyCounts():
 	global totalInferenceTop1Tokens
 	global totalInferenceTop1PredictionMatches
 	global totalInferenceTop1PredictionTokens
+	global totalInferenceTop1Nats
+	global totalInferenceTop1Bytes
+	global totalInferenceTop1PredictionNats
+	global totalInferenceTop1PredictionBytes
 	totalInferenceTop1Matches = 0
 	totalInferenceTop1Tokens = 0
 	totalInferenceTop1PredictionMatches = 0
 	totalInferenceTop1PredictionTokens = 0
+	totalInferenceTop1Nats = 0.0
+	totalInferenceTop1Bytes = 0
+	totalInferenceTop1PredictionNats = 0.0
+	totalInferenceTop1PredictionBytes = 0
 	return
 
-def addInferenceTop1AccuracyCount(featurePredictionTargetMatch, seedPhase):
+def calculateInferenceTokenByteCount(targetWord):
+	if(targetWord is None):
+		raise RuntimeError("calculateInferenceTokenByteCount error: targetWord is None")
+	targetWordBytes = len(targetWord.encode('utf-8'))
+	if(targetWordBytes < 0):
+		raise RuntimeError("calculateInferenceTokenByteCount error: targetWordBytes must be non-negative")
+	return targetWordBytes
+
+def addInferenceBitsPerByteCount(seedPhase, targetWord, targetNats):
+	if(printInferenceTop1AccuracyBitsPerByte):
+		if(targetNats is None):
+			raise RuntimeError("addInferenceBitsPerByteCount error: targetNats is None")
+		if(targetNats < 0.0 and not math.isinf(targetNats)):
+			raise RuntimeError("addInferenceBitsPerByteCount error: targetNats must be non-negative")
+		targetWordBytes = calculateInferenceTokenByteCount(targetWord)
+		if(targetWordBytes > 0):
+			global totalInferenceTop1Nats
+			global totalInferenceTop1Bytes
+			global totalInferenceTop1PredictionNats
+			global totalInferenceTop1PredictionBytes
+			totalInferenceTop1Nats += targetNats
+			totalInferenceTop1Bytes += targetWordBytes
+			if(not seedPhase):
+				totalInferenceTop1PredictionNats += targetNats
+				totalInferenceTop1PredictionBytes += targetWordBytes
+	return
+
+def addInferenceTop1AccuracyCount(featurePredictionTargetMatch, seedPhase, targetWord, targetNats):
 	if(printInferenceTop1Accuracy):
 		if(featurePredictionTargetMatch):
 			matchValue = 1
@@ -97,30 +137,48 @@ def addInferenceTop1AccuracyCount(featurePredictionTargetMatch, seedPhase):
 		if(not seedPhase):
 			totalInferenceTop1PredictionMatches += matchValue
 			totalInferenceTop1PredictionTokens += 1
+		addInferenceBitsPerByteCount(seedPhase, targetWord, targetNats)
 	return
 
 def printInferenceTop1Accuracy(databaseNetworkObject):
 	if(printInferenceTop1Accuracy):
-		if(totalInferenceTop1Tokens <= 0 or totalInferenceTop1PredictionTokens <= 0):
-			print("printInferenceTop1Accuracy: no prediction tokens recorded; skipping accuracy")
-		else:
-			predictionAccuracy = totalInferenceTop1PredictionMatches / totalInferenceTop1PredictionTokens
-			inferenceAccuracy = totalInferenceTop1Matches / totalInferenceTop1Tokens
-			if(useAutoresearch):
-				print("---")
-				print("averageTop1Accuracy: ", predictionAccuracy)
-				memory_gb = GIAANNproto_databaseNetworkExcitation.debugCountTotalParametersRun(databaseNetworkObject)
-				print("memory_gb: ", memory_gb)
+		if(printInferenceTop1AccuracyBitsPerByte):
+			if(totalInferenceTop1Bytes <= 0 or totalInferenceTop1PredictionBytes <= 0):
+				print("printInferenceTop1Accuracy: no prediction bytes recorded; skipping BPB")
 			else:
-				if(inferenceReportTokenAccuracyConstrainByColumn):
-					print("averageTop1Accuracy (col): predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
+				predictionBitsPerByte = totalInferenceTop1PredictionNats / (math.log(2) * totalInferenceTop1PredictionBytes)
+				inferenceBitsPerByte = totalInferenceTop1Nats / (math.log(2) * totalInferenceTop1Bytes)
+				if(useAutoresearch):
+					print("---")
+					print("averageTop1BPB: ", predictionBitsPerByte)
+					memory_gb = GIAANNproto_databaseNetworkExcitation.debugCountTotalParametersRun(databaseNetworkObject)
+					print("memory_gb: ", memory_gb)
 				else:
-					print("averageTop1Accuracy: predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
+					if(inferenceReportTokenAccuracyConstrainByColumn):
+						print("averageTop1BPB (col): predictionBytes = ", predictionBitsPerByte, ", inferenceBytes = ", inferenceBitsPerByte)
+					else:
+						print("averageTop1BPB: predictionBytes = ", predictionBitsPerByte, ", inferenceBytes = ", inferenceBitsPerByte)
+		else:
+			if(totalInferenceTop1Tokens <= 0 or totalInferenceTop1PredictionTokens <= 0):
+				print("printInferenceTop1Accuracy: no prediction tokens recorded; skipping accuracy")
+			else:
+				predictionAccuracy = totalInferenceTop1PredictionMatches / totalInferenceTop1PredictionTokens
+				inferenceAccuracy = totalInferenceTop1Matches / totalInferenceTop1Tokens
+				if(useAutoresearch):
+					print("---")
+					print("averageTop1Accuracy: ", predictionAccuracy)
+					memory_gb = GIAANNproto_databaseNetworkExcitation.debugCountTotalParametersRun(databaseNetworkObject)
+					print("memory_gb: ", memory_gb)
+				else:
+					if(inferenceReportTokenAccuracyConstrainByColumn):
+						print("averageTop1Accuracy (col): predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
+					else:
+						print("averageTop1Accuracy: predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
 	return
 
-def addInferenceTop1AccuracyCountPadding(numSeedTokens, numPredictionTokens, seedTokensProcessed, predictionTokensProcessed):
+def addInferenceTop1AccuracyCountPadding(tokensSequence, numSeedTokens, numPredictionTokens, seedTokensProcessed, predictionTokensProcessed):
 	if(printInferenceTop1Accuracy):
-		if(numSeedTokens is None or numPredictionTokens is None or seedTokensProcessed is None or predictionTokensProcessed is None):
+		if(tokensSequence is None or numSeedTokens is None or numPredictionTokens is None or seedTokensProcessed is None or predictionTokensProcessed is None):
 			raise RuntimeError("addInferenceTop1AccuracyCountPadding error: token counts are None")
 		if(numSeedTokens < 0 or numPredictionTokens < 0 or seedTokensProcessed < 0 or predictionTokensProcessed < 0):
 			raise RuntimeError("addInferenceTop1AccuracyCountPadding error: token counts must be non-negative")
@@ -129,9 +187,13 @@ def addInferenceTop1AccuracyCountPadding(numSeedTokens, numPredictionTokens, see
 		if(remainingSeedTokens < 0 or remainingPredictionTokens < 0):
 			raise RuntimeError("addInferenceTop1AccuracyCountPadding error: processed token counts exceed expected token counts")
 		for remainingSeedTokenIndex in range(remainingSeedTokens):
-			addInferenceTop1AccuracyCount(False, True)
+			sequenceWordIndex = int(seedTokensProcessed) + remainingSeedTokenIndex
+			targetWord = tokensSequence[sequenceWordIndex].word
+			addInferenceTop1AccuracyCount(False, True, targetWord, float("inf"))
 		for remainingPredictionTokenIndex in range(remainingPredictionTokens):
-			addInferenceTop1AccuracyCount(False, False)
+			sequenceWordIndex = int(numSeedTokens) + int(predictionTokensProcessed) + remainingPredictionTokenIndex
+			targetWord = tokensSequence[sequenceWordIndex].word
+			addInferenceTop1AccuracyCount(False, False, targetWord, float("inf"))
 	return
 
 if(inferenceOnlyRetainPredictedTargetObservedColumn):
@@ -280,20 +342,20 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 		for wordSeedIndex in range(numSeedTokens):
 			sequenceWordIndex = wordSeedIndex
 			wordPredictionIndex = wordSeedIndex
-			featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, seedPhase=True)
+			featurePredictionTargetMatch, targetNats, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, seedPhase=True)
 			conceptColumnIndex = int(conceptColumnIndexNext)
 			conceptColumnFeatureIndex = int(conceptColumnFeatureIndexNext)
 			seedTokensProcessed += 1
-			addInferenceTop1AccuracyCount(featurePredictionTargetMatch, True)
+			addInferenceTop1AccuracyCount(featurePredictionTargetMatch, True, tokensSequence[sequenceWordIndex].word, targetNats)
 
 		#predict next tokens;
 		for wordPredictionIndex in range(numPredictionTokens):
 			sequenceWordIndex = numSeedTokens + wordPredictionIndex
-			featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime)
+			featurePredictionTargetMatch, targetNats, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime)
 			conceptColumnIndex = int(conceptColumnIndexNext)
 			conceptColumnFeatureIndex = int(conceptColumnFeatureIndexNext)
 			predictionTokensProcessed += 1
-			addInferenceTop1AccuracyCount(featurePredictionTargetMatch, False)
+			addInferenceTop1AccuracyCount(featurePredictionTargetMatch, False, tokensSequence[sequenceWordIndex].word, targetNats)
 			if(not featurePredictionTargetMatch):
 				if(debugWarningInferenceOnPredictionTargetMismatch):
 					print("warning: featurePredictionTargetMatch=False")
@@ -304,7 +366,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	except GIAANNproto_predictionConstraints.InferenceStopSequenceNoPredictionCandidatesAvailable:
 		inferenceTerminatedPrematurely = True
 	if(inferenceTerminatedPrematurely):
-		addInferenceTop1AccuracyCountPadding(numSeedTokens, numPredictionTokens, seedTokensProcessed, predictionTokensProcessed)
+		addInferenceTop1AccuracyCountPadding(tokensSequence, numSeedTokens, numPredictionTokens, seedTokensProcessed, predictionTokensProcessed)
 	if(debugPrintTotalInferenceTokens):
 		addTotalInferenceTokens(seedTokensProcessed, predictionTokensProcessed)
 	if(drawNetworkDuringInference):
@@ -374,15 +436,17 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	#select next prediction column/feature;
 	if(seedPhase):
 		#seedPhase;
-		conceptColumnIndexPred, conceptColumnFeatureIndexPred, conceptColumnIndexNext, conceptColumnFeatureIndexNext, targetPreviousColumnIndex, targetNextColumnIndex, globalFeatureNeuronsActivation, predictionCandidatesAvailable = selectNextColumnFeatureSeedPhase(sequenceObservedColumns, databaseNetworkObject, globalFeatureNeuronsActivation, tokensSequence, conceptMask, sequenceWordIndex, wordPredictionIndex, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap)
+		conceptColumnIndexPred, conceptColumnFeatureIndexPred, conceptColumnIndexNext, conceptColumnFeatureIndexNext, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetNats, globalFeatureNeuronsActivation, predictionCandidatesAvailable = selectNextColumnFeatureSeedPhase(sequenceObservedColumns, databaseNetworkObject, globalFeatureNeuronsActivation, tokensSequence, conceptMask, sequenceWordIndex, wordPredictionIndex, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap)
 	else:	
 		#predictionPhase;
-		conceptColumnIndexPred, conceptColumnFeatureIndexPred, conceptColumnIndexNext, conceptColumnFeatureIndexNext, targetPreviousColumnIndex, targetNextColumnIndex, predictionCandidatesAvailable = selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap)
+		conceptColumnIndexPred, conceptColumnFeatureIndexPred, conceptColumnIndexNext, conceptColumnFeatureIndexNext, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetNats, predictionCandidatesAvailable = selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap)
 	if(conceptColumnIndexPred is None or conceptColumnFeatureIndexPred is None):
 		GIAANNproto_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no prediction candidates available")
 
 	#calculate featurePredictionTargetMatch; 
 	featurePredictionTargetMatch, targetWord, predictedWord, targetColumnName, predictedColumnName = calculateInferencePredictionMatch(tokensSequence, sequenceWordIndex, conceptMask, databaseNetworkObject, conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex, predictionCandidatesAvailable)
+	if(seedPhase):
+		targetNats = 0.0
 
 	#print prediction; 
 	if(printPredictionsDuringInferencePredict):
@@ -401,7 +465,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		if(inferenceUseNeuronFeaturePropertiesTime):
 			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, databaseNetworkObject.arrayIndexPropertiesTimeIndex)
 		GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumnsPrediction, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+generateDrawSequenceIndex(sequenceWordIndex))
-	return featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime
+	return featurePredictionTargetMatch, targetNats, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime
 
 def ensurePredictionStateAvailable(conceptColumnsIndices, conceptColumnsFeatureIndices, sequenceWordIndex, wordPredictionIndex, tokensSequence, reason):
 	if(conceptColumnsIndices is None or conceptColumnsIndices.numel() == 0):
@@ -567,14 +631,18 @@ def selectNextColumnFeatureSeedPhase(sequenceObservedColumns, databaseNetworkObj
 	globalFeatureNeuronsActivationResult = GIAANNproto_sparseTensors.addElementValueToSparseTensor(globalFeatureNeuronsActivation, indicesToUpdateList, j1)
 	conceptColumnIndexPred = conceptColumnIndexNext	#temporarily assign prediction from seed target for print only
 	conceptColumnFeatureIndexPred = conceptColumnFeatureIndexNext	#temporarily assign prediction from seed target for print only
-	return conceptColumnIndexPred, conceptColumnFeatureIndexPred, conceptColumnIndexNext, conceptColumnFeatureIndexNext, targetPreviousColumnIndex, targetNextColumnIndex, globalFeatureNeuronsActivationResult, True
+	return conceptColumnIndexPred, conceptColumnFeatureIndexPred, conceptColumnIndexNext, conceptColumnFeatureIndexNext, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, 0.0, globalFeatureNeuronsActivationResult, True
 
 def selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap):
 	#predictionPhase;
 	predictionCandidatesAvailable = True
 	if(inferenceBeamSearch):
+		if(printInferenceTop1AccuracyBitsPerByte):
+			raise RuntimeError("selectNextColumnFeaturePredictionPhase error: printInferenceTop1AccuracyBitsPerByte requires inferenceBeamSearch=False")
 		try:
 			conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex = GIAANNproto_predictionBeamSearch.beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap)
+			targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
+			targetNats = 0.0
 			if(inferenceOnlyRetainPredictedTargetObservedColumn and not inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch):
 				if(observedColumnsDict is None):
 					raise RuntimeError("processColumnInferencePrediction error: observedColumnsDict is None")
@@ -586,9 +654,10 @@ def selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetw
 			targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 			conceptColumnIndexPred = int(targetPreviousColumnIndex)
 			conceptColumnFeatureIndexPred = int(targetFeatureIndex)
+			targetNats = float("inf")
 	else:
 		try:
-			conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex = GIAANNproto_predictionBeamSearch.beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap)
+			conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetNats = GIAANNproto_predictionBeamSearch.beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap)
 		except GIAANNproto_predictionConstraints.InferenceStopSequenceNoPredictionCandidatesAvailable:
 			if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 				raise
@@ -596,6 +665,7 @@ def selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetw
 			targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 			conceptColumnIndexPred = int(targetPreviousColumnIndex)
 			conceptColumnFeatureIndexPred = int(targetFeatureIndex)
+			targetNats = float("inf")
 	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		conceptColumnIndexNext = conceptColumnIndexPred	#use prediction as next selected feature
 		conceptColumnFeatureIndexNext = conceptColumnFeatureIndexPred	#use prediction as next selected feature
@@ -616,7 +686,7 @@ def selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetw
 		conceptColumnIndexNext = int(conceptColumnIndexNextTensor.squeeze().item())
 		conceptColumnFeatureIndexNext = int(conceptColumnFeatureIndexNextTensor.squeeze().item())
 		#connected predictions constraint is not applied in target-driven activation
-	return conceptColumnIndexPred, conceptColumnFeatureIndexPred, conceptColumnIndexNext, conceptColumnFeatureIndexNext, targetPreviousColumnIndex, targetNextColumnIndex, predictionCandidatesAvailable
+	return conceptColumnIndexPred, conceptColumnFeatureIndexPred, conceptColumnIndexNext, conceptColumnFeatureIndexNext, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetNats, predictionCandidatesAvailable
 
 def calculateInferencePredictionMatch(tokensSequence, sequenceWordIndex, conceptMask, databaseNetworkObject, conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex, predictionCandidatesAvailable):
 	#calculate featurePredictionTargetMatch; 

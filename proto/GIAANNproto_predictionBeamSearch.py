@@ -18,6 +18,7 @@ GIA ANN proto prediction Beam Search
 """
 
 import torch as pt
+import math
 import time
 
 from GIAANNproto_globalDefs import *
@@ -124,6 +125,10 @@ def beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkOb
 		if(useSANIcolumns or useSANIfeaturesAndColumns):
 			sequenceColumnIndex = GIAANNproto_predictionActivate.calculateSequenceColumnIndex(conceptMask, sequenceWordIndex)
 	constraintState = GIAANNproto_predictionConstraints.createConstraintState(allowedColumns, constraintMode)
+	if(printInferenceTop1AccuracyBitsPerByte):
+		targetNats = calculatePredictionNodeTargetNats(globalFeatureNeuronsActivation, globalFeatureNeuronsTime, strengthLookup, databaseNetworkObject, targetPreviousColumnIndex, targetFeatureIndex, constraintState, connectedColumnsConstraint, connectedColumnsFeatures, sequenceWordIndex, sequenceColumnIndex)
+	else:
+		targetNats = 0.0
 	candidateLimit = 1	#inferenceBeamWidth
 	candidates = selectBeamCandidates(globalFeatureNeuronsActivation, globalFeatureNeuronsTime, strengthLookup, candidateLimit, databaseNetworkObject, constraintState, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatures, sequenceWordIndex, sequenceColumnIndex)
 	if(len(candidates) == 0):
@@ -146,11 +151,49 @@ def beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkOb
 				raise RuntimeError("beamSearchSelectSingleStepFeature error: multiple prediction candidates not supported")
 			conceptColumnIndexPred = int(conceptColumnsIndicesNext.squeeze().item())
 			conceptColumnFeatureIndexPred = int(conceptColumnsFeatureIndicesNext.squeeze().item())
-			result = (conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex)
+			result = (conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex, targetNats)
 	
 	if(result is None):
 		raise RuntimeError("beamSearchSelectSingleStepFeature error: no prediction result available")
 	return result
+
+
+def calculatePredictionNodeTargetNats(stateFeatures, stateTime, strengthLookup, databaseNetworkObject, targetColumnIndex, targetFeatureIndex, constraintState=None, connectedColumnsTensor=None, connectedColumnsFeatures=None, sequenceWordIndex=None, sequenceColumnIndex=None):
+	if(stateFeatures is None):
+		raise RuntimeError("calculatePredictionNodeTargetNats error: stateFeatures is None")
+	stateFeaturesMetric = stateFeatures
+	if(inferenceUseNeuronFeaturePropertiesTime):
+		stateFeaturesMetric = GIAANNproto_predictionActivate.applyTimeBasedActivationModifier(stateFeaturesMetric, stateTime, sequenceWordIndex, sequenceColumnIndex)
+	columnIndices, featureIndices, activationValues = GIAANNproto_predictionConstraints.aggregateSparseColumnFeatureValues(stateFeaturesMetric, databaseNetworkObject.f)
+	if(columnIndices is None or featureIndices is None or activationValues is None):
+		return float("inf")
+	columnIndices, featureIndices, activationValues = filterCandidatesByActivationThreshold(columnIndices, featureIndices, activationValues)
+	columnIndices, featureIndices, activationValues = filterCandidatesByLastSegment(columnIndices, featureIndices, activationValues, stateFeaturesMetric, databaseNetworkObject.f)
+	if(columnIndices is None or featureIndices is None or activationValues is None):
+		return float("inf")
+	columnIndices, featureIndices, activationValues = GIAANNproto_predictionConstraints.filterColumnFeatureCandidatesByConnectedColumns(columnIndices, featureIndices, activationValues, connectedColumnsTensor, connectedColumnsFeatures)
+	if(columnIndices is None or featureIndices is None or activationValues is None):
+		return float("inf")
+	scoreValues = []
+	targetProbability = 0.0
+	for idx in range(columnIndices.shape[0]):
+		columnIndex = columnIndices[idx].item()
+		featureIndex = featureIndices[idx].item()
+		if(constraintState is not None and not GIAANNproto_predictionConstraints.constraintAllowsNode(databaseNetworkObject, columnIndex, featureIndex, constraintState)):
+			continue
+		activationValue = activationValues[idx].item()
+		connectionValue = getConnectionValue(strengthLookup, columnIndex, featureIndex, databaseNetworkObject.f)
+		scoreValues.append((columnIndex, featureIndex, computeBeamNodeScore(activationValue, connectionValue)))
+	if(len(scoreValues) == 0):
+		return float("inf")
+	scoreTensor = pt.tensor([scoreValue for _, _, scoreValue in scoreValues], dtype=pt.float32)
+	probabilityTensor = pt.softmax(scoreTensor, dim=0)
+	for scoreIndex, (columnIndex, featureIndex, scoreValue) in enumerate(scoreValues):
+		if(columnIndex == int(targetColumnIndex) and featureIndex == int(targetFeatureIndex)):
+			targetProbability += float(probabilityTensor[scoreIndex].item())
+	if(targetProbability <= 0.0):
+		return float("inf")
+	return -math.log(targetProbability)
 
 def initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState):
 	state = {"features": globalFeatureNeuronsActivation.clone()}
