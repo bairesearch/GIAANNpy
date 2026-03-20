@@ -36,14 +36,13 @@
 \maketitle
 
 \begin{abstract}
-General Intelligence Algorithm Artificial Neural Network (GIAANN) introduces an alternative learning algorithm to backpropagation: a dynamically growing network of features and connections for continuous learning. GIAANN Proto is an experimental implementation for language modeling.
-The system constructs an excitatory database network of feature neurons organised into concept columns, incrementally updates that network during training, and performs autoregressive inference by predicting subsequent features conditioned on a seeded prompt. The neurons are sequentially activated and sensitive to the timing of their input (SANI).
-This paper summarises the core ideas and provides an implementation-oriented description intended to accompany the released code.
+General Intelligence Algorithm Artificial Neural Network (GIAANN) introduces an alternative learning algorithm to backpropagation: a dynamically growing network of features and connections. GIAANN Proto is an experimental implementation for language modeling.
+The system constructs an excitatory database network of feature neurons organised into concept columns, incrementally updates that network during training, and performs autoregressive inference by predicting subsequent features conditioned on a seeded prompt. The neurons are sequentially activated and sensitive to the timing of their input (SANI). GIAANN provides advantages for biological feasibility, continual learning, online learning, catastrophic forgetting, concept-level generalisation, and robustness to hallucination. This paper summarises the core ideas and provides an implementation-oriented description intended to accompany the released code.
 \end{abstract}
 
 \section{Summary}
 Neural language models are commonly trained with gradient-based backpropagation and fixed-context attention mechanisms.
-GIAANN explores an alternative associative memory design: an online, dynamically growing network of features and connections intended to support continuous learning and effectively unbounded context via a persistent database network.
+GIAANN explores an alternative associative memory design: an online, dynamically growing network of features and connections intended to support continual learning and effectively unbounded context via a persistent database network.
 
 This paper is a \emph{companion} to the codebase \texttt{github.com/bairesearch/GIAANNpy}.
 

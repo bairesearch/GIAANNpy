@@ -548,3 +548,5 @@ v1k (Codex IDE GPT-5.4):
 MANUAL; - update oscar training-set eval inferencePromptFileName
 - update docs meta tags
 - add natural language code (nlc) specification to paper
+- patch paper latex references
+
