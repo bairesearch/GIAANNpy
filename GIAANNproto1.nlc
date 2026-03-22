@@ -549,4 +549,5 @@ MANUAL; - update oscar training-set eval inferencePromptFileName
 - update docs meta tags
 - add natural language code (nlc) specification to paper
 - patch paper latex references
+MANUAL; - add oscar useBenchmark:useBenchmarkDefaults=False training/test-set eval inferencePromptFileName
 
