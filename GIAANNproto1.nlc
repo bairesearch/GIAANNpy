@@ -550,4 +550,4 @@ MANUAL; - update oscar training-set eval inferencePromptFileName
 - add natural language code (nlc) specification to paper
 - patch paper latex references
 MANUAL; - add oscar useBenchmark:useBenchmarkDefaults=False training/test-set eval inferencePromptFileName
-
+/MANUAL; - upgrade trainLoadExistingDatabase to support storeDatabaseInRam

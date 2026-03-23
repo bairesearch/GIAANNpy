@@ -28,7 +28,7 @@ Thus, GIAANN’s neurons are more powerful, potentially reducing the number of n
 
 Against the backdrop of modern deep learning (e.g. Transformers), GIAANN stands out by eschewing backpropagation and dense continuous representations.
 Instead, it relies on local learning rules (Hebbian) and highly sparse, event-driven computation.
-While GIAANN might not reach the performance of a Transformer on benchmark datasets and evaluation metrics, it offers advantages in interpretability, incremental learning, and energy efficiency. Likewise, experiments are indicative of consistent scaling. GIAANN produced an OSCAR-2201 whole-word token top-1 test accuracy $\approx 0.15$ after 1M samples (\Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-trainsize}), whereas a RoBERTa Causal Transformer Language Model typically delivers a subword token top-1 test accuracy $\approx 0.3$ after 1M samples \citep{bairesearch2022TSBNLP}.
+While GIAANN might not reach the performance of a Transformer on benchmark datasets and evaluation metrics, it offers advantages in interpretability, incremental learning, and energy efficiency. Likewise, experiments are indicative of consistent scaling. GIAANN produced an OSCAR-2201 whole-word token top-1 test accuracy $\approx 0.15$ after 1M samples (\Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-trainsize}), whereas a RoBERTa Causal Transformer Language Model can deliver a subword token top-1 test accuracy $\approx 0.3$ after 1M samples \citep{bairesearch2022TSBNLP}.
 
 Every activation in GIAANN can be traced to a concept, every connection to a relation---a transparency that is largely missing in black-box deep nets.
 And whereas Transformers require enormous training data and then struggle with one-shot or continual learning, GIAANN can potentially incorporate new knowledge by adjusting a few connections in the semantic graph or adding a new neuron/column, without retraining the whole network. 
@@ -39,7 +39,7 @@ This addresses the plasticity-stability dilemma in a structural way: knowledge i
 It is important to note that while GIAANN draws on biology, it is not a direct simulation of the brain but rather a brain-inspired algorithm.
 Consequently, some differences exist: for instance, real cortical columns may not each hold a distinct ontology of a concept---the brain’s columns may be more sensorily grounded whereas GIAANN’s may be more abstract and conceptual. 
 
-Likewise, GIAANN currently supports the dynamic growing of columns and features (not only connections), which appears biologically unrealistic for a cortical substrate. It was developed under the assumption however of a dedicated pool of neurons distributed across columns that is progressively programmed to act as references to newly declared concepts and features (see \hyperref[sec:appendix]{Appendix}).
+Likewise, GIAANN currently supports the dynamic growing of columns and features (not only connections), which appears biologically unrealistic for a cortical substrate. It was developed under the assumption however of a dedicated pool of neurons distributed across columns that is progressively programmed to act as references to newly declared concepts and features (see Appendix~\ref{subsec:appendix-giaann-development}).
 
 Inhibitory interneurons are also critical in cortex for shaping activity; GIAANN currently emphasises excitatory drives with simplified global inhibition or as a mechanism for restricting prediction targets (exclusive top-1 selection, akin to winner-take-all).
 

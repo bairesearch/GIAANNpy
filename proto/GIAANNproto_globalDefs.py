@@ -233,7 +233,7 @@ useGPUdense = True	#default: True
 if(executionMode=="inference" or executionMode=="trainAndInference"):
 	useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors
 elif(executionMode=="train"):
-	useGPUsparse = True		#slight performance increase during train (does not use significant additional GPU ram during train)
+	useGPUsparse = True	#default: True	#slight performance increase during train (does not use significant additional GPU ram during train)
 useGPUsparseStrict = True	#default: True	#orig: False	#enforce strict sparse device during transfer to/from dense tensors
 runtimeReleaseGPUMemory = False	#default: True	#aggressively release cached CUDA memory after sequence processing
 runtimeReleaseGPUMemoryEverySequenceCount = 1	#default: 1	#only apply release every N processed sequences

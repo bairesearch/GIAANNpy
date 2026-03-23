@@ -104,11 +104,11 @@ def executeMode(inferenceMode):
 		GIAANNproto_databaseNetworkExcitation.debugCountTotalParametersRun(databaseNetworkObject)
 	if(usePOS):
 		GIAANNproto_sequenceTokens.loadPOSdatabase()
-	if(inferenceMode):
-		if(not inferenceTrainFirstSequences):
+	if((inferenceMode and not inferenceTrainFirstSequences) or (not inferenceMode and trainLoadExistingDatabase and trainSetStartOffsetSequences>0)):
+		if(inferenceMode and not inferenceTrainFirstSequences):
 			GIAANNproto_databaseNetworkExcitation.backupGlobalArrays(databaseNetworkObject)
-			if(storeDatabaseInRam):
-				GIAANNproto_databaseNetworkExcitation.loadAllObservedColumnsToRam(databaseNetworkObject)
+		if(storeDatabaseInRam):
+			GIAANNproto_databaseNetworkExcitation.loadAllObservedColumnsToRam(databaseNetworkObject)
 		
 	for epochIndex in range(numberEpochs):
 		#print("\nepochIndex = ", epochIndex)

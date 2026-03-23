@@ -14,10 +14,10 @@ Tokens are produced by spaCy (models \texttt{en\_core\_web\_trf} or \texttt{en\_
 Training runs for 1 epoch (\texttt{numberEpochs=1}) with a maximum of 1000000 sequences (\texttt{trainMaxSequences<=1000000}), sequence length capped at 80 tokens (\texttt{maxSequenceLength=80}). \texttt{numSeedTokensInference=8,12,16} is retained for segment sizing. Single-sentence sequences are used by default (\texttt{multisentencePredictions=False}, \texttt{numSentencesPerSequence=1}). The database is stored at \texttt{/media/user/ssdpro/GIAANN/database/}.
 
 \paragraph{Hardware.}
-ASUS B760 Intel Chipset, ASUS NVIDIA GeForce RTX 5070 (12GB GDDR7), NVIDIA Driver 580.126.09, CUDA 12.8. Intel i7 14700F. 64GB Patriot DDR4. Samsung 990 Pro PCIe 4.0 NVMe M.2 SSD (1TB).
+ASUS B760 Intel Chipset. ASUS NVIDIA GeForce RTX 5070 (12GB GDDR7). Intel i7 14700F. Patriot 64GB DDR4. Samsung 990 Pro PCIe 4.0 NVMe M.2 SSD (1TB).
 
 \paragraph{Software.}
-Ubuntu 24.04 LTS, IceWM, NEdit, Codex IDE extension for Visual Studio Code \citep{openai2026codexIdeExtension}.
+NVIDIA Driver 580.126.09. CUDA 12.8. Ubuntu 24.04 LTS. IceWM. NEdit. Codex IDE extension for Visual Studio Code \citep{openai2026codexIdeExtension}.
 
 \paragraph{Configuration flags.}
 \begin{itemize}
@@ -308,11 +308,11 @@ Therefore, a number of changes were introduced for test-set accuracy measurement
 
 \Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-trainsize} contains OSCAR-2201 Top-1 test-set accuracy for different training sizes, and different inference activations, with segment timing none (t-1 none), and targets fed as input. It is an expanded version of the table across a greater selection of train sizes. It was also trained with \texttt{spacyPipelineOptimisations=True} for efficiency.
 
+\Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceActivations} contains OSCAR-2201 top-1 test-set accuracy across different training sizes and inference activations, segment timing none (t-1 none), and targets fed as input. The different inference activation settings used were ``bool f+c'' (\texttt{inferenceSegmentActivationsBoolean=True}), ``int f+c'' (\texttt{inferenceSegmentActivationsBoolean=False}), and ``bool f'' (\texttt{inferenceSegmentActivationsBooleanFeatureSegmentsOnly=True} - default). It was also trained with \texttt{spacyPipelineOptimisations=True} for efficiency.
+
 \Cref{tab:oscar-test-top1-accuracy-useBenchmarkDefaultsFalse} contains OSCAR-2201 top-1 test-set accuracy for different numbers of segments, and different time constraints, with targets fed as input.  The default time constraints used for benchmarking of the test-set (``t-1 bias'') are \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=False} and \texttt{enforceSequentialActivation=False}. It also contains results for these non-default time constraints: \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=True} +  \texttt{enforceSequentialActivation=True} (``t-1 exact''), and \texttt{inferenceUseNeuronFeaturePropertiesTime=False} (``t-1 none''). It was trained with \texttt{useBenchmarkDefaults=False} (\url{spacyPipelineOptimisations=True} and \texttt{pretrainConceptColumnsDelimitByPOSenforce=True}) for efficiency and a greater use of the training data respectively.
 
 \Cref{tab:oscar-test-top1-accuracy-useBenchmarkDefaultsFalse-multisentencePredictions} contains OSCAR-2201 top-1 test-set accuracy for across different training sizes and time constraints, with multiple sentence predictions, and targets fed as input. It was trained with \texttt{multisentencePredictions=True} and \texttt{numSentencesPerSequence=3}, which generates longer sequences that are more suitable for higher segment counts with this dataset. It was also trained with \texttt{useBenchmarkDefaults=False} (\url{spacyPipelineOptimisations=True} and \texttt{pretrainConceptColumnsDelimitByPOSenforce=True}) for efficiency and a greater use of the training data respectively.
-
-\Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceActivations} contains OSCAR-2201 top-1 test-set accuracy across different training sizes and inference activations, segment timing none (t-1 none), and targets fed as input. The different inference activation settings used were ``bool f+c'' (\texttt{inferenceSegmentActivationsBoolean=True}), ``int f+c'' (\texttt{inferenceSegmentActivationsBoolean=False}), and ``bool f'' (\texttt{inferenceSegmentActivationsBooleanFeatureSegmentsOnly=True} - default). It was also trained with \texttt{spacyPipelineOptimisations=True} for efficiency.
 
 \Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceActivations-multisentencePredictionsInference} contains another version of the previous table but with multiple sentence predictions used during test-set inference. Inference was effectively performed with a different test-set (\texttt{multisentencePredictions=True}) than usual for this train database.
 
@@ -437,6 +437,24 @@ Although the vast majority of inference evaluations were performed with \texttt{
 
 \begin{table}[H]
 \centering
+\caption{OSCAR-2201 Top-1 test-set accuracy for different training sizes, and different inference activations, segment timing none (t-1 none), and targets fed as input.}
+\label{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceActivations}
+\begin{tabular}{rrrrrrrrr}
+\toprule
+\textbf{seed} & \textbf{c seg} & \textbf{f seg} & \textbf{sequences} & \textbf{bool f+c} & \textbf{int f+c} & \textbf{bool f} & \textbf{param} & \textbf{db size} \\
+\midrule
+8 & 3 & 5 & 5,000     & 0.029 & 0.029 & 0.029 & 2.2M & 0.1GB \\
+8 & 3 & 5 & 200,000   & 0.091 & 0.100 & 0.100 & 76.6M & 4.5GB \\
+12 & 4 & 7 & 5,000    & 0.028 & 0.029 & 0.031 & 2.5M & 0.2GB \\
+12 & 4 & 7 & 200,000  & 0.110 & 0.116 & 0.117 & 88.6M & 5.3GB \\
+16 & 5 & 9 & 5,000    & 0.023 & 0.023 & 0.024 & 2.9M & 0.2GB \\
+16 & 5 & 9 & 200,000  & 0.108 & 0.113 & 0.112 & 103.8M & 6.3GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
 \caption{OSCAR-2201 Top-1 test-set accuracy for different numbers of segments, and different time constraints, with targets fed as input}
 \label{tab:oscar-test-top1-accuracy-useBenchmarkDefaultsFalse}
 \begin{tabular}{rrrrrrrrrrrr}
@@ -470,24 +488,6 @@ Although the vast majority of inference evaluations were performed with \texttt{
 16 & 5 & 9 & 5,000    & 0.029 & 0.042 & 11.6M & 0.7GB \\
 16 & 5 & 9 & 50,000   & 0.037 & 0.088 & 107.4M & 6.0GB \\
 16 & 5 & 9 & 200,000  & 0.045 & 0.119 & 416.8M & 22.7GB \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{table}[H]
-\centering
-\caption{OSCAR-2201 Top-1 test-set accuracy for different training sizes, and different inference activations, segment timing none (t-1 none), and targets fed as input.}
-\label{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceActivations}
-\begin{tabular}{rrrrrrrrr}
-\toprule
-\textbf{seed} & \textbf{c seg} & \textbf{f seg} & \textbf{sequences} & \textbf{bool f+c} & \textbf{int f+c} & \textbf{bool f} & \textbf{param} & \textbf{db size} \\
-\midrule
-8 & 3 & 5 & 5,000     & 0.029 & 0.029 & 0.029 & 2.2M & 0.1GB \\
-8 & 3 & 5 & 200,000   & 0.091 & 0.100 & 0.100 & 76.6M & 4.5GB \\
-12 & 4 & 7 & 5,000    & 0.028 & 0.029 & 0.031 & 2.5M & 0.2GB \\
-12 & 4 & 7 & 200,000  & 0.110 & 0.116 & 0.117 & 88.6M & 5.3GB \\
-16 & 5 & 9 & 5,000    & 0.023 & 0.023 & 0.024 & 2.9M & 0.2GB \\
-16 & 5 & 9 & 200,000  & 0.108 & 0.113 & 0.112 & 103.8M & 6.3GB \\
 \bottomrule
 \end{tabular}
 \end{table}
