@@ -26,7 +26,7 @@ import sys
 
 
 #Execution mode selection;
-useQuickExecution = True	#default: False	#orig: True
+useQuickExecution = False	#default: False	#orig: True
 useAutoresearch = False
 inferenceTrainFirstSequences = False
 if(useQuickExecution):
@@ -35,8 +35,8 @@ if(useQuickExecution):
 elif(useAutoresearch):
 	executionMode = "trainAndInference" 
 else:
-	executionMode = "train"
-	#executionMode = "inference"
+	#executionMode = "train"
+	executionMode = "inference"
 	#executionMode = "trainAndInference" 
 	
 
@@ -46,7 +46,7 @@ drawNetworkDuringInference = False	#default: False
 
 
 #Primary Inference settings:
-numSeedTokensInference = 12	#default: 5, 8, 12, 16	#this is also set during train phase only so that the derived numberOfSegments always matches inference phase
+numSeedTokensInference = 8	#default: 5, 8, 12, 16	#this is also set during train phase only so that the derived numberOfSegments always matches inference phase
 useInference = True  #mandatory: True	#enable options that support inference mode
 if(useInference):
 	inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True	#True: activate next column features using current prediction; False: use current target (default top-1 accuracy measurement)
@@ -63,8 +63,8 @@ def printe(str):
 	
 	
 #Benchmarking;
-useBenchmark = False	#default: False	#orig: False	#use benchmark file naming schemes and evals
-useBenchmarkDefaults = False	#default: False	#orig: True
+useBenchmark = True	#default: False	#orig: False	#use benchmark file naming schemes and evals
+useBenchmarkDefaults = True	#default: False	#orig: True
 if(useAutoresearch):
 	useBenchmarkDefaultsTestSet = True	#True: eval test set
 else:
@@ -130,7 +130,7 @@ else:
 if(useAutoresearch):
 	trainMaxSequences = 5000
 else:
-	trainMaxSequences = 1000000		#dev: 10, 500, 5000, 10000, 200000 	#default: 1000000	  #adjust as needed	#max sequences for train
+	trainMaxSequences = 5000		#dev: 10, 500, 5000, 10000, 200000 	#default: 1000000	  #adjust as needed	#max sequences for train
 if(useQuickExecution):
 	databaseFolder = "../database"	#default: "../database/"
 elif(useAutoresearch):
@@ -162,7 +162,7 @@ else:
 	else:
 		databaseFolder = "../database"	#default: "../database/"
 databaseFolder += "/"
-maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
+maxSequenceLength = 60	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 
 
@@ -219,7 +219,7 @@ if(not datasetType=="textfile"):
 			raise RuntimeError("trainTestSet configuration error: unsupported dataset selection")
 		trainSetStartOffsetSequences = 0
 	else:
-		trainSetStartOffsetSequences = 0	#1000000	#default: 0	#orig: 0
+		trainSetStartOffsetSequences = 0	#1000000	#default: 0	#orig: 0	
 		if(datasetType=="oscar"):
 			maxSentencesPerArticle = 100	#CHECKTHIS
 		elif(datasetType=="wikipedia"):
@@ -512,7 +512,6 @@ if(printInferenceTop1Accuracy):
 		if(printInferenceTop1AccuracyBitsPerByte):
 			printInferenceTop1AccuracyBitsPerByteModified = True	#default: True	#print inference top-1 accuracy in modified BPB
 
-
 if(useAutoresearch):
 	printTotalFeatures = False
 	printConfiguration = True
@@ -619,6 +618,20 @@ if(useInference):
 
 
 #Database save paths;
+conceptColumnsDictFile = databaseFolder + 'conceptColumnsDict.pkl'
+conceptFeaturesDictFile = databaseFolder + 'conceptFeaturesDict.pkl'
+observedColumnsFolderName = 'observedColumns'
+observedColumnsDir = databaseFolder + observedColumnsFolderName
+observedColumnFolderNamePrefix = 'cIndex'
+observedColumnMetadataFileName = 'data.pkl'
+observedColumnFeatureConnectionsFolderName = 'featureConnections'
+observedColumnSourceFeatureConnectionsFileNamePrefix = 'fIndex'
+observedColumnFeatureNeuronsTensorName = 'featureNeurons'
+observedColumnLegacyMetadataFileSuffix = '_data.pkl'
+observedColumnLegacyFeatureConnectionsTensorNameSuffix = '_featureConnections'
+observedColumnLegacyFeatureNeuronsTensorNameSuffix = '_featureNeurons'
+observedColumnFeatureConnectionsFormat = 'bySourceFeature.v1'
+pytorchTensorFileExtension = ".pt"
 if(useInference):
 	if(useQuickExecution):
 		if(datasetType=="textfile"):
@@ -669,10 +682,6 @@ if(useInference):
 		else:
 			printe("invalid datasetType")
 	inferencePromptFile = databaseFolder + inferencePromptFileName
-conceptColumnsDictFile = databaseFolder + 'conceptColumnsDict.pkl'
-conceptFeaturesDictFile = databaseFolder + 'conceptFeaturesDict.pkl'
-observedColumnsDir = databaseFolder + 'observedColumns'
-pytorchTensorFileExtension = ".pt"
 if(conceptColumnsDelimitByPOS):
 	if(detectReferenceSetDelimitersBetweenNouns):
 		conceptFeaturesReferenceSetDelimiterDeterministicListFile = databaseFolder + 'conceptFeaturesReferenceSetDelimiterDeterministicList.pkl'

@@ -189,7 +189,7 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 			raise RuntimeError("executeBeamNodeActivation error: observedColumnsDict is None")
 		observedColumnsDict.clear()
 	observedColumnsDict[lemma] = observedColumn
-	featureConnections = observedColumn.featureConnections
+	featureConnections = observedColumn.getFeatureConnectionsForSourceFeature(featureIndex, targetDevice=state["features"].device, createMissing=False)
 	state["features"], state["connections"], state["time"] = GIAANNproto_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, state["features"], state["connections"], featureConnections, columnIndex, featureIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex)
 	applyBeamNodePredictionEffects(state, columnIndex, featureIndex, sequenceWordIndex)
 	if(predictionColumnsMustActivateConceptFeature):

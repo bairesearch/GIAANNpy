@@ -270,8 +270,8 @@ def getConnectedColumnsForFeature(observedColumn, featureIndex, includeFeatureDe
 	databaseNetworkObject = observedColumn.databaseNetworkObject
 	if(featureIndex is None or featureIndex < 0):
 		return [], {} if includeFeatureDetails else None
-	featureConnectionsStrength = observedColumn.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
-	featureConnectionsStrength = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsStrength, 2, featureIndex)
+	featureConnectionsSource = observedColumn.getFeatureConnectionsForSourceFeature(featureIndex, targetDevice=deviceSparse, createMissing=False)
+	featureConnectionsStrength = featureConnectionsSource[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 	featureConnectionsStrength = featureConnectionsStrength.coalesce()
 	if(featureConnectionsStrength._nnz() == 0):
 		return [], {} if includeFeatureDetails else None
