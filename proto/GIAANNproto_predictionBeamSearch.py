@@ -302,21 +302,29 @@ def selectBeamCandidates(stateFeatures, stateTime, strengthLookup, candidateLimi
 	candidateLimit = max(1, candidateLimit)
 	debugTimeStart = None
 	debugTimeLast = None
-	if(inferenceUseNeuronFeaturePropertiesTime):
-		# spec step (b): apply time-based activation modifier during beam candidate selection
-		stateFeatures = GIAANNproto_predictionActivate.applyTimeBasedActivationModifier(stateFeatures, stateTime, sequenceWordIndex, sequenceColumnIndex)
-	columnIndices, featureIndices, activationValues = GIAANNproto_predictionConstraints.aggregateSparseColumnFeatureValues(stateFeatures, databaseNetworkObject.f)
-	if(columnIndices is None):
-		return []
-	columnIndices, featureIndices, activationValues = filterCandidatesByActivationThreshold(columnIndices, featureIndices, activationValues)
-	columnIndices, featureIndices, activationValues = filterCandidatesByLastSegment(columnIndices, featureIndices, activationValues, stateFeatures, databaseNetworkObject.f)
-	if(columnIndices is None):
-		return []
-	columnIndices, featureIndices, activationValues = GIAANNproto_predictionConstraints.filterColumnFeatureCandidatesByConnectedColumns(columnIndices, featureIndices, activationValues, connectedColumnsTensor, connectedColumnsFeatures)
+	columnIndices, featureIndices, activationValues = calculateSelectionActivationDistribution(databaseNetworkObject, stateFeatures, stateTime, constraintState, connectedColumnsTensor, connectedColumnsFeatures, sequenceWordIndex, sequenceColumnIndex)
 	if(columnIndices is None):
 		return []
 	candidates = selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, databaseNetworkObject.f, databaseNetworkObject, constraintState, conceptActivationState)
 	return candidates
+
+def calculateSelectionActivationDistribution(databaseNetworkObject, stateFeatures, stateTime, constraintState=None, connectedColumnsTensor=None, connectedColumnsFeatures=None, sequenceWordIndex=None, sequenceColumnIndex=None):
+	columnIndices = None
+	featureIndices = None
+	activationValues = None
+	stateFeaturesSelection = stateFeatures
+	if(inferenceUseNeuronFeaturePropertiesTime):
+		# spec step (b): apply time-based activation modifier during beam candidate selection
+		stateFeaturesSelection = GIAANNproto_predictionActivate.applyTimeBasedActivationModifier(stateFeaturesSelection, stateTime, sequenceWordIndex, sequenceColumnIndex)
+	columnIndices, featureIndices, activationValues = GIAANNproto_predictionConstraints.aggregateSparseColumnFeatureValues(stateFeaturesSelection, databaseNetworkObject.f)
+	if(columnIndices is not None):
+		columnIndices, featureIndices, activationValues = filterCandidatesByActivationThreshold(columnIndices, featureIndices, activationValues)
+		columnIndices, featureIndices, activationValues = filterCandidatesByLastSegment(columnIndices, featureIndices, activationValues, stateFeaturesSelection, databaseNetworkObject.f)
+		if(columnIndices is not None):
+			columnIndices, featureIndices, activationValues = GIAANNproto_predictionConstraints.filterColumnFeatureCandidatesByConnectedColumns(columnIndices, featureIndices, activationValues, connectedColumnsTensor, connectedColumnsFeatures)
+		if(columnIndices is not None):
+			columnIndices, featureIndices, activationValues = GIAANNproto_predictionConstraints.filterColumnFeatureCandidatesByConstraint(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
+	return columnIndices, featureIndices, activationValues
 
 def filterCandidatesByLastSegment(columnIndices, featureIndices, activationValues, stateFeatures, maxFeatures):
 	filteredColumns = columnIndices

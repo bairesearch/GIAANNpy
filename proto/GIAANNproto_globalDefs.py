@@ -219,7 +219,7 @@ if(not datasetType=="textfile"):
 			raise RuntimeError("trainTestSet configuration error: unsupported dataset selection")
 		trainSetStartOffsetSequences = 0
 	else:
-		trainSetStartOffsetSequences = 0	#default: 0	#orig: 0	
+		trainSetStartOffsetSequences = 0	#1000000	#default: 0	#orig: 0
 		if(datasetType=="oscar"):
 			maxSentencesPerArticle = 100	#CHECKTHIS
 		elif(datasetType=="wikipedia"):
@@ -233,7 +233,7 @@ useGPUdense = True	#default: True
 if(executionMode=="inference" or executionMode=="trainAndInference"):
 	useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors
 elif(executionMode=="train"):
-	useGPUsparse = True	#default: True	#slight performance increase during train (does not use significant additional GPU ram during train)
+	useGPUsparse = True	#default: True		#slight performance increase during train (does not use significant additional GPU ram during train)
 useGPUsparseStrict = True	#default: True	#orig: False	#enforce strict sparse device during transfer to/from dense tensors
 runtimeReleaseGPUMemory = False	#default: True	#aggressively release cached CUDA memory after sequence processing
 runtimeReleaseGPUMemoryEverySequenceCount = 1	#default: 1	#only apply release every N processed sequences
@@ -501,7 +501,18 @@ randomiseColumnFeatureXposition = True	#shuffle x position of column internal fe
 
 
 #Information vars;
-printInferenceTop1Accuracy = True	#print inference top-1 accuracy
+printInferenceTop1Accuracy = True	#default: True	#print inference top-1 accuracy
+printInferenceTop1AccuracyBitsPerByte = False	#dependent var
+printInferenceTop1AccuracyBitsPerByteModified = False	#dependent var
+if(printInferenceTop1Accuracy):
+	printInferenceTop1AccuracyBitsPerByte = False	#default: False	#print inference top-1 accuracy in BPB
+	if(printInferenceTop1AccuracyBitsPerByte):
+		assert not inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures, "printInferenceTop1AccuracyBitsPerByte requires inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=False"
+		assert not inferenceBeamSearch, "printInferenceTop1AccuracyBitsPerByte requires inferenceBeamSearch=False"
+		if(printInferenceTop1AccuracyBitsPerByte):
+			printInferenceTop1AccuracyBitsPerByteModified = True	#default: True	#print inference top-1 accuracy in modified BPB
+
+
 if(useAutoresearch):
 	printTotalFeatures = False
 	printConfiguration = True
@@ -547,7 +558,7 @@ debugTerminateInferenceOnNoPredictionCandidatesAvailable = False
 debugTerminateOnConceptColumnsDelimitByPOSwarning = False
 if(not useAutoresearch):
 	if(not printTrainSequenceRaw):
-		debugTerminateOnConceptColumnsDelimitByPOSwarning = True
+		debugTerminateOnConceptColumnsDelimitByPOSwarning = False	#default: True
 if(pretrainConceptColumnsDelimitByPOSenforce):
 	debugTerminateOnConceptColumnsDelimitByPOSerror = False
 else:
@@ -1088,4 +1099,3 @@ if(printConfiguration):
 	print("")
 	print("************************************ ")
 	
-

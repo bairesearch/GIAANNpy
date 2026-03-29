@@ -551,3 +551,15 @@ MANUAL; - update oscar training-set eval inferencePromptFileName
 - patch paper latex references
 MANUAL; - add oscar useBenchmark:useBenchmarkDefaults=False training/test-set eval inferencePromptFileName
 /MANUAL; - upgrade trainLoadExistingDatabase to support storeDatabaseInRam
+- add option printInferenceTop1AccuracyBitsPerByte=True - that prints BPB instead of accuracy across tokens (ie words).
+	Note the formula is;
+	BPB = (val_loss / log(2)) * (tokens / bytes)
+	where;
+	- tokens = total number of tokens (i.e. words) in inference sequence (executionMode = "inference")
+	- bytes = total number of bytes in inference sequence (the inference datasets are utf-8, so you need to count the bytes; it is approx 1 byte per character)
+	- log(2) = ln(2)
+	- val_loss = \frac{1}{N}\sum_{i=1}^{N} -\ln(p_i)
+	- p_i = the probability assigned to the target (i.e. correct) token at index i in the inference sequence. Note p_i is the probability that the correct word (feature), independent of column, is predicted for the inference step i. It therefore depends on the probability of any other word being predicted. Thus, p_i is likely calculated by taking a) the final filtered selection activation of the successfully predicted token feature index (summed across all columns), and dividing it by b) the final filtered selection activations of all token feature indices (summed across all columns) [or b) the sum of activations of all neurons in the network]. 
+	For printInferenceTop1AccuracyBitsPerByte=True, assume (not inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures), i.e. inference is performed (BPB is calculated) for every token of the inference dataset.
+- introduce a "modified-BPB" (printInferenceTop1AccuracyBitsPerByteModified=True) that calculates the val_loss as;
+	val_loss = -\ln\left(\frac{1}{N}\sum_{i=1}^{N} p_i\right)

@@ -19,6 +19,7 @@ GIA ANN proto prediction
 
 import torch as pt
 import time
+import math
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_databaseNetworkExcitation
@@ -41,6 +42,10 @@ totalInferenceTop1Matches = 0
 totalInferenceTop1Tokens = 0
 totalInferenceTop1PredictionMatches = 0
 totalInferenceTop1PredictionTokens = 0
+totalInferenceTop1NegativeLogProbabilitySum = 0.0
+totalInferenceTop1BitsPerByteTokens = 0
+totalInferenceTop1BitsPerByteBytes = 0
+totalInferenceTop1ProbabilitySumModified = 0.0
 
 def resetTotalInferenceTokens():
 	if(debugPrintTotalInferenceTokens):
@@ -76,10 +81,18 @@ def resetInferenceTop1AccuracyCounts():
 	global totalInferenceTop1Tokens
 	global totalInferenceTop1PredictionMatches
 	global totalInferenceTop1PredictionTokens
+	global totalInferenceTop1NegativeLogProbabilitySum
+	global totalInferenceTop1BitsPerByteTokens
+	global totalInferenceTop1BitsPerByteBytes
+	global totalInferenceTop1ProbabilitySumModified
 	totalInferenceTop1Matches = 0
 	totalInferenceTop1Tokens = 0
 	totalInferenceTop1PredictionMatches = 0
 	totalInferenceTop1PredictionTokens = 0
+	totalInferenceTop1NegativeLogProbabilitySum = 0.0
+	totalInferenceTop1BitsPerByteTokens = 0
+	totalInferenceTop1BitsPerByteBytes = 0
+	totalInferenceTop1ProbabilitySumModified = 0.0
 	return
 
 def addInferenceTop1AccuracyCount(featurePredictionTargetMatch, seedPhase):
@@ -99,9 +112,79 @@ def addInferenceTop1AccuracyCount(featurePredictionTargetMatch, seedPhase):
 			totalInferenceTop1PredictionTokens += 1
 	return
 
+def addInferenceTop1AccuracyBitsPerByteProbability(targetProbability):
+	if(printInferenceTop1AccuracyBitsPerByte):
+		if(targetProbability is None):
+			raise RuntimeError("addInferenceTop1AccuracyBitsPerByteProbability error: targetProbability is None")
+		if(targetProbability < 0.0 or targetProbability > 1.0):
+			raise RuntimeError("addInferenceTop1AccuracyBitsPerByteProbability error: targetProbability must be within [0, 1]")
+		global totalInferenceTop1NegativeLogProbabilitySum
+		global totalInferenceTop1BitsPerByteTokens
+		global totalInferenceTop1ProbabilitySumModified
+		totalInferenceTop1BitsPerByteTokens += 1
+		totalInferenceTop1ProbabilitySumModified += targetProbability
+		if(targetProbability == 0.0):
+			totalInferenceTop1NegativeLogProbabilitySum = math.inf
+		elif(not math.isinf(totalInferenceTop1NegativeLogProbabilitySum)):
+			totalInferenceTop1NegativeLogProbabilitySum += -math.log(targetProbability)
+	return
+
+def addInferenceTop1AccuracyBitsPerByteBytes(sequenceRaw):
+	if(printInferenceTop1AccuracyBitsPerByte):
+		if(sequenceRaw is None):
+			raise RuntimeError("addInferenceTop1AccuracyBitsPerByteBytes error: sequenceRaw is None")
+		sequenceBytes = len(sequenceRaw.encode("utf-8"))
+		if(sequenceBytes <= 0):
+			raise RuntimeError("addInferenceTop1AccuracyBitsPerByteBytes error: sequenceBytes must be > 0")
+		global totalInferenceTop1BitsPerByteBytes
+		totalInferenceTop1BitsPerByteBytes += sequenceBytes
+	return
+
 def printInferenceTop1Accuracy(databaseNetworkObject):
 	if(printInferenceTop1Accuracy):
-		if(totalInferenceTop1Tokens <= 0 or totalInferenceTop1PredictionTokens <= 0):
+		if(printInferenceTop1AccuracyBitsPerByte):
+			if(totalInferenceTop1BitsPerByteTokens <= 0):
+				if(printInferenceTop1AccuracyBitsPerByteModified):
+					print("printInferenceTop1AccuracyBitsPerByteModified: no inference tokens recorded; skipping modified BPB")
+				else:
+					print("printInferenceTop1AccuracyBitsPerByte: no inference tokens recorded; skipping BPB")
+			elif(totalInferenceTop1BitsPerByteBytes <= 0):
+				if(printInferenceTop1AccuracyBitsPerByteModified):
+					raise RuntimeError("printInferenceTop1AccuracyBitsPerByteModified error: totalInferenceTop1BitsPerByteBytes must be > 0")
+				else:
+					raise RuntimeError("printInferenceTop1AccuracyBitsPerByte error: totalInferenceTop1BitsPerByteBytes must be > 0")
+			else:
+				if(printInferenceTop1AccuracyBitsPerByteModified):
+					averageProbabilityModified = totalInferenceTop1ProbabilitySumModified / totalInferenceTop1BitsPerByteTokens
+					if(averageProbabilityModified < 0.0 or averageProbabilityModified > 1.0):
+						raise RuntimeError("printInferenceTop1AccuracyBitsPerByteModified error: averageProbabilityModified must be within [0, 1]")
+					if(averageProbabilityModified == 0.0):
+						valLoss = math.inf
+						bitsPerByte = math.inf
+					else:
+						valLoss = -math.log(averageProbabilityModified)
+						bitsPerByte = (valLoss / math.log(2.0)) * (totalInferenceTop1BitsPerByteTokens / totalInferenceTop1BitsPerByteBytes)
+				else:
+					if(math.isinf(totalInferenceTop1NegativeLogProbabilitySum)):
+						valLoss = math.inf
+						bitsPerByte = math.inf
+					else:
+						valLoss = totalInferenceTop1NegativeLogProbabilitySum / totalInferenceTop1BitsPerByteTokens
+						bitsPerByte = (valLoss / math.log(2.0)) * (totalInferenceTop1BitsPerByteTokens / totalInferenceTop1BitsPerByteBytes)
+				if(useAutoresearch):
+					print("---")
+					if(printInferenceTop1AccuracyBitsPerByteModified):
+						print("averageTop1BitsPerByteModified: ", bitsPerByte)
+					else:
+						print("averageTop1BitsPerByte: ", bitsPerByte)
+					memory_gb = GIAANNproto_databaseNetworkExcitation.debugCountTotalParametersRun(databaseNetworkObject)
+					print("memory_gb: ", memory_gb)
+				else:
+					if(printInferenceTop1AccuracyBitsPerByteModified):
+						print("averageTop1BitsPerByteModified: bitsPerByte = ", bitsPerByte, ", valLoss = ", valLoss, ", averageProbability = ", averageProbabilityModified, ", inferenceTokens = ", totalInferenceTop1BitsPerByteTokens, ", inferenceBytes = ", totalInferenceTop1BitsPerByteBytes)
+					else:
+						print("averageTop1BitsPerByte: bitsPerByte = ", bitsPerByte, ", valLoss = ", valLoss, ", inferenceTokens = ", totalInferenceTop1BitsPerByteTokens, ", inferenceBytes = ", totalInferenceTop1BitsPerByteBytes)
+		elif(totalInferenceTop1Tokens <= 0 or totalInferenceTop1PredictionTokens <= 0):
 			print("printInferenceTop1Accuracy: no prediction tokens recorded; skipping accuracy")
 		else:
 			predictionAccuracy = totalInferenceTop1PredictionMatches / totalInferenceTop1PredictionTokens
@@ -133,6 +216,63 @@ def addInferenceTop1AccuracyCountPadding(numSeedTokens, numPredictionTokens, see
 		for remainingPredictionTokenIndex in range(remainingPredictionTokens):
 			addInferenceTop1AccuracyCount(False, False)
 	return
+
+def getInferenceTargetWord(tokensSequence, conceptMask, sequenceWordIndex):
+	targetWord = None
+	targetToken = tokensSequence[sequenceWordIndex]
+	targetIsConceptFeature = bool(conceptMask[sequenceWordIndex].item())
+	if(targetIsConceptFeature):
+		if(targetToken.lemma is None):
+			raise RuntimeError("getInferenceTargetWord error: concept token lemma is None")
+		targetWord = targetToken.lemma
+	else:
+		targetWord = targetToken.word
+	return targetWord
+
+def getInferenceCandidateWord(databaseNetworkObject, columnIndex, featureIndex):
+	candidateWord = None
+	if(columnIndex < 0 or columnIndex >= len(databaseNetworkObject.conceptColumnsList)):
+		raise RuntimeError("getInferenceCandidateWord error: columnIndex out of range")
+	if(featureIndex == featureIndexPrimeConceptNeuron):
+		candidateWord = databaseNetworkObject.conceptColumnsList[columnIndex]
+	else:
+		if(featureIndex < 0 or featureIndex >= len(databaseNetworkObject.conceptFeaturesList)):
+			raise RuntimeError("getInferenceCandidateWord error: featureIndex out of range")
+		candidateWord = databaseNetworkObject.conceptFeaturesList[featureIndex]
+	return candidateWord
+
+def calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap):
+	targetProbability = 0.0
+	sequenceColumnIndex = None
+	if(globalFeatureNeuronsActivation is None):
+		raise RuntimeError("calculateInferenceTargetProbability error: globalFeatureNeuronsActivation is None")
+	if(inferenceUseNeuronFeaturePropertiesTime):
+		if(globalFeatureNeuronsTime is None):
+			raise RuntimeError("calculateInferenceTargetProbability error: globalFeatureNeuronsTime is None while inferenceUseNeuronFeaturePropertiesTime")
+		if(useSANIcolumns or useSANIfeaturesAndColumns):
+			sequenceColumnIndex = GIAANNproto_predictionActivate.calculateSequenceColumnIndex(conceptMask, sequenceWordIndex)
+	constraintState = GIAANNproto_predictionConstraints.createConstraintState(allowedColumnsConstraint, constraintModePrediction)
+	columnIndices, featureIndices, activationValues = GIAANNproto_predictionBeamSearch.calculateSelectionActivationDistribution(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, constraintState, connectedColumnsConstraint, connectedColumnsFeatureMap, sequenceWordIndex, sequenceColumnIndex)
+	if(columnIndices is not None and featureIndices is not None and activationValues is not None and columnIndices.numel() > 0 and featureIndices.numel() > 0 and activationValues.numel() > 0):
+		targetWord = getInferenceTargetWord(tokensSequence, conceptMask, sequenceWordIndex)
+		totalActivation = 0.0
+		targetActivation = 0.0
+		for activationIndex in range(columnIndices.shape[0]):
+			columnIndex = int(columnIndices[activationIndex].item())
+			featureIndex = int(featureIndices[activationIndex].item())
+			activationValue = float(activationValues[activationIndex].item())
+			# Biased time penalties can drive activations negative; these contribute zero probability mass.
+			if(activationValue < 0.0):
+				activationValue = 0.0
+			if(activationValue == 0.0):
+				continue
+			candidateWord = getInferenceCandidateWord(databaseNetworkObject, columnIndex, featureIndex)
+			totalActivation += activationValue
+			if(candidateWord == targetWord):
+				targetActivation += activationValue
+		if(totalActivation > 0.0):
+			targetProbability = targetActivation / totalActivation
+	return targetProbability
 
 if(inferenceOnlyRetainPredictedTargetObservedColumn):
 	def loadObservedColumnInference(databaseNetworkObject, observedColumnsDict, conceptIndex, sequenceWordIndex):
@@ -242,13 +382,14 @@ if not drawSequenceObservedColumns:
 			self.databaseNetworkObject = databaseNetworkObject
 			self.observedColumnsDict = observedColumnsDict
 
-def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequence, sequenceSeed, sequencePredict, numSeedTokens):
+def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequence, sequenceSeed, sequencePredict, numSeedTokens, sequenceRaw):
 	if(printHeaderDuringInferencePredict):
 		print("processConceptWordsInference:")
 
 	sequenceWordIndex = 0
 
 	tokensSequence = GIAANNproto_sequenceTokens.getTokens(sequence)
+	addInferenceTop1AccuracyBitsPerByteBytes(sequenceRaw)
 	conceptMask, conceptIndices, numberConcepts = GIAANNproto_sequenceConcepts.createConceptMask(sequenceObservedColumns, tokensSequence)
 
 	numPredictionTokens = len(sequencePredict)	#set numPredictionTokens (dynamic)
@@ -303,6 +444,8 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 					break
 	except GIAANNproto_predictionConstraints.InferenceStopSequenceNoPredictionCandidatesAvailable:
 		inferenceTerminatedPrematurely = True
+	if(inferenceTerminatedPrematurely and printInferenceTop1AccuracyBitsPerByte):
+		raise RuntimeError("processConceptWordsInference error: BPB requires inference to evaluate every token in the sequence")
 	if(inferenceTerminatedPrematurely):
 		addInferenceTop1AccuracyCountPadding(numSeedTokens, numPredictionTokens, seedTokensProcessed, predictionTokensProcessed)
 	if(debugPrintTotalInferenceTokens):
@@ -368,8 +511,18 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		#activation targets have already been activated
 		sequenceObservedColumnsPrediction = SequenceObservedColumnsDraw(databaseNetworkObject, observedColumnsDict)
 
+	targetProbability = None
+	if(printInferenceTop1AccuracyBitsPerByte):
+		if(sequenceWordIndex == 0):
+			targetProbability = calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap)
+
 	#deactivate previously predicted neurons;
 	globalFeatureNeuronsActivation, conceptActivationState = deactivatePredictedNeuronActivations(globalFeatureNeuronsActivation, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, conceptColumnFeatureIndexTensorActivation, conceptColumnIndex, conceptColumnFeatureIndex, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, conceptActivationState)
+
+	if(printInferenceTop1AccuracyBitsPerByte):
+		if(sequenceWordIndex > 0):
+			targetProbability = calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap)
+		addInferenceTop1AccuracyBitsPerByteProbability(targetProbability)
 	
 	#select next prediction column/feature;
 	if(seedPhase):

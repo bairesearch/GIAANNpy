@@ -446,7 +446,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 					print("warning: inference skipped due to missing concept column delimiter detection in sequence")
 			else:
 				# Process each concept word in the sequence (predict)
-				GIAANNproto_prediction.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens)
+				GIAANNproto_prediction.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens, sequenceRaw)
 		else:
 			# Process each concept word in the sequence (train)
 			trained = GIAANNproto_databaseNetworkTrainExcitation.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)
