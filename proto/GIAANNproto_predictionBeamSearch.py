@@ -302,13 +302,13 @@ def selectBeamCandidates(stateFeatures, stateTime, strengthLookup, candidateLimi
 	candidateLimit = max(1, candidateLimit)
 	debugTimeStart = None
 	debugTimeLast = None
-	columnIndices, featureIndices, activationValues = calculateSelectionActivationDistribution(databaseNetworkObject, stateFeatures, stateTime, constraintState, connectedColumnsTensor, connectedColumnsFeatures, sequenceWordIndex, sequenceColumnIndex)
+	columnIndices, featureIndices, activationValues = calculateSelectionActivationDistribution(databaseNetworkObject, stateFeatures, stateTime, constraintState, connectedColumnsTensor, connectedColumnsFeatures, sequenceWordIndex, sequenceColumnIndex, False)
 	if(columnIndices is None):
 		return []
 	candidates = selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, databaseNetworkObject.f, databaseNetworkObject, constraintState, conceptActivationState)
 	return candidates
 
-def calculateSelectionActivationDistribution(databaseNetworkObject, stateFeatures, stateTime, constraintState=None, connectedColumnsTensor=None, connectedColumnsFeatures=None, sequenceWordIndex=None, sequenceColumnIndex=None):
+def calculateSelectionActivationDistribution(databaseNetworkObject, stateFeatures, stateTime, constraintState=None, connectedColumnsTensor=None, connectedColumnsFeatures=None, sequenceWordIndex=None, sequenceColumnIndex=None, applyConstraintFilter=False):
 	columnIndices = None
 	featureIndices = None
 	activationValues = None
@@ -322,7 +322,7 @@ def calculateSelectionActivationDistribution(databaseNetworkObject, stateFeature
 		columnIndices, featureIndices, activationValues = filterCandidatesByLastSegment(columnIndices, featureIndices, activationValues, stateFeaturesSelection, databaseNetworkObject.f)
 		if(columnIndices is not None):
 			columnIndices, featureIndices, activationValues = GIAANNproto_predictionConstraints.filterColumnFeatureCandidatesByConnectedColumns(columnIndices, featureIndices, activationValues, connectedColumnsTensor, connectedColumnsFeatures)
-		if(columnIndices is not None):
+		if(columnIndices is not None and applyConstraintFilter):
 			columnIndices, featureIndices, activationValues = GIAANNproto_predictionConstraints.filterColumnFeatureCandidatesByConstraint(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
 	return columnIndices, featureIndices, activationValues
 

@@ -563,3 +563,5 @@ MANUAL; - add oscar useBenchmark:useBenchmarkDefaults=False training/test-set ev
 	For printInferenceTop1AccuracyBitsPerByte=True, assume (not inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures), i.e. inference is performed (BPB is calculated) for every token of the inference dataset.
 - introduce a "modified-BPB" (printInferenceTop1AccuracyBitsPerByteModified=True) that calculates the val_loss as;
 	val_loss = -\ln\left(\frac{1}{N}\sum_{i=1}^{N} p_i\right)
+- patch printInferenceTop1AccuracyBitsPerByte - restore the pre-BPB inference candidate-selection path when printInferenceTop1AccuracyBitsPerByte=False by limiting the new node-level constraint filtering to the BPB probability-calculation path only.
+

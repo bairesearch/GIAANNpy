@@ -252,7 +252,7 @@ def calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeur
 		if(useSANIcolumns or useSANIfeaturesAndColumns):
 			sequenceColumnIndex = GIAANNproto_predictionActivate.calculateSequenceColumnIndex(conceptMask, sequenceWordIndex)
 	constraintState = GIAANNproto_predictionConstraints.createConstraintState(allowedColumnsConstraint, constraintModePrediction)
-	columnIndices, featureIndices, activationValues = GIAANNproto_predictionBeamSearch.calculateSelectionActivationDistribution(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, constraintState, connectedColumnsConstraint, connectedColumnsFeatureMap, sequenceWordIndex, sequenceColumnIndex)
+	columnIndices, featureIndices, activationValues = GIAANNproto_predictionBeamSearch.calculateSelectionActivationDistribution(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, constraintState, connectedColumnsConstraint, connectedColumnsFeatureMap, sequenceWordIndex, sequenceColumnIndex, True)
 	if(columnIndices is not None and featureIndices is not None and activationValues is not None and columnIndices.numel() > 0 and featureIndices.numel() > 0 and activationValues.numel() > 0):
 		targetWord = getInferenceTargetWord(tokensSequence, conceptMask, sequenceWordIndex)
 		totalActivation = 0.0
