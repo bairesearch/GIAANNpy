@@ -248,6 +248,8 @@ class ObservedColumn:
 
 		self.featureConnectionsBySourceFeature = {}
 		self.loadedSourceFeatureIndices = set()
+		if(getFeatureConnectionsForSourceFeatureCache):
+			self.storedSourceFeatureIndicesCache = None
 
 		if(not trainStoreFeatureMapsGlobally):
 			self.nextFeatureIndex = 0
@@ -315,8 +317,12 @@ class ObservedColumn:
 		return indicesList
 
 	def listStoredSourceFeatureIndices(self):
-		storedIndices = GIAANNproto_databaseNetworkFilesExcitation.listObservedColumnSourceFeatureIndices(self.conceptIndex)
-		combinedIndices = set(storedIndices)
+		if(getFeatureConnectionsForSourceFeatureCache):
+			if(self.storedSourceFeatureIndicesCache is None):
+				self.storedSourceFeatureIndicesCache = set(GIAANNproto_databaseNetworkFilesExcitation.listObservedColumnSourceFeatureIndices(self.conceptIndex))
+			combinedIndices = set(self.storedSourceFeatureIndicesCache)
+		else:
+			combinedIndices = set(GIAANNproto_databaseNetworkFilesExcitation.listObservedColumnSourceFeatureIndices(self.conceptIndex))
 		for sourceFeatureIndex in self.featureConnectionsBySourceFeature.keys():
 			combinedIndices.add(self.normaliseSourceFeatureIndex(sourceFeatureIndex))
 		result = sorted(combinedIndices)
@@ -334,7 +340,12 @@ class ObservedColumn:
 		resolvedTargetDevice = targetDevice if targetDevice is not None else self.getDefaultConnectionTargetDevice()
 		result = self.featureConnectionsBySourceFeature.get(normalisedSourceFeatureIndex)
 		if(result is None):
-			storedSourceFeatureIndices = self.listStoredSourceFeatureIndices()
+			if(getFeatureConnectionsForSourceFeatureCache):
+				if(self.storedSourceFeatureIndicesCache is None):
+					self.storedSourceFeatureIndicesCache = set(GIAANNproto_databaseNetworkFilesExcitation.listObservedColumnSourceFeatureIndices(self.conceptIndex))
+				storedSourceFeatureIndices = self.storedSourceFeatureIndicesCache
+			else:
+				storedSourceFeatureIndices = self.listStoredSourceFeatureIndices()
 			if(normalisedSourceFeatureIndex in storedSourceFeatureIndices):
 				result = GIAANNproto_databaseNetworkFilesExcitation.loadObservedColumnSourceFeatureConnectionsTensor(self.databaseNetworkObject, self.conceptIndex, normalisedSourceFeatureIndex, resolvedTargetDevice)
 			else:
@@ -368,11 +379,24 @@ class ObservedColumn:
 
 	def saveLoadedSourceFeatureConnectionsToDisk(self):
 		sourceFeatureIndices = sorted(self.loadedSourceFeatureIndices)
+		if(getFeatureConnectionsForSourceFeatureCache):
+			if(self.storedSourceFeatureIndicesCache is None):
+				self.storedSourceFeatureIndicesCache = set(GIAANNproto_databaseNetworkFilesExcitation.listObservedColumnSourceFeatureIndices(self.conceptIndex))
 		for sourceFeatureIndex in sourceFeatureIndices:
 			if(sourceFeatureIndex not in self.featureConnectionsBySourceFeature):
 				raise RuntimeError(f"saveLoadedSourceFeatureConnectionsToDisk error: missing loaded source feature tensor {sourceFeatureIndex}")
 			sourceTensor = self.featureConnectionsBySourceFeature[sourceFeatureIndex]
 			GIAANNproto_databaseNetworkFilesExcitation.saveObservedColumnSourceFeatureConnectionsTensor(self.conceptIndex, sourceFeatureIndex, sourceTensor)
+			if(getFeatureConnectionsForSourceFeatureCache):
+				if(sourceTensor.is_sparse):
+					sourceTensor = sourceTensor.coalesce()
+					tensorNNZ = sourceTensor._nnz()
+				else:
+					tensorNNZ = int(pt.count_nonzero(sourceTensor).item())
+				if(tensorNNZ > 0):
+					self.storedSourceFeatureIndicesCache.add(sourceFeatureIndex)
+				else:
+					self.storedSourceFeatureIndicesCache.discard(sourceFeatureIndex)
 		return
 
 	def unloadLoadedSourceFeatureConnections(self, sourceFeatureIndices=None):

@@ -645,3 +645,7 @@ v1l (Codex IDE GPT-5.4) [under development]:
 	- Missing per-source-feature files represent empty sparse tensors of the correct shape and are only created on disk when the training update path writes them.
 	- `storeDatabaseInRam=False` lazy loading applies to observed-column connection tensors; existing metadata and `featureNeurons` behavior remains unchanged unless required by the new folder layout.
 - update train-time observed-column loading to only load the source feature connections tensors for the precise features that occur in each column of the sequence.
+- add option updateObservedColumnsVerboseSourceFeatureConnectionsOnly - upgrade updateObservedColumnsVerbose to operate on individual source-feature tensors rather than materialising full observed-column connections
+- add option getTrainRequiredSourceFeatureIndicesByObservedColumnVectorize - vectorise exact per-column source-feature detection for trainSequenceObservedColumnsUseSequenceFeaturesOnly/trainSequenceObservedColumnsMatchSequenceWords
+- add option getFeatureConnectionsForSourceFeatureCache - cache stored source-feature file indices per observed column to avoid repeated directory scans
+

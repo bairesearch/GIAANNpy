@@ -413,6 +413,9 @@ if(useCUDAObservedColumnUpdateKernel):
 		raise RuntimeError("useCUDAObservedColumnUpdateKernel requires useGPUsparse=True")
 	if(not useGPUsparseStrict):
 		raise RuntimeError("useCUDAObservedColumnUpdateKernel requires useGPUsparseStrict=True")
+updateObservedColumnsVerboseSourceFeatureConnectionsOnly = True	#default: True	#orig: False	#upgrade updateObservedColumnsVerbose to operate on individual source-feature tensors rather than materialising full observed-column connections
+getTrainRequiredSourceFeatureIndicesByObservedColumnVectorize = True	#default: True	#orig: False	#vectorise exact per-column source-feature detection for trainSequenceObservedColumnsUseSequenceFeaturesOnly/trainSequenceObservedColumnsMatchSequenceWords
+getFeatureConnectionsForSourceFeatureCache = True	#default: True	#orig: False	#cache stored source-feature file indices per observed column to avoid repeated directory scans
 
 
 #Draw;
@@ -1076,6 +1079,9 @@ if(printConfiguration):
 	print("trainSequenceObservedColumnsMatchSequenceWords:", trainSequenceObservedColumnsMatchSequenceWords)
 	print("combineSparseUpdatesPerSequence:", combineSparseUpdatesPerSequence)
 	print("useCUDAObservedColumnUpdateKernel:", useCUDAObservedColumnUpdateKernel)
+	print("updateObservedColumnsVerboseSourceFeatureConnectionsOnly:", updateObservedColumnsVerboseSourceFeatureConnectionsOnly)
+	print("getTrainRequiredSourceFeatureIndicesByObservedColumnVectorize:", getTrainRequiredSourceFeatureIndicesByObservedColumnVectorize)
+	print("getFeatureConnectionsForSourceFeatureCache:", getFeatureConnectionsForSourceFeatureCache)
 	print("")
 	print("#Draw;")
 	print("drawSegments:", drawSegments)

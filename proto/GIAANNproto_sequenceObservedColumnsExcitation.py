@@ -49,6 +49,7 @@ class SequenceObservedColumns:
 		self.observedColumnsDict = observedColumnsDict	# key: lemma, value: ObservedColumn
 		self.observedColumnsSequenceWordIndexDict = observedColumnsSequenceWordIndexDict	# key: sequence word index, value: ObservedColumn
 		self.noDelimiterDetectedBetweenConceptTokens = False
+		self.requiredSourceFeatureIndicesByObservedColumn = None
 
 		if(trainSequenceObservedColumnsMatchSequenceWords):
 			self.cs = len(observedColumnsSequenceWordIndexDict)
@@ -184,6 +185,31 @@ class SequenceObservedColumns:
 				raise RuntimeError("ensureTokenConceptColumnIndexList error: tokenConceptColumnIndexList length mismatch")
 		return
 
+	def getTrainRequiredSourceFeatureIndicesByObservedColumnGeneric(self, observedColumnsByConceptIndex):
+		result = {}
+		for conceptIndex in observedColumnsByConceptIndex.keys():
+			result[conceptIndex] = set()
+		for tokenIndex, conceptIndex in enumerate(self.tokenConceptColumnIndexList):
+			if(conceptIndex is None):
+				raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumnGeneric error: unassigned token index {tokenIndex}")
+			normalisedConceptIndex = int(conceptIndex)
+			observedColumn = observedColumnsByConceptIndex.get(normalisedConceptIndex)
+			if(observedColumn is None):
+				raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumnGeneric error: missing observed column for conceptIndex {normalisedConceptIndex}")
+			if(tokenIndex in self.columnsIndexSequenceWordIndexDict):
+				sourceFeatureIndex = featureIndexPrimeConceptNeuron
+			else:
+				featureWord = self.tokens[tokenIndex].word
+				if(featureWord not in observedColumn.featureWordToIndex):
+					raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumnGeneric error: feature word '{featureWord}' not found in observed column '{observedColumn.conceptName}'")
+				sourceFeatureIndex = int(observedColumn.featureWordToIndex[featureWord])
+			result[normalisedConceptIndex].add(int(sourceFeatureIndex))
+		for conceptIndex, requiredSourceFeatureIndices in result.items():
+			if(len(requiredSourceFeatureIndices) == 0):
+				raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumnGeneric error: no required source features for conceptIndex {conceptIndex}")
+			result[conceptIndex] = sorted(requiredSourceFeatureIndices)
+		return result
+
 	def getTrainRequiredSourceFeatureIndicesByObservedColumn(self):
 		self.ensureTokenConceptColumnIndexList()
 		observedColumnsByConceptIndex = {}
@@ -193,26 +219,31 @@ class SequenceObservedColumns:
 			if(conceptIndex in observedColumnsByConceptIndex):
 				raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumn error: duplicate observed column conceptIndex {conceptIndex}")
 			observedColumnsByConceptIndex[conceptIndex] = observedColumn
-			result[conceptIndex] = set()
-		for tokenIndex, conceptIndex in enumerate(self.tokenConceptColumnIndexList):
-			if(conceptIndex is None):
-				raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumn error: unassigned token index {tokenIndex}")
-			normalisedConceptIndex = int(conceptIndex)
-			observedColumn = observedColumnsByConceptIndex.get(normalisedConceptIndex)
-			if(observedColumn is None):
-				raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumn error: missing observed column for conceptIndex {normalisedConceptIndex}")
-			if(tokenIndex in self.columnsIndexSequenceWordIndexDict):
-				sourceFeatureIndex = featureIndexPrimeConceptNeuron
-			else:
-				featureWord = self.tokens[tokenIndex].word
-				if(featureWord not in observedColumn.featureWordToIndex):
-					raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumn error: feature word '{featureWord}' not found in observed column '{observedColumn.conceptName}'")
-				sourceFeatureIndex = int(observedColumn.featureWordToIndex[featureWord])
-			result[normalisedConceptIndex].add(int(sourceFeatureIndex))
-		for conceptIndex, requiredSourceFeatureIndices in result.items():
-			if(len(requiredSourceFeatureIndices) == 0):
-				raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumn error: no required source features for conceptIndex {conceptIndex}")
-			result[conceptIndex] = sorted(requiredSourceFeatureIndices)
+			result[conceptIndex] = []
+		if(getTrainRequiredSourceFeatureIndicesByObservedColumnVectorize and trainSequenceObservedColumnsUseSequenceFeaturesOnly and trainSequenceObservedColumnsMatchSequenceWords):
+			if(any(conceptIndex is None for conceptIndex in self.tokenConceptColumnIndexList)):
+				raise RuntimeError("getTrainRequiredSourceFeatureIndicesByObservedColumn error: tokenConceptColumnIndexList contains unassigned entries")
+			conceptIndexTensor = pt.tensor(self.tokenConceptColumnIndexList, dtype=pt.long)
+			featureIndexTensor = self.featureIndicesInObservedTensor.to(conceptIndexTensor.device)
+			if(featureIndexTensor.dim() != 1):
+				raise RuntimeError("getTrainRequiredSourceFeatureIndicesByObservedColumn error: featureIndicesInObservedTensor rank mismatch")
+			if(featureIndexTensor.shape[0] != conceptIndexTensor.shape[0]):
+				raise RuntimeError("getTrainRequiredSourceFeatureIndicesByObservedColumn error: featureIndicesInObservedTensor length mismatch")
+			combinedKeys = conceptIndexTensor * self.databaseNetworkObject.f + featureIndexTensor
+			sortedCombinedKeys = pt.sort(combinedKeys).values
+			uniqueCombinedKeys = pt.unique_consecutive(sortedCombinedKeys)
+			uniqueConceptIndices = pt.div(uniqueCombinedKeys, self.databaseNetworkObject.f, rounding_mode='floor')
+			uniqueFeatureIndices = pt.remainder(uniqueCombinedKeys, self.databaseNetworkObject.f)
+			for conceptIndexValue, featureIndexValue in zip(uniqueConceptIndices.tolist(), uniqueFeatureIndices.tolist()):
+				if(conceptIndexValue not in result):
+					raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumn error: missing observed column for conceptIndex {conceptIndexValue}")
+				result[conceptIndexValue].append(int(featureIndexValue))
+			for conceptIndex, requiredSourceFeatureIndices in result.items():
+				if(len(requiredSourceFeatureIndices) == 0):
+					raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumn error: no required source features for conceptIndex {conceptIndex}")
+		else:
+			result = self.getTrainRequiredSourceFeatureIndicesByObservedColumnGeneric(observedColumnsByConceptIndex)
+		self.requiredSourceFeatureIndicesByObservedColumn = result
 		return result
 	
 	def removeDuplicates(self, lst):
@@ -713,38 +744,95 @@ class SequenceObservedColumns:
 			else:
 				globalFeatureNeurons = featureTargetSparse
 
-			connectionTargetSparse = observedColumn.materialiseFeatureConnections(loadAllStored=False, targetDevice=deviceSparse).coalesce()
-			connectionTargetSize = connectionTargetSparse.size()
-			if(addPropertiesEnabled):
-				connectionUpdatesAdd = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsDeltaSparse, addPropertyMaskLookup, sequenceFeatureMaskLookup, connectionTargetSize)
-			if(replacePropertiesEnabled):
-				connectionUpdatesReplace = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsCurrentSparse, replacePropertyMaskLookup, sequenceFeatureMaskLookup, connectionTargetSize)
-			if(arrayIndexPropertiesPos):
-				connectionUpdatesPos = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsCurrentSparse, posPropertyMaskLookupConnection, sequenceFeatureMaskLookup, connectionTargetSize)
-			if(arrayIndexPropertiesMinWordDistance):
-				connectionUpdatesMin = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsCurrentSparse, minPropertyMaskLookup, sequenceFeatureMaskLookup, connectionTargetSize)
-			if(replacePropertiesEnabled):
-				connectionIndices = connectionTargetSparse.indices()
-				connectionValues = connectionTargetSparse.values()
-				removeMaskConnections = replacePropertyMaskLookup[connectionIndices[0]]
-				removeMaskConnections = removeMaskConnections & observedFeatureMaskLookup[connectionIndices[3]]
-				removeMaskConnections = removeMaskConnections & sequenceConceptMaskLookup[connectionIndices[4]]
-				removeMaskConnections = removeMaskConnections & observedFeatureMaskLookup[connectionIndices[5]]
-				keepConnectionsMask = pt.logical_not(removeMaskConnections)
-				filteredConnectionIndices = connectionIndices[:, keepConnectionsMask]
-				filteredConnectionValues = connectionValues[keepConnectionsMask]
-				connectionTargetSparse = pt.sparse_coo_tensor(filteredConnectionIndices, filteredConnectionValues, size=connectionTargetSize, dtype=arrayType, device=deviceSparse)
-
-				combinedConnectionUpdates = self.combineSparseUpdates(connectionUpdatesAdd, connectionUpdatesReplace, connectionTargetSize)
+			if(updateObservedColumnsVerboseSourceFeatureConnectionsOnly):
+				connectionTargetSize = observedColumn.getFeatureConnectionsTargetSize()
+				connectionMaterialisedTargetSize = observedColumn.getMaterialisedFeatureConnectionsTargetSize()
+				connectionUpdatesAddBySourceFeature = {}
+				connectionUpdatesReplaceBySourceFeature = {}
+				connectionUpdatesPosBySourceFeature = {}
+				connectionUpdatesMinBySourceFeature = {}
+				if(addPropertiesEnabled):
+					connectionUpdatesAdd = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsDeltaSparse, addPropertyMaskLookup, sequenceFeatureMaskLookup, connectionMaterialisedTargetSize)
+					connectionUpdatesAddBySourceFeature = self.splitConnectionUpdateSparseBySourceFeature(connectionUpdatesAdd, connectionTargetSize)
+				if(replacePropertiesEnabled):
+					connectionUpdatesReplace = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsCurrentSparse, replacePropertyMaskLookup, sequenceFeatureMaskLookup, connectionMaterialisedTargetSize)
+					connectionUpdatesReplaceBySourceFeature = self.splitConnectionUpdateSparseBySourceFeature(connectionUpdatesReplace, connectionTargetSize)
+				if(arrayIndexPropertiesPos):
+					connectionUpdatesPos = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsCurrentSparse, posPropertyMaskLookupConnection, sequenceFeatureMaskLookup, connectionMaterialisedTargetSize)
+					connectionUpdatesPosBySourceFeature = self.splitConnectionUpdateSparseBySourceFeature(connectionUpdatesPos, connectionTargetSize)
+				if(arrayIndexPropertiesMinWordDistance):
+					connectionUpdatesMin = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsCurrentSparse, minPropertyMaskLookup, sequenceFeatureMaskLookup, connectionMaterialisedTargetSize)
+					connectionUpdatesMinBySourceFeature = self.splitConnectionUpdateSparseBySourceFeature(connectionUpdatesMin, connectionTargetSize)
+				connectionSourceFeatureIndices = self.getVerboseConnectionSourceFeatureIndices(observedColumn, conceptIndex, [connectionUpdatesAddBySourceFeature, connectionUpdatesReplaceBySourceFeature, connectionUpdatesPosBySourceFeature, connectionUpdatesMinBySourceFeature])
+				for sourceFeatureIndex in connectionSourceFeatureIndices:
+					connectionTargetSparse = observedColumn.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=deviceSparse, createMissing=False).coalesce()
+					connectionSourceTargetSize = connectionTargetSparse.size()
+					emptyConnectionUpdates = self.initialiseEmptySparseTensor(connectionSourceTargetSize, connectionTargetSparse.device)
+					connectionUpdatesAddSource = emptyConnectionUpdates
+					connectionUpdatesReplaceSource = emptyConnectionUpdates
+					connectionUpdatesPosSource = emptyConnectionUpdates
+					connectionUpdatesMinSource = emptyConnectionUpdates
+					if(addPropertiesEnabled):
+						connectionUpdatesAddSource = connectionUpdatesAddBySourceFeature.get(sourceFeatureIndex, emptyConnectionUpdates)
+					if(replacePropertiesEnabled):
+						connectionUpdatesReplaceSource = connectionUpdatesReplaceBySourceFeature.get(sourceFeatureIndex, emptyConnectionUpdates)
+					if(arrayIndexPropertiesPos):
+						connectionUpdatesPosSource = connectionUpdatesPosBySourceFeature.get(sourceFeatureIndex, emptyConnectionUpdates)
+					if(arrayIndexPropertiesMinWordDistance):
+						connectionUpdatesMinSource = connectionUpdatesMinBySourceFeature.get(sourceFeatureIndex, emptyConnectionUpdates)
+					if(replacePropertiesEnabled):
+						connectionIndices = connectionTargetSparse.indices()
+						connectionValues = connectionTargetSparse.values()
+						removeMaskConnections = replacePropertyMaskLookup[connectionIndices[0]]
+						removeMaskConnections = removeMaskConnections & sequenceConceptMaskLookup[connectionIndices[3]]
+						removeMaskConnections = removeMaskConnections & observedFeatureMaskLookup[connectionIndices[4]]
+						keepConnectionsMask = pt.logical_not(removeMaskConnections)
+						filteredConnectionIndices = connectionIndices[:, keepConnectionsMask]
+						filteredConnectionValues = connectionValues[keepConnectionsMask]
+						connectionTargetSparse = pt.sparse_coo_tensor(filteredConnectionIndices, filteredConnectionValues, size=connectionSourceTargetSize, dtype=arrayType, device=deviceSparse)
+						combinedConnectionUpdates = self.combineSparseUpdates(connectionUpdatesAddSource, connectionUpdatesReplaceSource, connectionSourceTargetSize)
+					else:
+						combinedConnectionUpdates = connectionUpdatesAddSource
+					if(addPropertiesEnabled):
+						connectionTargetSparse = self.addSparseUpdate(connectionTargetSparse, combinedConnectionUpdates)
+					if(arrayIndexPropertiesMinWordDistance):
+						connectionTargetSparse = self.applySparseMinUpdate(connectionTargetSparse, connectionUpdatesMinSource)
+					if(arrayIndexPropertiesPos):
+						connectionTargetSparse = self.applySparseMaxUpdate(connectionTargetSparse, connectionUpdatesPosSource)
+					observedColumn.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, connectionTargetSparse)
 			else:
-				combinedConnectionUpdates = connectionUpdatesAdd
-			if(addPropertiesEnabled):
-				connectionTargetSparse = self.addSparseUpdate(connectionTargetSparse, combinedConnectionUpdates)
-			if(arrayIndexPropertiesMinWordDistance):
-				connectionTargetSparse = self.applySparseMinUpdate(connectionTargetSparse, connectionUpdatesMin)
-			if(arrayIndexPropertiesPos):
-				connectionTargetSparse = self.applySparseMaxUpdate(connectionTargetSparse, connectionUpdatesPos)
-			observedColumn.setMaterialisedFeatureConnections(connectionTargetSparse, sorted(observedColumn.loadedSourceFeatureIndices))
+				connectionTargetSparse = observedColumn.materialiseFeatureConnections(loadAllStored=False, targetDevice=deviceSparse).coalesce()
+				connectionTargetSize = connectionTargetSparse.size()
+				if(addPropertiesEnabled):
+					connectionUpdatesAdd = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsDeltaSparse, addPropertyMaskLookup, sequenceFeatureMaskLookup, connectionTargetSize)
+				if(replacePropertiesEnabled):
+					connectionUpdatesReplace = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsCurrentSparse, replacePropertyMaskLookup, sequenceFeatureMaskLookup, connectionTargetSize)
+				if(arrayIndexPropertiesPos):
+					connectionUpdatesPos = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsCurrentSparse, posPropertyMaskLookupConnection, sequenceFeatureMaskLookup, connectionTargetSize)
+				if(arrayIndexPropertiesMinWordDistance):
+					connectionUpdatesMin = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsCurrentSparse, minPropertyMaskLookup, sequenceFeatureMaskLookup, connectionTargetSize)
+				if(replacePropertiesEnabled):
+					connectionIndices = connectionTargetSparse.indices()
+					connectionValues = connectionTargetSparse.values()
+					removeMaskConnections = replacePropertyMaskLookup[connectionIndices[0]]
+					removeMaskConnections = removeMaskConnections & observedFeatureMaskLookup[connectionIndices[3]]
+					removeMaskConnections = removeMaskConnections & sequenceConceptMaskLookup[connectionIndices[4]]
+					removeMaskConnections = removeMaskConnections & observedFeatureMaskLookup[connectionIndices[5]]
+					keepConnectionsMask = pt.logical_not(removeMaskConnections)
+					filteredConnectionIndices = connectionIndices[:, keepConnectionsMask]
+					filteredConnectionValues = connectionValues[keepConnectionsMask]
+					connectionTargetSparse = pt.sparse_coo_tensor(filteredConnectionIndices, filteredConnectionValues, size=connectionTargetSize, dtype=arrayType, device=deviceSparse)
+
+					combinedConnectionUpdates = self.combineSparseUpdates(connectionUpdatesAdd, connectionUpdatesReplace, connectionTargetSize)
+				else:
+					combinedConnectionUpdates = connectionUpdatesAdd
+				if(addPropertiesEnabled):
+					connectionTargetSparse = self.addSparseUpdate(connectionTargetSparse, combinedConnectionUpdates)
+				if(arrayIndexPropertiesMinWordDistance):
+					connectionTargetSparse = self.applySparseMinUpdate(connectionTargetSparse, connectionUpdatesMin)
+				if(arrayIndexPropertiesPos):
+					connectionTargetSparse = self.applySparseMaxUpdate(connectionTargetSparse, connectionUpdatesPos)
+				observedColumn.setMaterialisedFeatureConnections(connectionTargetSparse, sorted(observedColumn.loadedSourceFeatureIndices))
 
 		if not lowMem:
 			self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
@@ -1112,6 +1200,61 @@ class SequenceObservedColumns:
 				updateIndices = pt.stack((propertyRow, groupBranch, groupSegment, groupTargetConceptIndex, groupTargetFeatureIndex), dim=0)
 				updateDict[int(sourceFeatureIndexValue)] = pt.sparse_coo_tensor(updateIndices, groupValues, size=targetSize, dtype=arrayType, device=deviceSparse)
 		return updateDict
+
+	def initialiseEmptySparseTensor(self, targetSize, targetDevice):
+		if(not updateObservedColumnsVerboseSourceFeatureConnectionsOnly):
+			raise RuntimeError("initialiseEmptySparseTensor error: updateObservedColumnsVerboseSourceFeatureConnectionsOnly is disabled")
+		emptyIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=targetDevice)
+		emptyValues = pt.empty((0,), dtype=arrayType, device=targetDevice)
+		result = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=targetSize, dtype=arrayType, device=targetDevice)
+		return result
+
+	def splitConnectionUpdateSparseBySourceFeature(self, updateSparse, targetSize):
+		if(not updateObservedColumnsVerboseSourceFeatureConnectionsOnly):
+			raise RuntimeError("splitConnectionUpdateSparseBySourceFeature error: updateObservedColumnsVerboseSourceFeatureConnectionsOnly is disabled")
+		result = {}
+		if(updateSparse is not None):
+			updateSparse = updateSparse.coalesce()
+			updateIndices = updateSparse.indices()
+			updateValues = updateSparse.values()
+			if(updateIndices.numel() > 0):
+				sortedSourceFeatureIndices, sortOrder = pt.sort(updateIndices[3])
+				sortedIndices = updateIndices[:, sortOrder]
+				sortedValues = updateValues.index_select(0, sortOrder)
+				uniqueSourceFeatures, counts = pt.unique_consecutive(sortedSourceFeatureIndices, return_counts=True)
+				starts = pt.cumsum(counts, 0) - counts
+				for sourceFeatureIndexValue, start, count in zip(uniqueSourceFeatures.tolist(), starts.tolist(), counts.tolist()):
+					end = start + count
+					sourceIndices = pt.stack((sortedIndices[0, start:end], sortedIndices[1, start:end], sortedIndices[2, start:end], sortedIndices[4, start:end], sortedIndices[5, start:end]), dim=0)
+					sourceValues = sortedValues[start:end]
+					result[int(sourceFeatureIndexValue)] = pt.sparse_coo_tensor(sourceIndices, sourceValues, size=targetSize, dtype=arrayType, device=updateSparse.device)
+		return result
+
+	def getVerboseConnectionSourceFeatureIndices(self, observedColumn, conceptIndex, connectionUpdatesBySourceFeatureList):
+		if(not updateObservedColumnsVerboseSourceFeatureConnectionsOnly):
+			raise RuntimeError("getVerboseConnectionSourceFeatureIndices error: updateObservedColumnsVerboseSourceFeatureConnectionsOnly is disabled")
+		resultSet = set()
+		if(not getattr(self, "debugInferenceActive", False) and self.requiredSourceFeatureIndicesByObservedColumn is not None):
+			if(conceptIndex not in self.requiredSourceFeatureIndicesByObservedColumn):
+				raise RuntimeError(f"getVerboseConnectionSourceFeatureIndices error: missing required source features for conceptIndex {conceptIndex}")
+			requiredSourceFeatureIndices = set(int(sourceFeatureIndex) for sourceFeatureIndex in self.requiredSourceFeatureIndicesByObservedColumn[conceptIndex])
+		else:
+			requiredSourceFeatureIndices = None
+			if(storeDatabaseInRam):
+				for sourceFeatureIndex in observedColumn.featureConnectionsBySourceFeature.keys():
+					resultSet.add(int(sourceFeatureIndex))
+			else:
+				for sourceFeatureIndex in observedColumn.featureConnectionsBySourceFeature.keys():
+					resultSet.add(int(sourceFeatureIndex))
+		for connectionUpdatesBySourceFeature in connectionUpdatesBySourceFeatureList:
+			for sourceFeatureIndex in connectionUpdatesBySourceFeature.keys():
+				normalisedSourceFeatureIndex = int(sourceFeatureIndex)
+				if(requiredSourceFeatureIndices is not None):
+					if(normalisedSourceFeatureIndex not in requiredSourceFeatureIndices):
+						raise RuntimeError(f"getVerboseConnectionSourceFeatureIndices error: unexpected source feature {normalisedSourceFeatureIndex} for conceptIndex {conceptIndex}")
+				resultSet.add(normalisedSourceFeatureIndex)
+		result = sorted(resultSet)
+		return result
 
 	def flattenSparseIndices(self, indices, size):
 		device = indices.device
