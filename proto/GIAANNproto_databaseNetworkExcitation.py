@@ -758,10 +758,18 @@ def moveObservedColumnsDictConnectionsToDatabaseAfterTrain(observedColumnsDict, 
 					observedColumn.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, sourceTensor)
 	return
 
-def prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFeatureIndices):
-	if(requiredSourceFeatureIndices is None):
-		raise RuntimeError("prepareObservedColumnsForTrainSequence error: requiredSourceFeatureIndices is None")
+def prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFeatureIndicesByObservedColumn):
+	if(requiredSourceFeatureIndicesByObservedColumn is None):
+		raise RuntimeError("prepareObservedColumnsForTrainSequence error: requiredSourceFeatureIndicesByObservedColumn is None")
 	for observedColumn in observedColumnsDict.values():
+		conceptIndex = int(observedColumn.conceptIndex)
+		if(conceptIndex not in requiredSourceFeatureIndicesByObservedColumn):
+			raise RuntimeError(f"prepareObservedColumnsForTrainSequence error: missing required source features for conceptIndex {conceptIndex}")
+		requiredSourceFeatureIndices = requiredSourceFeatureIndicesByObservedColumn[conceptIndex]
+		if(requiredSourceFeatureIndices is None):
+			raise RuntimeError(f"prepareObservedColumnsForTrainSequence error: requiredSourceFeatureIndices is None for conceptIndex {conceptIndex}")
+		if(len(requiredSourceFeatureIndices) == 0):
+			raise RuntimeError(f"prepareObservedColumnsForTrainSequence error: requiredSourceFeatureIndices is empty for conceptIndex {conceptIndex}")
 		observedColumn.loadRequiredSourceFeatureConnections(requiredSourceFeatureIndices, deviceSparse, createMissing=False)
 	return
 

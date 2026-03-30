@@ -172,6 +172,48 @@ class SequenceObservedColumns:
 		
 	def getObservedColumnFeatureIndices(self):
 		return self.featureIndicesInObservedTensor, self.fIdxTensor
+
+	def ensureTokenConceptColumnIndexList(self):
+		if(not hasattr(self, "tokenConceptColumnIndexList") or self.tokenConceptColumnIndexList is None or len(self.tokenConceptColumnIndexList) != len(self.tokens)):
+			result = GIAANNproto_sequenceConcepts.processConceptWords(self, 0, self.tokens, self.tokens)
+			if(result is None):
+				raise RuntimeError("ensureTokenConceptColumnIndexList error: failed to compute token concept column assignment")
+			if(not hasattr(self, "tokenConceptColumnIndexList") or self.tokenConceptColumnIndexList is None):
+				raise RuntimeError("ensureTokenConceptColumnIndexList error: tokenConceptColumnIndexList was not generated")
+			if(len(self.tokenConceptColumnIndexList) != len(self.tokens)):
+				raise RuntimeError("ensureTokenConceptColumnIndexList error: tokenConceptColumnIndexList length mismatch")
+		return
+
+	def getTrainRequiredSourceFeatureIndicesByObservedColumn(self):
+		self.ensureTokenConceptColumnIndexList()
+		observedColumnsByConceptIndex = {}
+		result = {}
+		for observedColumn in self.observedColumnsDict.values():
+			conceptIndex = int(observedColumn.conceptIndex)
+			if(conceptIndex in observedColumnsByConceptIndex):
+				raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumn error: duplicate observed column conceptIndex {conceptIndex}")
+			observedColumnsByConceptIndex[conceptIndex] = observedColumn
+			result[conceptIndex] = set()
+		for tokenIndex, conceptIndex in enumerate(self.tokenConceptColumnIndexList):
+			if(conceptIndex is None):
+				raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumn error: unassigned token index {tokenIndex}")
+			normalisedConceptIndex = int(conceptIndex)
+			observedColumn = observedColumnsByConceptIndex.get(normalisedConceptIndex)
+			if(observedColumn is None):
+				raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumn error: missing observed column for conceptIndex {normalisedConceptIndex}")
+			if(tokenIndex in self.columnsIndexSequenceWordIndexDict):
+				sourceFeatureIndex = featureIndexPrimeConceptNeuron
+			else:
+				featureWord = self.tokens[tokenIndex].word
+				if(featureWord not in observedColumn.featureWordToIndex):
+					raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumn error: feature word '{featureWord}' not found in observed column '{observedColumn.conceptName}'")
+				sourceFeatureIndex = int(observedColumn.featureWordToIndex[featureWord])
+			result[normalisedConceptIndex].add(int(sourceFeatureIndex))
+		for conceptIndex, requiredSourceFeatureIndices in result.items():
+			if(len(requiredSourceFeatureIndices) == 0):
+				raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumn error: no required source features for conceptIndex {conceptIndex}")
+			result[conceptIndex] = sorted(requiredSourceFeatureIndices)
+		return result
 	
 	def removeDuplicates(self, lst):
 		#python requires ordered sets
