@@ -351,7 +351,7 @@ class SequenceObservedColumns:
 				fIdxTensor = fIdxTensor.to(deviceSparse)
 
 			# Get indices and values from the sparse tensor
-			featureConnections = observedColumn.featureConnections.coalesce()
+			featureConnections = observedColumn.materialiseFeatureConnections(loadAllStored=True, targetDevice=deviceSparse).coalesce()
 			if(not useGPUsparseStrict and not useGPUsparse):
 				featureConnections = featureConnections.to(deviceDense)
 
@@ -467,7 +467,8 @@ class SequenceObservedColumns:
 			if(observedColumn is None):
 				print(f"debugPersistedColumn ({mode}): lemma '{targetLemma}' not in observedColumnsDict")
 			else:
-				connectionsStrength = observedColumn.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
+				featureConnections = observedColumn.materialiseFeatureConnections(loadAllStored=True, targetDevice=deviceSparse)
+				connectionsStrength = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 				if(connectionsStrength.is_sparse):
 					connectionsStrength = connectionsStrength.to_dense()
 				outgoingCount = 0
@@ -670,8 +671,8 @@ class SequenceObservedColumns:
 			else:
 				globalFeatureNeurons = featureTargetSparse
 
-			observedColumn.featureConnections = observedColumn.featureConnections.coalesce()
-			connectionTargetSize = observedColumn.featureConnections.size()
+			connectionTargetSparse = observedColumn.materialiseFeatureConnections(loadAllStored=False, targetDevice=deviceSparse).coalesce()
+			connectionTargetSize = connectionTargetSparse.size()
 			if(addPropertiesEnabled):
 				connectionUpdatesAdd = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsDeltaSparse, addPropertyMaskLookup, sequenceFeatureMaskLookup, connectionTargetSize)
 			if(replacePropertiesEnabled):
@@ -681,8 +682,8 @@ class SequenceObservedColumns:
 			if(arrayIndexPropertiesMinWordDistance):
 				connectionUpdatesMin = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsCurrentSparse, minPropertyMaskLookup, sequenceFeatureMaskLookup, connectionTargetSize)
 			if(replacePropertiesEnabled):
-				connectionIndices = observedColumn.featureConnections.indices()
-				connectionValues = observedColumn.featureConnections.values()
+				connectionIndices = connectionTargetSparse.indices()
+				connectionValues = connectionTargetSparse.values()
 				removeMaskConnections = replacePropertyMaskLookup[connectionIndices[0]]
 				removeMaskConnections = removeMaskConnections & observedFeatureMaskLookup[connectionIndices[3]]
 				removeMaskConnections = removeMaskConnections & sequenceConceptMaskLookup[connectionIndices[4]]
@@ -690,17 +691,18 @@ class SequenceObservedColumns:
 				keepConnectionsMask = pt.logical_not(removeMaskConnections)
 				filteredConnectionIndices = connectionIndices[:, keepConnectionsMask]
 				filteredConnectionValues = connectionValues[keepConnectionsMask]
-				observedColumn.featureConnections = pt.sparse_coo_tensor(filteredConnectionIndices, filteredConnectionValues, size=connectionTargetSize, dtype=arrayType, device=deviceSparse)
+				connectionTargetSparse = pt.sparse_coo_tensor(filteredConnectionIndices, filteredConnectionValues, size=connectionTargetSize, dtype=arrayType, device=deviceSparse)
 
 				combinedConnectionUpdates = self.combineSparseUpdates(connectionUpdatesAdd, connectionUpdatesReplace, connectionTargetSize)
 			else:
 				combinedConnectionUpdates = connectionUpdatesAdd
 			if(addPropertiesEnabled):
-				observedColumn.featureConnections = self.addSparseUpdate(observedColumn.featureConnections, combinedConnectionUpdates)
+				connectionTargetSparse = self.addSparseUpdate(connectionTargetSparse, combinedConnectionUpdates)
 			if(arrayIndexPropertiesMinWordDistance):
-				observedColumn.featureConnections = self.applySparseMinUpdate(observedColumn.featureConnections, connectionUpdatesMin)
+				connectionTargetSparse = self.applySparseMinUpdate(connectionTargetSparse, connectionUpdatesMin)
 			if(arrayIndexPropertiesPos):
-				observedColumn.featureConnections = self.applySparseMaxUpdate(observedColumn.featureConnections, connectionUpdatesPos)
+				connectionTargetSparse = self.applySparseMaxUpdate(connectionTargetSparse, connectionUpdatesPos)
+			observedColumn.setMaterialisedFeatureConnections(connectionTargetSparse, sorted(observedColumn.loadedSourceFeatureIndices))
 
 		if not lowMem:
 			self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
@@ -801,16 +803,18 @@ class SequenceObservedColumns:
 				if not combineSparseUpdatesPerSequence:
 					globalFeatureNeurons = featureTargetSparse
 
-			connectionTargetSparse = observedColumn.featureConnections
-			connectionTargetSize = connectionTargetSparse.size()
+			connectionTargetSize = observedColumn.getFeatureConnectionsTargetSize()
 
 			connectionRange = connectionRanges.get(cIdx)
 			if(connectionRange is not None):
 				start, end = connectionRange
 				connectionUpdateIndices = connectionIndicesSorted[:, start:end]
 				connectionUpdateValues = connectionValuesSorted[start:end]
-				connectionUpdates = self.buildConnectionPropertyUpdateSparse(connectionUpdateIndices, connectionUpdateValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesTensor, connectionTargetSize)
-				connectionTargetSparse = self.addSparseUpdateNonNegative(connectionTargetSparse, connectionUpdates)
+				connectionUpdatesBySourceFeature = self.buildConnectionSourceFeaturePropertyUpdateSparseDict(connectionUpdateIndices, connectionUpdateValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesTensor, connectionTargetSize)
+				for sourceFeatureIndex, connectionUpdates in connectionUpdatesBySourceFeature.items():
+					connectionTargetSparse = observedColumn.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=connectionDevice, createMissing=False)
+					connectionTargetSparse = self.addSparseUpdateNonNegative(connectionTargetSparse, connectionUpdates)
+					observedColumn.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, connectionTargetSparse)
 
 			if(arrayIndexPropertiesMinWordDistance):
 				minRange = connectionMinRanges.get(cIdx)
@@ -818,10 +822,11 @@ class SequenceObservedColumns:
 					start, end = minRange
 					minUpdateIndices = connectionMinIndicesSorted[:, start:end]
 					minUpdateValues = connectionMinValuesSorted[start:end]
-					minUpdates = self.buildConnectionPropertyUpdateSparse(minUpdateIndices, minUpdateValues, databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex, featureIndicesObservedConnectionDevice, conceptIndicesTensor, connectionTargetSize)
-					connectionTargetSparse = self.applySparseMinUpdate(connectionTargetSparse, minUpdates)
-
-			observedColumn.featureConnections = connectionTargetSparse
+					minUpdatesBySourceFeature = self.buildConnectionSourceFeaturePropertyUpdateSparseDict(minUpdateIndices, minUpdateValues, databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex, featureIndicesObservedConnectionDevice, conceptIndicesTensor, connectionTargetSize)
+					for sourceFeatureIndex, minUpdates in minUpdatesBySourceFeature.items():
+						connectionTargetSparse = observedColumn.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=connectionDevice, createMissing=False)
+						connectionTargetSparse = self.applySparseMinUpdate(connectionTargetSparse, minUpdates)
+						observedColumn.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, connectionTargetSparse)
 
 		if not lowMem:
 			if(combineSparseUpdatesPerSequence):
@@ -1033,6 +1038,38 @@ class SequenceObservedColumns:
 		propertyRow = pt.full_like(segment, propertyIndex)
 		updateIndices = pt.stack((propertyRow, branch, segment, sourceFeatureIndex, targetConceptIndex, targetFeatureIndex), dim=0)
 		return pt.sparse_coo_tensor(updateIndices, values, size=targetSize, dtype=arrayType, device=deviceSparse)
+
+	def buildConnectionSourceFeaturePropertyUpdateSparseDict(self, indices, values, propertyIndex, featureIndicesInObserved, conceptIndicesTensor, targetSize):
+		updateDict = {}
+		if(indices.numel() > 0):
+			branch = indices[0]
+			segment = indices[1]
+			sourceFeatureIndex = indices[3]
+			targetConceptIndex = indices[4]
+			targetFeatureIndex = indices[5]
+			targetConceptIndex = conceptIndicesTensor[targetConceptIndex]
+			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
+				sourceFeatureIndex = featureIndicesInObserved[sourceFeatureIndex]
+				targetFeatureIndex = featureIndicesInObserved[targetFeatureIndex]
+			sortedSourceFeatureIndex, sortOrder = pt.sort(sourceFeatureIndex)
+			sortedBranch = branch.index_select(0, sortOrder)
+			sortedSegment = segment.index_select(0, sortOrder)
+			sortedTargetConceptIndex = targetConceptIndex.index_select(0, sortOrder)
+			sortedTargetFeatureIndex = targetFeatureIndex.index_select(0, sortOrder)
+			sortedValues = values.index_select(0, sortOrder)
+			uniqueSourceFeatures, counts = pt.unique_consecutive(sortedSourceFeatureIndex, return_counts=True)
+			starts = pt.cumsum(counts, 0) - counts
+			for sourceFeatureIndexValue, start, count in zip(uniqueSourceFeatures.tolist(), starts.tolist(), counts.tolist()):
+				end = start + count
+				groupBranch = sortedBranch[start:end]
+				groupSegment = sortedSegment[start:end]
+				groupTargetConceptIndex = sortedTargetConceptIndex[start:end]
+				groupTargetFeatureIndex = sortedTargetFeatureIndex[start:end]
+				groupValues = sortedValues[start:end]
+				propertyRow = pt.full_like(groupSegment, propertyIndex)
+				updateIndices = pt.stack((propertyRow, groupBranch, groupSegment, groupTargetConceptIndex, groupTargetFeatureIndex), dim=0)
+				updateDict[int(sourceFeatureIndexValue)] = pt.sparse_coo_tensor(updateIndices, groupValues, size=targetSize, dtype=arrayType, device=deviceSparse)
+		return updateDict
 
 	def flattenSparseIndices(self, indices, size):
 		device = indices.device

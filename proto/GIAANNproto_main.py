@@ -449,6 +449,8 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 				GIAANNproto_prediction.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens, sequenceRaw)
 		else:
 			# Process each concept word in the sequence (train)
+			requiredSourceFeatureIndices = pt.unique(sequenceObservedColumns.featureIndicesInObservedTensor)
+			GIAANNproto_databaseNetworkExcitation.prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFeatureIndices)
 			trained = GIAANNproto_databaseNetworkTrainExcitation.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)
 			if(trained):
 				# Update observed columns from sequence observed columns

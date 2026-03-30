@@ -431,7 +431,11 @@ def updateTimeValuesFromActivation(globalFeatureNeuronsTime, featureNeuronsTarge
 
 #first dim cs1 restricted to a single token
 def processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None):
-	featureConnections = GIAANNproto_sparseTensors.sliceSparseTensor(sequenceObservedColumnsPrediction.featureConnections, 3, 0)	#sequence concept index dimension
+	if(0 not in sequenceObservedColumnsPrediction.observedColumnsSequenceWordIndexDict):
+		raise RuntimeError("processFeaturesActivePredictSingle error: missing observed column sequence index 0")
+	observedColumn = sequenceObservedColumnsPrediction.observedColumnsSequenceWordIndexDict[0]
+	connectionDevice = globalFeatureNeuronsActivation.device
+	featureConnections = observedColumn.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=connectionDevice, createMissing=False)
 	result = processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
 	return result
 
@@ -482,9 +486,7 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 	featureConnectionsStrength = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 	if(inferenceConnectionStrengthPOSdependence):
 		featureConnectionsPos = featureConnections[databaseNetworkObject.arrayIndexPropertiesPosIndex]
-	featureConnectionsStrength = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsStrength, 2, sourceFeatureIndex)
 	if(inferenceConnectionStrengthPOSdependence):
-		featureConnectionsPos = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsPos, 2, sourceFeatureIndex)
 		featureConnectionsStrength = applyConnectionStrengthPOSdependenceInference(databaseNetworkObject, featureConnectionsStrength, featureConnectionsPos, sourceColumnIndex)
 	if(inferenceConnectionsStrengthBoolean):
 		featureConnectionsStrength = featureConnectionsStrength.bool().float()
@@ -641,8 +643,8 @@ def computeConnectionMinWordDistanceMask(observedColumn, sourceFeatureIndex, tar
 		if(targetIndices is None or targetIndices.shape[1] == 0):
 			printe("(targetIndices is None or targetIndices.shape[1] == 0)")
 			#return None
-		featureConnectionsMinWordDistance = observedColumn.featureConnections[databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex]
-		featureConnectionsMinWordDistance = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsMinWordDistance, 2, sourceFeatureIndex)
+		featureConnectionsSource = observedColumn.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=targetIndices.device, createMissing=False)
+		featureConnectionsMinWordDistance = featureConnectionsSource[databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex]
 		featureConnectionsMinWordDistance = featureConnectionsMinWordDistance.coalesce()
 		if(featureConnectionsMinWordDistance._nnz() == 0):
 			printe("(featureConnectionsMinWordDistance._nnz() == 0)")

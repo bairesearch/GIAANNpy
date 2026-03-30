@@ -297,11 +297,7 @@ class SequenceObservedColumnsInferencePrediction:
 		
 		self.cs2 = len(databaseNetworkObject.conceptColumnsDict)
 		self.fs2 = len(databaseNetworkObject.conceptFeaturesDict)
-			
-		featureConnectionsList = []
-		for observedColumn in observedColumnsSequenceWordIndexDict.values():
-			 featureConnectionsList.append(observedColumn.featureConnections)
-		self.featureConnections = pt.stack(featureConnectionsList, dim=3)
+		return
 		
 
 def buildAllowedColumnsLookup(conceptColumnsIndices, totalColumns):
@@ -667,7 +663,8 @@ def processFeaturePredictionActivations(databaseNetworkObject, observedColumnsDi
 	if(inferenceOnlyRetainPredictedTargetObservedColumn):
 		sourceConceptIndexValue = int(conceptColumnIndexActivation)
 		observedColumn = loadObservedColumnInference(databaseNetworkObject, observedColumnsDict, sourceConceptIndexValue, sequenceWordIndex)
-		featureConnections = observedColumn.featureConnections
+		connectionDevice = globalFeatureNeuronsActivationResult.device
+		featureConnections = observedColumn.getFeatureConnectionsForSourceFeature(int(conceptColumnFeatureIndexActivation), targetDevice=connectionDevice, createMissing=False)
 		globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = GIAANNproto_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, featureConnections, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex)
 	else:
 		globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = GIAANNproto_predictionActivate.processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, sequenceObservedColumnsPrediction, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex)

@@ -565,3 +565,12 @@ MANUAL; - add oscar useBenchmark:useBenchmarkDefaults=False training/test-set ev
 	val_loss = -\ln\left(\frac{1}{N}\sum_{i=1}^{N} p_i\right)
 - patch printInferenceTop1AccuracyBitsPerByte - restore the pre-BPB inference candidate-selection path when printInferenceTop1AccuracyBitsPerByte=False by limiting the new node-level constraint filtering to the BPB probability-calculation path only.
 
+---
+v1l (Codex IDE GPT-5.4) [under development]:
+- add proto GIAANNproto1l1a - divide the database observed columns connections tensors into a tensor per source feature
+	1. Create a separate database subfolder per observed column index (c), and create a separate database connections file per observed column source feature index (f). Only create connections files (f) for source features that exist for a given observed column. If storeDatabaseInRam=False, the observed column source features connections dictionary only loads the source features required by a sequence during train or inference - it will rarely be completely full. (For reference, this ammendment concerns a critical design change to your plan item: "Save one file per observed column for the split connections").
+	2. please ensure to retain all optional storeDatabaseInRam=True/False logic. Ie if storeDatabaseInRam=True, it loads the entire database into ram on startup (device useGPUdatabase), populating all ObservedColumn.featureConnectionsBySourceFeature dictionaries. Otherwise these observed columns are only ever temporarily populated, and only with the source features requried by their train/inference sequence.
+	3. ensure that your final implementation still respects useGPUdense, useGPUsparse, and useGPUdatabase (the current codebase device logic is OK).
+	4. training should load all source feature connections tensors for the columns in the sequence; this will be approximately equal to the number of words in the sequence (although not exactly due to duplicates features within columns referenced by a given sequence).
+	5. there should be no need to mark touched source-feature tensors, as you will assume that all source feature connections tensors that are dynamically loaded into ram during training will be modified (when storeDatabaseInRam=False).
+

@@ -71,6 +71,80 @@ def saveListFile(listFileName, listObject):
 	with open(listFileName, 'wb') as fOut:
 		pickle.dump(listObject, fOut)
 
+def getObservedColumnFolder(conceptIndex):
+	result = os.path.join(observedColumnsDir, observedColumnFolderNamePrefix + str(int(conceptIndex)))
+	return result
+
+def getObservedColumnMetadataFile(conceptIndex):
+	result = os.path.join(getObservedColumnFolder(conceptIndex), observedColumnMetadataFileName)
+	return result
+
+def getObservedColumnFeatureConnectionsFolder(conceptIndex):
+	result = os.path.join(getObservedColumnFolder(conceptIndex), observedColumnFeatureConnectionsFolderName)
+	return result
+
+def getObservedColumnFeatureNeuronsFileBaseName():
+	result = observedColumnFeatureNeuronsTensorName
+	return result
+
+def getObservedColumnSourceFeatureConnectionsFileBaseName(sourceFeatureIndex):
+	result = observedColumnSourceFeatureConnectionsFileNamePrefix + str(int(sourceFeatureIndex))
+	return result
+
+def parseObservedColumnSourceFeatureConnectionsFileBaseName(fileBaseName):
+	if(not fileBaseName.startswith(observedColumnSourceFeatureConnectionsFileNamePrefix)):
+		raise RuntimeError(f"Invalid observed column source feature file name: {fileBaseName}")
+	fileIndexText = fileBaseName[len(observedColumnSourceFeatureConnectionsFileNamePrefix):]
+	if(fileIndexText == "" or not fileIndexText.isdigit()):
+		raise RuntimeError(f"Invalid observed column source feature file name: {fileBaseName}")
+	result = int(fileIndexText)
+	return result
+
+def getObservedColumnLegacyMetadataFile(conceptIndex):
+	result = os.path.join(observedColumnsDir, str(conceptIndex) + observedColumnLegacyMetadataFileSuffix)
+	return result
+
+def getObservedColumnLegacyConnectionsFile(conceptIndex):
+	result = os.path.join(observedColumnsDir, str(conceptIndex) + observedColumnLegacyFeatureConnectionsTensorNameSuffix + pytorchTensorFileExtension)
+	return result
+
+def getObservedColumnLegacyFeatureNeuronsFile(conceptIndex):
+	result = os.path.join(observedColumnsDir, str(conceptIndex) + observedColumnLegacyFeatureNeuronsTensorNameSuffix + pytorchTensorFileExtension)
+	return result
+
+def ensureObservedColumnFolderExists(conceptIndex):
+	columnFolder = getObservedColumnFolder(conceptIndex)
+	connectionsFolder = getObservedColumnFeatureConnectionsFolder(conceptIndex)
+	os.makedirs(columnFolder, exist_ok=True)
+	os.makedirs(connectionsFolder, exist_ok=True)
+	return
+
+def validateObservedColumnStorageFormat(conceptIndex):
+	legacyMetadataFile = getObservedColumnLegacyMetadataFile(conceptIndex)
+	legacyConnectionsFile = getObservedColumnLegacyConnectionsFile(conceptIndex)
+	legacyFeatureNeuronsFile = getObservedColumnLegacyFeatureNeuronsFile(conceptIndex)
+	if(pathExists(legacyMetadataFile) or pathExists(legacyConnectionsFile) or pathExists(legacyFeatureNeuronsFile)):
+		raise RuntimeError(f"Observed column storage format has changed for conceptIndex={conceptIndex}. Clear and rebuild the database.")
+	return
+
+def observedColumnMetadataExists(conceptIndex):
+	validateObservedColumnStorageFormat(conceptIndex)
+	result = pathExists(getObservedColumnMetadataFile(conceptIndex))
+	return result
+
+def listObservedColumnSourceFeatureIndices(conceptIndex):
+	validateObservedColumnStorageFormat(conceptIndex)
+	connectionsFolder = getObservedColumnFeatureConnectionsFolder(conceptIndex)
+	indices = []
+	if(pathExists(connectionsFolder)):
+		for fileName in os.listdir(connectionsFolder):
+			if(not fileName.endswith(pytorchTensorFileExtension)):
+				continue
+			fileStem = fileName[:-len(pytorchTensorFileExtension)]
+			indices.append(parseObservedColumnSourceFeatureConnectionsFileBaseName(fileStem))
+	indices.sort()
+	return indices
+
 def loadFeatureNeuronsGlobalFile(inferenceMode):
 	globalFeatureNeurons = loadTensor(databaseFolder, globalFeatureNeuronsFile)
 	globalFeatureNeurons = adjustPropertyDimensions(inferenceMode, globalFeatureNeurons, "globalFeatureNeurons")
@@ -121,6 +195,27 @@ def adjustBranchDimensions(tensor, tensorName, expectedRank, branchCount=numberO
 	if tensor.dim() == expectedRank - 1:
 		return insertBranchDimension(tensor, tensorName, insertIndex=1, branchCount=branchCount)
 	raise RuntimeError(f"{tensorName} branch dimension mismatch: expected rank {expectedRank} or {expectedRank - 1}, got {tensor.dim()}")
+
+def ensureFeatureConnectionsSourceTensorCurrentSize(tensor, targetC, targetF, tensorName):
+	result = tensor
+	if(result.dim() != 5):
+		raise RuntimeError(f"{tensorName} rank mismatch: expected 5, got {result.dim()}")
+	currentC = result.size(3)
+	currentF = result.size(4)
+	if(currentC > targetC or currentF > targetF):
+		raise RuntimeError(f"{tensorName} size mismatch: stored size {(currentC, currentF)} exceeds current database size {(targetC, targetF)}")
+	if(currentC < targetC or currentF < targetF):
+		newSize = list(result.size())
+		newSize[3] = targetC
+		newSize[4] = targetF
+		if(result.is_sparse):
+			result = result.coalesce()
+			result = pt.sparse_coo_tensor(result.indices(), result.values(), size=newSize, dtype=result.dtype, device=result.device).coalesce()
+		else:
+			expandedTensor = pt.zeros(newSize, dtype=result.dtype, device=result.device)
+			expandedTensor[:, :, :, :currentC, :currentF] = result
+			result = expandedTensor
+	return result
 
 def insertBranchDimension(tensor, tensorName, insertIndex, branchCount):
 	if tensor.is_sparse:
@@ -207,34 +302,71 @@ def observedColumnSaveToDisk(self):
 	"""
 	Save the observed column data to disk.
 	"""
+	validateObservedColumnStorageFormat(self.conceptIndex)
+	ensureObservedColumnFolderExists(self.conceptIndex)
 	if(trainStoreFeatureMapsGlobally):
 		data = {
 			'conceptIndex': self.conceptIndex,
-			'nextFeatureIndex': self.nextFeatureIndex
+			'nextFeatureIndex': self.nextFeatureIndex,
+			'featureConnectionsFormat': observedColumnFeatureConnectionsFormat
 		}
 	else:
 		data = {
 			'conceptIndex': self.conceptIndex,
 			'featureWordToIndex': self.featureWordToIndex,
 			'featureIndexToWord': self.featureIndexToWord,
-			'nextFeatureIndex': self.nextFeatureIndex
+			'nextFeatureIndex': self.nextFeatureIndex,
+			'featureConnectionsFormat': observedColumnFeatureConnectionsFormat
 		}
-	# Save the data dictionary using pickle
-	with open(os.path.join(observedColumnsDir, f"{self.conceptIndex}_data.pkl"), 'wb') as f:
+	with open(getObservedColumnMetadataFile(self.conceptIndex), 'wb') as f:
 		pickle.dump(data, f)
-	# Save the tensors using pt.save
-	saveTensor(self.featureConnections, observedColumnsDir, f"{self.conceptIndex}_featureConnections")
+	self.saveLoadedSourceFeatureConnectionsToDisk()
 	if lowMem:
-		saveTensor(self.featureNeurons, observedColumnsDir, f"{self.conceptIndex}_featureNeurons")
+		saveTensor(self.featureNeurons, getObservedColumnFolder(self.conceptIndex), getObservedColumnFeatureNeuronsFileBaseName())
 
-def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i):
+def loadObservedColumnSourceFeatureConnectionsTensor(databaseNetworkObject, conceptIndex, sourceFeatureIndex, targetDevice):
+	validateObservedColumnStorageFormat(conceptIndex)
+	connectionsFolder = getObservedColumnFeatureConnectionsFolder(conceptIndex)
+	fileBaseName = getObservedColumnSourceFeatureConnectionsFileBaseName(sourceFeatureIndex)
+	tensorName = f"observedColumn.featureConnectionsBySourceFeature[{conceptIndex}][{sourceFeatureIndex}]"
+	tensor = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, loadTensor(connectionsFolder, fileBaseName, targetDevice=targetDevice), tensorName)
+	tensor = adjustBranchDimensions(tensor, tensorName, expectedRank=5)
+	if(debugLimitFeatures):
+		tensor = applyDebugLimitFeatureConnectionsSourceTensor(tensor, databaseNetworkObject.c, databaseNetworkObject.f, tensorName)
+	tensor = ensureFeatureConnectionsSourceTensorCurrentSize(tensor, databaseNetworkObject.c, databaseNetworkObject.f, tensorName)
+	return tensor
+
+def saveObservedColumnSourceFeatureConnectionsTensor(conceptIndex, sourceFeatureIndex, tensor):
+	validateObservedColumnStorageFormat(conceptIndex)
+	ensureObservedColumnFolderExists(conceptIndex)
+	connectionsFolder = getObservedColumnFeatureConnectionsFolder(conceptIndex)
+	fileBaseName = getObservedColumnSourceFeatureConnectionsFileBaseName(sourceFeatureIndex)
+	filePath = os.path.join(connectionsFolder, fileBaseName + pytorchTensorFileExtension)
+	if(tensor is None):
+		raise RuntimeError("saveObservedColumnSourceFeatureConnectionsTensor error: tensor is None")
+	if(tensor.is_sparse):
+		tensor = tensor.coalesce()
+		tensorNNZ = tensor._nnz()
+	else:
+		tensorNNZ = int(pt.count_nonzero(tensor).item())
+	if(tensorNNZ > 0):
+		saveTensor(tensor, connectionsFolder, fileBaseName)
+	else:
+		if(pathExists(filePath)):
+			os.remove(filePath)
+	return
+
+def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i, targetDevice=None, loadAllSourceFeatures=False):
 	"""
 	Load the observed column data from disk.
 	"""
-	# Load the data dictionary
-	with open(os.path.join(observedColumnsDir, f"{conceptIndex}_data.pkl"), 'rb') as f:
+	validateObservedColumnStorageFormat(conceptIndex)
+	metadataFile = getObservedColumnMetadataFile(conceptIndex)
+	with open(metadataFile, 'rb') as f:
 		data = pickle.load(f)
 	instance = cls(databaseNetworkObject, conceptIndex, lemma, i)
+	if(data.get('featureConnectionsFormat') != observedColumnFeatureConnectionsFormat):
+		raise RuntimeError(f"Unsupported observed column connection storage format for conceptIndex={conceptIndex}. Clear and rebuild the database.")
 	if(trainStoreFeatureMapsGlobally):
 		instance.featureWordToIndex = databaseNetworkObject.conceptFeaturesDict
 		instance.featureIndexToWord = databaseNetworkObject.conceptFeaturesIndexToWordDict
@@ -249,27 +381,30 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 				raise RuntimeError("observedColumnLoadFromDisk error: nextFeatureIndex < 0")
 			if(instance.nextFeatureIndex > databaseNetworkObject.f):
 				instance.nextFeatureIndex = databaseNetworkObject.f
-	# Load the tensors
-	instance.featureConnections = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, loadTensor(observedColumnsDir, f"{conceptIndex}_featureConnections"), f"observedColumn.featureConnections[{conceptIndex}]")
-	instance.featureConnections = adjustBranchDimensions(instance.featureConnections, f"observedColumn.featureConnections[{conceptIndex}]", expectedRank=6)
-	if(debugLimitFeatures):
-		instance.featureConnections = applyDebugLimitFeatureConnectionsTensor(instance.featureConnections, databaseNetworkObject.c, databaseNetworkObject.f, f"observedColumn.featureConnections[{conceptIndex}]")
 	if lowMem:
-		instance.featureNeurons = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, loadTensor(observedColumnsDir, f"{conceptIndex}_featureNeurons"), f"observedColumn.featureNeurons[{conceptIndex}]")
+		featureNeuronTargetDevice = targetDevice if targetDevice is not None else deviceDatabase
+		instance.featureNeurons = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, loadTensor(getObservedColumnFolder(conceptIndex), getObservedColumnFeatureNeuronsFileBaseName(), targetDevice=featureNeuronTargetDevice), f"observedColumn.featureNeurons[{conceptIndex}]")
 		instance.featureNeurons = adjustBranchDimensions(instance.featureNeurons, f"observedColumn.featureNeurons[{conceptIndex}]", expectedRank=4)
 		if(debugLimitFeatures):
 			instance.featureNeurons = applyDebugLimitFeatureNeuronsTensor(instance.featureNeurons, databaseNetworkObject.f, f"observedColumn.featureNeurons[{conceptIndex}]")
+	if(loadAllSourceFeatures):
+		sourceFeatureIndices = listObservedColumnSourceFeatureIndices(conceptIndex)
+		loadTargetDevice = targetDevice if targetDevice is not None else deviceDatabase
+		instance.loadRequiredSourceFeatureConnections(sourceFeatureIndices, loadTargetDevice, createMissing=False)
 	return instance
 
 def saveTensor(tensor, folderName, fileName):
 	pt.save(tensor, os.path.join(folderName, fileName+pytorchTensorFileExtension))
 
-def loadTensor(folderName, fileName):
+def loadTensor(folderName, fileName, targetDevice=None):
+	loadDevice = targetDevice if targetDevice is not None else deviceSparse
+	tensorPath = os.path.join(folderName, fileName+pytorchTensorFileExtension)
 	if(useGPUsparseStrict and not useGPUsparse):
-		tensor = pt.load(os.path.join(folderName, fileName+pytorchTensorFileExtension), map_location=deviceSparse)
+		tensor = pt.load(tensorPath, map_location=loadDevice)
 	else:
-		tensor = pt.load(os.path.join(folderName, fileName+pytorchTensorFileExtension))
-	tensor = tensor.to(deviceSparse)
+		tensor = pt.load(tensorPath, map_location=loadDevice)
+	if(tensor.device != loadDevice):
+		tensor = tensor.to(loadDevice)
 	return tensor
 
 
@@ -328,6 +463,32 @@ if(debugLimitFeatures):
 					result = pt.sparse_coo_tensor(indices, values, size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
 				else:
 					result = tensor[:, :, :, :capF, :capC, :capF]
+		return result
+	def applyDebugLimitFeatureConnectionsSourceTensor(tensor, cLimit, fLimit, tensorName):
+		result = tensor
+		if(debugLimitFeatures):
+			if(cLimit <= 0 or fLimit <= 0):
+				raise RuntimeError(f"{tensorName} debug limit requires positive limits")
+			capC = tensor.size(3)
+			capF = tensor.size(4)
+			if(capC > cLimit):
+				capC = cLimit
+			if(capF > fLimit):
+				capF = fLimit
+			if(capC != tensor.size(3) or capF != tensor.size(4)):
+				if(tensor.is_sparse):
+					tensor = tensor.coalesce()
+					indices = tensor.indices()
+					values = tensor.values()
+					mask = (indices[3] < capC) & (indices[4] < capF)
+					indices = indices[:, mask]
+					values = values[mask]
+					newSize = list(tensor.size())
+					newSize[3] = capC
+					newSize[4] = capF
+					result = pt.sparse_coo_tensor(indices, values, size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
+				else:
+					result = tensor[:, :, :, :capC, :capF]
 		return result
 	def applyDebugLimitFeatureNeuronsTensor(tensor, fLimit, tensorName):
 		result = tensor

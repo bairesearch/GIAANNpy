@@ -81,7 +81,10 @@ def secondPass(databaseNetworkObject, tokens, inferenceMode):
 					if(lemma in observedColumnsDict):
 						observedColumn = observedColumnsDict[lemma]
 					else:
-						observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, deviceLoadColumnInference, inferenceMode and deviceLoadColumnInferenceCopy)
+						if(inferenceMode):
+							observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, deviceLoadColumnInference, inferenceMode and deviceLoadColumnInferenceCopy)
+						else:
+							observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
 						observedColumnsDict[lemma] = observedColumn
 					observedColumnsSequenceWordIndexDict[i] = observedColumn
 		else:
@@ -94,7 +97,10 @@ def secondPass(databaseNetworkObject, tokens, inferenceMode):
 				if(lemma in observedColumnsDict):
 					observedColumn = observedColumnsDict[lemma]
 				else:
-					observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, deviceLoadColumnInference, inferenceMode and deviceLoadColumnInferenceCopy)
+					if(inferenceMode):
+						observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, deviceLoadColumnInference, inferenceMode and deviceLoadColumnInferenceCopy)
+					else:
+						observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
 					observedColumnsDict[lemma] = observedColumn
 				observedColumnsSequenceWordIndexDict[i] = observedColumn
 	return observedColumnsDict, observedColumnsSequenceWordIndexDict

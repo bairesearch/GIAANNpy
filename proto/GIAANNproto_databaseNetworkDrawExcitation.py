@@ -471,7 +471,7 @@ if(drawSparseArrays):
 				featureWordToIndex = observedColumn.featureWordToIndex
 				otherFeatureWordToIndex = observedColumn.featureWordToIndex
 				cIdx = databaseNetworkObject.conceptColumnsDict[lemma]
-				featureConnections = selectDrawBranch(observedColumn.featureConnections, drawBranches)
+				featureConnections = selectDrawBranch(observedColumn.materialiseFeatureConnections(loadAllStored=True, targetDevice=deviceSparse), drawBranches)
 			if(drawRelationTypesConnectionsFromSource):
 				sourceFeatureNeurons = None
 				if(drawRelationTypes):
@@ -831,7 +831,7 @@ else:
 				featureWordToIndex = observedColumn.featureWordToIndex
 				otherFeatureWordToIndex = observedColumn.featureWordToIndex
 				cIdx = databaseNetworkObject.conceptColumnsDict[lemma]
-				featureConnections = selectDrawBranch(observedColumn.featureConnections, drawBranches)
+				featureConnections = selectDrawBranch(observedColumn.materialiseFeatureConnections(loadAllStored=True, targetDevice=deviceSparse), drawBranches)
 			if(drawRelationTypesConnectionsFromSource):
 				sourceFeatureNeurons = None
 				if(drawRelationTypes):
