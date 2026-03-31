@@ -27,17 +27,19 @@ import sys
 
 #Execution mode selection;
 useQuickExecution = True	#default: False	#orig: True
+useBenchmark = False		#use benchmark file naming schemes and evals
 useAutoresearch = False
-inferenceTrainFirstSequences = False
+#useDefault = True	#default: True
+inferenceTrainFirstSequences = False	#dependent var
 if(useQuickExecution):
-	executionMode = "inference" 
+	executionMode = "inference" 	#mandatory: "inference" (effective trainAndInference but uses a text datafile)
 	inferenceTrainFirstSequences = True	#trains first sequences in inference_prompt.txt, performs inference only on last sequence
+elif(useBenchmark):
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
-	executionMode = "trainAndInference" 
+	executionMode = "trainAndInference"
 else:
-	executionMode = "train"
-	#executionMode = "inference"
-	#executionMode = "trainAndInference" 
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
 	
 
 #Primary Draw settings:
@@ -45,40 +47,21 @@ drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype 
 drawNetworkDuringInference = False	#default: False
 
 
-#Primary Inference settings:
+#Inference settings:
 numSeedTokensInference = 8	#default: 5, 8, 12, 16	#this is also set during train phase only so that the derived numberOfSegments always matches inference phase
 useInference = True  #mandatory: True	#enable options that support inference mode
 if(useInference):
 	inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True	#True: activate next column features using current prediction; False: use current target (default top-1 accuracy measurement)
 inferenceAddNewFeatures = True	#default: True	#orig: False	#run a controlled expansion pass during inference to add missing columns/features without training updates
-
-
-#Error report;
-ERROR_SIGNAL = 1
-def exitWithError():
-	sys.exit(ERROR_SIGNAL)
-def printe(str):
-	print(str)
-	exitWithError()
-	
-	
-#Benchmarking;
-if(useQuickExecution or useAutoresearch):
-	useBenchmark = False
-	useBenchmarkDefaults = False
+if(useQuickExecution):
+	useBenchmarkDefaultsEvalTestSet = False	#default: False: eval training-set
+elif(useBenchmark):
+	useBenchmarkDefaultsEvalTestSet = False	#default: False: eval training-set
+elif(useAutoresearch):
+	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 else:
-	useBenchmark = True	#default: False	#orig: False	#use benchmark file naming schemes and evals
-	useBenchmarkDefaults = True	#default: False	#orig: True
-if(useAutoresearch):
-	useBenchmarkDefaultsTestSet = True	#True: eval test set
-else:
-	useBenchmarkDefaultsTestSet = False	#False: eval train set	#default: False	#orig: False
-if(useBenchmarkDefaults):
-	spacyPipelineOptimisations = True	#default: True	#orig: False	#spacyPipelineOptimisations do not significantly affect test-set accuracies (-0.002)
-else:
-	spacyPipelineOptimisations = True	#default: True
-inferenceReportTokenAccuracyConstrainByColumn = False	#default: False	#orig: False
-if(useBenchmarkDefaultsTestSet):
+	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
+if(useBenchmarkDefaultsEvalTestSet):
 	inferenceEvaluateTestSet = True
 	#inferenceSegmentTiming = "none"	#~optimum
 	inferenceSegmentTiming = "biased"	#default
@@ -96,7 +79,36 @@ else:
 	inferenceActivationsType = "boolf"	#default
 	#inferenceActivationsType = "boolf+c"
 	#inferenceActivationsType = "intf+c"
-	
+inferenceReportTokenAccuracyConstrainByColumn = False	#default: False	#orig: False
+
+
+#Dataset Type;
+if(useQuickExecution):
+	datasetType = "textfile"
+elif(useBenchmark):
+	datasetType = "oscar"	#"oscar"/"wikipedia"
+elif(useAutoresearch):
+	datasetType = "oscar"
+else:
+	datasetType = "wikipedia"	#"oscar" / "wikipedia" / "textfile" [experimental]
+
+
+#Database;
+if(useQuickExecution):
+	trainMaxSequences = 10	#N/A: auto generated from inference_prompt.txt.trainAndInference
+	databaseFolderBase = "../database"	#default: "../database/"
+elif(useBenchmark):
+	trainMaxSequences = 1000000	#5000, 200000, 1000000
+	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"
+elif(useAutoresearch):
+	trainMaxSequences = 5000
+	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"
+else:
+	trainMaxSequences = 1000000	#dev: 10, 500, 5000, 10000, 200000 	#default: 1000000	  #adjust as needed	#max sequences for train
+	databaseFolderBase = "../database"
+maxSequenceLength = 60	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
+numberEpochs = 1	#default: 1
+
 
 #Multisentence predictions;
 multisentencePredictions = False	#default: False	#each sequence comprises multiple sentences	#requires higher GPU RAM for train
@@ -117,57 +129,6 @@ if(multipleDendriticBranches):
 else:
 	numberOfDendriticBranches = 1
 	randomlyAssignBranches = False
-
-
-#Dataset type;
-if(useQuickExecution):
-	datasetType = "textfile"
-elif(useAutoresearch):
-	datasetType = "oscar"
-else:
-	#datasetType = "wikipedia"
-	datasetType = "oscar"
-	#datasetType = "textfile"
-
-
-#Database;
-if(useAutoresearch):
-	trainMaxSequences = 5000
-else:
-	trainMaxSequences = 5000		#dev: 10, 500, 5000, 10000, 200000 	#default: 1000000	  #adjust as needed	#max sequences for train
-if(useQuickExecution):
-	databaseFolder = "../database"	#default: "../database/"
-elif(useAutoresearch):
-	databaseFolder = "/media/user/ssdpro/GIAANN/databaseAutoresearch"
-else:
-	if(useBenchmark):
-		#generate benchmark filename:
-		if(multipleDendriticBranches and randomlyAssignBranches):
-			if(spacyPipelineOptimisations):
-				benchmarkAblationText = "-randomlyAssignBranches" + str(numberOfDendriticBranches)
-			else:
-				printe("randomlyAssignBranches currently assumes spacyPipelineOptimisations")
-		elif(multisentencePredictions):
-			if(not useBenchmarkDefaults):
-				benchmarkAblationText = "-multisentencePredictions"
-			else:
-				printe("multisentencePredictions currently assumes not useBenchmarkDefaults")
-		elif(not useBenchmarkDefaults):
-			benchmarkAblationText = "-useBenchmarkDefaultsFalse"
-		elif(spacyPipelineOptimisations):
-			benchmarkAblationText = "-spacyPipelineOptimisations"
-		else:
-			benchmarkAblationText = ""
-		if(datasetType=="wikipedia"):
-			databaseTypeText = "database"
-		elif(datasetType=="oscar"):
-			databaseTypeText = "databaseOscar"
-		databaseFolder = "/media/user/ssdpro/GIAANN/" + databaseTypeText + str(trainMaxSequences) + "-numSeedTokensInference" + str(numSeedTokensInference) + benchmarkAblationText		#useSANIfeaturesAndColumns
-	else:
-		databaseFolder = "../database"	#default: "../database/"
-databaseFolder += "/"
-maxSequenceLength = 60	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
-numberEpochs = 1	#default: 1
 
 
 #Dataset;
@@ -223,7 +184,7 @@ if(not datasetType=="textfile"):
 			raise RuntimeError("trainTestSet configuration error: unsupported dataset selection")
 		trainSetStartOffsetSequences = 0
 	else:
-		trainSetStartOffsetSequences = 0	#1000000	#default: 0	#orig: 0	
+		trainSetStartOffsetSequences = 0	#200000	#1000000	#default: 0	#orig: 0	
 		if(datasetType=="oscar"):
 			maxSentencesPerArticle = 100	#CHECKTHIS
 		elif(datasetType=="wikipedia"):
@@ -247,6 +208,52 @@ if(runtimeReleaseGPUMemory):
 storeDatabaseInRam = True	#default: True	#orig: False
 if(storeDatabaseInRam):
 	useGPUdatabase = False	#default: False	#default: False
+
+
+#Error report;
+ERROR_SIGNAL = 1
+def exitWithError():
+	sys.exit(ERROR_SIGNAL)
+def printe(str):
+	print(str)
+	exitWithError()
+
+
+#Benchmarking;
+if(useBenchmark):
+	useBenchmarkDefaults = True	#default: True
+else:
+	useBenchmarkDefaults = False	#default: False
+if(useBenchmarkDefaults):
+	spacyPipelineOptimisations = True	#default: True	#orig: False	#spacyPipelineOptimisations do not significantly affect test-set accuracies (~-0.002)
+else:
+	spacyPipelineOptimisations = True	#default: True
+if(useBenchmark):
+	#generate benchmark filename:
+	if(multipleDendriticBranches and randomlyAssignBranches):
+		if(spacyPipelineOptimisations):
+			benchmarkAblationText = "-randomlyAssignBranches" + str(numberOfDendriticBranches)
+		else:
+			printe("randomlyAssignBranches currently assumes spacyPipelineOptimisations")
+	elif(multisentencePredictions):
+		if(not useBenchmarkDefaults):
+			benchmarkAblationText = "-multisentencePredictions"
+		else:
+			printe("multisentencePredictions currently assumes not useBenchmarkDefaults")
+	elif(not useBenchmarkDefaults):
+		benchmarkAblationText = "-useBenchmarkDefaultsFalse"
+	elif(spacyPipelineOptimisations):
+		benchmarkAblationText = "-spacyPipelineOptimisations"
+	else:
+		benchmarkAblationText = ""
+	if(datasetType=="wikipedia"):
+		databaseTypeText = ""	#or Wikipedia
+	elif(datasetType=="oscar"):
+		databaseTypeText = "Oscar"
+	databaseFolder = databaseFolderBase + databaseTypeText + str(trainMaxSequences) + "-numSeedTokensInference" + str(numSeedTokensInference) + benchmarkAblationText		#useSANIfeaturesAndColumns
+else:
+	databaseFolder = databaseFolderBase
+databaseFolder = databaseFolder + "/"
 
 
 #Optimisations;
@@ -508,6 +515,7 @@ randomiseColumnFeatureXposition = True	#shuffle x position of column internal fe
 
 
 #Information vars;
+printCountTotalParameters = False	#count number of connections in network
 printInferenceTop1Accuracy = True	#default: True	#print inference top-1 accuracy
 printInferenceTop1AccuracyBitsPerByte = False	#dependent var
 printInferenceTop1AccuracyBitsPerByteModified = False	#dependent var
@@ -548,7 +556,6 @@ if(not useAutoresearch):
 #Debug vars;
 debugPrintTotalInferenceTokens = False	#print total number of inference tokens in seed phase, prediction phase, and both phases (summed across all sequences) 
 debugPrintTrainSectionTimes = False	#print per-sequence timing breakdown for key train sections
-debugCountTotalParameters = False	#count number of connections in network
 debugPrintSpacySectionTimes = False	#print spacy preprocessing times
 
 if(useAutoresearch):
@@ -832,7 +839,7 @@ if(useSANI):
 		arrayIndexSegmentLast = arrayNumberOfSegments-1
 
 	'''
-	if(useInference):	#no restrictions with useBenchmarkDefaultsTestSet;
+	if(useInference):	#no restrictions with useBenchmarkDefaultsEvalTestSet;
 		#arrayNumberOfSegments must be <= numSeedTokens (eg with numSeedTokens = 5, segment budget = 5)
 		#absolute minimum, for useSANIcolumns (and useSANIfeaturesAndColumns with arrayNumberOfSegmentsColumnDistance>1), arrayNumberOfSegments must be significantly less than numSeedTokens
 		assert arrayNumberOfSegments <= numSeedTokensInference	
@@ -981,8 +988,10 @@ if(printConfiguration):
 	print("***** printConfiguration: ***** ")
 	print("")
 	print("#Execution mode selection;")
-	print("useAutoresearch:", useAutoresearch)
 	print("useQuickExecution:", useQuickExecution)
+	print("useBenchmark:", useBenchmark)
+	print("useAutoresearch:", useAutoresearch)
+	#print("useDefault:", useDefault)
 	print("executionMode:", executionMode)
 	print("inferenceTrainFirstSequences:", inferenceTrainFirstSequences)
 	print("")
@@ -990,20 +999,25 @@ if(printConfiguration):
 	print("drawNetworkDuringTrain:", drawNetworkDuringTrain)
 	print("drawNetworkDuringInference:", drawNetworkDuringInference)
 	print("")
-	print("#Primary Inference settings;")
+	print("#Inference settings;")
 	print("numSeedTokensInference:", numSeedTokensInference)
 	if(useInference):
 		print("inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures:", inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures)
-	print("")
-	print("#Benchmarking;")
-	print("useBenchmark:", useBenchmark)
-	print("useBenchmarkDefaults:", useBenchmarkDefaults)
-	print("useBenchmarkDefaultsTestSet:", useBenchmarkDefaultsTestSet)
-	print("spacyPipelineOptimisations:", spacyPipelineOptimisations)
-	print("inferenceReportTokenAccuracyConstrainByColumn:", inferenceReportTokenAccuracyConstrainByColumn)
+	print("useBenchmarkDefaultsEvalTestSet:", useBenchmarkDefaultsEvalTestSet)
 	print("inferenceEvaluateTestSet:", inferenceEvaluateTestSet)
 	print("inferenceSegmentTiming:", inferenceSegmentTiming)
 	print("inferenceActivationsType:", inferenceActivationsType)
+	print("inferenceReportTokenAccuracyConstrainByColumn:", inferenceReportTokenAccuracyConstrainByColumn)
+	print("")
+	print("#Dataset Type;")
+	print("datasetType:", datasetType)
+	print("")
+	print("#Database;")
+	print("databaseFolder:", databaseFolder)
+	print("trainLoadExistingDatabase:", trainLoadExistingDatabase)
+	print("trainMaxSequences:", trainMaxSequences)
+	print("maxSequenceLength:", maxSequenceLength)
+	print("numberEpochs:", numberEpochs)
 	print("")
 	print("#Multisentence predictions;")
 	print("multisentencePredictions:", multisentencePredictions)
@@ -1014,15 +1028,7 @@ if(printConfiguration):
 	print("numberOfDendriticBranches:", numberOfDendriticBranches)
 	print("randomlyAssignBranches:", randomlyAssignBranches)
 	print("")
-	print("#Database;")
-	print("databaseFolder:", databaseFolder)
-	print("trainLoadExistingDatabase:", trainLoadExistingDatabase)
-	print("trainMaxSequences:", trainMaxSequences)
-	print("maxSequenceLength:", maxSequenceLength)
-	print("numberEpochs:", numberEpochs)
-	print("")
 	print("#Dataset;")
-	print("datasetType:", datasetType)
 	print("datasetName:", datasetName)
 	if(not datasetType=="textfile"):
 		print("datasetsLibrary4plus:", datasetsLibrary4plus)
@@ -1040,6 +1046,10 @@ if(printConfiguration):
 	print("storeDatabaseInRam:", storeDatabaseInRam)
 	if(storeDatabaseInRam):
 		print("useGPUdatabase:", useGPUdatabase)
+	print("")
+	print("#Benchmarking;")
+	print("useBenchmarkDefaults:", useBenchmarkDefaults)
+	print("spacyPipelineOptimisations:", spacyPipelineOptimisations)
 	print("")
 	print("#Optimisations;")
 	print("inferenceOnlyRetainPredictedTargetObservedColumn:", inferenceOnlyRetainPredictedTargetObservedColumn)

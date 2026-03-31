@@ -177,7 +177,7 @@ def printInferenceTop1Accuracy(databaseNetworkObject):
 						print("averageTop1BitsPerByteModified: ", bitsPerByte)
 					else:
 						print("averageTop1BitsPerByte: ", bitsPerByte)
-					memory_gb = GIAANNproto_databaseNetworkExcitation.debugCountTotalParametersRun(databaseNetworkObject)
+					memory_gb = GIAANNproto_databaseNetworkExcitation.printCountTotalParametersRun(databaseNetworkObject)
 					print("memory_gb: ", memory_gb)
 				else:
 					if(printInferenceTop1AccuracyBitsPerByteModified):
@@ -192,7 +192,7 @@ def printInferenceTop1Accuracy(databaseNetworkObject):
 			if(useAutoresearch):
 				print("---")
 				print("averageTop1Accuracy: ", predictionAccuracy)
-				memory_gb = GIAANNproto_databaseNetworkExcitation.debugCountTotalParametersRun(databaseNetworkObject)
+				memory_gb = GIAANNproto_databaseNetworkExcitation.printCountTotalParametersRun(databaseNetworkObject)
 				print("memory_gb: ", memory_gb)
 			else:
 				if(inferenceReportTokenAccuracyConstrainByColumn):

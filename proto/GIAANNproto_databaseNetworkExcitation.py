@@ -912,7 +912,7 @@ if(debugLimitFeatures):
 		return resultList
 
 
-#if(debugCountTotalParameters):
+#if(printCountTotalParameters):
 def debugCountObservedColumnConnections(databaseNetworkObject, conceptIndex, lemma, columnIndex):
 	columnConnections = 0
 	if(not GIAANNproto_databaseNetworkFilesExcitation.observedColumnMetadataExists(conceptIndex)):
@@ -929,28 +929,28 @@ def debugCountObservedColumnConnections(databaseNetworkObject, conceptIndex, lem
 			del featureConnections
 	return columnConnections
 
-def debugCountTotalParametersRun(databaseNetworkObject):
+def printCountTotalParametersRun(databaseNetworkObject):
 	assert arrayIndexPropertiesEfficient 	#only databaseNetworkObject.arrayIndexPropertiesStrengthIndex stored in database, all tensors are coalesced
 	if(databaseNetworkObject is None):
-		raise RuntimeError("debugCountTotalParametersRun error: databaseNetworkObject is None")
+		raise RuntimeError("printCountTotalParametersRun error: databaseNetworkObject is None")
 	if(databaseNetworkObject.arrayIndexPropertiesStrengthIndex is None):
-		raise RuntimeError("debugCountTotalParametersRun error: databaseNetworkObject.arrayIndexPropertiesStrengthIndex is None")
+		raise RuntimeError("printCountTotalParametersRun error: databaseNetworkObject.arrayIndexPropertiesStrengthIndex is None")
 	totalColumns = len(databaseNetworkObject.conceptColumnsList)
 	if(totalColumns <= 0):
-		raise RuntimeError("debugCountTotalParametersRun error: conceptColumnsList is empty")
+		raise RuntimeError("printCountTotalParametersRun error: conceptColumnsList is empty")
 	totalConnections = 0
 	for columnIndex, lemma in enumerate(databaseNetworkObject.conceptColumnsList):
 		#print("columnIndex = ", columnIndex)
 		conceptIndex = databaseNetworkObject.conceptColumnsDict.get(lemma)
 		if(conceptIndex is None):
-			raise RuntimeError("debugCountTotalParametersRun error: conceptIndex is None for lemma = " + lemma)
+			raise RuntimeError("printCountTotalParametersRun error: conceptIndex is None for lemma = " + lemma)
 		columnConnections = debugCountObservedColumnConnections(databaseNetworkObject, conceptIndex, lemma, columnIndex)
 		totalConnections += columnConnections
 	database_pt_size_gb = debugCalculateDatabasePtSizeGiB()
 	memory_gb = debugCalculateDatabaseSizeGiB()
-	if(debugCountTotalParameters):
-		print("debugCountTotalParameters totalConnections = ", totalConnections)
-		print("debugCountTotalParameters totalColumns = ", totalColumns)
+	if(printCountTotalParameters):
+		print("printCountTotalParameters totalConnections = ", totalConnections)
+		print("printCountTotalParameters totalColumns = ", totalColumns)
 		print(f"Total .pt size (uncompressed GiB): {database_pt_size_gb:.3f}")
 		print(f"Total database size (uncompressed GiB): {memory_gb:.3f}")
 	return memory_gb

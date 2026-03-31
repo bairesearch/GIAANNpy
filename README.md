@@ -85,28 +85,65 @@ All settings are located in GIAANNproto_globalDefs.py.
 #### Train/inference mode selection
 
 ##### Quick execution (demo)
-For quick execution (train/inference);
-* set useInference=True and inferenceTrainFirstSequences=True (and optionally drawNetworkDuringTrain=True). 
+
+For quick execution (train and inference);
+* set useQuickExecution = True 
 
 This will;
-* train the database using all sequences in "database/prompt_inference.txt" except for the last (*numSentencesPerSequence) sequences, and then;
+* automatically set useInference=True and inferenceTrainFirstSequences=True 
+* train the database using all sequences in "database/inference_prompt.txt.trainAndInference" except for the last (*numSentencesPerSequence) sequences, and then;
 * perform inference on the last (*numSentencesPerSequence) sequences.
 
-The prompt_inference.txt provided is taken from the first sentences from the first article of the database (Wikipedia).
+The database/inference_prompt.txt.trainAndInference provided is taken from the first sentences from the first article of the dataset (Wikipedia).
 
 ##### Standard execution
-* to train the network from a huggingface (current: Wikipedia) database set useInference=False.
-* to perform inference on a seeded prompt (prompt_inference.txt) set useInference=True and inferenceTrainFirstSequences=False.
 
-Additional parameters;
-* set numSeedTokensInference - the number of tokens used for the seed (vs prediction) phase of inference. Note arrayNumberOfSegments is derived from this parameter.
-* set inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures - for standard inference set True (Predictions), for benchmarking top-1 accuracy set False (Targets).
+For standard execution (train or inference);
+* set useQuickExecution = False
+* set useInference = False to train the network from a huggingface dataset (e.g. Wikipedia/OSCAR-2201), or;
+* set useInference = True to perform inference on a seeded prompt (prompt_inference.txt.*)
+
+#### Primary Draw settings
+
+* drawNetworkDuringTrain - draw network during train
+* drawNetworkDuringInference - draw network during inference
+
+#### Inference settings
+
+* numSeedTokensInference - the number of tokens used for the seed (vs prediction) phase of inference. Note arrayNumberOfSegments is derived from this parameter.
+* inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False for benchmarking top-1 accuracy (fires targets rather than predictions).
+* useBenchmarkDefaultsEvalTestSet - select default inference settings for eval using training-set or test-set data
+* inferenceEvaluateTestSet -  eval using training-set or test-set data
+* inferenceSegmentTiming - "none"/"biased"/"seq"/"exact" (from least restrictive to most restrictive):
+  * "none: no segment timing checks.
+  * "biased": no sequentiality enforcement but timing bias (wrt expected/train timings). 
+  * "seq": sequentiality enforcement only (no other timing checks). 
+  * "exact": sequentiality and timing enforcement (wrt expected/train timings)
+* inferenceActivationsType: 
+  * "boolf": inference segment activations boolean for feature segments only
+  * "boolf+c": inference segment activations boolean for feature and column segments
+  * "intf+c": inference segment activations integer for feature and column segments
+
+#### Dataset Type
+
+* datasetType - set "oscar" / "wikipedia" / "textfile" [experimental]
 
 #### Database
 
-* set databaseFolder - select local SSD for fast i/o
-* set trainMaxSequences - max sequences for train
-* set maxSequenceLength - depends on CPU/GPU RAM availability during train 
+* databaseFolderBase - select local SSD for fast i/o
+* trainMaxSequences - max sequences for train
+* maxSequenceLength - depends on CPU/GPU RAM availability during train 
+
+#### Multisentence predictions
+
+* multisentencePredictions - each sequence comprises multiple sentences
+* numSentencesPerSequence - the number of sentences per sequence
+
+#### Dendritic branches
+
+* multipleDendriticBranches - support cases where a trained sequence has repeated references to a column feature 
+* numberOfDendriticBranches - number of dendritic branches
+* randomlyAssignBranches to support increasingly conflicting reuse of phrases throughout dataset
 
 #### Dataset
 
@@ -116,40 +153,29 @@ Additional parameters;
 * useLocalDataset - use local dataset (else stream)
 * datasetFolder - folder to store dataset
 
-#### Multisentence predictions
-
-* set multisentencePredictions - each sequence comprises multiple sentences
-* set numSentencesPerSequence - the number of sentences per sequence
-
 #### RAM
 
-* set useGPUdense=True (and optionally useGPUsparse=True) during train (sequence size dependent)
-* set useGPUsparse=False during inference (network size dependent)
-* set storeDatabaseInRam=True
-* set useGPUdatabase=False (assume CPU has more RAM)
+* useGPUdense=True (and useGPUsparse=True) during train (sequence size dependent)
+* useGPUsparse=False during inference (network size dependent)
+* storeDatabaseInRam
+* useGPUdatabase=False (assume CPU has more RAM)
 		
 #### Segment activation time
 
-* set inferenceUseNeuronFeaturePropertiesTime - record segment activation times and use them to bias feature selection during inference based on their proximity to their ideal (i.e. trained) timings
-* set inferenceUseNeuronFeaturePropertiesTimeExact - most strict time selection
-
-#### Dendritic branches
-
-* set multipleDendriticBranches - support cases where a trained sequence has repeated references to a column feature 
-* set numberOfDendriticBranches - number of dendritic branches
-* set randomlyAssignBranches to support increasingly conflicting reuse of phrases throughout dataset
+* inferenceUseNeuronFeaturePropertiesTime - record segment activation times and use them to bias feature selection during inference based on their proximity to their ideal (i.e. trained) timings
+* inferenceUseNeuronFeaturePropertiesTimeExact - most strict time selection
 
 #### Array properties
 
-* set arrayIndexPropertiesEfficient=True to reduce train time/RAM (not compatible with drawRelationTypes)
+* arrayIndexPropertiesEfficient=True to reduce train time/RAM (not compatible with drawRelationTypes)
 
 #### SANI
 
-* set useSANI=True - enables sequentially activated neuronal input
+* useSANI=True - enables sequentially activated neuronal input
 
 #### Immediate (direct) connections
 
-* set enforceDirectConnections=True (by default it uses useSANI to enforce direct connections between predicted features).
+* enforceDirectConnections=True (by default it uses useSANI to enforce direct connections between predicted features).
 
 #### Concept column delimiters
 
@@ -161,14 +187,16 @@ Additional parameters;
 
 #### Beam search
 
-* set inferenceBeamSearch - executes inference by identifying the best beam path
-* set inferenceBeamWidth - width of beam search
-* set inferenceBeamDepth - depth of beam search
+* inferenceBeamSearch - executes inference by identifying the best beam path
+* inferenceBeamWidth - width of beam search
+* inferenceBeamDepth - depth of beam search
 
-#### Inference
+#### Inference activations
 
-Settings for inference. See:
-* inferenceConnectionsStrengthBoolean, inferenceSegmentActivationsBoolean, inferenceSourceActivationsBoolean
+* inferenceConnectionsStrengthBoolean
+* inferenceSegmentActivationsBoolean
+* inferenceSegmentActivationsBooleanFeatureSegmentsOnly
+* inferenceSourceActivationsBoolean
 
 #### Train optimisations
 

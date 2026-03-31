@@ -100,8 +100,11 @@ def executeMode(inferenceMode):
 	databaseNetworkObject = GIAANNproto_databaseNetworkExcitation.initialiseDatabaseNetwork(inferenceMode)
 	databaseNetworkObject.nlp = nlpSequence	#used by posStringToPosInt
 
-	if(debugCountTotalParameters):
-		GIAANNproto_databaseNetworkExcitation.debugCountTotalParametersRun(databaseNetworkObject)
+	if(printCountTotalParameters):
+		if(len(databaseNetworkObject.conceptColumnsList) > 0):
+			GIAANNproto_databaseNetworkExcitation.printCountTotalParametersRun(databaseNetworkObject)
+		else:
+			print("printCountTotalParameters totalColumns = 0 (empty database)")
 	if(usePOS):
 		GIAANNproto_sequenceTokens.loadPOSdatabase()
 	if((inferenceMode and not inferenceTrainFirstSequences) or (not inferenceMode and trainLoadExistingDatabase and trainSetStartOffsetSequences>0)):
@@ -226,14 +229,17 @@ def processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, ar
 	if(ignoreNewlineCharacters):
 		text = text.replace('\n', ' ')
 	textParsed = nlpArticle(text)
-	
-	if(datasetType=="textfile"):
-		skipMode = False
+
+	if(executionMode=="inference"):
+		skipMode = False	
 	else:
-		if(trainTestSet):
+		if(datasetType=="textfile"):	#executionMode=="trainAndInference":
 			skipMode = False
-		else:
-			skipMode = (sequenceCount < (trainSetStartOffsetSequences-maxSentencesPerArticle))
+		else:	#executionMode=="train": 
+			if(trainTestSet):
+				skipMode = False
+			else:
+				skipMode = (sequenceCount < (trainSetStartOffsetSequences-maxSentencesPerArticle))
 	sequences, sequencesRaw = generateSeqencesBatchOrSerial(textParsed, skipMode)
 
 	if(debugPrintSpacySectionTimes):

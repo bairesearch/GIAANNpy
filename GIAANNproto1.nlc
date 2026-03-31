@@ -650,3 +650,7 @@ v1l (Codex IDE GPT-5.4) [under development]:
 - add option getFeatureConnectionsForSourceFeatureCache - cache stored source-feature file indices per observed column to avoid repeated directory scans
 - patch arrayIndexPropertiesEfficient=False - add adjustPropertyDimensions():if(propertyCount == arrayNumberOfPropertiesTrain):remapTrainPropertyDimensionsToInference() - remap train-layout property tensors to inference property indices on load, with an identity fast path for arrayIndexPropertiesEfficient=True
 - set drawDefaultInference=True (and debugDrawNeuronActivations=True)
+MANUAL; - add useBenchmark to execution mode selection
+MANUAL; - reorder params in GIAANNproto_globalDefs
+-  upgrade the independent python file countParametersAndSize.py to support the new database version in GIAANNproto (version 1l).
+MANUAL; - rename debugCountTotalParameters to printCountTotalParameters
