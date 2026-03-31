@@ -151,20 +151,87 @@ def loadFeatureNeuronsGlobalFile(inferenceMode):
 	globalFeatureNeurons = adjustBranchDimensions(globalFeatureNeurons, "globalFeatureNeurons", expectedRank=5)
 	return globalFeatureNeurons
 
+def getTrainToInferencePropertyIndexMap():
+	result = {}
+	propertyIndexPairs = [
+		(arrayIndexPropertiesStrengthIndexTrain, arrayIndexPropertiesStrengthIndexInference),
+		(arrayIndexPropertiesPermanenceIndexTrain, arrayIndexPropertiesPermanenceIndexInference),
+		(arrayIndexPropertiesActivationIndexTrain, arrayIndexPropertiesActivationIndexInference),
+		(arrayIndexPropertiesTimeIndexTrain, arrayIndexPropertiesTimeIndexInference),
+		(arrayIndexPropertiesPosIndexTrain, arrayIndexPropertiesPosIndexInference),
+		(arrayIndexPropertiesMinWordDistanceIndexTrain, arrayIndexPropertiesMinWordDistanceIndexInference)
+	]
+	for trainPropertyIndex, inferencePropertyIndex in propertyIndexPairs:
+		if(trainPropertyIndex is not None):
+			if(inferencePropertyIndex is None):
+				raise RuntimeError(f"getTrainToInferencePropertyIndexMap error: missing inference property index for train property index {trainPropertyIndex}")
+			result[int(trainPropertyIndex)] = int(inferencePropertyIndex)
+	if(len(result) != arrayNumberOfPropertiesTrain):
+		raise RuntimeError(f"getTrainToInferencePropertyIndexMap error: expected {arrayNumberOfPropertiesTrain} mapped train properties, got {len(result)}")
+	return result
+
+def remapTrainPropertyDimensionsToInference(tensor, tensorName):
+	result = tensor
+	propertyIndexMap = None
+	useIdentityExpansion = False
+	if(tensor.shape[0] != arrayNumberOfPropertiesTrain):
+		raise RuntimeError(f"{tensorName} train property dimension mismatch: expected {arrayNumberOfPropertiesTrain}, got {tensor.shape[0]}")
+	propertyIndexMap = getTrainToInferencePropertyIndexMap()
+	if(arrayIndexPropertiesEfficient):
+		useIdentityExpansion = True
+		for trainPropertyIndex, inferencePropertyIndex in propertyIndexMap.items():
+			if(trainPropertyIndex != inferencePropertyIndex):
+				useIdentityExpansion = False
+	if(useIdentityExpansion):
+		if(tensor.is_sparse):
+			tensor = tensor.coalesce()
+			newSize = list(tensor.size())
+			newSize[0] = arrayNumberOfPropertiesInference
+			result = pt.sparse_coo_tensor(tensor.indices(), tensor.values(), size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
+		else:
+			newSize = list(tensor.shape)
+			newSize[0] = arrayNumberOfPropertiesInference
+			result = pt.zeros(newSize, dtype=tensor.dtype, device=tensor.device)
+			result[:tensor.shape[0]] = tensor
+	else:
+		if(tensor.is_sparse):
+			tensor = tensor.coalesce()
+			indices = tensor.indices().clone()
+			values = tensor.values()
+			for trainPropertyIndex, inferencePropertyIndex in propertyIndexMap.items():
+				propertyMask = indices[0] == trainPropertyIndex
+				if(propertyMask.any()):
+					indices[0, propertyMask] = inferencePropertyIndex
+			newSize = list(tensor.size())
+			newSize[0] = arrayNumberOfPropertiesInference
+			result = pt.sparse_coo_tensor(indices, values, size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
+		else:
+			newSize = list(tensor.shape)
+			newSize[0] = arrayNumberOfPropertiesInference
+			result = pt.zeros(newSize, dtype=tensor.dtype, device=tensor.device)
+			for trainPropertyIndex, inferencePropertyIndex in propertyIndexMap.items():
+				result[inferencePropertyIndex] = tensor[trainPropertyIndex]
+	return result
+	
 def adjustPropertyDimensions(inferenceMode, tensor, tensorName):
 	propertyCount = tensor.shape[0]
 	result = tensor
 	if(inferenceMode):
 		if(propertyCount == arrayNumberOfPropertiesInference):
 			result = tensor
+		elif(propertyCount == arrayNumberOfPropertiesTrain):
+			result = remapTrainPropertyDimensionsToInference(tensor, tensorName)
+		else:
+			raise RuntimeError(f"{tensorName} property dimension mismatch: expected {arrayNumberOfPropertiesInference}, got {propertyCount}")
+		'''
+		#legacy branches: refactor these if i) the code changes between train and inference, or ii) arrayIndexProperties boolean flags change between train and inference.
 		elif(arrayIndexPropertiesActivationCreateInference and arrayIndexPropertiesActivationIndexInference is not None and propertyCount == arrayIndexPropertiesActivationIndexInference and propertyCount < arrayNumberOfPropertiesInference):
 			result = insertPropertyDimension(tensor, arrayIndexPropertiesActivationIndexInference, arrayNumberOfPropertiesInference)
 		elif(arrayIndexPropertiesTimeCreateInference and arrayIndexPropertiesTimeIndexInference is not None and propertyCount == arrayIndexPropertiesTimeIndexInference and propertyCount < arrayNumberOfPropertiesInference):
 			result = insertPropertyDimension(tensor, arrayIndexPropertiesTimeIndexInference, arrayNumberOfPropertiesInference)
 		elif(arrayIndexPropertiesActivationCreateInference and not arrayIndexPropertiesActivation and propertyCount == arrayNumberOfPropertiesInference - 1):
 			result = insertPropertyDimension(tensor, arrayIndexPropertiesActivationIndexInference, arrayNumberOfPropertiesInference)
-		else:
-			raise RuntimeError(f"{tensorName} property dimension mismatch: expected {arrayNumberOfPropertiesInference}, got {propertyCount}")
+		'''	
 	else:
 		if(propertyCount == arrayNumberOfPropertiesTrain):
 			result = tensor

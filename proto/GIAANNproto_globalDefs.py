@@ -26,7 +26,7 @@ import sys
 
 
 #Execution mode selection;
-useQuickExecution = False	#default: False	#orig: True
+useQuickExecution = True	#default: False	#orig: True
 useAutoresearch = False
 inferenceTrainFirstSequences = False
 if(useQuickExecution):
@@ -35,8 +35,8 @@ if(useQuickExecution):
 elif(useAutoresearch):
 	executionMode = "trainAndInference" 
 else:
-	#executionMode = "train"
-	executionMode = "inference"
+	executionMode = "train"
+	#executionMode = "inference"
 	#executionMode = "trainAndInference" 
 	
 
@@ -63,8 +63,12 @@ def printe(str):
 	
 	
 #Benchmarking;
-useBenchmark = True	#default: False	#orig: False	#use benchmark file naming schemes and evals
-useBenchmarkDefaults = True	#default: False	#orig: True
+if(useQuickExecution or useAutoresearch):
+	useBenchmark = False
+	useBenchmarkDefaults = False
+else:
+	useBenchmark = True	#default: False	#orig: False	#use benchmark file naming schemes and evals
+	useBenchmarkDefaults = True	#default: False	#orig: True
 if(useAutoresearch):
 	useBenchmarkDefaultsTestSet = True	#True: eval test set
 else:
@@ -280,11 +284,11 @@ if(arrayIndexPropertiesEfficient):
 	arrayIndexPropertiesTime = False	#inference only (see arrayIndexPropertiesTimeCreate)
 	arrayIndexPropertiesPos = False
 else:
-	arrayIndexPropertiesStrength = True
-	arrayIndexPropertiesPermanence = True
-	arrayIndexPropertiesActivation = False	#inference only (see arrayIndexPropertiesActivationCreate)
-	arrayIndexPropertiesTime = False 	#inference only (see arrayIndexPropertiesTimeCreate)
-	arrayIndexPropertiesPos = True
+	arrayIndexPropertiesStrength = True	#default: True
+	arrayIndexPropertiesPermanence = True	#default: True
+	arrayIndexPropertiesActivation = False	#default: False	#inference only (see arrayIndexPropertiesActivationCreate)
+	arrayIndexPropertiesTime = False 	#default: False	#inference only (see arrayIndexPropertiesTimeCreate)
+	arrayIndexPropertiesPos = True	#default: True
 arrayIndexPropertiesActivationCreateInference = arrayIndexPropertiesActivation or True
 arrayIndexPropertiesTimeCreateInference = arrayIndexPropertiesTime or inferenceUseNeuronFeaturePropertiesTime
 
@@ -460,7 +464,7 @@ elif(drawDelimiters):
 	drawDelimitersInference = False		#False: draw activation status
 elif(drawDefault):
 	drawDefaultTrain = True	#standard colours (prime concept feature neurons in blue and instance feature neurons in cyan)
-	drawDefaultInference = False	#False: draw activation status
+	drawDefaultInference = True	#False: draw activation status
 else:
 	printe("warning: draw scheme not defined")
 drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSequenceIndex"
@@ -579,7 +583,7 @@ debugOnlyDrawBranchIndexX = 0
 
 debugConnectNodesToNextNodesInSequenceOnly = False
 debugConnectColumnsToNextColumnsInSequenceOnly = False
-debugDrawNeuronActivations = False
+debugDrawNeuronActivations = True
 debugReloadGlobalFeatureNeuronsEverySequence = False
 
 
@@ -1074,7 +1078,7 @@ if(printConfiguration):
 			print("inferenceSegmentActivationsBooleanFeatureSegmentsOnly:", inferenceSegmentActivationsBooleanFeatureSegmentsOnly)
 		print("inferenceSourceActivationsBoolean:", inferenceSourceActivationsBoolean)
 	print("")
-	print("Train optimisations;")
+	print("#Train optimisations;")
 	print("trainSequenceObservedColumnsUseSequenceFeaturesOnly:", trainSequenceObservedColumnsUseSequenceFeaturesOnly)
 	print("trainSequenceObservedColumnsMatchSequenceWords:", trainSequenceObservedColumnsMatchSequenceWords)
 	print("combineSparseUpdatesPerSequence:", combineSparseUpdatesPerSequence)
