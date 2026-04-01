@@ -77,18 +77,23 @@ See the repository [README](https://github.com/bairesearch/GIAANNpy/blob/main/RE
 ### Train/inference mode selection
 
 #### Quick execution (demo)
-For quick execution (train/inference);
-* set useInference=True and inferenceTrainFirstSequences=True (and optionally drawNetworkDuringTrain=True). 
+
+For quick execution (train and inference);
+* set useQuickExecution = True 
 
 This will;
-* train the database using all sequences in "database/prompt_inference.txt" except for the last (*numSentencesPerSequence) sequences, and then;
+* automatically set useInference=True and inferenceTrainFirstSequences=True 
+* train the database using all sequences in "database/inference_prompt.txt.trainAndInference" except for the last (*numSentencesPerSequence) sequences, and then;
 * perform inference on the last (*numSentencesPerSequence) sequences.
 
-The prompt_inference.txt provided is taken from the first sentences from the first article of the database (Wikipedia).
+The database/inference_prompt.txt.trainAndInference provided is taken from the first sentences from the first article of the dataset (Wikipedia).
 
 #### Standard execution
-* to train the network from a huggingface (current: Wikipedia) database set useInference=False.
-* to perform inference on a seeded prompt (prompt_inference.txt) set useInference=True and inferenceTrainFirstSequences=False.
+
+For standard execution (train or inference);
+* set useQuickExecution = False
+* set useInference = False to train the network from a huggingface dataset (e.g. Wikipedia/OSCAR-2201), or;
+* set useInference = True to perform inference on a seeded prompt (prompt_inference.txt.*)
 
 See the repository [README](https://github.com/bairesearch/GIAANNpy/blob/main/README.md) for more configuration details.
 

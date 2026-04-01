@@ -340,19 +340,22 @@ class ObservedColumn:
 		resolvedTargetDevice = targetDevice if targetDevice is not None else self.getDefaultConnectionTargetDevice()
 		result = self.featureConnectionsBySourceFeature.get(normalisedSourceFeatureIndex)
 		if(result is None):
-			if(getFeatureConnectionsForSourceFeatureCache):
-				if(self.storedSourceFeatureIndicesCache is None):
-					self.storedSourceFeatureIndicesCache = set(GIAANNproto_databaseNetworkFilesExcitation.listObservedColumnSourceFeatureIndices(self.conceptIndex))
-				storedSourceFeatureIndices = self.storedSourceFeatureIndicesCache
+			if(storeDatabaseInRam and self.databaseNetworkObject.observedColumnsRAMLoaded):
+				result = self.initialiseFeatureConnections(self.databaseNetworkObject.c, self.databaseNetworkObject.f, resolvedTargetDevice)
 			else:
-				storedSourceFeatureIndices = self.listStoredSourceFeatureIndices()
-			if(normalisedSourceFeatureIndex in storedSourceFeatureIndices):
-				result = GIAANNproto_databaseNetworkFilesExcitation.loadObservedColumnSourceFeatureConnectionsTensor(self.databaseNetworkObject, self.conceptIndex, normalisedSourceFeatureIndex, resolvedTargetDevice)
-			else:
-				if(not createMissing):
-					result = self.initialiseFeatureConnections(self.databaseNetworkObject.c, self.databaseNetworkObject.f, resolvedTargetDevice)
+				if(getFeatureConnectionsForSourceFeatureCache):
+					if(self.storedSourceFeatureIndicesCache is None):
+						self.storedSourceFeatureIndicesCache = set(GIAANNproto_databaseNetworkFilesExcitation.listObservedColumnSourceFeatureIndices(self.conceptIndex))
+					storedSourceFeatureIndices = self.storedSourceFeatureIndicesCache
 				else:
-					result = self.initialiseFeatureConnections(self.databaseNetworkObject.c, self.databaseNetworkObject.f, resolvedTargetDevice)
+					storedSourceFeatureIndices = self.listStoredSourceFeatureIndices()
+				if(normalisedSourceFeatureIndex in storedSourceFeatureIndices):
+					result = GIAANNproto_databaseNetworkFilesExcitation.loadObservedColumnSourceFeatureConnectionsTensor(self.databaseNetworkObject, self.conceptIndex, normalisedSourceFeatureIndex, resolvedTargetDevice)
+				else:
+					if(not createMissing):
+						result = self.initialiseFeatureConnections(self.databaseNetworkObject.c, self.databaseNetworkObject.f, resolvedTargetDevice)
+					else:
+						result = self.initialiseFeatureConnections(self.databaseNetworkObject.c, self.databaseNetworkObject.f, resolvedTargetDevice)
 			self.featureConnectionsBySourceFeature[normalisedSourceFeatureIndex] = result
 		elif(result.device != resolvedTargetDevice):
 			result = result.to(resolvedTargetDevice)

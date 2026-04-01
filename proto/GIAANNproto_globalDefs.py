@@ -35,7 +35,7 @@ if(useQuickExecution):
 	executionMode = "inference" 	#mandatory: "inference" (effective trainAndInference but uses a text datafile)
 	inferenceTrainFirstSequences = True	#trains first sequences in inference_prompt.txt, performs inference only on last sequence
 elif(useBenchmark):
-	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 else:
@@ -98,7 +98,7 @@ if(useQuickExecution):
 	trainMaxSequences = 10	#N/A: auto generated from inference_prompt.txt.trainAndInference
 	databaseFolderBase = "../database"	#default: "../database/"
 elif(useBenchmark):
-	trainMaxSequences = 1000000	#5000, 200000, 1000000
+	trainMaxSequences = 5000	#5000, 200000, 1000000
 	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"
 elif(useAutoresearch):
 	trainMaxSequences = 5000
@@ -426,7 +426,7 @@ if(useCUDAObservedColumnUpdateKernel):
 		raise RuntimeError("useCUDAObservedColumnUpdateKernel requires useGPUsparseStrict=True")
 updateObservedColumnsVerboseSourceFeatureConnectionsOnly = True	#default: True	#orig: False	#upgrade updateObservedColumnsVerbose to operate on individual source-feature tensors rather than materialising full observed-column connections
 getTrainRequiredSourceFeatureIndicesByObservedColumnVectorize = True	#default: True	#orig: False	#vectorise exact per-column source-feature detection for trainSequenceObservedColumnsUseSequenceFeaturesOnly/trainSequenceObservedColumnsMatchSequenceWords
-getFeatureConnectionsForSourceFeatureCache = True	#default: True	#orig: False	#cache stored source-feature file indices per observed column to avoid repeated directory scans
+getFeatureConnectionsForSourceFeatureCache = not storeDatabaseInRam	#not storeDatabaseInRam	#default: not storeDatabaseInRam	#orig: False	#cache stored source-feature file indices per observed column to avoid repeated directory scans when storeDatabaseInRam=False
 
 
 #Draw;

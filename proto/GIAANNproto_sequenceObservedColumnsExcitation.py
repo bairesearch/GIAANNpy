@@ -110,9 +110,6 @@ class SequenceObservedColumns:
 			self.featureNeurons = self.initialiseFeatureNeuronsSequence(self.cs, self.fs)
 			self.featureConnections = self.initialiseFeatureConnectionsSequence(self.cs, self.fs)
 
-			self.featureNeuronsOriginal = self.featureNeurons.clone()
-			self.featureConnectionsOriginal = self.featureConnections.clone()
-
 			# Populate arrays with data from observedColumnsDict (required for inference)
 			if(inferenceMode):
 				if(trainSequenceObservedColumnsMatchSequenceWords):
@@ -133,9 +130,7 @@ class SequenceObservedColumns:
 				GIAANNproto_sequenceConcepts.processConceptWords(self, 0, tokens, tokens)
 			self.featureNeurons = None
 			self.featureConnections = None
-			self.featureNeuronsOriginal = None
-			self.featureConnectionsOriginal = None
-			
+
 	def identifyObservedColumnFeatureWords(self, tokens, observedColumn):
 		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
 			featureWords = []
@@ -411,7 +406,6 @@ class SequenceObservedColumns:
 			combinedValues = pt.cat(featureListValues, dim=0)
 			# Convert to dense as per original code, though consider keeping sparse for memory savings
 			self.featureNeurons = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=self.featureNeurons.size(), dtype=arrayType, device=deviceDense).to_dense()
-			self.featureNeuronsOriginal = self.featureNeurons.clone()
 
 		# Now handle connections
 		connectionIndicesList = []
@@ -518,7 +512,6 @@ class SequenceObservedColumns:
 				dtype=arrayType, 
 				device=deviceDense
 			).to_dense()
-			self.featureConnectionsOriginal = self.featureConnections.clone()
 			if(debugDrawNeuronActivations):
 				strengthSum = self.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex].sum().item()
 	
@@ -594,8 +587,8 @@ class SequenceObservedColumns:
 		# Update observed columns with data from sequence arrays
 
 		inferenceConceptUpdateCounts = self.inferenceConceptUpdateCounts if getattr(self, "debugInferenceActive", False) else None
-		featureNeuronsDelta = self.featureNeurons - self.featureNeuronsOriginal
-		featureConnectionsDelta = self.featureConnections - self.featureConnectionsOriginal
+		featureNeuronsDelta = self.featureNeurons
+		featureConnectionsDelta = self.featureConnections
 		if(useGPUsparseStrict and not useGPUsparse):
 			featureNeuronsDelta = featureNeuronsDelta.to(deviceSparse)
 			featureConnectionsDelta = featureConnectionsDelta.to(deviceSparse)
@@ -842,8 +835,8 @@ class SequenceObservedColumns:
 		if not arrayIndexPropertiesStrength:
 			return
 
-		featureNeuronsDelta = self.featureNeurons[databaseNetworkObject.arrayIndexPropertiesStrengthIndex] - self.featureNeuronsOriginal[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
-		featureConnectionsDelta = self.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex] - self.featureConnectionsOriginal[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
+		featureNeuronsDelta = self.featureNeurons[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
+		featureConnectionsDelta = self.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 		if(useGPUsparseStrict and not useGPUsparse):
 			featureNeuronsDelta = featureNeuronsDelta.to(deviceSparse)
 			featureConnectionsDelta = featureConnectionsDelta.to(deviceSparse)
