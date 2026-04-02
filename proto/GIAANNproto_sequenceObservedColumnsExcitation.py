@@ -866,16 +866,15 @@ class SequenceObservedColumns:
 		featureIndices = featureNeuronsDeltaSparse.indices()
 		featureValues = featureNeuronsDeltaSparse.values()
 		featureIndices, featureValues = self.filterSparseByFeatureMask(featureIndices, featureValues, sequenceFeatureMaskFeature, [3])
-		featureRanges, featureIndicesSorted, featureValuesSorted = self.buildSparseColumnRanges(featureIndices, featureValues, 2)
 
 		connectionIndices = featureConnectionsDeltaSparse.indices()
 		connectionValues = featureConnectionsDeltaSparse.values()
 		connectionIndices, connectionValues = self.filterSparseByFeatureMask(connectionIndices, connectionValues, sequenceFeatureMaskConnection, [3, 5])
-		connectionRanges, connectionIndicesSorted, connectionValuesSorted = self.buildSparseColumnRanges(connectionIndices, connectionValues, 2)
 
-		connectionMinRanges = {}
-		connectionMinIndicesSorted = None
-		connectionMinValuesSorted = None
+		connectionMinIndices = None
+		connectionMinValues = None
+		connectionSourceCombinedKeys = None
+		connectionMinSourceCombinedKeys = None
 		if(arrayIndexPropertiesMinWordDistance):
 			connectionMin = self.featureConnections[databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex]
 			connectionMinSparse = connectionMin.to_sparse()
@@ -884,72 +883,224 @@ class SequenceObservedColumns:
 			connectionMinIndices = connectionMinSparse.indices()
 			connectionMinValues = connectionMinSparse.values()
 			connectionMinIndices, connectionMinValues = self.filterSparseByFeatureMask(connectionMinIndices, connectionMinValues, sequenceFeatureMaskConnection, [3, 5])
-			connectionMinRanges, connectionMinIndicesSorted, connectionMinValuesSorted = self.buildSparseColumnRanges(connectionMinIndices, connectionMinValues, 2)
+		observedColumnsByConceptIndex = self.getObservedColumnsByConceptIndex(sequenceObservedColumnsDict)
+		conceptIndicesFeatureTensor = self.conceptIndicesInSequenceObservedTensor.to(featureDevice)
+		conceptIndicesConnectionTensor = self.conceptIndicesInSequenceObservedTensor.to(connectionDevice)
 
-		conceptIndicesTensor = self.conceptIndicesInSequenceObservedTensor.to(connectionDevice)
-
-		if not lowMem:
-			globalFeatureNeurons = self.databaseNetworkObject.globalFeatureNeurons
-			if(combineSparseUpdatesPerSequence):
-				globalFeatureNeuronUpdates = []
-
-		for cIdx, observedColumn in sequenceObservedColumnsDict.items():
-			conceptIndex = observedColumn.conceptIndex
-
-			if lowMem:
-				featureTargetSparse = observedColumn.featureNeurons
-				featureTargetSize = featureTargetSparse.size()
+		#A: update feature neurons;
+		if(featureIndices.numel() > 0):
+			if(lowMem):
+				featureConceptIndicesUnique = pt.unique(conceptIndicesFeatureTensor[featureIndices[2]], sorted=True)
+				featureTargetSize = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, featureConceptIndicesUnique.shape[0], databaseNetworkObject.f)
+				featureTargetSparse = self.gatherFeatureNeuronConceptBucketTensor(observedColumnsByConceptIndex, featureConceptIndicesUnique, featureDevice)
+				featureUpdates = self.buildFeaturePropertyUpdateSparseBatched(featureIndices, featureValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, conceptIndicesFeatureTensor, featureTargetSize, featureConceptIndicesUnique)
+				featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
+				self.scatterFeatureNeuronConceptBucketTensor(observedColumnsByConceptIndex, featureConceptIndicesUnique, featureTargetSparse)
 			else:
-				if(combineSparseUpdatesPerSequence):
-					featureTargetSparse = None
-				else:
-					featureTargetSparse = globalFeatureNeurons
-				featureTargetSize = globalFeatureNeurons.size()
+				globalFeatureNeurons = self.databaseNetworkObject.globalFeatureNeurons
+				featureUpdates = self.buildFeaturePropertyUpdateSparseBatched(featureIndices, featureValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, conceptIndicesFeatureTensor, globalFeatureNeurons.size())
+				globalFeatureNeurons = self.addSparseUpdateNonNegative(globalFeatureNeurons, featureUpdates)
+				self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
 
-			featureRange = featureRanges.get(cIdx)
-			if(featureRange is not None):
-				start, end = featureRange
-				featureUpdateIndices = featureIndicesSorted[:, start:end]
-				featureUpdateValues = featureValuesSorted[start:end]
-				featureUpdates = self.buildFeaturePropertyUpdateSparse(featureUpdateIndices, featureUpdateValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, featureTargetSize, insertConceptIndex=None if lowMem else conceptIndex)
-				if lowMem:
-					featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
-				else:
-					if combineSparseUpdatesPerSequence:
-						globalFeatureNeuronUpdates.append(featureUpdates)
-					else:
-						featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
+		#B: update feature connections;
+		if(connectionIndices.numel() > 0):
+			connectionSourceCombinedKeys = self.buildConnectionSourceCombinedKeys(connectionIndices, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor)
+		if(arrayIndexPropertiesMinWordDistance):
+			if(connectionMinIndices is not None and connectionMinIndices.numel() > 0):
+				connectionMinSourceCombinedKeys = self.buildConnectionSourceCombinedKeys(connectionMinIndices, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor)
+		connectionSourceCombinedKeysList = []
+		if(connectionSourceCombinedKeys is not None and connectionSourceCombinedKeys.numel() > 0):
+			connectionSourceCombinedKeysList.append(connectionSourceCombinedKeys)
+		if(connectionMinSourceCombinedKeys is not None and connectionMinSourceCombinedKeys.numel() > 0):
+			connectionSourceCombinedKeysList.append(connectionMinSourceCombinedKeys)
+		if(len(connectionSourceCombinedKeysList) > 0):
+			connectionSourceCombinedKeysUnique = pt.unique(pt.cat(connectionSourceCombinedKeysList, dim=0), sorted=True)
+			connectionTargetSize = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, connectionSourceCombinedKeysUnique.shape[0], databaseNetworkObject.c, databaseNetworkObject.f)
+			connectionTargetSparse = self.gatherConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionDevice)
+			if(connectionIndices.numel() > 0):
+				connectionUpdates = self.buildConnectionSourceBucketUpdateSparse(connectionIndices, connectionValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor, connectionSourceCombinedKeysUnique, connectionTargetSize)
+				connectionTargetSparse = self.addSparseUpdateNonNegative(connectionTargetSparse, connectionUpdates)
+			if(arrayIndexPropertiesMinWordDistance):
+				if(connectionMinIndices is not None and connectionMinIndices.numel() > 0):
+					connectionMinUpdates = self.buildConnectionSourceBucketUpdateSparse(connectionMinIndices, connectionMinValues, databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor, connectionSourceCombinedKeysUnique, connectionTargetSize)
+					connectionTargetSparse = self.applySparseMinUpdate(connectionTargetSparse, connectionMinUpdates)
+			self.scatterConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionTargetSparse)
 
-			if lowMem:
-				observedColumn.featureNeurons = featureTargetSparse
+	def getObservedColumnsByConceptIndex(self, sequenceObservedColumnsDict):
+		result = {}
+		for observedColumn in sequenceObservedColumnsDict.values():
+			conceptIndex = int(observedColumn.conceptIndex)
+			if(conceptIndex in result):
+				if(result[conceptIndex] is not observedColumn):
+					raise RuntimeError(f"getObservedColumnsByConceptIndex error: conflicting observed column for conceptIndex {conceptIndex}")
 			else:
-				if not combineSparseUpdatesPerSequence:
-					globalFeatureNeurons = featureTargetSparse
+				result[conceptIndex] = observedColumn
+		return result
 
-			connectionRange = connectionRanges.get(cIdx)
-			minRange = connectionMinRanges.get(cIdx) if arrayIndexPropertiesMinWordDistance else None
-			if(connectionRange is not None or minRange is not None):
-				connectionTargetSize = observedColumn.getFeatureConnectionsTargetSize()
-				connectionTargetsBySourceFeature = {}
-				if(connectionRange is not None):
-					start, end = connectionRange
-					connectionUpdateIndices = connectionIndicesSorted[:, start:end]
-					connectionUpdateValues = connectionValuesSorted[start:end]
-					self.applyConnectionSourceFeaturePropertyUpdates(connectionTargetsBySourceFeature, observedColumn, connectionUpdateIndices, connectionUpdateValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesTensor, connectionTargetSize, connectionDevice, False)
-				if(minRange is not None):
-					start, end = minRange
-					minUpdateIndices = connectionMinIndicesSorted[:, start:end]
-					minUpdateValues = connectionMinValuesSorted[start:end]
-					self.applyConnectionSourceFeaturePropertyUpdates(connectionTargetsBySourceFeature, observedColumn, minUpdateIndices, minUpdateValues, databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex, featureIndicesObservedConnectionDevice, conceptIndicesTensor, connectionTargetSize, connectionDevice, True)
-				for sourceFeatureIndex in sorted(connectionTargetsBySourceFeature.keys()):
-					observedColumn.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, connectionTargetsBySourceFeature[sourceFeatureIndex])
+	def initialiseSparseTensor(self, targetSize, targetDevice):
+		emptyIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=targetDevice)
+		emptyValues = pt.empty((0,), dtype=arrayType, device=targetDevice)
+		result = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=targetSize, dtype=arrayType, device=targetDevice)
+		return result
 
-		if not lowMem:
-			if(combineSparseUpdatesPerSequence):
-				if len(globalFeatureNeuronUpdates) > 0:
-					combinedFeatureUpdates = self.combineSparseUpdatesList(globalFeatureNeuronUpdates, globalFeatureNeurons.size())
-					globalFeatureNeurons = self.addSparseUpdateNonNegative(globalFeatureNeurons, combinedFeatureUpdates)
-			self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
+	def buildFeaturePropertyUpdateSparseBatched(self, indices, values, propertyIndex, featureIndicesInObserved, conceptIndicesTensor, targetSize, compactConceptIndices=None):
+		result = self.initialiseSparseTensor(targetSize, indices.device)
+		if(indices.numel() > 0):
+			branch = indices[0]
+			segment = indices[1]
+			conceptIndex = conceptIndicesTensor[indices[2]]
+			featureIndex = indices[3]
+			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
+				featureIndex = featureIndicesInObserved[featureIndex]
+			if(compactConceptIndices is not None):
+				conceptIndex = pt.searchsorted(compactConceptIndices, conceptIndex)
+			propertyRow = pt.full_like(segment, propertyIndex)
+			updateIndices = pt.stack((propertyRow, branch, segment, conceptIndex, featureIndex), dim=0)
+			result = pt.sparse_coo_tensor(updateIndices, values, size=targetSize, dtype=arrayType, device=indices.device)
+		return result
+
+	def gatherFeatureNeuronConceptBucketTensor(self, observedColumnsByConceptIndex, compactConceptIndices, targetDevice):
+		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, compactConceptIndices.shape[0], self.databaseNetworkObject.f)
+		combinedIndicesList = []
+		combinedValuesList = []
+		conceptIndexList = compactConceptIndices.detach().cpu().tolist()
+		for conceptBucketIndex, conceptIndexValue in enumerate(conceptIndexList):
+			if(int(conceptIndexValue) not in observedColumnsByConceptIndex):
+				raise RuntimeError(f"gatherFeatureNeuronConceptBucketTensor error: missing observed column for conceptIndex {int(conceptIndexValue)}")
+			featureTargetSparse = observedColumnsByConceptIndex[int(conceptIndexValue)].featureNeurons
+			if(featureTargetSparse.device != targetDevice):
+				featureTargetSparse = featureTargetSparse.to(targetDevice)
+			featureTargetSparse = featureTargetSparse.coalesce()
+			if(featureTargetSparse._nnz() > 0):
+				featureTargetIndices = featureTargetSparse.indices()
+				featureTargetValues = featureTargetSparse.values()
+				conceptBucketRow = pt.full((1, featureTargetIndices.shape[1]), conceptBucketIndex, dtype=pt.long, device=featureTargetIndices.device)
+				batchedIndices = pt.cat([featureTargetIndices[0:3], conceptBucketRow, featureTargetIndices[3:]], dim=0)
+				combinedIndicesList.append(batchedIndices)
+				combinedValuesList.append(featureTargetValues)
+		if(len(combinedIndicesList) > 0):
+			combinedIndices = pt.cat(combinedIndicesList, dim=1)
+			combinedValues = pt.cat(combinedValuesList, dim=0)
+			result = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSize, dtype=arrayType, device=targetDevice)
+		else:
+			result = self.initialiseSparseTensor(targetSize, targetDevice)
+		return result
+
+	def scatterFeatureNeuronConceptBucketTensor(self, observedColumnsByConceptIndex, compactConceptIndices, featureTargetSparse):
+		featureTargetSparse = featureTargetSparse.coalesce()
+		featureTargetIndices = featureTargetSparse.indices()
+		featureTargetValues = featureTargetSparse.values()
+		featureTargetSortedIndices = featureTargetIndices
+		featureTargetSortedValues = featureTargetValues
+		featureTargetBucketRanges = {}
+		if(featureTargetIndices.numel() > 0):
+			sortedBucketIndices, sortOrder = pt.sort(featureTargetIndices[3])
+			featureTargetSortedIndices = featureTargetIndices[:, sortOrder]
+			featureTargetSortedValues = featureTargetValues.index_select(0, sortOrder)
+			uniqueBuckets, counts = pt.unique_consecutive(sortedBucketIndices, return_counts=True)
+			starts = pt.cumsum(counts, 0) - counts
+			for conceptBucketIndexValue, start, count in zip(uniqueBuckets.tolist(), starts.tolist(), counts.tolist()):
+				featureTargetBucketRanges[int(conceptBucketIndexValue)] = (int(start), int(start + count))
+		conceptIndexList = compactConceptIndices.detach().cpu().tolist()
+		sourceTensorSize = (self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, self.databaseNetworkObject.f)
+		for conceptBucketIndex, conceptIndexValue in enumerate(conceptIndexList):
+			if(int(conceptIndexValue) not in observedColumnsByConceptIndex):
+				raise RuntimeError(f"scatterFeatureNeuronConceptBucketTensor error: missing observed column for conceptIndex {int(conceptIndexValue)}")
+			if(conceptBucketIndex in featureTargetBucketRanges):
+				start, end = featureTargetBucketRanges[conceptBucketIndex]
+				sourceIndices = pt.stack((featureTargetSortedIndices[0, start:end], featureTargetSortedIndices[1, start:end], featureTargetSortedIndices[2, start:end], featureTargetSortedIndices[4, start:end]), dim=0)
+				sourceValues = featureTargetSortedValues[start:end]
+				sourceTensor = pt.sparse_coo_tensor(sourceIndices, sourceValues, size=sourceTensorSize, dtype=arrayType, device=featureTargetSparse.device)
+			else:
+				sourceTensor = self.initialiseSparseTensor(sourceTensorSize, featureTargetSparse.device)
+			observedColumnsByConceptIndex[int(conceptIndexValue)].featureNeurons = sourceTensor.coalesce()
+		return
+
+	def buildConnectionSourceCombinedKeys(self, indices, featureIndicesInObserved, conceptIndicesTensor):
+		result = pt.empty((0,), dtype=pt.long, device=indices.device)
+		if(indices.numel() > 0):
+			sourceConceptIndex = conceptIndicesTensor[indices[2]]
+			sourceFeatureIndex = indices[3]
+			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
+				sourceFeatureIndex = featureIndicesInObserved[sourceFeatureIndex]
+			result = sourceConceptIndex * self.databaseNetworkObject.f + sourceFeatureIndex
+		return result
+
+	def buildConnectionSourceBucketUpdateSparse(self, indices, values, propertyIndex, featureIndicesInObserved, conceptIndicesTensor, sourceCombinedKeysUnique, targetSize):
+		result = self.initialiseSparseTensor(targetSize, indices.device)
+		if(indices.numel() > 0):
+			branch = indices[0]
+			segment = indices[1]
+			sourceConceptIndex = conceptIndicesTensor[indices[2]]
+			sourceFeatureIndex = indices[3]
+			targetConceptIndex = conceptIndicesTensor[indices[4]]
+			targetFeatureIndex = indices[5]
+			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
+				sourceFeatureIndex = featureIndicesInObserved[sourceFeatureIndex]
+				targetFeatureIndex = featureIndicesInObserved[targetFeatureIndex]
+			sourceCombinedKeys = sourceConceptIndex * self.databaseNetworkObject.f + sourceFeatureIndex
+			sourceBucketIndex = pt.searchsorted(sourceCombinedKeysUnique, sourceCombinedKeys)
+			propertyRow = pt.full_like(segment, propertyIndex)
+			updateIndices = pt.stack((propertyRow, branch, segment, sourceBucketIndex, targetConceptIndex, targetFeatureIndex), dim=0)
+			result = pt.sparse_coo_tensor(updateIndices, values, size=targetSize, dtype=arrayType, device=indices.device)
+		return result
+
+	def gatherConnectionSourceBucketTensor(self, observedColumnsByConceptIndex, sourceCombinedKeysUnique, targetDevice):
+		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, sourceCombinedKeysUnique.shape[0], self.databaseNetworkObject.c, self.databaseNetworkObject.f)
+		combinedIndicesList = []
+		combinedValuesList = []
+		sourceConceptIndexList = pt.div(sourceCombinedKeysUnique, self.databaseNetworkObject.f, rounding_mode='floor').detach().cpu().tolist()
+		sourceFeatureIndexList = pt.remainder(sourceCombinedKeysUnique, self.databaseNetworkObject.f).detach().cpu().tolist()
+		for sourceBucketIndex, (conceptIndexValue, sourceFeatureIndexValue) in enumerate(zip(sourceConceptIndexList, sourceFeatureIndexList)):
+			if(int(conceptIndexValue) not in observedColumnsByConceptIndex):
+				raise RuntimeError(f"gatherConnectionSourceBucketTensor error: missing observed column for conceptIndex {int(conceptIndexValue)}")
+			sourceTensor = observedColumnsByConceptIndex[int(conceptIndexValue)].getFeatureConnectionsForSourceFeature(int(sourceFeatureIndexValue), targetDevice=targetDevice, createMissing=False)
+			sourceTensor = sourceTensor.coalesce()
+			if(sourceTensor._nnz() > 0):
+				sourceIndices = sourceTensor.indices()
+				sourceValues = sourceTensor.values()
+				sourceBucketRow = pt.full((1, sourceIndices.shape[1]), sourceBucketIndex, dtype=pt.long, device=sourceIndices.device)
+				batchedIndices = pt.cat([sourceIndices[0:3], sourceBucketRow, sourceIndices[3:]], dim=0)
+				combinedIndicesList.append(batchedIndices)
+				combinedValuesList.append(sourceValues)
+		if(len(combinedIndicesList) > 0):
+			combinedIndices = pt.cat(combinedIndicesList, dim=1)
+			combinedValues = pt.cat(combinedValuesList, dim=0)
+			result = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSize, dtype=arrayType, device=targetDevice)
+		else:
+			result = self.initialiseSparseTensor(targetSize, targetDevice)
+		return result
+
+	def scatterConnectionSourceBucketTensor(self, observedColumnsByConceptIndex, sourceCombinedKeysUnique, connectionTargetSparse):
+		connectionTargetSparse = connectionTargetSparse.coalesce()
+		connectionTargetIndices = connectionTargetSparse.indices()
+		connectionTargetValues = connectionTargetSparse.values()
+		connectionTargetSortedIndices = connectionTargetIndices
+		connectionTargetSortedValues = connectionTargetValues
+		connectionTargetBucketRanges = {}
+		if(connectionTargetIndices.numel() > 0):
+			sortedBucketIndices, sortOrder = pt.sort(connectionTargetIndices[3])
+			connectionTargetSortedIndices = connectionTargetIndices[:, sortOrder]
+			connectionTargetSortedValues = connectionTargetValues.index_select(0, sortOrder)
+			uniqueBuckets, counts = pt.unique_consecutive(sortedBucketIndices, return_counts=True)
+			starts = pt.cumsum(counts, 0) - counts
+			for sourceBucketIndexValue, start, count in zip(uniqueBuckets.tolist(), starts.tolist(), counts.tolist()):
+				connectionTargetBucketRanges[int(sourceBucketIndexValue)] = (int(start), int(start + count))
+		sourceConceptIndexList = pt.div(sourceCombinedKeysUnique, self.databaseNetworkObject.f, rounding_mode='floor').detach().cpu().tolist()
+		sourceFeatureIndexList = pt.remainder(sourceCombinedKeysUnique, self.databaseNetworkObject.f).detach().cpu().tolist()
+		sourceTensorSize = (self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, self.databaseNetworkObject.c, self.databaseNetworkObject.f)
+		for sourceBucketIndex, (conceptIndexValue, sourceFeatureIndexValue) in enumerate(zip(sourceConceptIndexList, sourceFeatureIndexList)):
+			if(int(conceptIndexValue) not in observedColumnsByConceptIndex):
+				raise RuntimeError(f"scatterConnectionSourceBucketTensor error: missing observed column for conceptIndex {int(conceptIndexValue)}")
+			if(sourceBucketIndex in connectionTargetBucketRanges):
+				start, end = connectionTargetBucketRanges[sourceBucketIndex]
+				sourceIndices = pt.stack((connectionTargetSortedIndices[0, start:end], connectionTargetSortedIndices[1, start:end], connectionTargetSortedIndices[2, start:end], connectionTargetSortedIndices[4, start:end], connectionTargetSortedIndices[5, start:end]), dim=0)
+				sourceValues = connectionTargetSortedValues[start:end]
+				sourceTensor = pt.sparse_coo_tensor(sourceIndices, sourceValues, size=sourceTensorSize, dtype=arrayType, device=connectionTargetSparse.device)
+			else:
+				sourceTensor = self.initialiseSparseTensor(sourceTensorSize, connectionTargetSparse.device)
+			observedColumnsByConceptIndex[int(conceptIndexValue)].setFeatureConnectionsForSourceFeature(int(sourceFeatureIndexValue), sourceTensor)
+		return
 
 	def buildMaskLookup(self, maskSize, indices, device):
 		maskLookup = pt.zeros((maskSize,), dtype=pt.bool, device=device)
