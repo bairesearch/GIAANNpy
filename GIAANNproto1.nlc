@@ -674,4 +674,8 @@ MANUAL; - rename proto files - remove Excitation suffix
 - restrict post-train source-feature write-back to the current sequence prepared source-feature indices instead of all previously loaded tensors.
 - move train-time source-feature preparation to resize required tensors on the database device before copying them to the sparse update device.
 - implement option debugPrintTrainSectionTimesSourceFeatureConnections - print granular per-sequence timings for updateObservedColumnsEfficient source-feature-connection gather/scatter sections and nested get/set operations
-
+- add options to resize all source feature connections upon database save from RAM to file/database load from file into RAM:
+	reimplement the following two suboptions for case storeDatabaseInRam=True (which are disabled by default);
+	resizeTensorsOnRAMdatabaseSave - resize all feature neuron and connections tensors during final RAM database save
+	resizeTensorsOnRAMdatabaseLoad - resize all feature neuron and connections tensors during initial RAM database load
+	They resize all feature neuron and source feature connection tensors during RAM database save/load phase based on the current database c/f values.

@@ -272,7 +272,7 @@ def loadObservedColumnToRamStartup(databaseNetworkObject, conceptIndex, lemma, i
 	GIAANNproto_databaseNetworkFiles.validateObservedColumnStorageFormat(conceptIndex)
 	metadataFile = GIAANNproto_databaseNetworkFiles.getObservedColumnMetadataFile(conceptIndex)
 	if(GIAANNproto_databaseNetworkFiles.pathExists(metadataFile)):
-		result = ObservedColumn.loadFromDisk(databaseNetworkObject, conceptIndex, lemma, i, targetDevice=deviceDatabase, loadAllSourceFeatures=True)
+		result = ObservedColumn.loadFromDisk(databaseNetworkObject, conceptIndex, lemma, i, targetDevice=deviceDatabase, loadAllSourceFeatures=True, resizeFeatureTensorsToCurrentSize=resizeTensorsOnRAMdatabaseLoad)
 	else:
 		result = ObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
 	return result
@@ -363,7 +363,7 @@ def saveAllObservedColumnsToDisk(databaseNetworkObject):
 		if(databaseNetworkObject.observedColumnsDictRAM is None):
 			raise RuntimeError("saveAllObservedColumnsToDisk error: observedColumnsDictRAM is None")
 		for observedColumn in databaseNetworkObject.observedColumnsDictRAM.values():
-			observedColumn.saveToDisk()
+			observedColumn.saveToDisk(resizeFeatureTensorsToCurrentSize=resizeTensorsOnRAMdatabaseSave)
 	else:
 		raise RuntimeError("saveAllObservedColumnsToDisk error: storeDatabaseInRam is False")
 	return

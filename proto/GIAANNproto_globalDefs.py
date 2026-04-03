@@ -108,7 +108,7 @@ elif(useAutoresearch):
 else:
 	trainMaxSequences = 1000000	#dev: 10, 500, 5000, 10000, 200000 	#default: 1000000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = "../database"
-maxSequenceLength = 60	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
+maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 
 
@@ -210,7 +210,8 @@ if(runtimeReleaseGPUMemory):
 storeDatabaseInRam = True	#default: True	#orig: False
 if(storeDatabaseInRam):
 	useGPUdatabase = False	#default: False	#default: False
-
+	resizeTensorsOnRAMdatabaseSave = False	#default: False #orig: True	#resize all feature neuron and connections tensors during final RAM database save
+	resizeTensorsOnRAMdatabaseLoad = False	#default: False #orig: True	#resize all feature neuron and connections tensors during initial RAM database load
 
 #Error report;
 ERROR_SIGNAL = 1

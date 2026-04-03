@@ -78,11 +78,11 @@ class ObservedColumnConnectionBase:
 				result = f"{debugSectionContext}/{operationName}"
 		return result
 
-	def loadRequiredSourceFeatureConnections(self, requiredSourceFeatureIndices, targetDevice, createMissing=False):
+	def loadRequiredSourceFeatureConnections(self, requiredSourceFeatureIndices, targetDevice, createMissing=False, ensureCurrentSizeOnLoad=False):
 		resolvedTargetDevice = targetDevice if targetDevice is not None else self.getDefaultConnectionTargetDevice()
 		sourceFeatureIndices = self.normaliseSourceFeatureIndices(requiredSourceFeatureIndices)
 		for sourceFeatureIndex in sourceFeatureIndices:
-			self.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, resolvedTargetDevice, createMissing)
+			self.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, resolvedTargetDevice, createMissing, ensureCurrentSizeOnLoad)
 		return
 
 	def ensureSourceFeatureArraySizes(self, sourceFeatureIndices):
@@ -119,6 +119,13 @@ class ObservedColumnConnectionBase:
 		self.prepareRequiredSourceFeatureConnections([sourceFeatureIndex], resolvedTargetDevice, createMissing)
 		result = self.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, resolvedTargetDevice, createMissing)
 		return result
+
+	def ensureRAMdatabaseFeatureTensorSizes(self):
+		loadedSourceFeatureIndices = sorted(self.featureConnectionsBySourceFeature.keys())
+		self.expandFeatureNeuronArraysFeatures(self.databaseNetworkObject.f)
+		self.expandFeatureConnectionsArraysConcepts(self.databaseNetworkObject.c, loadedSourceFeatureIndices)
+		self.expandFeatureConnectionsArraysFeatures(self.databaseNetworkObject.f, loadedSourceFeatureIndices)
+		return
 
 	def setTrainPreparedSourceFeatureIndices(self, sourceFeatureIndices):
 		self.trainPreparedSourceFeatureIndices = set(self.normaliseSourceFeatureIndices(sourceFeatureIndices))
@@ -392,7 +399,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		result = sorted(combinedIndices)
 		return result
 
-	def getFeatureConnectionsForSourceFeature(self, sourceFeatureIndex, targetDevice=None, createMissing=False):
+	def getFeatureConnectionsForSourceFeature(self, sourceFeatureIndex, targetDevice=None, createMissing=False, ensureCurrentSizeOnLoad=False):
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
 			debugSectionName = self.getSourceFeatureConnectionsDebugSectionName("getFeatureConnectionsForSourceFeature")
 			debugSectionStartTime = None
@@ -412,7 +419,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 				else:
 					storedSourceFeatureIndices = self.listStoredSourceFeatureIndices()
 				if(normalisedSourceFeatureIndex in storedSourceFeatureIndices):
-					result = GIAANNproto_databaseNetworkFiles.loadObservedColumnSourceFeatureConnectionsTensor(self.databaseNetworkObject, self.conceptIndex, normalisedSourceFeatureIndex, resolvedTargetDevice)
+					result = GIAANNproto_databaseNetworkFiles.loadObservedColumnSourceFeatureConnectionsTensor(self.databaseNetworkObject, self.conceptIndex, normalisedSourceFeatureIndex, resolvedTargetDevice, ensureCurrentSizeOnLoad=ensureCurrentSizeOnLoad)
 				else:
 					result = self.initialiseFeatureConnections(self.databaseNetworkObject.c, self.databaseNetworkObject.f, resolvedTargetDevice)
 			self.featureConnectionsBySourceFeature[normalisedSourceFeatureIndex] = result
@@ -447,13 +454,13 @@ class ObservedColumn(ObservedColumnConnectionBase):
 					self.storedSourceFeatureIndicesCache.discard(sourceFeatureIndex)
 		return
 
-	def saveToDisk(self):
-		GIAANNproto_databaseNetworkFiles.observedColumnSaveToDisk(self)
+	def saveToDisk(self, resizeFeatureTensorsToCurrentSize=False):
+		GIAANNproto_databaseNetworkFiles.observedColumnSaveToDisk(self, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize)
 		return
 
 	@classmethod
-	def loadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i, targetDevice=None, loadAllSourceFeatures=False):
-		result = GIAANNproto_databaseNetworkFiles.observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i, targetDevice=targetDevice, loadAllSourceFeatures=loadAllSourceFeatures)
+	def loadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i, targetDevice=None, loadAllSourceFeatures=False, resizeFeatureTensorsToCurrentSize=False):
+		result = GIAANNproto_databaseNetworkFiles.observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i, targetDevice=targetDevice, loadAllSourceFeatures=loadAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize)
 		return result
 
 
@@ -496,12 +503,12 @@ class ObservedColumnProxy(ObservedColumnConnectionBase):
 		result = self.sourceObservedColumn.listStoredSourceFeatureIndices()
 		return result
 
-	def getFeatureConnectionsForSourceFeature(self, sourceFeatureIndex, targetDevice=None, createMissing=False):
+	def getFeatureConnectionsForSourceFeature(self, sourceFeatureIndex, targetDevice=None, createMissing=False, ensureCurrentSizeOnLoad=False):
 		normalisedSourceFeatureIndex = self.normaliseSourceFeatureIndex(sourceFeatureIndex)
 		resolvedTargetDevice = targetDevice if targetDevice is not None else self.proxyTargetDevice
 		result = self.featureConnectionsBySourceFeature.get(normalisedSourceFeatureIndex)
 		if(result is None):
-			baseTensor = self.sourceObservedColumn.getFeatureConnectionsForSourceFeature(normalisedSourceFeatureIndex, self.sourceObservedColumn.getDefaultConnectionTargetDevice(), createMissing)
+			baseTensor = self.sourceObservedColumn.getFeatureConnectionsForSourceFeature(normalisedSourceFeatureIndex, self.sourceObservedColumn.getDefaultConnectionTargetDevice(), createMissing, ensureCurrentSizeOnLoad)
 			result = baseTensor.to(resolvedTargetDevice)
 			self.featureConnectionsBySourceFeature[normalisedSourceFeatureIndex] = result
 		elif(result.device != resolvedTargetDevice):

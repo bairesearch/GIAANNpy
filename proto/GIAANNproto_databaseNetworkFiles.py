@@ -296,6 +296,24 @@ def ensureFeatureConnectionsSourceTensorCurrentSize(tensor, targetC, targetF, te
 			result = expandedTensor
 	return result
 
+def ensureFeatureNeuronsTensorCurrentSize(tensor, targetF, tensorName):
+	result = tensor
+	if(result.dim() != 4):
+		raise RuntimeError(f"{tensorName} rank mismatch: expected 4, got {result.dim()}")
+	currentF = result.size(3)
+	if(currentF > targetF):
+		raise RuntimeError(f"{tensorName} size mismatch: stored feature size {currentF} exceeds current database size {targetF}")
+	if(currentF < targetF):
+		newSize = list(result.size())
+		newSize[3] = targetF
+		if(result.is_sparse):
+			result = expandSparseTensorSize(result, newSize, tensorName)
+		else:
+			expandedTensor = pt.zeros(newSize, dtype=result.dtype, device=result.device)
+			expandedTensor[:, :, :, :currentF] = result
+			result = expandedTensor
+	return result
+
 def insertBranchDimension(tensor, tensorName, insertIndex, branchCount):
 	if tensor.is_sparse:
 		tensor = tensor.coalesce()
@@ -377,12 +395,14 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 	if(debugPrintTrainSectionTimes):
 		debugTrainSectionTimesAdd(databaseNetworkObject, "saveData.total", time.perf_counter() - saveDataStartTime)
 		
-def observedColumnSaveToDisk(self):
+def observedColumnSaveToDisk(self, resizeFeatureTensorsToCurrentSize=False):
 	"""
 	Save the observed column data to disk.
 	"""
 	validateObservedColumnStorageFormat(self.conceptIndex)
 	ensureObservedColumnFolderExists(self.conceptIndex)
+	if(resizeFeatureTensorsToCurrentSize):
+		self.ensureRAMdatabaseFeatureTensorSizes()
 	if(trainStoreFeatureMapsGlobally):
 		data = {
 			'conceptIndex': self.conceptIndex,
@@ -403,7 +423,7 @@ def observedColumnSaveToDisk(self):
 	if lowMem:
 		saveTensor(self.featureNeurons, getObservedColumnFolder(self.conceptIndex), getObservedColumnFeatureNeuronsFileBaseName())
 
-def loadObservedColumnSourceFeatureConnectionsTensor(databaseNetworkObject, conceptIndex, sourceFeatureIndex, targetDevice):
+def loadObservedColumnSourceFeatureConnectionsTensor(databaseNetworkObject, conceptIndex, sourceFeatureIndex, targetDevice, ensureCurrentSizeOnLoad=False):
 	validateObservedColumnStorageFormat(conceptIndex)
 	connectionsFolder = getObservedColumnFeatureConnectionsFolder(conceptIndex)
 	fileBaseName = getObservedColumnSourceFeatureConnectionsFileBaseName(sourceFeatureIndex)
@@ -412,7 +432,8 @@ def loadObservedColumnSourceFeatureConnectionsTensor(databaseNetworkObject, conc
 	tensor = adjustBranchDimensions(tensor, tensorName, expectedRank=5)
 	if(debugLimitFeatures):
 		tensor = applyDebugLimitFeatureConnectionsSourceTensor(tensor, databaseNetworkObject.c, databaseNetworkObject.f, tensorName)
-	tensor = ensureFeatureConnectionsSourceTensorCurrentSize(tensor, databaseNetworkObject.c, databaseNetworkObject.f, tensorName)
+	if(ensureCurrentSizeOnLoad):
+		tensor = ensureFeatureConnectionsSourceTensorCurrentSize(tensor, databaseNetworkObject.c, databaseNetworkObject.f, tensorName)
 	return tensor
 
 def saveObservedColumnSourceFeatureConnectionsTensor(conceptIndex, sourceFeatureIndex, tensor):
@@ -435,7 +456,7 @@ def saveObservedColumnSourceFeatureConnectionsTensor(conceptIndex, sourceFeature
 			os.remove(filePath)
 	return
 
-def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i, targetDevice=None, loadAllSourceFeatures=False):
+def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i, targetDevice=None, loadAllSourceFeatures=False, resizeFeatureTensorsToCurrentSize=False):
 	"""
 	Load the observed column data from disk.
 	"""
@@ -466,10 +487,12 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 		instance.featureNeurons = adjustBranchDimensions(instance.featureNeurons, f"observedColumn.featureNeurons[{conceptIndex}]", expectedRank=4)
 		if(debugLimitFeatures):
 			instance.featureNeurons = applyDebugLimitFeatureNeuronsTensor(instance.featureNeurons, databaseNetworkObject.f, f"observedColumn.featureNeurons[{conceptIndex}]")
+		if(resizeFeatureTensorsToCurrentSize):
+			instance.featureNeurons = ensureFeatureNeuronsTensorCurrentSize(instance.featureNeurons, databaseNetworkObject.f, f"observedColumn.featureNeurons[{conceptIndex}]")
 	if(loadAllSourceFeatures):
 		sourceFeatureIndices = listObservedColumnSourceFeatureIndices(conceptIndex)
 		loadTargetDevice = targetDevice if targetDevice is not None else deviceDatabase
-		instance.loadRequiredSourceFeatureConnections(sourceFeatureIndices, loadTargetDevice, createMissing=False)
+		instance.loadRequiredSourceFeatureConnections(sourceFeatureIndices, loadTargetDevice, createMissing=False, ensureCurrentSizeOnLoad=resizeFeatureTensorsToCurrentSize)
 	return instance
 
 def saveTensor(tensor, folderName, fileName):
