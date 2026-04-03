@@ -23,6 +23,8 @@ import sys
 
 
 #Recent debug vars;
+debugPrintTrainSectionTimes = False	#print per-sequence timing breakdown for key train sections
+debugPrintTrainSectionTimesSourceFeatureConnections = False	#print granular source-feature-connection timings within updateObservedColumnsEfficient
 
 
 #Execution mode selection;
@@ -555,7 +557,6 @@ if(not useAutoresearch):
 
 #Debug vars;
 debugPrintTotalInferenceTokens = False	#print total number of inference tokens in seed phase, prediction phase, and both phases (summed across all sequences) 
-debugPrintTrainSectionTimes = False	#print per-sequence timing breakdown for key train sections
 debugPrintSpacySectionTimes = False	#print spacy preprocessing times
 
 if(useAutoresearch):
@@ -964,6 +965,8 @@ def debugTrainSectionTimesReset(databaseNetworkObject, sequenceCount):
 	if(debugPrintTrainSectionTimes):
 		databaseNetworkObject.debugTrainSectionTimes = {}
 		databaseNetworkObject.debugTrainSectionSequenceCount = sequenceCount
+		if(debugPrintTrainSectionTimesSourceFeatureConnections):
+			databaseNetworkObject.debugTrainSectionTimesContextStack = []
 	return
 
 def debugTrainSectionTimesAdd(databaseNetworkObject, sectionName, sectionDuration):
@@ -981,6 +984,38 @@ def debugTrainSectionTimesPrint(databaseNetworkObject):
 		for sectionName, sectionDuration in databaseNetworkObject.debugTrainSectionTimes.items():
 			print(f"\t{sectionName}: {sectionDuration:.6f}s")
 	return
+
+def debugTrainSectionTimesContextPush(databaseNetworkObject, contextName):
+	if(debugPrintTrainSectionTimesSourceFeatureConnections):
+		if(not debugPrintTrainSectionTimes):
+			raise RuntimeError("debugTrainSectionTimesContextPush error: debugPrintTrainSectionTimes must be enabled")
+		if(contextName is None or contextName == ""):
+			raise RuntimeError("debugTrainSectionTimesContextPush error: contextName is invalid")
+		if(not hasattr(databaseNetworkObject, "debugTrainSectionTimesContextStack")):
+			databaseNetworkObject.debugTrainSectionTimesContextStack = []
+		databaseNetworkObject.debugTrainSectionTimesContextStack.append(contextName)
+	return
+
+def debugTrainSectionTimesContextPop(databaseNetworkObject):
+	result = None
+	if(debugPrintTrainSectionTimesSourceFeatureConnections):
+		if(not debugPrintTrainSectionTimes):
+			raise RuntimeError("debugTrainSectionTimesContextPop error: debugPrintTrainSectionTimes must be enabled")
+		if(not hasattr(databaseNetworkObject, "debugTrainSectionTimesContextStack")):
+			raise RuntimeError("debugTrainSectionTimesContextPop error: debugTrainSectionTimesContextStack is not initialised")
+		if(len(databaseNetworkObject.debugTrainSectionTimesContextStack) == 0):
+			raise RuntimeError("debugTrainSectionTimesContextPop error: debugTrainSectionTimesContextStack is empty")
+		result = databaseNetworkObject.debugTrainSectionTimesContextStack.pop()
+	return result
+
+def debugTrainSectionTimesContextGet(databaseNetworkObject):
+	result = None
+	if(debugPrintTrainSectionTimesSourceFeatureConnections):
+		contextStack = getattr(databaseNetworkObject, "debugTrainSectionTimesContextStack", None)
+		if(contextStack is not None):
+			if(len(contextStack) > 0):
+				result = contextStack[-1]
+	return result
 
 
 #printConfiguration;

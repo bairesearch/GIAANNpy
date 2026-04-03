@@ -107,11 +107,10 @@ def executeMode(inferenceMode):
 			print("printCountTotalParameters totalColumns = 0 (empty database)")
 	if(usePOS):
 		GIAANNproto_sequenceTokens.loadPOSdatabase()
-	if((inferenceMode and not inferenceTrainFirstSequences) or (not inferenceMode and trainLoadExistingDatabase and trainSetStartOffsetSequences>0)):
-		if(inferenceMode and not inferenceTrainFirstSequences):
-			GIAANNproto_databaseNetwork.backupGlobalArrays(databaseNetworkObject)
-		if(storeDatabaseInRam):
-			GIAANNproto_databaseNetwork.loadAllObservedColumnsToRam(databaseNetworkObject)
+	if(inferenceMode and not inferenceTrainFirstSequences):
+		GIAANNproto_databaseNetwork.backupGlobalArrays(databaseNetworkObject)
+	if(storeDatabaseInRam):
+		GIAANNproto_databaseNetwork.loadAllObservedColumnsToRam(databaseNetworkObject)
 		
 	for epochIndex in range(numberEpochs):
 		#print("\nepochIndex = ", epochIndex)
@@ -386,8 +385,8 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 	
 	allowNewFeatures = True
 	if(storeDatabaseInRam):
-		if(inferenceMode and not databaseNetworkObject.observedColumnsRAMLoaded):
-			GIAANNproto_databaseNetwork.loadAllObservedColumnsToRam(databaseNetworkObject)
+		if(not databaseNetworkObject.observedColumnsRAMLoaded):
+			raise RuntimeError("processSequence error: storeDatabaseInRam requires observedColumnsRAMLoaded after startup")
 	if(inferenceMode and inferenceAddNewFeatures):
 		expandSequenceForInference(databaseNetworkObject, sequence)
 		allowNewFeatures = False

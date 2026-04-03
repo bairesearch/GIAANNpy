@@ -664,4 +664,14 @@ MANUAL; - rename debugCountTotalParameters to printCountTotalParameters
 - create class ObservedColumnConnectionBase - remove ObservedColumnProxy/ObservedColumn function replications
 - move class ObservedColumn, ObservedColumnConnectionBase, ObservedColumnProxy, ObservedColumnStub to new file GIAANNproto_databaseNetworkObservedColumn.py
 MANUAL; - rename proto files - remove Excitation suffix
+- patch storeDatabaseInRam=True so that after startup all database data is assumed to already be loaded into ram, with no redundant checks.
+- ensureObservedColumnArraySizes() is not required by loadObservedColumnToRamStartup - this is redundant if it is also being executed by ensureSouceFeatureArraySize(); which is dynamically executed only when source feature connections are accessed during train/inference.
+- loadOrCreateObservedColumn() should not ever load the source feature connections. The source feature connections are only dynamically loaded when necessary during train steps or inference steps. That is the only time their f/c sizes need to be checked/resize, and they should use the specific function ensureSouceFeatureArraySize(), not a wasteful function like ensureObservedColumnArraySizes().
+- split requiresExpandFeatureArrays/expandFeatureArrays into requiresExpandFeatureNeuronArraysFeatures/expandFeatureNeuronArraysFeatures and requiresExpandFeatureConnectionsArraysFeatures/expandFeatureConnectionsArraysFeatures. 
+- rename requiresResizeConceptArrays/resizeConceptArrays to requiresExpandFeatureConnectionsArraysConcepts/expandFeatureConnectionsArraysConcepts
+- when storeDatabaseInRam=False, update loadAllColumns() to not execute loadOrCreateObservedColumn() with loadAllSourceFeatures=True. source features connections should only ever be loaded dynamically when they are needed, as per the spec.
+- replace all sparse tensor resize operations with expandSparseTensorSize():sparse_resize_()
+- restrict post-train source-feature write-back to the current sequence prepared source-feature indices instead of all previously loaded tensors.
+- move train-time source-feature preparation to resize required tensors on the database device before copying them to the sparse update device.
+- implement option debugPrintTrainSectionTimesSourceFeatureConnections - print granular per-sequence timings for updateObservedColumnsEfficient source-feature-connection gather/scatter sections and nested get/set operations
 

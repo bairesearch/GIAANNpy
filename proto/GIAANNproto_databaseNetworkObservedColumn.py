@@ -18,6 +18,7 @@ GIA ANN proto database Network Observed Column
 """
 
 import torch as pt
+import time
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_databaseNetworkFiles
@@ -69,6 +70,14 @@ class ObservedColumnConnectionBase:
 		indicesList.sort()
 		return indicesList
 
+	def getSourceFeatureConnectionsDebugSectionName(self, operationName):
+		result = None
+		if(debugPrintTrainSectionTimes and debugPrintTrainSectionTimesSourceFeatureConnections):
+			debugSectionContext = debugTrainSectionTimesContextGet(self.databaseNetworkObject)
+			if(debugSectionContext is not None):
+				result = f"{debugSectionContext}/{operationName}"
+		return result
+
 	def loadRequiredSourceFeatureConnections(self, requiredSourceFeatureIndices, targetDevice, createMissing=False):
 		resolvedTargetDevice = targetDevice if targetDevice is not None else self.getDefaultConnectionTargetDevice()
 		sourceFeatureIndices = self.normaliseSourceFeatureIndices(requiredSourceFeatureIndices)
@@ -76,7 +85,167 @@ class ObservedColumnConnectionBase:
 			self.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, resolvedTargetDevice, createMissing)
 		return
 
+	def ensureSourceFeatureArraySizes(self, sourceFeatureIndices):
+		resolvedSourceFeatureIndices = self.normaliseSourceFeatureIndices(sourceFeatureIndices)
+		for sourceFeatureIndex in resolvedSourceFeatureIndices:
+			self.ensureSourceFeatureArraySize(sourceFeatureIndex)
+		return
+
+	def prepareRequiredSourceFeatureConnectionsTrain(self, requiredSourceFeatureIndices, targetDevice, createMissing=False):
+		if(storeDatabaseInRam and useGPUdatabase != useGPUsparse):
+			self.prepareRequiredSourceFeatureConnectionsDatabaseInRamCPU(requiredSourceFeatureIndices, targetDevice, createMissing)
+		else:
+			self.prepareRequiredSourceFeatureConnections(requiredSourceFeatureIndices, targetDevice, createMissing)
+		return
+	
+	def prepareRequiredSourceFeatureConnections(self, requiredSourceFeatureIndices, targetDevice, createMissing=False):
+		resolvedTargetDevice = targetDevice if targetDevice is not None else self.getDefaultConnectionTargetDevice()
+		resolvedSourceFeatureIndices = self.normaliseSourceFeatureIndices(requiredSourceFeatureIndices)
+		self.loadRequiredSourceFeatureConnections(resolvedSourceFeatureIndices, resolvedTargetDevice, createMissing)
+		self.ensureSourceFeatureArraySizes(resolvedSourceFeatureIndices)
+		return
+
+	def prepareRequiredSourceFeatureConnectionsDatabaseInRamCPU(self, requiredSourceFeatureIndices, targetDevice, createMissing=False):
+		resolvedTargetDevice = targetDevice if targetDevice is not None else self.getDefaultConnectionTargetDevice()
+		resolvedSourceFeatureIndices = self.normaliseSourceFeatureIndices(requiredSourceFeatureIndices)
+		self.loadRequiredSourceFeatureConnections(resolvedSourceFeatureIndices, deviceDatabase, createMissing)
+		self.ensureSourceFeatureArraySizes(resolvedSourceFeatureIndices)
+		if(resolvedTargetDevice != deviceDatabase):
+			self.loadRequiredSourceFeatureConnections(resolvedSourceFeatureIndices, resolvedTargetDevice, createMissing)
+		return
+
+	def prepareFeatureConnectionsForSourceFeature(self, sourceFeatureIndex, targetDevice=None, createMissing=False):
+		resolvedTargetDevice = targetDevice if targetDevice is not None else self.getDefaultConnectionTargetDevice()
+		self.prepareRequiredSourceFeatureConnections([sourceFeatureIndex], resolvedTargetDevice, createMissing)
+		result = self.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, resolvedTargetDevice, createMissing)
+		return result
+
+	def setTrainPreparedSourceFeatureIndices(self, sourceFeatureIndices):
+		self.trainPreparedSourceFeatureIndices = set(self.normaliseSourceFeatureIndices(sourceFeatureIndices))
+		return
+
+	def getTrainPreparedSourceFeatureIndices(self):
+		if(not hasattr(self, "trainPreparedSourceFeatureIndices")):
+			raise RuntimeError(f"{self.getObservedColumnErrorName()}.getTrainPreparedSourceFeatureIndices error: trainPreparedSourceFeatureIndices missing")
+		result = sorted(self.trainPreparedSourceFeatureIndices)
+		return result
+
+	def clearTrainPreparedSourceFeatureIndices(self):
+		if(not hasattr(self, "trainPreparedSourceFeatureIndices")):
+			raise RuntimeError(f"{self.getObservedColumnErrorName()}.clearTrainPreparedSourceFeatureIndices error: trainPreparedSourceFeatureIndices missing")
+		self.trainPreparedSourceFeatureIndices.clear()
+		return
+
+	def requiresExpandFeatureConnectionsArraysConcepts(self, newC, sourceFeatureIndices=None):
+		result = False
+		resolvedSourceFeatureIndices = self.normaliseSourceFeatureIndices(sourceFeatureIndices) if sourceFeatureIndices is not None else sorted(self.featureConnectionsBySourceFeature.keys())
+		for sourceFeatureIndex in resolvedSourceFeatureIndices:
+			if(sourceFeatureIndex not in self.featureConnectionsBySourceFeature):
+				raise RuntimeError(f"{self.getObservedColumnErrorName()}.requiresExpandFeatureConnectionsArraysConcepts error: missing loaded source feature tensor {sourceFeatureIndex}")
+			sourceTensor = self.featureConnectionsBySourceFeature[sourceFeatureIndex]
+			if(newC > sourceTensor.shape[3]):
+				result = True
+		return result
+
+	def expandFeatureConnectionsArraysConcepts(self, newC, sourceFeatureIndices=None):
+		resolvedSourceFeatureIndices = self.normaliseSourceFeatureIndices(sourceFeatureIndices) if sourceFeatureIndices is not None else sorted(self.featureConnectionsBySourceFeature.keys())
+		for sourceFeatureIndex in resolvedSourceFeatureIndices:
+			if(sourceFeatureIndex not in self.featureConnectionsBySourceFeature):
+				raise RuntimeError(f"{self.getObservedColumnErrorName()}.expandFeatureConnectionsArraysConcepts error: missing loaded source feature tensor {sourceFeatureIndex}")
+			sourceTensor = self.featureConnectionsBySourceFeature[sourceFeatureIndex]
+			loadC = sourceTensor.shape[3]
+			if(newC > loadC):
+				expandedSize = (sourceTensor.shape[0], sourceTensor.shape[1], sourceTensor.shape[2], newC, sourceTensor.shape[4])
+				sourceTensor = GIAANNproto_databaseNetworkFiles.expandSparseTensorSize(sourceTensor, expandedSize, f"{self.getObservedColumnErrorName()}.expandFeatureConnectionsArraysConcepts")
+				self.featureConnectionsBySourceFeature[sourceFeatureIndex] = sourceTensor
+		return
+
+	def requiresExpandFeatureNeuronArraysFeatures(self, newF):
+		result = False
+		if(lowMem):
+			if(not hasattr(self, "featureNeurons")):
+				raise RuntimeError(f"{self.getObservedColumnErrorName()}.requiresExpandFeatureNeuronArraysFeatures error: featureNeurons missing while lowMem is enabled")
+			if(newF > self.featureNeurons.shape[3]):
+				result = True
+		return result
+
+	def expandFeatureNeuronArraysFeatures(self, newF):
+		if(lowMem):
+			if(not hasattr(self, "featureNeurons")):
+				raise RuntimeError(f"{self.getObservedColumnErrorName()}.expandFeatureNeuronArraysFeatures error: featureNeurons missing while lowMem is enabled")
+			if(newF > self.featureNeurons.shape[3]):
+				expandedSizeNeurons = (self.featureNeurons.shape[0], self.featureNeurons.shape[1], self.featureNeurons.shape[2], newF)
+				self.featureNeurons = GIAANNproto_databaseNetworkFiles.expandSparseTensorSize(self.featureNeurons, expandedSizeNeurons, f"{self.getObservedColumnErrorName()}.expandFeatureNeuronArraysFeatures")
+		return
+
+	def requiresExpandFeatureMapsFeatures(self, newF):
+		result = False
+		if(not trainStoreFeatureMapsGlobally):
+			if(not hasattr(self, "nextFeatureIndex")):
+				raise RuntimeError(f"{self.getObservedColumnErrorName()}.requiresExpandFeatureMapsFeatures error: nextFeatureIndex missing")
+			if(newF > (self.nextFeatureIndex + 1)):
+				result = True
+		return result
+
+	def expandFeatureMapsFeatures(self, newF):
+		if(not trainStoreFeatureMapsGlobally):
+			if(not hasattr(self, "nextFeatureIndex")):
+				raise RuntimeError(f"{self.getObservedColumnErrorName()}.expandFeatureMapsFeatures error: nextFeatureIndex missing")
+			loadFReference = self.nextFeatureIndex + 1
+			for featureIndex in range(loadFReference, newF):
+				featureWord = self.databaseNetworkObject.conceptFeaturesList[featureIndex]
+				self.featureWordToIndex[featureWord] = featureIndex
+				self.featureIndexToWord[featureIndex] = featureWord
+				self.nextFeatureIndex += 1
+		return
+
+	def requiresExpandFeatureConnectionsArraysFeatures(self, newF, sourceFeatureIndices=None):
+		result = False
+		resolvedSourceFeatureIndices = self.normaliseSourceFeatureIndices(sourceFeatureIndices) if sourceFeatureIndices is not None else sorted(self.featureConnectionsBySourceFeature.keys())
+		for sourceFeatureIndex in resolvedSourceFeatureIndices:
+			if(sourceFeatureIndex not in self.featureConnectionsBySourceFeature):
+				raise RuntimeError(f"{self.getObservedColumnErrorName()}.requiresExpandFeatureConnectionsArraysFeatures error: missing loaded source feature tensor {sourceFeatureIndex}")
+			sourceTensor = self.featureConnectionsBySourceFeature[sourceFeatureIndex]
+			if(newF > sourceTensor.shape[4]):
+				result = True
+		return result
+
+	def expandFeatureConnectionsArraysFeatures(self, newF, sourceFeatureIndices=None):
+		resolvedSourceFeatureIndices = self.normaliseSourceFeatureIndices(sourceFeatureIndices) if sourceFeatureIndices is not None else sorted(self.featureConnectionsBySourceFeature.keys())
+		for sourceFeatureIndex in resolvedSourceFeatureIndices:
+			if(sourceFeatureIndex not in self.featureConnectionsBySourceFeature):
+				raise RuntimeError(f"{self.getObservedColumnErrorName()}.expandFeatureConnectionsArraysFeatures error: missing loaded source feature tensor {sourceFeatureIndex}")
+			sourceTensor = self.featureConnectionsBySourceFeature[sourceFeatureIndex]
+			loadF = sourceTensor.shape[4]
+			if(newF > loadF):
+				expandedSizeConnections = (sourceTensor.shape[0], sourceTensor.shape[1], sourceTensor.shape[2], sourceTensor.shape[3], newF)
+				sourceTensor = GIAANNproto_databaseNetworkFiles.expandSparseTensorSize(sourceTensor, expandedSizeConnections, f"{self.getObservedColumnErrorName()}.expandFeatureConnectionsArraysFeatures")
+				self.featureConnectionsBySourceFeature[sourceFeatureIndex] = sourceTensor
+		return
+
+	def ensureObservedColumnFeatureArraysFeatures(self, newF):
+		if(self.requiresExpandFeatureNeuronArraysFeatures(newF)):
+			self.expandFeatureNeuronArraysFeatures(newF)
+		if(self.requiresExpandFeatureMapsFeatures(newF)):
+			self.expandFeatureMapsFeatures(newF)
+		return
+
+	def ensureSourceFeatureArraySize(self, sourceFeatureIndex):
+		normalisedSourceFeatureIndex = self.normaliseSourceFeatureIndex(sourceFeatureIndex)
+		if(normalisedSourceFeatureIndex not in self.featureConnectionsBySourceFeature):
+			raise RuntimeError(f"{self.getObservedColumnErrorName()}.ensureSourceFeatureArraySize error: missing loaded source feature tensor {normalisedSourceFeatureIndex}")
+		if(self.requiresExpandFeatureConnectionsArraysConcepts(self.databaseNetworkObject.c, [normalisedSourceFeatureIndex])):
+			self.expandFeatureConnectionsArraysConcepts(self.databaseNetworkObject.c, [normalisedSourceFeatureIndex])
+		if(self.requiresExpandFeatureConnectionsArraysFeatures(self.databaseNetworkObject.f, [normalisedSourceFeatureIndex])):
+			self.expandFeatureConnectionsArraysFeatures(self.databaseNetworkObject.f, [normalisedSourceFeatureIndex])
+		return
+
 	def setFeatureConnectionsForSourceFeature(self, sourceFeatureIndex, tensor):
+		if(debugPrintTrainSectionTimesSourceFeatureConnections):
+			debugSectionName = self.getSourceFeatureConnectionsDebugSectionName("setFeatureConnectionsForSourceFeature")
+			debugSectionStartTime = None
+			if(debugSectionName is not None):
+				debugSectionStartTime = time.perf_counter()
 		normalisedSourceFeatureIndex = self.normaliseSourceFeatureIndex(sourceFeatureIndex)
 		expectedSize = self.getFeatureConnectionsTargetSize()
 		errorName = self.getObservedColumnErrorName()
@@ -92,6 +261,9 @@ class ObservedColumnConnectionBase:
 			tensor = tensor.coalesce()
 		self.featureConnectionsBySourceFeature[normalisedSourceFeatureIndex] = tensor
 		self.loadedSourceFeatureIndices.add(normalisedSourceFeatureIndex)
+		if(debugPrintTrainSectionTimesSourceFeatureConnections):
+			if(debugSectionName is not None):
+				debugTrainSectionTimesAdd(self.databaseNetworkObject, debugSectionName, time.perf_counter() - debugSectionStartTime)
 		return
 
 	def unloadLoadedSourceFeatureConnections(self, sourceFeatureIndices=None):
@@ -181,6 +353,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 					self.featureIndexToWord[featureIndexPrimeConceptNeuron] = variablePrimeConceptFeatureNeuronName
 		self.featureConnectionsBySourceFeature = {}
 		self.loadedSourceFeatureIndices = set()
+		self.trainPreparedSourceFeatureIndices = set()
 		if(getFeatureConnectionsForSourceFeatureCache):
 			self.storedSourceFeatureIndicesCache = None
 		if(not trainStoreFeatureMapsGlobally):
@@ -206,7 +379,9 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		return deviceTarget
 
 	def listStoredSourceFeatureIndices(self):
-		if(getFeatureConnectionsForSourceFeatureCache):
+		if(storeDatabaseInRam and self.databaseNetworkObject.observedColumnsRAMLoaded):
+			combinedIndices = set(self.featureConnectionsBySourceFeature.keys())
+		elif(getFeatureConnectionsForSourceFeatureCache):
 			if(self.storedSourceFeatureIndicesCache is None):
 				self.storedSourceFeatureIndicesCache = set(GIAANNproto_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(self.conceptIndex))
 			combinedIndices = set(self.storedSourceFeatureIndicesCache)
@@ -218,6 +393,11 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		return result
 
 	def getFeatureConnectionsForSourceFeature(self, sourceFeatureIndex, targetDevice=None, createMissing=False):
+		if(debugPrintTrainSectionTimesSourceFeatureConnections):
+			debugSectionName = self.getSourceFeatureConnectionsDebugSectionName("getFeatureConnectionsForSourceFeature")
+			debugSectionStartTime = None
+			if(debugSectionName is not None):
+				debugSectionStartTime = time.perf_counter()
 		normalisedSourceFeatureIndex = self.normaliseSourceFeatureIndex(sourceFeatureIndex)
 		resolvedTargetDevice = targetDevice if targetDevice is not None else self.getDefaultConnectionTargetDevice()
 		result = self.featureConnectionsBySourceFeature.get(normalisedSourceFeatureIndex)
@@ -234,15 +414,15 @@ class ObservedColumn(ObservedColumnConnectionBase):
 				if(normalisedSourceFeatureIndex in storedSourceFeatureIndices):
 					result = GIAANNproto_databaseNetworkFiles.loadObservedColumnSourceFeatureConnectionsTensor(self.databaseNetworkObject, self.conceptIndex, normalisedSourceFeatureIndex, resolvedTargetDevice)
 				else:
-					if(not createMissing):
-						result = self.initialiseFeatureConnections(self.databaseNetworkObject.c, self.databaseNetworkObject.f, resolvedTargetDevice)
-					else:
-						result = self.initialiseFeatureConnections(self.databaseNetworkObject.c, self.databaseNetworkObject.f, resolvedTargetDevice)
+					result = self.initialiseFeatureConnections(self.databaseNetworkObject.c, self.databaseNetworkObject.f, resolvedTargetDevice)
 			self.featureConnectionsBySourceFeature[normalisedSourceFeatureIndex] = result
 		elif(result.device != resolvedTargetDevice):
 			result = result.to(resolvedTargetDevice)
 			self.featureConnectionsBySourceFeature[normalisedSourceFeatureIndex] = result
 		self.loadedSourceFeatureIndices.add(normalisedSourceFeatureIndex)
+		if(debugPrintTrainSectionTimesSourceFeatureConnections):
+			if(debugSectionName is not None):
+				debugTrainSectionTimesAdd(self.databaseNetworkObject, debugSectionName, time.perf_counter() - debugSectionStartTime)
 		return result
 
 	def saveLoadedSourceFeatureConnectionsToDisk(self):
@@ -265,43 +445,6 @@ class ObservedColumn(ObservedColumnConnectionBase):
 					self.storedSourceFeatureIndicesCache.add(sourceFeatureIndex)
 				else:
 					self.storedSourceFeatureIndicesCache.discard(sourceFeatureIndex)
-		return
-
-	def resizeConceptArrays(self, newC):
-		for sourceFeatureIndex, sourceTensor in list(self.featureConnectionsBySourceFeature.items()):
-			loadC = sourceTensor.shape[3]
-			if(newC > loadC):
-				sourceTensor = sourceTensor.coalesce()
-				expandedSize = (sourceTensor.shape[0], sourceTensor.shape[1], sourceTensor.shape[2], newC, sourceTensor.shape[4])
-				sourceTensor = pt.sparse_coo_tensor(sourceTensor.indices(), sourceTensor.values(), size=expandedSize, dtype=arrayType, device=sourceTensor.device).coalesce()
-				self.featureConnectionsBySourceFeature[sourceFeatureIndex] = sourceTensor
-		return
-
-	def expandFeatureArrays(self, newF):
-		loadFReference = (self.nextFeatureIndex + 1) if (len(self.featureConnectionsBySourceFeature) == 0 and not trainStoreFeatureMapsGlobally) else None
-		for sourceFeatureIndex, sourceTensor in list(self.featureConnectionsBySourceFeature.items()):
-			loadF = sourceTensor.shape[4]
-			if(loadFReference is None):
-				loadFReference = loadF
-			if(newF > loadF):
-				sourceTensor = sourceTensor.coalesce()
-				expandedSizeConnections = (sourceTensor.shape[0], sourceTensor.shape[1], sourceTensor.shape[2], sourceTensor.shape[3], newF)
-				sourceTensor = pt.sparse_coo_tensor(sourceTensor.indices(), sourceTensor.values(), size=expandedSizeConnections, dtype=arrayType, device=sourceTensor.device).coalesce()
-				self.featureConnectionsBySourceFeature[sourceFeatureIndex] = sourceTensor
-		if(loadFReference is None):
-			loadFReference = 0
-		if lowMem:
-			expandedSizeNeurons = (self.featureNeurons.shape[0], self.featureNeurons.shape[1], self.featureNeurons.shape[2], newF)
-			self.featureNeurons = self.featureNeurons.coalesce()
-			self.featureNeurons = pt.sparse_coo_tensor(self.featureNeurons.indices(), self.featureNeurons.values(), size=expandedSizeNeurons, dtype=arrayType, device=self.featureNeurons.device).coalesce()
-		if(trainStoreFeatureMapsGlobally):
-			self.nextFeatureIndex = len(self.databaseNetworkObject.conceptFeaturesDict) - 1
-		else:
-			for featureIndex in range(loadFReference, newF):
-				featureWord = self.databaseNetworkObject.conceptFeaturesList[featureIndex]
-				self.featureWordToIndex[featureWord] = featureIndex
-				self.featureIndexToWord[featureIndex] = featureWord
-				self.nextFeatureIndex += 1
 		return
 
 	def saveToDisk(self):
@@ -341,6 +484,7 @@ class ObservedColumnProxy(ObservedColumnConnectionBase):
 		self.proxyTargetDevice = targetDevice
 		self.featureConnectionsBySourceFeature = {}
 		self.loadedSourceFeatureIndices = set()
+		self.trainPreparedSourceFeatureIndices = set()
 		if(lowMem and hasattr(observedColumn, "featureNeurons")):
 			self.featureNeurons = observedColumn.featureNeurons.to(targetDevice)
 

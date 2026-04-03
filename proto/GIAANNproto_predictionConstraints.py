@@ -270,7 +270,7 @@ def getConnectedColumnsForFeature(observedColumn, featureIndex, includeFeatureDe
 	databaseNetworkObject = observedColumn.databaseNetworkObject
 	if(featureIndex is None or featureIndex < 0):
 		return [], {} if includeFeatureDetails else None
-	featureConnectionsSource = observedColumn.getFeatureConnectionsForSourceFeature(featureIndex, targetDevice=deviceSparse, createMissing=False)
+	featureConnectionsSource = observedColumn.prepareFeatureConnectionsForSourceFeature(featureIndex, targetDevice=deviceSparse, createMissing=False)
 	featureConnectionsStrength = featureConnectionsSource[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 	featureConnectionsStrength = featureConnectionsStrength.coalesce()
 	if(featureConnectionsStrength._nnz() == 0):
@@ -278,7 +278,7 @@ def getConnectedColumnsForFeature(observedColumn, featureIndex, includeFeatureDe
 	targetColumnIndices = featureConnectionsStrength.indices()
 	if(targetColumnIndices.shape[1] == 0):
 		return [], {} if includeFeatureDetails else None
-	minWordDistanceMask = GIAANNproto_predictionActivate.computeConnectionMinWordDistanceMask(observedColumn, featureIndex, targetColumnIndices)
+	minWordDistanceMask = GIAANNproto_predictionActivate.computeConnectionMinWordDistanceMask(observedColumn, featureIndex, targetColumnIndices, featureConnectionsSource=featureConnectionsSource)
 	if(minWordDistanceMask is not None):
 		if(minWordDistanceMask.sum().item() == 0):
 			return [], {} if includeFeatureDetails else None

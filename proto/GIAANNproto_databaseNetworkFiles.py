@@ -184,10 +184,9 @@ def remapTrainPropertyDimensionsToInference(tensor, tensorName):
 				useIdentityExpansion = False
 	if(useIdentityExpansion):
 		if(tensor.is_sparse):
-			tensor = tensor.coalesce()
 			newSize = list(tensor.size())
 			newSize[0] = arrayNumberOfPropertiesInference
-			result = pt.sparse_coo_tensor(tensor.indices(), tensor.values(), size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
+			result = expandSparseTensorSize(tensor, newSize, tensorName)
 		else:
 			newSize = list(tensor.shape)
 			newSize[0] = arrayNumberOfPropertiesInference
@@ -239,6 +238,20 @@ def adjustPropertyDimensions(inferenceMode, tensor, tensorName):
 			raise RuntimeError(f"{tensorName} property dimension mismatch: expected {arrayNumberOfPropertiesTrain}, got {propertyCount}")
 	return result
 
+def expandSparseTensorSize(tensor, newSize, tensorName):
+	result = tensor
+	currentSize = tuple(result.size())
+	targetSize = tuple(newSize)
+	if(result.layout != pt.sparse_coo):
+		raise RuntimeError(f"{tensorName} sparse expansion error: tensor must be sparse COO")
+	if(len(currentSize) != len(targetSize)):
+		raise RuntimeError(f"{tensorName} sparse expansion error: rank mismatch {len(currentSize)} vs {len(targetSize)}")
+	for dimensionIndex in range(len(currentSize)):
+		if(targetSize[dimensionIndex] < currentSize[dimensionIndex]):
+			raise RuntimeError(f"{tensorName} sparse expansion error: target size {targetSize} shrinks current size {currentSize}")
+	result.sparse_resize_(targetSize, result.sparse_dim(), result.dense_dim())
+	return result
+
 def insertPropertyDimension(tensor, insertIndex, targetPropertyCount):
 	if(tensor.is_sparse):
 		tensor = tensor.coalesce()
@@ -276,8 +289,7 @@ def ensureFeatureConnectionsSourceTensorCurrentSize(tensor, targetC, targetF, te
 		newSize[3] = targetC
 		newSize[4] = targetF
 		if(result.is_sparse):
-			result = result.coalesce()
-			result = pt.sparse_coo_tensor(result.indices(), result.values(), size=newSize, dtype=result.dtype, device=result.device).coalesce()
+			result = expandSparseTensorSize(result, newSize, tensorName)
 		else:
 			expandedTensor = pt.zeros(newSize, dtype=result.dtype, device=result.device)
 			expandedTensor[:, :, :, :currentC, :currentF] = result
@@ -320,7 +332,7 @@ def expandBranchDimensions(tensor, tensorName, branchCount):
 		if tensor.is_sparse:
 			newSize = list(tensor.size())
 			newSize[1] = branchCount
-			return pt.sparse_coo_tensor(tensor.indices(), tensor.values(), size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
+			return expandSparseTensorSize(tensor, newSize, tensorName)
 		padShape = list(tensor.shape)
 		padShape[1] = branchCount - currentBranches
 		padTensor = pt.zeros(padShape, dtype=tensor.dtype, device=tensor.device)

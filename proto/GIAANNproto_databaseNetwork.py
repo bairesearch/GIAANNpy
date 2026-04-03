@@ -104,15 +104,12 @@ def ensureGlobalFeatureNeuronsSize(databaseNetworkObject, updateBackup):
 		raise RuntimeError("ensureGlobalFeatureNeuronsSize error: globalFeatureNeurons is None")
 	if(databaseNetworkObject.globalFeatureNeurons.shape[3] < databaseNetworkObject.c or databaseNetworkObject.globalFeatureNeurons.shape[4] < databaseNetworkObject.f):
 		newShape = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
-		databaseNetworkObject.globalFeatureNeurons = databaseNetworkObject.globalFeatureNeurons.coalesce()
-		databaseNetworkObject.globalFeatureNeurons = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeurons.indices(), databaseNetworkObject.globalFeatureNeurons.values(), size=newShape, dtype=arrayType, device=deviceSparse)
+		databaseNetworkObject.globalFeatureNeurons = GIAANNproto_databaseNetworkFiles.expandSparseTensorSize(databaseNetworkObject.globalFeatureNeurons, newShape, "ensureGlobalFeatureNeuronsSize.globalFeatureNeurons")
 		expanded = True
 	if(updateBackup and databaseNetworkObject.globalFeatureNeuronsBackup is not None):
 		if(databaseNetworkObject.globalFeatureNeuronsBackup.shape[3] < databaseNetworkObject.c or databaseNetworkObject.globalFeatureNeuronsBackup.shape[4] < databaseNetworkObject.f):
 			newBackupShape = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
-			databaseNetworkObject.globalFeatureNeuronsBackup = databaseNetworkObject.globalFeatureNeuronsBackup.coalesce()
-			backupDevice = databaseNetworkObject.globalFeatureNeuronsBackup.device
-			databaseNetworkObject.globalFeatureNeuronsBackup = pt.sparse_coo_tensor(databaseNetworkObject.globalFeatureNeuronsBackup.indices(), databaseNetworkObject.globalFeatureNeuronsBackup.values(), size=newBackupShape, dtype=arrayType, device=backupDevice)
+			databaseNetworkObject.globalFeatureNeuronsBackup = GIAANNproto_databaseNetworkFiles.expandSparseTensorSize(databaseNetworkObject.globalFeatureNeuronsBackup, newBackupShape, "ensureGlobalFeatureNeuronsSize.globalFeatureNeuronsBackup")
 			expanded = True
 	return expanded
 
@@ -230,33 +227,25 @@ def addConceptToConceptColumnsDict(databaseNetworkObject, lemma, conceptsFound, 
 	return conceptsFound, newConceptsAdded
 	
 def loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, targetDevice=None, createDeviceCopy=False, requiredSourceFeatureIndices=None, loadAllSourceFeatures=False):
-	GIAANNproto_databaseNetworkFiles.validateObservedColumnStorageFormat(conceptIndex)
 	observedColumn = None
 	if(storeDatabaseInRam):
 		if(databaseNetworkObject.observedColumnsDictRAM is None):
-			databaseNetworkObject.observedColumnsDictRAM = {}
+			raise RuntimeError("loadOrCreateObservedColumn error: observedColumnsDictRAM is None while storeDatabaseInRam is enabled")
+		if(not databaseNetworkObject.observedColumnsRAMLoaded):
+			raise RuntimeError("loadOrCreateObservedColumn error: storeDatabaseInRam requires observedColumnsRAMLoaded after startup")
 		if(lemma in databaseNetworkObject.observedColumnsDictRAM):
 			observedColumn = databaseNetworkObject.observedColumnsDictRAM[lemma]
 		else:
-			if(databaseNetworkObject.observedColumnsRAMLoaded):
-				observedColumn = ObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
-			else:
-				if GIAANNproto_databaseNetworkFiles.observedColumnMetadataExists(conceptIndex):
-					observedColumn = ObservedColumn.loadFromDisk(databaseNetworkObject, conceptIndex, lemma, i, targetDevice=deviceDatabase, loadAllSourceFeatures=True)
-				else:
-					observedColumn = ObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
+			observedColumn = ObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
 			databaseNetworkObject.observedColumnsDictRAM[lemma] = observedColumn
-		observedColumn.resizeConceptArrays(databaseNetworkObject.c)
-		observedColumn.expandFeatureArrays(databaseNetworkObject.f)
+		observedColumn.ensureObservedColumnFeatureArraysFeatures(databaseNetworkObject.f)
 	else:
+		GIAANNproto_databaseNetworkFiles.validateObservedColumnStorageFormat(conceptIndex)
 		if GIAANNproto_databaseNetworkFiles.observedColumnMetadataExists(conceptIndex):
 			observedColumn = ObservedColumn.loadFromDisk(databaseNetworkObject, conceptIndex, lemma, i, targetDevice=deviceDatabase, loadAllSourceFeatures=loadAllSourceFeatures)
-			observedColumn.resizeConceptArrays(databaseNetworkObject.c)
-			observedColumn.expandFeatureArrays(databaseNetworkObject.f)
 		else:
 			observedColumn = ObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
-			observedColumn.resizeConceptArrays(databaseNetworkObject.c)
-			observedColumn.expandFeatureArrays(databaseNetworkObject.f)
+		observedColumn.ensureObservedColumnFeatureArraysFeatures(databaseNetworkObject.f)
 	resultObservedColumn = observedColumn
 	if(createDeviceCopy):
 		if(not storeDatabaseInRam):
@@ -275,6 +264,19 @@ def loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, ta
 			observedColumn.loadRequiredSourceFeatureConnections(requiredSourceFeatureIndices, loadTargetDevice, createMissing=False)
 	return resultObservedColumn
 
+def loadObservedColumnToRamStartup(databaseNetworkObject, conceptIndex, lemma, i):
+	if(not storeDatabaseInRam):
+		raise RuntimeError("loadObservedColumnToRamStartup error: storeDatabaseInRam is False")
+	if(databaseNetworkObject.observedColumnsRAMLoaded):
+		raise RuntimeError("loadObservedColumnToRamStartup error: observedColumnsRAMLoaded is already True")
+	GIAANNproto_databaseNetworkFiles.validateObservedColumnStorageFormat(conceptIndex)
+	metadataFile = GIAANNproto_databaseNetworkFiles.getObservedColumnMetadataFile(conceptIndex)
+	if(GIAANNproto_databaseNetworkFiles.pathExists(metadataFile)):
+		result = ObservedColumn.loadFromDisk(databaseNetworkObject, conceptIndex, lemma, i, targetDevice=deviceDatabase, loadAllSourceFeatures=True)
+	else:
+		result = ObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
+	return result
+
 def generateGlobalFeatureConnections(databaseNetworkObject):
 	conceptColumnsListTemp = []
 	for i, (lemma, conceptIndex) in enumerate(databaseNetworkObject.conceptColumnsDict.items()):
@@ -288,16 +290,29 @@ def generateGlobalFeatureConnections(databaseNetworkObject):
 
 def loadAllColumns(databaseNetworkObject):
 	observedColumnsDict = {}
-	for i, (lemma, conceptIndex) in enumerate(databaseNetworkObject.conceptColumnsDict.items()):
-		conceptColumn = loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, targetDevice=deviceDatabase, createDeviceCopy=False, loadAllSourceFeatures=True)
-		observedColumnsDict[lemma] = conceptColumn
+	if(storeDatabaseInRam):
+		if(databaseNetworkObject.observedColumnsRAMLoaded):
+			if(databaseNetworkObject.observedColumnsDictRAM is None):
+				raise RuntimeError("loadAllColumns error: observedColumnsDictRAM is None while observedColumnsRAMLoaded is True")
+			observedColumnsDict = databaseNetworkObject.observedColumnsDictRAM
+			for observedColumn in observedColumnsDict.values():
+				observedColumn.ensureObservedColumnFeatureArraysFeatures(databaseNetworkObject.f)
+		else:
+			for i, (lemma, conceptIndex) in enumerate(databaseNetworkObject.conceptColumnsDict.items()):
+				conceptColumn = loadObservedColumnToRamStartup(databaseNetworkObject, conceptIndex, lemma, i)
+				observedColumnsDict[lemma] = conceptColumn
+	else:
+		for i, (lemma, conceptIndex) in enumerate(databaseNetworkObject.conceptColumnsDict.items()):
+			conceptColumn = loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, targetDevice=deviceDatabase, createDeviceCopy=False, loadAllSourceFeatures=False)
+			observedColumnsDict[lemma] = conceptColumn
 	return observedColumnsDict
 
 def loadAllObservedColumnsToRam(databaseNetworkObject):
 	if(storeDatabaseInRam):
-		observedColumnsDict = loadAllColumns(databaseNetworkObject)
-		databaseNetworkObject.observedColumnsDictRAM = observedColumnsDict
-		databaseNetworkObject.observedColumnsRAMLoaded = True
+		if(not databaseNetworkObject.observedColumnsRAMLoaded):
+			observedColumnsDict = loadAllColumns(databaseNetworkObject)
+			databaseNetworkObject.observedColumnsDictRAM = observedColumnsDict
+			databaseNetworkObject.observedColumnsRAMLoaded = True
 	else:
 		raise RuntimeError("loadAllObservedColumnsToRam error: storeDatabaseInRam is False")
 	return
@@ -321,9 +336,10 @@ def moveObservedColumnsDictConnectionsToDatabaseAfterTrain(observedColumnsDict, 
 	if(useGPUdatabase != useGPUsparse):
 		if(not inferenceSequenceInPrompt):
 			for observedColumn in observedColumnsDict.values():
-				for sourceFeatureIndex in sorted(observedColumn.loadedSourceFeatureIndices):
+				for sourceFeatureIndex in observedColumn.getTrainPreparedSourceFeatureIndices():
 					sourceTensor = observedColumn.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, deviceDatabase, createMissing=False)
 					observedColumn.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, sourceTensor)
+				observedColumn.clearTrainPreparedSourceFeatureIndices()
 	return
 
 def prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFeatureIndicesByObservedColumn):
@@ -338,7 +354,8 @@ def prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFe
 			raise RuntimeError(f"prepareObservedColumnsForTrainSequence error: requiredSourceFeatureIndices is None for conceptIndex {conceptIndex}")
 		if(len(requiredSourceFeatureIndices) == 0):
 			raise RuntimeError(f"prepareObservedColumnsForTrainSequence error: requiredSourceFeatureIndices is empty for conceptIndex {conceptIndex}")
-		observedColumn.loadRequiredSourceFeatureConnections(requiredSourceFeatureIndices, deviceSparse, createMissing=False)
+		observedColumn.prepareRequiredSourceFeatureConnectionsTrain(requiredSourceFeatureIndices, deviceSparse, createMissing=False)
+		observedColumn.setTrainPreparedSourceFeatureIndices(requiredSourceFeatureIndices)
 	return
 
 def saveAllObservedColumnsToDisk(databaseNetworkObject):

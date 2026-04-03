@@ -435,7 +435,7 @@ def processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuro
 		raise RuntimeError("processFeaturesActivePredictSingle error: missing observed column sequence index 0")
 	observedColumn = sequenceObservedColumnsPrediction.observedColumnsSequenceWordIndexDict[0]
 	connectionDevice = globalFeatureNeuronsActivation.device
-	featureConnections = observedColumn.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=connectionDevice, createMissing=False)
+	featureConnections = observedColumn.prepareFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=connectionDevice, createMissing=False)
 	result = processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
 	return result
 
@@ -635,7 +635,7 @@ def hybridActivation(x, scale=100.0):
 	#print("f = ", f)
 	return f
 
-def computeConnectionMinWordDistanceMask(observedColumn, sourceFeatureIndex, targetIndices, requiredDistance=1.0):
+def computeConnectionMinWordDistanceMask(observedColumn, sourceFeatureIndex, targetIndices, requiredDistance=1.0, featureConnectionsSource=None):
 	if(not hasattr(observedColumn, "databaseNetworkObject") or observedColumn.databaseNetworkObject is None):
 		raise RuntimeError("computeConnectionMinWordDistanceMask error: observedColumn.databaseNetworkObject is required")
 	databaseNetworkObject = observedColumn.databaseNetworkObject
@@ -643,7 +643,8 @@ def computeConnectionMinWordDistanceMask(observedColumn, sourceFeatureIndex, tar
 		if(targetIndices is None or targetIndices.shape[1] == 0):
 			printe("(targetIndices is None or targetIndices.shape[1] == 0)")
 			#return None
-		featureConnectionsSource = observedColumn.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=targetIndices.device, createMissing=False)
+		if(featureConnectionsSource is None):
+			featureConnectionsSource = observedColumn.prepareFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=targetIndices.device, createMissing=False)
 		featureConnectionsMinWordDistance = featureConnectionsSource[databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex]
 		featureConnectionsMinWordDistance = featureConnectionsMinWordDistance.coalesce()
 		if(featureConnectionsMinWordDistance._nnz() == 0):

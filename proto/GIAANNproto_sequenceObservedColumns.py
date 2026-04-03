@@ -883,7 +883,14 @@ class SequenceObservedColumns:
 			connectionMinIndices = connectionMinSparse.indices()
 			connectionMinValues = connectionMinSparse.values()
 			connectionMinIndices, connectionMinValues = self.filterSparseByFeatureMask(connectionMinIndices, connectionMinValues, sequenceFeatureMaskConnection, [3, 5])
+		if(debugPrintTrainSectionTimesSourceFeatureConnections):
+			getObservedColumnsByConceptIndexStartTime = None
+			if(debugPrintTrainSectionTimes):
+				getObservedColumnsByConceptIndexStartTime = time.perf_counter()
 		observedColumnsByConceptIndex = self.getObservedColumnsByConceptIndex(sequenceObservedColumnsDict)
+		if(debugPrintTrainSectionTimesSourceFeatureConnections):
+			if(debugPrintTrainSectionTimes):
+				debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient:getObservedColumnsByConceptIndex", time.perf_counter() - getObservedColumnsByConceptIndexStartTime)
 		conceptIndicesFeatureTensor = self.conceptIndicesInSequenceObservedTensor.to(featureDevice)
 		conceptIndicesConnectionTensor = self.conceptIndicesInSequenceObservedTensor.to(connectionDevice)
 
@@ -1047,6 +1054,12 @@ class SequenceObservedColumns:
 
 	def gatherConnectionSourceBucketTensor(self, observedColumnsByConceptIndex, sourceCombinedKeysUnique, targetDevice):
 		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, sourceCombinedKeysUnique.shape[0], self.databaseNetworkObject.c, self.databaseNetworkObject.f)
+		result = None
+		if(debugPrintTrainSectionTimesSourceFeatureConnections):
+			gatherConnectionSourceBucketTensorStartTime = None
+			if(debugPrintTrainSectionTimes):
+				gatherConnectionSourceBucketTensorStartTime = time.perf_counter()
+				debugTrainSectionTimesContextPush(self.databaseNetworkObject, "updateObservedColumnsEfficient:gatherConnectionSourceBucketTensor")
 		combinedIndicesList = []
 		combinedValuesList = []
 		sourceConceptIndexList = pt.div(sourceCombinedKeysUnique, self.databaseNetworkObject.f, rounding_mode='floor').detach().cpu().tolist()
@@ -1069,9 +1082,18 @@ class SequenceObservedColumns:
 			result = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSize, dtype=arrayType, device=targetDevice)
 		else:
 			result = self.initialiseSparseTensor(targetSize, targetDevice)
+		if(debugPrintTrainSectionTimesSourceFeatureConnections):
+			if(debugPrintTrainSectionTimes):
+				debugTrainSectionTimesContextPop(self.databaseNetworkObject)
+				debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient:gatherConnectionSourceBucketTensor", time.perf_counter() - gatherConnectionSourceBucketTensorStartTime)
 		return result
 
 	def scatterConnectionSourceBucketTensor(self, observedColumnsByConceptIndex, sourceCombinedKeysUnique, connectionTargetSparse):
+		if(debugPrintTrainSectionTimesSourceFeatureConnections):
+			scatterConnectionSourceBucketTensorStartTime = None
+			if(debugPrintTrainSectionTimes):
+				scatterConnectionSourceBucketTensorStartTime = time.perf_counter()
+				debugTrainSectionTimesContextPush(self.databaseNetworkObject, "updateObservedColumnsEfficient:scatterConnectionSourceBucketTensor")
 		connectionTargetSparse = connectionTargetSparse.coalesce()
 		connectionTargetIndices = connectionTargetSparse.indices()
 		connectionTargetValues = connectionTargetSparse.values()
@@ -1100,6 +1122,10 @@ class SequenceObservedColumns:
 			else:
 				sourceTensor = self.initialiseSparseTensor(sourceTensorSize, connectionTargetSparse.device)
 			observedColumnsByConceptIndex[int(conceptIndexValue)].setFeatureConnectionsForSourceFeature(int(sourceFeatureIndexValue), sourceTensor)
+		if(debugPrintTrainSectionTimesSourceFeatureConnections):
+			if(debugPrintTrainSectionTimes):
+				debugTrainSectionTimesContextPop(self.databaseNetworkObject)
+				debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient:scatterConnectionSourceBucketTensor", time.perf_counter() - scatterConnectionSourceBucketTensorStartTime)
 		return
 
 	def buildMaskLookup(self, maskSize, indices, device):
