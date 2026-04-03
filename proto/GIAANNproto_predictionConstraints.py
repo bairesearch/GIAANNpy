@@ -20,7 +20,7 @@ GIA ANN proto prediction constraint helpers
 import torch as pt
 
 from GIAANNproto_globalDefs import *
-import GIAANNproto_databaseNetworkExcitation
+import GIAANNproto_databaseNetwork
 import GIAANNproto_sparseTensors
 import GIAANNproto_predictionActivate
 
@@ -63,8 +63,8 @@ def constraintAllowsNode(databaseNetworkObject, columnIndex, featureIndex, const
 			if(featureIndex is None):
 				allowed = False
 			else:
-				isDeterministicDelimiter = GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, int(featureIndex))
-				isProbabilisticDelimiter = GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, int(featureIndex))
+				isDeterministicDelimiter = GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, int(featureIndex))
+				isProbabilisticDelimiter = GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, int(featureIndex))
 				allowed = (isDeterministicDelimiter or isProbabilisticDelimiter)
 	return allowed
 
@@ -251,7 +251,7 @@ def getObservedColumn(databaseNetworkObject, observedColumnsDict, columnIndex):
 		columnLemma = databaseNetworkObject.conceptColumnsList[columnIndex]
 		observedColumn = observedColumnsDict.get(columnLemma)
 		if(observedColumn is None):
-			observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, columnIndex, columnLemma, columnIndex)
+			observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, columnIndex, columnLemma, columnIndex)
 		clearObservedColumns = inferenceOnlyRetainPredictedTargetObservedColumn
 		if(clearObservedColumns and inferenceBeamSearch and not inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch):
 			clearObservedColumns = False

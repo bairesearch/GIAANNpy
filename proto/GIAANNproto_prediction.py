@@ -22,9 +22,9 @@ import time
 import math
 
 from GIAANNproto_globalDefs import *
-import GIAANNproto_databaseNetworkExcitation
-import GIAANNproto_databaseNetworkTrainExcitation
-import GIAANNproto_databaseNetworkDrawExcitation
+import GIAANNproto_databaseNetwork
+import GIAANNproto_databaseNetworkTrain
+import GIAANNproto_databaseNetworkDraw
 import GIAANNproto_sparseTensors
 import GIAANNproto_sequenceTokens
 import GIAANNproto_predictionBeamSearch
@@ -177,7 +177,7 @@ def printInferenceTop1Accuracy(databaseNetworkObject):
 						print("averageTop1BitsPerByteModified: ", bitsPerByte)
 					else:
 						print("averageTop1BitsPerByte: ", bitsPerByte)
-					memory_gb = GIAANNproto_databaseNetworkExcitation.printCountTotalParametersRun(databaseNetworkObject)
+					memory_gb = GIAANNproto_databaseNetwork.printCountTotalParametersRun(databaseNetworkObject)
 					print("memory_gb: ", memory_gb)
 				else:
 					if(printInferenceTop1AccuracyBitsPerByteModified):
@@ -192,7 +192,7 @@ def printInferenceTop1Accuracy(databaseNetworkObject):
 			if(useAutoresearch):
 				print("---")
 				print("averageTop1Accuracy: ", predictionAccuracy)
-				memory_gb = GIAANNproto_databaseNetworkExcitation.printCountTotalParametersRun(databaseNetworkObject)
+				memory_gb = GIAANNproto_databaseNetwork.printCountTotalParametersRun(databaseNetworkObject)
 				print("memory_gb: ", memory_gb)
 			else:
 				if(inferenceReportTokenAccuracyConstrainByColumn):
@@ -277,7 +277,7 @@ def calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeur
 if(inferenceOnlyRetainPredictedTargetObservedColumn):
 	def loadObservedColumnInference(databaseNetworkObject, observedColumnsDict, conceptIndex, sequenceWordIndex):
 		lemma = databaseNetworkObject.conceptColumnsList[conceptIndex]
-		observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, sequenceWordIndex, deviceLoadColumnInference, deviceLoadColumnInferenceCopy)
+		observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, sequenceWordIndex, deviceLoadColumnInference, deviceLoadColumnInferenceCopy)
 		if(inferenceOnlyRetainPredictedTargetObservedColumn):
 			if(observedColumnsDict is None):
 				raise RuntimeError("loadObservedColumnInference error: observedColumnsDict is None")
@@ -327,7 +327,7 @@ def activatedNodesAreReferenceSetDelimiters(databaseNetworkObject, conceptColumn
 		return False
 	for featureIndexTensor in flattenedFeatureIndices:
 		featureIndex = featureIndexTensor.item()
-		if(not GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, featureIndex)):
+		if(not GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, featureIndex)):
 			return False
 	return True
 
@@ -341,7 +341,7 @@ def activatedNodesAreProbabilisticReferenceSetDelimiters(databaseNetworkObject, 
 		return False
 	for featureIndexTensor in flattenedFeatureIndices:
 		featureIndex = featureIndexTensor.item()
-		if(not GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, featureIndex)):
+		if(not GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, featureIndex)):
 			return False
 	return True
 
@@ -394,7 +394,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	kcMax = 1	#not used
 	initialContextWordIndex = 0		#use first seed token as the context for the first prediction
 	initialContextWordIndex = max(0, min(initialContextWordIndex, len(tokensSequence)-1))
-	targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, initialContextWordIndex, kcMax)
+	targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, initialContextWordIndex, kcMax)
 	conceptColumnIndex = int(targetPreviousColumnIndex)
 	conceptColumnFeatureIndex = int(targetFeatureIndex)
 	conceptActivationState = None
@@ -549,7 +549,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, databaseNetworkObject.arrayIndexPropertiesActivationIndex)
 		if(inferenceUseNeuronFeaturePropertiesTime):
 			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, databaseNetworkObject.arrayIndexPropertiesTimeIndex)
-		GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumnsPrediction, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+generateDrawSequenceIndex(sequenceWordIndex))
+		GIAANNproto_databaseNetworkDraw.visualizeGraph(sequenceObservedColumnsPrediction, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+generateDrawSequenceIndex(sequenceWordIndex))
 	return featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime
 
 def ensurePredictionStateAvailable(conceptColumnsIndices, conceptColumnsFeatureIndices, sequenceWordIndex, wordPredictionIndex, tokensSequence, reason):
@@ -627,7 +627,7 @@ def createSequenceObservedColumnsPrediction(databaseNetworkObject, observedColum
 		observedColumnsSequenceCandidateIndexDict = {}
 		lemma = databaseNetworkObject.conceptColumnsList[int(conceptColumnIndex)]
 		# Load observed column from disk or create new one
-		observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, int(conceptColumnIndex), lemma, sequenceWordIndex, deviceLoadColumnInference, deviceLoadColumnInferenceCopy)
+		observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, int(conceptColumnIndex), lemma, sequenceWordIndex, deviceLoadColumnInference, deviceLoadColumnInferenceCopy)
 		observedColumnsDict[lemma] = observedColumn
 		observedColumnsSequenceCandidateIndexDict[0] = observedColumn
 		sequenceObservedColumnsPrediction = SequenceObservedColumnsInferencePrediction(databaseNetworkObject, observedColumnsDict, observedColumnsSequenceCandidateIndexDict)
@@ -695,7 +695,7 @@ def deactivatePredictedNeuronActivations(globalFeatureNeuronsActivation, concept
 
 def selectNextColumnFeatureSeedPhase(sequenceObservedColumns, databaseNetworkObject, globalFeatureNeuronsActivation, tokensSequence, conceptMask, sequenceWordIndex, wordPredictionIndex, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap):
 	#seedPhase;
-	targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
+	targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 	conceptColumnIndexNext = int(targetPreviousColumnIndex)
 	conceptColumnFeatureIndexNext = int(targetFeatureIndex)
 	conceptColumnIndexNextTensor = pt.tensor([conceptColumnIndexNext], dtype=pt.long)
@@ -733,7 +733,7 @@ def selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetw
 			if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 				raise
 			predictionCandidatesAvailable = False
-			targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
+			targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 			conceptColumnIndexPred = int(targetPreviousColumnIndex)
 			conceptColumnFeatureIndexPred = int(targetFeatureIndex)
 	else:
@@ -743,14 +743,14 @@ def selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetw
 			if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 				raise
 			predictionCandidatesAvailable = False
-			targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
+			targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 			conceptColumnIndexPred = int(targetPreviousColumnIndex)
 			conceptColumnFeatureIndexPred = int(targetFeatureIndex)
 	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		conceptColumnIndexNext = conceptColumnIndexPred	#use prediction as next selected feature
 		conceptColumnFeatureIndexNext = conceptColumnFeatureIndexPred	#use prediction as next selected feature
 	else:
-		targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
+		targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 		conceptColumnIndexNext = int(targetPreviousColumnIndex)
 		conceptColumnFeatureIndexNext = int(targetFeatureIndex)
 		conceptColumnIndexNextTensor = pt.tensor([conceptColumnIndexNext], dtype=pt.long)

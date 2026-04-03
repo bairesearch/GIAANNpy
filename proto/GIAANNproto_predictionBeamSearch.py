@@ -21,7 +21,7 @@ import torch as pt
 import time
 
 from GIAANNproto_globalDefs import *
-import GIAANNproto_databaseNetworkExcitation
+import GIAANNproto_databaseNetwork
 import GIAANNproto_sparseTensors
 import GIAANNproto_predictionActivate
 import GIAANNproto_predictionConstraints
@@ -29,7 +29,7 @@ import GIAANNproto_predictionConstraints
 
 def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, conceptActivationState=None, connectedColumnsConstraint=None, connectedColumnsFeatures=None):
 	#generate targets for debug/analysis output
-	targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
+	targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 
 	strengthLookup = None
 	if(globalFeatureNeuronsStrength is not None):
@@ -113,7 +113,7 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 
 def beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, conceptActivationState=None, connectedColumnsConstraint=None, connectedColumnsFeatures=None):
 	#single-step beam candidate selection (no beam depth expansion)
-	targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetworkExcitation.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
+	targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNproto_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 	result = None
 
 	strengthLookup = None
@@ -183,7 +183,7 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 	if(lemma in observedColumnsDict):
 		observedColumn = observedColumnsDict[lemma]
 	else:
-		observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, columnIndex, lemma, sequenceWordIndex)
+		observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, columnIndex, lemma, sequenceWordIndex)
 	if(inferenceOnlyRetainPredictedTargetObservedColumn and inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch):
 		if(observedColumnsDict is None):
 			raise RuntimeError("executeBeamNodeActivation error: observedColumnsDict is None")
@@ -594,13 +594,13 @@ def prepareBeamNodes(databaseNetworkObject, nodes, conceptActivationState, const
 
 def nodesContainReferenceSetDelimiter(databaseNetworkObject, nodes):
 	for nodeColumn, nodeFeature in nodes:
-		if(GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, nodeFeature)):
+		if(GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, nodeFeature)):
 			return True
 	return False
 
 def nodesContainProbabilisticReferenceSetDelimiter(databaseNetworkObject, nodes):
 	for nodeColumn, nodeFeature in nodes:
-		if(GIAANNproto_databaseNetworkExcitation.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, nodeFeature)):
+		if(GIAANNproto_databaseNetwork.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, nodeFeature)):
 			return True
 	return False
 

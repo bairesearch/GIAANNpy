@@ -21,7 +21,7 @@ import random
 import torch as pt
 
 from GIAANNproto_globalDefs import *
-import GIAANNproto_databaseNetworkExcitation
+import GIAANNproto_databaseNetwork
 import GIAANNproto_sequenceTokens
 
 
@@ -44,7 +44,7 @@ def firstPass(databaseNetworkObject, sequence, allowNewFeatures):
 		
 		if(conceptFound):
 			if(allowNewFeatures):
-				conceptsFound, newConceptsAdded = GIAANNproto_databaseNetworkExcitation.addConceptToConceptColumnsDict(databaseNetworkObject, token.lemma, conceptsFound, newConceptsAdded)
+				conceptsFound, newConceptsAdded = GIAANNproto_databaseNetwork.addConceptToConceptColumnsDict(databaseNetworkObject, token.lemma, conceptsFound, newConceptsAdded)
 			else:
 				if(token.lemma not in databaseNetworkObject.conceptColumnsDict):
 					raise RuntimeError("firstPass error: concept lemma not found while allowNewFeatures is False (" + token.lemma + ")")
@@ -74,7 +74,7 @@ def secondPass(databaseNetworkObject, tokens, inferenceMode):
 			if GIAANNproto_sequenceTokens.isConcept(token):
 				conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
 				if(inferenceMode and inferenceOnlyRetainPredictedTargetObservedColumn):
-					observedColumn = GIAANNproto_databaseNetworkExcitation.ObservedColumnStub(databaseNetworkObject, conceptIndex, lemma, i)
+					observedColumn = GIAANNproto_databaseNetwork.ObservedColumnStub(databaseNetworkObject, conceptIndex, lemma, i)
 					observedColumnsSequenceWordIndexDict[i] = observedColumn
 				else:
 					# Load observed column from disk or create new one (reuse per-lemma instance for multi-occurrence concepts)
@@ -82,15 +82,15 @@ def secondPass(databaseNetworkObject, tokens, inferenceMode):
 						observedColumn = observedColumnsDict[lemma]
 					else:
 						if(inferenceMode):
-							observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, deviceLoadColumnInference, inferenceMode and deviceLoadColumnInferenceCopy)
+							observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, deviceLoadColumnInference, inferenceMode and deviceLoadColumnInferenceCopy)
 						else:
-							observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
+							observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
 						observedColumnsDict[lemma] = observedColumn
 					observedColumnsSequenceWordIndexDict[i] = observedColumn
 		else:
 			conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
 			if(inferenceMode and inferenceOnlyRetainPredictedTargetObservedColumn):
-				observedColumn = GIAANNproto_databaseNetworkExcitation.ObservedColumnStub(databaseNetworkObject, conceptIndex, lemma, i)
+				observedColumn = GIAANNproto_databaseNetwork.ObservedColumnStub(databaseNetworkObject, conceptIndex, lemma, i)
 				observedColumnsSequenceWordIndexDict[i] = observedColumn
 			else:
 				# Load observed column from disk or create new one (reuse per-lemma instance for multi-occurrence concepts)
@@ -98,9 +98,9 @@ def secondPass(databaseNetworkObject, tokens, inferenceMode):
 					observedColumn = observedColumnsDict[lemma]
 				else:
 					if(inferenceMode):
-						observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, deviceLoadColumnInference, inferenceMode and deviceLoadColumnInferenceCopy)
+						observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, deviceLoadColumnInference, inferenceMode and deviceLoadColumnInferenceCopy)
 					else:
-						observedColumn = GIAANNproto_databaseNetworkExcitation.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
+						observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
 					observedColumnsDict[lemma] = observedColumn
 				observedColumnsSequenceWordIndexDict[i] = observedColumn
 	return observedColumnsDict, observedColumnsSequenceWordIndexDict

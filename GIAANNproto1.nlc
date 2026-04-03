@@ -661,4 +661,7 @@ MANUAL; - rename debugCountTotalParameters to printCountTotalParameters
 	The only exceptions to parallelisation should be steps;
 	i) generating a large sparse 6D connections tensor from individual python dictionary connection tensors (using indices in featureIndicesInObserved())
 	iii) splitting the updated large sparse 6D connections tensor back into its source feature components (to be inserted back into the python dictionary via setFeatureConnectionsForSourceFeature()) 
+- create class ObservedColumnConnectionBase - remove ObservedColumnProxy/ObservedColumn function replications
+- move class ObservedColumn, ObservedColumnConnectionBase, ObservedColumnProxy, ObservedColumnStub to new file GIAANNproto_databaseNetworkObservedColumn.py
+MANUAL; - rename proto files - remove Excitation suffix
 

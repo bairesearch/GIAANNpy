@@ -1,4 +1,4 @@
-"""GIAANNproto_databaseNetworkDrawExcitation.py
+"""GIAANNproto_databaseNetworkDraw.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -13,7 +13,7 @@ see GIAANNproto_main.py
 see GIAANNproto_main.py
 
 # Description:
-GIA ANN proto database Network Draw Excitation
+GIA ANN proto database Network Draw
 
 """
 
@@ -24,7 +24,7 @@ import torch as pt
 import GIAANNproto_sparseTensors
 
 from GIAANNproto_globalDefs import *
-import GIAANNproto_databaseNetworkExcitation
+import GIAANNproto_databaseNetwork
 
 
 #if(drawDefault):
@@ -244,7 +244,7 @@ def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=
 	G.clear()
 
 	if(drawAllColumns):
-		observedColumnsDict = GIAANNproto_databaseNetworkExcitation.loadAllColumns(databaseNetworkObject)
+		observedColumnsDict = GIAANNproto_databaseNetwork.loadAllColumns(databaseNetworkObject)
 	else:
 		observedColumnsDict = sequenceObservedColumns.observedColumnsDict
 	

@@ -1,4 +1,4 @@
-"""GIAANNproto_databaseNetworkTrainExcitation.py
+"""GIAANNproto_databaseNetworkTrain.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -13,7 +13,7 @@ see GIAANNproto_main.py
 see GIAANNproto_main.py
 
 # Description:
-GIA ANN proto database Network Train Excitation
+GIA ANN proto database Network Train
 
 """
 

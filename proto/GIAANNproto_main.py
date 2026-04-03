@@ -39,13 +39,13 @@ pt.set_grad_enabled(False)
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_sparseTensors
-import GIAANNproto_databaseNetworkExcitation
-import GIAANNproto_databaseNetworkFilesExcitation
-import GIAANNproto_databaseNetworkDrawExcitation
+import GIAANNproto_databaseNetwork
+import GIAANNproto_databaseNetworkFiles
+import GIAANNproto_databaseNetworkDraw
 import GIAANNproto_sequenceTokens
 import GIAANNproto_sequenceConcepts
-import GIAANNproto_sequenceObservedColumnsExcitation
-import GIAANNproto_databaseNetworkTrainExcitation
+import GIAANNproto_sequenceObservedColumns
+import GIAANNproto_databaseNetworkTrain
 if(executionMode=="inference" or executionMode=="trainAndInference"):
 	import GIAANNproto_prediction
 
@@ -87,7 +87,7 @@ else:
 			nlpSequence = nlpArticle
 
 def main():
-	GIAANNproto_databaseNetworkFilesExcitation.prepareDatabaseFilesStartup()
+	GIAANNproto_databaseNetworkFiles.prepareDatabaseFilesStartup()
 	if(executionMode=="inference"):
 		executeMode(True)
 	elif(executionMode=="trainAndInference"):
@@ -97,21 +97,21 @@ def main():
 		executeMode(False)
 	
 def executeMode(inferenceMode):
-	databaseNetworkObject = GIAANNproto_databaseNetworkExcitation.initialiseDatabaseNetwork(inferenceMode)
+	databaseNetworkObject = GIAANNproto_databaseNetwork.initialiseDatabaseNetwork(inferenceMode)
 	databaseNetworkObject.nlp = nlpSequence	#used by posStringToPosInt
 
 	if(printCountTotalParameters):
 		if(len(databaseNetworkObject.conceptColumnsList) > 0):
-			GIAANNproto_databaseNetworkExcitation.printCountTotalParametersRun(databaseNetworkObject)
+			GIAANNproto_databaseNetwork.printCountTotalParametersRun(databaseNetworkObject)
 		else:
 			print("printCountTotalParameters totalColumns = 0 (empty database)")
 	if(usePOS):
 		GIAANNproto_sequenceTokens.loadPOSdatabase()
 	if((inferenceMode and not inferenceTrainFirstSequences) or (not inferenceMode and trainLoadExistingDatabase and trainSetStartOffsetSequences>0)):
 		if(inferenceMode and not inferenceTrainFirstSequences):
-			GIAANNproto_databaseNetworkExcitation.backupGlobalArrays(databaseNetworkObject)
+			GIAANNproto_databaseNetwork.backupGlobalArrays(databaseNetworkObject)
 		if(storeDatabaseInRam):
-			GIAANNproto_databaseNetworkExcitation.loadAllObservedColumnsToRam(databaseNetworkObject)
+			GIAANNproto_databaseNetwork.loadAllObservedColumnsToRam(databaseNetworkObject)
 		
 	for epochIndex in range(numberEpochs):
 		#print("\nepochIndex = ", epochIndex)
@@ -138,8 +138,8 @@ def executeMode(inferenceMode):
 	if(not inferenceMode or inferenceTrainFirstSequences):
 		if(useSaveData):
 			if(storeDatabaseInRam):
-				GIAANNproto_databaseNetworkExcitation.saveAllObservedColumnsToDisk(databaseNetworkObject)
-			GIAANNproto_databaseNetworkFilesExcitation.saveData(databaseNetworkObject, {}, sequenceCount, forceSaveGlobalState=True)
+				GIAANNproto_databaseNetwork.saveAllObservedColumnsToDisk(databaseNetworkObject)
+			GIAANNproto_databaseNetworkFiles.saveData(databaseNetworkObject, {}, sequenceCount, forceSaveGlobalState=True)
 			#only required if trainMaxSequences%saveGlobalFeatureNeuronsRate != 0
 
 def releaseRuntimeGpuMemory(sequenceCount):
@@ -201,7 +201,7 @@ def expandSequenceForInference(databaseNetworkObject, sequence):
 		if not (useDedicatedFeatureLists):
 			GIAANNproto_sequenceConcepts.detectNewFeatures(databaseNetworkObject, tokens, True)
 		observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNproto_sequenceConcepts.secondPass(databaseNetworkObject, tokens, False)
-	GIAANNproto_databaseNetworkExcitation.ensureGlobalFeatureNeuronsSize(databaseNetworkObject, True)
+	GIAANNproto_databaseNetwork.ensureGlobalFeatureNeuronsSize(databaseNetworkObject, True)
 	return
 	
 def processDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset):
@@ -364,12 +364,12 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		debugTrainSectionTimesAdd(databaseNetworkObject, "preprocessSequence", time.perf_counter() - preprocessSequenceStartTime)
 	
 	if(debugReloadGlobalFeatureNeuronsEverySequence):
-		GIAANNproto_databaseNetworkExcitation.initialiseDatabaseNetwork(inferenceMode)
+		GIAANNproto_databaseNetwork.initialiseDatabaseNetwork(inferenceMode)
 		if(not lowMem):
-			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_databaseNetworkExcitation.initialiseFeatureNeuronsGlobal(inferenceMode, databaseNetworkObject.c, databaseNetworkObject.f)
+			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_databaseNetwork.initialiseFeatureNeuronsGlobal(inferenceMode, databaseNetworkObject.c, databaseNetworkObject.f)
 	if(inferenceMode):
 		if(not inferenceTrainFirstSequences):
-			GIAANNproto_databaseNetworkExcitation.restoreGlobalArrays(databaseNetworkObject)	#reset activations so each prompt sequence is independent
+			GIAANNproto_databaseNetwork.restoreGlobalArrays(databaseNetworkObject)	#reset activations so each prompt sequence is independent
 	
 	databaseNetworkObject.articleIndexDebug = articleIndex
 	databaseNetworkObject.sequenceIndexDebug = sequenceIndex
@@ -387,7 +387,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 	allowNewFeatures = True
 	if(storeDatabaseInRam):
 		if(inferenceMode and not databaseNetworkObject.observedColumnsRAMLoaded):
-			GIAANNproto_databaseNetworkExcitation.loadAllObservedColumnsToRam(databaseNetworkObject)
+			GIAANNproto_databaseNetwork.loadAllObservedColumnsToRam(databaseNetworkObject)
 	if(inferenceMode and inferenceAddNewFeatures):
 		expandSequenceForInference(databaseNetworkObject, sequence)
 		allowNewFeatures = False
@@ -442,7 +442,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		sequenceObservedColumnsInitStartTime = None
 		if(debugPrintTrainSectionTimes and trainMode):
 			sequenceObservedColumnsInitStartTime = time.perf_counter()
-		sequenceObservedColumns = GIAANNproto_sequenceObservedColumnsExcitation.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict, inferenceMode)
+		sequenceObservedColumns = GIAANNproto_sequenceObservedColumns.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict, inferenceMode)
 		if(debugPrintTrainSectionTimes and trainMode):
 			debugTrainSectionTimesAdd(databaseNetworkObject, "SequenceObservedColumns.__init__", time.perf_counter() - sequenceObservedColumnsInitStartTime)
 
@@ -456,8 +456,8 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		else:
 			# Process each concept word in the sequence (train)
 			requiredSourceFeatureIndicesByObservedColumn = sequenceObservedColumns.getTrainRequiredSourceFeatureIndicesByObservedColumn()
-			GIAANNproto_databaseNetworkExcitation.prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFeatureIndicesByObservedColumn)
-			trained = GIAANNproto_databaseNetworkTrainExcitation.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)
+			GIAANNproto_databaseNetwork.prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFeatureIndicesByObservedColumn)
+			trained = GIAANNproto_databaseNetworkTrain.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)
 			if(trained):
 				# Update observed columns from sequence observed columns
 				updateObservedColumnsWrapperStartTime = None
@@ -470,14 +470,14 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 				# Save observed columns to disk
 				if(useSaveData):
 					if(not storeDatabaseInRam):
-						GIAANNproto_databaseNetworkFilesExcitation.saveData(databaseNetworkObject, observedColumnsDict, sequenceCount)
+						GIAANNproto_databaseNetworkFiles.saveData(databaseNetworkObject, observedColumnsDict, sequenceCount)
 
 				if(drawNetworkDuringTrain):
 					# Visualize the complete graph every time a new sequence is parsed by the application.
-					GIAANNproto_databaseNetworkDrawExcitation.visualizeGraph(sequenceObservedColumns, False, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+generateDrawSequenceIndex(sequenceIndex))
+					GIAANNproto_databaseNetworkDraw.visualizeGraph(sequenceObservedColumns, False, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+generateDrawSequenceIndex(sequenceIndex))
 
 		if(storeDatabaseInRam):
-			GIAANNproto_databaseNetworkExcitation.moveObservedColumnsDictConnectionsToDatabaseAfterTrain(observedColumnsDict, inferenceMode)
+			GIAANNproto_databaseNetwork.moveObservedColumnsDictConnectionsToDatabaseAfterTrain(observedColumnsDict, inferenceMode)
 
 		releaseRuntimeGpuMemoryStartTime = None
 		if(debugPrintTrainSectionTimes and trainMode):
