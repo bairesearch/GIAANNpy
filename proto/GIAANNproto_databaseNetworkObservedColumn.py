@@ -55,19 +55,22 @@ class ObservedColumnConnectionBase:
 		return result
 
 	def normaliseSourceFeatureIndices(self, requiredSourceFeatureIndices):
-		indicesList = []
-		seen = set()
-		if(requiredSourceFeatureIndices is not None):
-			if(pt.is_tensor(requiredSourceFeatureIndices)):
-				rawIndices = requiredSourceFeatureIndices.detach().view(-1).cpu().tolist()
-			else:
-				rawIndices = list(requiredSourceFeatureIndices)
-			for sourceFeatureIndex in rawIndices:
-				normalisedSourceFeatureIndex = self.normaliseSourceFeatureIndex(sourceFeatureIndex)
-				if(normalisedSourceFeatureIndex not in seen):
-					indicesList.append(normalisedSourceFeatureIndex)
-					seen.add(normalisedSourceFeatureIndex)
-		indicesList.sort()
+		if(optimisationNormaliseSourceFeatureIndicesDisabled):
+			indicesList = requiredSourceFeatureIndices	
+		else:
+			indicesList = []
+			seen = set()
+			if(requiredSourceFeatureIndices is not None):
+				if(pt.is_tensor(requiredSourceFeatureIndices)):
+					rawIndices = requiredSourceFeatureIndices.detach().view(-1).cpu().tolist()
+				else:
+					rawIndices = list(requiredSourceFeatureIndices)
+				for sourceFeatureIndex in rawIndices:
+					normalisedSourceFeatureIndex = self.normaliseSourceFeatureIndex(sourceFeatureIndex)
+					if(normalisedSourceFeatureIndex not in seen):
+						indicesList.append(normalisedSourceFeatureIndex)
+						seen.add(normalisedSourceFeatureIndex)
+			indicesList.sort()
 		return indicesList
 
 	def getSourceFeatureConnectionsDebugSectionName(self, operationName):
@@ -135,6 +138,12 @@ class ObservedColumnConnectionBase:
 		if(not hasattr(self, "trainPreparedSourceFeatureIndices")):
 			raise RuntimeError(f"{self.getObservedColumnErrorName()}.getTrainPreparedSourceFeatureIndices error: trainPreparedSourceFeatureIndices missing")
 		result = sorted(self.trainPreparedSourceFeatureIndices)
+		return result
+
+	def hasTrainPreparedSourceFeatureIndices(self):
+		if(not hasattr(self, "trainPreparedSourceFeatureIndices")):
+			raise RuntimeError(f"{self.getObservedColumnErrorName()}.hasTrainPreparedSourceFeatureIndices error: trainPreparedSourceFeatureIndices missing")
+		result = len(self.trainPreparedSourceFeatureIndices) > 0
 		return result
 
 	def clearTrainPreparedSourceFeatureIndices(self):
@@ -309,31 +318,6 @@ class ObservedColumnConnectionBase:
 		result = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSize, dtype=arrayType, device=resolvedTargetDevice).coalesce()
 		return result
 
-	def setMaterialisedFeatureConnections(self, featureConnections, sourceFeatureIndices=None):
-		errorName = self.getObservedColumnErrorName()
-		if(featureConnections is None):
-			raise RuntimeError(f"{errorName}.setMaterialisedFeatureConnections error: featureConnections is None")
-		if(featureConnections.layout != pt.sparse_coo):
-			raise RuntimeError(f"{errorName}.setMaterialisedFeatureConnections error: featureConnections must be sparse COO")
-		if(featureConnections.dim() != 6):
-			raise RuntimeError(f"{errorName}.setMaterialisedFeatureConnections error: featureConnections rank must be 6")
-		featureConnections = featureConnections.coalesce()
-		connectionIndices = featureConnections.indices()
-		connectionValues = featureConnections.values()
-		resolvedSourceFeatureIndices = self.normaliseSourceFeatureIndices(sourceFeatureIndices) if sourceFeatureIndices is not None else sorted(self.loadedSourceFeatureIndices)
-		targetSize = self.getFeatureConnectionsTargetSize()
-		for sourceFeatureIndex in resolvedSourceFeatureIndices:
-			sourceMask = connectionIndices[3] == sourceFeatureIndex
-			if(sourceMask.any()):
-				sourceIndices = pt.stack((connectionIndices[0, sourceMask], connectionIndices[1, sourceMask], connectionIndices[2, sourceMask], connectionIndices[4, sourceMask], connectionIndices[5, sourceMask]), dim=0)
-				sourceValues = connectionValues[sourceMask]
-			else:
-				sourceIndices = pt.empty((5, 0), dtype=pt.long, device=featureConnections.device)
-				sourceValues = pt.empty((0,), dtype=arrayType, device=featureConnections.device)
-			sourceTensor = pt.sparse_coo_tensor(sourceIndices, sourceValues, size=targetSize, dtype=arrayType, device=featureConnections.device).coalesce()
-			self.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, sourceTensor)
-		return
-
 
 class ObservedColumn(ObservedColumnConnectionBase):
 	"""
@@ -361,7 +345,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		self.featureConnectionsBySourceFeature = {}
 		self.loadedSourceFeatureIndices = set()
 		self.trainPreparedSourceFeatureIndices = set()
-		if(getFeatureConnectionsForSourceFeatureCache):
+		if(optimiseGetFeatureConnectionsForSourceFeatureCache):
 			self.storedSourceFeatureIndicesCache = None
 		if(not trainStoreFeatureMapsGlobally):
 			self.nextFeatureIndex = 0
@@ -388,7 +372,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 	def listStoredSourceFeatureIndices(self):
 		if(storeDatabaseInRam and self.databaseNetworkObject.observedColumnsRAMLoaded):
 			combinedIndices = set(self.featureConnectionsBySourceFeature.keys())
-		elif(getFeatureConnectionsForSourceFeatureCache):
+		elif(optimiseGetFeatureConnectionsForSourceFeatureCache):
 			if(self.storedSourceFeatureIndicesCache is None):
 				self.storedSourceFeatureIndicesCache = set(GIAANNproto_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(self.conceptIndex))
 			combinedIndices = set(self.storedSourceFeatureIndicesCache)
@@ -412,7 +396,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 			if(storeDatabaseInRam and self.databaseNetworkObject.observedColumnsRAMLoaded):
 				result = self.initialiseFeatureConnections(self.databaseNetworkObject.c, self.databaseNetworkObject.f, resolvedTargetDevice)
 			else:
-				if(getFeatureConnectionsForSourceFeatureCache):
+				if(optimiseGetFeatureConnectionsForSourceFeatureCache):
 					if(self.storedSourceFeatureIndicesCache is None):
 						self.storedSourceFeatureIndicesCache = set(GIAANNproto_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(self.conceptIndex))
 					storedSourceFeatureIndices = self.storedSourceFeatureIndicesCache
@@ -432,17 +416,20 @@ class ObservedColumn(ObservedColumnConnectionBase):
 				debugTrainSectionTimesAdd(self.databaseNetworkObject, debugSectionName, time.perf_counter() - debugSectionStartTime)
 		return result
 
-	def saveLoadedSourceFeatureConnectionsToDisk(self):
-		sourceFeatureIndices = sorted(self.loadedSourceFeatureIndices)
-		if(getFeatureConnectionsForSourceFeatureCache):
+	def saveLoadedSourceFeatureConnectionsToDisk(self, sourceFeatureIndices=None):
+		if(sourceFeatureIndices is None):
+			resolvedSourceFeatureIndices = sorted(self.loadedSourceFeatureIndices)
+		else:
+			resolvedSourceFeatureIndices = self.normaliseSourceFeatureIndices(sourceFeatureIndices)
+		if(optimiseGetFeatureConnectionsForSourceFeatureCache):
 			if(self.storedSourceFeatureIndicesCache is None):
 				self.storedSourceFeatureIndicesCache = set(GIAANNproto_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(self.conceptIndex))
-		for sourceFeatureIndex in sourceFeatureIndices:
+		for sourceFeatureIndex in resolvedSourceFeatureIndices:
 			if(sourceFeatureIndex not in self.featureConnectionsBySourceFeature):
 				raise RuntimeError(f"saveLoadedSourceFeatureConnectionsToDisk error: missing loaded source feature tensor {sourceFeatureIndex}")
 			sourceTensor = self.featureConnectionsBySourceFeature[sourceFeatureIndex]
 			GIAANNproto_databaseNetworkFiles.saveObservedColumnSourceFeatureConnectionsTensor(self.conceptIndex, sourceFeatureIndex, sourceTensor)
-			if(getFeatureConnectionsForSourceFeatureCache):
+			if(optimiseGetFeatureConnectionsForSourceFeatureCache):
 				if(sourceTensor.is_sparse):
 					sourceTensor = sourceTensor.coalesce()
 					tensorNNZ = sourceTensor._nnz()
@@ -454,8 +441,8 @@ class ObservedColumn(ObservedColumnConnectionBase):
 					self.storedSourceFeatureIndicesCache.discard(sourceFeatureIndex)
 		return
 
-	def saveToDisk(self, resizeFeatureTensorsToCurrentSize=False):
-		GIAANNproto_databaseNetworkFiles.observedColumnSaveToDisk(self, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize)
+	def saveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsToCurrentSize=False):
+		GIAANNproto_databaseNetworkFiles.observedColumnSaveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize)
 		return
 
 	@classmethod

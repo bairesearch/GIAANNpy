@@ -37,7 +37,7 @@ if(useQuickExecution):
 	executionMode = "inference" 	#mandatory: "inference" (effective trainAndInference but uses a text datafile)
 	inferenceTrainFirstSequences = True	#trains first sequences in inference_prompt.txt, performs inference only on last sequence
 elif(useBenchmark):
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 else:
@@ -207,6 +207,7 @@ runtimeReleaseGPUMemoryEverySequenceCount = 1	#default: 1	#only apply release ev
 if(runtimeReleaseGPUMemory):
 	if(runtimeReleaseGPUMemoryEverySequenceCount <= 0):
 		raise RuntimeError("runtimeReleaseGPUMemoryEverySequenceCount must be > 0")
+useGPUfileio = useGPUsparse	#default: useGPUsparse	#orig: useGPUsparse
 storeDatabaseInRam = True	#default: True	#orig: False
 if(storeDatabaseInRam):
 	useGPUdatabase = False	#default: False	#default: False
@@ -420,18 +421,18 @@ else:
 	lowMem = False		 #default: False	#orig: True	#currently required to be False for inference compatibility	#optional
 trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
 trainSequenceObservedColumnsMatchSequenceWords = True	#mantatory		#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
-combineSparseUpdatesPerSequence = True	#default: True	#orig: False	#updateObservedColumnsEfficient combines sparse updates per sequence instead of per column (reduces calls to coalesce) 
-useCUDAObservedColumnUpdateKernel = False	#default: False	#use custom CUDA sparse accumulator for updateObservedColumnsEfficient strength updates
-if(useCUDAObservedColumnUpdateKernel):
+optimiseCombineSparseUpdatesPerSequence = True	#default: True	#orig: False	#updateObservedColumnsEfficient combines sparse updates per sequence instead of per column (reduces calls to coalesce) 
+optimiseUseCUDAObservedColumnUpdateKernel = False	#default: False	#use custom CUDA sparse accumulator for updateObservedColumnsEfficient strength updates
+if(optimiseUseCUDAObservedColumnUpdateKernel):
 	if(not useGPUsparse):
-		raise RuntimeError("useCUDAObservedColumnUpdateKernel requires useGPUsparse=True")
+		raise RuntimeError("optimiseUseCUDAObservedColumnUpdateKernel requires useGPUsparse=True")
 	if(not useGPUsparseStrict):
-		raise RuntimeError("useCUDAObservedColumnUpdateKernel requires useGPUsparseStrict=True")
-updateObservedColumnsVerboseSourceFeatureConnectionsOnly = True	#default: True	#orig: False	#upgrade updateObservedColumnsVerbose to operate on individual source-feature tensors rather than materialising full observed-column connections
-getTrainRequiredSourceFeatureIndicesByObservedColumnVectorize = True	#default: True	#orig: False	#vectorise exact per-column source-feature detection for trainSequenceObservedColumnsUseSequenceFeaturesOnly/trainSequenceObservedColumnsMatchSequenceWords
-getFeatureConnectionsForSourceFeatureCache = not storeDatabaseInRam	#not storeDatabaseInRam	#default: not storeDatabaseInRam	#orig: False	#cache stored source-feature file indices per observed column to avoid repeated directory scans when storeDatabaseInRam=False
-
-
+		raise RuntimeError("optimiseUseCUDAObservedColumnUpdateKernel requires useGPUsparseStrict=True")
+optimiseGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize = True	#default: True	#orig: False	#vectorise exact per-column source-feature detection for trainSequenceObservedColumnsUseSequenceFeaturesOnly/trainSequenceObservedColumnsMatchSequenceWords
+optimiseGetFeatureConnectionsForSourceFeatureCache = not storeDatabaseInRam		#default: not storeDatabaseInRam	#orig: False	#cache stored source-feature file indices per observed column to avoid repeated directory scans when storeDatabaseInRam=False
+optimisationNormaliseSourceFeatureIndicesDisabled = False	#default: False	#orig: False
+optimisationObservedColumnsWriteMetadataCheck = False	#default: False, orig: False
+	
 #Draw;
 #select a single draw method (colouring scheme);
 drawSegments = False and useSANI	#optional
@@ -902,6 +903,13 @@ if(useGPUsparse):
 		printe("useGPUsparse and !pt.cuda.is_available")
 else:
 	deviceSparse = pt.device("cpu")
+if(useGPUfileio):
+	if(pt.cuda.is_available()):
+		deviceFileIO = pt.device("cuda")
+	else:
+		printe("useGPUfileio and !pt.cuda.is_available")
+else:
+	deviceFileIO = pt.device("cpu")
 if(storeDatabaseInRam):
 	if(useGPUdatabase):
 		if(not pt.cuda.is_available()):
@@ -1127,11 +1135,12 @@ if(printConfiguration):
 	print("#Train optimisations;")
 	print("trainSequenceObservedColumnsUseSequenceFeaturesOnly:", trainSequenceObservedColumnsUseSequenceFeaturesOnly)
 	print("trainSequenceObservedColumnsMatchSequenceWords:", trainSequenceObservedColumnsMatchSequenceWords)
-	print("combineSparseUpdatesPerSequence:", combineSparseUpdatesPerSequence)
-	print("useCUDAObservedColumnUpdateKernel:", useCUDAObservedColumnUpdateKernel)
-	print("updateObservedColumnsVerboseSourceFeatureConnectionsOnly:", updateObservedColumnsVerboseSourceFeatureConnectionsOnly)
-	print("getTrainRequiredSourceFeatureIndicesByObservedColumnVectorize:", getTrainRequiredSourceFeatureIndicesByObservedColumnVectorize)
-	print("getFeatureConnectionsForSourceFeatureCache:", getFeatureConnectionsForSourceFeatureCache)
+	print("optimiseCombineSparseUpdatesPerSequence:", optimiseCombineSparseUpdatesPerSequence)
+	print("optimiseUseCUDAObservedColumnUpdateKernel:", optimiseUseCUDAObservedColumnUpdateKernel)
+	print("optimiseGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize:", optimiseGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize)
+	print("optimiseGetFeatureConnectionsForSourceFeatureCache:", optimiseGetFeatureConnectionsForSourceFeatureCache)
+	print("optimisationNormaliseSourceFeatureIndicesDisabled:", optimisationNormaliseSourceFeatureIndicesDisabled)
+	print("optimisationObservedColumnsWriteMetadataCheck:", optimisationObservedColumnsWriteMetadataCheck)
 	print("")
 	print("#Draw;")
 	print("drawSegments:", drawSegments)

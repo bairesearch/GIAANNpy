@@ -363,7 +363,8 @@ def saveAllObservedColumnsToDisk(databaseNetworkObject):
 		if(databaseNetworkObject.observedColumnsDictRAM is None):
 			raise RuntimeError("saveAllObservedColumnsToDisk error: observedColumnsDictRAM is None")
 		for observedColumn in databaseNetworkObject.observedColumnsDictRAM.values():
-			observedColumn.saveToDisk(resizeFeatureTensorsToCurrentSize=resizeTensorsOnRAMdatabaseSave)
+			saveAllSourceFeatures = True
+			observedColumn.saveToDisk(saveAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeTensorsOnRAMdatabaseSave)
 	else:
 		raise RuntimeError("saveAllObservedColumnsToDisk error: storeDatabaseInRam is False")
 	return

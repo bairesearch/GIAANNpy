@@ -365,14 +365,18 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 		saveDataStartTime = time.perf_counter()
 
 	if not forceSaveGlobalState:
-		# Save observed columns to disk
-		if(debugPrintTrainSectionTimes):
-			saveObservedColumnsStartTime = time.perf_counter()
-		for observedColumn in observedColumnsDict.values():
-			observedColumn.saveToDisk()
-		if(debugPrintTrainSectionTimes):
-			debugTrainSectionTimesAdd(databaseNetworkObject, "saveData.observedColumn.saveToDisk", time.perf_counter() - saveObservedColumnsStartTime)
-
+		if(not storeDatabaseInRam):
+			# Save observed columns to disk
+			if(debugPrintTrainSectionTimes):
+				saveObservedColumnsStartTime = time.perf_counter()
+			for observedColumn in observedColumnsDict.values():
+				saveAllSourceFeatures = False
+				observedColumn.saveToDisk(saveAllSourceFeatures)
+			if(debugPrintTrainSectionTimes):
+				debugTrainSectionTimesAdd(databaseNetworkObject, "saveData.observedColumn.saveToDisk", time.perf_counter() - saveObservedColumnsStartTime)
+		else:
+			printe("GIAANNproto_databaseNetworkFiles:saveData():!forceSaveGlobalState requires !storeDatabaseInRam")
+			
 	saveGlobalState = ((sequenceCount + 1) % saveGlobalFeatureNeuronsRate == 0) or forceSaveGlobalState
 	if(saveGlobalState):
 		# Save global feature neuron arrays if not lowMem
@@ -394,8 +398,34 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 	
 	if(debugPrintTrainSectionTimes):
 		debugTrainSectionTimesAdd(databaseNetworkObject, "saveData.total", time.perf_counter() - saveDataStartTime)
+
+def generateObservedColumnMetadataData(observedColumn):
+	if(trainStoreFeatureMapsGlobally):
+		result = {
+			'conceptIndex': observedColumn.conceptIndex,
+			'nextFeatureIndex': observedColumn.nextFeatureIndex,
+			'featureConnectionsFormat': observedColumnFeatureConnectionsFormat
+		}
+	else:
+		result = {
+			'conceptIndex': observedColumn.conceptIndex,
+			'featureWordToIndex': observedColumn.featureWordToIndex,
+			'featureIndexToWord': observedColumn.featureIndexToWord,
+			'nextFeatureIndex': observedColumn.nextFeatureIndex,
+			'featureConnectionsFormat': observedColumnFeatureConnectionsFormat
+		}
+	return result
+
+def generateObservedColumnMetadataSignature(metadataData):
+	if('featureConnectionsFormat' not in metadataData):
+		raise RuntimeError("generateObservedColumnMetadataSignature error: missing featureConnectionsFormat")
+	if(trainStoreFeatureMapsGlobally):
+		result = (int(metadataData['conceptIndex']), int(metadataData['nextFeatureIndex']), metadataData['featureConnectionsFormat'])
+	else:
+		result = (int(metadataData['conceptIndex']), tuple(sorted(metadataData['featureWordToIndex'].items())), tuple(sorted(metadataData['featureIndexToWord'].items())), int(metadataData['nextFeatureIndex']), metadataData['featureConnectionsFormat'])
+	return result
 		
-def observedColumnSaveToDisk(self, resizeFeatureTensorsToCurrentSize=False):
+def observedColumnSaveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsToCurrentSize=False):
 	"""
 	Save the observed column data to disk.
 	"""
@@ -403,28 +433,32 @@ def observedColumnSaveToDisk(self, resizeFeatureTensorsToCurrentSize=False):
 	ensureObservedColumnFolderExists(self.conceptIndex)
 	if(resizeFeatureTensorsToCurrentSize):
 		self.ensureRAMdatabaseFeatureTensorSizes()
-	if(trainStoreFeatureMapsGlobally):
-		data = {
-			'conceptIndex': self.conceptIndex,
-			'nextFeatureIndex': self.nextFeatureIndex,
-			'featureConnectionsFormat': observedColumnFeatureConnectionsFormat
-		}
+	
+	data = generateObservedColumnMetadataData(self)
+	if(optimisationObservedColumnsWriteMetadataCheck):
+		metadataSignature = generateObservedColumnMetadataSignature(data)
+		metadataNeedsWrite = getattr(self, "savedMetadataSignature", None) != metadataSignature
+		if(metadataNeedsWrite):
+			with open(getObservedColumnMetadataFile(self.conceptIndex), 'wb') as f:
+				pickle.dump(data, f)
+			self.savedMetadataSignature = metadataSignature
 	else:
-		data = {
-			'conceptIndex': self.conceptIndex,
-			'featureWordToIndex': self.featureWordToIndex,
-			'featureIndexToWord': self.featureIndexToWord,
-			'nextFeatureIndex': self.nextFeatureIndex,
-			'featureConnectionsFormat': observedColumnFeatureConnectionsFormat
-		}
-	with open(getObservedColumnMetadataFile(self.conceptIndex), 'wb') as f:
-		pickle.dump(data, f)
-	self.saveLoadedSourceFeatureConnectionsToDisk()
+		with open(getObservedColumnMetadataFile(self.conceptIndex), 'wb') as f:
+			pickle.dump(data, f)
+	
+	if(saveAllSourceFeatures):
+		sourceFeatureIndicesToSave = None
+	else:
+		if(not storeDatabaseInRam and self.hasTrainPreparedSourceFeatureIndices()):
+			sourceFeatureIndicesToSave = self.getTrainPreparedSourceFeatureIndices()
+		else:
+			printe("observedColumnSaveToDisk(saveAllSourceFeatures) requires !storeDatabaseInRam and self.hasTrainPreparedSourceFeatureIndices()")
+	self.saveLoadedSourceFeatureConnectionsToDisk(sourceFeatureIndicesToSave)
+	
 	if lowMem:
 		saveTensor(self.featureNeurons, getObservedColumnFolder(self.conceptIndex), getObservedColumnFeatureNeuronsFileBaseName())
 
 def loadObservedColumnSourceFeatureConnectionsTensor(databaseNetworkObject, conceptIndex, sourceFeatureIndex, targetDevice, ensureCurrentSizeOnLoad=False):
-	validateObservedColumnStorageFormat(conceptIndex)
 	connectionsFolder = getObservedColumnFeatureConnectionsFolder(conceptIndex)
 	fileBaseName = getObservedColumnSourceFeatureConnectionsFileBaseName(sourceFeatureIndex)
 	tensorName = f"observedColumn.featureConnectionsBySourceFeature[{conceptIndex}][{sourceFeatureIndex}]"
@@ -437,8 +471,6 @@ def loadObservedColumnSourceFeatureConnectionsTensor(databaseNetworkObject, conc
 	return tensor
 
 def saveObservedColumnSourceFeatureConnectionsTensor(conceptIndex, sourceFeatureIndex, tensor):
-	validateObservedColumnStorageFormat(conceptIndex)
-	ensureObservedColumnFolderExists(conceptIndex)
 	connectionsFolder = getObservedColumnFeatureConnectionsFolder(conceptIndex)
 	fileBaseName = getObservedColumnSourceFeatureConnectionsFileBaseName(sourceFeatureIndex)
 	filePath = os.path.join(connectionsFolder, fileBaseName + pytorchTensorFileExtension)
@@ -467,6 +499,7 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 	instance = cls(databaseNetworkObject, conceptIndex, lemma, i)
 	if(data.get('featureConnectionsFormat') != observedColumnFeatureConnectionsFormat):
 		raise RuntimeError(f"Unsupported observed column connection storage format for conceptIndex={conceptIndex}. Clear and rebuild the database.")
+	instance.savedMetadataSignature = generateObservedColumnMetadataSignature(data)
 	if(trainStoreFeatureMapsGlobally):
 		instance.featureWordToIndex = databaseNetworkObject.conceptFeaturesDict
 		instance.featureIndexToWord = databaseNetworkObject.conceptFeaturesIndexToWordDict
@@ -496,15 +529,16 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 	return instance
 
 def saveTensor(tensor, folderName, fileName):
-	pt.save(tensor, os.path.join(folderName, fileName+pytorchTensorFileExtension))
+	fileIOTensor = tensor
+	if(fileIOTensor.device != deviceFileIO):
+		fileIOTensor = fileIOTensor.to(deviceFileIO)
+	pt.save(fileIOTensor, os.path.join(folderName, fileName+pytorchTensorFileExtension))
+	return
 
 def loadTensor(folderName, fileName, targetDevice=None):
 	loadDevice = targetDevice if targetDevice is not None else deviceSparse
 	tensorPath = os.path.join(folderName, fileName+pytorchTensorFileExtension)
-	if(useGPUsparseStrict and not useGPUsparse):
-		tensor = pt.load(tensorPath, map_location=loadDevice)
-	else:
-		tensor = pt.load(tensorPath, map_location=loadDevice)
+	tensor = pt.load(tensorPath, map_location=deviceFileIO)
 	if(tensor.device != loadDevice):
 		tensor = tensor.to(loadDevice)
 	return tensor

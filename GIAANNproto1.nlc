@@ -679,3 +679,10 @@ MANUAL; - rename proto files - remove Excitation suffix
 	resizeTensorsOnRAMdatabaseSave - resize all feature neuron and connections tensors during final RAM database save
 	resizeTensorsOnRAMdatabaseLoad - resize all feature neuron and connections tensors during initial RAM database load
 	They resize all feature neuron and source feature connection tensors during RAM database save/load phase based on the current database c/f values.
+- update observedColumnSaveToDisk():saveLoadedSourceFeatureConnectionsToDisk() to save trainPreparedSourceFeatureIndices instead of loadedSourceFeatureIndices
+- add option optimisationObservedColumnsWriteMetadataCheck to observedColumnSaveToDisk()
+MANUAL; - update saveData():saveToDisk():observedColumnSaveToDisk() - require parameter saveAllSourceFeatures
+MANUAL; - update saveData():saveToDisk():observedColumnSaveToDisk() - check that when saveAllSourceFeatures=False storeDatabaseInRam=False and self.hasTrainPreparedSourceFeatureIndices() is required
+MANUAL; - add option optimisationNormaliseSourceFeatureIndicesDisabled
+MANUAL; - rename all other train optimisations: optimiseCombineSparseUpdatesPerSequence, optimiseUseCUDAObservedColumnUpdateKernel, optimiseGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize, optimiseGetFeatureConnectionsForSourceFeatureCache
+MANUAL; - remove option updateObservedColumnsVerboseSourceFeatureConnectionsOnly=False
