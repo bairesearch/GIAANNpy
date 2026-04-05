@@ -32,6 +32,7 @@ import os
 import pickle
 import re
 import string
+import sys
 import time
 from functools import lru_cache
 from typing import Dict, Set, Any, Optional
@@ -39,11 +40,6 @@ import nltk
 
 from GIAANNproto_globalDefs import *
 
-
-try:
-	nltk.data.find('corpora/wordnet')
-except LookupError:
-	nltk.download('wordnet')
 from nltk.corpus import wordnet as wn
 from nltk.corpus import treebank
 from nltk.corpus import conll2000
@@ -59,6 +55,9 @@ WORDNET_POS_MAP = {"NOUN": wn.NOUN, "VERB": wn.VERB, "ADJ": wn.ADJ, "ADV": wn.AD
 PTB_TAG_TO_SPACY_POS = {"CC": ("CCONJ",), "CD": ("NUM",), "DT": ("DET",), "EX": ("PRON",), "FW": ("X",), "IN": ("ADP", "SCONJ"), "JJ": ("ADJ",), "JJR": ("ADJ",), "JJS": ("ADJ",), "LS": ("X",), "MD": ("AUX",), "NN": ("NOUN",), "NNS": ("NOUN",), "NNP": ("PROPN",), "NNPS": ("PROPN",), "PDT": ("DET",), "POS": ("PART",), "PRP": ("PRON",), "PRP$": ("PRON",), "RB": ("ADV",), "RBR": ("ADV",), "RBS": ("ADV",), "RP": ("PART",), "SYM": ("SYM",), "TO": ("PART", "ADP"), "UH": ("INTJ",), "VB": ("VERB",), "VBD": ("VERB",), "VBG": ("VERB",), "VBN": ("VERB",), "VBP": ("VERB",), "VBZ": ("VERB",), "WDT": ("DET",), "WP": ("PRON",), "WP$": ("PRON",), "WRB": ("ADV",), "#": ("SYM",), "$": ("SYM",), ".": ("PUNCT",), ",": ("PUNCT",), ":": ("PUNCT",), "``": ("PUNCT",), "''": ("PUNCT",), "-LRB-": ("PUNCT",), "-RRB-": ("PUNCT",), "HYPH": ("PUNCT",), "NFP": ("PUNCT",), "ADD": ("X",), "AFX": ("ADJ",), "GW": ("X",), "XX": ("X",)}
 POS_CORPORA = ("treebank", "conll2000")
 CORPUS_LOOKUP_PATHS = {"treebank": "corpora/treebank", "conll2000": "corpora/conll2000"}
+WORDNET_LOOKUP_PATH = "corpora/wordnet"
+REQUIRED_POS_BUILD_RESOURCES = ("wordnet",) + POS_CORPORA
+NLTK_RESOURCE_LOOKUP_PATHS = {"wordnet": WORDNET_LOOKUP_PATH, **CORPUS_LOOKUP_PATHS}
 AUX_WORDS = {"am", "are", "is", "was", "were", "be", "being", "been", "do", "does", "did", "doing", "have", "has", "had", "having", "can", "could", "may", "might", "must", "shall", "should", "will", "would", "ought", "need", "dare"}
 SYMBOL_CHARS = "$%&*+=<>@^~|"
 
@@ -81,23 +80,61 @@ def ensurePosDictsComplete(posDicts: Dict[str, Set[str]]) -> Dict[str, Set[str]]
 			result[posType] = set()
 	return result
 
+def ensureRequiredPosBuildResources() -> None:
+	missingResourceNames = getMissingNltkResourceNames(REQUIRED_POS_BUILD_RESOURCES)
+	if missingResourceNames:
+		raise RuntimeError("ensureRequiredPosBuildResources error: " + getMissingNltkResourceErrorMessage(missingResourceNames))
+
+def getNltkResourceLookupCandidates(resourceName: str) -> tuple[str, ...]:
+	lookupPath = NLTK_RESOURCE_LOOKUP_PATHS.get(resourceName)
+	lookupCandidates = []
+	if lookupPath is None:
+		raise RuntimeError(f"getNltkResourceLookupCandidates error: missing lookup path for resource '{resourceName}'")
+	lookupCandidates.append(lookupPath)
+	if not lookupPath.endswith(".zip"):
+		lookupCandidates.append(lookupPath + ".zip")
+	result = tuple(lookupCandidates)
+	return result
+
+def getMissingNltkResourceNames(resourceNames) -> list[str]:
+	result = []
+	for resourceName in resourceNames:
+		lookupCandidates = getNltkResourceLookupCandidates(resourceName)
+		found = False
+		for lookupCandidate in lookupCandidates:
+			try:
+				nltk.data.find(lookupCandidate)
+				found = True
+			except LookupError:
+				pass
+		if not found:
+			result.append(resourceName)
+	return result
+
+def getMissingNltkResourceErrorMessage(resourceNames) -> str:
+	lookupPathDescriptions = []
+	for resourceName in resourceNames:
+		lookupCandidates = getNltkResourceLookupCandidates(resourceName)
+		lookupPathDescriptions.append(resourceName + " (" + " or ".join(lookupCandidates) + ")")
+	downloadCommand = getNltkDownloadCommand(resourceNames)
+	result = "required NLTK resources not installed: " + ", ".join(lookupPathDescriptions) + ". Install them manually with: " + downloadCommand
+	return result
+
+def getNltkDownloadCommand(resourceNames) -> str:
+	downloadStatements = []
+	for resourceName in resourceNames:
+		downloadStatements.append(f"nltk.download('{resourceName}')")
+	result = sys.executable + " -c \"import nltk; " + "; ".join(downloadStatements) + "\""
+	return result
+
 def ensureNltkCorpus(corpusName: str) -> None:
 	lookupPath = CORPUS_LOOKUP_PATHS.get(corpusName)
-	found = False
 	if lookupPath is None:
 		raise RuntimeError(f"ensureNltkCorpus error: missing lookup path for corpus '{corpusName}'")
 	try:
 		nltk.data.find(lookupPath)
-		found = True
-	except LookupError:
-		nltk.download(corpusName)
-		try:
-			nltk.data.find(lookupPath)
-			found = True
-		except LookupError:
-			found = False
-	if not found:
-		raise RuntimeError(f"ensureNltkCorpus error: corpus '{corpusName}' not available after download")
+	except LookupError as exception:
+		raise RuntimeError("ensureNltkCorpus error: " + getMissingNltkResourceErrorMessage([corpusName])) from exception
 
 def getTaggedWordsFromCorpus(corpusName: str):
 	result = []
@@ -191,6 +228,7 @@ def buildEverPosDicts() -> Dict[str, Set[str]]:
 	"""
 	Build EVER-POS dictionaries using WordNet and tagged corpora.
 	"""
+	ensureRequiredPosBuildResources()
 	posDicts = initPosDicts()
 	posDicts = addWordNetPosDicts(posDicts)
 	posDicts = addAuxWordsToPosDicts(posDicts)

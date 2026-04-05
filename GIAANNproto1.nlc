@@ -686,3 +686,4 @@ MANUAL; - update saveData():saveToDisk():observedColumnSaveToDisk() - check that
 MANUAL; - add option optimisationNormaliseSourceFeatureIndicesDisabled
 MANUAL; - rename all other train optimisations: optimiseCombineSparseUpdatesPerSequence, optimiseUseCUDAObservedColumnUpdateKernel, optimiseGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize, optimiseGetFeatureConnectionsForSourceFeatureCache
 MANUAL; - remove option updateObservedColumnsVerboseSourceFeatureConnectionsOnly=False
+- avoid NLTK network hangs by removing auto-downloads and validating both extracted and zip-backed corpora before hard-failing with an explicit install error
