@@ -22,6 +22,7 @@ import time
 import math
 
 from GIAANNproto_globalDefs import *
+import GIAANNproto_debug
 import GIAANNproto_databaseNetwork
 import GIAANNproto_databaseNetworkTrain
 import GIAANNproto_databaseNetworkDraw
@@ -32,12 +33,6 @@ import GIAANNproto_sequenceConcepts
 import GIAANNproto_predictionActivate
 import GIAANNproto_predictionConstraints
 
-
-if(debugPrintTotalInferenceTokens):
-	totalInferenceTokensSeed = 0
-	totalInferenceTokensPrediction = 0
-	totalInferenceTokensAll = 0
-
 totalInferenceTop1Matches = 0
 totalInferenceTop1Tokens = 0
 totalInferenceTop1PredictionMatches = 0
@@ -46,35 +41,6 @@ totalInferenceTop1NegativeLogProbabilitySum = 0.0
 totalInferenceTop1BitsPerByteTokens = 0
 totalInferenceTop1BitsPerByteBytes = 0
 totalInferenceTop1ProbabilitySumModified = 0.0
-
-def resetTotalInferenceTokens():
-	if(debugPrintTotalInferenceTokens):
-		global totalInferenceTokensSeed
-		global totalInferenceTokensPrediction
-		global totalInferenceTokensAll
-		totalInferenceTokensSeed = 0
-		totalInferenceTokensPrediction = 0
-		totalInferenceTokensAll = 0
-	return
-
-def addTotalInferenceTokens(seedTokensCount, predictionTokensCount):
-	if(debugPrintTotalInferenceTokens):
-		if(seedTokensCount is None or predictionTokensCount is None):
-			raise RuntimeError("addTotalInferenceTokens error: token counts are None")
-		if(seedTokensCount < 0 or predictionTokensCount < 0):
-			raise RuntimeError("addTotalInferenceTokens error: token counts must be non-negative")
-		global totalInferenceTokensSeed
-		global totalInferenceTokensPrediction
-		global totalInferenceTokensAll
-		totalInferenceTokensSeed += int(seedTokensCount)
-		totalInferenceTokensPrediction += int(predictionTokensCount)
-		totalInferenceTokensAll += int(seedTokensCount) + int(predictionTokensCount)
-	return
-
-def printTotalInferenceTokens():
-	if(debugPrintTotalInferenceTokens):
-		print("debugPrintTotalInferenceTokens: seedPhaseTokens = ", totalInferenceTokensSeed, ", predictionPhaseTokens = ", totalInferenceTokensPrediction, ", totalInferenceTokens = ", totalInferenceTokensAll)
-	return
 
 def resetInferenceTop1AccuracyCounts():
 	global totalInferenceTop1Matches
@@ -445,7 +411,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	if(inferenceTerminatedPrematurely):
 		addInferenceTop1AccuracyCountPadding(numSeedTokens, numPredictionTokens, seedTokensProcessed, predictionTokensProcessed)
 	if(debugPrintTotalInferenceTokens):
-		addTotalInferenceTokens(seedTokensProcessed, predictionTokensProcessed)
+		GIAANNproto_debug.addTotalInferenceTokens(seedTokensProcessed, predictionTokensProcessed)
 	if(drawNetworkDuringInference):
 		databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, databaseNetworkObject.arrayIndexPropertiesActivationIndex)
 		if(inferenceUseNeuronFeaturePropertiesTime):
@@ -550,6 +516,9 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		if(inferenceUseNeuronFeaturePropertiesTime):
 			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, databaseNetworkObject.arrayIndexPropertiesTimeIndex)
 		GIAANNproto_databaseNetworkDraw.visualizeGraph(sequenceObservedColumnsPrediction, True, save=drawNetworkDuringInferenceSave, fileName=drawNetworkDuringInferenceSaveFilenamePrepend+generateDrawSequenceIndex(sequenceWordIndex))
+	if(GIAANNproto_debug.debugPrintGPUramUsage):
+		if(executionMode=="inference"):
+			GIAANNproto_debug.debugPrintRamUsage("processColumnInferencePrediction", "sequenceIndex = " + str(sequenceIndex) + ", sequenceWordIndex = " + str(sequenceWordIndex) + ", wordPredictionIndex = " + str(wordPredictionIndex) + ", seedPhase = " + str(seedPhase))
 	return featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime
 
 def ensurePredictionStateAvailable(conceptColumnsIndices, conceptColumnsFeatureIndices, sequenceWordIndex, wordPredictionIndex, tokensSequence, reason):

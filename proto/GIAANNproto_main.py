@@ -38,6 +38,7 @@ import spacy
 pt.set_grad_enabled(False)
 
 from GIAANNproto_globalDefs import *
+import GIAANNproto_debug
 import GIAANNproto_sparseTensors
 import GIAANNproto_databaseNetwork
 import GIAANNproto_databaseNetworkFiles
@@ -49,10 +50,28 @@ import GIAANNproto_databaseNetworkTrain
 if(executionMode=="inference" or executionMode=="trainAndInference"):
 	import GIAANNproto_prediction
 
+if(debugPrintTimeDatabaseLoadSaveTimes):
+	debugPrintTimeDatabaseLoadSaveTimesExecutionModeCount = GIAANNproto_debug.getDebugPrintTimeDatabaseLoadSaveTimesExecutionModeCount()
+	debugPrintTimeDatabaseLoadSaveTimesCompletedExecutionModeCount = 0
+	debugPrintTimeDatabaseLoadSaveTimesProgramExecutionStartTime = 0.0
+	debugPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadExecutionTime = 0.0
+	debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime = 0.0
+	debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime = 0.0
+	debugPrintTimeDatabaseLoadSaveTimesExecuteModeStartTime = 0.0
+	debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamStartTime = 0.0
+	debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskStartTime = 0.0
+
+if(debugPrintTimeDatabaseLoadSaveTimes):
+	debugPrintTimeDatabaseLoadSaveTimesProgramExecutionStartTime = time.perf_counter()
+
 # Load the selected dataset using Hugging Face datasets
 if(datasetType != "textfile" and executionMode != "inference"):
 	import GIAANNproto_datasets
+	if(debugPrintTimeDatabaseLoadSaveTimes):
+		debugPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadStartTime = time.perf_counter()
 	dataset = GIAANNproto_datasets.loadDataset()
+	if(debugPrintTimeDatabaseLoadSaveTimes):
+		debugPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadExecutionTime = debugPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadExecutionTime + (time.perf_counter() - debugPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadStartTime)
 
 if(debugPrintSpacySectionTimes):
 	processArticlePart1totalTime = 0
@@ -88,6 +107,8 @@ else:
 
 def main():
 	GIAANNproto_databaseNetworkFiles.prepareDatabaseFilesStartup()
+	if(debugPrintRamMaxUsage):
+		GIAANNproto_debug.debugResetGpuRamMaxUsage()
 	if(executionMode=="inference"):
 		executeMode(True)
 	elif(executionMode=="trainAndInference"):
@@ -95,8 +116,21 @@ def main():
 		executeMode(True)
 	elif(executionMode=="train"):
 		executeMode(False)
+	if(debugPrintRamAverageUsage and not debugPrintRamCurrentUsage):
+		GIAANNproto_debug.debugPrintRamUsageSummary()
+	if(debugPrintRamMaxUsage):
+		GIAANNproto_debug.debugPrintGpuRamMaxUsageSummary()
 	
 def executeMode(inferenceMode):
+	if(debugPrintTimeDatabaseLoadSaveTimes):
+		global debugPrintTimeDatabaseLoadSaveTimesExecuteModeStartTime
+		global debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamStartTime
+		global debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime
+		global debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskStartTime
+		global debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime
+		global debugPrintTimeDatabaseLoadSaveTimesCompletedExecutionModeCount
+		debugPrintTimeDatabaseLoadSaveTimesExecuteModeStartTime = time.perf_counter()
+	
 	databaseNetworkObject = GIAANNproto_databaseNetwork.initialiseDatabaseNetwork(inferenceMode)
 	databaseNetworkObject.nlp = nlpSequence	#used by posStringToPosInt
 
@@ -110,14 +144,18 @@ def executeMode(inferenceMode):
 	if(inferenceMode and not inferenceTrainFirstSequences):
 		GIAANNproto_databaseNetwork.backupGlobalArrays(databaseNetworkObject)
 	if(storeDatabaseInRam):
+		if(debugPrintTimeDatabaseLoadSaveTimes):
+			debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamStartTime = time.perf_counter()
 		GIAANNproto_databaseNetwork.loadAllObservedColumnsToRam(databaseNetworkObject)
+		if(debugPrintTimeDatabaseLoadSaveTimes):
+			debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime = debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime + (time.perf_counter() - debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamStartTime)
 		
 	for epochIndex in range(numberEpochs):
 		#print("\nepochIndex = ", epochIndex)
 		# Start processing the dataset
 		sequenceCount = 0
 		if(inferenceMode and debugPrintTotalInferenceTokens):
-			GIAANNproto_prediction.resetTotalInferenceTokens()
+			GIAANNproto_debug.resetTotalInferenceTokens()
 		if(inferenceMode):
 			GIAANNproto_prediction.resetInferenceTop1AccuracyCounts()
 		if(inferenceMode):
@@ -125,7 +163,7 @@ def executeMode(inferenceMode):
 		else:
 			sequenceCount = processDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset)
 		if(inferenceMode and debugPrintTotalInferenceTokens):
-			GIAANNproto_prediction.printTotalInferenceTokens()
+			GIAANNproto_debug.printTotalInferenceTokens()
 		if(inferenceMode and printInferenceTop1Accuracy):
 			GIAANNproto_prediction.printInferenceTop1Accuracy(databaseNetworkObject)
 
@@ -137,10 +175,26 @@ def executeMode(inferenceMode):
 	if(not inferenceMode or inferenceTrainFirstSequences):
 		if(useSaveData):
 			if(storeDatabaseInRam):
+				if(debugPrintTimeDatabaseLoadSaveTimes):
+					debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskStartTime = time.perf_counter()
 				GIAANNproto_databaseNetwork.saveAllObservedColumnsToDisk(databaseNetworkObject)
+				if(debugPrintTimeDatabaseLoadSaveTimes):
+					debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime = debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime + (time.perf_counter() - debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskStartTime)
 			GIAANNproto_databaseNetworkFiles.saveData(databaseNetworkObject, {}, sequenceCount, forceSaveGlobalState=True)
 			#only required if trainMaxSequences%saveGlobalFeatureNeuronsRate != 0
 
+	if(debugPrintTimeDatabaseLoadSaveTimes):
+		debugPrintTimeDatabaseLoadSaveTimesProgramExecutionEndTime = time.perf_counter()
+		debugPrintTimeDatabaseLoadSaveTimesTotalExecutionTime = debugPrintTimeDatabaseLoadSaveTimesProgramExecutionEndTime - debugPrintTimeDatabaseLoadSaveTimesProgramExecutionStartTime
+		debugPrintTimeDatabaseLoadSaveTimesCompletedExecutionModeCount = debugPrintTimeDatabaseLoadSaveTimesCompletedExecutionModeCount + 1
+		if(debugPrintTimeDatabaseLoadSaveTimesCompletedExecutionModeCount == debugPrintTimeDatabaseLoadSaveTimesExecutionModeCount):
+			debugPrintTimeDatabaseLoadSaveTimesHuggingFaceAdjustedTotalExecutionTime = debugPrintTimeDatabaseLoadSaveTimesTotalExecutionTime - debugPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadExecutionTime
+			if(debugPrintTimeDatabaseLoadSaveTimesHuggingFaceAdjustedTotalExecutionTime < 0):
+				raise RuntimeError("executeMode error: debugPrintTimeDatabaseLoadSaveTimesHuggingFaceAdjustedTotalExecutionTime must be >= 0")
+			GIAANNproto_debug.printDebugPrintTimeDatabaseLoadSaveTimesEntry("Hugging Face dataset load execution time", debugPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadExecutionTime)
+			GIAANNproto_debug.printDebugPrintTimeDatabaseLoadSaveTimesSummary("debugPrintTimeDatabaseLoadSaveTimes execution times:", debugPrintTimeDatabaseLoadSaveTimesTotalExecutionTime, debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime, debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime)
+			GIAANNproto_debug.printDebugPrintTimeDatabaseLoadSaveTimesSummary("debugPrintTimeDatabaseLoadSaveTimes execution times with Hugging Face dataset load time subtracted from total execution time:", debugPrintTimeDatabaseLoadSaveTimesHuggingFaceAdjustedTotalExecutionTime, debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime, debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime)
+	
 def releaseRuntimeGpuMemory(sequenceCount):
 	if(sequenceCount < 0):
 		raise RuntimeError("releaseRuntimeGpuMemory error: sequenceCount must be >= 0")
@@ -352,7 +406,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 	trainMode = not inferenceMode
 	sequenceTrainTotalStartTime = None
 	if(debugPrintTrainSectionTimes and trainMode):
-		debugTrainSectionTimesReset(databaseNetworkObject, sequenceCount)
+		GIAANNproto_debug.debugTrainSectionTimesReset(databaseNetworkObject, sequenceCount)
 		sequenceTrainTotalStartTime = time.perf_counter()
 	preprocessSequenceStartTime = None
 	if(debugPrintTrainSectionTimes and trainMode):
@@ -360,7 +414,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 
 	sequence = GIAANNproto_sequenceTokens.preprocessSequence(sequence)
 	if(debugPrintTrainSectionTimes and trainMode):
-		debugTrainSectionTimesAdd(databaseNetworkObject, "preprocessSequence", time.perf_counter() - preprocessSequenceStartTime)
+		GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "preprocessSequence", time.perf_counter() - preprocessSequenceStartTime)
 	
 	if(debugReloadGlobalFeatureNeuronsEverySequence):
 		GIAANNproto_databaseNetwork.initialiseDatabaseNetwork(inferenceMode)
@@ -397,7 +451,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		firstPassStartTime = time.perf_counter()
 	conceptsFound, conceptMask = GIAANNproto_sequenceConcepts.firstPass(databaseNetworkObject, sequence, allowNewFeatures)
 	if(debugPrintTrainSectionTimes and trainMode):
-		debugTrainSectionTimesAdd(databaseNetworkObject, "firstPass", time.perf_counter() - firstPassStartTime)
+		GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "firstPass", time.perf_counter() - firstPassStartTime)
 	
 	if(conceptsFound):
 		getTokensStartTime = None
@@ -405,7 +459,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 			getTokensStartTime = time.perf_counter()
 		tokens = GIAANNproto_sequenceTokens.getTokens(sequence)
 		if(debugPrintTrainSectionTimes and trainMode):
-			debugTrainSectionTimesAdd(databaseNetworkObject, "getTokens", time.perf_counter() - getTokensStartTime)
+			GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "getTokens", time.perf_counter() - getTokensStartTime)
 
 		# When usePOS is enabled, detect all possible new features in the sequence
 		detectNewFeaturesStartTime = None
@@ -414,7 +468,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 				detectNewFeaturesStartTime = time.perf_counter()
 			GIAANNproto_sequenceConcepts.detectNewFeatures(databaseNetworkObject, tokens, allowNewFeatures)
 			if(debugPrintTrainSectionTimes and trainMode):
-				debugTrainSectionTimesAdd(databaseNetworkObject, "detectNewFeatures", time.perf_counter() - detectNewFeaturesStartTime)
+				GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "detectNewFeatures", time.perf_counter() - detectNewFeaturesStartTime)
 
 		if(printTrainSequencePOS):
 			sentenceWithPOS = " ".join(f"{token.text} ({tokenIndex}:{token.pos_})" for tokenIndex, token in enumerate(sequence))
@@ -435,7 +489,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 			secondPassStartTime = time.perf_counter()
 		observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNproto_sequenceConcepts.secondPass(databaseNetworkObject, tokens, inferenceMode)
 		if(debugPrintTrainSectionTimes and trainMode):
-			debugTrainSectionTimesAdd(databaseNetworkObject, "secondPass", time.perf_counter() - secondPassStartTime)
+			GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "secondPass", time.perf_counter() - secondPassStartTime)
 
 		# Create the sequence observed columns object
 		sequenceObservedColumnsInitStartTime = None
@@ -443,7 +497,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 			sequenceObservedColumnsInitStartTime = time.perf_counter()
 		sequenceObservedColumns = GIAANNproto_sequenceObservedColumns.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict, inferenceMode)
 		if(debugPrintTrainSectionTimes and trainMode):
-			debugTrainSectionTimesAdd(databaseNetworkObject, "SequenceObservedColumns.__init__", time.perf_counter() - sequenceObservedColumnsInitStartTime)
+			GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "SequenceObservedColumns.__init__", time.perf_counter() - sequenceObservedColumnsInitStartTime)
 
 		if(inferenceMode):
 			if(conceptColumnsDelimitByPOS and sequenceObservedColumns.noDelimiterDetectedBetweenConceptTokens):
@@ -464,7 +518,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 					updateObservedColumnsWrapperStartTime = time.perf_counter()
 				sequenceObservedColumns.updateObservedColumnsWrapper()
 				if(debugPrintTrainSectionTimes and trainMode):
-					debugTrainSectionTimesAdd(databaseNetworkObject, "updateObservedColumnsWrapper", time.perf_counter() - updateObservedColumnsWrapperStartTime)
+					GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "updateObservedColumnsWrapper", time.perf_counter() - updateObservedColumnsWrapperStartTime)
 
 				# Save observed columns to disk
 				if(useSaveData):
@@ -483,11 +537,11 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 			releaseRuntimeGpuMemoryStartTime = time.perf_counter()
 		releaseRuntimeGpuMemory(sequenceCount)
 		if(debugPrintTrainSectionTimes and trainMode):
-			debugTrainSectionTimesAdd(databaseNetworkObject, "releaseRuntimeGpuMemory", time.perf_counter() - releaseRuntimeGpuMemoryStartTime)
+			GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "releaseRuntimeGpuMemory", time.perf_counter() - releaseRuntimeGpuMemoryStartTime)
 
 	if(debugPrintTrainSectionTimes and trainMode):
-		debugTrainSectionTimesAdd(databaseNetworkObject, "totalSequenceTrain", time.perf_counter() - sequenceTrainTotalStartTime)
-		debugTrainSectionTimesPrint(databaseNetworkObject)
+		GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "totalSequenceTrain", time.perf_counter() - sequenceTrainTotalStartTime)
+		GIAANNproto_debug.debugTrainSectionTimesPrint(databaseNetworkObject)
 
 	#note sequenceCount can be used as sequenceIndex (independent of index in sequenceList) because sequenceIndex is only used to index sequence time (same for all sequences in sequenceList)
 

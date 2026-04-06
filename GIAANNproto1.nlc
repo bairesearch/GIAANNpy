@@ -618,7 +618,7 @@ v1l (Codex IDE GPT-5.4) [under development]:
 		- `storeDatabaseInRam=False`: `ObservedColumn.loadFromDisk()` loads metadata only by default and leaves `featureConnectionsBySourceFeature` empty until a sequence requests specific source features
 	- Update observed-column resize/expand logic:
 		- resize loaded per-source-feature tensors individually
-		- preserve each tensor’s current device
+		- preserve each tensor's current device
 		- expand only target dimensions `(targetColumn, targetFeature)`
 	- Update train-time observed-column loading:
 		- after sequence features are known, training must load all required source-feature tensors for the columns in the sequence before train updates run
@@ -687,3 +687,18 @@ MANUAL; - add option optimisationNormaliseSourceFeatureIndicesDisabled
 MANUAL; - rename all other train optimisations: optimiseCombineSparseUpdatesPerSequence, optimiseUseCUDAObservedColumnUpdateKernel, optimiseGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize, optimiseGetFeatureConnectionsForSourceFeatureCache
 MANUAL; - remove option updateObservedColumnsVerboseSourceFeatureConnectionsOnly=False
 - avoid NLTK network hangs by removing auto-downloads and validating both extracted and zip-backed corpora before hard-failing with an explicit install error
+- implement options debugPrintRamCurrentUsage=True and debugPrintRamAverageUsage=True, that;
+	if(executionMode=="train"):
+	- prints current/average GPU and CPU RAM usage at the a) start and b) end of updateObservedColumnsEfficient()/updateObservedColumnsVerbose() (depending on arrayIndexPropertiesEfficient).
+	if(executionMode=="inference"):
+	- prints current/average GPU and CPU RAM usage during main inference loop processColumnInferencePrediction().
+- add new option debugPrintRamMaxUsage (that prints max allocated and reserved)
+- implement option debugPrintTimeDatabaseLoadSaveTimes=True:
+	1. print the total Hugging Face dataset load execution time (approx 1.5 min currently due to issue)
+	2. at the end of execution print, in both formats "00:00:00" and "seconds", the:
+	a) total execution time
+	b) loadAllObservedColumnsToRam execution time
+	c) saveAllObservedColumnsToDisk execution time
+	d) the total "processing time" = total execution time - loadAllObservedColumnsToRam execution time - saveAllObservedColumnsToDisk execution time
+	3. print the execution times again (2) but with the huggingface load times (1) subtracted from them. The reason this is required is because I am performing benchmarking and need the times to reflect real-world execution times without huggingface anomalies.
+- move all explicit debugging functions in codebase to GIAANNproto_debug

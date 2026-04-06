@@ -21,21 +21,11 @@ import torch as pt
 import time
 
 from GIAANNproto_globalDefs import *
+import GIAANNproto_debug
 import GIAANNproto_sparseTensors
 import GIAANNproto_sequenceConcepts
-if(optimiseUseCUDAObservedColumnUpdateKernel):
+if(optimisationUseCUDAObservedColumnUpdateKernel):
 	import GIAANNproto_cudaObservedColumnUpdate
-	
-def debugPrintConnectionSamples(label, indices, values, maxSamples=5):
-	numEntries = indices.shape[1]
-	print(f"\tsequenceObservedColumns debug: {label}: entries={numEntries}")
-	if(numEntries == 0):
-		return
-	sampleCount = min(numEntries, maxSamples)
-	for entryIndex in range(sampleCount):
-		indexTuple = indices[:, entryIndex].tolist()
-		value = float(values[entryIndex].item())
-		print(f"\tsequenceObservedColumns debug:\tindices={indexTuple}, value={value}")
 
 # Define the SequenceObservedColumns class
 class SequenceObservedColumns:
@@ -215,7 +205,7 @@ class SequenceObservedColumns:
 				raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumn error: duplicate observed column conceptIndex {conceptIndex}")
 			observedColumnsByConceptIndex[conceptIndex] = observedColumn
 			result[conceptIndex] = []
-		if(optimiseGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize and trainSequenceObservedColumnsUseSequenceFeaturesOnly and trainSequenceObservedColumnsMatchSequenceWords):
+		if(optimisationGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize and trainSequenceObservedColumnsUseSequenceFeaturesOnly and trainSequenceObservedColumnsMatchSequenceWords):
 			if(any(conceptIndex is None for conceptIndex in self.tokenConceptColumnIndexList)):
 				raise RuntimeError("getTrainRequiredSourceFeatureIndicesByObservedColumn error: tokenConceptColumnIndexList contains unassigned entries")
 			conceptIndexTensor = pt.tensor(self.tokenConceptColumnIndexList, dtype=pt.long)
@@ -524,53 +514,6 @@ class SequenceObservedColumns:
 		else:
 			self.updateObservedColumns(self.observedColumnsDict2, inference, mode="default")
 
-	def debugPrintPersistedColumnSummary(self, mode):
-		databaseNetworkObject = self.databaseNetworkObject
-		debugEnabled = debugPrintSequenceObservedColumnsConnections
-		if(debugEnabled):
-			targetLemma = "movement"
-			observedColumn = self.observedColumnsDict.get(targetLemma)
-			if(observedColumn is None):
-				print(f"debugPersistedColumn ({mode}): lemma '{targetLemma}' not in observedColumnsDict")
-			else:
-				featureConnections = observedColumn.materialiseFeatureConnections(loadAllStored=True, targetDevice=deviceSparse)
-				connectionsStrength = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
-				if(connectionsStrength.is_sparse):
-					connectionsStrength = connectionsStrength.to_dense()
-				outgoingCount = 0
-				maxStrength = 0.0
-				internalCount = 0
-				externalCount = 0
-				segmentCounts = None
-				lastSegmentCount = 0
-				targetTop = []
-				if(connectionsStrength.numel() > 0):
-					outgoingMask = connectionsStrength > 0
-					outgoingCount = int(outgoingMask.sum().item())
-					maxStrength = float(connectionsStrength.max().item())
-					internalMask = outgoingMask[:, :, :, observedColumn.conceptIndex, :]
-					internalCount = int(internalMask.sum().item())
-					externalCount = outgoingCount - internalCount
-					segmentCounts = outgoingMask.sum(dim=(0, 2, 3, 4)).to("cpu").tolist()
-					lastSegmentCount = int(outgoingMask[:, arrayIndexSegmentLast].sum().item())
-					targetCounts = outgoingMask.sum(dim=(0, 1, 2, 4))
-					if(targetCounts.numel() > 0):
-						topkCount = min(3, int(targetCounts.shape[0]))
-						topkValues, topkIndices = pt.topk(targetCounts, topkCount)
-						targetTop = [(int(idx.item()), int(val.item())) for idx, val in zip(topkIndices, topkValues) if int(val.item()) > 0]
-				print(f"debugPersistedColumn ({mode}): lemma={targetLemma}, outgoing>0={outgoingCount}, maxStrength={maxStrength}, internal>0={internalCount}, external>0={externalCount}, lastSegment>0={lastSegmentCount}")
-				if(segmentCounts is not None):
-					print(f"\tsegmentCounts>0={segmentCounts}")
-				if(len(targetTop) > 0):
-					targetLabels = []
-					for targetIndex, targetCount in targetTop:
-						targetLemma = "<unknown>"
-						if(targetIndex < len(observedColumn.databaseNetworkObject.conceptColumnsList)):
-							targetLemma = observedColumn.databaseNetworkObject.conceptColumnsList[targetIndex]
-						targetLabels.append(f"{targetLemma}:{targetCount}")
-					print(f"\ttopTargets={targetLabels}")
-		return
-			
 	def updateObservedColumns(self, sequenceObservedColumnsDict, inference, mode):
 		if(arrayIndexPropertiesEfficient and not inference):
 			updateObservedColumnsEfficientStartTime = None
@@ -578,13 +521,16 @@ class SequenceObservedColumns:
 				updateObservedColumnsEfficientStartTime = time.perf_counter()
 			self.updateObservedColumnsEfficient(sequenceObservedColumnsDict, mode)
 			if(debugPrintTrainSectionTimes):
-				debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient", time.perf_counter() - updateObservedColumnsEfficientStartTime)
+				GIAANNproto_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient", time.perf_counter() - updateObservedColumnsEfficientStartTime)
 		else:
 			self.updateObservedColumnsVerbose(sequenceObservedColumnsDict, mode)
 	
 	def updateObservedColumnsVerbose(self, sequenceObservedColumnsDict, mode):
 		databaseNetworkObject = self.databaseNetworkObject
 		# Update observed columns with data from sequence arrays
+		if(GIAANNproto_debug.debugPrintGPUramUsage):
+			if(executionMode=="train"):
+				GIAANNproto_debug.debugPrintRamUsage("updateObservedColumnsVerbose:start", "mode = " + str(mode))
 
 		inferenceConceptUpdateCounts = self.inferenceConceptUpdateCounts if getattr(self, "debugInferenceActive", False) else None
 		featureNeuronsDelta = self.featureNeurons
@@ -795,9 +741,15 @@ class SequenceObservedColumns:
 
 		if not lowMem:
 			self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
+		if(GIAANNproto_debug.debugPrintGPUramUsage):
+			if(executionMode=="train"):
+				GIAANNproto_debug.debugPrintRamUsage("updateObservedColumnsVerbose:end", "mode = " + str(mode))
 
 	def updateObservedColumnsEfficient(self, sequenceObservedColumnsDict, mode):
 		databaseNetworkObject = self.databaseNetworkObject
+		if(GIAANNproto_debug.debugPrintGPUramUsage):
+			if(executionMode=="train"):
+				GIAANNproto_debug.debugPrintRamUsage("updateObservedColumnsEfficient:start", "mode = " + str(mode))
 		if not arrayIndexPropertiesStrength:
 			return
 
@@ -856,7 +808,7 @@ class SequenceObservedColumns:
 		observedColumnsByConceptIndex = self.getObservedColumnsByConceptIndex(sequenceObservedColumnsDict)
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
 			if(debugPrintTrainSectionTimes):
-				debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient:getObservedColumnsByConceptIndex", time.perf_counter() - getObservedColumnsByConceptIndexStartTime)
+				GIAANNproto_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient:getObservedColumnsByConceptIndex", time.perf_counter() - getObservedColumnsByConceptIndexStartTime)
 		conceptIndicesFeatureTensor = self.conceptIndicesInSequenceObservedTensor.to(featureDevice)
 		conceptIndicesConnectionTensor = self.conceptIndicesInSequenceObservedTensor.to(connectionDevice)
 
@@ -898,6 +850,9 @@ class SequenceObservedColumns:
 					connectionMinUpdates = self.buildConnectionSourceBucketUpdateSparse(connectionMinIndices, connectionMinValues, databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor, connectionSourceCombinedKeysUnique, connectionTargetSize)
 					connectionTargetSparse = self.applySparseMinUpdate(connectionTargetSparse, connectionMinUpdates)
 			self.scatterConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionTargetSparse)
+		if(GIAANNproto_debug.debugPrintGPUramUsage):
+			if(executionMode=="train"):
+				GIAANNproto_debug.debugPrintRamUsage("updateObservedColumnsEfficient:end", "mode = " + str(mode))
 
 	def getObservedColumnsByConceptIndex(self, sequenceObservedColumnsDict):
 		result = {}
@@ -1025,7 +980,7 @@ class SequenceObservedColumns:
 			gatherConnectionSourceBucketTensorStartTime = None
 			if(debugPrintTrainSectionTimes):
 				gatherConnectionSourceBucketTensorStartTime = time.perf_counter()
-				debugTrainSectionTimesContextPush(self.databaseNetworkObject, "updateObservedColumnsEfficient:gatherConnectionSourceBucketTensor")
+				GIAANNproto_debug.debugTrainSectionTimesContextPush(self.databaseNetworkObject, "updateObservedColumnsEfficient:gatherConnectionSourceBucketTensor")
 		combinedIndicesList = []
 		combinedValuesList = []
 		sourceConceptIndexList = pt.div(sourceCombinedKeysUnique, self.databaseNetworkObject.f, rounding_mode='floor').detach().cpu().tolist()
@@ -1050,8 +1005,8 @@ class SequenceObservedColumns:
 			result = self.initialiseSparseTensor(targetSize, targetDevice)
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
 			if(debugPrintTrainSectionTimes):
-				debugTrainSectionTimesContextPop(self.databaseNetworkObject)
-				debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient:gatherConnectionSourceBucketTensor", time.perf_counter() - gatherConnectionSourceBucketTensorStartTime)
+				GIAANNproto_debug.debugTrainSectionTimesContextPop(self.databaseNetworkObject)
+				GIAANNproto_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient:gatherConnectionSourceBucketTensor", time.perf_counter() - gatherConnectionSourceBucketTensorStartTime)
 		return result
 
 	def scatterConnectionSourceBucketTensor(self, observedColumnsByConceptIndex, sourceCombinedKeysUnique, connectionTargetSparse):
@@ -1059,7 +1014,7 @@ class SequenceObservedColumns:
 			scatterConnectionSourceBucketTensorStartTime = None
 			if(debugPrintTrainSectionTimes):
 				scatterConnectionSourceBucketTensorStartTime = time.perf_counter()
-				debugTrainSectionTimesContextPush(self.databaseNetworkObject, "updateObservedColumnsEfficient:scatterConnectionSourceBucketTensor")
+				GIAANNproto_debug.debugTrainSectionTimesContextPush(self.databaseNetworkObject, "updateObservedColumnsEfficient:scatterConnectionSourceBucketTensor")
 		connectionTargetSparse = connectionTargetSparse.coalesce()
 		connectionTargetIndices = connectionTargetSparse.indices()
 		connectionTargetValues = connectionTargetSparse.values()
@@ -1094,8 +1049,8 @@ class SequenceObservedColumns:
 			observedColumn.setFeatureConnectionsForSourceFeature(int(sourceFeatureIndexValue), sourceTensor)
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
 			if(debugPrintTrainSectionTimes):
-				debugTrainSectionTimesContextPop(self.databaseNetworkObject)
-				debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient:scatterConnectionSourceBucketTensor", time.perf_counter() - scatterConnectionSourceBucketTensorStartTime)
+				GIAANNproto_debug.debugTrainSectionTimesContextPop(self.databaseNetworkObject)
+				GIAANNproto_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient:scatterConnectionSourceBucketTensor", time.perf_counter() - scatterConnectionSourceBucketTensorStartTime)
 		return
 
 	def buildMaskLookup(self, maskSize, indices, device):
@@ -1126,7 +1081,7 @@ class SequenceObservedColumns:
 		combinedSparse = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSize, dtype=arrayType, device=deviceSparse)
 		return combinedSparse
 	
-	if(optimiseCombineSparseUpdatesPerSequence):
+	if(optimisationCombineSparseUpdatesPerSequence):
 		def combineSparseUpdatesList(self, updatesList, targetSize):
 			combinedIndices = None
 			combinedValues = None
@@ -1167,7 +1122,7 @@ class SequenceObservedColumns:
 		return targetSparse
 
 	def validateCUDAObservedColumnUpdateInputs(self, targetSparse, updateSparse):
-		if(optimiseUseCUDAObservedColumnUpdateKernel):
+		if(optimisationUseCUDAObservedColumnUpdateKernel):
 			if(targetSparse.device.type != "cuda"):
 				raise RuntimeError("validateCUDAObservedColumnUpdateInputs error: targetSparse must be CUDA tensor")
 			if(updateSparse.device.type != "cuda"):
@@ -1183,11 +1138,11 @@ class SequenceObservedColumns:
 			if(targetSparse.dim() != updateSparse.dim()):
 				raise RuntimeError("validateCUDAObservedColumnUpdateInputs error: targetSparse and updateSparse must have matching rank")
 		else:
-			raise RuntimeError("validateCUDAObservedColumnUpdateInputs error: optimiseUseCUDAObservedColumnUpdateKernel is disabled")
+			raise RuntimeError("validateCUDAObservedColumnUpdateInputs error: optimisationUseCUDAObservedColumnUpdateKernel is disabled")
 		return
 
 	def recordCUDAObservedColumnUpdateStats(self, stats):
-		if(optimiseUseCUDAObservedColumnUpdateKernel):
+		if(optimisationUseCUDAObservedColumnUpdateKernel):
 			if(not hasattr(self.databaseNetworkObject, "cudaObservedColumnUpdateInstrumentation")):
 				self.databaseNetworkObject.cudaObservedColumnUpdateInstrumentation = {"hashHitCount": 0, "overflowCount": 0, "rebuildCount": 0, "updateCalls": 0, "averageUpdateLatencySeconds": 0.0, "hashHitRate": 0.0}
 			instrumentation = self.databaseNetworkObject.cudaObservedColumnUpdateInstrumentation
@@ -1201,7 +1156,7 @@ class SequenceObservedColumns:
 
 	def addSparseUpdateNonNegativeCUDA(self, targetSparse, updateSparse):
 		resultSparse = targetSparse
-		if(optimiseUseCUDAObservedColumnUpdateKernel):
+		if(optimisationUseCUDAObservedColumnUpdateKernel):
 			if not targetSparse.is_coalesced():
 				targetSparse = targetSparse.coalesce()
 			if not updateSparse.is_coalesced():
@@ -1216,13 +1171,13 @@ class SequenceObservedColumns:
 			self.recordCUDAObservedColumnUpdateStats(exportStats)
 			resultSparse = pt.sparse_coo_tensor(exportIndices, exportValues, size=targetSparse.size(), dtype=arrayType, device=targetSparse.device)
 		else:
-			raise RuntimeError("addSparseUpdateNonNegativeCUDA error: optimiseUseCUDAObservedColumnUpdateKernel is disabled")
+			raise RuntimeError("addSparseUpdateNonNegativeCUDA error: optimisationUseCUDAObservedColumnUpdateKernel is disabled")
 		return resultSparse
 
 	def addSparseUpdateNonNegative(self, targetSparse, updateSparse):
 		resultSparse = targetSparse
 		if(updateSparse._nnz() > 0):
-			if(optimiseUseCUDAObservedColumnUpdateKernel):
+			if(optimisationUseCUDAObservedColumnUpdateKernel):
 				resultSparse = self.addSparseUpdateNonNegativeCUDA(targetSparse, updateSparse)
 			else:
 				if not targetSparse.is_coalesced():

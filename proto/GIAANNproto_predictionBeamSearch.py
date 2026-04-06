@@ -21,6 +21,7 @@ import torch as pt
 import time
 
 from GIAANNproto_globalDefs import *
+import GIAANNproto_debug
 import GIAANNproto_databaseNetwork
 import GIAANNproto_sparseTensors
 import GIAANNproto_predictionActivate
@@ -253,37 +254,6 @@ def printBestBeamPath(bestBeam, databaseNetworkObject):
 		pathSegments.append(f"Depth {depthIndex}: {description}")
 	if(inferenceBeamSearch):
 		print("\t\tBest beam path:\n\t\t\t" + "\n\t\t\t".join(pathSegments))	# Debug: summary of the highest scoring beam path
-
-def debugDescribeColumnFeatureName(databaseNetworkObject, columnIndex, featureIndex):
-	if(0 <= columnIndex < len(databaseNetworkObject.conceptColumnsList)):
-		columnName = databaseNetworkObject.conceptColumnsList[columnIndex]
-	else:
-		columnName = f"<invalid:{columnIndex}>"
-	if(featureIndex == featureIndexPrimeConceptNeuron):
-		featureName = "conceptNeuron"
-	elif(0 <= featureIndex < len(databaseNetworkObject.conceptFeaturesList)):
-		featureName = databaseNetworkObject.conceptFeaturesList[featureIndex]
-	else:
-		featureName = f"feature_{featureIndex}"
-	return columnName, featureName
-
-def debugDescribeAllowedBeamFeatures(databaseNetworkObject, connectedColumnsTensor, connectedColumnsFeatures):
-	if(connectedColumnsTensor is None):
-		return "<none>"
-	if(connectedColumnsTensor.numel() == 0):
-		return "[]"
-	elements = []
-	for columnValue in connectedColumnsTensor.cpu().tolist():
-		columnName, _ = debugDescribeColumnFeatureName(databaseNetworkObject, columnValue, featureIndexPrimeConceptNeuron)
-		if(connectedColumnsFeatures is not None and columnValue in connectedColumnsFeatures):
-			featureList = []
-			for featureIndex in sorted(connectedColumnsFeatures[columnValue]):
-				_, featureName = debugDescribeColumnFeatureName(databaseNetworkObject, columnValue, featureIndex)
-			featureList.append(f"{featureIndex}:{featureName}")
-			elements.append(f"{columnName} -> [{', '.join(featureList)}]")
-		else:
-			elements.append(f"{columnName} -> <any feature>")
-	return "[" + "; ".join(elements) + "]"
 
 def filterCandidatesByActivationThreshold(columnIndices, featureIndices, activationValues):
 	if(minimumPredictionActivationThreshold <= 0):

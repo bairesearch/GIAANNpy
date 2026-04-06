@@ -21,6 +21,7 @@ import torch as pt
 import time
 
 from GIAANNproto_globalDefs import *
+import GIAANNproto_debug
 import GIAANNproto_sparseTensors
 import GIAANNproto_sequenceConcepts
 
@@ -41,7 +42,7 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 
 	featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex)
 	if(debugPrintTrainSectionTimes):
-		debugTrainSectionTimesAdd(sequenceObservedColumns.databaseNetworkObject, "trainConceptWords", time.perf_counter() - trainConceptWordsStartTime)
+		GIAANNproto_debug.debugTrainSectionTimesAdd(sequenceObservedColumns.databaseNetworkObject, "trainConceptWords", time.perf_counter() - trainConceptWordsStartTime)
 
 	return True
 
@@ -141,7 +142,7 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 	if(arrayIndexPropertiesStrength):
 		applyTrainConnectionStrengthLimits(sequenceObservedColumns)
 	if(debugPrintTrainSectionTimes):
-		debugTrainSectionTimesAdd(sequenceObservedColumns.databaseNetworkObject, "processFeaturesActiveTrain", time.perf_counter() - processFeaturesActiveTrainStartTime)
+		GIAANNproto_debug.debugTrainSectionTimesAdd(sequenceObservedColumns.databaseNetworkObject, "processFeaturesActiveTrain", time.perf_counter() - processFeaturesActiveTrainStartTime)
 
 	return featureConnectionsActive, featureConnectionsSegmentMask
 

@@ -1,5 +1,6 @@
 
 \section{Experiments}
+
 \subsection{Setup}
 
 The experiments use the GIAANN prototype with POS-driven concept columns and SANI segments. Training is executed (\texttt{useInference=False}) only with a single epoch over a fixed number of sequences.
@@ -42,26 +43,27 @@ Top-1 accuracy has been calculated as a baseline performance metric.
 
 \subsection{Results}
 
+The accuracy measurements were taken with GIAANN Proto 1k. 
+
 \subsubsection{Training-set Accuracy}
 
 \paragraph{Tables}
 
-\Cref{tab:wiki-train-top1-accuracy} contains Wikipedia top-1 training-set accuracy for different numbers of segments and training budgets, with targets/predictions fed as input, and segment timing exact (``t-1 exact''). It includes `t-1 exact pred' (\texttt{inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=True}), a non-standard top-1 accuracy report that is more sensitive to errors and can therefore better differentiate between ablations (it feeds current predictions rather than current targets to input).
+\Cref{tab:wiki-train-top1-accuracy} contains Wikipedia top-1 training-set accuracy for different numbers of segments and training sizes, with targets/predictions fed as input, and segment timing exact (``t-1 exact''). It includes `t-1 exact pred' (\texttt{inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=True}), a non-standard top-1 accuracy report that is more sensitive to errors and can therefore better differentiate between ablations (it feeds current predictions rather than current targets to input).
 
-\Cref{tab:wiki-train-top1-accuracy-segmentLayouts} contains Wikipedia top-1 training-set accuracy for different segment layouts and training budgets, with targets fed as input, and segment timing exact.
+\Cref{tab:wiki-train-top1-accuracy-segmentLayouts} contains Wikipedia top-1 training-set accuracy for different segment layouts and training sizes, with targets fed as input, and segment timing exact.
 
-\Cref{tab:wiki-train-top1-accuracy-time} contains Wikipedia top-1 training-set accuracy for different sequentiality enforcement (\texttt{enforceSequentialActivation}) and segment timing settings (\texttt{inferenceUseNeuronFeaturePropertiesTime/Exact}), with targets fed as input.
+\Cref{tab:wiki-train-top1-accuracy-time} contains Wikipedia top-1 training-set accuracy for different sequentiality enforcement (\texttt{enforceSequentialActivation}), segment timing settings (\texttt{inferenceUseNeuronFeaturePropertiesTime/Exact}), and training sizes, with targets fed as input.
 
-\Cref{tab:oscar-train-top1-accuracy} contains OSCAR-2201 top-1 training-set accuracy for different numbers of segments and training budgets, with targets/predictions fed as input, and segment timing exact.
+\Cref{tab:oscar-train-top1-accuracy} contains OSCAR-2201 top-1 training-set accuracy for different numbers of segments and training sizes, with targets/predictions fed as input, and segment timing exact.
 
-\Cref{tab:oscar-train-top1-accuracy-spacyPipelineOptimisations} likewise contains OSCAR-2201 top-1 training-set accuracy for different numbers of segments and training budgets, with targets/predictions fed as input, and segment timing exact. It was trained with \url{spacyPipelineOptimisations=True} for efficiency.
+\Cref{tab:oscar-train-top1-accuracy-spacyPipelineOptimisations} likewise contains OSCAR-2201 top-1 training-set accuracy for different numbers of segments and training sizes, with targets/predictions fed as input, and segment timing exact. It was trained with \url{spacyPipelineOptimisations=True} for efficiency.
 
-\Cref{tab:oscar-train-top1-accuracy-useBenchmarkDefaultsFalse} contains OSCAR-2201 top-1 training-set accuracy for different numbers of segments, and different time constraints, with targets fed as input. The default time constraints used for benchmarking of the train-set(``t-1 exact'') are \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=True} and \texttt{enforceSequentialActivation=True}. It also contains results for these non-default time constraints: \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=False} and \texttt{enforceSequentialActivation=True} (``top-1 bias''), and \texttt{inferenceUseNeuronFeaturePropertiesTime=False} (``top-1 none''). It was trained with \texttt{useBenchmarkDefaults=False} (\url{spacyPipelineOptimisations=True} and \texttt{pretrainConceptColumnsDelimitByPOSenforce=True}) for efficiency.
+\Cref{tab:oscar-train-top1-accuracy-useBenchmarkDefaultsFalse} contains OSCAR-2201 top-1 training-set accuracy for different numbers of segments and training sizes, and different time constraints, with targets fed as input. The default time constraints used for benchmarking of the train-set(``t-1 exact'') are \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=True} and \texttt{enforceSequentialActivation=True}. It also contains results for these non-default time constraints: \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=False} and \texttt{enforceSequentialActivation=True} (``top-1 bias''), and \texttt{inferenceUseNeuronFeaturePropertiesTime=False} (``top-1 none''). It was trained with \texttt{useBenchmarkDefaults=False} (\url{spacyPipelineOptimisations=True} and \texttt{pretrainConceptColumnsDelimitByPOSenforce=True}) for efficiency.
 
+\Cref{tab:oscar-train-top1-accuracy-useBenchmarkDefaultsFalse-multisentencePredictions} contains OSCAR-2201 top-1 training-set accuracy for different numbers of segments and training sizes, and different time constraints, with targets fed as input, and multiple sentence predictions. The default time constraints used for benchmarking of the train-set(``t-1 exact'') are \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=True} and \texttt{enforceSequentialActivation=True}. It also contains results for these non-default time constraints: \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=False} and \texttt{enforceSequentialActivation=True} (``top-1 bias''), and \texttt{inferenceUseNeuronFeaturePropertiesTime=False} (``top-1 none''). It was trained with \texttt{multisentencePredictions=True} and \texttt{numSentencesPerSequence=3}, which generates longer sequences that are more suitable for higher segment counts. It was also trained with \texttt{useBenchmarkDefaults=False} (\url{spacyPipelineOptimisations=True} and \texttt{pretrainConceptColumnsDelimitByPOSenforce=True}) for efficiency.
 
-\Cref{tab:oscar-train-top1-accuracy-useBenchmarkDefaultsFalse-multisentencePredictions} contains OSCAR-2201 top-1 training-set accuracy for different numbers of segments, and different time constraints, with targets fed as input, and multiple sentence predictions. The default time constraints used for benchmarking of the train-set(``t-1 exact'') are \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=True} and \texttt{enforceSequentialActivation=True}. It also contains results for these non-default time constraints: \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=False} and \texttt{enforceSequentialActivation=True} (``top-1 bias''), and \texttt{inferenceUseNeuronFeaturePropertiesTime=False} (``top-1 none''). It was trained with \texttt{multisentencePredictions=True} and \texttt{numSentencesPerSequence=3}, which generates longer sequences that are more suitable for higher segment counts. It was also trained with \texttt{useBenchmarkDefaults=False} (\url{spacyPipelineOptimisations=True} and \texttt{pretrainConceptColumnsDelimitByPOSenforce=True}) for efficiency.
-
-\Cref{tab:oscar-train-top1-accuracy-spacyPipelineOptimisations-multipleDendriticBranches} contains OSCAR-2201 top-1 training-set accuracy for different dendritic branches and time constraints, with targets fed as input. The default time constraints used for benchmarking of the train-set (``top-1 exact'') are \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=True} and \texttt{enforceSequentialActivation=True}. It also contains results for these non-default time settings: \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=False} + \texttt{enforceSequentialActivation=False} (``t-1 bias''), \texttt{inferenceUseNeuronFeaturePropertiesTime=False} + \texttt{enforceSequentialActivation=False} (``t-1 none''), and activations constraints (with t-1 none): \texttt{inferenceSegmentActivationsBoolean=False} (``int f+c''). The default dendritic branch settings used for benchmarking are \texttt{multipleDendriticBranches=True}, \texttt{randomlyAssignBranches=False}, and \texttt{numberOfDendriticBranches=2} (``2 uniq''), where branches are uniquely assigned for repeated feature instances within sequences. It also contains results for these non-default dendritic branch settings: \texttt{randomlyAssignBranches=True}, and \texttt{numberOfDendriticBranches=5} (``5 rand''), \texttt{numberOfDendriticBranches=5} (``10 rand''). It was also trained with \texttt{spacyPipelineOptimisations=True} for efficiency.
+\Cref{tab:oscar-train-top1-accuracy-spacyPipelineOptimisations-multipleDendriticBranches} contains OSCAR-2201 top-1 training-set accuracy for different training sizes, dendritic branches and time constraints, with targets fed as input. The default time constraints used for benchmarking of the train-set (``top-1 exact'') are \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=True} and \texttt{enforceSequentialActivation=True}. It also contains results for these non-default time settings: \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=False} + \texttt{enforceSequentialActivation=False} (``t-1 bias''), \texttt{inferenceUseNeuronFeaturePropertiesTime=False} + \texttt{enforceSequentialActivation=False} (``t-1 none''), and activations constraints (with t-1 none): \texttt{inferenceSegmentActivationsBoolean=False} (``int f+c''). The default dendritic branch settings used for benchmarking are \texttt{multipleDendriticBranches=True}, \texttt{randomlyAssignBranches=False}, and \texttt{numberOfDendriticBranches=2} (``2 uniq''), where branches are uniquely assigned for repeated feature instances within sequences. It also contains results for these non-default dendritic branch settings: \texttt{randomlyAssignBranches=True}, and \texttt{numberOfDendriticBranches=5} (``5 rand''), \texttt{numberOfDendriticBranches=5} (``10 rand''). It was also trained with \texttt{spacyPipelineOptimisations=True} for efficiency.
 
 The number of seed tokens, neuron column (c) segments, neuron feature (f) segments, and training sequences (along with their token top-1 accuracies), are provided in all tables.
 
@@ -76,7 +78,7 @@ Wikipedia sentences are typically longer than OSCAR-2201 sentences, so multiple 
 
 \begin{table}[H]
 \centering
-\caption{Wikipedia Top-1 training-set accuracy for different numbers of segments, with targets/predictions fed as input.}
+\caption{Wikipedia Top-1 training-set accuracy for different numbers of segments and training sizes, with targets/predictions fed as input.}
 \label{tab:wiki-train-top1-accuracy}
 \begin{tabular}{rrrrrrrr}
 \toprule
@@ -111,7 +113,7 @@ Wikipedia sentences are typically longer than OSCAR-2201 sentences, so multiple 
 
 \begin{table}[H]
 \centering
-\caption{Wikipedia Top-1 training-set accuracy for different segment layouts, with targets fed as input.}
+\caption{Wikipedia Top-1 training-set accuracy for different segment layouts and training sizes, with targets fed as input.}
 \label{tab:wiki-train-top1-accuracy-segmentLayouts}
 \begin{tabular}{rrrrr}
 \toprule
@@ -130,7 +132,7 @@ Wikipedia sentences are typically longer than OSCAR-2201 sentences, so multiple 
 
 \begin{table}[H]
 \centering
-\caption{Wikipedia Top-1 training-set accuracy for different sequentiality enforcement and segment timing settings, with targets fed as input.}
+\caption{Wikipedia Top-1 training-set accuracy for different sequentiality enforcement, segment timing settings, and training sizes, with targets fed as input.}
 \label{tab:wiki-train-top1-accuracy-time}
 \begin{tabular}{rrrrrrrr}
 \toprule
@@ -160,7 +162,7 @@ Wikipedia sentences are typically longer than OSCAR-2201 sentences, so multiple 
 
 %\begin{table}[H]
 %\centering
-%\caption{Wikipedia Top-1 training-set accuracy for different sequentiality enforcement and segment timing settings, with predictions fed as input.}
+%\caption{Wikipedia Top-1 training-set accuracy for different sequentiality enforcement, segment timing settings, and training sizes, with predictions fed as input.}
 %\label{tab:wiki-train-top1-accuracy-time}
 %\begin{tabular}{rrrrrrrr}
 %\toprule
@@ -191,7 +193,7 @@ Wikipedia sentences are typically longer than OSCAR-2201 sentences, so multiple 
 
 \begin{table}[H]
 \centering
-\caption{OSCAR-2201 Top-1 training-set accuracy for different numbers of segments, with targets/predictions fed as input.}
+\caption{OSCAR-2201 Top-1 training-set accuracy for different numbers of segments and training sizes, with targets/predictions fed as input.}
 \label{tab:oscar-train-top1-accuracy}
 \begin{tabular}{rrrrrrrr}
 \toprule
@@ -212,7 +214,7 @@ Wikipedia sentences are typically longer than OSCAR-2201 sentences, so multiple 
 
 \begin{table}[H]
 \centering
-\caption{OSCAR-2201 Top-1 training-set accuracy for different numbers of segments, with targets/predictions fed as input.}
+\caption{OSCAR-2201 Top-1 training-set accuracy for different numbers of segments and training sizes, with targets/predictions fed as input.}
 \label{tab:oscar-train-top1-accuracy-spacyPipelineOptimisations}
 \begin{tabular}{rrrrrrrr}
 \toprule
@@ -231,7 +233,7 @@ Wikipedia sentences are typically longer than OSCAR-2201 sentences, so multiple 
 
 \begin{table}[H]
 \centering
-\caption{OSCAR-2201 Top-1 training-set accuracy for different numbers of segments, and different time constraints, with targets fed as input}
+\caption{OSCAR-2201 Top-1 training-set accuracy for different numbers of segments and training sizes, and different time constraints, with targets fed as input}
 \label{tab:oscar-train-top1-accuracy-useBenchmarkDefaultsFalse}
 \begin{tabular}{rrrrrrrrrrrr}
 \toprule
@@ -249,7 +251,7 @@ Wikipedia sentences are typically longer than OSCAR-2201 sentences, so multiple 
 
 \begin{table}[H]
 \centering
-\caption{OSCAR-2201 Top-1 training-set accuracy for different numbers of segments, and different time constraints, with targets fed as input, and multiple sentence predictions}
+\caption{OSCAR-2201 Top-1 training-set accuracy for different numbers of segments and training sizes, and different time constraints, with targets fed as input, and multiple sentence predictions}
 \label{tab:oscar-train-top1-accuracy-useBenchmarkDefaultsFalse-multisentencePredictions}
 \begin{tabular}{rrrrrrrrrrrr}
 \toprule
@@ -270,7 +272,7 @@ Wikipedia sentences are typically longer than OSCAR-2201 sentences, so multiple 
 
 \begin{table}[H]
 \centering
-\caption{OSCAR-2201 Top-1 training-set accuracy for different numbers of dendritic branches and time constraints, with targets fed as input.}
+\caption{OSCAR-2201 Top-1 training-set accuracy for different training sizes, dendritic branches and time constraints, with targets fed as input.}
 \label{tab:oscar-train-top1-accuracy-spacyPipelineOptimisations-multipleDendriticBranches}
 \begin{tabular}{rrrrrrrrrrrrr}
 \toprule
@@ -302,21 +304,21 @@ Therefore, a number of changes were introduced for test-set accuracy measurement
 
 \paragraph{Tables}
 
-\Cref{tab:oscar-test-top1-accuracy} contains OSCAR-2201 top-1 test-set accuracy for different numbers of segments, and different time constraints, with targets fed as input. The default time constraints used for benchmarking of the test-set (``t-1 bias'') are \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=False} and \texttt{enforceSequentialActivation=False}. It also contains results for these non-default time constraints: \texttt{enforceSequentialActivation=True} (``t-1 seq''),\texttt{inferenceUseNeuronFeaturePropertiesTimeExact=True} +  \texttt{enforceSequentialActivation=True} (``t-1 exact''), and \texttt{inferenceUseNeuronFeaturePropertiesTime=False} (``t-1 none'').
+\Cref{tab:oscar-test-top1-accuracy} contains OSCAR-2201 top-1 test-set accuracy for different numbers of segments and training sizes, and different time constraints, with targets fed as input. The default time constraints used for benchmarking of the test-set (``t-1 bias'') are \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=False} and \texttt{enforceSequentialActivation=False}. It also contains results for these non-default time constraints: \texttt{enforceSequentialActivation=True} (``t-1 seq''),\texttt{inferenceUseNeuronFeaturePropertiesTimeExact=True} +  \texttt{enforceSequentialActivation=True} (``t-1 exact''), and \texttt{inferenceUseNeuronFeaturePropertiesTime=False} (``t-1 none'').
 
-\Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations} contains OSCAR-2201 Top-1 test-set accuracy for different numbers of segments, with segment timing biased, targets fed as input. It is an expanded version of the table across a greater selection of segment counts. It also contains results with \texttt{inferenceReportTokenAccuracyConstrainByColumn=True} (t-1 bias col). It was also trained with \texttt{spacyPipelineOptimisations=True} for efficiency.
+\Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations} contains OSCAR-2201 Top-1 test-set accuracy for different numbers of segments and training sizes, with segment timing biased, targets fed as input. It is an expanded version of the table across a greater selection of segment counts. It also contains results with \texttt{inferenceReportTokenAccuracyConstrainByColumn=True} (t-1 bias col). It was also trained with \texttt{spacyPipelineOptimisations=True} for efficiency.
 
 \Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-trainsize} contains OSCAR-2201 Top-1 test-set accuracy for different training sizes, and different inference activations, with segment timing none (t-1 none), and targets fed as input. It is an expanded version of the table across a greater selection of train sizes. It was also trained with \texttt{spacyPipelineOptimisations=True} for efficiency.
 
 \Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceActivations} contains OSCAR-2201 top-1 test-set accuracy across different training sizes and inference activations, segment timing none (t-1 none), and targets fed as input. The different inference activation settings used were ``bool f+c'' (\texttt{inferenceSegmentActivationsBoolean=True}), ``int f+c'' (\texttt{inferenceSegmentActivationsBoolean=False}), and ``bool f'' (\texttt{inferenceSegmentActivationsBooleanFeatureSegmentsOnly=True} - default). It was also trained with \texttt{spacyPipelineOptimisations=True} for efficiency.
 
-\Cref{tab:oscar-test-top1-accuracy-useBenchmarkDefaultsFalse} contains OSCAR-2201 top-1 test-set accuracy for different numbers of segments, and different time constraints, with targets fed as input.  The default time constraints used for benchmarking of the test-set (``t-1 bias'') are \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=False} and \texttt{enforceSequentialActivation=False}. It also contains results for these non-default time constraints: \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=True} +  \texttt{enforceSequentialActivation=True} (``t-1 exact''), and \texttt{inferenceUseNeuronFeaturePropertiesTime=False} (``t-1 none''). It was trained with \texttt{useBenchmarkDefaults=False} (\url{spacyPipelineOptimisations=True} and \texttt{pretrainConceptColumnsDelimitByPOSenforce=True}) for efficiency and a greater use of the training data respectively.
+\Cref{tab:oscar-test-top1-accuracy-useBenchmarkDefaultsFalse} contains OSCAR-2201 top-1 test-set accuracy for different numbers of segments and training sizes, and different time constraints, with targets fed as input.  The default time constraints used for benchmarking of the test-set (``t-1 bias'') are \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=False} and \texttt{enforceSequentialActivation=False}. It also contains results for these non-default time constraints: \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=True} +  \texttt{enforceSequentialActivation=True} (``t-1 exact''), and \texttt{inferenceUseNeuronFeaturePropertiesTime=False} (``t-1 none''). It was trained with \texttt{useBenchmarkDefaults=False} (\url{spacyPipelineOptimisations=True} and \texttt{pretrainConceptColumnsDelimitByPOSenforce=True}) for efficiency and a greater use of the training data respectively.
 
 \Cref{tab:oscar-test-top1-accuracy-useBenchmarkDefaultsFalse-multisentencePredictions} contains OSCAR-2201 top-1 test-set accuracy for across different training sizes and time constraints, with multiple sentence predictions, and targets fed as input. It was trained with \texttt{multisentencePredictions=True} and \texttt{numSentencesPerSequence=3}, which generates longer sequences that are more suitable for higher segment counts with this dataset. It was also trained with \texttt{useBenchmarkDefaults=False} (\url{spacyPipelineOptimisations=True} and \texttt{pretrainConceptColumnsDelimitByPOSenforce=True}) for efficiency and a greater use of the training data respectively.
 
 \Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceActivations-multisentencePredictionsInference} contains another version of the previous table but with multiple sentence predictions used during test-set inference. Inference was effectively performed with a different test-set (\texttt{multisentencePredictions=True}) than usual for this train database.
 
-\Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-multipleDendriticBranches} contains OSCAR-2201 top-1 test-set accuracy for different numbers of dendritic branches and time constraints, with targets fed as input. The default time constraints used for benchmarking of the test-set (``t-1 bias'') are \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=False} and \texttt{enforceSequentialActivation=False}. It also contains results for these non-default time settings: \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=True} + \texttt{enforceSequentialActivation=True} (``top-1 exact''), \texttt{inferenceUseNeuronFeaturePropertiesTime=False} (``top-1 none''), and activations constraints (with t-1 none): \texttt{inferenceSegmentActivationsBoolean=False} (``int f+c''). The default dendritic branch settings used for benchmarking are \texttt{multipleDendriticBranches=True}, \texttt{randomlyAssignBranches=False}, and \texttt{numberOfDendriticBranches=2} (``2 uniq''), where branches are uniquely assigned for repeated feature instances within sequences. It also contains results for these non-default dendritic branch settings: \texttt{randomlyAssignBranches=True}, and \texttt{numberOfDendriticBranches=5} (``5 rand''), \texttt{numberOfDendriticBranches=5} (``10 rand''). It was also trained with \texttt{spacyPipelineOptimisations=True} for efficiency.
+\Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-multipleDendriticBranches} contains OSCAR-2201 top-1 test-set accuracy for different training sizes, dendritic branches and time constraints, with targets fed as input. The default time constraints used for benchmarking of the test-set (``t-1 bias'') are \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=False} and \texttt{enforceSequentialActivation=False}. It also contains results for these non-default time settings: \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=True} + \texttt{enforceSequentialActivation=True} (``top-1 exact''), \texttt{inferenceUseNeuronFeaturePropertiesTime=False} (``top-1 none''), and activations constraints (with t-1 none): \texttt{inferenceSegmentActivationsBoolean=False} (``int f+c''). The default dendritic branch settings used for benchmarking are \texttt{multipleDendriticBranches=True}, \texttt{randomlyAssignBranches=False}, and \texttt{numberOfDendriticBranches=2} (``2 uniq''), where branches are uniquely assigned for repeated feature instances within sequences. It also contains results for these non-default dendritic branch settings: \texttt{randomlyAssignBranches=True}, and \texttt{numberOfDendriticBranches=5} (``5 rand''), \texttt{numberOfDendriticBranches=5} (``10 rand''). It was also trained with \texttt{spacyPipelineOptimisations=True} for efficiency.
 
 149 test-set sequences were used during inference for the OSCAR-2201 dataset (taken from later in the dataset).
 
@@ -349,7 +351,7 @@ Although the vast majority of inference evaluations were performed with \texttt{
 
 \begin{table}[H]
 \centering
-\caption{OSCAR-2201 Top-1 test-set accuracy for different numbers of segments, and different time constraints, with targets fed as input.}
+\caption{OSCAR-2201 Top-1 test-set accuracy for different numbers of segments and training sizes, and different time constraints, with targets fed as input.}
 \label{tab:oscar-test-top1-accuracy}
 \begin{tabular}{rrrrrrrrrr}
 \toprule
@@ -370,7 +372,7 @@ Although the vast majority of inference evaluations were performed with \texttt{
 
 \begin{table}[H]
 \centering
-\caption{OSCAR-2201 Top-1 test-set accuracy for different numbers of segments, with segment timing biased (t-1 bias), and targets fed as input.}
+\caption{OSCAR-2201 Top-1 test-set accuracy for different numbers of segments and training sizes, with segment timing biased (t-1 bias), and targets fed as input.}
 \label{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations}
 \begin{tabular}{rrrrrrrr}
 \toprule
@@ -455,7 +457,7 @@ Although the vast majority of inference evaluations were performed with \texttt{
 
 \begin{table}[H]
 \centering
-\caption{OSCAR-2201 Top-1 test-set accuracy for different numbers of segments, and different time constraints, with targets fed as input}
+\caption{OSCAR-2201 Top-1 test-set accuracy for different numbers of segments and training sizes, and different time constraints, with targets fed as input}
 \label{tab:oscar-test-top1-accuracy-useBenchmarkDefaultsFalse}
 \begin{tabular}{rrrrrrrrrrrr}
 \toprule
@@ -512,7 +514,7 @@ Although the vast majority of inference evaluations were performed with \texttt{
 
 \begin{table}[H]
 \centering
-\caption{OSCAR-2201 Top-1 test-set accuracy for different numbers of dendritic branches and time constraints, with targets fed as input.}
+\caption{OSCAR-2201 Top-1 test-set accuracy for different training sizes, dendritic branches and time constraints, with targets fed as input.}
 \label{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-multipleDendriticBranches}
 \begin{tabular}{rrrrrrrrrrrrr}
 \toprule
@@ -535,3 +537,72 @@ Additional ablations to be conducted over:
 \begin{itemize}
 \item beam search depth/width,
 \end{itemize}
+
+\subsection{Performance}
+
+The performance measurements were taken with GIAANN Proto 1l, after splitting the souce feature connections tensors per source feature.
+
+Experimental optimisations ``optimisationGetFeatureConnectionsForSourceFeatureCache'' and ``optimisationObservedColumnsWriteMetadataCheck'' were disabled for all measurements.
+
+\Cref{tab:oscar-performance-storeDatabaseInRamTrue} contains OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes, with store database in RAM (``storeDatabaseInRam=True''). It also contains time measurements separated for the final write (train phase) or initial read (inference phase) of the entire database from/to CPU RAM (``t w/r''), where ``t tot = t proc + t w/r''. RAM measurements are calculated as peak memory allocated across execution.
+
+\Cref{tab:oscar-performance-storeDatabaseInRamFalse} contains OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes, without store database in RAM (``storeDatabaseInRam=False'').
+
+\Cref{tab:oscar-performance-param} contains OSCAR-2201 model paramaters for different training sizes.
+
+\begin{table}[H]
+\centering
+\caption{OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes, with store database in RAM}
+\label{tab:oscar-performance-storeDatabaseInRamTrue}
+\begin{tabular}{rrrrrrrrrrrrr}
+\toprule
+\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{phase} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{gpu ram} & \textbf{cpu ram} \\
+\midrule
+8 & 3 & 5 & 5,000       & train & 00:01:05 & 00:00:54 & 00:00:11 & 0.9GB & 1.9GB \\
+8 & 3 & 5 & 200,000     & train & 01:30:38 & 01:26:02 & 00:04:36 & 1.9GB & 6.9GB \\
+8 & 3 & 5 & 1,000,000   & train & 16:00:00 & 15:38:24 & 00:21:36 & 7.0GB & 20.6GB \\
+8 & 3 & 5 & 5,000       & tr eval & 00:00:39 & 00:00:22 & 00:00:17 & 0.0GB & 1.6GB \\
+8 & 3 & 5 & 200,000     & tr eval & 00:18:11 & 00:10:15 & 00:07:55 & 0.4GB & 7.1GB \\
+8 & 3 & 5 & 1,000,000   & tr eval & 01:24:03 & 00:40:29 & 00:43:33 & 1.5GB & 23.3GB \\
+8 & 3 & 5 & 5,000       & ts eval & 00:00:57 & 00:00:37 & 00:00:20 & 0.0GB & 1.6GB \\
+8 & 3 & 5 & 200,000     & ts eval & 00:25:42 & 00:15:23 & 00:10:19 & 0.4GB & 7.2GB \\
+8 & 3 & 5 & 1,000,000   & ts eval & 01:47:28 & 01:03:26 & 00:44:02 & 1.5GB & 20.6GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes, without store database in RAM}
+\label{tab:oscar-performance-storeDatabaseInRamFalse}
+\begin{tabular}{rrrrrrrrrrr}
+\toprule
+\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{phase} & \textbf{t tot} & \textbf{gpu ram} & \textbf{cpu ram} \\
+\midrule
+8 & 3 & 5 & 5,000       & train & 00:01:19 & 0.9GB & 1.8GB \\
+8 & 3 & 5 & 200,000     & train & 02:00:17 & 2.0GB & 2.0GB \\
+8 & 3 & 5 & 5,000       & tr eval & 00:00:23 & 0.0GB & 1.5GB \\
+8 & 3 & 5 & 200,000     & tr eval & 00:09:50 & 0.4GB & 2.2GB \\
+8 & 3 & 5 & 5,000       & ts eval & 00:00:30 & 0.0GB & 1.5GB \\
+8 & 3 & 5 & 200,000     & ts eval & 00:15:13 & 0.4GB & 2.2GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{OSCAR-2201 model paramaters for different training sizes}
+\label{tab:oscar-performance-param}
+\begin{tabular}{rrrrrrrr}
+\toprule
+\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{param} & \textbf{db size} & \textbf{columns} & \textbf{features} \\
+\midrule
+8 & 3 & 5 & 5,000       & 2.2M & 0.2GB & 9964 & 6263 \\
+8 & 3 & 5 & 200,000     & 76.6M & 6.0GB & 203804 & 43636 \\
+8 & 3 & 5 & 1,000,000   & 353.7M & 25.5GB & 795326 & 113756 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\FloatBarrier
+

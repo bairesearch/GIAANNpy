@@ -21,6 +21,7 @@ import torch as pt
 import time
 
 from GIAANNproto_globalDefs import *
+import GIAANNproto_debug
 import GIAANNproto_databaseNetworkFiles
 
 
@@ -72,14 +73,6 @@ class ObservedColumnConnectionBase:
 						seen.add(normalisedSourceFeatureIndex)
 			indicesList.sort()
 		return indicesList
-
-	def getSourceFeatureConnectionsDebugSectionName(self, operationName):
-		result = None
-		if(debugPrintTrainSectionTimes and debugPrintTrainSectionTimesSourceFeatureConnections):
-			debugSectionContext = debugTrainSectionTimesContextGet(self.databaseNetworkObject)
-			if(debugSectionContext is not None):
-				result = f"{debugSectionContext}/{operationName}"
-		return result
 
 	def loadRequiredSourceFeatureConnections(self, requiredSourceFeatureIndices, targetDevice, createMissing=False, ensureCurrentSizeOnLoad=False):
 		resolvedTargetDevice = targetDevice if targetDevice is not None else self.getDefaultConnectionTargetDevice()
@@ -258,7 +251,7 @@ class ObservedColumnConnectionBase:
 
 	def setFeatureConnectionsForSourceFeature(self, sourceFeatureIndex, tensor):
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
-			debugSectionName = self.getSourceFeatureConnectionsDebugSectionName("setFeatureConnectionsForSourceFeature")
+			debugSectionName = GIAANNproto_debug.getSourceFeatureConnectionsDebugSectionName(self.databaseNetworkObject, "setFeatureConnectionsForSourceFeature")
 			debugSectionStartTime = None
 			if(debugSectionName is not None):
 				debugSectionStartTime = time.perf_counter()
@@ -279,7 +272,7 @@ class ObservedColumnConnectionBase:
 		self.loadedSourceFeatureIndices.add(normalisedSourceFeatureIndex)
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
 			if(debugSectionName is not None):
-				debugTrainSectionTimesAdd(self.databaseNetworkObject, debugSectionName, time.perf_counter() - debugSectionStartTime)
+				GIAANNproto_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, debugSectionName, time.perf_counter() - debugSectionStartTime)
 		return
 
 	def unloadLoadedSourceFeatureConnections(self, sourceFeatureIndices=None):
@@ -345,7 +338,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		self.featureConnectionsBySourceFeature = {}
 		self.loadedSourceFeatureIndices = set()
 		self.trainPreparedSourceFeatureIndices = set()
-		if(optimiseGetFeatureConnectionsForSourceFeatureCache):
+		if(optimisationGetFeatureConnectionsForSourceFeatureCache):
 			self.storedSourceFeatureIndicesCache = None
 		if(not trainStoreFeatureMapsGlobally):
 			self.nextFeatureIndex = 0
@@ -372,7 +365,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 	def listStoredSourceFeatureIndices(self):
 		if(storeDatabaseInRam and self.databaseNetworkObject.observedColumnsRAMLoaded):
 			combinedIndices = set(self.featureConnectionsBySourceFeature.keys())
-		elif(optimiseGetFeatureConnectionsForSourceFeatureCache):
+		elif(optimisationGetFeatureConnectionsForSourceFeatureCache):
 			if(self.storedSourceFeatureIndicesCache is None):
 				self.storedSourceFeatureIndicesCache = set(GIAANNproto_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(self.conceptIndex))
 			combinedIndices = set(self.storedSourceFeatureIndicesCache)
@@ -385,7 +378,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 
 	def getFeatureConnectionsForSourceFeature(self, sourceFeatureIndex, targetDevice=None, createMissing=False, ensureCurrentSizeOnLoad=False):
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
-			debugSectionName = self.getSourceFeatureConnectionsDebugSectionName("getFeatureConnectionsForSourceFeature")
+			debugSectionName = GIAANNproto_debug.getSourceFeatureConnectionsDebugSectionName(self.databaseNetworkObject, "getFeatureConnectionsForSourceFeature")
 			debugSectionStartTime = None
 			if(debugSectionName is not None):
 				debugSectionStartTime = time.perf_counter()
@@ -396,7 +389,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 			if(storeDatabaseInRam and self.databaseNetworkObject.observedColumnsRAMLoaded):
 				result = self.initialiseFeatureConnections(self.databaseNetworkObject.c, self.databaseNetworkObject.f, resolvedTargetDevice)
 			else:
-				if(optimiseGetFeatureConnectionsForSourceFeatureCache):
+				if(optimisationGetFeatureConnectionsForSourceFeatureCache):
 					if(self.storedSourceFeatureIndicesCache is None):
 						self.storedSourceFeatureIndicesCache = set(GIAANNproto_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(self.conceptIndex))
 					storedSourceFeatureIndices = self.storedSourceFeatureIndicesCache
@@ -413,7 +406,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		self.loadedSourceFeatureIndices.add(normalisedSourceFeatureIndex)
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
 			if(debugSectionName is not None):
-				debugTrainSectionTimesAdd(self.databaseNetworkObject, debugSectionName, time.perf_counter() - debugSectionStartTime)
+				GIAANNproto_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, debugSectionName, time.perf_counter() - debugSectionStartTime)
 		return result
 
 	def saveLoadedSourceFeatureConnectionsToDisk(self, sourceFeatureIndices=None):
@@ -421,7 +414,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 			resolvedSourceFeatureIndices = sorted(self.loadedSourceFeatureIndices)
 		else:
 			resolvedSourceFeatureIndices = self.normaliseSourceFeatureIndices(sourceFeatureIndices)
-		if(optimiseGetFeatureConnectionsForSourceFeatureCache):
+		if(optimisationGetFeatureConnectionsForSourceFeatureCache):
 			if(self.storedSourceFeatureIndicesCache is None):
 				self.storedSourceFeatureIndicesCache = set(GIAANNproto_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(self.conceptIndex))
 		for sourceFeatureIndex in resolvedSourceFeatureIndices:
@@ -429,7 +422,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 				raise RuntimeError(f"saveLoadedSourceFeatureConnectionsToDisk error: missing loaded source feature tensor {sourceFeatureIndex}")
 			sourceTensor = self.featureConnectionsBySourceFeature[sourceFeatureIndex]
 			GIAANNproto_databaseNetworkFiles.saveObservedColumnSourceFeatureConnectionsTensor(self.conceptIndex, sourceFeatureIndex, sourceTensor)
-			if(optimiseGetFeatureConnectionsForSourceFeatureCache):
+			if(optimisationGetFeatureConnectionsForSourceFeatureCache):
 				if(sourceTensor.is_sparse):
 					sourceTensor = sourceTensor.coalesce()
 					tensorNNZ = sourceTensor._nnz()

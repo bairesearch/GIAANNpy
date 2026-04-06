@@ -25,6 +25,10 @@ import sys
 #Recent debug vars;
 debugPrintTrainSectionTimes = False	#print per-sequence timing breakdown for key train sections
 debugPrintTrainSectionTimesSourceFeatureConnections = False	#print granular source-feature-connection timings within updateObservedColumnsEfficient
+debugPrintTimeDatabaseLoadSaveTimes = False
+debugPrintRamCurrentUsage = False
+debugPrintRamAverageUsage = False
+debugPrintRamMaxUsage = False
 
 
 #Execution mode selection;
@@ -421,18 +425,19 @@ else:
 	lowMem = False		 #default: False	#orig: True	#currently required to be False for inference compatibility	#optional
 trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
 trainSequenceObservedColumnsMatchSequenceWords = True	#mantatory		#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
-optimiseCombineSparseUpdatesPerSequence = True	#default: True	#orig: False	#updateObservedColumnsEfficient combines sparse updates per sequence instead of per column (reduces calls to coalesce) 
-optimiseUseCUDAObservedColumnUpdateKernel = False	#default: False	#use custom CUDA sparse accumulator for updateObservedColumnsEfficient strength updates
-if(optimiseUseCUDAObservedColumnUpdateKernel):
+optimisationCombineSparseUpdatesPerSequence = True	#default: True	#orig: False	#updateObservedColumnsEfficient combines sparse updates per sequence instead of per column (reduces calls to coalesce) 
+optimisationUseCUDAObservedColumnUpdateKernel = False	#default: False	#use custom CUDA sparse accumulator for updateObservedColumnsEfficient strength updates
+if(optimisationUseCUDAObservedColumnUpdateKernel):
 	if(not useGPUsparse):
-		raise RuntimeError("optimiseUseCUDAObservedColumnUpdateKernel requires useGPUsparse=True")
+		raise RuntimeError("optimisationUseCUDAObservedColumnUpdateKernel requires useGPUsparse=True")
 	if(not useGPUsparseStrict):
-		raise RuntimeError("optimiseUseCUDAObservedColumnUpdateKernel requires useGPUsparseStrict=True")
-optimiseGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize = True	#default: True	#orig: False	#vectorise exact per-column source-feature detection for trainSequenceObservedColumnsUseSequenceFeaturesOnly/trainSequenceObservedColumnsMatchSequenceWords
-optimiseGetFeatureConnectionsForSourceFeatureCache = not storeDatabaseInRam		#default: not storeDatabaseInRam	#orig: False	#cache stored source-feature file indices per observed column to avoid repeated directory scans when storeDatabaseInRam=False
+		raise RuntimeError("optimisationUseCUDAObservedColumnUpdateKernel requires useGPUsparseStrict=True")
+optimisationGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize = True	#default: True	#orig: False	#vectorise exact per-column source-feature detection for trainSequenceObservedColumnsUseSequenceFeaturesOnly/trainSequenceObservedColumnsMatchSequenceWords
+optimisationGetFeatureConnectionsForSourceFeatureCache = False 	#default: not storeDatabaseInRam	#orig: False	#cache stored source-feature file indices per observed column to avoid repeated directory scans when storeDatabaseInRam=False
 optimisationNormaliseSourceFeatureIndicesDisabled = False	#default: False	#orig: False
 optimisationObservedColumnsWriteMetadataCheck = False	#default: False, orig: False
-	
+
+
 #Draw;
 #select a single draw method (colouring scheme);
 drawSegments = False and useSANI	#optional
@@ -970,62 +975,6 @@ def getTensorSizeInMB(tensor):
 def generateDrawSequenceIndex(sequenceWordIndex):
 	return str(sequenceWordIndex).zfill(3)
 
-def debugTrainSectionTimesReset(databaseNetworkObject, sequenceCount):
-	if(debugPrintTrainSectionTimes):
-		databaseNetworkObject.debugTrainSectionTimes = {}
-		databaseNetworkObject.debugTrainSectionSequenceCount = sequenceCount
-		if(debugPrintTrainSectionTimesSourceFeatureConnections):
-			databaseNetworkObject.debugTrainSectionTimesContextStack = []
-	return
-
-def debugTrainSectionTimesAdd(databaseNetworkObject, sectionName, sectionDuration):
-	if(debugPrintTrainSectionTimes):
-		if(not hasattr(databaseNetworkObject, "debugTrainSectionTimes")):
-			databaseNetworkObject.debugTrainSectionTimes = {}
-		currentDuration = databaseNetworkObject.debugTrainSectionTimes.get(sectionName, 0.0)
-		databaseNetworkObject.debugTrainSectionTimes[sectionName] = currentDuration + sectionDuration
-	return
-
-def debugTrainSectionTimesPrint(databaseNetworkObject):
-	if(debugPrintTrainSectionTimes):
-		sequenceCountDebug = getattr(databaseNetworkObject, "debugTrainSectionSequenceCount", -1)
-		print(f"debugTrainSectionTimes: sequenceCount={sequenceCountDebug}")
-		for sectionName, sectionDuration in databaseNetworkObject.debugTrainSectionTimes.items():
-			print(f"\t{sectionName}: {sectionDuration:.6f}s")
-	return
-
-def debugTrainSectionTimesContextPush(databaseNetworkObject, contextName):
-	if(debugPrintTrainSectionTimesSourceFeatureConnections):
-		if(not debugPrintTrainSectionTimes):
-			raise RuntimeError("debugTrainSectionTimesContextPush error: debugPrintTrainSectionTimes must be enabled")
-		if(contextName is None or contextName == ""):
-			raise RuntimeError("debugTrainSectionTimesContextPush error: contextName is invalid")
-		if(not hasattr(databaseNetworkObject, "debugTrainSectionTimesContextStack")):
-			databaseNetworkObject.debugTrainSectionTimesContextStack = []
-		databaseNetworkObject.debugTrainSectionTimesContextStack.append(contextName)
-	return
-
-def debugTrainSectionTimesContextPop(databaseNetworkObject):
-	result = None
-	if(debugPrintTrainSectionTimesSourceFeatureConnections):
-		if(not debugPrintTrainSectionTimes):
-			raise RuntimeError("debugTrainSectionTimesContextPop error: debugPrintTrainSectionTimes must be enabled")
-		if(not hasattr(databaseNetworkObject, "debugTrainSectionTimesContextStack")):
-			raise RuntimeError("debugTrainSectionTimesContextPop error: debugTrainSectionTimesContextStack is not initialised")
-		if(len(databaseNetworkObject.debugTrainSectionTimesContextStack) == 0):
-			raise RuntimeError("debugTrainSectionTimesContextPop error: debugTrainSectionTimesContextStack is empty")
-		result = databaseNetworkObject.debugTrainSectionTimesContextStack.pop()
-	return result
-
-def debugTrainSectionTimesContextGet(databaseNetworkObject):
-	result = None
-	if(debugPrintTrainSectionTimesSourceFeatureConnections):
-		contextStack = getattr(databaseNetworkObject, "debugTrainSectionTimesContextStack", None)
-		if(contextStack is not None):
-			if(len(contextStack) > 0):
-				result = contextStack[-1]
-	return result
-
 
 #printConfiguration;
 if(printConfiguration): 
@@ -1085,8 +1034,6 @@ if(printConfiguration):
 	print("useGPUdense:", useGPUdense)
 	print("useGPUsparse:", useGPUsparse)
 	print("useGPUsparseStrict:", useGPUsparseStrict)
-	print("runtimeReleaseGPUMemory:", runtimeReleaseGPUMemory)
-	print("runtimeReleaseGPUMemoryEverySequenceCount:", runtimeReleaseGPUMemoryEverySequenceCount)
 	print("storeDatabaseInRam:", storeDatabaseInRam)
 	if(storeDatabaseInRam):
 		print("useGPUdatabase:", useGPUdatabase)
@@ -1135,10 +1082,10 @@ if(printConfiguration):
 	print("#Train optimisations;")
 	print("trainSequenceObservedColumnsUseSequenceFeaturesOnly:", trainSequenceObservedColumnsUseSequenceFeaturesOnly)
 	print("trainSequenceObservedColumnsMatchSequenceWords:", trainSequenceObservedColumnsMatchSequenceWords)
-	print("optimiseCombineSparseUpdatesPerSequence:", optimiseCombineSparseUpdatesPerSequence)
-	print("optimiseUseCUDAObservedColumnUpdateKernel:", optimiseUseCUDAObservedColumnUpdateKernel)
-	print("optimiseGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize:", optimiseGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize)
-	print("optimiseGetFeatureConnectionsForSourceFeatureCache:", optimiseGetFeatureConnectionsForSourceFeatureCache)
+	print("optimisationCombineSparseUpdatesPerSequence:", optimisationCombineSparseUpdatesPerSequence)
+	print("optimisationUseCUDAObservedColumnUpdateKernel:", optimisationUseCUDAObservedColumnUpdateKernel)
+	print("optimisationGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize:", optimisationGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize)
+	print("optimisationGetFeatureConnectionsForSourceFeatureCache:", optimisationGetFeatureConnectionsForSourceFeatureCache)
 	print("optimisationNormaliseSourceFeatureIndicesDisabled:", optimisationNormaliseSourceFeatureIndicesDisabled)
 	print("optimisationObservedColumnsWriteMetadataCheck:", optimisationObservedColumnsWriteMetadataCheck)
 	print("")

@@ -17,10 +17,10 @@ GIA ANN proto database Network
 
 """
 
-import os
 import torch as pt
 
 from GIAANNproto_globalDefs import *
+import GIAANNproto_debug
 import GIAANNproto_databaseNetworkFiles
 from GIAANNproto_databaseNetworkObservedColumn import ObservedColumn, ObservedColumnConnectionBase, ObservedColumnProxy, ObservedColumnStub
 import GIAANNproto_sparseTensors
@@ -124,7 +124,7 @@ if not lowMem:
 		if GIAANNproto_databaseNetworkFiles.pathExists(globalFeatureNeuronsFileFull):
 			globalFeatureNeurons = GIAANNproto_databaseNetworkFiles.loadFeatureNeuronsGlobalFile(inferenceMode)
 			if(debugLimitFeatures):
-				globalFeatureNeurons = GIAANNproto_databaseNetworkFiles.applyDebugLimitGlobalFeatureNeuronsTensor(globalFeatureNeurons, c, f, "globalFeatureNeurons")
+				globalFeatureNeurons = GIAANNproto_debug.applyDebugLimitGlobalFeatureNeuronsTensor(globalFeatureNeurons, c, f, "globalFeatureNeurons")
 				if(globalFeatureNeurons.size(3) < c or globalFeatureNeurons.size(4) < f):
 					print("globalFeatureNeurons.size(3) = ", globalFeatureNeurons.size(3))
 					print("globalFeatureNeurons.size(4) = ", globalFeatureNeurons.size(4))
@@ -165,18 +165,18 @@ def initialiseDatabaseNetwork(inferenceMode):
 				conceptFeaturesReferenceSetDelimiterDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterListFile)
 				conceptFeaturesReferenceSetDelimiterList = list(conceptFeaturesReferenceSetDelimiterDict.values())
 		if(debugLimitFeatures):
-			conceptColumnsDict = applyDebugLimitIndexDict(conceptColumnsDict, debugLimitFeaturesCMax, "conceptColumnsDict")
-			conceptColumnsList = buildIndexListFromDict(conceptColumnsDict, "conceptColumnsDict")
+			conceptColumnsDict = GIAANNproto_debug.applyDebugLimitIndexDict(conceptColumnsDict, debugLimitFeaturesCMax, "conceptColumnsDict")
+			conceptColumnsList = GIAANNproto_debug.buildIndexListFromDict(conceptColumnsDict, "conceptColumnsDict")
 			c = len(conceptColumnsList)
-			conceptFeaturesDict = applyDebugLimitIndexDict(conceptFeaturesDict, debugLimitFeaturesFMax, "conceptFeaturesDict")
-			conceptFeaturesList = buildIndexListFromDict(conceptFeaturesDict, "conceptFeaturesDict")
+			conceptFeaturesDict = GIAANNproto_debug.applyDebugLimitIndexDict(conceptFeaturesDict, debugLimitFeaturesFMax, "conceptFeaturesDict")
+			conceptFeaturesList = GIAANNproto_debug.buildIndexListFromDict(conceptFeaturesDict, "conceptFeaturesDict")
 			f = len(conceptFeaturesList)
 			if(conceptColumnsDelimitByPOS):
 				if(detectReferenceSetDelimitersBetweenNouns):
-					conceptFeaturesReferenceSetDelimiterDeterministicList = applyDebugLimitList(conceptFeaturesReferenceSetDelimiterDeterministicList, f, "conceptFeaturesReferenceSetDelimiterDeterministicList")
-					conceptFeaturesReferenceSetDelimiterProbabilisticList = applyDebugLimitList(conceptFeaturesReferenceSetDelimiterProbabilisticList, f, "conceptFeaturesReferenceSetDelimiterProbabilisticList")
+					conceptFeaturesReferenceSetDelimiterDeterministicList = GIAANNproto_debug.applyDebugLimitList(conceptFeaturesReferenceSetDelimiterDeterministicList, f, "conceptFeaturesReferenceSetDelimiterDeterministicList")
+					conceptFeaturesReferenceSetDelimiterProbabilisticList = GIAANNproto_debug.applyDebugLimitList(conceptFeaturesReferenceSetDelimiterProbabilisticList, f, "conceptFeaturesReferenceSetDelimiterProbabilisticList")
 				else:
-					conceptFeaturesReferenceSetDelimiterList = applyDebugLimitList(conceptFeaturesReferenceSetDelimiterList, f, "conceptFeaturesReferenceSetDelimiterList")
+					conceptFeaturesReferenceSetDelimiterList = GIAANNproto_debug.applyDebugLimitList(conceptFeaturesReferenceSetDelimiterList, f, "conceptFeaturesReferenceSetDelimiterList")
 	else:
 		if(useDedicatedConceptNames):
 			# Add dummy feature for prime concept neuron (different per concept column)
@@ -426,71 +426,6 @@ def isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, feat
 		printe("conceptColumnsDelimitByPOS is required")
 	return isDelimiterProbabilistic
 
-
-if(debugLimitFeatures):
-	def buildIndexListFromDict(indexDict, dictName):
-		resultList = []
-		maxIndex = -1
-		for index in indexDict.values():
-			if(index > maxIndex):
-				maxIndex = index
-		if(maxIndex >= 0):
-			resultList = [None] * (maxIndex + 1)
-			for name, index in indexDict.items():
-				if(index < 0):
-					raise RuntimeError(f"{dictName} index < 0")
-				if(index >= len(resultList)):
-					raise RuntimeError(f"{dictName} index out of bounds")
-				if(resultList[index] is not None):
-					raise RuntimeError(f"{dictName} duplicate index {index}")
-				resultList[index] = name
-			for name in resultList:
-				if(name is None):
-					raise RuntimeError(f"{dictName} missing index entry")
-		return resultList
-	def applyDebugLimitIndexDict(indexDict, maxCount, dictName):
-		resultDict = indexDict
-		if(debugLimitFeatures):
-			if(maxCount <= 0):
-				raise RuntimeError(f"{dictName} maxCount must be > 0")
-			if(len(indexDict) > maxCount):
-				trimmedDict = {}
-				for name, index in indexDict.items():
-					if(index < 0):
-						raise RuntimeError(f"{dictName} index < 0")
-					if(index < maxCount):
-						trimmedDict[name] = index
-				resultDict = trimmedDict
-		return resultDict
-	def applyDebugLimitList(listObject, maxCount, listName):
-		resultList = listObject
-		if(debugLimitFeatures):
-			if(maxCount <= 0):
-				raise RuntimeError(f"{listName} maxCount must be > 0")
-			if(len(listObject) < maxCount):
-				raise RuntimeError(f"{listName} length {len(listObject)} < expected {maxCount}")
-			if(len(listObject) > maxCount):
-				resultList = listObject[:maxCount]
-		return resultList
-
-
-#if(printCountTotalParameters):
-def debugCountObservedColumnConnections(databaseNetworkObject, conceptIndex, lemma, columnIndex):
-	columnConnections = 0
-	if(not GIAANNproto_databaseNetworkFiles.observedColumnMetadataExists(conceptIndex)):
-		columnConnections = 0
-	else:
-		sourceFeatureIndices = GIAANNproto_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(conceptIndex)
-		for sourceFeatureIndex in sourceFeatureIndices:
-			featureConnections = GIAANNproto_databaseNetworkFiles.loadObservedColumnSourceFeatureConnectionsTensor(databaseNetworkObject, conceptIndex, sourceFeatureIndex, deviceDatabase)
-			if(featureConnections is None):
-				raise RuntimeError("debugCountObservedColumnConnections error: featureConnections is None for conceptIndex = " + str(conceptIndex) + ", sourceFeatureIndex = " + str(sourceFeatureIndex))
-			if(databaseNetworkObject.arrayIndexPropertiesStrengthIndex < 0 or databaseNetworkObject.arrayIndexPropertiesStrengthIndex >= featureConnections.shape[0]):
-				raise RuntimeError("debugCountObservedColumnConnections error: databaseNetworkObject.arrayIndexPropertiesStrengthIndex out of range")
-			columnConnections += countNonZero(featureConnections)
-			del featureConnections
-	return columnConnections
-
 def printCountTotalParametersRun(databaseNetworkObject):
 	assert arrayIndexPropertiesEfficient 	#only databaseNetworkObject.arrayIndexPropertiesStrengthIndex stored in database, all tensors are coalesced
 	if(databaseNetworkObject is None):
@@ -506,54 +441,13 @@ def printCountTotalParametersRun(databaseNetworkObject):
 		conceptIndex = databaseNetworkObject.conceptColumnsDict.get(lemma)
 		if(conceptIndex is None):
 			raise RuntimeError("printCountTotalParametersRun error: conceptIndex is None for lemma = " + lemma)
-		columnConnections = debugCountObservedColumnConnections(databaseNetworkObject, conceptIndex, lemma, columnIndex)
+		columnConnections = GIAANNproto_debug.debugCountObservedColumnConnections(databaseNetworkObject, conceptIndex, lemma, columnIndex)
 		totalConnections += columnConnections
-	database_pt_size_gb = debugCalculateDatabasePtSizeGiB()
-	memory_gb = debugCalculateDatabaseSizeGiB()
+	database_pt_size_gb = GIAANNproto_debug.debugCalculateDatabasePtSizeGiB()
+	memory_gb = GIAANNproto_debug.debugCalculateDatabaseSizeGiB()
 	if(printCountTotalParameters):
 		print("printCountTotalParameters totalConnections = ", totalConnections)
 		print("printCountTotalParameters totalColumns = ", totalColumns)
 		print(f"Total .pt size (uncompressed GiB): {database_pt_size_gb:.3f}")
 		print(f"Total database size (uncompressed GiB): {memory_gb:.3f}")
 	return memory_gb
-
-def debugCalculateDatabasePtSizeGiB():
-	if(not os.path.isdir(databaseFolder)):
-		raise RuntimeError("debugCalculateDatabasePtSizeGiB error: missing databaseFolder = " + databaseFolder)
-	totalPtBytesUncompressed = 0
-	for directoryPath, directoryNames, fileNames in os.walk(databaseFolder):
-		if(directoryNames is None):
-			raise RuntimeError("debugCalculateDatabasePtSizeGiB error: directoryNames is None")
-		for fileName in fileNames:
-			filePath = os.path.join(directoryPath, fileName)
-			if(not os.path.isfile(filePath)):
-				raise RuntimeError("debugCalculateDatabasePtSizeGiB error: path is not a file = " + filePath)
-			if(fileName.lower().endswith(pytorchTensorFileExtension.lower())):
-				totalPtBytesUncompressed += os.path.getsize(filePath)
-	totalPtGiB = totalPtBytesUncompressed / (1024 ** 3)
-	return totalPtGiB
-
-def debugCalculateDatabaseSizeGiB():
-	if(not os.path.isdir(databaseFolder)):
-		raise RuntimeError("debugCalculateDatabaseSizeGiB error: missing databaseFolder = " + databaseFolder)
-	totalDatabaseBytesUncompressed = 0
-	for directoryPath, directoryNames, fileNames in os.walk(databaseFolder):
-		if(directoryNames is None):
-			raise RuntimeError("debugCalculateDatabaseSizeGiB error: directoryNames is None")
-		for fileName in fileNames:
-			filePath = os.path.join(directoryPath, fileName)
-			if(not os.path.isfile(filePath)):
-				raise RuntimeError("debugCalculateDatabaseSizeGiB error: path is not a file = " + filePath)
-			totalDatabaseBytesUncompressed += os.path.getsize(filePath)
-	totalDatabaseGiB = totalDatabaseBytesUncompressed / (1024 ** 3)
-	return totalDatabaseGiB
-
-def countNonZero(t):
-	# Works for sparse COO/CSR/CSC/BSR/BSC and dense tensors
-	if isinstance(t, pt.Tensor):
-		if t.is_sparse or (hasattr(t, "layout") and t.layout in {
-			pt.sparse_coo, pt.sparse_csr, pt.sparse_csc, pt.sparse_bsr, pt.sparse_bsc
-		}):
-			return int(t._nnz())
-		return int(pt.count_nonzero(t).item())
-	return 0
