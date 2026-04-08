@@ -566,7 +566,7 @@ MANUAL; - add oscar useBenchmark:useBenchmarkDefaults=False training/test-set ev
 - patch printInferenceTop1AccuracyBitsPerByte - restore the pre-BPB inference candidate-selection path when printInferenceTop1AccuracyBitsPerByte=False by limiting the new node-level constraint filtering to the BPB probability-calculation path only.
 
 ---
-v1l (Codex IDE GPT-5.4) [under development]:
+v1l (Codex IDE GPT-5.4):
 - add proto GIAANNproto1l1a - divide the database observed columns connections tensors into a tensor per source feature
 	1. create a separate database subfolder per observed column index (c), and create a separate database connections file per observed column source feature index (f). Only create connections files (f) for source features that exist for a given observed column. If storeDatabaseInRam=False, the observed column source features connections dictionary only loads the source features required by a sequence during train or inference - it will rarely be completely full. (For reference, this ammendment concerns a critical design change to your plan item: "Save one file per observed column for the split connections").
 	2. ensure to retain all optional storeDatabaseInRam=True/False logic. Ie if storeDatabaseInRam=True, it loads the entire database into ram on startup (device useGPUdatabase), populating all ObservedColumn.featureConnectionsBySourceFeature dictionaries. Otherwise these observed columns are only ever temporarily populated, and only with the source features requried by their train/inference sequence.
@@ -704,7 +704,11 @@ MANUAL; - remove option updateObservedColumnsVerboseSourceFeatureConnectionsOnly
 - move all explicit debugging functions in codebase to GIAANNproto_debug
 /MANUAL; - reintroduce an alternative version of updateObservedColumnsEfficient() optimisationArrayIndexPropertiesEfficientSerial=True (before upgrade updateObservedColumnsEfficient() so that both "#A: update feature neurons" and "#B: update feature connections" are performed simultaneously across all columns and source features).
 - upgrade the alternative option (optimisationArrayIndexPropertiesEfficientSerial=True) to use less GPU RAM:
-	1. in prepareObservedColumnsForTrainSequence(), if if(optimisationArrayIndexPropertiesEfficientSerial): do not execute prepareRequiredSourceFeatureConnectionsTrain()
-	2. in updateObservedColumnsEfficient(),  if if(optimisationArrayIndexPropertiesEfficientSerial): step "#B: update feature connections" loads the sequence source feature connections tensors serially on demand (and only store them in GPU ram temporarily per sequence token).
+	1. in prepareObservedColumnsForTrainSequence(), if(optimisationArrayIndexPropertiesEfficientSerial): do not execute prepareRequiredSourceFeatureConnectionsTrain()
+	2. in updateObservedColumnsEfficient(), if(optimisationArrayIndexPropertiesEfficientSerial): step "#B: update feature connections" loads the sequence source feature connections tensors serially on demand (and only store them in GPU ram temporarily per sequence token).
 MANUAL; - split options optimisationArrayIndexPropertiesEfficientSerialConnections and optimisationArrayIndexPropertiesEfficientSerialNeurons (from optimisationArrayIndexPropertiesEfficientSerial) for clarity.
 - implement Phase-local peak profiling within context if(debugPrintRamMaxUsagePhaseLocal==True)
+
+---
+v1m (Codex IDE GPT-5.4) [under development]:
+- add proto GIAANNproto1m1a - remove options enforceDirectConnectionsMinWordDistance and arrayIndexPropertiesMinWordDistance entirely from the codebase (assume they are both False).

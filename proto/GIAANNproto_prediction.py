@@ -435,7 +435,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	conceptColumnIndexTensorActivation = conceptColumnIndexTensor
 	conceptColumnFeatureIndexTensorActivation = conceptColumnFeatureIndexTensor
 	
-	if(predictionEnsureConnectedToPreviousPrediction or enforceDirectConnectionsMinWordDistance):
+	if(predictionEnsureConnectedToPreviousPrediction):
 		if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 			if(not (seedPhase and enforceDirectConnectionsIgnoreSeed)):
 				ensurePredictionStateAvailable(conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected context available before prediction")
@@ -570,10 +570,10 @@ def calculateConnectedColumnsConstraint(databaseNetworkObject, observedColumnsDi
 	#set predictionEnsureConnectedToPreviousPrediction connectedColumnsConstraint/connectedColumnsFeatureMap;
 	connectedColumnsConstraint = None
 	connectedColumnsFeatureMap = None
-	if((predictionEnsureConnectedToPreviousPrediction or enforceDirectConnectionsMinWordDistance) and (inferenceSeedNetwork and sequenceWordIndex > 0) and not (seedPhase and enforceDirectConnectionsIgnoreSeed)):
+	if(predictionEnsureConnectedToPreviousPrediction and (inferenceSeedNetwork and sequenceWordIndex > 0) and not (seedPhase and enforceDirectConnectionsIgnoreSeed)):
 		#limit prediction candidates to columns directly connected to previously predicted nodes
 		connectedColumnsConstraint, connectedColumnsFeatureMap = GIAANNproto_predictionConstraints.buildConnectedColumnsLookupFromPrediction(databaseNetworkObject, observedColumnsDict, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor)
-	if((predictionEnsureConnectedToPreviousPrediction or enforceDirectConnectionsMinWordDistance) and (inferenceSeedNetwork and sequenceWordIndex > 0) and connectedColumnsConstraint is not None and connectedColumnsConstraint.numel() == 0 and inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+	if(predictionEnsureConnectedToPreviousPrediction and (inferenceSeedNetwork and sequenceWordIndex > 0) and connectedColumnsConstraint is not None and connectedColumnsConstraint.numel() == 0 and inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		GIAANNproto_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "previous prediction has no outgoing connections")
 	return connectedColumnsConstraint, connectedColumnsFeatureMap
 
@@ -676,7 +676,7 @@ def selectNextColumnFeatureSeedPhase(sequenceObservedColumns, databaseNetworkObj
 		raise RuntimeError("processColumnInferencePrediction error: multiple prediction candidates not supported")
 	conceptColumnIndexNext = int(conceptColumnIndexNextTensor.squeeze().item())
 	conceptColumnFeatureIndexNext = int(conceptColumnFeatureIndexNextTensor.squeeze().item())
-	if((predictionEnsureConnectedToPreviousPrediction or enforceDirectConnectionsMinWordDistance) and connectedColumnsConstraint is not None):
+	if(predictionEnsureConnectedToPreviousPrediction and connectedColumnsConstraint is not None):
 		if(conceptColumnIndexNext is None):
 			GIAANNproto_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected predictions available for current step")
 		if(conceptColumnIndexNext is None):

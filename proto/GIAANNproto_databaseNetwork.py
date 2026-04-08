@@ -66,7 +66,6 @@ class DatabaseNetworkClass():
 			self.arrayIndexPropertiesActivationIndex = arrayIndexPropertiesActivationIndexInference
 			self.arrayIndexPropertiesTimeIndex = arrayIndexPropertiesTimeIndexInference
 			self.arrayIndexPropertiesPosIndex = arrayIndexPropertiesPosIndexInference
-			self.arrayIndexPropertiesMinWordDistanceIndex = arrayIndexPropertiesMinWordDistanceIndexInference
 		else:
 			self.arrayNumberOfProperties = arrayNumberOfPropertiesTrain
 			self.arrayIndexPropertiesStrengthIndex = arrayIndexPropertiesStrengthIndexTrain
@@ -74,7 +73,6 @@ class DatabaseNetworkClass():
 			self.arrayIndexPropertiesActivationIndex = arrayIndexPropertiesActivationIndexTrain
 			self.arrayIndexPropertiesTimeIndex = arrayIndexPropertiesTimeIndexTrain
 			self.arrayIndexPropertiesPosIndex = arrayIndexPropertiesPosIndexTrain
-			self.arrayIndexPropertiesMinWordDistanceIndex = arrayIndexPropertiesMinWordDistanceIndexTrain
 		return
 		
 def backupGlobalArrays(databaseNetworkObject):

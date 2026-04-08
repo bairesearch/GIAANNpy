@@ -551,8 +551,6 @@ class SequenceObservedColumns:
 		if(replacePropertiesEnabled):
 			featureNeuronsCurrentSparse = self.featureNeurons.to_sparse()
 			featureConnectionsCurrentSparse = self.featureConnections.to_sparse()
-		elif(arrayIndexPropertiesMinWordDistance):
-			featureConnectionsCurrentSparse = self.featureConnections.to_sparse()
 		elif(arrayIndexPropertiesPos):
 			featureNeuronsCurrentSparse = self.featureNeurons.to_sparse()
 			featureConnectionsCurrentSparse = self.featureConnections.to_sparse()
@@ -587,9 +585,6 @@ class SequenceObservedColumns:
 				replacePropertyIndicesList.append(databaseNetworkObject.arrayIndexPropertiesTimeIndex)
 			replacePropertyIndices = pt.tensor(replacePropertyIndicesList, dtype=pt.long)
 			replacePropertyMaskLookup = self.buildMaskLookup(self.databaseNetworkObject.arrayNumberOfProperties, replacePropertyIndices.to(featureNeuronsDeltaSparse.device), featureNeuronsDeltaSparse.device)
-		if(arrayIndexPropertiesMinWordDistance):
-			minPropertyIndices = pt.tensor([databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex], dtype=pt.long)
-			minPropertyMaskLookup = self.buildMaskLookup(self.databaseNetworkObject.arrayNumberOfProperties, minPropertyIndices.to(featureConnectionsCurrentSparse.device), featureConnectionsCurrentSparse.device)
 
 		featureIndicesInObserved, fIdxTensor = self.getObservedColumnFeatureIndices()
 		fIdxTensorDevice = fIdxTensor.to(featureNeuronsDeltaSparse.device)
@@ -688,7 +683,6 @@ class SequenceObservedColumns:
 			connectionUpdatesAddBySourceFeature = {}
 			connectionUpdatesReplaceBySourceFeature = {}
 			connectionUpdatesPosBySourceFeature = {}
-			connectionUpdatesMinBySourceFeature = {}
 			if(addPropertiesEnabled):
 				connectionUpdatesAdd = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsDeltaSparse, addPropertyMaskLookup, sequenceFeatureMaskLookup, connectionMaterialisedTargetSize)
 				connectionUpdatesAddBySourceFeature = self.splitConnectionUpdateSparseBySourceFeature(connectionUpdatesAdd, connectionTargetSize)
@@ -698,10 +692,7 @@ class SequenceObservedColumns:
 			if(arrayIndexPropertiesPos):
 				connectionUpdatesPos = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsCurrentSparse, posPropertyMaskLookupConnection, sequenceFeatureMaskLookup, connectionMaterialisedTargetSize)
 				connectionUpdatesPosBySourceFeature = self.splitConnectionUpdateSparseBySourceFeature(connectionUpdatesPos, connectionTargetSize)
-			if(arrayIndexPropertiesMinWordDistance):
-				connectionUpdatesMin = self.extractSequenceConnectionUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureConnectionsCurrentSparse, minPropertyMaskLookup, sequenceFeatureMaskLookup, connectionMaterialisedTargetSize)
-				connectionUpdatesMinBySourceFeature = self.splitConnectionUpdateSparseBySourceFeature(connectionUpdatesMin, connectionTargetSize)
-			connectionSourceFeatureIndices = self.getVerboseConnectionSourceFeatureIndices(observedColumn, conceptIndex, [connectionUpdatesAddBySourceFeature, connectionUpdatesReplaceBySourceFeature, connectionUpdatesPosBySourceFeature, connectionUpdatesMinBySourceFeature])
+			connectionSourceFeatureIndices = self.getVerboseConnectionSourceFeatureIndices(observedColumn, conceptIndex, [connectionUpdatesAddBySourceFeature, connectionUpdatesReplaceBySourceFeature, connectionUpdatesPosBySourceFeature])
 			for sourceFeatureIndex in connectionSourceFeatureIndices:
 				connectionTargetSparse = observedColumn.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=deviceSparse, createMissing=False).coalesce()
 				connectionSourceTargetSize = connectionTargetSparse.size()
@@ -709,15 +700,12 @@ class SequenceObservedColumns:
 				connectionUpdatesAddSource = emptyConnectionUpdates
 				connectionUpdatesReplaceSource = emptyConnectionUpdates
 				connectionUpdatesPosSource = emptyConnectionUpdates
-				connectionUpdatesMinSource = emptyConnectionUpdates
 				if(addPropertiesEnabled):
 					connectionUpdatesAddSource = connectionUpdatesAddBySourceFeature.get(sourceFeatureIndex, emptyConnectionUpdates)
 				if(replacePropertiesEnabled):
 					connectionUpdatesReplaceSource = connectionUpdatesReplaceBySourceFeature.get(sourceFeatureIndex, emptyConnectionUpdates)
 				if(arrayIndexPropertiesPos):
 					connectionUpdatesPosSource = connectionUpdatesPosBySourceFeature.get(sourceFeatureIndex, emptyConnectionUpdates)
-				if(arrayIndexPropertiesMinWordDistance):
-					connectionUpdatesMinSource = connectionUpdatesMinBySourceFeature.get(sourceFeatureIndex, emptyConnectionUpdates)
 				if(replacePropertiesEnabled):
 					connectionIndices = connectionTargetSparse.indices()
 					connectionValues = connectionTargetSparse.values()
@@ -733,8 +721,6 @@ class SequenceObservedColumns:
 					combinedConnectionUpdates = connectionUpdatesAddSource
 				if(addPropertiesEnabled):
 					connectionTargetSparse = self.addSparseUpdate(connectionTargetSparse, combinedConnectionUpdates)
-				if(arrayIndexPropertiesMinWordDistance):
-					connectionTargetSparse = self.applySparseMinUpdate(connectionTargetSparse, connectionUpdatesMinSource)
 				if(arrayIndexPropertiesPos):
 					connectionTargetSparse = self.applySparseMaxUpdate(connectionTargetSparse, connectionUpdatesPosSource)
 				observedColumn.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, connectionTargetSparse)
@@ -789,18 +775,7 @@ class SequenceObservedColumns:
 		connectionValues = featureConnectionsDeltaSparse.values()
 		connectionIndices, connectionValues = self.filterSparseByFeatureMask(connectionIndices, connectionValues, sequenceFeatureMaskConnection, [3, 5])
 
-		connectionMinIndices = None
-		connectionMinValues = None
 		connectionSourceCombinedKeys = None
-		connectionMinSourceCombinedKeys = None
-		if(arrayIndexPropertiesMinWordDistance):
-			connectionMin = self.featureConnections[databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex]
-			connectionMinSparse = connectionMin.to_sparse()
-			if not useGPUsparse:
-				connectionMinSparse = connectionMinSparse.to(deviceSparse)
-			connectionMinIndices = connectionMinSparse.indices()
-			connectionMinValues = connectionMinSparse.values()
-			connectionMinIndices, connectionMinValues = self.filterSparseByFeatureMask(connectionMinIndices, connectionMinValues, sequenceFeatureMaskConnection, [3, 5])
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
 			getObservedColumnsByConceptIndexStartTime = None
 			if(debugPrintTrainSectionTimes):
@@ -880,26 +855,16 @@ class SequenceObservedColumns:
 			connectionStorageDevice = self.getConnectionSerialStorageDevice()
 
 			connectionRanges, connectionIndicesSorted, connectionValuesSorted = self.buildSparseColumnRanges(connectionIndices, connectionValues, 2)
-			connectionMinRanges = {}
-			if(arrayIndexPropertiesMinWordDistance and connectionMinIndices is not None and connectionMinValues is not None):
-				connectionMinRanges, connectionMinIndicesSorted, connectionMinValuesSorted = self.buildSparseColumnRanges(connectionMinIndices, connectionMinValues, 2)
 
 			for cIdx, observedColumn in sequenceObservedColumnsDict.items():
 				connectionRange = connectionRanges.get(cIdx)
-				minRange = connectionMinRanges.get(cIdx) if arrayIndexPropertiesMinWordDistance else None
-				if(connectionRange is not None or minRange is not None):
+				if(connectionRange is not None):
 					connectionTargetSize = observedColumn.getFeatureConnectionsTargetSize()
 					connectionTargetsBySourceFeature = {}
-					if(connectionRange is not None):
-						start, end = connectionRange
-						connectionUpdateIndices = connectionIndicesSorted[:, start:end]
-						connectionUpdateValues = connectionValuesSorted[start:end]
-						self.applyConnectionSourceFeaturePropertyUpdates(connectionTargetsBySourceFeature, observedColumn, connectionUpdateIndices, connectionUpdateValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor, connectionTargetSize, connectionDevice, False, connectionStorageDevice)
-					if(minRange is not None):
-						start, end = minRange
-						minUpdateIndices = connectionMinIndicesSorted[:, start:end]
-						minUpdateValues = connectionMinValuesSorted[start:end]
-						self.applyConnectionSourceFeaturePropertyUpdates(connectionTargetsBySourceFeature, observedColumn, minUpdateIndices, minUpdateValues, databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor, connectionTargetSize, connectionDevice, True, connectionStorageDevice)
+					start, end = connectionRange
+					connectionUpdateIndices = connectionIndicesSorted[:, start:end]
+					connectionUpdateValues = connectionValuesSorted[start:end]
+					self.applyConnectionSourceFeaturePropertyUpdates(connectionTargetsBySourceFeature, observedColumn, connectionUpdateIndices, connectionUpdateValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor, connectionTargetSize, connectionDevice, connectionStorageDevice)
 					updatedSourceFeatureIndices = sorted(connectionTargetsBySourceFeature.keys())
 					for sourceFeatureIndex in updatedSourceFeatureIndices:
 						observedColumn.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, connectionTargetsBySourceFeature[sourceFeatureIndex])
@@ -909,25 +874,13 @@ class SequenceObservedColumns:
 		else:
 			if(connectionIndices.numel() > 0):
 				connectionSourceCombinedKeys = self.buildConnectionSourceCombinedKeys(connectionIndices, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor)
-			if(arrayIndexPropertiesMinWordDistance):
-				if(connectionMinIndices is not None and connectionMinIndices.numel() > 0):
-					connectionMinSourceCombinedKeys = self.buildConnectionSourceCombinedKeys(connectionMinIndices, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor)
-			connectionSourceCombinedKeysList = []
 			if(connectionSourceCombinedKeys is not None and connectionSourceCombinedKeys.numel() > 0):
-				connectionSourceCombinedKeysList.append(connectionSourceCombinedKeys)
-			if(connectionMinSourceCombinedKeys is not None and connectionMinSourceCombinedKeys.numel() > 0):
-				connectionSourceCombinedKeysList.append(connectionMinSourceCombinedKeys)
-			if(len(connectionSourceCombinedKeysList) > 0):
-				connectionSourceCombinedKeysUnique = pt.unique(pt.cat(connectionSourceCombinedKeysList, dim=0), sorted=True)
+				connectionSourceCombinedKeysUnique = pt.unique(connectionSourceCombinedKeys, sorted=True)
 				connectionTargetSize = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, connectionSourceCombinedKeysUnique.shape[0], databaseNetworkObject.c, databaseNetworkObject.f)
 				connectionTargetSparse = self.gatherConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionDevice)
 				if(connectionIndices.numel() > 0):
 					connectionUpdates = self.buildConnectionSourceBucketUpdateSparse(connectionIndices, connectionValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor, connectionSourceCombinedKeysUnique, connectionTargetSize)
 					connectionTargetSparse = self.addSparseUpdateNonNegative(connectionTargetSparse, connectionUpdates)
-				if(arrayIndexPropertiesMinWordDistance):
-					if(connectionMinIndices is not None and connectionMinIndices.numel() > 0):
-						connectionMinUpdates = self.buildConnectionSourceBucketUpdateSparse(connectionMinIndices, connectionMinValues, databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor, connectionSourceCombinedKeysUnique, connectionTargetSize)
-						connectionTargetSparse = self.applySparseMinUpdate(connectionTargetSparse, connectionMinUpdates)
 				self.scatterConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionTargetSparse)
 			
 		if(GIAANNproto_debug.debugPrintGPUramUsage):
@@ -1341,7 +1294,7 @@ class SequenceObservedColumns:
 		result = pt.device("cpu")
 		return result
 
-	def applyConnectionSourceFeaturePropertyUpdates(self, connectionTargetsBySourceFeature, observedColumn, indices, values, propertyIndex, featureIndicesInObserved, conceptIndicesTensor, connectionTargetSize, connectionDevice, useMinUpdate, connectionStorageDevice=None):
+	def applyConnectionSourceFeaturePropertyUpdates(self, connectionTargetsBySourceFeature, observedColumn, indices, values, propertyIndex, featureIndicesInObserved, conceptIndicesTensor, connectionTargetSize, connectionDevice, connectionStorageDevice=None):
 		if(indices.numel() > 0):
 			branch = indices[0]
 			segment = indices[1]
@@ -1377,10 +1330,7 @@ class SequenceObservedColumns:
 						connectionTargetSparse = connectionTargetSparse.to(connectionDevice)
 				else:
 					connectionTargetSparse = observedColumn.prepareFeatureConnectionsForSourceFeature(normalisedSourceFeatureIndex, targetDevice=connectionDevice, createMissing=False)
-				if(useMinUpdate):
-					connectionTargetSparse = self.applySparseMinUpdate(connectionTargetSparse, updateSparse)
-				else:
-					connectionTargetSparse = self.addSparseUpdateNonNegative(connectionTargetSparse, updateSparse)
+				connectionTargetSparse = self.addSparseUpdateNonNegative(connectionTargetSparse, updateSparse)
 				if(connectionStorageDevice is not None):
 					if(connectionTargetSparse.device != connectionStorageDevice):
 						connectionTargetSparse = connectionTargetSparse.to(connectionStorageDevice)
@@ -1444,46 +1394,6 @@ class SequenceObservedColumns:
 			strides[i] = strides[i+1] * sizeTensor[i+1]
 		linear = (indices * strides.unsqueeze(1)).sum(dim=0)
 		return linear
-
-	def applySparseMinUpdate(self, targetSparse, updateSparse):
-		updatedSparse = targetSparse.coalesce()
-		updateSparse = updateSparse.coalesce()
-		targetIndices = updatedSparse.indices()
-		targetValues = updatedSparse.values()
-		updateIndices = updateSparse.indices()
-		updateValues = updateSparse.values()
-		if(updateIndices.numel() > 0):
-			targetLinear = self.flattenSparseIndices(targetIndices, updatedSparse.size())
-			updateLinear = self.flattenSparseIndices(updateIndices, updatedSparse.size())
-			sortedTargetLinear, sortOrder = pt.sort(targetLinear)
-			if(sortedTargetLinear.numel() > 0):
-				updatePos = pt.searchsorted(sortedTargetLinear, updateLinear)
-				inBounds = updatePos < sortedTargetLinear.numel()
-				clampedPos = updatePos.clamp(max=sortedTargetLinear.numel()-1)
-				matchMask = inBounds & (sortedTargetLinear[clampedPos] == updateLinear)
-			else:
-				updatePos = pt.zeros_like(updateLinear, dtype=pt.long)
-				matchMask = pt.zeros_like(updateLinear, dtype=pt.bool)
-
-			updatedTargetValues = targetValues
-			if(matchMask.any()):
-				matchedPositions = updatePos[matchMask]
-				matchedTargetIndices = sortOrder[matchedPositions]
-				updatedTargetValues = targetValues.clone()
-				updatedTargetValues[matchedTargetIndices] = pt.minimum(updatedTargetValues[matchedTargetIndices], updateValues[matchMask])
-
-			nonMatchMask = pt.logical_not(matchMask)
-			if(nonMatchMask.any()):
-				newIndices = updateIndices[:, nonMatchMask]
-				newValues = updateValues[nonMatchMask]
-				combinedIndices = pt.cat([targetIndices, newIndices], dim=1)
-				combinedValues = pt.cat([updatedTargetValues, newValues], dim=0)
-			else:
-				combinedIndices = targetIndices
-				combinedValues = updatedTargetValues
-
-			updatedSparse = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=updatedSparse.size(), dtype=arrayType, device=deviceSparse)
-		return updatedSparse
 
 	def applySparseMaxUpdate(self, targetSparse, updateSparse):
 		updatedSparse = targetSparse.coalesce()

@@ -42,7 +42,7 @@ if(useQuickExecution):
 	executionMode = "inference" 	#mandatory: "inference" (effective trainAndInference but uses a text datafile)
 	inferenceTrainFirstSequences = True	#trains first sequences in inference_prompt.txt, performs inference only on last sequence
 elif(useBenchmark):
-	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 else:
@@ -105,7 +105,7 @@ if(useQuickExecution):
 	trainMaxSequences = 10	#N/A: auto generated from inference_prompt.txt.trainAndInference
 	databaseFolderBase = "../database"	#default: "../database/"
 elif(useBenchmark):
-	trainMaxSequences = 200000	#5000, 200000, 1000000
+	trainMaxSequences = 5000	#5000, 200000, 1000000
 	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"
 elif(useAutoresearch):
 	trainMaxSequences = 5000
@@ -316,21 +316,15 @@ useSANI = True	#default: True	#orig: False	#sequentially activated neuronal inpu
 enforceDirectConnections = True	#default: True	#orig: False	#prediction requires a direct connection from previous prediction as observed during training (ie adjacent tokens)
 if(enforceDirectConnections):
 	enforceDirectConnectionsSANI = True	#default: True #orig: False	#enforce activation of first segment (direct feature connection)
-	enforceDirectConnectionsMinWordDistance = False	#default: False #orig: True	#enforce min word distance (=1) during inference
 	enforceDirectConnectionsIgnoreSeed = True	#default: True #orig: False
 else:
 	enforceDirectConnectionsSANI = False
-	enforceDirectConnectionsMinWordDistance = False
 	enforceDirectConnectionsIgnoreSeed = False
 if(enforceDirectConnectionsSANI):
 	useSANI = True	#sequentially activated neuronal input (divide dendrites into segments)	#override
 	enforceDirectConnectionsSANIminimal = False	#default: False	#orig: True	#deprecated
 else:
 	enforceDirectConnectionsSANIminimal = False
-if(enforceDirectConnectionsMinWordDistance):
-	arrayIndexPropertiesMinWordDistance = True	#store min word distance per connection
-else:
-	arrayIndexPropertiesMinWordDistance = False	#optional	#default: False
 minimumPredictionActivationThreshold = 0.0	#explicit threshold application not required (for verification only)
 predictionEnsureConnectedToPreviousPrediction = True	#default: True	#ensure every new prediction connects to previous node (requirement is independent of enforceDirectConnections)
 
@@ -593,7 +587,6 @@ if(debugLimitFeatures):
 	debugLimitFeaturesCMax = 207910
 	debugLimitFeaturesFMax = 50089
 
-debugPrintMinWordDistanceDetails = False
 debugOnlyDrawBranchIndexConnections = False
 debugOnlyDrawBranchIndexX = 0
 
@@ -725,13 +718,11 @@ arrayIndexPropertiesPermanenceIndexTrain = None
 arrayIndexPropertiesActivationIndexTrain = None
 arrayIndexPropertiesTimeIndexTrain = None
 arrayIndexPropertiesPosIndexTrain = None
-arrayIndexPropertiesMinWordDistanceIndexTrain = None	#optional property storing min distance between connected words
 arrayIndexPropertiesStrengthIndexInference = None
 arrayIndexPropertiesPermanenceIndexInference = None
 arrayIndexPropertiesActivationIndexInference = None
 arrayIndexPropertiesTimeIndexInference = None
 arrayIndexPropertiesPosIndexInference = None
-arrayIndexPropertiesMinWordDistanceIndexInference = None	#optional property storing min distance between connected words
 arrayPropertiesListTrain = []
 if(arrayIndexPropertiesStrength):
 	arrayIndexPropertiesStrengthIndexTrain = len(arrayPropertiesListTrain)
@@ -748,9 +739,6 @@ if(arrayIndexPropertiesTime):
 if(arrayIndexPropertiesPos):
 	arrayIndexPropertiesPosIndexTrain = len(arrayPropertiesListTrain)
 	arrayPropertiesListTrain.append(arrayIndexPropertiesPosIndexTrain)
-if(arrayIndexPropertiesMinWordDistance):
-	arrayIndexPropertiesMinWordDistanceIndexTrain = len(arrayPropertiesListTrain)
-	arrayPropertiesListTrain.append(arrayIndexPropertiesMinWordDistanceIndexTrain)
 arrayNumberOfPropertiesTrain = len(arrayPropertiesListTrain)
 arrayPropertiesListInference = []
 if(arrayIndexPropertiesStrength):
@@ -768,9 +756,6 @@ if(arrayIndexPropertiesTimeCreateInference):
 if(arrayIndexPropertiesPos):
 	arrayIndexPropertiesPosIndexInference = len(arrayPropertiesListInference)
 	arrayPropertiesListInference.append(arrayIndexPropertiesPosIndexInference)
-if(arrayIndexPropertiesMinWordDistance):
-	arrayIndexPropertiesMinWordDistanceIndexInference = len(arrayPropertiesListInference)
-	arrayPropertiesListInference.append(arrayIndexPropertiesMinWordDistanceIndexInference)
 arrayNumberOfPropertiesInference = len(arrayPropertiesListInference)
 
 
@@ -1061,7 +1046,6 @@ if(printConfiguration):
 	print("#Immediate (direct) connections;")
 	print("enforceDirectConnections:", enforceDirectConnections)
 	print("enforceDirectConnectionsSANI:", enforceDirectConnectionsSANI)
-	print("enforceDirectConnectionsMinWordDistance:", enforceDirectConnectionsMinWordDistance)
 	print("")
 	print("#Concept column delimiters:")
 	print("pretrainConceptColumnsDelimitByPOSenforce:", pretrainConceptColumnsDelimitByPOSenforce)

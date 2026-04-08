@@ -159,8 +159,7 @@ def getTrainToInferencePropertyIndexMap():
 		(arrayIndexPropertiesPermanenceIndexTrain, arrayIndexPropertiesPermanenceIndexInference),
 		(arrayIndexPropertiesActivationIndexTrain, arrayIndexPropertiesActivationIndexInference),
 		(arrayIndexPropertiesTimeIndexTrain, arrayIndexPropertiesTimeIndexInference),
-		(arrayIndexPropertiesPosIndexTrain, arrayIndexPropertiesPosIndexInference),
-		(arrayIndexPropertiesMinWordDistanceIndexTrain, arrayIndexPropertiesMinWordDistanceIndexInference)
+		(arrayIndexPropertiesPosIndexTrain, arrayIndexPropertiesPosIndexInference)
 	]
 	for trainPropertyIndex, inferencePropertyIndex in propertyIndexPairs:
 		if(trainPropertyIndex is not None):

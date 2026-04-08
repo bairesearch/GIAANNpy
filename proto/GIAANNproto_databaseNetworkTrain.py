@@ -133,8 +133,6 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 		#OLD inferenceUseNeuronFeaturePropertiesTime=False: sequenceObservedColumns.featureConnections[databaseNetworkObject.arrayIndexPropertiesTimeIndex, :, :, :, :, :, :] = featureConnectionsInactive*sequenceObservedColumns.featureConnections[databaseNetworkObject.arrayIndexPropertiesTimeIndex] + featureConnectionsActive*sequenceIndex
 	if(arrayIndexPropertiesPos):
 		sequenceObservedColumns.featureConnections[databaseNetworkObject.arrayIndexPropertiesPosIndex, :, :, :, :, :, :] = featureConnectionsInactive*sequenceObservedColumns.featureConnections[databaseNetworkObject.arrayIndexPropertiesPosIndex] + featureConnectionsActive*featureConnectionsPos
-	if(arrayIndexPropertiesMinWordDistance):
-		updateConnectionMinWordDistances(sequenceObservedColumns, featureConnectionsActive, featureNeuronsWordOrder)
 
 	if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections and arrayIndexPropertiesPermanence):
 		decreasePermanenceActive(sequenceObservedColumns, featureNeuronsActiveUnion, featureNeuronsInactiveUnion, sequenceConceptIndexMask, featureNeuronsSegmentMask, featureConnectionsSegmentMask)
@@ -152,28 +150,6 @@ def applyTrainConnectionStrengthLimits(sequenceObservedColumns):
 		sequenceObservedColumns.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex] = sequenceObservedColumns.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex].clamp(max=1.0)
 	if(trainConnectionStrengthLimitTanh):
 		sequenceObservedColumns.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex] = pt.tanh(sequenceObservedColumns.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex])
-
-def updateConnectionMinWordDistances(sequenceObservedColumns, featureConnectionsActive, featureNeuronsWordOrder):
-	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
-	if(featureNeuronsWordOrder is None):
-		return
-	cs = sequenceObservedColumns.cs
-	fs = sequenceObservedColumns.fs
-	device = featureConnectionsActive.device
-	wordOrderTensor = featureNeuronsWordOrder.to(device)
-	wordOrderSource = wordOrderTensor.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
-	wordOrderTarget = wordOrderTensor.view(1, 1, cs, fs).expand(cs, fs, cs, fs)
-	wordDistances = pt.abs(wordOrderTarget - wordOrderSource).to(arrayType)
-	wordDistances = wordDistances.unsqueeze(0).unsqueeze(0).expand(numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs)
-	wordDistances = wordDistances * featureConnectionsActive
-	updateMask = featureConnectionsActive > 0
-	validDistanceMask = updateMask & (wordDistances > 0)
-	connectionMinDistances = sequenceObservedColumns.featureConnections[databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex]
-	firstWriteMask = validDistanceMask & (connectionMinDistances == 0)
-	connectionMinDistances = pt.where(firstWriteMask, wordDistances, connectionMinDistances)
-	smallerMask = validDistanceMask & (connectionMinDistances > 0) & (wordDistances < connectionMinDistances)
-	connectionMinDistances = pt.where(smallerMask, wordDistances, connectionMinDistances)
-	sequenceObservedColumns.featureConnections[databaseNetworkObject.arrayIndexPropertiesMinWordDistanceIndex] = connectionMinDistances
 
 def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder):
 
