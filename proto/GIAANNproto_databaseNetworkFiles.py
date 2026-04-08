@@ -450,10 +450,18 @@ def observedColumnSaveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsTo
 	if(saveAllSourceFeatures):
 		sourceFeatureIndicesToSave = None
 	else:
-		if(not storeDatabaseInRam and self.hasTrainPreparedSourceFeatureIndices()):
-			sourceFeatureIndicesToSave = self.getTrainPreparedSourceFeatureIndices()
+		if(not storeDatabaseInRam):
+			if(self.hasTrainPreparedSourceFeatureIndices()):
+				sourceFeatureIndicesToSave = self.getTrainPreparedSourceFeatureIndices()
+			elif(optimisationArrayIndexPropertiesEfficientSerialConnections):
+				if(len(self.loadedSourceFeatureIndices) == 0):
+					sourceFeatureIndicesToSave = []
+				else:
+					raise RuntimeError("observedColumnSaveToDisk error: optimisationArrayIndexPropertiesEfficientSerialConnections requires trainPreparedSourceFeatureIndices for loaded source feature tensors")
+			else:
+				raise RuntimeError("observedColumnSaveToDisk(saveAllSourceFeatures) requires self.hasTrainPreparedSourceFeatureIndices() or optimisationArrayIndexPropertiesEfficientSerialConnections")
 		else:
-			printe("observedColumnSaveToDisk(saveAllSourceFeatures) requires !storeDatabaseInRam and self.hasTrainPreparedSourceFeatureIndices()")
+			raise RuntimeError("observedColumnSaveToDisk(saveAllSourceFeatures) requires !storeDatabaseInRam")
 	self.saveLoadedSourceFeatureConnectionsToDisk(sourceFeatureIndicesToSave)
 	
 	if lowMem:

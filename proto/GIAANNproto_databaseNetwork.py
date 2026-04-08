@@ -354,8 +354,11 @@ def prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFe
 			raise RuntimeError(f"prepareObservedColumnsForTrainSequence error: requiredSourceFeatureIndices is None for conceptIndex {conceptIndex}")
 		if(len(requiredSourceFeatureIndices) == 0):
 			raise RuntimeError(f"prepareObservedColumnsForTrainSequence error: requiredSourceFeatureIndices is empty for conceptIndex {conceptIndex}")
-		observedColumn.prepareRequiredSourceFeatureConnectionsTrain(requiredSourceFeatureIndices, deviceSparse, createMissing=False)
-		observedColumn.setTrainPreparedSourceFeatureIndices(requiredSourceFeatureIndices)
+		if(not optimisationArrayIndexPropertiesEfficientSerialConnections):
+			observedColumn.prepareRequiredSourceFeatureConnectionsTrain(requiredSourceFeatureIndices, deviceSparse, createMissing=False)
+			observedColumn.setTrainPreparedSourceFeatureIndices(requiredSourceFeatureIndices)
+		else:
+			observedColumn.clearTrainPreparedSourceFeatureIndices()
 	return
 
 def saveAllObservedColumnsToDisk(databaseNetworkObject):

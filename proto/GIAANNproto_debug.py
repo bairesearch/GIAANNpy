@@ -22,13 +22,16 @@ import torch as pt
 
 from GIAANNproto_globalDefs import *
 
-debugPrintGPUramUsage = debugPrintRamCurrentUsage or debugPrintRamAverageUsage or debugPrintRamMaxUsage
+debugPrintGPUramUsage = debugPrintRamCurrentUsage or debugPrintRamAverageUsage or debugPrintRamMaxUsage or debugPrintRamMaxUsagePhaseLocal
 totalInferenceTokensSeed = 0
 totalInferenceTokensPrediction = 0
 totalInferenceTokensAll = 0
 
 if(debugPrintGPUramUsage):
 	debugPrintRamUsageStatistics = {}
+	debugPrintGpuRamMaxUsageProgramAllocatedBytes = 0
+	debugPrintGpuRamMaxUsageProgramReservedBytes = 0
+	debugPrintGpuRamMaxUsagePhaseLocalStatistics = {}
 
 	def debugPrintRamUsage(label, contextText=""):
 		if(label is None or label == ""):
@@ -64,18 +67,80 @@ if(debugPrintGPUramUsage):
 		return
 
 	def debugResetGpuRamMaxUsage():
-		if(debugPrintRamMaxUsage):
+		if(debugPrintRamMaxUsage or debugPrintRamMaxUsagePhaseLocal):
+			global debugPrintGpuRamMaxUsageProgramAllocatedBytes
+			global debugPrintGpuRamMaxUsageProgramReservedBytes
+			debugPrintGpuRamMaxUsageProgramAllocatedBytes = 0
+			debugPrintGpuRamMaxUsageProgramReservedBytes = 0
 			gpuRamUsageDevice = debugGetGpuRamUsageDevice()
 			if(gpuRamUsageDevice is not None):
 				pt.cuda.reset_peak_memory_stats(gpuRamUsageDevice)
+		return
+
+	def debugResetGpuRamMaxUsagePhaseLocal(label):
+		if(debugPrintRamMaxUsagePhaseLocal):
+			if(label is None or label == ""):
+				raise RuntimeError("debugResetGpuRamMaxUsagePhaseLocal error: label must not be empty")
+			gpuRamUsageDevice = debugGetGpuRamUsageDevice()
+			if(gpuRamUsageDevice is not None):
+				pt.cuda.reset_peak_memory_stats(gpuRamUsageDevice)
+		return
+
+	def debugRecordGpuRamMaxUsagePhaseLocal(label):
+		if(debugPrintRamMaxUsagePhaseLocal):
+			if(label is None or label == ""):
+				raise RuntimeError("debugRecordGpuRamMaxUsagePhaseLocal error: label must not be empty")
+			gpuRamMaxAllocatedUsageBytes = debugGetGpuRamMaxAllocatedUsageBytes()
+			gpuRamMaxReservedUsageBytes = debugGetGpuRamMaxReservedUsageBytes()
+			debugUpdateGpuRamMaxUsageProgramStatistics(gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes)
+			if(label in debugPrintGpuRamMaxUsagePhaseLocalStatistics):
+				phaseLocalStatistics = debugPrintGpuRamMaxUsagePhaseLocalStatistics[label]
+			else:
+				phaseLocalStatistics = {"gpuRamMaxAllocatedUsageBytes": 0, "gpuRamMaxReservedUsageBytes": 0, "sampleCount": 0}
+				debugPrintGpuRamMaxUsagePhaseLocalStatistics[label] = phaseLocalStatistics
+			if(gpuRamMaxAllocatedUsageBytes > phaseLocalStatistics["gpuRamMaxAllocatedUsageBytes"]):
+				phaseLocalStatistics["gpuRamMaxAllocatedUsageBytes"] = gpuRamMaxAllocatedUsageBytes
+			if(gpuRamMaxReservedUsageBytes > phaseLocalStatistics["gpuRamMaxReservedUsageBytes"]):
+				phaseLocalStatistics["gpuRamMaxReservedUsageBytes"] = gpuRamMaxReservedUsageBytes
+			phaseLocalStatistics["sampleCount"] = phaseLocalStatistics["sampleCount"] + 1
+		return
+
+	def debugPrintGpuRamMaxUsagePhaseLocalSummary():
+		if(debugPrintRamMaxUsagePhaseLocal):
+			for label in sorted(debugPrintGpuRamMaxUsagePhaseLocalStatistics.keys()):
+				phaseLocalStatistics = debugPrintGpuRamMaxUsagePhaseLocalStatistics[label]
+				sampleCount = phaseLocalStatistics["sampleCount"]
+				if(sampleCount <= 0):
+					raise RuntimeError("debugPrintGpuRamMaxUsagePhaseLocalSummary error: sampleCount must be > 0")
+				gpuRamMaxAllocatedUsageBytes = phaseLocalStatistics["gpuRamMaxAllocatedUsageBytes"]
+				gpuRamMaxReservedUsageBytes = phaseLocalStatistics["gpuRamMaxReservedUsageBytes"]
+				printText = "debugPrintGPUramUsage max phase-local: " + label + ", gpuRamMaxAllocatedUsageGb = " + debugConvertRamUsageBytesToGigabytesText(gpuRamMaxAllocatedUsageBytes) + ", gpuRamMaxReservedUsageGb = " + debugConvertRamUsageBytesToGigabytesText(gpuRamMaxReservedUsageBytes) + ", sampleCount = " + str(sampleCount)
+				print(printText)
 		return
 
 	def debugPrintGpuRamMaxUsageSummary():
 		if(debugPrintRamMaxUsage):
 			gpuRamMaxAllocatedUsageBytes = debugGetGpuRamMaxAllocatedUsageBytes()
 			gpuRamMaxReservedUsageBytes = debugGetGpuRamMaxReservedUsageBytes()
+			if(debugPrintRamMaxUsagePhaseLocal):
+				debugUpdateGpuRamMaxUsageProgramStatistics(gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes)
+				gpuRamMaxAllocatedUsageBytes = debugPrintGpuRamMaxUsageProgramAllocatedBytes
+				gpuRamMaxReservedUsageBytes = debugPrintGpuRamMaxUsageProgramReservedBytes
 			printText = "debugPrintGPUramUsage max: program, gpuRamMaxAllocatedUsageGb = " + debugConvertRamUsageBytesToGigabytesText(gpuRamMaxAllocatedUsageBytes) + ", gpuRamMaxReservedUsageGb = " + debugConvertRamUsageBytesToGigabytesText(gpuRamMaxReservedUsageBytes)
 			print(printText)
+		return
+
+	def debugUpdateGpuRamMaxUsageProgramStatistics(gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes):
+		global debugPrintGpuRamMaxUsageProgramAllocatedBytes
+		global debugPrintGpuRamMaxUsageProgramReservedBytes
+		if(gpuRamMaxAllocatedUsageBytes < 0):
+			raise RuntimeError("debugUpdateGpuRamMaxUsageProgramStatistics error: gpuRamMaxAllocatedUsageBytes must be >= 0")
+		if(gpuRamMaxReservedUsageBytes < 0):
+			raise RuntimeError("debugUpdateGpuRamMaxUsageProgramStatistics error: gpuRamMaxReservedUsageBytes must be >= 0")
+		if(gpuRamMaxAllocatedUsageBytes > debugPrintGpuRamMaxUsageProgramAllocatedBytes):
+			debugPrintGpuRamMaxUsageProgramAllocatedBytes = gpuRamMaxAllocatedUsageBytes
+		if(gpuRamMaxReservedUsageBytes > debugPrintGpuRamMaxUsageProgramReservedBytes):
+			debugPrintGpuRamMaxUsageProgramReservedBytes = gpuRamMaxReservedUsageBytes
 		return
 
 	def debugGetRamUsageStatistics(label, gpuRamCurrentAllocatedUsageBytes, gpuRamCurrentReservedUsageBytes, cpuRamCurrentUsageBytes):

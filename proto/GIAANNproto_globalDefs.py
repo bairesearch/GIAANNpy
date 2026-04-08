@@ -29,6 +29,7 @@ debugPrintTimeDatabaseLoadSaveTimes = False
 debugPrintRamCurrentUsage = False
 debugPrintRamAverageUsage = False
 debugPrintRamMaxUsage = False
+debugPrintRamMaxUsagePhaseLocal = False
 
 
 #Execution mode selection;
@@ -41,7 +42,7 @@ if(useQuickExecution):
 	executionMode = "inference" 	#mandatory: "inference" (effective trainAndInference but uses a text datafile)
 	inferenceTrainFirstSequences = True	#trains first sequences in inference_prompt.txt, performs inference only on last sequence
 elif(useBenchmark):
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 else:
@@ -104,7 +105,7 @@ if(useQuickExecution):
 	trainMaxSequences = 10	#N/A: auto generated from inference_prompt.txt.trainAndInference
 	databaseFolderBase = "../database"	#default: "../database/"
 elif(useBenchmark):
-	trainMaxSequences = 5000	#5000, 200000, 1000000
+	trainMaxSequences = 200000	#5000, 200000, 1000000
 	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"
 elif(useAutoresearch):
 	trainMaxSequences = 5000
@@ -307,7 +308,6 @@ else:
 arrayIndexPropertiesActivationCreateInference = arrayIndexPropertiesActivation or True
 arrayIndexPropertiesTimeCreateInference = arrayIndexPropertiesTime or inferenceUseNeuronFeaturePropertiesTime
 
-
 #SANI;
 useSANI = True	#default: True	#orig: False	#sequentially activated neuronal input
 
@@ -436,7 +436,8 @@ optimisationGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize = True
 optimisationGetFeatureConnectionsForSourceFeatureCache = False 	#default: not storeDatabaseInRam	#orig: False	#cache stored source-feature file indices per observed column to avoid repeated directory scans when storeDatabaseInRam=False
 optimisationNormaliseSourceFeatureIndicesDisabled = False	#default: False	#orig: False
 optimisationObservedColumnsWriteMetadataCheck = False	#default: False, orig: False
-
+optimisationArrayIndexPropertiesEfficientSerialConnections = False	#default: False #orig: True	#uses less GPU RAM
+optimisationArrayIndexPropertiesEfficientSerialNeurons = False	#default: False #orig: False
 
 #Draw;
 #select a single draw method (colouring scheme);

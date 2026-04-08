@@ -107,7 +107,7 @@ else:
 
 def main():
 	GIAANNproto_databaseNetworkFiles.prepareDatabaseFilesStartup()
-	if(debugPrintRamMaxUsage):
+	if(debugPrintRamMaxUsage or debugPrintRamMaxUsagePhaseLocal):
 		GIAANNproto_debug.debugResetGpuRamMaxUsage()
 	if(executionMode=="inference"):
 		executeMode(True)
@@ -118,6 +118,8 @@ def main():
 		executeMode(False)
 	if(debugPrintRamAverageUsage and not debugPrintRamCurrentUsage):
 		GIAANNproto_debug.debugPrintRamUsageSummary()
+	if(debugPrintRamMaxUsagePhaseLocal):
+		GIAANNproto_debug.debugPrintGpuRamMaxUsagePhaseLocalSummary()
 	if(debugPrintRamMaxUsage):
 		GIAANNproto_debug.debugPrintGpuRamMaxUsageSummary()
 	
@@ -175,12 +177,20 @@ def executeMode(inferenceMode):
 	if(not inferenceMode or inferenceTrainFirstSequences):
 		if(useSaveData):
 			if(storeDatabaseInRam):
+				if(debugPrintRamMaxUsagePhaseLocal):
+					GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal("saveAllObservedColumnsToDisk")
 				if(debugPrintTimeDatabaseLoadSaveTimes):
 					debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskStartTime = time.perf_counter()
 				GIAANNproto_databaseNetwork.saveAllObservedColumnsToDisk(databaseNetworkObject)
 				if(debugPrintTimeDatabaseLoadSaveTimes):
 					debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime = debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime + (time.perf_counter() - debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskStartTime)
+				if(debugPrintRamMaxUsagePhaseLocal):
+					GIAANNproto_debug.debugRecordGpuRamMaxUsagePhaseLocal("saveAllObservedColumnsToDisk")
+			if(debugPrintRamMaxUsagePhaseLocal):
+				GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal("saveData(final)")
 			GIAANNproto_databaseNetworkFiles.saveData(databaseNetworkObject, {}, sequenceCount, forceSaveGlobalState=True)
+			if(debugPrintRamMaxUsagePhaseLocal):
+				GIAANNproto_debug.debugRecordGpuRamMaxUsagePhaseLocal("saveData(final)")
 			#only required if trainMaxSequences%saveGlobalFeatureNeuronsRate != 0
 
 	if(debugPrintTimeDatabaseLoadSaveTimes):
@@ -449,7 +459,11 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 	firstPassStartTime = None
 	if(debugPrintTrainSectionTimes and trainMode):
 		firstPassStartTime = time.perf_counter()
+	if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
+		GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal("firstPass")
 	conceptsFound, conceptMask = GIAANNproto_sequenceConcepts.firstPass(databaseNetworkObject, sequence, allowNewFeatures)
+	if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
+		GIAANNproto_debug.debugRecordGpuRamMaxUsagePhaseLocal("firstPass")
 	if(debugPrintTrainSectionTimes and trainMode):
 		GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "firstPass", time.perf_counter() - firstPassStartTime)
 	
@@ -466,7 +480,11 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		if not (useDedicatedFeatureLists):
 			if(debugPrintTrainSectionTimes and trainMode):
 				detectNewFeaturesStartTime = time.perf_counter()
+			if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
+				GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal("detectNewFeatures")
 			GIAANNproto_sequenceConcepts.detectNewFeatures(databaseNetworkObject, tokens, allowNewFeatures)
+			if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
+				GIAANNproto_debug.debugRecordGpuRamMaxUsagePhaseLocal("detectNewFeatures")
 			if(debugPrintTrainSectionTimes and trainMode):
 				GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "detectNewFeatures", time.perf_counter() - detectNewFeaturesStartTime)
 
@@ -487,7 +505,11 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		secondPassStartTime = None
 		if(debugPrintTrainSectionTimes and trainMode):
 			secondPassStartTime = time.perf_counter()
+		if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
+			GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal("secondPass")
 		observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNproto_sequenceConcepts.secondPass(databaseNetworkObject, tokens, inferenceMode)
+		if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
+			GIAANNproto_debug.debugRecordGpuRamMaxUsagePhaseLocal("secondPass")
 		if(debugPrintTrainSectionTimes and trainMode):
 			GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "secondPass", time.perf_counter() - secondPassStartTime)
 
@@ -495,7 +517,11 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		sequenceObservedColumnsInitStartTime = None
 		if(debugPrintTrainSectionTimes and trainMode):
 			sequenceObservedColumnsInitStartTime = time.perf_counter()
+		if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
+			GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal("SequenceObservedColumns.__init__")
 		sequenceObservedColumns = GIAANNproto_sequenceObservedColumns.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict, inferenceMode)
+		if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
+			GIAANNproto_debug.debugRecordGpuRamMaxUsagePhaseLocal("SequenceObservedColumns.__init__")
 		if(debugPrintTrainSectionTimes and trainMode):
 			GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "SequenceObservedColumns.__init__", time.perf_counter() - sequenceObservedColumnsInitStartTime)
 
@@ -509,21 +535,37 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		else:
 			# Process each concept word in the sequence (train)
 			requiredSourceFeatureIndicesByObservedColumn = sequenceObservedColumns.getTrainRequiredSourceFeatureIndicesByObservedColumn()
+			if(debugPrintRamMaxUsagePhaseLocal):
+				GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal("prepareObservedColumnsForTrainSequence")
 			GIAANNproto_databaseNetwork.prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFeatureIndicesByObservedColumn)
+			if(debugPrintRamMaxUsagePhaseLocal):
+				GIAANNproto_debug.debugRecordGpuRamMaxUsagePhaseLocal("prepareObservedColumnsForTrainSequence")
+			if(debugPrintRamMaxUsagePhaseLocal):
+				GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal("trainConceptWords")
 			trained = GIAANNproto_databaseNetworkTrain.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)
+			if(debugPrintRamMaxUsagePhaseLocal):
+				GIAANNproto_debug.debugRecordGpuRamMaxUsagePhaseLocal("trainConceptWords")
 			if(trained):
 				# Update observed columns from sequence observed columns
 				updateObservedColumnsWrapperStartTime = None
 				if(debugPrintTrainSectionTimes and trainMode):
 					updateObservedColumnsWrapperStartTime = time.perf_counter()
+				if(debugPrintRamMaxUsagePhaseLocal):
+					GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal("updateObservedColumnsWrapper")
 				sequenceObservedColumns.updateObservedColumnsWrapper()
+				if(debugPrintRamMaxUsagePhaseLocal):
+					GIAANNproto_debug.debugRecordGpuRamMaxUsagePhaseLocal("updateObservedColumnsWrapper")
 				if(debugPrintTrainSectionTimes and trainMode):
 					GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "updateObservedColumnsWrapper", time.perf_counter() - updateObservedColumnsWrapperStartTime)
 
 				# Save observed columns to disk
 				if(useSaveData):
 					if(not storeDatabaseInRam):
+						if(debugPrintRamMaxUsagePhaseLocal):
+							GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal("saveData(sequence)")
 						GIAANNproto_databaseNetworkFiles.saveData(databaseNetworkObject, observedColumnsDict, sequenceCount)
+						if(debugPrintRamMaxUsagePhaseLocal):
+							GIAANNproto_debug.debugRecordGpuRamMaxUsagePhaseLocal("saveData(sequence)")
 
 				if(drawNetworkDuringTrain):
 					# Visualize the complete graph every time a new sequence is parsed by the application.

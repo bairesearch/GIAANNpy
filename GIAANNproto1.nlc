@@ -702,3 +702,9 @@ MANUAL; - remove option updateObservedColumnsVerboseSourceFeatureConnectionsOnly
 	d) the total "processing time" = total execution time - loadAllObservedColumnsToRam execution time - saveAllObservedColumnsToDisk execution time
 	3. print the execution times again (2) but with the huggingface load times (1) subtracted from them. The reason this is required is because I am performing benchmarking and need the times to reflect real-world execution times without huggingface anomalies.
 - move all explicit debugging functions in codebase to GIAANNproto_debug
+/MANUAL; - reintroduce an alternative version of updateObservedColumnsEfficient() optimisationArrayIndexPropertiesEfficientSerial=True (before upgrade updateObservedColumnsEfficient() so that both "#A: update feature neurons" and "#B: update feature connections" are performed simultaneously across all columns and source features).
+- upgrade the alternative option (optimisationArrayIndexPropertiesEfficientSerial=True) to use less GPU RAM:
+	1. in prepareObservedColumnsForTrainSequence(), if if(optimisationArrayIndexPropertiesEfficientSerial): do not execute prepareRequiredSourceFeatureConnectionsTrain()
+	2. in updateObservedColumnsEfficient(),  if if(optimisationArrayIndexPropertiesEfficientSerial): step "#B: update feature connections" loads the sequence source feature connections tensors serially on demand (and only store them in GPU ram temporarily per sequence token).
+MANUAL; - split options optimisationArrayIndexPropertiesEfficientSerialConnections and optimisationArrayIndexPropertiesEfficientSerialNeurons (from optimisationArrayIndexPropertiesEfficientSerial) for clarity.
+- implement Phase-local peak profiling within context if(debugPrintRamMaxUsagePhaseLocal==True)
