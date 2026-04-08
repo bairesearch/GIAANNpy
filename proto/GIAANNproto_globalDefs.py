@@ -25,11 +25,11 @@ import sys
 #Recent debug vars;
 debugPrintTrainSectionTimes = False	#print per-sequence timing breakdown for key train sections
 debugPrintTrainSectionTimesSourceFeatureConnections = False	#print granular source-feature-connection timings within updateObservedColumnsEfficient
-debugPrintTimeDatabaseLoadSaveTimes = False
+debugPrintTimeDatabaseLoadSaveTimes = True
 debugPrintRamCurrentUsage = False
-debugPrintRamAverageUsage = False
-debugPrintRamMaxUsage = False
-debugPrintRamMaxUsagePhaseLocal = False
+debugPrintRamAverageUsage = True
+debugPrintRamMaxUsage = True
+debugPrintRamMaxUsagePhaseLocal = True
 
 
 #Execution mode selection;
@@ -105,7 +105,7 @@ if(useQuickExecution):
 	trainMaxSequences = 10	#N/A: auto generated from inference_prompt.txt.trainAndInference
 	databaseFolderBase = "../database"	#default: "../database/"
 elif(useBenchmark):
-	trainMaxSequences = 5000	#5000, 200000, 1000000
+	trainMaxSequences = 200000	#5000, 200000, 1000000
 	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"
 elif(useAutoresearch):
 	trainMaxSequences = 5000
@@ -432,6 +432,7 @@ optimisationNormaliseSourceFeatureIndicesDisabled = False	#default: False	#orig:
 optimisationObservedColumnsWriteMetadataCheck = False	#default: False, orig: False
 optimisationArrayIndexPropertiesEfficientSerialConnections = False	#default: False #orig: True	#uses less GPU RAM
 optimisationArrayIndexPropertiesEfficientSerialNeurons = False	#default: False #orig: False
+trainSparseConnectionsTensor = True	#default: False	#orig: False
 
 #Draw;
 #select a single draw method (colouring scheme);

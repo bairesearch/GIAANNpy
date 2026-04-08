@@ -98,7 +98,10 @@ class SequenceObservedColumns:
 
 			# Initialize arrays
 			self.featureNeurons = self.initialiseFeatureNeuronsSequence(self.cs, self.fs)
-			self.featureConnections = self.initialiseFeatureConnectionsSequence(self.cs, self.fs)
+			if(trainSparseConnectionsTensor and not inferenceMode):
+				self.featureConnections = self.initialiseFeatureConnectionsSequenceSparse(self.cs, self.fs)
+			else:
+				self.featureConnections = self.initialiseFeatureConnectionsSequence(self.cs, self.fs)
 
 			# Populate arrays with data from observedColumnsDict (required for inference)
 			if(inferenceMode):
@@ -245,6 +248,122 @@ class SequenceObservedColumns:
 	def initialiseFeatureConnectionsSequence(self, cs, fs):
 		featureConnections = pt.zeros(self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs, dtype=arrayType)
 		return featureConnections
+
+	#@staticmethod
+	def initialiseFeatureConnectionsSequenceSparse(self, cs, fs):
+		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs)
+		emptyIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=deviceSparse)
+		emptyValues = pt.empty((0,), dtype=arrayType, device=deviceSparse)
+		featureConnections = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=targetSize, dtype=arrayType, device=deviceSparse)
+		return featureConnections
+
+	def useTrainSparseConnectionsTensor(self):
+		result = trainSparseConnectionsTensor and self.featureConnections is not None and self.featureConnections.layout == pt.sparse_coo
+		return result
+
+	def coalesceSequenceFeatureConnectionsSparse(self, targetDevice=None):
+		if(not self.useTrainSparseConnectionsTensor()):
+			raise RuntimeError("coalesceSequenceFeatureConnectionsSparse error: train sparse connections tensor is disabled")
+		result = self.featureConnections.coalesce()
+		if(targetDevice is not None and result.device != targetDevice):
+			result = result.to(targetDevice)
+		return result
+
+	def buildSequenceConnectionPropertyUpdateSparse(self, propertyIndex, propertyTensor):
+		if(not self.useTrainSparseConnectionsTensor()):
+			raise RuntimeError("buildSequenceConnectionPropertyUpdateSparse error: train sparse connections tensor is disabled")
+		targetSize = self.featureConnections.size()
+		propertyTargetSize = targetSize[1:]
+		if(propertyIndex < 0 or propertyIndex >= targetSize[0]):
+			raise RuntimeError(f"buildSequenceConnectionPropertyUpdateSparse error: propertyIndex {propertyIndex} out of range")
+		if(propertyTensor is None):
+			result = self.initialiseSparseTensor(targetSize, deviceSparse)
+		else:
+			if(tuple(propertyTensor.size()) != tuple(propertyTargetSize)):
+				raise RuntimeError(f"buildSequenceConnectionPropertyUpdateSparse error: propertyTensor size {tuple(propertyTensor.size())} does not match expected size {tuple(propertyTargetSize)}")
+			if(propertyTensor.layout == pt.sparse_coo):
+				propertySparse = propertyTensor.coalesce()
+				if(propertySparse.device != deviceSparse):
+					propertySparse = propertySparse.to(deviceSparse)
+			else:
+				if(propertyTensor.device != deviceSparse):
+					propertyTensor = propertyTensor.to(deviceSparse)
+				propertySparse = propertyTensor.to_sparse().coalesce()
+			if(propertySparse.dim() != len(propertyTargetSize)):
+				raise RuntimeError(f"buildSequenceConnectionPropertyUpdateSparse error: propertyTensor rank {propertySparse.dim()} does not match expected rank {len(propertyTargetSize)}")
+			propertyIndices = propertySparse.indices()
+			propertyValues = propertySparse.values()
+			propertyRow = pt.full((1, propertyIndices.shape[1]), propertyIndex, dtype=pt.long, device=propertyIndices.device)
+			updateIndices = pt.cat([propertyRow, propertyIndices], dim=0)
+			result = pt.sparse_coo_tensor(updateIndices, propertyValues, size=targetSize, dtype=arrayType, device=deviceSparse).coalesce()
+		return result
+
+	def removeSequenceConnectionPropertySparse(self, propertyIndex):
+		if(not self.useTrainSparseConnectionsTensor()):
+			raise RuntimeError("removeSequenceConnectionPropertySparse error: train sparse connections tensor is disabled")
+		connectionSparse = self.coalesceSequenceFeatureConnectionsSparse()
+		connectionIndices = connectionSparse.indices()
+		connectionValues = connectionSparse.values()
+		if(connectionIndices.numel() > 0):
+			keepMask = connectionIndices[0] != propertyIndex
+			filteredIndices = connectionIndices[:, keepMask]
+			filteredValues = connectionValues[keepMask]
+			self.featureConnections = pt.sparse_coo_tensor(filteredIndices, filteredValues, size=connectionSparse.size(), dtype=arrayType, device=deviceSparse).coalesce()
+		else:
+			self.featureConnections = connectionSparse
+		return
+
+	def addSequenceConnectionPropertyUpdate(self, propertyIndex, propertyTensor):
+		if(not self.useTrainSparseConnectionsTensor()):
+			raise RuntimeError("addSequenceConnectionPropertyUpdate error: train sparse connections tensor is disabled")
+		connectionTargetSparse = self.coalesceSequenceFeatureConnectionsSparse()
+		connectionUpdateSparse = self.buildSequenceConnectionPropertyUpdateSparse(propertyIndex, propertyTensor)
+		self.featureConnections = self.addSparseUpdateNonNegative(connectionTargetSparse, connectionUpdateSparse)
+		return
+
+	def setSequenceConnectionPropertyUpdate(self, propertyIndex, propertyTensor):
+		if(not self.useTrainSparseConnectionsTensor()):
+			raise RuntimeError("setSequenceConnectionPropertyUpdate error: train sparse connections tensor is disabled")
+		self.removeSequenceConnectionPropertySparse(propertyIndex)
+		if(propertyTensor is not None):
+			self.addSequenceConnectionPropertyUpdate(propertyIndex, propertyTensor)
+		return
+
+	def transformSequenceConnectionPropertyValues(self, propertyIndex, transformType, transformValue=None):
+		if(not self.useTrainSparseConnectionsTensor()):
+			raise RuntimeError("transformSequenceConnectionPropertyValues error: train sparse connections tensor is disabled")
+		connectionSparse = self.coalesceSequenceFeatureConnectionsSparse()
+		connectionIndices = connectionSparse.indices()
+		connectionValues = connectionSparse.values()
+		updatedValues = connectionValues
+		propertyMask = connectionIndices[0] == propertyIndex
+		if(propertyMask.any()):
+			updatedValues = connectionValues.clone()
+			if(transformType == "clampMax"):
+				updatedValues[propertyMask] = updatedValues[propertyMask].clamp(max=transformValue)
+			elif(transformType == "tanh"):
+				updatedValues[propertyMask] = pt.tanh(updatedValues[propertyMask])
+			else:
+				raise RuntimeError(f"transformSequenceConnectionPropertyValues error: unsupported transformType {transformType}")
+		self.featureConnections = pt.sparse_coo_tensor(connectionIndices, updatedValues, size=connectionSparse.size(), dtype=arrayType, device=deviceSparse).coalesce()
+		return
+
+	def extractSequenceConnectionPropertySparse(self, propertyIndex):
+		if(not self.useTrainSparseConnectionsTensor()):
+			raise RuntimeError("extractSequenceConnectionPropertySparse error: train sparse connections tensor is disabled")
+		connectionSparse = self.coalesceSequenceFeatureConnectionsSparse()
+		connectionIndices = connectionSparse.indices()
+		connectionValues = connectionSparse.values()
+		propertyTargetSize = connectionSparse.size()[1:]
+		if(connectionIndices.numel() > 0):
+			propertyMask = connectionIndices[0] == propertyIndex
+			filteredIndices = connectionIndices[1:, propertyMask]
+			filteredValues = connectionValues[propertyMask]
+		else:
+			filteredIndices = pt.empty((len(propertyTargetSize), 0), dtype=pt.long, device=connectionSparse.device)
+			filteredValues = pt.empty((0,), dtype=arrayType, device=connectionSparse.device)
+		result = pt.sparse_coo_tensor(filteredIndices, filteredValues, size=propertyTargetSize, dtype=arrayType, device=connectionSparse.device).coalesce()
+		return result
 
 	def computeColumnLocalFeatureMaps(self, tokens):
 		if(not trainSequenceObservedColumnsMatchSequenceWords):
@@ -537,10 +656,14 @@ class SequenceObservedColumns:
 		featureConnectionsDelta = self.featureConnections
 		if(useGPUsparseStrict and not useGPUsparse):
 			featureNeuronsDelta = featureNeuronsDelta.to(deviceSparse)
-			featureConnectionsDelta = featureConnectionsDelta.to(deviceSparse)
+			if(not self.useTrainSparseConnectionsTensor()):
+				featureConnectionsDelta = featureConnectionsDelta.to(deviceSparse)
 
 		featureNeuronsDeltaSparse = featureNeuronsDelta.to_sparse()
-		featureConnectionsDeltaSparse = featureConnectionsDelta.to_sparse()
+		if(self.useTrainSparseConnectionsTensor()):
+			featureConnectionsDeltaSparse = self.coalesceSequenceFeatureConnectionsSparse()
+		else:
+			featureConnectionsDeltaSparse = featureConnectionsDelta.to_sparse()
 		featureNeuronsCurrentSparse = None
 		featureConnectionsCurrentSparse = None
 
@@ -550,10 +673,16 @@ class SequenceObservedColumns:
 		
 		if(replacePropertiesEnabled):
 			featureNeuronsCurrentSparse = self.featureNeurons.to_sparse()
-			featureConnectionsCurrentSparse = self.featureConnections.to_sparse()
+			if(self.useTrainSparseConnectionsTensor()):
+				featureConnectionsCurrentSparse = featureConnectionsDeltaSparse
+			else:
+				featureConnectionsCurrentSparse = self.featureConnections.to_sparse()
 		elif(arrayIndexPropertiesPos):
 			featureNeuronsCurrentSparse = self.featureNeurons.to_sparse()
-			featureConnectionsCurrentSparse = self.featureConnections.to_sparse()
+			if(self.useTrainSparseConnectionsTensor()):
+				featureConnectionsCurrentSparse = featureConnectionsDeltaSparse
+			else:
+				featureConnectionsCurrentSparse = self.featureConnections.to_sparse()
 		if not useGPUsparse:
 			featureNeuronsDeltaSparse = featureNeuronsDeltaSparse.to(deviceSparse)
 			featureConnectionsDeltaSparse = featureConnectionsDeltaSparse.to(deviceSparse)
@@ -740,13 +869,20 @@ class SequenceObservedColumns:
 			return
 
 		featureNeuronsDelta = self.featureNeurons[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
-		featureConnectionsDelta = self.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
+		featureConnectionsDelta = None
+		featureConnectionsDeltaSparse = None
+		if(self.useTrainSparseConnectionsTensor()):
+			featureConnectionsDeltaSparse = self.extractSequenceConnectionPropertySparse(databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
+		else:
+			featureConnectionsDelta = self.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 		if(useGPUsparseStrict and not useGPUsparse):
 			featureNeuronsDelta = featureNeuronsDelta.to(deviceSparse)
-			featureConnectionsDelta = featureConnectionsDelta.to(deviceSparse)
+			if(featureConnectionsDelta is not None):
+				featureConnectionsDelta = featureConnectionsDelta.to(deviceSparse)
 
 		featureNeuronsDeltaSparse = featureNeuronsDelta.to_sparse()
-		featureConnectionsDeltaSparse = featureConnectionsDelta.to_sparse()
+		if(featureConnectionsDelta is not None):
+			featureConnectionsDeltaSparse = featureConnectionsDelta.to_sparse()
 		if not useGPUsparse:
 			featureNeuronsDeltaSparse = featureNeuronsDeltaSparse.to(deviceSparse)
 			featureConnectionsDeltaSparse = featureConnectionsDeltaSparse.to(deviceSparse)
