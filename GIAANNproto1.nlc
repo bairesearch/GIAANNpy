@@ -713,3 +713,11 @@ MANUAL; - split options optimisationArrayIndexPropertiesEfficientSerialConnectio
 v1m (Codex IDE GPT-5.4) [under development]:
 - add proto GIAANNproto1m1a - remove options enforceDirectConnectionsMinWordDistance and arrayIndexPropertiesMinWordDistance entirely from the codebase (assume they are both False).
 - implement option trainSparseConnectionsTensor=True (it should be compatible with both optimisationArrayIndexPropertiesEfficient and optimisationArrayIndexPropertiesVerbose) 
+- update debugPrintRamMaxUsagePhaseLocal to add sub-phase-local max profiling inside updateObservedColumnsEfficient()
+- implement trainSparseNeuronsTensor=True (where trainSparseNeuronsTensor=True requires trainSparseConnectionsTensor=True).
+- implement option lowMemGenerateGlobalFeatureNeuronsTensor=True - this updates lowMem=True to generate a globalFeatureNeurons tensor at the end of training during phase useSaveData (do not have just save individual column featureNeurons tensors). use deviceFileIO to generate and save this tensor (usually defined as CPU). To generate globalFeatureNeurons:
+	if(storeDatabaseInRam==True): concatenate all the column feature neuron tensors currently stored in RAM.
+	if(storeDatabaseInRam==False): read all column feature neuron tensors from the filesystem database and concatenate them.
+- implement option highMemGenerateGlobalFeatureNeuronsTensor=True - it generates and saves a globalFeatureNeurons at the start of inference after previously being trained in lowMem mode, so that inference is supported. Please use function generateLowMemGlobalFeatureNeuronsTensor(). Execute option highMemGenerateGlobalTensor=True at the very start of GIAANN proto execution (because it is assumed executionMode = "inference", and change in lowMem mode is not supported by executionMode = "trainAndInference").
+- rename every instance of the parameter "lowMem" (exact whole-word matches only) in the proto folder python files to "storeDatabaseGlobalFeatureNeuronsInRam" and invert its boolean logic. For example, "lowMem=True" will become "storeDatabaseGlobalFeatureNeuronsInRam=False".
+- MANUAL; - rename all storeDatabaseInRam to storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam

@@ -55,7 +55,7 @@ def firstPass(databaseNetworkObject, sequence, allowNewFeatures):
 
 	# If new concept columns have been added, expand arrays as needed
 	if newConceptsAdded:
-		if not lowMem:
+		if storeDatabaseGlobalFeatureNeuronsInRam:
 			# Expand global feature neuron arrays
 			if databaseNetworkObject.globalFeatureNeurons.shape[3] < databaseNetworkObject.c:
 				newShape = (databaseNetworkObject.globalFeatureNeurons.shape[0], databaseNetworkObject.globalFeatureNeurons.shape[1], databaseNetworkObject.globalFeatureNeurons.shape[2], databaseNetworkObject.c, databaseNetworkObject.globalFeatureNeurons.shape[4])
@@ -125,7 +125,7 @@ def detectNewFeatures(databaseNetworkObject, tokens, allowNewFeatures):
 		databaseNetworkObject.f += numNewFeatures
 	
 	# Now, expand arrays accordingly
-	if(allowNewFeatures and not lowMem):
+	if(allowNewFeatures and storeDatabaseGlobalFeatureNeuronsInRam):
 		if databaseNetworkObject.f > databaseNetworkObject.globalFeatureNeurons.shape[4]:
 			extraCols = databaseNetworkObject.f - databaseNetworkObject.globalFeatureNeurons.shape[4]
 			newShape = (databaseNetworkObject.globalFeatureNeurons.shape[0], databaseNetworkObject.globalFeatureNeurons.shape[1], databaseNetworkObject.globalFeatureNeurons.shape[2], databaseNetworkObject.globalFeatureNeurons.shape[3], databaseNetworkObject.f)

@@ -135,6 +135,9 @@ def executeMode(inferenceMode):
 	
 	databaseNetworkObject = GIAANNproto_databaseNetwork.initialiseDatabaseNetwork(inferenceMode)
 	databaseNetworkObject.nlp = nlpSequence	#used by posStringToPosInt
+	if(inferenceMode):
+		if(highMemGenerateGlobalFeatureNeuronsTensor):
+			GIAANNproto_databaseNetwork.generateHighMemGlobalFeatureNeuronsForInferenceStartup(databaseNetworkObject)
 
 	if(printCountTotalParameters):
 		if(len(databaseNetworkObject.conceptColumnsList) > 0):
@@ -145,7 +148,7 @@ def executeMode(inferenceMode):
 		GIAANNproto_sequenceTokens.loadPOSdatabase()
 	if(inferenceMode and not inferenceTrainFirstSequences):
 		GIAANNproto_databaseNetwork.backupGlobalArrays(databaseNetworkObject)
-	if(storeDatabaseInRam):
+	if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 		if(debugPrintTimeDatabaseLoadSaveTimes):
 			debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamStartTime = time.perf_counter()
 		GIAANNproto_databaseNetwork.loadAllObservedColumnsToRam(databaseNetworkObject)
@@ -176,7 +179,7 @@ def executeMode(inferenceMode):
 
 	if(not inferenceMode or inferenceTrainFirstSequences):
 		if(useSaveData):
-			if(storeDatabaseInRam):
+			if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 				if(debugPrintRamMaxUsagePhaseLocal):
 					GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal("saveAllObservedColumnsToDisk")
 				if(debugPrintTimeDatabaseLoadSaveTimes):
@@ -428,7 +431,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 	
 	if(debugReloadGlobalFeatureNeuronsEverySequence):
 		GIAANNproto_databaseNetwork.initialiseDatabaseNetwork(inferenceMode)
-		if(not lowMem):
+		if(storeDatabaseGlobalFeatureNeuronsInRam):
 			databaseNetworkObject.globalFeatureNeurons = GIAANNproto_databaseNetwork.initialiseFeatureNeuronsGlobal(inferenceMode, databaseNetworkObject.c, databaseNetworkObject.f)
 	if(inferenceMode):
 		if(not inferenceTrainFirstSequences):
@@ -448,9 +451,9 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		sequencePredict = sequence[numSeedTokens:]
 	
 	allowNewFeatures = True
-	if(storeDatabaseInRam):
+	if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 		if(not databaseNetworkObject.observedColumnsRAMLoaded):
-			raise RuntimeError("processSequence error: storeDatabaseInRam requires observedColumnsRAMLoaded after startup")
+			raise RuntimeError("processSequence error: storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam requires observedColumnsRAMLoaded after startup")
 	if(inferenceMode and inferenceAddNewFeatures):
 		expandSequenceForInference(databaseNetworkObject, sequence)
 		allowNewFeatures = False
@@ -560,7 +563,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 
 				# Save observed columns to disk
 				if(useSaveData):
-					if(not storeDatabaseInRam):
+					if(not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 						if(debugPrintRamMaxUsagePhaseLocal):
 							GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal("saveData(sequence)")
 						GIAANNproto_databaseNetworkFiles.saveData(databaseNetworkObject, observedColumnsDict, sequenceCount)
@@ -571,7 +574,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 					# Visualize the complete graph every time a new sequence is parsed by the application.
 					GIAANNproto_databaseNetworkDraw.visualizeGraph(sequenceObservedColumns, False, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+generateDrawSequenceIndex(sequenceIndex))
 
-		if(storeDatabaseInRam):
+		if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 			GIAANNproto_databaseNetwork.moveObservedColumnsDictConnectionsToDatabaseAfterTrain(observedColumnsDict, inferenceMode)
 
 		releaseRuntimeGpuMemoryStartTime = None

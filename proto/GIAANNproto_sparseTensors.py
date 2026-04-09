@@ -628,7 +628,7 @@ def neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANIme
 		featureNeuronsActive = sliceSegment(globalFeatureNeuronsActivation, arrayIndexSegmentLast)
 	return featureNeuronsActive	
 			
-def insertSequenceObservedColumnIntoObservedColumnFeatures(self, cIdx, fIdxTensor, featureIndicesInObserved, featureNeuronsSparse, observedColumn, lowMem=True):
+def insertSequenceObservedColumnIntoObservedColumnFeatures(self, cIdx, fIdxTensor, featureIndicesInObserved, featureNeuronsSparse, observedColumn, storeDatabaseGlobalFeatureNeuronsInRam=False):
 	# feature neurons
 	indices = featureNeuronsSparse.indices()
 	values = featureNeuronsSparse.values()
@@ -645,7 +645,7 @@ def insertSequenceObservedColumnIntoObservedColumnFeatures(self, cIdx, fIdxTenso
 	), dim=0)
 	if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
 		filteredIndices[3] = featureIndicesInObserved[filteredIndices[3]]
-	if lowMem:
+	if not storeDatabaseGlobalFeatureNeuronsInRam:
 		observedColumn.featureNeurons = observedColumn.featureNeurons + pt.sparse_coo_tensor(filteredIndices, filteredValues, size=observedColumn.featureNeurons.size(), dtype=arrayType, device=deviceSparse)
 		observedColumn.featureNeurons = observedColumn.featureNeurons.coalesce()
 		observedColumn.featureNeurons.values().clamp_(min=0)

@@ -252,7 +252,7 @@ def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=
 	for lemma, observedColumn in observedColumnsDict.items():
 		conceptIndexToLemma[observedColumn.conceptIndex] = lemma
 
-	if not lowMem:
+	if storeDatabaseGlobalFeatureNeuronsInRam:
 		global globalFeatureNeurons
 
 	excitatoryNodeMap = drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, drawRelationTypes, drawSegments, drawBranches, drawDelimiters, drawDefault, inferenceMode)
@@ -324,7 +324,7 @@ if(drawSparseArrays):
 			else:
 				featureWordToIndex = observedColumn.featureWordToIndex
 				yOffset = 1
-				if lowMem:
+				if not storeDatabaseGlobalFeatureNeuronsInRam:
 					featureNeurons = selectDrawBranch(observedColumn.featureNeurons, drawBranches)
 					if(drawBranches):
 						featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
@@ -485,7 +485,7 @@ if(drawSparseArrays):
 								sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
 							sourceFeatureNeurons = sourceFeatureNeurons[:, :, cIdx]
 						else:
-							if lowMem:
+							if not storeDatabaseGlobalFeatureNeuronsInRam:
 								sourceFeatureNeurons = selectDrawBranch(observedColumn.featureNeurons, drawBranches)
 								if(drawBranches):
 									sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
@@ -733,7 +733,7 @@ else:
 			else:
 				featureWordToIndex = observedColumn.featureWordToIndex
 				yOffset = 1
-				if lowMem:
+				if not storeDatabaseGlobalFeatureNeuronsInRam:
 					featureNeurons = selectDrawBranch(observedColumn.featureNeurons, drawBranches)
 					if(drawBranches):
 						featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
@@ -845,7 +845,7 @@ else:
 								sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
 							sourceFeatureNeurons = sourceFeatureNeurons[:, :, cIdx]
 						else:
-							if lowMem:
+							if not storeDatabaseGlobalFeatureNeuronsInRam:
 								sourceFeatureNeurons = selectDrawBranch(observedColumn.featureNeurons, drawBranches)
 								if(drawBranches):
 									sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)

@@ -97,7 +97,10 @@ class SequenceObservedColumns:
 			self.computeColumnLocalFeatureMaps(tokens)
 
 			# Initialize arrays
-			self.featureNeurons = self.initialiseFeatureNeuronsSequence(self.cs, self.fs)
+			if(trainSparseNeuronsTensor and not inferenceMode):
+				self.featureNeurons = self.initialiseFeatureNeuronsSequenceSparse(self.cs, self.fs)
+			else:
+				self.featureNeurons = self.initialiseFeatureNeuronsSequence(self.cs, self.fs)
 			if(trainSparseConnectionsTensor and not inferenceMode):
 				self.featureConnections = self.initialiseFeatureConnectionsSequenceSparse(self.cs, self.fs)
 			else:
@@ -245,6 +248,14 @@ class SequenceObservedColumns:
 		return featureNeurons
 
 	#@staticmethod
+	def initialiseFeatureNeuronsSequenceSparse(self, cs, fs):
+		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, cs, fs)
+		emptyIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=deviceSparse)
+		emptyValues = pt.empty((0,), dtype=arrayType, device=deviceSparse)
+		featureNeurons = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=targetSize, dtype=arrayType, device=deviceSparse)
+		return featureNeurons
+
+	#@staticmethod
 	def initialiseFeatureConnectionsSequence(self, cs, fs):
 		featureConnections = pt.zeros(self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs, dtype=arrayType)
 		return featureConnections
@@ -256,6 +267,95 @@ class SequenceObservedColumns:
 		emptyValues = pt.empty((0,), dtype=arrayType, device=deviceSparse)
 		featureConnections = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=targetSize, dtype=arrayType, device=deviceSparse)
 		return featureConnections
+
+	def useTrainSparseNeuronsTensor(self):
+		result = trainSparseNeuronsTensor and self.featureNeurons is not None and self.featureNeurons.layout == pt.sparse_coo
+		return result
+
+	def coalesceSequenceFeatureNeuronsSparse(self, targetDevice=None):
+		if(not self.useTrainSparseNeuronsTensor()):
+			raise RuntimeError("coalesceSequenceFeatureNeuronsSparse error: train sparse neurons tensor is disabled")
+		result = self.featureNeurons.coalesce()
+		if(targetDevice is not None and result.device != targetDevice):
+			result = result.to(targetDevice)
+		return result
+
+	def buildSequenceFeaturePropertyUpdateSparse(self, propertyIndex, propertyTensor):
+		if(not self.useTrainSparseNeuronsTensor()):
+			raise RuntimeError("buildSequenceFeaturePropertyUpdateSparse error: train sparse neurons tensor is disabled")
+		targetSize = self.featureNeurons.size()
+		propertyTargetSize = targetSize[1:]
+		if(propertyIndex < 0 or propertyIndex >= targetSize[0]):
+			raise RuntimeError(f"buildSequenceFeaturePropertyUpdateSparse error: propertyIndex {propertyIndex} out of range")
+		if(propertyTensor is None):
+			result = self.initialiseSparseTensor(targetSize, deviceSparse)
+		else:
+			if(tuple(propertyTensor.size()) != tuple(propertyTargetSize)):
+				raise RuntimeError(f"buildSequenceFeaturePropertyUpdateSparse error: propertyTensor size {tuple(propertyTensor.size())} does not match expected size {tuple(propertyTargetSize)}")
+			if(propertyTensor.layout == pt.sparse_coo):
+				propertySparse = propertyTensor.coalesce()
+				if(propertySparse.device != deviceSparse):
+					propertySparse = propertySparse.to(deviceSparse)
+			else:
+				if(propertyTensor.device != deviceSparse):
+					propertyTensor = propertyTensor.to(deviceSparse)
+				propertySparse = propertyTensor.to_sparse().coalesce()
+			if(propertySparse.dim() != len(propertyTargetSize)):
+				raise RuntimeError(f"buildSequenceFeaturePropertyUpdateSparse error: propertyTensor rank {propertySparse.dim()} does not match expected rank {len(propertyTargetSize)}")
+			propertyIndices = propertySparse.indices()
+			propertyValues = propertySparse.values()
+			propertyRow = pt.full((1, propertyIndices.shape[1]), propertyIndex, dtype=pt.long, device=propertyIndices.device)
+			updateIndices = pt.cat([propertyRow, propertyIndices], dim=0)
+			result = pt.sparse_coo_tensor(updateIndices, propertyValues, size=targetSize, dtype=arrayType, device=deviceSparse).coalesce()
+		return result
+
+	def removeSequenceFeaturePropertySparse(self, propertyIndex):
+		if(not self.useTrainSparseNeuronsTensor()):
+			raise RuntimeError("removeSequenceFeaturePropertySparse error: train sparse neurons tensor is disabled")
+		featureSparse = self.coalesceSequenceFeatureNeuronsSparse()
+		featureIndices = featureSparse.indices()
+		featureValues = featureSparse.values()
+		if(featureIndices.numel() > 0):
+			keepMask = featureIndices[0] != propertyIndex
+			filteredIndices = featureIndices[:, keepMask]
+			filteredValues = featureValues[keepMask]
+			self.featureNeurons = pt.sparse_coo_tensor(filteredIndices, filteredValues, size=featureSparse.size(), dtype=arrayType, device=deviceSparse).coalesce()
+		else:
+			self.featureNeurons = featureSparse
+		return
+
+	def addSequenceFeaturePropertyUpdate(self, propertyIndex, propertyTensor):
+		if(not self.useTrainSparseNeuronsTensor()):
+			raise RuntimeError("addSequenceFeaturePropertyUpdate error: train sparse neurons tensor is disabled")
+		featureTargetSparse = self.coalesceSequenceFeatureNeuronsSparse()
+		featureUpdateSparse = self.buildSequenceFeaturePropertyUpdateSparse(propertyIndex, propertyTensor)
+		self.featureNeurons = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdateSparse)
+		return
+
+	def setSequenceFeaturePropertyUpdate(self, propertyIndex, propertyTensor):
+		if(not self.useTrainSparseNeuronsTensor()):
+			raise RuntimeError("setSequenceFeaturePropertyUpdate error: train sparse neurons tensor is disabled")
+		self.removeSequenceFeaturePropertySparse(propertyIndex)
+		if(propertyTensor is not None):
+			self.addSequenceFeaturePropertyUpdate(propertyIndex, propertyTensor)
+		return
+
+	def extractSequenceFeaturePropertySparse(self, propertyIndex):
+		if(not self.useTrainSparseNeuronsTensor()):
+			raise RuntimeError("extractSequenceFeaturePropertySparse error: train sparse neurons tensor is disabled")
+		featureSparse = self.coalesceSequenceFeatureNeuronsSparse()
+		featureIndices = featureSparse.indices()
+		featureValues = featureSparse.values()
+		propertyTargetSize = featureSparse.size()[1:]
+		if(featureIndices.numel() > 0):
+			propertyMask = featureIndices[0] == propertyIndex
+			filteredIndices = featureIndices[1:, propertyMask]
+			filteredValues = featureValues[propertyMask]
+		else:
+			filteredIndices = pt.empty((len(propertyTargetSize), 0), dtype=pt.long, device=featureSparse.device)
+			filteredValues = pt.empty((0,), dtype=arrayType, device=featureSparse.device)
+		result = pt.sparse_coo_tensor(filteredIndices, filteredValues, size=propertyTargetSize, dtype=arrayType, device=featureSparse.device).coalesce()
+		return result
 
 	def useTrainSparseConnectionsTensor(self):
 		result = trainSparseConnectionsTensor and self.featureConnections is not None and self.featureConnections.layout == pt.sparse_coo
@@ -457,7 +557,7 @@ class SequenceObservedColumns:
 			cIdxList.append(pt.full((numFeatures,), cIdx, dtype=pt.long))
 			fIdxList.append(fIdxTensor)
 
-			if lowMem:
+			if not storeDatabaseGlobalFeatureNeuronsInRam:
 				featureNeurons = observedColumn.featureNeurons.coalesce()
 			else:
 				# Slice the globalFeatureNeurons as before
@@ -655,11 +755,15 @@ class SequenceObservedColumns:
 		featureNeuronsDelta = self.featureNeurons
 		featureConnectionsDelta = self.featureConnections
 		if(useGPUsparseStrict and not useGPUsparse):
-			featureNeuronsDelta = featureNeuronsDelta.to(deviceSparse)
+			if(not self.useTrainSparseNeuronsTensor()):
+				featureNeuronsDelta = featureNeuronsDelta.to(deviceSparse)
 			if(not self.useTrainSparseConnectionsTensor()):
 				featureConnectionsDelta = featureConnectionsDelta.to(deviceSparse)
 
-		featureNeuronsDeltaSparse = featureNeuronsDelta.to_sparse()
+		if(self.useTrainSparseNeuronsTensor()):
+			featureNeuronsDeltaSparse = self.coalesceSequenceFeatureNeuronsSparse()
+		else:
+			featureNeuronsDeltaSparse = featureNeuronsDelta.to_sparse()
 		if(self.useTrainSparseConnectionsTensor()):
 			featureConnectionsDeltaSparse = self.coalesceSequenceFeatureConnectionsSparse()
 		else:
@@ -672,13 +776,19 @@ class SequenceObservedColumns:
 		addPropertiesEnabled = arrayIndexPropertiesStrength or arrayIndexPropertiesPermanence
 		
 		if(replacePropertiesEnabled):
-			featureNeuronsCurrentSparse = self.featureNeurons.to_sparse()
+			if(self.useTrainSparseNeuronsTensor()):
+				featureNeuronsCurrentSparse = featureNeuronsDeltaSparse
+			else:
+				featureNeuronsCurrentSparse = self.featureNeurons.to_sparse()
 			if(self.useTrainSparseConnectionsTensor()):
 				featureConnectionsCurrentSparse = featureConnectionsDeltaSparse
 			else:
 				featureConnectionsCurrentSparse = self.featureConnections.to_sparse()
 		elif(arrayIndexPropertiesPos):
-			featureNeuronsCurrentSparse = self.featureNeurons.to_sparse()
+			if(self.useTrainSparseNeuronsTensor()):
+				featureNeuronsCurrentSparse = featureNeuronsDeltaSparse
+			else:
+				featureNeuronsCurrentSparse = self.featureNeurons.to_sparse()
 			if(self.useTrainSparseConnectionsTensor()):
 				featureConnectionsCurrentSparse = featureConnectionsDeltaSparse
 			else:
@@ -730,7 +840,7 @@ class SequenceObservedColumns:
 		if(arrayIndexPropertiesPos):
 			posPropertyMaskLookupConnection = self.buildMaskLookup(self.databaseNetworkObject.arrayNumberOfProperties, posPropertyIndices.to(connectionDevice), connectionDevice)
 
-		if not lowMem:
+		if storeDatabaseGlobalFeatureNeuronsInRam:
 			globalFeatureNeurons = self.databaseNetworkObject.globalFeatureNeurons.coalesce()
 
 		for cIdx, observedColumn in sequenceObservedColumnsDict.items():
@@ -740,7 +850,7 @@ class SequenceObservedColumns:
 				updateCount = inferenceConceptUpdateCounts.get(conceptIndex, 0) + 1
 				inferenceConceptUpdateCounts[conceptIndex] = updateCount
 
-			if lowMem:
+			if not storeDatabaseGlobalFeatureNeuronsInRam:
 				featureTargetSparse = observedColumn.featureNeurons.coalesce()
 				featureTargetSize = featureTargetSparse.size()
 			else:
@@ -750,11 +860,11 @@ class SequenceObservedColumns:
 			connectionUpdatesPos = None
 
 			if(addPropertiesEnabled):
-				featureUpdatesAdd = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsDeltaSparse, addPropertyMaskLookup, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if lowMem else conceptIndex)
+				featureUpdatesAdd = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsDeltaSparse, addPropertyMaskLookup, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if not storeDatabaseGlobalFeatureNeuronsInRam else conceptIndex)
 			if(replacePropertiesEnabled):
-				featureUpdatesReplace = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsCurrentSparse, replacePropertyMaskLookup, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if lowMem else conceptIndex)
+				featureUpdatesReplace = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsCurrentSparse, replacePropertyMaskLookup, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if not storeDatabaseGlobalFeatureNeuronsInRam else conceptIndex)
 			if(arrayIndexPropertiesPos):
-				featureUpdatesPos = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsCurrentSparse, posPropertyMaskLookupFeature, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if lowMem else conceptIndex)
+				featureUpdatesPos = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsCurrentSparse, posPropertyMaskLookupFeature, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if not storeDatabaseGlobalFeatureNeuronsInRam else conceptIndex)
 
 			if(replacePropertiesEnabled):
 				activationUpdateBranches = None
@@ -765,14 +875,14 @@ class SequenceObservedColumns:
 					activationUpdates = featureUpdatesReplace.coalesce()
 					activationUpdateIndices = activationUpdates.indices()
 					activationUpdateMask = (activationUpdateIndices[0] == databaseNetworkObject.arrayIndexPropertiesActivationIndex)
-					if(not lowMem):
+					if(storeDatabaseGlobalFeatureNeuronsInRam):
 						activationUpdateMask = activationUpdateMask & (activationUpdateIndices[3] == conceptIndex)
 					if(activationUpdateMask.any()):
 						activationUpdateBranches = pt.unique(activationUpdateIndices[1][activationUpdateMask])
 				featureTargetSparse = featureTargetSparse.coalesce()
 				targetIndices = featureTargetSparse.indices()
 				targetValues = featureTargetSparse.values()
-				if lowMem:
+				if not storeDatabaseGlobalFeatureNeuronsInRam:
 					removeMask = replacePropertyMaskLookup[targetIndices[0]] & observedFeatureMaskLookup[targetIndices[3]]
 				else:
 					removeMask = replacePropertyMaskLookup[targetIndices[0]] & (targetIndices[3] == conceptIndex) & observedFeatureMaskLookup[targetIndices[4]]
@@ -782,7 +892,7 @@ class SequenceObservedColumns:
 					if(activationUpdateBranches is not None and activationUpdateBranches.numel() > 0):
 						activationBranchLookup = self.buildMaskLookup(numberOfDendriticBranches, activationUpdateBranches.to(targetIndices.device), targetIndices.device)
 						activationMask = (targetIndices[0] == databaseNetworkObject.arrayIndexPropertiesActivationIndex)
-						if(lowMem):
+						if(not storeDatabaseGlobalFeatureNeuronsInRam):
 							activationMask = activationMask & observedFeatureMaskLookup[targetIndices[3]]
 						else:
 							activationMask = activationMask & (targetIndices[3] == conceptIndex) & observedFeatureMaskLookup[targetIndices[4]]
@@ -802,7 +912,7 @@ class SequenceObservedColumns:
 			if(arrayIndexPropertiesPos):
 				featureTargetSparse = self.applySparseMaxUpdate(featureTargetSparse, featureUpdatesPos)
 
-			if lowMem:
+			if not storeDatabaseGlobalFeatureNeuronsInRam:
 				observedColumn.featureNeurons = featureTargetSparse
 			else:
 				globalFeatureNeurons = featureTargetSparse
@@ -854,7 +964,7 @@ class SequenceObservedColumns:
 					connectionTargetSparse = self.applySparseMaxUpdate(connectionTargetSparse, connectionUpdatesPosSource)
 				observedColumn.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, connectionTargetSparse)
 
-		if not lowMem:
+		if storeDatabaseGlobalFeatureNeuronsInRam:
 			self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
 		if(GIAANNproto_debug.debugPrintGPUramUsage):
 			if(executionMode=="train"):
@@ -867,20 +977,37 @@ class SequenceObservedColumns:
 				GIAANNproto_debug.debugPrintRamUsage("updateObservedColumnsEfficient:start", "mode = " + str(mode))
 		if not arrayIndexPropertiesStrength:
 			return
+		updateObservedColumnsEfficientAggregatePhaseLabel = None
+		updateObservedColumnsEfficientPreparePhaseLabel = None
+		updateObservedColumnsEfficientFeatureNeuronsPhaseLabel = None
+		updateObservedColumnsEfficientFeatureConnectionsPhaseLabel = None
+		if(debugPrintRamMaxUsagePhaseLocal and executionMode=="train"):
+			updateObservedColumnsEfficientAggregatePhaseLabel = "updateObservedColumnsWrapper"
+			updateObservedColumnsEfficientPreparePhaseLabel = "updateObservedColumnsEfficient:prepare"
+			updateObservedColumnsEfficientFeatureNeuronsPhaseLabel = "updateObservedColumnsEfficient:#A feature neurons"
+			updateObservedColumnsEfficientFeatureConnectionsPhaseLabel = "updateObservedColumnsEfficient:#B feature connections"
+			GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal(updateObservedColumnsEfficientPreparePhaseLabel)
 
-		featureNeuronsDelta = self.featureNeurons[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
+		featureNeuronsDelta = None
 		featureConnectionsDelta = None
+		featureNeuronsDeltaSparse = None
 		featureConnectionsDeltaSparse = None
+		if(self.useTrainSparseNeuronsTensor()):
+			featureNeuronsDeltaSparse = self.extractSequenceFeaturePropertySparse(databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
+		else:
+			featureNeuronsDelta = self.featureNeurons[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 		if(self.useTrainSparseConnectionsTensor()):
 			featureConnectionsDeltaSparse = self.extractSequenceConnectionPropertySparse(databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
 		else:
 			featureConnectionsDelta = self.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 		if(useGPUsparseStrict and not useGPUsparse):
-			featureNeuronsDelta = featureNeuronsDelta.to(deviceSparse)
+			if(featureNeuronsDelta is not None):
+				featureNeuronsDelta = featureNeuronsDelta.to(deviceSparse)
 			if(featureConnectionsDelta is not None):
 				featureConnectionsDelta = featureConnectionsDelta.to(deviceSparse)
 
-		featureNeuronsDeltaSparse = featureNeuronsDelta.to_sparse()
+		if(featureNeuronsDelta is not None):
+			featureNeuronsDeltaSparse = featureNeuronsDelta.to_sparse()
 		if(featureConnectionsDelta is not None):
 			featureConnectionsDeltaSparse = featureConnectionsDelta.to_sparse()
 		if not useGPUsparse:
@@ -922,6 +1049,9 @@ class SequenceObservedColumns:
 				GIAANNproto_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient:getObservedColumnsByConceptIndex", time.perf_counter() - getObservedColumnsByConceptIndexStartTime)
 		conceptIndicesFeatureTensor = self.conceptIndicesInSequenceObservedTensor.to(featureDevice)
 		conceptIndicesConnectionTensor = self.conceptIndicesInSequenceObservedTensor.to(connectionDevice)
+		if(updateObservedColumnsEfficientPreparePhaseLabel is not None):
+			GIAANNproto_debug.debugRecordGpuRamMaxUsagePhaseLocalGrouped(updateObservedColumnsEfficientPreparePhaseLabel, updateObservedColumnsEfficientAggregatePhaseLabel)
+			GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal(updateObservedColumnsEfficientFeatureNeuronsPhaseLabel)
 
 		#A: update feature neurons;
 		if(optimisationArrayIndexPropertiesEfficientSerialNeurons):
@@ -929,7 +1059,7 @@ class SequenceObservedColumns:
 			
 			globalFeatureNeurons = None
 			globalFeatureNeuronUpdates = None
-			if(not lowMem):
+			if(storeDatabaseGlobalFeatureNeuronsInRam):
 				globalFeatureNeurons = self.databaseNetworkObject.globalFeatureNeurons
 				if(optimisationCombineSparseUpdatesPerSequence):
 					globalFeatureNeuronUpdates = []
@@ -938,7 +1068,7 @@ class SequenceObservedColumns:
 				conceptIndex = observedColumn.conceptIndex
 
 				#A: update feature neurons;
-				if(lowMem):
+				if(not storeDatabaseGlobalFeatureNeuronsInRam):
 					featureTargetSparse = observedColumn.featureNeurons
 					featureTargetSize = featureTargetSparse.size()
 				else:
@@ -949,21 +1079,21 @@ class SequenceObservedColumns:
 					start, end = featureRange
 					featureUpdateIndices = featureIndicesSorted[:, start:end]
 					featureUpdateValues = featureValuesSorted[start:end]
-					featureUpdates = self.buildFeaturePropertyUpdateSparse(featureUpdateIndices, featureUpdateValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, featureTargetSize, insertConceptIndex=None if lowMem else conceptIndex)
-					if(lowMem):
+					featureUpdates = self.buildFeaturePropertyUpdateSparse(featureUpdateIndices, featureUpdateValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, featureTargetSize, insertConceptIndex=None if not storeDatabaseGlobalFeatureNeuronsInRam else conceptIndex)
+					if(not storeDatabaseGlobalFeatureNeuronsInRam):
 						featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
 					else:
 						if(optimisationCombineSparseUpdatesPerSequence):
 							globalFeatureNeuronUpdates.append(featureUpdates)
 						else:
 							featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
-				if(lowMem):
+				if(not storeDatabaseGlobalFeatureNeuronsInRam):
 					observedColumn.featureNeurons = featureTargetSparse
 				else:
 					if(not optimisationCombineSparseUpdatesPerSequence):
 						globalFeatureNeurons = featureTargetSparse
 
-			if(not lowMem):
+			if(storeDatabaseGlobalFeatureNeuronsInRam):
 				if(optimisationCombineSparseUpdatesPerSequence):
 					if(globalFeatureNeuronUpdates is None):
 						raise RuntimeError("updateObservedColumnsEfficient error: globalFeatureNeuronUpdates is None while optimisationCombineSparseUpdatesPerSequence")
@@ -973,7 +1103,7 @@ class SequenceObservedColumns:
 				self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
 		else:
 			if(featureIndices.numel() > 0):
-				if(lowMem):
+				if(not storeDatabaseGlobalFeatureNeuronsInRam):
 					featureConceptIndicesUnique = pt.unique(conceptIndicesFeatureTensor[featureIndices[2]], sorted=True)
 					featureTargetSize = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, featureConceptIndicesUnique.shape[0], databaseNetworkObject.f)
 					featureTargetSparse = self.gatherFeatureNeuronConceptBucketTensor(observedColumnsByConceptIndex, featureConceptIndicesUnique, featureDevice)
@@ -985,6 +1115,9 @@ class SequenceObservedColumns:
 					featureUpdates = self.buildFeaturePropertyUpdateSparseBatched(featureIndices, featureValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, conceptIndicesFeatureTensor, globalFeatureNeurons.size())
 					globalFeatureNeurons = self.addSparseUpdateNonNegative(globalFeatureNeurons, featureUpdates)
 					self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
+		if(updateObservedColumnsEfficientFeatureNeuronsPhaseLabel is not None):
+			GIAANNproto_debug.debugRecordGpuRamMaxUsagePhaseLocalGrouped(updateObservedColumnsEfficientFeatureNeuronsPhaseLabel, updateObservedColumnsEfficientAggregatePhaseLabel)
+			GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal(updateObservedColumnsEfficientFeatureConnectionsPhaseLabel)
 
 		#B: update feature connections;
 		if(optimisationArrayIndexPropertiesEfficientSerialConnections):
@@ -1018,6 +1151,8 @@ class SequenceObservedColumns:
 					connectionUpdates = self.buildConnectionSourceBucketUpdateSparse(connectionIndices, connectionValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor, connectionSourceCombinedKeysUnique, connectionTargetSize)
 					connectionTargetSparse = self.addSparseUpdateNonNegative(connectionTargetSparse, connectionUpdates)
 				self.scatterConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionTargetSparse)
+		if(updateObservedColumnsEfficientFeatureConnectionsPhaseLabel is not None):
+			GIAANNproto_debug.debugRecordGpuRamMaxUsagePhaseLocalGrouped(updateObservedColumnsEfficientFeatureConnectionsPhaseLabel, updateObservedColumnsEfficientAggregatePhaseLabel)
 			
 		if(GIAANNproto_debug.debugPrintGPUramUsage):
 			if(executionMode=="train"):
@@ -1205,7 +1340,7 @@ class SequenceObservedColumns:
 			if(int(conceptIndexValue) not in observedColumnsByConceptIndex):
 				raise RuntimeError(f"scatterConnectionSourceBucketTensor error: missing observed column for conceptIndex {int(conceptIndexValue)}")
 			observedColumn = observedColumnsByConceptIndex[int(conceptIndexValue)]
-			if(not storeDatabaseInRam and observedColumn.hasTrainPreparedSourceFeatureIndices()):
+			if(not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam and observedColumn.hasTrainPreparedSourceFeatureIndices()):
 				if(int(sourceFeatureIndexValue) not in observedColumn.trainPreparedSourceFeatureIndices):
 					raise RuntimeError(f"scatterConnectionSourceBucketTensor error: sourceFeatureIndex {int(sourceFeatureIndexValue)} was not prepared for conceptIndex {int(conceptIndexValue)}")
 			if(sourceBucketIndex in connectionTargetBucketRanges):
@@ -1506,7 +1641,7 @@ class SequenceObservedColumns:
 			requiredSourceFeatureIndices = set(int(sourceFeatureIndex) for sourceFeatureIndex in self.requiredSourceFeatureIndicesByObservedColumn[conceptIndex])
 		else:
 			requiredSourceFeatureIndices = None
-			if(storeDatabaseInRam):
+			if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 				for sourceFeatureIndex in observedColumn.featureConnectionsBySourceFeature.keys():
 					resultSet.add(int(sourceFeatureIndex))
 			else:

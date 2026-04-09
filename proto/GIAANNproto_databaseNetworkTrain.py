@@ -52,26 +52,34 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 	processFeaturesActiveTrainStartTime = None
 	if(debugPrintTrainSectionTimes):
 		processFeaturesActiveTrainStartTime = time.perf_counter()
+	useSparseSequenceNeurons = trainSparseNeuronsTensor
 	useSparseSequenceConnections = trainSparseConnectionsTensor
+	if(useSparseSequenceNeurons):
+		if(not useSparseSequenceConnections):
+			raise RuntimeError("processFeaturesActiveTrain error: trainSparseNeuronsTensor requires trainSparseConnectionsTensor")
+		if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections and arrayIndexPropertiesPermanence):
+			raise RuntimeError("processFeaturesActiveTrain error: trainSparseNeuronsTensor does not support trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections")
 	if(useSparseSequenceConnections):
 		if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections and arrayIndexPropertiesPermanence):
 			raise RuntimeError("processFeaturesActiveTrain error: trainSparseConnectionsTensor does not support trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections")
-	featureNeuronsInactive = 1 - featureNeuronsActive
 	if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections and arrayIndexPropertiesPermanence):
 		featureNeuronsActiveUnion = featureNeuronsActive.amax(dim=(0, 1))
 		featureNeuronsInactiveUnion = 1 - featureNeuronsActiveUnion
-	
-	if(arrayIndexPropertiesStrength):
-		sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, :, :, :, :] += featureNeuronsActive
-	if(arrayIndexPropertiesPermanence):
-		sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesPermanenceIndex, :, :, :, :] += featureNeuronsActive*z1
-	if(arrayIndexPropertiesActivation):
-		sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesActivationIndex, :, :, :, :] = 0
-	if(arrayIndexPropertiesTime):
-		sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesTimeIndex, :, :, :, :] = 0
-		#OLD inferenceUseNeuronFeaturePropertiesTime=False: sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesTimeIndex, :, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesTimeIndex] + featureNeuronsActive*sequenceIndex
-	if(arrayIndexPropertiesPos):
-		sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesPosIndex, :, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesPosIndex] + featureNeuronsActive*featureNeuronsPos
+	if(useSparseSequenceNeurons):
+		processFeaturesActiveTrainSparseNeurons(sequenceObservedColumns, featureNeuronsActive, cs, fs, featureNeuronsPos)
+	else:
+		featureNeuronsInactive = 1 - featureNeuronsActive
+		if(arrayIndexPropertiesStrength):
+			sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, :, :, :, :] += featureNeuronsActive
+		if(arrayIndexPropertiesPermanence):
+			sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesPermanenceIndex, :, :, :, :] += featureNeuronsActive*z1
+		if(arrayIndexPropertiesActivation):
+			sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesActivationIndex, :, :, :, :] = 0
+		if(arrayIndexPropertiesTime):
+			sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesTimeIndex, :, :, :, :] = 0
+			#OLD inferenceUseNeuronFeaturePropertiesTime=False: sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesTimeIndex, :, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesTimeIndex] + featureNeuronsActive*sequenceIndex
+		if(arrayIndexPropertiesPos):
+			sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesPosIndex, :, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesPosIndex] + featureNeuronsActive*featureNeuronsPos
 
 	if(useSparseSequenceConnections):
 		featureConnectionsActive = None
@@ -89,6 +97,30 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 		GIAANNproto_debug.debugTrainSectionTimesAdd(sequenceObservedColumns.databaseNetworkObject, "processFeaturesActiveTrain", time.perf_counter() - processFeaturesActiveTrainStartTime)
 
 	return featureConnectionsActive, featureConnectionsSegmentMask
+
+def processFeaturesActiveTrainSparseNeurons(sequenceObservedColumns, featureNeuronsActive, cs, fs, featureNeuronsPos):
+	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
+	featureNeuronsActiveSparse = featureNeuronsActive.to_sparse().coalesce()
+	featureNeuronIndices = featureNeuronsActiveSparse.indices()
+	featureNeuronValues = featureNeuronsActiveSparse.values()
+	if(arrayIndexPropertiesStrength):
+		strengthSparse = buildSequenceFeaturePropertySparse(featureNeuronIndices, featureNeuronValues, cs, fs)
+		addSequenceFeatureNeuronsProperty(sequenceObservedColumns, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, strengthSparse)
+	if(arrayIndexPropertiesPermanence):
+		permanenceValues = pt.full((featureNeuronValues.shape[0],), z1, dtype=arrayType, device=featureNeuronValues.device)
+		permanenceSparse = buildSequenceFeaturePropertySparse(featureNeuronIndices, permanenceValues, cs, fs)
+		addSequenceFeatureNeuronsProperty(sequenceObservedColumns, databaseNetworkObject.arrayIndexPropertiesPermanenceIndex, permanenceSparse)
+	if(arrayIndexPropertiesActivation):
+		setSequenceFeatureNeuronsProperty(sequenceObservedColumns, databaseNetworkObject.arrayIndexPropertiesActivationIndex, None)
+	if(arrayIndexPropertiesTime):
+		setSequenceFeatureNeuronsProperty(sequenceObservedColumns, databaseNetworkObject.arrayIndexPropertiesTimeIndex, None)
+	if(arrayIndexPropertiesPos):
+		posValues = featureNeuronValues
+		if(featureNeuronIndices.numel() > 0):
+			posValues = featureNeuronsPos[featureNeuronIndices[2], featureNeuronIndices[3]].to(featureNeuronValues.dtype)
+		posSparse = buildSequenceFeaturePropertySparse(featureNeuronIndices, posValues, cs, fs)
+		setSequenceFeatureNeuronsProperty(sequenceObservedColumns, databaseNetworkObject.arrayIndexPropertiesPosIndex, posSparse)
+	return
 
 def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos):
 
@@ -357,6 +389,22 @@ def assignFeatureConnectionsToTargetSegmentsSparse(branchIndices, sourceConceptI
 		result = pt.cat(indicesList, dim=1)
 	return result
 
+def buildSequenceFeaturePropertySparse(featureIndices, featureValues, cs, fs):
+	targetSize = (numberOfDendriticBranches, arrayNumberOfSegments, cs, fs)
+	targetDevice = deviceSparse
+	sparseIndices = featureIndices
+	sparseValues = featureValues
+	if(sparseIndices.numel() == 0):
+		sparseIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=targetDevice)
+		sparseValues = pt.empty((0,), dtype=arrayType, device=targetDevice)
+	else:
+		if(sparseIndices.device != targetDevice):
+			sparseIndices = sparseIndices.to(targetDevice)
+		if(sparseValues.device != targetDevice):
+			sparseValues = sparseValues.to(targetDevice)
+	result = pt.sparse_coo_tensor(sparseIndices, sparseValues, size=targetSize, dtype=arrayType, device=targetDevice).coalesce()
+	return result
+
 def buildSequenceConnectionPropertySparse(connectionIndices, connectionValues, cs, fs):
 	targetSize = (numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs)
 	targetDevice = deviceSparse
@@ -385,6 +433,23 @@ def applyTrainConnectionStrengthLimits(sequenceObservedColumns):
 			sequenceObservedColumns.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex] = sequenceObservedColumns.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex].clamp(max=1.0)
 		if(trainConnectionStrengthLimitTanh):
 			sequenceObservedColumns.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex] = pt.tanh(sequenceObservedColumns.featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex])
+	return
+
+def addSequenceFeatureNeuronsProperty(sequenceObservedColumns, propertyIndex, propertyTensor):
+	if(trainSparseNeuronsTensor):
+		sequenceObservedColumns.addSequenceFeaturePropertyUpdate(propertyIndex, propertyTensor)
+	else:
+		sequenceObservedColumns.featureNeurons[propertyIndex, :, :, :, :] += propertyTensor
+	return
+
+def setSequenceFeatureNeuronsProperty(sequenceObservedColumns, propertyIndex, propertyTensor):
+	if(trainSparseNeuronsTensor):
+		sequenceObservedColumns.setSequenceFeaturePropertyUpdate(propertyIndex, propertyTensor)
+	else:
+		if(propertyTensor is None):
+			sequenceObservedColumns.featureNeurons[propertyIndex, :, :, :, :] = 0
+		else:
+			sequenceObservedColumns.featureNeurons[propertyIndex, :, :, :, :] = propertyTensor
 	return
 
 def addSequenceFeatureConnectionsProperty(sequenceObservedColumns, propertyIndex, propertyTensor):

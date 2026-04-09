@@ -42,7 +42,7 @@ if(useQuickExecution):
 	executionMode = "inference" 	#mandatory: "inference" (effective trainAndInference but uses a text datafile)
 	inferenceTrainFirstSequences = True	#trains first sequences in inference_prompt.txt, performs inference only on last sequence
 elif(useBenchmark):
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 else:
@@ -105,7 +105,7 @@ if(useQuickExecution):
 	trainMaxSequences = 10	#N/A: auto generated from inference_prompt.txt.trainAndInference
 	databaseFolderBase = "../database"	#default: "../database/"
 elif(useBenchmark):
-	trainMaxSequences = 200000	#5000, 200000, 1000000
+	trainMaxSequences = 5000	#5000, 200000, 1000000
 	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"
 elif(useAutoresearch):
 	trainMaxSequences = 5000
@@ -138,6 +138,11 @@ else:
 	randomlyAssignBranches = False
 
 
+#Error report;
+def printe(str):
+	raise RuntimeError(str)
+
+
 #Dataset;
 datasetsLibrary4plus = False	#default: False	#orig: False	#set False during dev to maintain benchmark consistency
 trainTestSet = False	#default: False	#only set True to generate an inference test set (with printTrainSequenceRaw=True)
@@ -163,7 +168,7 @@ elif(datasetType=="wikipedia"):
 		datasetCfg = "20220301.en"
 	useLocalDataset = True	#default: True	#orig: False (stream)	#use local dataset	#automatic huggingface access to dataset is unreliable
 else:
-	raise RuntimeError("Dataset selection error: enable either datasetType==textfile or datasetType==oscar or datasetType==wikipedia")
+	printe("Dataset selection error: enable either datasetType==textfile or datasetType==oscar or datasetType==wikipedia")
 if(not datasetType=="textfile"):
 	if(useLocalDataset):
 		datasetFolder = "../../dataset/"
@@ -172,7 +177,7 @@ if(not datasetType=="textfile"):
 		elif(datasetType=="oscar"):
 			useLocalDatasetDownloadManual = False	#OSCAR2201 uses custom HF dataset code and non-parquet source files; do not use manual parquet downloader
 		else:
-			raise RuntimeError("Dataset selection error: unsupported dataset for useLocalDatasetDownloadManual configuration")
+			printe("Dataset selection error: unsupported dataset for useLocalDatasetDownloadManual configuration")
 		datasetProcessedCacheFolderName = "processed_dataset_cache"	#manual name for processed dataset cache
 		datasetProcessedCacheFolder = datasetFolder + datasetProcessedCacheFolderName + "/"
 	else:
@@ -188,7 +193,7 @@ if(not datasetType=="textfile"):
 			testSetStartOffset = int(trainMaxSequencesEver / datasetOscarAverageEligibleSentencesPerArticle)*numSentencesPerSequenceEver
 			testSetSize = 1000	#number of entries to include in test set
 		else:
-			raise RuntimeError("trainTestSet configuration error: unsupported dataset selection")
+			printe("trainTestSet configuration error: unsupported dataset selection")
 		trainSetStartOffsetSequences = 0
 	else:
 		trainSetStartOffsetSequences = 0	#200000	#1000000	#default: 0	#orig: 0	
@@ -210,22 +215,27 @@ useGPUsparseStrict = True	#default: True	#orig: False	#enforce strict sparse dev
 runtimeReleaseGPUMemory = False	#default: True	#aggressively release cached CUDA memory after sequence processing
 runtimeReleaseGPUMemoryEverySequenceCount = 1	#default: 1	#only apply release every N processed sequences
 if(runtimeReleaseGPUMemory):
-	if(runtimeReleaseGPUMemoryEverySequenceCount <= 0):
-		raise RuntimeError("runtimeReleaseGPUMemoryEverySequenceCount must be > 0")
-useGPUfileio = useGPUsparse	#default: useGPUsparse	#orig: useGPUsparse
-storeDatabaseInRam = True	#default: True	#orig: False
-if(storeDatabaseInRam):
+	assert runtimeReleaseGPUMemoryEverySequenceCount > 0, "runtimeReleaseGPUMemoryEverySequenceCount must be > 0"
+useGPUfileio = False	#default: useGPUsparse	#orig: useGPUsparse
+storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = True	#default: True	#orig: False
+if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 	useGPUdatabase = False	#default: False	#default: False
 	resizeTensorsOnRAMdatabaseSave = False	#default: False #orig: True	#resize all feature neuron and connections tensors during final RAM database save
 	resizeTensorsOnRAMdatabaseLoad = False	#default: False #orig: True	#resize all feature neuron and connections tensors during initial RAM database load
-
-#Error report;
-ERROR_SIGNAL = 1
-def exitWithError():
-	sys.exit(ERROR_SIGNAL)
-def printe(str):
-	print(str)
-	exitWithError()
+lowMemGenerateGlobalFeatureNeuronsTensor = False	#derived var
+highMemGenerateGlobalFeatureNeuronsTensor = False	#derived var
+if(executionMode=="train"):
+	storeDatabaseGlobalFeatureNeuronsInRam = True		 #default: True	#orig: False	 #currently required to be True for inference compatibility	#optional
+	if(not storeDatabaseGlobalFeatureNeuronsInRam):
+		lowMemGenerateGlobalFeatureNeuronsTensor = False	#default: False	#orig: False	#generates and saves a globalFeatureNeurons at the end of training (not just individual column featureNeurons tensors) so that subsequent inference is supported
+	trainSparseConnectionsTensor = False	#default: False	#orig: False
+	trainSparseNeuronsTensor = False	#default: False	#orig: False
+	if(trainSparseNeuronsTensor):
+		assert trainSparseConnectionsTensor, "trainSparseNeuronsTensor requires trainSparseConnectionsTensor=True"
+else:
+	storeDatabaseGlobalFeatureNeuronsInRam = True		#mandatory: True	#if storeDatabaseGlobalFeatureNeuronsInRam=True use global feature neuron tensors, else use feature neuron tensors in observed columns (note feature connection tensors are always in observed columns)
+	if(executionMode=="inference"):
+		highMemGenerateGlobalFeatureNeuronsTensor = False	#default: False	#orig: False	#generates and saves a globalFeatureNeurons at the start of inference after being trained with storeDatabaseGlobalFeatureNeuronsInRam=False (with individual column featureNeurons tensors), so that inference is supported
 
 
 #Benchmarking;
@@ -270,7 +280,7 @@ inferenceOnlyRetainPredictedTargetObservedColumn = False	#default: False	#orig: 
 inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch = False	#default: False	#orig: False	#True: retain only current beam-search target(s); False: retain all beam-search targets	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
 trainStoreFeatureMapsGlobally = True	#default: True	#orig: False	#True: avoid per-column persistence of global feature index maps; False: preserve legacy per-column map persistence
 if not trainStoreFeatureMapsGlobally:
-	assert not storeDatabaseInRam
+	assert not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam
 
 
 #Inference segment activation times;
@@ -412,27 +422,21 @@ if(useInference):
 	
 
 #Train optimisations;
-#trainSequenceObservedColumnsUseSequenceFeaturesOnly can be upgraded so only a limited amount of data is ever loaded to GPU during train (it currently temporarily masks entire feature arrays in GPU during transfer phase)
-if(executionMode=="inference" or executionMode=="trainAndInference"):
-	lowMem = False		#mandatory: False	#if lowMem=False use global feature neuron tensors, else use feature neuron tensors in observed columns (note feature connection tensors are always in observed columns)
-else:
-	lowMem = False		 #default: False	#orig: True	#currently required to be False for inference compatibility	#optional
 trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
+#trainSequenceObservedColumnsUseSequenceFeaturesOnly can be upgraded so only a limited amount of data is ever loaded to GPU during train (it currently temporarily masks entire feature arrays in GPU during transfer phase)
 trainSequenceObservedColumnsMatchSequenceWords = True	#mantatory		#introduced GIAANNproto1b12a; more robust method for training (independently train each instance of a concept in a sequence)	#False: not robust as there may be less concept columns than concepts referenced in sequence (if multiple references to the same column)	
 optimisationCombineSparseUpdatesPerSequence = True	#default: True	#orig: False	#updateObservedColumnsEfficient combines sparse updates per sequence instead of per column (reduces calls to coalesce) 
 optimisationUseCUDAObservedColumnUpdateKernel = False	#default: False	#use custom CUDA sparse accumulator for updateObservedColumnsEfficient strength updates
 if(optimisationUseCUDAObservedColumnUpdateKernel):
-	if(not useGPUsparse):
-		raise RuntimeError("optimisationUseCUDAObservedColumnUpdateKernel requires useGPUsparse=True")
-	if(not useGPUsparseStrict):
-		raise RuntimeError("optimisationUseCUDAObservedColumnUpdateKernel requires useGPUsparseStrict=True")
+	assert useGPUsparse, "optimisationUseCUDAObservedColumnUpdateKernel requires useGPUsparse=True"
+	assert useGPUsparseStrict, "optimisationUseCUDAObservedColumnUpdateKernel requires useGPUsparseStrict=True"
 optimisationGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize = True	#default: True	#orig: False	#vectorise exact per-column source-feature detection for trainSequenceObservedColumnsUseSequenceFeaturesOnly/trainSequenceObservedColumnsMatchSequenceWords
-optimisationGetFeatureConnectionsForSourceFeatureCache = False 	#default: not storeDatabaseInRam	#orig: False	#cache stored source-feature file indices per observed column to avoid repeated directory scans when storeDatabaseInRam=False
+optimisationGetFeatureConnectionsForSourceFeatureCache = False 	#default: not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam	#orig: False	#cache stored source-feature file indices per observed column to avoid repeated directory scans when storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=False
 optimisationNormaliseSourceFeatureIndicesDisabled = False	#default: False	#orig: False
 optimisationObservedColumnsWriteMetadataCheck = False	#default: False, orig: False
 optimisationArrayIndexPropertiesEfficientSerialConnections = False	#default: False #orig: True	#uses less GPU RAM
 optimisationArrayIndexPropertiesEfficientSerialNeurons = False	#default: False #orig: False
-trainSparseConnectionsTensor = True	#default: False	#orig: False
+
 
 #Draw;
 #select a single draw method (colouring scheme);
@@ -599,7 +603,7 @@ debugReloadGlobalFeatureNeuronsEverySequence = False
 
 #Concept/feature names;
 useDedicatedFeatureLists = False	#default: False - dynamically learn concept features	#True: use static feature lists (depreciated)
-#if usePOS and not lowMem:
+#if usePOS and storeDatabaseGlobalFeatureNeuronsInRam:
 #	useDedicatedFeatureLists = True
 useDedicatedConceptNames = False
 useDedicatedConceptNames2 = False
@@ -630,9 +634,10 @@ if(useInference):
 	kcMax = 1 	#topk next concept column prediction
 	kf = 1
 	assert kcNetwork==1 and kf==1 and kcMax==1, "multiple prediction column/feature pairs not supported"
-	assert not lowMem, "useInference: global feature neuron lists are required" 
+	if(executionMode == "inference"):
+		assert storeDatabaseGlobalFeatureNeuronsInRam, "useInference: global feature neuron lists are required" 
 	assert useSaveData,  "useInference: useSaveData is required" 
-
+		
 
 #Database save paths;
 conceptColumnsDictFile = databaseFolder + 'conceptColumnsDict.pkl'
@@ -705,9 +710,8 @@ if(conceptColumnsDelimitByPOS):
 		conceptFeaturesReferenceSetDelimiterProbabilisticListFile = databaseFolder + 'conceptFeaturesReferenceSetDelimiterProbabilisticList.pkl'
 	else:
 		conceptFeaturesReferenceSetDelimiterListFile = databaseFolder + 'conceptFeaturesReferenceSetDelimiterList.pkl'
-if not lowMem:
-	globalFeatureNeuronsFile = 'globalFeatureNeurons'
-	globalFeatureNeuronsFileFull = databaseFolder + globalFeatureNeuronsFile + pytorchTensorFileExtension
+globalFeatureNeuronsFile = 'globalFeatureNeurons'
+globalFeatureNeuronsFileFull = databaseFolder + globalFeatureNeuronsFile + pytorchTensorFileExtension
 posFolder = databaseFolder + "POS/"
 posDictFile = "everPos.wordnet.pkl.gz"
 saveGlobalFeatureNeuronsRate = 1000
@@ -902,7 +906,7 @@ if(useGPUfileio):
 		printe("useGPUfileio and !pt.cuda.is_available")
 else:
 	deviceFileIO = pt.device("cpu")
-if(storeDatabaseInRam):
+if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 	if(useGPUdatabase):
 		if(not pt.cuda.is_available()):
 			printe("useGPUdatabase and !pt.cuda.is_available")
@@ -911,8 +915,8 @@ if(storeDatabaseInRam):
 		deviceDatabase = pt.device("cpu")
 else:
 	deviceDatabase = deviceSparse
-deviceLoadColumnInference = deviceSparse if (storeDatabaseInRam and useGPUdatabase != useGPUsparse) else None
-deviceLoadColumnInferenceCopy = storeDatabaseInRam and useGPUdatabase != useGPUsparse
+deviceLoadColumnInference = deviceSparse if (storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam and useGPUdatabase != useGPUsparse) else None
+deviceLoadColumnInferenceCopy = storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam and useGPUdatabase != useGPUsparse
 
 
 #Dedicated feature lists (non-dynamic);
@@ -1020,9 +1024,15 @@ if(printConfiguration):
 	print("#RAM;")
 	print("useGPUdense:", useGPUdense)
 	print("useGPUsparse:", useGPUsparse)
-	print("useGPUsparseStrict:", useGPUsparseStrict)
-	print("storeDatabaseInRam:", storeDatabaseInRam)
-	if(storeDatabaseInRam):
+	print("useGPUfileio:", useGPUfileio)
+	print("storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam:", storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam)
+	print("storeDatabaseGlobalFeatureNeuronsInRam:", storeDatabaseGlobalFeatureNeuronsInRam)
+	print("lowMemGenerateGlobalFeatureNeuronsTensor:", lowMemGenerateGlobalFeatureNeuronsTensor)
+	print("highMemGenerateGlobalFeatureNeuronsTensor:", highMemGenerateGlobalFeatureNeuronsTensor)
+	if(executionMode=="train"):
+		print("trainSparseConnectionsTensor:", trainSparseConnectionsTensor)
+		print("trainSparseNeuronsTensor:", trainSparseNeuronsTensor)
+	if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 		print("useGPUdatabase:", useGPUdatabase)
 	print("")
 	print("#Benchmarking;")

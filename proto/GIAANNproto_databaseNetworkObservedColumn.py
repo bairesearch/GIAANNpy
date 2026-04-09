@@ -88,7 +88,7 @@ class ObservedColumnConnectionBase:
 		return
 
 	def prepareRequiredSourceFeatureConnectionsTrain(self, requiredSourceFeatureIndices, targetDevice, createMissing=False):
-		if(storeDatabaseInRam and useGPUdatabase != useGPUsparse):
+		if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam and useGPUdatabase != useGPUsparse):
 			self.prepareRequiredSourceFeatureConnectionsDatabaseInRamCPU(requiredSourceFeatureIndices, targetDevice, createMissing)
 		else:
 			self.prepareRequiredSourceFeatureConnections(requiredSourceFeatureIndices, targetDevice, createMissing)
@@ -171,17 +171,17 @@ class ObservedColumnConnectionBase:
 
 	def requiresExpandFeatureNeuronArraysFeatures(self, newF):
 		result = False
-		if(lowMem):
+		if(not storeDatabaseGlobalFeatureNeuronsInRam):
 			if(not hasattr(self, "featureNeurons")):
-				raise RuntimeError(f"{self.getObservedColumnErrorName()}.requiresExpandFeatureNeuronArraysFeatures error: featureNeurons missing while lowMem is enabled")
+				raise RuntimeError(f"{self.getObservedColumnErrorName()}.requiresExpandFeatureNeuronArraysFeatures error: featureNeurons missing while storeDatabaseGlobalFeatureNeuronsInRam is False")
 			if(newF > self.featureNeurons.shape[3]):
 				result = True
 		return result
 
 	def expandFeatureNeuronArraysFeatures(self, newF):
-		if(lowMem):
+		if(not storeDatabaseGlobalFeatureNeuronsInRam):
 			if(not hasattr(self, "featureNeurons")):
-				raise RuntimeError(f"{self.getObservedColumnErrorName()}.expandFeatureNeuronArraysFeatures error: featureNeurons missing while lowMem is enabled")
+				raise RuntimeError(f"{self.getObservedColumnErrorName()}.expandFeatureNeuronArraysFeatures error: featureNeurons missing while storeDatabaseGlobalFeatureNeuronsInRam is False")
 			if(newF > self.featureNeurons.shape[3]):
 				expandedSizeNeurons = (self.featureNeurons.shape[0], self.featureNeurons.shape[1], self.featureNeurons.shape[2], newF)
 				self.featureNeurons = GIAANNproto_databaseNetworkFiles.expandSparseTensorSize(self.featureNeurons, expandedSizeNeurons, f"{self.getObservedColumnErrorName()}.expandFeatureNeuronArraysFeatures")
@@ -314,14 +314,14 @@ class ObservedColumnConnectionBase:
 
 class ObservedColumn(ObservedColumnConnectionBase):
 	"""
-	Create a class defining observed columns. The observed column class contains an index to the dataset concept column dictionary. The observed column class contains a list of feature connection arrays. The observed column class also contains a list of feature neuron arrays when lowMem mode is enabled.
+	Create a class defining observed columns. The observed column class contains an index to the dataset concept column dictionary. The observed column class contains a list of feature connection arrays. The observed column class also contains a list of feature neuron arrays when storeDatabaseGlobalFeatureNeuronsInRam is False.
 	"""
 	def __init__(self, databaseNetworkObject, conceptIndex, lemma, i):
 		self.databaseNetworkObject = databaseNetworkObject
 		self.conceptIndex = conceptIndex
 		self.conceptName = lemma
 		self.conceptSequenceWordIndex = i
-		if lowMem:
+		if not storeDatabaseGlobalFeatureNeuronsInRam:
 			self.featureNeurons = self.initialiseFeatureNeurons(databaseNetworkObject.f)
 		if(trainStoreFeatureMapsGlobally):
 			self.featureWordToIndex = databaseNetworkObject.conceptFeaturesDict
@@ -349,21 +349,21 @@ class ObservedColumn(ObservedColumnConnectionBase):
 				self.nextFeatureIndex += 1
 
 	def initialiseFeatureNeurons(self, f, targetDevice=None):
-		deviceTarget = targetDevice if targetDevice is not None else (deviceDatabase if storeDatabaseInRam else deviceSparse)
+		deviceTarget = targetDevice if targetDevice is not None else (deviceDatabase if storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam else deviceSparse)
 		indices = pt.empty((4, 0), dtype=pt.long, device=deviceTarget)
 		values = pt.empty((0,), dtype=arrayType, device=deviceTarget)
 		featureNeurons = pt.sparse_coo_tensor(indices, values, size=(self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, f), dtype=arrayType, device=deviceTarget)
 		return featureNeurons
 
 	def getDefaultConnectionTargetDevice(self):
-		deviceTarget = deviceDatabase if storeDatabaseInRam else deviceSparse
+		deviceTarget = deviceDatabase if storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam else deviceSparse
 		if(len(self.featureConnectionsBySourceFeature) > 0):
 			firstTensor = next(iter(self.featureConnectionsBySourceFeature.values()))
 			deviceTarget = firstTensor.device
 		return deviceTarget
 
 	def listStoredSourceFeatureIndices(self):
-		if(storeDatabaseInRam and self.databaseNetworkObject.observedColumnsRAMLoaded):
+		if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam and self.databaseNetworkObject.observedColumnsRAMLoaded):
 			combinedIndices = set(self.featureConnectionsBySourceFeature.keys())
 		elif(optimisationGetFeatureConnectionsForSourceFeatureCache):
 			if(self.storedSourceFeatureIndicesCache is None):
@@ -386,7 +386,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		resolvedTargetDevice = targetDevice if targetDevice is not None else self.getDefaultConnectionTargetDevice()
 		result = self.featureConnectionsBySourceFeature.get(normalisedSourceFeatureIndex)
 		if(result is None):
-			if(storeDatabaseInRam and self.databaseNetworkObject.observedColumnsRAMLoaded):
+			if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam and self.databaseNetworkObject.observedColumnsRAMLoaded):
 				result = self.initialiseFeatureConnections(self.databaseNetworkObject.c, self.databaseNetworkObject.f, resolvedTargetDevice)
 			else:
 				if(optimisationGetFeatureConnectionsForSourceFeatureCache):
@@ -472,7 +472,7 @@ class ObservedColumnProxy(ObservedColumnConnectionBase):
 		self.featureConnectionsBySourceFeature = {}
 		self.loadedSourceFeatureIndices = set()
 		self.trainPreparedSourceFeatureIndices = set()
-		if(lowMem and hasattr(observedColumn, "featureNeurons")):
+		if((not storeDatabaseGlobalFeatureNeuronsInRam) and hasattr(observedColumn, "featureNeurons")):
 			self.featureNeurons = observedColumn.featureNeurons.to(targetDevice)
 
 	def getDefaultConnectionTargetDevice(self):

@@ -365,7 +365,7 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 		saveDataStartTime = time.perf_counter()
 
 	if not forceSaveGlobalState:
-		if(not storeDatabaseInRam):
+		if(not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 			# Save observed columns to disk
 			if(debugPrintTrainSectionTimes):
 				saveObservedColumnsStartTime = time.perf_counter()
@@ -375,13 +375,18 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 			if(debugPrintTrainSectionTimes):
 				GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "saveData.observedColumn.saveToDisk", time.perf_counter() - saveObservedColumnsStartTime)
 		else:
-			printe("GIAANNproto_databaseNetworkFiles:saveData():!forceSaveGlobalState requires !storeDatabaseInRam")
+			printe("GIAANNproto_databaseNetworkFiles:saveData():!forceSaveGlobalState requires !storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam")
 			
 	saveGlobalState = ((sequenceCount + 1) % saveGlobalFeatureNeuronsRate == 0) or forceSaveGlobalState
 	if(saveGlobalState):
-		# Save global feature neuron arrays if not lowMem
-		if not lowMem:
+		# Save global feature neuron arrays if storeDatabaseGlobalFeatureNeuronsInRam or lowMemGenerateGlobalFeatureNeuronsTensor
+		if storeDatabaseGlobalFeatureNeuronsInRam:
 			saveTensor(databaseNetworkObject.globalFeatureNeurons, databaseFolder, globalFeatureNeuronsFile)
+		else:
+			if(lowMemGenerateGlobalFeatureNeuronsTensor):
+				if(forceSaveGlobalState):
+					globalFeatureNeurons = generateGlobalFeatureNeuronsTensor(databaseNetworkObject, useRAMcolumnFeatureNeurons=storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam)
+					saveTensor(globalFeatureNeurons, databaseFolder, globalFeatureNeuronsFile)
 
 		saveDictFile(conceptColumnsDictFile, databaseNetworkObject.conceptColumnsDict)
 		saveDictFile(conceptFeaturesDictFile, databaseNetworkObject.conceptFeaturesDict)
@@ -398,6 +403,82 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 	
 	if(debugPrintTrainSectionTimes):
 		GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "saveData.total", time.perf_counter() - saveDataStartTime)
+
+def generateGlobalFeatureNeuronsTensor(databaseNetworkObject, useRAMcolumnFeatureNeurons):
+	if(storeDatabaseGlobalFeatureNeuronsInRam):
+		if(not highMemGenerateGlobalFeatureNeuronsTensor):
+			raise RuntimeError("generateGlobalFeatureNeuronsTensor error: storeDatabaseGlobalFeatureNeuronsInRam must be False unless highMemGenerateGlobalFeatureNeuronsTensor is enabled")
+	if(not lowMemGenerateGlobalFeatureNeuronsTensor and not highMemGenerateGlobalFeatureNeuronsTensor):
+		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: lowMemGenerateGlobalFeatureNeuronsTensor or highMemGenerateGlobalFeatureNeuronsTensor must be True")
+	if(databaseNetworkObject is None):
+		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: databaseNetworkObject is None")
+	if(useRAMcolumnFeatureNeurons and storeDatabaseGlobalFeatureNeuronsInRam):
+		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: useRAMcolumnFeatureNeurons requires storeDatabaseGlobalFeatureNeuronsInRam to be False")
+	conceptIndices = sorted(int(conceptIndex) for conceptIndex in databaseNetworkObject.conceptColumnsDict.values())
+	if(len(conceptIndices) != databaseNetworkObject.c):
+		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: concept index count mismatch")
+	for expectedConceptIndex, conceptIndex in enumerate(conceptIndices):
+		if(conceptIndex != expectedConceptIndex):
+			raise RuntimeError(f"generateGlobalFeatureNeuronsTensor error: concept indices must be contiguous from 0; found {conceptIndex} at position {expectedConceptIndex}")
+	targetSize = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
+	combinedIndicesList = []
+	combinedValuesList = []
+	observedColumnsByConceptIndex = None
+	if(useRAMcolumnFeatureNeurons):
+		if(databaseNetworkObject.observedColumnsDictRAM is None):
+			raise RuntimeError("generateGlobalFeatureNeuronsTensor error: observedColumnsDictRAM is None")
+		if(not databaseNetworkObject.observedColumnsRAMLoaded):
+			raise RuntimeError("generateGlobalFeatureNeuronsTensor error: observedColumnsRAMLoaded is False")
+		observedColumnsByConceptIndex = {}
+		for observedColumn in databaseNetworkObject.observedColumnsDictRAM.values():
+			if(observedColumn is None):
+				raise RuntimeError("generateGlobalFeatureNeuronsTensor error: observedColumn is None in observedColumnsDictRAM")
+			conceptIndex = int(observedColumn.conceptIndex)
+			if(conceptIndex in observedColumnsByConceptIndex):
+				raise RuntimeError(f"generateGlobalFeatureNeuronsTensor error: duplicate observed column for conceptIndex {conceptIndex}")
+			observedColumnsByConceptIndex[conceptIndex] = observedColumn
+	for conceptIndex in conceptIndices:
+		featureNeurons = None
+		featureNeuronsTensorName = f"lowMemGlobalFeatureNeurons[{conceptIndex}]"
+		if(useRAMcolumnFeatureNeurons):
+			if(conceptIndex not in observedColumnsByConceptIndex):
+				raise RuntimeError(f"generateGlobalFeatureNeuronsTensor error: missing RAM observed column for conceptIndex {conceptIndex}")
+			featureNeurons = observedColumnsByConceptIndex[conceptIndex].featureNeurons
+			if(featureNeurons is None):
+				raise RuntimeError(f"generateGlobalFeatureNeuronsTensor error: featureNeurons is None for conceptIndex {conceptIndex}")
+			featureNeurons = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, featureNeurons, featureNeuronsTensorName)
+			featureNeurons = adjustBranchDimensions(featureNeurons, featureNeuronsTensorName, expectedRank=4)
+		else:
+			featureNeuronsFilePath = os.path.join(getObservedColumnFolder(conceptIndex), getObservedColumnFeatureNeuronsFileBaseName() + pytorchTensorFileExtension)
+			if(pathExists(featureNeuronsFilePath)):
+				featureNeurons = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, loadTensor(getObservedColumnFolder(conceptIndex), getObservedColumnFeatureNeuronsFileBaseName(), targetDevice=deviceFileIO), featureNeuronsTensorName)
+				featureNeurons = adjustBranchDimensions(featureNeurons, featureNeuronsTensorName, expectedRank=4)
+			else:
+				emptyIndices = pt.empty((4, 0), dtype=pt.long, device=deviceFileIO)
+				emptyValues = pt.empty((0,), dtype=arrayType, device=deviceFileIO)
+				featureNeurons = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=(databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.f), dtype=arrayType, device=deviceFileIO)
+		featureNeurons = ensureFeatureNeuronsTensorCurrentSize(featureNeurons, databaseNetworkObject.f, featureNeuronsTensorName)
+		if(featureNeurons.device != deviceFileIO):
+			featureNeurons = featureNeurons.to(deviceFileIO)
+		if(featureNeurons.layout != pt.sparse_coo):
+			featureNeurons = featureNeurons.to_sparse()
+		featureNeurons = featureNeurons.coalesce()
+		if(featureNeurons._nnz() > 0):
+			featureIndices = featureNeurons.indices()
+			featureValues = featureNeurons.values()
+			conceptIndexRow = pt.full((1, featureIndices.shape[1]), conceptIndex, dtype=pt.long, device=featureIndices.device)
+			globalIndices = pt.cat([featureIndices[0:3], conceptIndexRow, featureIndices[3:4]], dim=0)
+			combinedIndicesList.append(globalIndices)
+			combinedValuesList.append(featureValues)
+	if(len(combinedIndicesList) > 0):
+		combinedIndices = pt.cat(combinedIndicesList, dim=1)
+		combinedValues = pt.cat(combinedValuesList, dim=0)
+		result = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSize, dtype=arrayType, device=deviceFileIO).coalesce()
+	else:
+		emptyIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=deviceFileIO)
+		emptyValues = pt.empty((0,), dtype=arrayType, device=deviceFileIO)
+		result = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=targetSize, dtype=arrayType, device=deviceFileIO)
+	return result
 
 def generateObservedColumnMetadataData(observedColumn):
 	if(trainStoreFeatureMapsGlobally):
@@ -449,7 +530,7 @@ def observedColumnSaveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsTo
 	if(saveAllSourceFeatures):
 		sourceFeatureIndicesToSave = None
 	else:
-		if(not storeDatabaseInRam):
+		if(not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 			if(self.hasTrainPreparedSourceFeatureIndices()):
 				sourceFeatureIndicesToSave = self.getTrainPreparedSourceFeatureIndices()
 			elif(optimisationArrayIndexPropertiesEfficientSerialConnections):
@@ -460,10 +541,10 @@ def observedColumnSaveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsTo
 			else:
 				raise RuntimeError("observedColumnSaveToDisk(saveAllSourceFeatures) requires self.hasTrainPreparedSourceFeatureIndices() or optimisationArrayIndexPropertiesEfficientSerialConnections")
 		else:
-			raise RuntimeError("observedColumnSaveToDisk(saveAllSourceFeatures) requires !storeDatabaseInRam")
+			raise RuntimeError("observedColumnSaveToDisk(saveAllSourceFeatures) requires !storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam")
 	self.saveLoadedSourceFeatureConnectionsToDisk(sourceFeatureIndicesToSave)
 	
-	if lowMem:
+	if not storeDatabaseGlobalFeatureNeuronsInRam:
 		saveTensor(self.featureNeurons, getObservedColumnFolder(self.conceptIndex), getObservedColumnFeatureNeuronsFileBaseName())
 
 def loadObservedColumnSourceFeatureConnectionsTensor(databaseNetworkObject, conceptIndex, sourceFeatureIndex, targetDevice, ensureCurrentSizeOnLoad=False):
@@ -522,7 +603,7 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 				raise RuntimeError("observedColumnLoadFromDisk error: nextFeatureIndex < 0")
 			if(instance.nextFeatureIndex > databaseNetworkObject.f):
 				instance.nextFeatureIndex = databaseNetworkObject.f
-	if lowMem:
+	if not storeDatabaseGlobalFeatureNeuronsInRam:
 		featureNeuronTargetDevice = targetDevice if targetDevice is not None else deviceDatabase
 		instance.featureNeurons = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, loadTensor(getObservedColumnFolder(conceptIndex), getObservedColumnFeatureNeuronsFileBaseName(), targetDevice=featureNeuronTargetDevice), f"observedColumn.featureNeurons[{conceptIndex}]")
 		instance.featureNeurons = adjustBranchDimensions(instance.featureNeurons, f"observedColumn.featureNeurons[{conceptIndex}]", expectedRank=4)

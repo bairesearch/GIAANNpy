@@ -92,6 +92,17 @@ if(debugPrintGPUramUsage):
 				raise RuntimeError("debugRecordGpuRamMaxUsagePhaseLocal error: label must not be empty")
 			gpuRamMaxAllocatedUsageBytes = debugGetGpuRamMaxAllocatedUsageBytes()
 			gpuRamMaxReservedUsageBytes = debugGetGpuRamMaxReservedUsageBytes()
+			debugRecordGpuRamMaxUsagePhaseLocalValue(label, gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes)
+		return
+
+	def debugRecordGpuRamMaxUsagePhaseLocalValue(label, gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes):
+		if(debugPrintRamMaxUsagePhaseLocal):
+			if(label is None or label == ""):
+				raise RuntimeError("debugRecordGpuRamMaxUsagePhaseLocalValue error: label must not be empty")
+			if(gpuRamMaxAllocatedUsageBytes < 0):
+				raise RuntimeError("debugRecordGpuRamMaxUsagePhaseLocalValue error: gpuRamMaxAllocatedUsageBytes must be >= 0")
+			if(gpuRamMaxReservedUsageBytes < 0):
+				raise RuntimeError("debugRecordGpuRamMaxUsagePhaseLocalValue error: gpuRamMaxReservedUsageBytes must be >= 0")
 			debugUpdateGpuRamMaxUsageProgramStatistics(gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes)
 			if(label in debugPrintGpuRamMaxUsagePhaseLocalStatistics):
 				phaseLocalStatistics = debugPrintGpuRamMaxUsagePhaseLocalStatistics[label]
@@ -103,6 +114,19 @@ if(debugPrintGPUramUsage):
 			if(gpuRamMaxReservedUsageBytes > phaseLocalStatistics["gpuRamMaxReservedUsageBytes"]):
 				phaseLocalStatistics["gpuRamMaxReservedUsageBytes"] = gpuRamMaxReservedUsageBytes
 			phaseLocalStatistics["sampleCount"] = phaseLocalStatistics["sampleCount"] + 1
+		return
+
+	def debugRecordGpuRamMaxUsagePhaseLocalGrouped(label, aggregateLabel=None):
+		if(debugPrintRamMaxUsagePhaseLocal):
+			if(label is None or label == ""):
+				raise RuntimeError("debugRecordGpuRamMaxUsagePhaseLocalGrouped error: label must not be empty")
+			if(aggregateLabel is not None and aggregateLabel == ""):
+				raise RuntimeError("debugRecordGpuRamMaxUsagePhaseLocalGrouped error: aggregateLabel must not be empty")
+			gpuRamMaxAllocatedUsageBytes = debugGetGpuRamMaxAllocatedUsageBytes()
+			gpuRamMaxReservedUsageBytes = debugGetGpuRamMaxReservedUsageBytes()
+			debugRecordGpuRamMaxUsagePhaseLocalValue(label, gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes)
+			if(aggregateLabel is not None):
+				debugRecordGpuRamMaxUsagePhaseLocalValue(aggregateLabel, gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes)
 		return
 
 	def debugPrintGpuRamMaxUsagePhaseLocalSummary():
