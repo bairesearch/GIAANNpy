@@ -146,11 +146,12 @@ if(debugPrintGPUramUsage):
 		if(debugPrintRamMaxUsage):
 			gpuRamMaxAllocatedUsageBytes = debugGetGpuRamMaxAllocatedUsageBytes()
 			gpuRamMaxReservedUsageBytes = debugGetGpuRamMaxReservedUsageBytes()
+			cpuRamMaxUsageBytes = debugGetCpuRamMaxUsageBytes()
 			if(debugPrintRamMaxUsagePhaseLocal):
 				debugUpdateGpuRamMaxUsageProgramStatistics(gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes)
 				gpuRamMaxAllocatedUsageBytes = debugPrintGpuRamMaxUsageProgramAllocatedBytes
 				gpuRamMaxReservedUsageBytes = debugPrintGpuRamMaxUsageProgramReservedBytes
-			printText = "debugPrintGPUramUsage max: program, gpuRamMaxAllocatedUsageGb = " + debugConvertRamUsageBytesToGigabytesText(gpuRamMaxAllocatedUsageBytes) + ", gpuRamMaxReservedUsageGb = " + debugConvertRamUsageBytesToGigabytesText(gpuRamMaxReservedUsageBytes)
+			printText = "debugPrintGPUramUsage max: program, gpuRamMaxAllocatedUsageGb = " + debugConvertRamUsageBytesToGigabytesText(gpuRamMaxAllocatedUsageBytes) + ", gpuRamMaxReservedUsageGb = " + debugConvertRamUsageBytesToGigabytesText(gpuRamMaxReservedUsageBytes) + ", cpuRamMaxUsageGb = " + debugConvertRamUsageBytesToGigabytesText(cpuRamMaxUsageBytes)
 			print(printText)
 		return
 
@@ -234,16 +235,29 @@ if(debugPrintGPUramUsage):
 		return result
 
 	def debugGetCpuRamCurrentUsageBytes():
+		result = debugGetCpuRamUsageBytesByProcStatusField("VmRSS", "debugGetCpuRamCurrentUsageBytes")
+		return result
+
+	def debugGetCpuRamMaxUsageBytes():
+		result = debugGetCpuRamUsageBytesByProcStatusField("VmHWM", "debugGetCpuRamMaxUsageBytes")
+		return result
+
+	def debugGetCpuRamUsageBytesByProcStatusField(memoryFieldName, functionName):
+		if(memoryFieldName is None or memoryFieldName == ""):
+			raise RuntimeError("debugGetCpuRamUsageBytesByProcStatusField error: memoryFieldName must not be empty")
+		if(functionName is None or functionName == ""):
+			raise RuntimeError("debugGetCpuRamUsageBytesByProcStatusField error: functionName must not be empty")
 		result = None
+		processStatusFieldKey = memoryFieldName + ":"
 		with open("/proc/self/status", "r") as processStatusFile:
 			for processStatusLine in processStatusFile:
-				if(processStatusLine.startswith("VmRSS:")):
+				if(processStatusLine.startswith(processStatusFieldKey)):
 					processStatusFields = processStatusLine.split()
 					if(len(processStatusFields) < 2):
-						raise RuntimeError("debugGetCpuRamCurrentUsageBytes error: VmRSS line is malformed")
+						raise RuntimeError(functionName + " error: " + processStatusFieldKey + " line is malformed")
 					result = int(processStatusFields[1]) * 1024
 		if(result is None):
-			raise RuntimeError("debugGetCpuRamCurrentUsageBytes error: VmRSS not found in /proc/self/status")
+			raise RuntimeError(functionName + " error: " + processStatusFieldKey + " not found in /proc/self/status")
 		return result
 
 	def debugConvertRamUsageBytesToGigabytesText(ramUsageBytes):
