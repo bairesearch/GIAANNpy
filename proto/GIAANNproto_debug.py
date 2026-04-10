@@ -17,12 +17,11 @@ GIA ANN proto debug helpers
 
 """
 
-import os
 import torch as pt
 
 from GIAANNproto_globalDefs import *
 
-debugPrintGPUramUsage = debugPrintRamCurrentUsage or debugPrintRamAverageUsage or debugPrintRamMaxUsage or debugPrintRamMaxUsagePhaseLocal
+debugPrintGPUramUsage = debugPrintRamCurrentUsage or debugPrintRamAverageUsage or printRamMaxUsage or debugPrintRamMaxUsagePhaseLocal
 totalInferenceTokensSeed = 0
 totalInferenceTokensPrediction = 0
 totalInferenceTokensAll = 0
@@ -67,7 +66,7 @@ if(debugPrintGPUramUsage):
 		return
 
 	def debugResetGpuRamMaxUsage():
-		if(debugPrintRamMaxUsage or debugPrintRamMaxUsagePhaseLocal):
+		if(printRamMaxUsage or debugPrintRamMaxUsagePhaseLocal):
 			global debugPrintGpuRamMaxUsageProgramAllocatedBytes
 			global debugPrintGpuRamMaxUsageProgramReservedBytes
 			debugPrintGpuRamMaxUsageProgramAllocatedBytes = 0
@@ -143,7 +142,7 @@ if(debugPrintGPUramUsage):
 		return
 
 	def debugPrintGpuRamMaxUsageSummary():
-		if(debugPrintRamMaxUsage):
+		if(printRamMaxUsage):
 			gpuRamMaxAllocatedUsageBytes = debugGetGpuRamMaxAllocatedUsageBytes()
 			gpuRamMaxReservedUsageBytes = debugGetGpuRamMaxReservedUsageBytes()
 			cpuRamMaxUsageBytes = debugGetCpuRamMaxUsageBytes()
@@ -628,29 +627,6 @@ def applyDebugLimitFeatureConnectionsSourceTensor(tensor, cLimit, fLimit, tensor
 				result = tensor[:, :, :, :capC, :capF]
 	return result
 
-def applyDebugLimitFeatureNeuronsTensor(tensor, fLimit, tensorName):
-	result = tensor
-	if(debugLimitFeatures):
-		if(fLimit <= 0):
-			raise RuntimeError(f"{tensorName} debug limit requires positive limits")
-		capF = tensor.size(3)
-		if(capF > fLimit):
-			capF = fLimit
-		if(capF != tensor.size(3)):
-			if(tensor.is_sparse):
-				tensor = tensor.coalesce()
-				indices = tensor.indices()
-				values = tensor.values()
-				mask = indices[3] < capF
-				indices = indices[:, mask]
-				values = values[mask]
-				newSize = list(tensor.size())
-				newSize[3] = capF
-				result = pt.sparse_coo_tensor(indices, values, size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
-			else:
-				result = tensor[:, :, :, :capF]
-	return result
-
 def applyDebugLimitFeatureIndexMaps(featureWordToIndex, featureIndexToWord, fLimit, mapName):
 	resultFeatureWordToIndex = featureWordToIndex
 	resultFeatureIndexToWord = featureIndexToWord
@@ -678,60 +654,3 @@ def applyDebugLimitFeatureIndexMaps(featureWordToIndex, featureIndexToWord, fLim
 		resultFeatureWordToIndex = trimmedWordToIndex
 		resultFeatureIndexToWord = trimmedIndexToWord
 	return resultFeatureWordToIndex, resultFeatureIndexToWord
-
-def debugCountObservedColumnConnections(databaseNetworkObject, conceptIndex, lemma, columnIndex):
-	import GIAANNproto_databaseNetworkFiles
-	columnConnections = 0
-	if(not GIAANNproto_databaseNetworkFiles.observedColumnMetadataExists(conceptIndex)):
-		columnConnections = 0
-	else:
-		sourceFeatureIndices = GIAANNproto_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(conceptIndex)
-		for sourceFeatureIndex in sourceFeatureIndices:
-			featureConnections = GIAANNproto_databaseNetworkFiles.loadObservedColumnSourceFeatureConnectionsTensor(databaseNetworkObject, conceptIndex, sourceFeatureIndex, deviceDatabase)
-			if(featureConnections is None):
-				raise RuntimeError("debugCountObservedColumnConnections error: featureConnections is None for conceptIndex = " + str(conceptIndex) + ", sourceFeatureIndex = " + str(sourceFeatureIndex))
-			if(databaseNetworkObject.arrayIndexPropertiesStrengthIndex < 0 or databaseNetworkObject.arrayIndexPropertiesStrengthIndex >= featureConnections.shape[0]):
-				raise RuntimeError("debugCountObservedColumnConnections error: databaseNetworkObject.arrayIndexPropertiesStrengthIndex out of range")
-			columnConnections += debugCountNonZero(featureConnections)
-			del featureConnections
-	return columnConnections
-
-def debugCalculateDatabasePtSizeGiB():
-	if(not os.path.isdir(databaseFolder)):
-		raise RuntimeError("debugCalculateDatabasePtSizeGiB error: missing databaseFolder = " + databaseFolder)
-	totalPtBytesUncompressed = 0
-	for directoryPath, directoryNames, fileNames in os.walk(databaseFolder):
-		if(directoryNames is None):
-			raise RuntimeError("debugCalculateDatabasePtSizeGiB error: directoryNames is None")
-		for fileName in fileNames:
-			filePath = os.path.join(directoryPath, fileName)
-			if(not os.path.isfile(filePath)):
-				raise RuntimeError("debugCalculateDatabasePtSizeGiB error: path is not a file = " + filePath)
-			if(fileName.lower().endswith(pytorchTensorFileExtension.lower())):
-				totalPtBytesUncompressed += os.path.getsize(filePath)
-	totalPtGiB = totalPtBytesUncompressed / (1024 ** 3)
-	return totalPtGiB
-
-def debugCalculateDatabaseSizeGiB():
-	if(not os.path.isdir(databaseFolder)):
-		raise RuntimeError("debugCalculateDatabaseSizeGiB error: missing databaseFolder = " + databaseFolder)
-	totalDatabaseBytesUncompressed = 0
-	for directoryPath, directoryNames, fileNames in os.walk(databaseFolder):
-		if(directoryNames is None):
-			raise RuntimeError("debugCalculateDatabaseSizeGiB error: directoryNames is None")
-		for fileName in fileNames:
-			filePath = os.path.join(directoryPath, fileName)
-			if(not os.path.isfile(filePath)):
-				raise RuntimeError("debugCalculateDatabaseSizeGiB error: path is not a file = " + filePath)
-			totalDatabaseBytesUncompressed += os.path.getsize(filePath)
-	totalDatabaseGiB = totalDatabaseBytesUncompressed / (1024 ** 3)
-	return totalDatabaseGiB
-
-def debugCountNonZero(t):
-	result = 0
-	if isinstance(t, pt.Tensor):
-		if t.is_sparse or (hasattr(t, "layout") and t.layout in {pt.sparse_coo, pt.sparse_csr, pt.sparse_csc, pt.sparse_bsr, pt.sparse_bsc}):
-			result = int(t._nnz())
-		else:
-			result = int(pt.count_nonzero(t).item())
-	return result

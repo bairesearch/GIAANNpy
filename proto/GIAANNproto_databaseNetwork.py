@@ -133,8 +133,8 @@ if storeDatabaseGlobalFeatureNeuronsInRam:
 		return globalFeatureNeurons
 
 def generateHighMemGlobalFeatureNeuronsForInferenceStartup(databaseNetworkObject):
-	if(not highMemGenerateGlobalFeatureNeuronsTensor):
-		raise RuntimeError("generateHighMemGlobalFeatureNeuronsForInferenceStartup error: highMemGenerateGlobalFeatureNeuronsTensor is disabled")
+	if(not inferenceStartGenerateGlobalFeatureNeuronsTensor):
+		raise RuntimeError("generateHighMemGlobalFeatureNeuronsForInferenceStartup error: inferenceStartGenerateGlobalFeatureNeuronsTensor is disabled")
 	if(databaseNetworkObject is None):
 		raise RuntimeError("generateHighMemGlobalFeatureNeuronsForInferenceStartup error: databaseNetworkObject is None")
 	if(not databaseNetworkObject.inferenceMode):
@@ -443,29 +443,3 @@ def isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, feat
 	else:
 		printe("conceptColumnsDelimitByPOS is required")
 	return isDelimiterProbabilistic
-
-def printCountTotalParametersRun(databaseNetworkObject):
-	assert arrayIndexPropertiesEfficient 	#only databaseNetworkObject.arrayIndexPropertiesStrengthIndex stored in database, all tensors are coalesced
-	if(databaseNetworkObject is None):
-		raise RuntimeError("printCountTotalParametersRun error: databaseNetworkObject is None")
-	if(databaseNetworkObject.arrayIndexPropertiesStrengthIndex is None):
-		raise RuntimeError("printCountTotalParametersRun error: databaseNetworkObject.arrayIndexPropertiesStrengthIndex is None")
-	totalColumns = len(databaseNetworkObject.conceptColumnsList)
-	if(totalColumns <= 0):
-		raise RuntimeError("printCountTotalParametersRun error: conceptColumnsList is empty")
-	totalConnections = 0
-	for columnIndex, lemma in enumerate(databaseNetworkObject.conceptColumnsList):
-		#print("columnIndex = ", columnIndex)
-		conceptIndex = databaseNetworkObject.conceptColumnsDict.get(lemma)
-		if(conceptIndex is None):
-			raise RuntimeError("printCountTotalParametersRun error: conceptIndex is None for lemma = " + lemma)
-		columnConnections = GIAANNproto_debug.debugCountObservedColumnConnections(databaseNetworkObject, conceptIndex, lemma, columnIndex)
-		totalConnections += columnConnections
-	database_pt_size_gb = GIAANNproto_debug.debugCalculateDatabasePtSizeGiB()
-	memory_gb = GIAANNproto_debug.debugCalculateDatabaseSizeGiB()
-	if(printCountTotalParameters):
-		print("printCountTotalParameters totalConnections = ", totalConnections)
-		print("printCountTotalParameters totalColumns = ", totalColumns)
-		print(f"Total .pt size (uncompressed GiB): {database_pt_size_gb:.3f}")
-		print(f"Total database size (uncompressed GiB): {memory_gb:.3f}")
-	return memory_gb

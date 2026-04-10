@@ -23,13 +23,6 @@ import sys
 
 
 #Recent debug vars;
-debugPrintTrainSectionTimes = False	#print per-sequence timing breakdown for key train sections
-debugPrintTrainSectionTimesSourceFeatureConnections = False	#print granular source-feature-connection timings within updateObservedColumnsEfficient
-debugPrintTimeDatabaseLoadSaveTimes = True
-debugPrintRamCurrentUsage = False
-debugPrintRamAverageUsage = True
-debugPrintRamMaxUsage = True
-debugPrintRamMaxUsagePhaseLocal = True
 
 
 #Execution mode selection;
@@ -105,7 +98,7 @@ if(useQuickExecution):
 	trainMaxSequences = 10	#N/A: auto generated from inference_prompt.txt.trainAndInference
 	databaseFolderBase = "../database"	#default: "../database/"
 elif(useBenchmark):
-	trainMaxSequences = 5000	#5000, 200000, 1000000
+	trainMaxSequences = 200000	#5000, 200000, 1000000
 	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"
 elif(useAutoresearch):
 	trainMaxSequences = 5000
@@ -222,12 +215,12 @@ if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 	useGPUdatabase = False	#default: False	#default: False
 	resizeTensorsOnRAMdatabaseSave = False	#default: False #orig: True	#resize all feature neuron and connections tensors during final RAM database save
 	resizeTensorsOnRAMdatabaseLoad = False	#default: False #orig: True	#resize all feature neuron and connections tensors during initial RAM database load
-lowMemGenerateGlobalFeatureNeuronsTensor = False	#derived var
-highMemGenerateGlobalFeatureNeuronsTensor = False	#derived var
+trainEndGenerateGlobalFeatureNeuronsTensor = False	#derived var
+inferenceStartGenerateGlobalFeatureNeuronsTensor = False	#derived var
 if(executionMode=="train"):
 	storeDatabaseGlobalFeatureNeuronsInRam = True		 #default: True	#orig: False	 #currently required to be True for inference compatibility	#optional
 	if(not storeDatabaseGlobalFeatureNeuronsInRam):
-		lowMemGenerateGlobalFeatureNeuronsTensor = False	#default: False	#orig: False	#generates and saves a globalFeatureNeurons at the end of training (not just individual column featureNeurons tensors) so that subsequent inference is supported
+		trainEndGenerateGlobalFeatureNeuronsTensor = False	#default: False	#orig: False	#generates and saves a globalFeatureNeurons at the end of training (not just individual column featureNeurons tensors)
 	trainSparseConnectionsTensor = False	#default: False	#orig: False
 	trainSparseNeuronsTensor = False	#default: False	#orig: False
 	if(trainSparseNeuronsTensor):
@@ -235,7 +228,9 @@ if(executionMode=="train"):
 else:
 	storeDatabaseGlobalFeatureNeuronsInRam = True		#mandatory: True	#if storeDatabaseGlobalFeatureNeuronsInRam=True use global feature neuron tensors, else use feature neuron tensors in observed columns (note feature connection tensors are always in observed columns)
 	if(executionMode=="inference"):
-		highMemGenerateGlobalFeatureNeuronsTensor = False	#default: False	#orig: False	#generates and saves a globalFeatureNeurons at the start of inference after being trained with storeDatabaseGlobalFeatureNeuronsInRam=False (with individual column featureNeurons tensors), so that inference is supported
+		inferenceStartGenerateGlobalFeatureNeuronsTensor = False	#default: False	#orig: False	#generates and saves a globalFeatureNeurons at the start of inference after being trained with storeDatabaseGlobalFeatureNeuronsInRam=False (with individual column featureNeurons tensors)
+	trainSparseConnectionsTensor = False	#default for executionMode=="trainAndInference"
+	trainSparseNeuronsTensor = False	#default for executionMode=="trainAndInference"
 
 
 #Benchmarking;
@@ -524,6 +519,9 @@ randomiseColumnFeatureXposition = True	#shuffle x position of column internal fe
 
 
 #Information vars;
+printTimeDatabaseLoadSaveTimes = False
+printRamMaxUsage = False
+
 printCountTotalParameters = False	#count number of connections in network
 printInferenceTop1Accuracy = True	#default: True	#print inference top-1 accuracy
 printInferenceTop1AccuracyBitsPerByte = False	#dependent var
@@ -563,6 +561,12 @@ if(not useAutoresearch):
 		
 
 #Debug vars;
+debugPrintTrainSectionTimes = False	#print per-sequence timing breakdown for key train sections
+debugPrintTrainSectionTimesSourceFeatureConnections = False	#print granular source-feature-connection timings within updateObservedColumnsEfficient
+debugPrintRamCurrentUsage = False
+debugPrintRamAverageUsage = False
+debugPrintRamMaxUsagePhaseLocal = False
+
 debugPrintTotalInferenceTokens = False	#print total number of inference tokens in seed phase, prediction phase, and both phases (summed across all sequences) 
 debugPrintSpacySectionTimes = False	#print spacy preprocessing times
 
@@ -1027,8 +1031,8 @@ if(printConfiguration):
 	print("useGPUfileio:", useGPUfileio)
 	print("storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam:", storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam)
 	print("storeDatabaseGlobalFeatureNeuronsInRam:", storeDatabaseGlobalFeatureNeuronsInRam)
-	print("lowMemGenerateGlobalFeatureNeuronsTensor:", lowMemGenerateGlobalFeatureNeuronsTensor)
-	print("highMemGenerateGlobalFeatureNeuronsTensor:", highMemGenerateGlobalFeatureNeuronsTensor)
+	#print("trainEndGenerateGlobalFeatureNeuronsTensor:", trainEndGenerateGlobalFeatureNeuronsTensor)
+	#print("inferenceStartGenerateGlobalFeatureNeuronsTensor:", inferenceStartGenerateGlobalFeatureNeuronsTensor)
 	if(executionMode=="train"):
 		print("trainSparseConnectionsTensor:", trainSparseConnectionsTensor)
 		print("trainSparseNeuronsTensor:", trainSparseNeuronsTensor)

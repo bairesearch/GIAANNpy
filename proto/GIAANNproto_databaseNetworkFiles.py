@@ -25,6 +25,7 @@ import subprocess
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_debug
+import GIAANNproto_count
 
 
 def prepareDatabaseFilesStartup():
@@ -379,11 +380,11 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 			
 	saveGlobalState = ((sequenceCount + 1) % saveGlobalFeatureNeuronsRate == 0) or forceSaveGlobalState
 	if(saveGlobalState):
-		# Save global feature neuron arrays if storeDatabaseGlobalFeatureNeuronsInRam or lowMemGenerateGlobalFeatureNeuronsTensor
+		# Save global feature neuron arrays if storeDatabaseGlobalFeatureNeuronsInRam or trainEndGenerateGlobalFeatureNeuronsTensor
 		if storeDatabaseGlobalFeatureNeuronsInRam:
 			saveTensor(databaseNetworkObject.globalFeatureNeurons, databaseFolder, globalFeatureNeuronsFile)
 		else:
-			if(lowMemGenerateGlobalFeatureNeuronsTensor):
+			if(trainEndGenerateGlobalFeatureNeuronsTensor):
 				if(forceSaveGlobalState):
 					globalFeatureNeurons = generateGlobalFeatureNeuronsTensor(databaseNetworkObject, useRAMcolumnFeatureNeurons=storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam)
 					saveTensor(globalFeatureNeurons, databaseFolder, globalFeatureNeuronsFile)
@@ -406,10 +407,10 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 
 def generateGlobalFeatureNeuronsTensor(databaseNetworkObject, useRAMcolumnFeatureNeurons):
 	if(storeDatabaseGlobalFeatureNeuronsInRam):
-		if(not highMemGenerateGlobalFeatureNeuronsTensor):
-			raise RuntimeError("generateGlobalFeatureNeuronsTensor error: storeDatabaseGlobalFeatureNeuronsInRam must be False unless highMemGenerateGlobalFeatureNeuronsTensor is enabled")
-	if(not lowMemGenerateGlobalFeatureNeuronsTensor and not highMemGenerateGlobalFeatureNeuronsTensor):
-		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: lowMemGenerateGlobalFeatureNeuronsTensor or highMemGenerateGlobalFeatureNeuronsTensor must be True")
+		if(not inferenceStartGenerateGlobalFeatureNeuronsTensor):
+			raise RuntimeError("generateGlobalFeatureNeuronsTensor error: storeDatabaseGlobalFeatureNeuronsInRam must be False unless inferenceStartGenerateGlobalFeatureNeuronsTensor is enabled")
+	if(not trainEndGenerateGlobalFeatureNeuronsTensor and not inferenceStartGenerateGlobalFeatureNeuronsTensor):
+		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: trainEndGenerateGlobalFeatureNeuronsTensor or inferenceStartGenerateGlobalFeatureNeuronsTensor must be True")
 	if(databaseNetworkObject is None):
 		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: databaseNetworkObject is None")
 	if(useRAMcolumnFeatureNeurons and storeDatabaseGlobalFeatureNeuronsInRam):
@@ -608,7 +609,7 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 		instance.featureNeurons = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, loadTensor(getObservedColumnFolder(conceptIndex), getObservedColumnFeatureNeuronsFileBaseName(), targetDevice=featureNeuronTargetDevice), f"observedColumn.featureNeurons[{conceptIndex}]")
 		instance.featureNeurons = adjustBranchDimensions(instance.featureNeurons, f"observedColumn.featureNeurons[{conceptIndex}]", expectedRank=4)
 		if(debugLimitFeatures):
-			instance.featureNeurons = GIAANNproto_debug.applyDebugLimitFeatureNeuronsTensor(instance.featureNeurons, databaseNetworkObject.f, f"observedColumn.featureNeurons[{conceptIndex}]")
+			instance.featureNeurons = GIAANNproto_count.applyDebugLimitFeatureNeuronsTensor(instance.featureNeurons, databaseNetworkObject.f, f"observedColumn.featureNeurons[{conceptIndex}]")
 		if(resizeFeatureTensorsToCurrentSize):
 			instance.featureNeurons = ensureFeatureNeuronsTensorCurrentSize(instance.featureNeurons, databaseNetworkObject.f, f"observedColumn.featureNeurons[{conceptIndex}]")
 	if(loadAllSourceFeatures):

@@ -11,6 +11,7 @@ python countParametersAndSize.py databaseOscar5000-numSeedTokensInference8-spacy
 import argparse
 import io
 import os
+import pickle
 import zipfile
 import torch as pt
 
@@ -98,6 +99,13 @@ def loadTensorPayloadFromZip(zf, info):
 	payload = pt.load(io.BytesIO(data), map_location="cpu")
 	return payload
 
+def loadPicklePayloadFromZip(zf, info):
+	payload = None
+	with zf.open(info, "r") as f:
+		data = f.read()
+	payload = pickle.load(io.BytesIO(data))
+	return payload
+
 def getTensorPayloadStats(payload):
 	resultNnz = 0
 	resultLoaded = False
@@ -121,6 +129,7 @@ def main():
 		zipPath = zipPath + ".zip"
 
 	totalNnz = 0
+	totalConnections = 0
 	totalPtBytesUncompressed = 0
 	totalPtBytesCompressed = 0
 	totalDataPklBytesUncompressed = 0
@@ -130,11 +139,24 @@ def main():
 	numSkipped = 0
 	numMetadataFiles = 0
 	numFeatureNeuronsTensorFiles = 0
+	totalAssignedFeatureNeurons = 0
+	featureNeuronCountMethod = None
+	numberColumns = 0
+	numberFeatures = 0
 	prefix = None
 	if(layoutType == "v1l"):
 		numSourceFeatureTensorFiles = 0
 		with zipfile.ZipFile(zipPath, "r") as zf:
 			prefix = getObservedColumnsPrefixFromZip(zf.infolist())
+			numberColumns = countDatabaseDictEntriesInZip(zf, zf.infolist(), prefix, "conceptColumnsDict.pkl")
+			numberFeatures = countDatabaseDictEntriesInZip(zf, zf.infolist(), prefix, "conceptFeaturesDict.pkl")
+			globalFeatureNeuronsInfo = getGlobalFeatureNeuronsInfoFromZip(zf.infolist(), prefix)
+			if(globalFeatureNeuronsInfo is not None):
+				globalFeatureNeuronsPayload = loadTensorPayloadFromZip(zf, globalFeatureNeuronsInfo)
+				totalAssignedFeatureNeurons = countAssignedFeatureNeuronsInTensorPayload(globalFeatureNeuronsPayload, globalFeatureNeuronsInfo.filename, globalFeatureNeuronsTensor=True)
+				featureNeuronCountMethod = "globalFeatureNeurons.pt"
+			else:
+				featureNeuronCountMethod = "observedColumns/*/featureNeurons.pt"
 			for info in zf.infolist():
 				if(not info.is_dir()):
 					totalZipBytesUncompressed += int(info.file_size)
@@ -178,17 +200,32 @@ def main():
 					payload = loadTensorPayloadFromZip(zf, info)
 					payloadNnz, payloadLoaded = getTensorPayloadStats(payload)
 					if(payloadLoaded):
-						totalNnz += payloadNnz
+						if(isSourceFeatureTensor):
+							totalConnections += payloadNnz
+						#totalNnz += payloadNnz
 						numLoaded += 1
+						if(isFeatureNeuronsTensor and globalFeatureNeuronsInfo is None):
+							totalAssignedFeatureNeurons += countAssignedFeatureNeuronsInTensorPayload(payload, name, globalFeatureNeuronsTensor=False)
 					else:
 						numSkipped += 1
 				except Exception as e:
+					if(isFeatureNeuronsTensor and globalFeatureNeuronsInfo is None):
+						raise RuntimeError(f"countParametersAndSize error: failed to count assigned feature neurons from {name}: {e}") from e
 					print(f"WARNING: failed to load {name}: {e}")
 					numSkipped += 1
 	elif(layoutType == "legacy"):
 		numLegacyFeatureConnectionsTensorFiles = 0
 		with zipfile.ZipFile(zipPath, "r") as zf:
 			prefix = getObservedColumnsPrefixFromZip(zf.infolist())
+			numberColumns = countDatabaseDictEntriesInZip(zf, zf.infolist(), prefix, "conceptColumnsDict.pkl")
+			numberFeatures = countDatabaseDictEntriesInZip(zf, zf.infolist(), prefix, "conceptFeaturesDict.pkl")
+			globalFeatureNeuronsInfo = getGlobalFeatureNeuronsInfoFromZip(zf.infolist(), prefix)
+			if(globalFeatureNeuronsInfo is not None):
+				globalFeatureNeuronsPayload = loadTensorPayloadFromZip(zf, globalFeatureNeuronsInfo)
+				totalAssignedFeatureNeurons = countAssignedFeatureNeuronsInTensorPayload(globalFeatureNeuronsPayload, globalFeatureNeuronsInfo.filename, globalFeatureNeuronsTensor=True)
+				featureNeuronCountMethod = "globalFeatureNeurons.pt"
+			else:
+				featureNeuronCountMethod = "observedColumns/*_featureNeurons.pt"
 			for info in zf.infolist():
 				if(not info.is_dir()):
 					totalZipBytesUncompressed += int(info.file_size)
@@ -222,11 +259,17 @@ def main():
 					payload = loadTensorPayloadFromZip(zf, info)
 					payloadNnz, payloadLoaded = getTensorPayloadStats(payload)
 					if(payloadLoaded):
-						totalNnz += payloadNnz
+						if(isLegacyFeatureConnectionsTensor):
+							totalConnections += payloadNnz
+						#totalNnz += payloadNnz
 						numLoaded += 1
+						if(isFeatureNeuronsTensor and globalFeatureNeuronsInfo is None):
+							totalAssignedFeatureNeurons += countAssignedFeatureNeuronsInTensorPayload(payload, name, globalFeatureNeuronsTensor=False)
 					else:
 						numSkipped += 1
 				except Exception as e:
+					if(isFeatureNeuronsTensor and globalFeatureNeuronsInfo is None):
+						raise RuntimeError(f"countParametersAndSize error: failed to count assigned feature neurons from {name}: {e}") from e
 					print(f"WARNING: failed to load {name}: {e}")
 					numSkipped += 1
 	else:
@@ -234,27 +277,143 @@ def main():
 
 	totalPtGiB = totalPtBytesUncompressed / (1024 ** 3)
 	totalZipGiBUncompressed = totalZipBytesUncompressed / (1024 ** 3)
+	if(numMetadataFiles != numberColumns):
+		raise RuntimeError("countParametersAndSize error: observed column metadata file count does not match conceptColumnsDict count")
 	
-	print(f"Zip: {zipPath}")
-	print(f"Observed-columns prefix scanned: {prefix}")
-	print(f"Observed-columns layout: {layoutType}")
-	print(f"Observed-column metadata files: {numMetadataFiles}")
-	print(f"Total columns: {numMetadataFiles}")
-	if(layoutType == "v1l"):
-		print(f"Observed-column source-feature tensors: {numSourceFeatureTensorFiles}")
-	if(layoutType == "legacy"):
-		print(f"Observed-column legacy feature-connection tensors: {numLegacyFeatureConnectionsTensorFiles}")
-	print(f"Observed-column feature-neuron tensors (when lowMem=True): {numFeatureNeuronsTensorFiles}")
-	print(f".pt files found: {numFiles}")
-	print(f".pt files loaded: {numLoaded}")
-	print(f".pt files skipped/failed: {numSkipped}")
-	print(f"Total .pt size (compressed bytes in zip): {totalPtBytesCompressed}")
-	print(f"Total .pt size (uncompressed bytes): {totalPtBytesUncompressed}")
-	print(f"Total .pt size (uncompressed GiB): {totalPtGiB:.3f}")
-	print("")
-	print(f"Total non-zero values (nnz): {totalNnz}")
-	print(f"Total zip size (uncompressed GiB): {totalZipGiBUncompressed:.3f}")
-	#print(f"Total zip size trainStoreFeatureMapsGlobally (uncompressed GiB): {totalZipGiBUncompressed_trainStoreFeatureMapsGlobally:.3f}")
+	#print(f"Zip: {zipPath}")
+	#print(f"Observed-columns prefix scanned: {prefix}")
+	#print(f"Observed-columns layout: {layoutType}")
+	#print(f"Observed-column metadata files: {numMetadataFiles}")
+	#print(f"Total columns: {numMetadataFiles}")
+	#if(layoutType == "v1l"):
+	#	print(f"Observed-column source-feature tensors: {numSourceFeatureTensorFiles}")
+	#if(layoutType == "legacy"):
+	#	print(f"Observed-column legacy feature-connection tensors: {numLegacyFeatureConnectionsTensorFiles}")
+	#print(f"Observed-column feature-neuron tensors (when lowMem=True): {numFeatureNeuronsTensorFiles}")
+	#print(f".pt files found: {numFiles}")
+	#print(f".pt files loaded: {numLoaded}")
+	#print(f".pt files skipped/failed: {numSkipped}")
+	#print(f"Total .pt size (compressed bytes in zip): {totalPtBytesCompressed}")
+	#print(f"Total .pt size (uncompressed bytes): {totalPtBytesUncompressed}")
+	#print(f"Total .pt size (uncompressed GB): {totalPtGiB:.3f}")
+	#print("")
+	#print(f"Feature-neuron count method: {featureNeuronCountMethod}")
+	#print(f"Total assigned feature neurons (unique column-feature neurons with any strength > 0): {totalAssignedFeatureNeurons}")
+	#print(f"Total non-zero values (nnz): {totalNnz}")
+	#print(f"Total zip size (uncompressed GB): {totalZipGiBUncompressed:.3f}")
+	#print(f"Total zip size trainStoreFeatureMapsGlobally (uncompressed GB): {totalZipGiBUncompressed_trainStoreFeatureMapsGlobally:.3f}")
+
+	numberNeurons = totalAssignedFeatureNeurons
+	numberConnections = totalConnections
+	databaseSizeGB = totalZipGiBUncompressed
+	print(f"neurons: {numberNeurons}")
+	print(f"connections: {numberConnections}")
+	print(f"columns: {numberColumns}")
+	print(f"features: {numberFeatures}")
+	print(f"database size (uncompressed GB): {databaseSizeGB:.3f}")
+
+def getGlobalFeatureNeuronsInfoFromZip(zipInfoList, observedColumnsPrefix):
+	result = None
+	globalFeatureNeuronsName = getDatabaseFilePathFromObservedColumnsPrefix(observedColumnsPrefix, "globalFeatureNeurons.pt")
+	for info in zipInfoList:
+		if(not info.is_dir() and info.filename == globalFeatureNeuronsName):
+			result = info
+	return result
+
+def getDatabaseFileInfoFromZip(zipInfoList, observedColumnsPrefix, fileName):
+	result = None
+	targetFileName = getDatabaseFilePathFromObservedColumnsPrefix(observedColumnsPrefix, fileName)
+	for info in zipInfoList:
+		if(not info.is_dir() and info.filename == targetFileName):
+			result = info
+	return result
+
+def getDatabaseFilePathFromObservedColumnsPrefix(observedColumnsPrefix, fileName):
+	result = None
+	databasePrefix = getDatabasePrefixFromObservedColumnsPrefix(observedColumnsPrefix)
+	result = databasePrefix + fileName
+	return result
+
+def getDatabasePrefixFromObservedColumnsPrefix(observedColumnsPrefix):
+	result = None
+	observedColumnsSuffix = "observedColumns/"
+	if(not observedColumnsPrefix.endswith(observedColumnsSuffix)):
+		raise RuntimeError("countParametersAndSize error: observedColumnsPrefix does not end with observedColumns/: " + observedColumnsPrefix)
+	result = observedColumnsPrefix[:-len(observedColumnsSuffix)]
+	return result
+
+def countDatabaseDictEntriesInZip(zf, zipInfoList, observedColumnsPrefix, fileName):
+	result = 0
+	info = getDatabaseFileInfoFromZip(zipInfoList, observedColumnsPrefix, fileName)
+	if(info is None):
+		raise RuntimeError("countParametersAndSize error: missing database file in zip = " + getDatabaseFilePathFromObservedColumnsPrefix(observedColumnsPrefix, fileName))
+	payload = loadPicklePayloadFromZip(zf, info)
+	if(not isinstance(payload, dict)):
+		raise RuntimeError("countParametersAndSize error: expected dict payload in database file = " + info.filename)
+	result = len(payload)
+	return result
+
+def countAssignedFeatureNeuronsInTensorPayload(payload, tensorName, globalFeatureNeuronsTensor):
+	result = 0
+	if(not isinstance(payload, pt.Tensor)):
+		raise RuntimeError("countAssignedFeatureNeuronsInTensorPayload error: payload is not a tensor for " + tensorName)
+	result = countAssignedFeatureNeuronsInTensor(payload, tensorName, globalFeatureNeuronsTensor)
+	return result
+
+def countAssignedFeatureNeuronsInTensor(tensor, tensorName, globalFeatureNeuronsTensor):
+	result = 0
+	strengthPropertyIndex = 0
+	if(tensor.dim() < 1):
+		raise RuntimeError("countAssignedFeatureNeuronsInTensor error: tensor.dim() < 1 for " + tensorName)
+	if(strengthPropertyIndex >= tensor.size(0)):
+		raise RuntimeError("countAssignedFeatureNeuronsInTensor error: strengthPropertyIndex out of range for " + tensorName)
+	if(tensor.layout == pt.sparse_coo):
+		tensor = tensor.coalesce()
+		strengthMask = pt.logical_and(tensor.indices()[0] == strengthPropertyIndex, tensor.values() > 0)
+		if(bool(pt.any(strengthMask).item())):
+			if(globalFeatureNeuronsTensor):
+				if(tensor.dim() == 5):
+					neuronIndices = tensor.indices()[3:5, strengthMask]
+					result = int(pt.unique(neuronIndices, dim=1).shape[1])
+				elif(tensor.dim() == 4):
+					neuronIndices = tensor.indices()[2:4, strengthMask]
+					result = int(pt.unique(neuronIndices, dim=1).shape[1])
+				else:
+					raise RuntimeError("countAssignedFeatureNeuronsInTensor error: unsupported global tensor rank for " + tensorName + ", dim = " + str(tensor.dim()))
+			else:
+				if(tensor.dim() == 4):
+					neuronIndices = tensor.indices()[3, strengthMask]
+					result = int(pt.unique(neuronIndices).shape[0])
+				elif(tensor.dim() == 3):
+					neuronIndices = tensor.indices()[2, strengthMask]
+					result = int(pt.unique(neuronIndices).shape[0])
+				else:
+					raise RuntimeError("countAssignedFeatureNeuronsInTensor error: unsupported column tensor rank for " + tensorName + ", dim = " + str(tensor.dim()))
+	elif(tensor.layout == pt.strided):
+		strengthTensor = tensor[strengthPropertyIndex]
+		if(globalFeatureNeuronsTensor):
+			if(tensor.dim() == 5):
+				positiveNeuronMask = pt.any(strengthTensor > 0, dim=0)
+				positiveNeuronMask = pt.any(positiveNeuronMask, dim=0)
+				result = int(pt.count_nonzero(positiveNeuronMask).item())
+			elif(tensor.dim() == 4):
+				positiveNeuronMask = pt.any(strengthTensor > 0, dim=0)
+				result = int(pt.count_nonzero(positiveNeuronMask).item())
+			else:
+				raise RuntimeError("countAssignedFeatureNeuronsInTensor error: unsupported global tensor rank for " + tensorName + ", dim = " + str(tensor.dim()))
+		else:
+			if(tensor.dim() == 4):
+				positiveNeuronMask = pt.any(strengthTensor > 0, dim=0)
+				positiveNeuronMask = pt.any(positiveNeuronMask, dim=0)
+				result = int(pt.count_nonzero(positiveNeuronMask).item())
+			elif(tensor.dim() == 3):
+				positiveNeuronMask = pt.any(strengthTensor > 0, dim=0)
+				result = int(pt.count_nonzero(positiveNeuronMask).item())
+			else:
+				raise RuntimeError("countAssignedFeatureNeuronsInTensor error: unsupported column tensor rank for " + tensorName + ", dim = " + str(tensor.dim()))
+	else:
+		raise RuntimeError("countAssignedFeatureNeuronsInTensor error: unsupported tensor layout for " + tensorName + ", layout = " + str(tensor.layout))
+	return result
 
 if __name__ == "__main__":
 	main()

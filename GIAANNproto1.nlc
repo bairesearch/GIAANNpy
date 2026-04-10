@@ -721,3 +721,10 @@ v1m (Codex IDE GPT-5.4) [under development]:
 - implement option highMemGenerateGlobalFeatureNeuronsTensor=True - it generates and saves a globalFeatureNeurons at the start of inference after previously being trained in lowMem mode, so that inference is supported. Please use function generateLowMemGlobalFeatureNeuronsTensor(). Execute option highMemGenerateGlobalTensor=True at the very start of GIAANN proto execution (because it is assumed executionMode = "inference", and change in lowMem mode is not supported by executionMode = "trainAndInference").
 - rename every instance of the parameter "lowMem" (exact whole-word matches only) in the proto folder python files to "storeDatabaseGlobalFeatureNeuronsInRam" and invert its boolean logic. For example, "lowMem=True" will become "storeDatabaseGlobalFeatureNeuronsInRam=False".
 - MANUAL; - rename all storeDatabaseInRam to storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam
+- add CPU peak RAM reporting to debug max usage summary
+- upgrade both database/countParametersAndSize.py and option printCountTotalParameters (i.e. GIAANNproto_databaseNetwork.printCountTotalParametersRun()) to print the total number of feature neurons across all columns in the network (not just the number of connections). 
+	if(storeDatabaseGlobalFeatureNeuronsInRam): a) it will measure the number of assigned neurons in the globalFeatureNeurons sparse tensor.
+	else: b) it will measure the number of assigned neurons in the featureNeurons sparse tensor of each column.
+	To count the number of assigned neurons; if any branch segment strength value for a given column feature is > 0, then count this as one neuron. 
+	In countParametersAndSize.py, the value of storeDatabaseGlobalFeatureNeuronsInRam is unknown, so detect whether globalFeatureNeurons.pt exists in the database. If so perform method a), else perform method b).
+- move all printCountTotalParametersRun() functions to file GIAANNproto_count.py

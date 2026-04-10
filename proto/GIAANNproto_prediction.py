@@ -23,6 +23,7 @@ import math
 
 from GIAANNproto_globalDefs import *
 import GIAANNproto_debug
+import GIAANNproto_count
 import GIAANNproto_databaseNetwork
 import GIAANNproto_databaseNetworkTrain
 import GIAANNproto_databaseNetworkDraw
@@ -143,7 +144,7 @@ def printInferenceTop1Accuracy(databaseNetworkObject):
 						print("averageTop1BitsPerByteModified: ", bitsPerByte)
 					else:
 						print("averageTop1BitsPerByte: ", bitsPerByte)
-					memory_gb = GIAANNproto_databaseNetwork.printCountTotalParametersRun(databaseNetworkObject)
+					memory_gb = GIAANNproto_count.printCountTotalParametersRun(databaseNetworkObject)
 					print("memory_gb: ", memory_gb)
 				else:
 					if(printInferenceTop1AccuracyBitsPerByteModified):
@@ -158,7 +159,7 @@ def printInferenceTop1Accuracy(databaseNetworkObject):
 			if(useAutoresearch):
 				print("---")
 				print("averageTop1Accuracy: ", predictionAccuracy)
-				memory_gb = GIAANNproto_databaseNetwork.printCountTotalParametersRun(databaseNetworkObject)
+				memory_gb = GIAANNproto_count.printCountTotalParametersRun(databaseNetworkObject)
 				print("memory_gb: ", memory_gb)
 			else:
 				if(inferenceReportTokenAccuracyConstrainByColumn):

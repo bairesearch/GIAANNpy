@@ -540,9 +540,17 @@ Additional ablations to be conducted over:
 
 \subsection{Performance}
 
-The performance measurements were taken with GIAANN Proto 1l/1m, after splitting the souce feature connections tensors per source feature.
+The performance measurements were taken with GIAANN Proto 1l/1m, after splitting the column souce feature connections tensors per source feature.
 
 Experimental optimisations \texttt{optimisationGetFeatureConnectionsForSourceFeatureCache} and \texttt{optimisationObservedColumnsWriteMetadataCheck} were disabled for all measurements.
+
+Time measurements were calculated across configurations. When \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True}, time measurements for the sequence processing ($t\_proc$) were separated from the final write (train phase) or initial read (inference phase) of the entire database from/to CPU RAM ($t\_w/r$), where $t\_tot = t\_proc + t\_w/r$. 
+
+GPU and CPU RAM measurements were calculated as peak memory allocated across execution.
+
+The RAM database i/o device for features and connections was CPU for all measurements (\texttt{useGPUfileio=False}).
+
+All measurements were conducted with \texttt{useGPUsparseStrict=True}. The primary effect of this setting is that if the sparse tensor device is set to CPU (\texttt{useGPUsparse=False}), it converts tensors to the sparse device (CPU) before converting tensors from dense to sparse. This can add some CPU memory overhead (memory/processing). This setting is not relevant for the measurements however because \texttt{useGPUsparse=True} by default, and there are no cases where dense tensors are used for training and \texttt{useGPUsparse=False}.
 
 \paragraph{Tensor configurations}
 
@@ -552,16 +560,18 @@ All feature neuron and connection tensors are stored as sparse tensors (PyTorch 
 Sparse and dense tensor devices are by default both set to GPU during training (i.e. \texttt{useGPUsparse=True}/\texttt{useGPUdense=True}), and set to CPU during inference (i.e. \texttt{useGPUsparse=False}). 
 
 \subparagraph{Database feature neurons}
-Database global feature neuron sparse tensors are by default stored in RAM during training (i.e. \texttt{storeDatabaseGlobalFeatureNeuronsInRam=True}: global feature neuron tensors).  Else if \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True}: the column feature neurons are stored independently in RAM, or if \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=False}: the filesystem database column feature neurons are read/written into/from RAM on a per sequence basis. Enabling global feature neuron tensors is mandatory during inference (i.e. \texttt{storeDatabaseGlobalFeatureNeuronsInRam=True}). 
+If \texttt{storeDatabaseGlobalFeatureNeuronsInRam=True}, feature neurons sparse tensors are stored in a global tensor representing all columns. Else, feature neuron sparse tensors are stored independently for each column. 
 
-If \texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}, feature neuron sparse tensors are stored independently for each column. If the train phase was conducted with \texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}, either \texttt{lowMemGenerateGlobalFeatureNeuronsTensor=True} must also be enabled (to generate the global feature neurons on exit), or the subsequent inference phase must be performed with \texttt{highMemGenerateGlobalFeatureNeuronsTensor=True} (to generate the global feature neurons on startup). 
+Database global feature neuron sparse tensors are by default stored in RAM during training (i.e. \texttt{storeDatabaseGlobalFeatureNeuronsInRam=True}). Else if \texttt{storeDatabaseGlobalFeatureNeuronsInRam=False} and \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True}: the column feature neurons are stored independently in RAM. Or if \texttt{storeDatabaseGlobalFeatureNeuronsInRam=False} and \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=False}: the filesystem database column feature neurons are read/written into/from RAM on a per sequence basis. 
+
+Enabling global feature neuron tensors is mandatory during inference (i.e. \texttt{storeDatabaseGlobalFeatureNeuronsInRam=True}). If the train phase was conducted with \texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}, either \texttt{trainEndGenerateGlobalFeatureNeuronsTensor=True} can be enabled during training, or the subsequent inference phase can be performed with \texttt{inferenceStartGenerateGlobalFeatureNeuronsTensor=True} to regenerate the global feature neurons. Otherwise the inference phase will reinitialise the global feature neurons as all zeros. This is sufficient as the inference phase currently only uses the activation values of the global feature neurons. 
 
 The database global feature neurons are by default stored on device GPU during training (\texttt{useGPUsparse=True}), and CPU during inference (\texttt{useGPUsparse=False}). The per sequence feature neurons accessed during training (if \texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}) are stored on the same device.
 
 \subparagraph{Database feature connections}
-Database feature connections sparse tensors are by default all stored in RAM during training (\texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True}). Else the filesystem database feature connections are read/written into/from RAM on a per sequence basis (RAM memory discarded).
+Database feature connections sparse tensors are by default all stored in RAM during training (\texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True}). Else the filesystem database feature connections are written/read into/from RAM on a per sequence basis (RAM memory discarded).
 
-The RAM database feature connections are always stored on device CPU during benchmarking (i.e. \texttt{useGPUdatabase=False}). The per sequence feature connections are by default moved to device GPU during training (i.e. \texttt{useGPUsparse=True}), and moved to (kept on) device CPU during inference (i.e. \texttt{useGPUsparse=False}).  
+The RAM database feature connections are always stored on device CPU during benchmarking (i.e. \texttt{useGPUdatabase=False}). The per sequence feature connections are by default moved to device GPU during training (i.e. \texttt{useGPUsparse=True}), and moved to (kept on) device CPU during inference (i.e. \texttt{useGPUsparse=False}).
 
 \paragraph{Filesystem}
 
@@ -569,7 +579,7 @@ The filesystem database is stored on a locally connected SSD drive.
 
 \paragraph{Tables}
 
-\Cref{tab:oscar-performance-storeDatabaseInRamTrue} contains OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes, with store database feature neurons and connections actively in RAM (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=True}, \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True}). It also contains time measurements separated for the final write (train phase) or initial read (inference phase) of the entire database from/to CPU RAM (``t w/r''), where ``t tot = t proc + t w/r''. GPU RAM measurements were calculated as peak memory allocated across execution, and CPU RAM measurements were taken by averaging process memory usage during execution of the highest GPU RAM function under default settings (\texttt{updateObservedColumnsEfficient()}). CPU RAM measurements are less sensitive to function execution timing as they are typically dominated by persistent database memory.
+\Cref{tab:oscar-performance-storeDatabaseInRamTrue} contains OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes, with store database feature neurons and connections actively in RAM (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=True}, \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True}).
 
 \Cref{tab:oscar-performance-storeDatabaseInRamFalse} contains OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes, without store database feature connections actively in RAM (\texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=False}).
 
@@ -583,11 +593,6 @@ The filesystem database is stored on a locally connected SSD drive.
 
 \Cref{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse-storeDatabase} contains OSCAR-2201 training performance measurements for different database feature connections active storage location (RAM/filesystem; \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True/False}) and training sizes, with train phase feature neuron and connection sparse tensors  (\texttt{trainSparseNeuronsTensor=True}, \texttt{trainSparseConnectionsTensor=True}), sparse tensor device CPU (\texttt{useGPUsparse=False}), and feature neuron sparse tensors stored independently for each column (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}).
 
-\paragraph{Variations}
-
-Option \texttt{useGPUsparseStrict} was disabled during the generation of \Cref{tab:oscar-performance-trainSparseConnectionsTensor}, \Cref{tab:oscar-performance-trainGlobalOrColumnFeatureNeuronTensors}, \Cref{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse}, \Cref{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse-storeDatabase} results. Within these specific environments (\texttt{executionMode=="train"} and \texttt{arrayIndexPropertiesEfficient}), setting \texttt{useGPUsparseStrict=False} could slightly increase peak GPU RAM in \texttt{updateObservedColumnsEfficient()}. When \texttt{useGPUsparse=False}, and \texttt{trainSparseConnectionsTensor=False} or \texttt{trainSparseNeuronsTensor=False}, large mostly-zero dense sequence tensors are converted to sparse tensors using the GPU (and only then moved to GPU). With \texttt{useGPUsparseStrict=True} however, the conversion to sparse device occurs before the conversion of the dense tensors to sparse type.
-
-
 \begin{table}[H]
 \centering
 \caption{OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes, with store database feature connections actively in RAM}
@@ -596,15 +601,15 @@ Option \texttt{useGPUsparseStrict} was disabled during the generation of \Cref{t
 \toprule
 \textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{phase} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{gpu ram} & \textbf{cpu ram} \\
 \midrule
-8 & 3 & 5 & 5,000       & train & 00:01:05 & 00:00:54 & 00:00:11 & 0.9GB & 1.9GB \\
-8 & 3 & 5 & 200,000     & train & 01:30:38 & 01:26:02 & 00:04:36 & 1.9GB & 6.9GB \\
-8 & 3 & 5 & 1,000,000   & train & 16:00:00 & 15:38:24 & 00:21:36 & 7.0GB & 20.6GB \\
+8 & 3 & 5 & 5,000       & train & 00:01:05 & 00:00:54 & 00:00:11 & 0.9GB & 2.1GB \\
+8 & 3 & 5 & 200,000     & train & 01:30:38 & 01:26:02 & 00:04:36 & 1.9GB & 8.0GB \\
+%8 & 3 & 5 & 1,000,000   & train & 16:00:00 & 15:38:24 & 00:21:36 & 7.0GB & >20.6GB \\
 8 & 3 & 5 & 5,000       & tr eval & 00:00:39 & 00:00:22 & 00:00:17 & 0.0GB & 1.6GB \\
-8 & 3 & 5 & 200,000     & tr eval & 00:18:11 & 00:10:15 & 00:07:55 & 0.4GB & 7.1GB \\
-8 & 3 & 5 & 1,000,000   & tr eval & 01:24:03 & 00:40:29 & 00:43:33 & 1.5GB & 23.3GB \\
-8 & 3 & 5 & 5,000       & ts eval & 00:00:57 & 00:00:37 & 00:00:20 & 0.0GB & 1.6GB \\
-8 & 3 & 5 & 200,000     & ts eval & 00:25:42 & 00:15:23 & 00:10:19 & 0.4GB & 7.2GB \\
-8 & 3 & 5 & 1,000,000   & ts eval & 01:47:28 & 01:03:26 & 00:44:02 & 1.5GB & 20.6GB \\
+8 & 3 & 5 & 200,000     & tr eval & 00:18:11 & 00:10:15 & 00:07:55 & 0.4GB & 7.6GB \\
+%8 & 3 & 5 & 1,000,000   & tr eval & 01:24:03 & 00:40:29 & 00:43:33 & 1.5GB & >23.3GB \\
+8 & 3 & 5 & 5,000       & ts eval & 00:00:57 & 00:00:37 & 00:00:20 & 0.0GB & 1.7GB \\
+8 & 3 & 5 & 200,000     & ts eval & 00:25:42 & 00:15:23 & 00:10:19 & 0.4GB & 8.1GB \\
+%8 & 3 & 5 & 1,000,000   & ts eval & 01:47:28 & 01:03:26 & 00:44:02 & 1.5GB & >20.6GB \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -617,12 +622,12 @@ Option \texttt{useGPUsparseStrict} was disabled during the generation of \Cref{t
 \toprule
 \textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{phase} & \textbf{t tot} & \textbf{gpu ram} & \textbf{cpu ram} \\
 \midrule
-8 & 3 & 5 & 5,000       & train & 00:01:19 & 0.9GB & 1.8GB \\
-8 & 3 & 5 & 200,000     & train & 02:00:17 & 2.0GB & 2.0GB \\
-8 & 3 & 5 & 5,000       & tr eval & 00:00:23 & 0.0GB & 1.5GB \\
-8 & 3 & 5 & 200,000     & tr eval & 00:09:50 & 0.4GB & 2.2GB \\
+8 & 3 & 5 & 5,000       & train & 00:01:19 & 0.9GB & 1.9GB \\
+8 & 3 & 5 & 200,000     & train & 02:00:17 & 2.0GB & 2.5GB \\
+8 & 3 & 5 & 5,000       & tr eval & 00:00:23 & 0.0GB & 1.4GB \\
+8 & 3 & 5 & 200,000     & tr eval & 00:09:50 & 0.4GB & 2.7GB \\
 8 & 3 & 5 & 5,000       & ts eval & 00:00:30 & 0.0GB & 1.5GB \\
-8 & 3 & 5 & 200,000     & ts eval & 00:15:13 & 0.4GB & 2.2GB \\
+8 & 3 & 5 & 200,000     & ts eval & 00:15:13 & 0.4GB & 3.0GB \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -631,13 +636,13 @@ Option \texttt{useGPUsparseStrict} was disabled during the generation of \Cref{t
 \centering
 \caption{OSCAR-2201 model paramaters for different training sizes}
 \label{tab:oscar-performance-param}
-\begin{tabular}{rrrrrrrr}
+\begin{tabular}{rrrrrrrrr}
 \toprule
-\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{param} & \textbf{db size} & \textbf{columns} & \textbf{features} \\
+\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{neurons} & \textbf{connections} & \textbf{columns} & \textbf{features} & \textbf{db size} \\
 \midrule
-8 & 3 & 5 & 5,000       & 2.2M & 0.2GB & 9964 & 6263 \\
-8 & 3 & 5 & 200,000     & 76.6M & 6.0GB & 203804 & 43636 \\
-8 & 3 & 5 & 1,000,000   & 353.7M & 25.5GB & 795326 & 113756 \\
+8 & 3 & 5 & 5,000       & 60,364 & 2,150,611 & 9,964 & 6,263 & 0.2GB \\
+8 & 3 & 5 & 200,000     & 1,382,140 & 76,581,459 & 203,804 & 43,636 & 6.0GB \\
+8 & 3 & 5 & 1,000,000   & 5,274,133 & 353,715,670 & 795,326 & 113,756 & 25.5GB \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -650,10 +655,10 @@ Option \texttt{useGPUsparseStrict} was disabled during the generation of \Cref{t
 \toprule
 \textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{type} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{gpu ram} & \textbf{cpu ram} \\
 \midrule
-8 & 3 & 5 & 5,000       & dense & 00:01:05 & 00:00:54 & 00:00:11 & 0.9GB & 1.9GB \\
-8 & 3 & 5 & 200,000     & dense & 01:30:38 & 01:26:02 & 00:04:36 & 1.9GB & 6.9GB \\
-8 & 3 & 5 & 5,000       & sparse con & 00:02:03 & 00:01:47 & 00:00:16 & 0.1GB & 1.9GB \\
-8 & 3 & 5 & 200,000     & sparse con & 01:52:59 & 01:48:03 & 00:04:56 & 1.8GB & 4.8GB \\
+8 & 3 & 5 & 5,000       & dense & 00:01:05 & 00:00:54 & 00:00:11 & 0.9GB & 2.1GB \\
+8 & 3 & 5 & 200,000     & dense & 01:30:38 & 01:26:02 & 00:04:36 & 1.9GB & 8.0GB \\
+8 & 3 & 5 & 5,000       & sparse con & 00:02:03 & 00:01:47 & 00:00:16 & 0.1GB & 2.0GB \\
+8 & 3 & 5 & 200,000     & sparse con & 01:52:59 & 01:48:03 & 00:04:56 & 1.8GB & 8.0GB \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -666,10 +671,10 @@ Option \texttt{useGPUsparseStrict} was disabled during the generation of \Cref{t
 \toprule
 \textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{method} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{gpu ram} & \textbf{cpu ram} \\
 \midrule
-8 & 3 & 5 & 5,000       & global & 00:01:05 & 00:00:54 & 00:00:11 & 0.9GB & 1.9GB \\
-8 & 3 & 5 & 200,000     & global & 01:30:38 & 01:26:02 & 00:04:36 & 1.9GB & 6.9GB \\
-8 & 3 & 5 & 5,000       & column & 00:02:16 & 00:01:54 & 00:00:21 & 0.9GB & 1.9GB \\
-8 & 3 & 5 & 200,000     & column & 00:52:38 & 00:48:53 & 00:03:45 & 1.4GB & 5.0GB \\
+8 & 3 & 5 & 5,000       & global & 00:01:05 & 00:00:54 & 00:00:11 & 0.9GB & 2.1GB \\
+8 & 3 & 5 & 200,000     & global & 01:30:38 & 01:26:02 & 00:04:36 & 1.9GB & 8.0GB \\
+8 & 3 & 5 & 5,000       & column & 00:02:16 & 00:01:54 & 00:00:21 & 0.9GB & 2.1GB \\
+8 & 3 & 5 & 200,000     & column & 00:52:38 & 00:48:53 & 00:03:45 & 1.4GB & 8.0GB \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -682,12 +687,12 @@ Option \texttt{useGPUsparseStrict} was disabled during the generation of \Cref{t
 \toprule
 \textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{type} & \textbf{device} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{gpu ram} & \textbf{cpu ram} \\
 \midrule
-8 & 3 & 5 & 5,000       & dense & GPU & 00:02:16 & 00:01:54 & 00:00:21 & 0.9GB & 1.9GB \\
-8 & 3 & 5 & 200,000     & dense & GPU & 00:52:38 & 00:48:53 & 00:03:45 & 1.4GB & 5.0GB \\
-8 & 3 & 5 & 5,000       & sparse & GPU & 00:01:33 & 00:01:23 & 00:00:09 & 0.02GB & 1.8GB \\
-8 & 3 & 5 & 200,000     & sparse & GPU & 00:58:28 & 00:54:55 & 00:03:33 & 0.5GB & 4.9GB \\
-8 & 3 & 5 & 5,000       & sparse & CPU & 00:01:16 & 00:01:07 & 00:00:08 & 0.0GB & 1.7GB \\
-8 & 3 & 5 & 200,000     & sparse & CPU & 01:01:01 & 00:57:33 & 00:03:27 & 0.0GB & 4.9GB \\
+8 & 3 & 5 & 5,000       & dense & GPU & 00:02:16 & 00:01:54 & 00:00:21 & 0.9GB & 2.1GB \\
+8 & 3 & 5 & 200,000     & dense & GPU & 00:52:38 & 00:48:53 & 00:03:45 & 1.4GB & 8.0GB \\
+8 & 3 & 5 & 5,000       & sparse & GPU & 00:01:33 & 00:01:23 & 00:00:09 & 0.02GB & 2.0GB \\
+8 & 3 & 5 & 200,000     & sparse & GPU & 00:58:28 & 00:54:55 & 00:03:33 & 0.5GB & 9.7GB \\
+8 & 3 & 5 & 5,000       & sparse & CPU & 00:01:16 & 00:01:07 & 00:00:08 & 0.0GB & 1.8GB \\
+8 & 3 & 5 & 200,000     & sparse & CPU & 01:01:01 & 00:57:33 & 00:03:27 & 0.0GB & 8.2GB \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -700,10 +705,10 @@ Option \texttt{useGPUsparseStrict} was disabled during the generation of \Cref{t
 \toprule
 \textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{database} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{gpu ram} & \textbf{cpu ram} \\
 \midrule
-8 & 3 & 5 & 5,000       & RAM & 00:01:16 & 00:01:07 & 00:00:08 & 0.0GB & 1.7GB \\
-8 & 3 & 5 & 200,000     & RAM & 01:01:01 & 00:57:33 & 00:03:27 & 0.0GB & 4.9GB \\
-8 & 3 & 5 & 5,000       & filesys & 00:02:07 & 00:02:07 & 00:00:00 & 0.0GB & 1.6GB \\
-8 & 3 & 5 & 200,000     & filesys & 01:34:21 & 01:34:21 & 00:00:00 & 0.0GB & 1.8GB \\
+8 & 3 & 5 & 5,000       & RAM & 00:01:16 & 00:01:07 & 00:00:08 & 0.0GB & 1.8GB \\
+8 & 3 & 5 & 200,000     & RAM & 01:01:01 & 00:57:33 & 00:03:27 & 0.0GB & 8.2GB \\
+8 & 3 & 5 & 5,000       & filesys & 00:02:07 & 00:02:07 & 00:00:00 & 0.0GB & 1.7GB \\
+8 & 3 & 5 & 200,000     & filesys & 01:34:21 & 01:34:21 & 00:00:00 & 0.0GB & 2.0GB \\
 \bottomrule
 \end{tabular}
 \end{table}
