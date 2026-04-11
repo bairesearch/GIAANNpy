@@ -249,10 +249,10 @@ def releaseRuntimeGpuMemory(sequenceCount):
 	if(sequenceCount < 0):
 		raise RuntimeError("releaseRuntimeGpuMemory error: sequenceCount must be >= 0")
 	releaseGpuMemory = False
-	if(runtimeReleaseGPUMemory):
-		if(runtimeReleaseGPUMemoryEverySequenceCount <= 0):
-			raise RuntimeError("releaseRuntimeGpuMemory error: runtimeReleaseGPUMemoryEverySequenceCount must be > 0")
-		if((sequenceCount % runtimeReleaseGPUMemoryEverySequenceCount) == 0):
+	if(debugRuntimeReleaseGPUMemory):
+		if(debugRuntimeReleaseGPUMemoryEverySequenceCount <= 0):
+			raise RuntimeError("releaseRuntimeGpuMemory error: debugRuntimeReleaseGPUMemoryEverySequenceCount must be > 0")
+		if((sequenceCount % debugRuntimeReleaseGPUMemoryEverySequenceCount) == 0):
 			releaseGpuMemory = True
 	if(debugDeleteGPUcache):
 		releaseGpuMemory = True

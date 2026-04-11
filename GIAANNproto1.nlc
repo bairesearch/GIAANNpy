@@ -751,3 +751,8 @@ v1m (Codex IDE GPT-5.4) [under development]:
 	When drawEfficient=False, absolutely no changes to any code should be made to any draw code - the draw code should execute exactly as before.
 - move the useDrawNetworkIndependently and drawEfficient code to a new file called GIAANNproto_databaseNetworkDrawLarge.py
 - set drawSparseArrays = True by default - improve the default performance of the drawEfficient=False execution path
+MANUAL; - set storeDatabaseGlobalFeatureNeuronsInRam=False by default during executionMode=="train"
+MANUAL; - set useGPUfileio=False by default (instead of =useGPUsparse)
+MANUAL; - set trainSparseConnectionsTensor/trainSparseNeuronsTensor=True by default if useGPUsparse=False
+- add option drawEfficientFormat3D=True (False by default), which draws the large network in format LDR (3D) instead of SVG (2D).
+- implement option drawEfficientFormat3Dprism, which positions the drawn columns on a 2D grid (rather than 1D grid), with each column represented as a rectangular prism (rather than rectangle), and the grid width and breadth in columns = sqrt(totalNumberColumns). The height of the network should not change.

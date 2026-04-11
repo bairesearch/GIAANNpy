@@ -45,6 +45,23 @@ else:
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
 	
 
+#useDrawNetworkIndependently;
+#select a single draw method (colouring scheme);
+if(useDrawNetworkIndependently):
+	drawEfficient = True
+else:
+	drawEfficient = False
+if(drawEfficient):
+	drawEfficientFormat3D = True	#default: False	#True: save standalone drawEfficient large-network output in LDraw .ldr format instead of 2D matplotlib output
+	if(drawEfficientFormat3D):
+		drawEfficientFormat3Dprism = True	#default: False	#True: position standalone drawEfficient 3D columns on a square 2D grid and draw each column as a rectangular prism
+	drawEfficientDrawDeadNeurons = True	#default: True	#draw empty columns with no connected neurons
+	drawEfficientGrid = True	#default: True
+	drawEfficientCompact = False	#better emulates the original draw visualisation of drawEfficient=False (but still not the same as no randomised horizontal position of nodes within columns)
+	if(drawEfficientGrid == drawEfficientCompact):
+		printe("drawEfficient configuration error: exactly one of drawEfficientGrid or drawEfficientCompact must be True")
+
+
 #Primary Draw settings:
 drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
 drawNetworkDuringInference = False	#default: False
@@ -108,7 +125,7 @@ elif(useAutoresearch):
 elif(useDrawNetworkIndependently):
 	trainMaxSequences = 0	#not used
 	#databaseFolderBase = "../database"	#default: "../database"	
-	#databaseFolderBase = "/media/user/ssdpro/GIAANN/databaseOscar1000-numSeedTokensInference8-spacyPipelineOptimisations"
+	databaseFolderBase = "/media/user/ssdpro/GIAANN/databaseOscar10000-numSeedTokensInference8-spacyPipelineOptimisations"
 else:
 	trainMaxSequences = 1000000	#dev: 10, 500, 5000, 10000, 200000 	#default: 1000000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = "../database"
@@ -207,38 +224,38 @@ else:
 #RAM;
 useGPUdense = True	#default: True
 if(executionMode=="inference" or executionMode=="trainAndInference"):
-	useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors
+	useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors	#inference can be slightly faster CPU sparse tensor operations
 elif(executionMode=="train"):
 	useGPUsparse = True	#default: True		#slight performance increase during train (does not use significant additional GPU ram during train)
-useGPUsparseStrict = True	#default: True	#orig: False	#enforce strict sparse device during transfer to/from dense tensors
-runtimeReleaseGPUMemory = False	#default: True	#aggressively release cached CUDA memory after sequence processing
-runtimeReleaseGPUMemoryEverySequenceCount = 1	#default: 1	#only apply release every N processed sequences
-if(runtimeReleaseGPUMemory):
-	assert runtimeReleaseGPUMemoryEverySequenceCount > 0, "runtimeReleaseGPUMemoryEverySequenceCount must be > 0"
-useGPUfileio = False	#default: useGPUsparse	#orig: useGPUsparse
+useGPUsparseStrict = True	#default: True	#orig: False	#optional	#enforce strict sparse device during transfer to/from dense tensors (make conversion process always use sparse device)	 #no significant difference in speed; can theoretically affect peak CPU or GPU RAM
+useGPUfileio = False	#default: False	#orig: useGPUsparse
 
-storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = True	#default: True	#orig: False
+if(useGPUsparse):
+	trainSparseConnectionsTensor = False	#default: False	#orig: False
+	trainSparseNeuronsTensor = False	#default: False	#orig: False
+else:
+	trainSparseConnectionsTensor = True	#default: True	#orig: True
+	trainSparseNeuronsTensor = True		#default: True	#orig: True
+if(trainSparseNeuronsTensor):
+	assert trainSparseConnectionsTensor, "trainSparseNeuronsTensor requires trainSparseConnectionsTensor=True"
+
+storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = True	#default: True	#orig: False	#optional
 if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 	useGPUdatabase = False	#default: False	#default: False
 	resizeTensorsOnRAMdatabaseSave = False	#default: False #orig: True	#resize all feature neuron and connections tensors during final RAM database save
 	resizeTensorsOnRAMdatabaseLoad = False	#default: False #orig: True	#resize all feature neuron and connections tensors during initial RAM database load
 
-trainEndGenerateGlobalFeatureNeuronsTensor = False	#derived var
-inferenceStartGenerateGlobalFeatureNeuronsTensor = False	#derived var
 if(executionMode=="train"):
-	storeDatabaseGlobalFeatureNeuronsInRam = True		 #default: True	#orig: False	 #currently required to be True for inference compatibility	#optional
-	if(not storeDatabaseGlobalFeatureNeuronsInRam):
-		trainEndGenerateGlobalFeatureNeuronsTensor = False	#default: False	#orig: False	#generates and saves a globalFeatureNeurons at the end of training (not just individual column featureNeurons tensors)
-	trainSparseConnectionsTensor = False	#default: False	#orig: False
-	trainSparseNeuronsTensor = False	#default: False	#orig: False
-	if(trainSparseNeuronsTensor):
-		assert trainSparseConnectionsTensor, "trainSparseNeuronsTensor requires trainSparseConnectionsTensor=True"
+	storeDatabaseGlobalFeatureNeuronsInRam = False		 #default: False	#orig: True	 #not required to be True for inference compatibility	#optional
 else:
 	storeDatabaseGlobalFeatureNeuronsInRam = True		#mandatory: True	#if storeDatabaseGlobalFeatureNeuronsInRam=True use global feature neuron tensors, else use feature neuron tensors in observed columns (note feature connection tensors are always in observed columns)
-	if(executionMode=="inference"):
+trainEndGenerateGlobalFeatureNeuronsTensor = False	#derived var
+inferenceStartGenerateGlobalFeatureNeuronsTensor = False	#derived var
+if(not storeDatabaseGlobalFeatureNeuronsInRam):
+	if(executionMode=="train"):
+		trainEndGenerateGlobalFeatureNeuronsTensor = False	#default: False	#orig: False	#generates and saves a globalFeatureNeurons at the end of training (not just individual column featureNeurons tensors)
+	elif(executionMode=="inference"):
 		inferenceStartGenerateGlobalFeatureNeuronsTensor = False	#default: False	#orig: False	#generates and saves a globalFeatureNeurons at the start of inference after being trained with storeDatabaseGlobalFeatureNeuronsInRam=False (with individual column featureNeurons tensors)
-	trainSparseConnectionsTensor = False	#default for executionMode=="trainAndInference"
-	trainSparseNeuronsTensor = False	#default for executionMode=="trainAndInference"
 
 
 #Benchmarking;
@@ -442,18 +459,6 @@ optimisationArrayIndexPropertiesEfficientSerialNeurons = False	#default: False #
 
 
 #Draw;
-#select a single draw method (colouring scheme);
-if(useDrawNetworkIndependently):
-	drawEfficient = True
-else:
-	drawEfficient = False
-if(drawEfficient):
-	drawEfficientDrawDeadNeurons = True
-	drawEfficientGrid = False	#default: True
-	drawEfficientCompact = True	#better emulates the original draw visualisation of drawEfficient=False (but still not the same as no randomised horizontal position of nodes within columns)
-	if(drawEfficientGrid == drawEfficientCompact):
-		printe("drawEfficient configuration error: exactly one of drawEfficientGrid or drawEfficientCompact must be True")
-
 drawSegments = False and useSANI	#optional
 drawBranches = False and multipleDendriticBranches	#optional
 drawRelationTypes = False and not arrayIndexPropertiesEfficient	#optional
@@ -615,6 +620,10 @@ else:
 	debugTerminateOnConceptColumnsDelimitByPOSerror = False
 
 debugDeleteGPUcache = False
+debugRuntimeReleaseGPUMemory = False	#default: False	#aggressively release cached CUDA memory after sequence processing	#results in significant performance drop
+debugRuntimeReleaseGPUMemoryEverySequenceCount = 1	#default: 1	#only apply release every N processed sequences
+if(debugRuntimeReleaseGPUMemory):
+	assert debugRuntimeReleaseGPUMemoryEverySequenceCount > 0, "debugRuntimeReleaseGPUMemoryEverySequenceCount must be > 0"
 
 debugLimitFeatures = False	#can be used to recover database for inference if run out of ram during training
 if(debugLimitFeatures):
@@ -1004,6 +1013,7 @@ if(printConfiguration):
 	print("useQuickExecution:", useQuickExecution)
 	print("useBenchmark:", useBenchmark)
 	print("useAutoresearch:", useAutoresearch)
+	print("useDrawNetworkIndependently:", useDrawNetworkIndependently)
 	#print("useDefault:", useDefault)
 	print("executionMode:", executionMode)
 	print("inferenceTrainFirstSequences:", inferenceTrainFirstSequences)
@@ -1054,15 +1064,15 @@ if(printConfiguration):
 	print("useGPUdense:", useGPUdense)
 	print("useGPUsparse:", useGPUsparse)
 	print("useGPUfileio:", useGPUfileio)
+	if(executionMode=="train" or executionMode=="trainAndInference"):
+		print("\ttrainSparseConnectionsTensor:", trainSparseConnectionsTensor)
+		print("\ttrainSparseNeuronsTensor:", trainSparseNeuronsTensor)
 	print("storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam:", storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam)
-	print("storeDatabaseGlobalFeatureNeuronsInRam:", storeDatabaseGlobalFeatureNeuronsInRam)
-	#print("trainEndGenerateGlobalFeatureNeuronsTensor:", trainEndGenerateGlobalFeatureNeuronsTensor)
-	#print("inferenceStartGenerateGlobalFeatureNeuronsTensor:", inferenceStartGenerateGlobalFeatureNeuronsTensor)
-	if(executionMode=="train"):
-		print("trainSparseConnectionsTensor:", trainSparseConnectionsTensor)
-		print("trainSparseNeuronsTensor:", trainSparseNeuronsTensor)
 	if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
-		print("useGPUdatabase:", useGPUdatabase)
+		print("\tuseGPUdatabase:", useGPUdatabase)
+	print("storeDatabaseGlobalFeatureNeuronsInRam:", storeDatabaseGlobalFeatureNeuronsInRam)
+		#print("trainEndGenerateGlobalFeatureNeuronsTensor:", trainEndGenerateGlobalFeatureNeuronsTensor)
+		#print("inferenceStartGenerateGlobalFeatureNeuronsTensor:", inferenceStartGenerateGlobalFeatureNeuronsTensor)
 	print("")
 	print("#Benchmarking;")
 	print("useBenchmarkDefaults:", useBenchmarkDefaults)
@@ -1124,6 +1134,10 @@ if(printConfiguration):
 	if(useInference):
 		print("drawNetworkDuringInferenceSave:", drawNetworkDuringInferenceSave)
 	print("drawNetworkSaveFormatVector:", drawNetworkSaveFormatVector)
+	if(drawEfficient):
+		print("drawEfficientFormat3D:", drawEfficientFormat3D)
+		if(drawEfficientFormat3D):
+			print("drawEfficientFormat3Dprism:", drawEfficientFormat3Dprism)
 	print("")
 	print("#Database save paths;")
 	if(executionMode=="inference" or executionMode=="trainAndInference"):

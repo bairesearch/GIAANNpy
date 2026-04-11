@@ -17,6 +17,8 @@ GIA ANN proto database Network Draw Large
 
 """
 
+import math
+import os
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.figure import Figure
@@ -28,6 +30,17 @@ import GIAANNproto_databaseNetworkDraw
 import GIAANNproto_databaseNetworkFiles
 from GIAANNproto_databaseNetworkObservedColumn import ObservedColumn
 
+standaloneDrawEfficient3DLdrNodePartFile = "4-4CUBE.DAT"
+standaloneDrawEfficient3DLdrNodeScale = 4.0
+standaloneDrawEfficient3DLdrColumnSpacing = 40.0
+standaloneDrawEfficient3DLdrFeatureSpacing = 20.0
+standaloneDrawEfficient3DLdrColumnDepth = 20.0
+standaloneDrawEfficient3DLdrColourConceptNode = 1
+standaloneDrawEfficient3DLdrColourFeatureNode = 3
+standaloneDrawEfficient3DLdrColourInternalConnection = 14
+standaloneDrawEfficient3DLdrColourExternalConnection = 25
+standaloneDrawEfficient3DLdrColourColumnBox = 7
+
 
 def drawDatabaseGraphStandalone(databaseNetworkObject, save=False, fileName=None, display=True):
 	if(databaseNetworkObject is None):
@@ -36,35 +49,254 @@ def drawDatabaseGraphStandalone(databaseNetworkObject, save=False, fileName=None
 		printe("drawDatabaseGraphStandalone requires drawEfficient")
 	sortedConceptColumns, activeFeatureSetsByConceptIndex, compactFeaturePositionsByConceptIndex, primeFeatureIndexByConceptIndex, nodeXs, nodeYs, nodeColors, columnRectangles, maxConceptIndex, maxFeaturePosition = prepareStandaloneDrawEfficientLayout(databaseNetworkObject)
 	lineSegments, lineColours = prepareStandaloneDrawEfficientConnectionSegments(databaseNetworkObject, sortedConceptColumns, activeFeatureSetsByConceptIndex, compactFeaturePositionsByConceptIndex)
-
-	figureWidth = max(16.0, (float(maxConceptIndex) * 0.08) + 4.0)
-	figureHeight = max(9.0, (float(maxFeaturePosition) * 0.04) + 4.0)
-	fig, ax = createStandaloneDrawEfficientFigure(figureWidth, figureHeight, save, display)
-	if(len(lineSegments) > 0):
-		lineCollection = LineCollection(lineSegments, colors=lineColours, linewidths=0.35, alpha=1.0, zorder=1)
-		ax.add_collection(lineCollection)
-	for rectangleX, rectangleY, rectangleWidth, rectangleHeight in columnRectangles:
-		ax.add_patch(plt.Rectangle((rectangleX, rectangleY), rectangleWidth, rectangleHeight, fill=False, edgecolor='black', linewidth=0.5, zorder=2))
-	if(len(nodeXs) > 0):
-		ax.scatter(nodeXs, nodeYs, marker='s', s=9, c=nodeColors, edgecolors=nodeColors, linewidths=0.0, zorder=3)
-	ax.set_xlim(-1.5, max(float(maxConceptIndex) + 1.5, 1.5))
-	ax.set_ylim(-1.0, max(float(maxFeaturePosition) + 1.5, 1.5))
-	ax.axis('off')
-	ax.margins(0.0)
-
-	if(save):
+	if(drawEfficientFormat3D):
+		if(not save):
+			raise RuntimeError("drawDatabaseGraphStandalone error: drawEfficientFormat3D requires save=True")
+		if(display):
+			raise RuntimeError("drawDatabaseGraphStandalone error: drawEfficientFormat3D requires display=False")
 		if(fileName is None):
 			fileName = drawNetworkIndependentSaveFilename
-		outputFileName = GIAANNproto_databaseNetworkDraw.resolveGraphOutputFileName(fileName)
-		if(drawNetworkSaveFormatVector):
-			fig.savefig(outputFileName, format="svg", bbox_inches='tight', pad_inches=0.0)
-		else:
-			fig.savefig(outputFileName, bbox_inches='tight', pad_inches=0.0)
-	if(display):
-		plt.show()
+		outputFileName = resolveStandaloneDrawEfficient3DOutputFileName(fileName)
+		saveStandaloneDrawEfficientLdrFile(outputFileName, sortedConceptColumns, nodeXs, nodeYs, nodeColors, columnRectangles, lineSegments, lineColours)
 	else:
-		plt.close(fig)
+		figureWidth = max(16.0, (float(maxConceptIndex) * 0.08) + 4.0)
+		figureHeight = max(9.0, (float(maxFeaturePosition) * 0.04) + 4.0)
+		fig, ax = createStandaloneDrawEfficientFigure(figureWidth, figureHeight, save, display)
+		if(len(lineSegments) > 0):
+			lineCollection = LineCollection(lineSegments, colors=lineColours, linewidths=0.35, alpha=1.0, zorder=1)
+			ax.add_collection(lineCollection)
+		for rectangleX, rectangleY, rectangleWidth, rectangleHeight in columnRectangles:
+			ax.add_patch(plt.Rectangle((rectangleX, rectangleY), rectangleWidth, rectangleHeight, fill=False, edgecolor='black', linewidth=0.5, zorder=2))
+		if(len(nodeXs) > 0):
+			ax.scatter(nodeXs, nodeYs, marker='s', s=9, c=nodeColors, edgecolors=nodeColors, linewidths=0.0, zorder=3)
+		ax.set_xlim(-1.5, max(float(maxConceptIndex) + 1.5, 1.5))
+		ax.set_ylim(-1.0, max(float(maxFeaturePosition) + 1.5, 1.5))
+		ax.axis('off')
+		ax.margins(0.0)
+
+		if(save):
+			if(fileName is None):
+				fileName = drawNetworkIndependentSaveFilename
+			outputFileName = GIAANNproto_databaseNetworkDraw.resolveGraphOutputFileName(fileName)
+			if(drawNetworkSaveFormatVector):
+				fig.savefig(outputFileName, format="svg", bbox_inches='tight', pad_inches=0.0)
+			else:
+				fig.savefig(outputFileName, bbox_inches='tight', pad_inches=0.0)
+		if(display):
+			plt.show()
+		else:
+			plt.close(fig)
 	return
+
+def saveStandaloneDrawEfficientLdrFile(outputFileName, sortedConceptColumns, nodeXs, nodeYs, nodeColors, columnRectangles, lineSegments, lineColours):
+	if(outputFileName is None):
+		raise RuntimeError("saveStandaloneDrawEfficientLdrFile error: outputFileName is None")
+	ldrLines = generateStandaloneDrawEfficientLdrLines(outputFileName, sortedConceptColumns, nodeXs, nodeYs, nodeColors, columnRectangles, lineSegments, lineColours)
+	with open(outputFileName, "w", encoding="ascii") as outputFile:
+		outputFile.write("\n".join(ldrLines))
+		outputFile.write("\n")
+	return
+
+def generateStandaloneDrawEfficientLdrLines(outputFileName, sortedConceptColumns, nodeXs, nodeYs, nodeColors, columnRectangles, lineSegments, lineColours):
+	if(outputFileName is None):
+		raise RuntimeError("generateStandaloneDrawEfficientLdrLines error: outputFileName is None")
+	if(sortedConceptColumns is None):
+		raise RuntimeError("generateStandaloneDrawEfficientLdrLines error: sortedConceptColumns is None")
+	if(len(nodeXs) != len(nodeYs) or len(nodeXs) != len(nodeColors)):
+		raise RuntimeError("generateStandaloneDrawEfficientLdrLines error: node coordinate arrays are inconsistent")
+	if(len(lineSegments) != len(lineColours)):
+		raise RuntimeError("generateStandaloneDrawEfficientLdrLines error: connection arrays are inconsistent")
+	totalNumberColumns = calculateStandaloneDrawEfficientLdrTotalNumberColumns(sortedConceptColumns)
+	totalNumberFeatures = calculateStandaloneDrawEfficientLdrTotalNumberFeatures(nodeYs)
+	lines = []
+	lines.append("0 GIAANN drawEfficientFormat3D")
+	lines.append("0 Name: " + os.path.basename(outputFileName))
+	lines.append("0 Author: Codex")
+	appendStandaloneDrawEfficientLdrNodes(lines, totalNumberColumns, totalNumberFeatures, nodeXs, nodeYs, nodeColors)
+	appendStandaloneDrawEfficientLdrConnections(lines, totalNumberColumns, totalNumberFeatures, lineSegments, lineColours)
+	appendStandaloneDrawEfficientLdrColumnBoxes(lines, totalNumberColumns, totalNumberFeatures, columnRectangles)
+	result = lines
+	return result
+
+def calculateStandaloneDrawEfficientLdrTotalNumberColumns(sortedConceptColumns):
+	if(sortedConceptColumns is None):
+		raise RuntimeError("calculateStandaloneDrawEfficientLdrTotalNumberColumns error: sortedConceptColumns is None")
+	result = int(len(sortedConceptColumns))
+	return result
+
+def calculateStandaloneDrawEfficientLdrTotalNumberFeatures(nodeYs):
+	if(nodeYs is None):
+		raise RuntimeError("calculateStandaloneDrawEfficientLdrTotalNumberFeatures error: nodeYs is None")
+	totalNumberFeatures = 0
+	if(len(nodeYs) > 0):
+		maxFeaturePosition = max(float(nodeY) for nodeY in nodeYs)
+		totalNumberFeatures = int(math.floor(maxFeaturePosition)) + 1
+	result = totalNumberFeatures
+	return result
+
+def appendStandaloneDrawEfficientLdrColumnBoxes(lines, totalNumberColumns, totalNumberFeatures, columnRectangles):
+	if(lines is None):
+		raise RuntimeError("appendStandaloneDrawEfficientLdrColumnBoxes error: lines is None")
+	if(columnRectangles is None):
+		raise RuntimeError("appendStandaloneDrawEfficientLdrColumnBoxes error: columnRectangles is None")
+	for rectangle in columnRectangles:
+		appendStandaloneDrawEfficientLdrBox(lines, totalNumberColumns, totalNumberFeatures, rectangle, standaloneDrawEfficient3DLdrColourColumnBox)
+	return
+
+def appendStandaloneDrawEfficientLdrConnections(lines, totalNumberColumns, totalNumberFeatures, lineSegments, lineColours):
+	if(lines is None):
+		raise RuntimeError("appendStandaloneDrawEfficientLdrConnections error: lines is None")
+	if(lineSegments is None):
+		raise RuntimeError("appendStandaloneDrawEfficientLdrConnections error: lineSegments is None")
+	if(lineColours is None):
+		raise RuntimeError("appendStandaloneDrawEfficientLdrConnections error: lineColours is None")
+	for lineSegmentIndex, lineSegment in enumerate(lineSegments):
+		lineColour = getStandaloneDrawEfficientLdrColourFromConnectionColour(lineColours[lineSegmentIndex])
+		lineStart, lineEnd = getStandaloneDrawEfficientLdrLineEndpoints(totalNumberColumns, totalNumberFeatures, lineSegment)
+		appendStandaloneDrawEfficientLdrLine(lines, lineColour, lineStart, lineEnd)
+	return
+
+def appendStandaloneDrawEfficientLdrNodes(lines, totalNumberColumns, totalNumberFeatures, nodeXs, nodeYs, nodeColors):
+	if(lines is None):
+		raise RuntimeError("appendStandaloneDrawEfficientLdrNodes error: lines is None")
+	if(nodeXs is None or nodeYs is None or nodeColors is None):
+		raise RuntimeError("appendStandaloneDrawEfficientLdrNodes error: node arrays are None")
+	for nodeIndex in range(len(nodeXs)):
+		nodePosition = getStandaloneDrawEfficientLdrNodePosition(totalNumberColumns, totalNumberFeatures, nodeXs[nodeIndex], nodeYs[nodeIndex])
+		nodeColour = getStandaloneDrawEfficientLdrColourFromNodeColour(nodeColors[nodeIndex])
+		appendStandaloneDrawEfficientLdrNode(lines, nodeColour, nodePosition)
+	return
+
+def appendStandaloneDrawEfficientLdrBox(lines, totalNumberColumns, totalNumberFeatures, rectangle, lineColour):
+	if(lines is None):
+		raise RuntimeError("appendStandaloneDrawEfficientLdrBox error: lines is None")
+	if(rectangle is None):
+		raise RuntimeError("appendStandaloneDrawEfficientLdrBox error: rectangle is None")
+	frontPoints, backPoints = getStandaloneDrawEfficientLdrRectanglePoints(totalNumberColumns, totalNumberFeatures, rectangle)
+	for pointIndex in range(4):
+		nextPointIndex = (pointIndex + 1) % 4
+		appendStandaloneDrawEfficientLdrLine(lines, lineColour, frontPoints[pointIndex], frontPoints[nextPointIndex])
+		appendStandaloneDrawEfficientLdrLine(lines, lineColour, backPoints[pointIndex], backPoints[nextPointIndex])
+		appendStandaloneDrawEfficientLdrLine(lines, lineColour, frontPoints[pointIndex], backPoints[pointIndex])
+	return
+
+def appendStandaloneDrawEfficientLdrLine(lines, lineColour, pointStart, pointEnd):
+	if(lines is None):
+		raise RuntimeError("appendStandaloneDrawEfficientLdrLine error: lines is None")
+	if(pointStart is None or pointEnd is None):
+		raise RuntimeError("appendStandaloneDrawEfficientLdrLine error: line endpoints are None")
+	lineString = "2 " + str(int(lineColour)) + " " + " ".join(format(float(value), ".5f") for value in pointStart) + " " + " ".join(format(float(value), ".5f") for value in pointEnd)
+	lines.append(lineString)
+	return
+
+def appendStandaloneDrawEfficientLdrNode(lines, nodeColour, nodePosition):
+	if(lines is None):
+		raise RuntimeError("appendStandaloneDrawEfficientLdrNode error: lines is None")
+	if(nodePosition is None):
+		raise RuntimeError("appendStandaloneDrawEfficientLdrNode error: nodePosition is None")
+	scale = standaloneDrawEfficient3DLdrNodeScale
+	nodeString = "1 " + str(int(nodeColour)) + " " + " ".join(format(float(value), ".5f") for value in nodePosition) + " " + format(scale, ".5f") + " 0.0 0.0 0.0 " + format(scale, ".5f") + " 0.0 0.0 0.0 " + format(scale, ".5f") + " " + standaloneDrawEfficient3DLdrNodePartFile
+	lines.append(nodeString)
+	return
+
+def getStandaloneDrawEfficientLdrRectanglePoints(totalNumberColumns, totalNumberFeatures, rectangle):
+	if(rectangle is None):
+		raise RuntimeError("getStandaloneDrawEfficientLdrRectanglePoints error: rectangle is None")
+	if(len(rectangle) != 4):
+		raise RuntimeError("getStandaloneDrawEfficientLdrRectanglePoints error: rectangle must have four entries")
+	rectangleX, rectangleY, rectangleWidth, rectangleHeight = rectangle
+	conceptIndex = getStandaloneDrawEfficientLdrConceptIndex(float(rectangleX) + (float(rectangleWidth)/2.0))
+	frontPoints = [generateGridCoordinates(conceptIndex, rectangleY, totalNumberColumns, totalNumberFeatures, pointXOffset=-(float(rectangleWidth)/2.0), pointZOffset=-(standaloneDrawEfficient3DLdrColumnDepth/2.0)), generateGridCoordinates(conceptIndex, rectangleY, totalNumberColumns, totalNumberFeatures, pointXOffset=(float(rectangleWidth)/2.0), pointZOffset=-(standaloneDrawEfficient3DLdrColumnDepth/2.0)), generateGridCoordinates(conceptIndex, float(rectangleY) + float(rectangleHeight), totalNumberColumns, totalNumberFeatures, pointXOffset=(float(rectangleWidth)/2.0), pointZOffset=-(standaloneDrawEfficient3DLdrColumnDepth/2.0)), generateGridCoordinates(conceptIndex, float(rectangleY) + float(rectangleHeight), totalNumberColumns, totalNumberFeatures, pointXOffset=-(float(rectangleWidth)/2.0), pointZOffset=-(standaloneDrawEfficient3DLdrColumnDepth/2.0))]
+	backPoints = [generateGridCoordinates(conceptIndex, rectangleY, totalNumberColumns, totalNumberFeatures, pointXOffset=-(float(rectangleWidth)/2.0), pointZOffset=(standaloneDrawEfficient3DLdrColumnDepth/2.0)), generateGridCoordinates(conceptIndex, rectangleY, totalNumberColumns, totalNumberFeatures, pointXOffset=(float(rectangleWidth)/2.0), pointZOffset=(standaloneDrawEfficient3DLdrColumnDepth/2.0)), generateGridCoordinates(conceptIndex, float(rectangleY) + float(rectangleHeight), totalNumberColumns, totalNumberFeatures, pointXOffset=(float(rectangleWidth)/2.0), pointZOffset=(standaloneDrawEfficient3DLdrColumnDepth/2.0)), generateGridCoordinates(conceptIndex, float(rectangleY) + float(rectangleHeight), totalNumberColumns, totalNumberFeatures, pointXOffset=-(float(rectangleWidth)/2.0), pointZOffset=(standaloneDrawEfficient3DLdrColumnDepth/2.0))]
+	result = (frontPoints, backPoints)
+	return result
+
+def getStandaloneDrawEfficientLdrLineEndpoints(totalNumberColumns, totalNumberFeatures, lineSegment):
+	if(lineSegment is None):
+		raise RuntimeError("getStandaloneDrawEfficientLdrLineEndpoints error: lineSegment is None")
+	if(len(lineSegment) != 2):
+		raise RuntimeError("getStandaloneDrawEfficientLdrLineEndpoints error: lineSegment must contain source and target positions")
+	lineStart = convertStandaloneDrawEfficientPointToLdrPosition(totalNumberColumns, totalNumberFeatures, lineSegment[0][0], lineSegment[0][1], 0.0)
+	lineEnd = convertStandaloneDrawEfficientPointToLdrPosition(totalNumberColumns, totalNumberFeatures, lineSegment[1][0], lineSegment[1][1], 0.0)
+	result = (lineStart, lineEnd)
+	return result
+
+def getStandaloneDrawEfficientLdrNodePosition(totalNumberColumns, totalNumberFeatures, nodeX, nodeY):
+	result = convertStandaloneDrawEfficientPointToLdrPosition(totalNumberColumns, totalNumberFeatures, nodeX, nodeY, 0.0)
+	return result
+
+def getStandaloneDrawEfficientLdrConceptIndex(pointX):
+	pointXFloat = float(pointX)
+	conceptIndex = int(round(pointXFloat))
+	if(not math.isclose(pointXFloat, float(conceptIndex), abs_tol=1.0e-6)):
+		raise RuntimeError(f"getStandaloneDrawEfficientLdrConceptIndex error: pointX {pointXFloat} does not identify a column centre")
+	result = conceptIndex
+	return result
+
+def getStandaloneDrawEfficientLdrHeightPosition(pointY):
+	result = -float(pointY) * standaloneDrawEfficient3DLdrFeatureSpacing
+	return result
+
+def calculateStandaloneDrawEfficientLdrPrismGridWidth(totalNumberColumns):
+	if(totalNumberColumns <= 0):
+		raise RuntimeError("calculateStandaloneDrawEfficientLdrPrismGridWidth error: totalNumberColumns must be > 0")
+	result = int(math.ceil(math.sqrt(float(totalNumberColumns))))
+	return result
+
+def generateGridCoordinates(conceptIndex, featureIndex, totalNumberColumns, totalNumberFeatures, pointXOffset=0.0, pointZOffset=0.0):
+	if(conceptIndex < 0):
+		raise RuntimeError("generateGridCoordinates error: conceptIndex must be >= 0")
+	if(totalNumberColumns <= 0):
+		raise RuntimeError("generateGridCoordinates error: totalNumberColumns must be > 0")
+	if(conceptIndex >= totalNumberColumns):
+		raise RuntimeError(f"generateGridCoordinates error: conceptIndex {conceptIndex} >= totalNumberColumns {totalNumberColumns}")
+	if(drawEfficientFormat3Dprism):
+		gridWidth = calculateStandaloneDrawEfficientLdrPrismGridWidth(totalNumberColumns)
+		gridColumnIndex = int(conceptIndex % gridWidth)
+		gridRowIndex = int(conceptIndex // gridWidth)
+		xPosition = (float(gridColumnIndex) + float(pointXOffset)) * standaloneDrawEfficient3DLdrColumnSpacing
+		zPosition = (float(gridRowIndex) * standaloneDrawEfficient3DLdrColumnSpacing) + float(pointZOffset)
+	else:
+		xPosition = (float(conceptIndex) + float(pointXOffset)) * standaloneDrawEfficient3DLdrColumnSpacing
+		zPosition = float(pointZOffset)
+	yPosition = getStandaloneDrawEfficientLdrHeightPosition(featureIndex)
+	result = (xPosition, yPosition, zPosition)
+	return result
+
+def convertStandaloneDrawEfficientPointToLdrPosition(totalNumberColumns, totalNumberFeatures, pointX, pointY, pointZ):
+	conceptIndex = getStandaloneDrawEfficientLdrConceptIndex(pointX)
+	result = generateGridCoordinates(conceptIndex, pointY, totalNumberColumns, totalNumberFeatures, pointXOffset=0.0, pointZOffset=pointZ)
+	return result
+
+def getStandaloneDrawEfficientLdrColourFromNodeColour(nodeColour):
+	if(nodeColour == GIAANNproto_databaseNetworkDraw.defaultColourConceptFeature):
+		result = standaloneDrawEfficient3DLdrColourConceptNode
+	elif(nodeColour == GIAANNproto_databaseNetworkDraw.defaultColourFeature):
+		result = standaloneDrawEfficient3DLdrColourFeatureNode
+	else:
+		raise RuntimeError(f"getStandaloneDrawEfficientLdrColourFromNodeColour error: unsupported node colour {nodeColour}")
+	return result
+
+def getStandaloneDrawEfficientLdrColourFromConnectionColour(connectionColour):
+	if(connectionColour == GIAANNproto_databaseNetworkDraw.defaultConnectionColourInternal):
+		result = standaloneDrawEfficient3DLdrColourInternalConnection
+	elif(connectionColour == GIAANNproto_databaseNetworkDraw.defaultConnectionColourExternal):
+		result = standaloneDrawEfficient3DLdrColourExternalConnection
+	else:
+		raise RuntimeError(f"getStandaloneDrawEfficientLdrColourFromConnectionColour error: unsupported connection colour {connectionColour}")
+	return result
+
+def resolveStandaloneDrawEfficient3DOutputFileName(fileName):
+	result = fileName
+	if(result is None):
+		raise RuntimeError("resolveStandaloneDrawEfficient3DOutputFileName error: fileName is None")
+	if(result.endswith(".svg") or result.endswith(".png")):
+		result = result[:-4] + ".ldr"
+	elif(not result.endswith(".ldr")):
+		result = result + ".ldr"
+	if(not os.path.isabs(result)):
+		result = os.path.join(databaseFolder, result)
+	return result
 
 def createStandaloneDrawEfficientFigure(figureWidth, figureHeight, save, display):
 	useStandaloneSvgCanvas = save and (not display) and drawNetworkSaveFormatVector
