@@ -86,7 +86,7 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 		featureConnectionsSegmentMask = None
 		processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos)
 	else:
-		featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos)
+		featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, useSparseSequenceConnections)
 
 	if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections and arrayIndexPropertiesPermanence):
 		decreasePermanenceActive(sequenceObservedColumns, featureNeuronsActiveUnion, featureNeuronsInactiveUnion, sequenceConceptIndexMask, featureNeuronsSegmentMask, featureConnectionsSegmentMask)
@@ -122,7 +122,7 @@ def processFeaturesActiveTrainSparseNeurons(sequenceObservedColumns, featureNeur
 		setSequenceFeatureNeuronsProperty(sequenceObservedColumns, databaseNetworkObject.arrayIndexPropertiesPosIndex, posSparse)
 	return
 
-def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos):
+def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, useSparseSequenceConnections):
 
 	if(useSANI):
 		featureConnectionsActive = None

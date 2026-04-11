@@ -13,3 +13,4 @@
 - To run the code; 1. cd proto, 2. /home/user/anaconda3/envs/pytorchsenv/bin/python GIAANNproto_main.py
 - Never declare variables, declare function arguments, or execute functions across multiple lines (assume the programmer IDE has a large horizontal view width and the programmer is capable of horizontal scrolling if necessary).
 - When arranging functions in a file, position parent functions above child functions (not below them).
+- When responding to prompt requests in point form, always enumerate your responses so the programmer can reference them systematically.

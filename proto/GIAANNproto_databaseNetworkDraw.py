@@ -17,6 +17,7 @@ GIA ANN proto database Network Draw
 
 """
 
+import os
 import networkx as nx
 import matplotlib.pyplot as plt
 import random
@@ -225,7 +226,20 @@ def getDelimiterFeatureColour(databaseNetworkObject, featureWord):
 		printe("conceptColumnsDelimitByPOS is required")
 	return delimiterColour
 
-def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=None):
+def resolveGraphOutputFileName(fileName):
+	result = fileName
+	if(result is None):
+		raise RuntimeError("resolveGraphOutputFileName error: fileName is None")
+	if(drawNetworkSaveFormatVector):
+		if(result.endswith(".png")):
+			result = result[:-4] + ".svg"
+		elif(not result.endswith(".svg")):
+			result = result + ".svg"
+	if(not os.path.isabs(result)):
+		result = os.path.join(databaseFolder, result)
+	return result
+
+def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=None, display=True):
 
 	if(inferenceMode):
 		drawSegments = drawSegmentsInference
@@ -284,11 +298,7 @@ def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=
 	plt.axis('off')  # Hide the axes
 	
 	if(save):
-		if(drawNetworkSaveFormatVector):
-			if(fileName.endswith(".png")):
-				fileName = fileName[:-4] + ".svg"
-			elif(not fileName.endswith(".svg")):
-				fileName = fileName + ".svg"
+		fileName = resolveGraphOutputFileName(fileName)
 		if(drawNetworkSaveFormatVector):
 			if(highResolutionFigure):
 				plt.savefig(fileName, dpi=saveFigDPI, format="svg")
@@ -299,562 +309,228 @@ def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=
 				plt.savefig(fileName, dpi=saveFigDPI)
 			else:
 				plt.savefig(fileName)
-		plt.clf()	
+		plt.clf()
+		plt.close()
 	else:
-		plt.show()
+		if(display):
+			plt.show()
+		else:
+			plt.close()
 
-if(drawSparseArrays):
-	def drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, drawRelationTypes, drawSegments, drawBranches, drawDelimiters, drawDefault, inferenceMode):
+def drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, drawRelationTypes, drawSegments, drawBranches, drawDelimiters, drawDefault, inferenceMode):
 
-		# Draw concept columns
-		posDict = {}
-		nodeNameMap = {}
-		xOffset = 0
-		for lemma, observedColumn in observedColumnsDict.items():
-			conceptIndex = observedColumn.conceptIndex
-			
-			if(drawSequenceObservedColumns):
-				featureWordToIndex = sequenceObservedColumns.featureWordToIndex
-				yOffset = 1 + 1	#reserve space at bottom of column for prime concept feature neuron
-				cIdx = sequenceObservedColumns.conceptNameToIndex[lemma]
-				featureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons, drawBranches)
-				if(drawBranches):
-					featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
-				featureNeurons = featureNeurons[:, :, cIdx]
-			else:
-				featureWordToIndex = observedColumn.featureWordToIndex
-				yOffset = 1
-				if not storeDatabaseGlobalFeatureNeuronsInRam:
-					featureNeurons = selectDrawBranch(observedColumn.featureNeurons, drawBranches)
-					if(drawBranches):
-						featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
-				else:
-					featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 3, conceptIndex)
-					featureNeurons = selectDrawBranch(featureNeurons, drawBranches)
-					if(drawBranches):
-						featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
-					#featureNeurons = databaseNetworkObject.globalFeatureNeurons[:, :, conceptIndex]	#operation not supported for sparse tensors
-			
-			# Draw feature neurons
-			for featureWord, featureIndexInObservedColumn in featureWordToIndex.items():
-				primeConceptNeuronFeature = False
-				if(useDedicatedConceptNames and useDedicatedConceptNames2):
-					if featureWord == variablePrimeConceptFeatureNeuronName:
-						neuronColor = defaultColourConceptFeature
-						neuronName = observedColumn.conceptName
-						primeConceptNeuronFeature = True
-						#print("\nvisualizeGraph: primeConceptNeuronFeature neuronName = ", neuronName)
-					else:
-						neuronColor = defaultColourFeature
-						neuronName = featureWord
-				else:
-					neuronColor = defaultColourFeature
-					neuronName = featureWord
-
-				fIdx = featureIndexInObservedColumn	#not used
-			
-				featurePresent = False
-				featureActive = False
-				if(neuronIsActive(featureNeurons, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndexInObservedColumn, "doNotEnforceActivationAcrossSegments")):	#if not useSANI: and neuronIsActive(featureNeurons, databaseNetworkObject.arrayIndexPropertiesPermanenceIndex, featureIndexInObservedColumn)
-					featurePresent = True
-				if(neuronIsActive(featureNeurons, databaseNetworkObject.arrayIndexPropertiesActivationIndex, featureIndexInObservedColumn, "doNotEnforceActivationAcrossSegments")):	#default: algorithmMatrixSANImethod
-					featureActive = True
-					
-				if(featurePresent):
-					if(drawRelationTypes):
-						if not primeConceptNeuronFeature:
-							if(useSANI and useSANIcolumns):
-								segmentIndex = arrayIndexSegmentAdjacentColumn #arrayIndexSegmentAdjacentColumn has a higher probability of being filled than arrayIndexSegmentLast
-							else:
-								segmentIndex = arrayIndexSegmentLast
-							if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
-								posValue = getFeaturePosValue(databaseNetworkObject, featureNeurons, featureIndexInObservedColumn, segmentIndex)
-								neuronColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, drawFeatureNodes=True)
-					elif(drawDelimiters):
-						if not primeConceptNeuronFeature:
-							delimiterColour = getDelimiterFeatureColour(databaseNetworkObject, featureWord)
-							if(delimiterColour is not None):
-								neuronColor = delimiterColour
-					elif(drawDefault):
-						if(featureActive):
-							if(primeConceptNeuronFeature):
-								neuronColor = defaultColourConceptFeatureActive
-							else:
-								neuronColor = defaultColourFeatureActive
-
-					if(inferenceMode):	
-						if(debugDrawNeuronActivations):
-							neuronName = createNeuronLabelWithActivation(neuronName, neuronActivationString(featureNeurons, databaseNetworkObject.arrayIndexPropertiesActivationIndex, featureIndexInObservedColumn))
-
-					featureNode = f"{lemma}_{featureWord}_{fIdx}"
-					if(randomiseColumnFeatureXposition and not primeConceptNeuronFeature):
-						xOffsetShuffled = xOffset + random.uniform(-0.5, 0.5)
-					else:
-						xOffsetShuffled = xOffset
-					if(drawSequenceObservedColumns and primeConceptNeuronFeature):
-						yOffsetPrev = yOffset
-						yOffset = 1
-					G.add_node(featureNode, pos=(xOffsetShuffled, yOffset), color=neuronColor, label=neuronName)
-					nodeNameMap[(lemma, featureIndexInObservedColumn)] = featureNode
-					if(drawSequenceObservedColumns and primeConceptNeuronFeature):
-						yOffset = yOffsetPrev
-					else:
-						yOffset += 1
-
-			# Draw rectangle around the column
-			plt.gca().add_patch(plt.Rectangle((xOffset - 0.5, -0.5), 1, max(yOffset, 1) + 0.5, fill=False, edgecolor='black'))
-			xOffset += 2  # Adjust xOffset for the next column
-
-		def buildSparseConnectionLookup(featureConnectionsSparse, drawSegments, drawBranches):
-			connectionLookup = {}
-			featureConnectionsSparse = featureConnectionsSparse.coalesce()
-			indices = featureConnectionsSparse.indices()
-			values = featureConnectionsSparse.values()
-			hasBranchDim = featureConnectionsSparse.dim() == 6
-			useBranchKey = drawBranches and hasBranchDim
-			for entryIndex in range(values.shape[0]):
-				propertyIndex = int(indices[0, entryIndex].item())
-				if(propertyIndex != databaseNetworkObject.arrayIndexPropertiesStrengthIndex and propertyIndex != databaseNetworkObject.arrayIndexPropertiesPermanenceIndex and propertyIndex != databaseNetworkObject.arrayIndexPropertiesPosIndex):
-					continue
-				if(hasBranchDim):
-					branchIndex = int(indices[1, entryIndex].item())
-					segmentIndex = int(indices[2, entryIndex].item())
-					sourceFeatureIndex = int(indices[3, entryIndex].item())
-					targetColumnIndex = int(indices[4, entryIndex].item())
-					targetFeatureIndex = int(indices[5, entryIndex].item())
-				else:
-					branchIndex = 0
-					segmentIndex = int(indices[1, entryIndex].item())
-					sourceFeatureIndex = int(indices[2, entryIndex].item())
-					targetColumnIndex = int(indices[3, entryIndex].item())
-					targetFeatureIndex = int(indices[4, entryIndex].item())
-				if(drawBranches and debugOnlyDrawBranchIndexConnections):
-					if(branchIndex != debugOnlyDrawBranchIndexX):
-						continue
-				if(drawSegments):
-					if(useBranchKey):
-						key = (branchIndex, segmentIndex, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex)
-					else:
-						key = (segmentIndex, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex)
-				else:
-					if(useBranchKey):
-						key = (branchIndex, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex)
-					else:
-						key = (sourceFeatureIndex, targetColumnIndex, targetFeatureIndex)
-				entry = connectionLookup.get(key)
-				if(entry is None):
-					entry = {"strength": 0.0, "permanence": 0.0, "pos": 0.0}
-					connectionLookup[key] = entry
-				value = float(values[entryIndex].item())
-				if(propertyIndex == databaseNetworkObject.arrayIndexPropertiesStrengthIndex):
-					entry["strength"] += value
-				elif(propertyIndex == databaseNetworkObject.arrayIndexPropertiesPermanenceIndex):
-					entry["permanence"] += value
-				else:
-					entry["pos"] += value
-			return connectionLookup
-
-		# Draw connections
-		for lemma, observedColumn in observedColumnsDict.items():
-				
-			conceptIndex = observedColumn.conceptIndex
-			if(drawSequenceObservedColumns):
-				featureWordToIndex = sequenceObservedColumns.featureWordToIndex
-				otherFeatureWordToIndex = sequenceObservedColumns.featureWordToIndex
-				cIdx = sequenceObservedColumns.conceptNameToIndex[lemma]
-				featureConnections = selectDrawBranch(sequenceObservedColumns.featureConnections, drawBranches)
-				if(featureConnections.dim() == 7):
-					featureConnections = featureConnections[:, :, :, cIdx]
-				else:
-					featureConnections = featureConnections[:, :, cIdx]
-			else:
-				featureWordToIndex = observedColumn.featureWordToIndex
-				otherFeatureWordToIndex = observedColumn.featureWordToIndex
-				cIdx = databaseNetworkObject.conceptColumnsDict[lemma]
-				featureConnections = selectDrawBranch(observedColumn.materialiseFeatureConnections(loadAllStored=True, targetDevice=deviceSparse), drawBranches)
-			if(drawRelationTypesConnectionsFromSource):
-				sourceFeatureNeurons = None
-				if(drawRelationTypes):
-					relationSegmentIndex = arrayIndexSegmentLast
-					if(useSANI and useSANIcolumns):
-						relationSegmentIndex = arrayIndexSegmentAdjacentColumn
-					if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
-						if(drawSequenceObservedColumns):
-							sourceFeatureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons, drawBranches)
-							if(drawBranches):
-								sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
-							sourceFeatureNeurons = sourceFeatureNeurons[:, :, cIdx]
-						else:
-							if not storeDatabaseGlobalFeatureNeuronsInRam:
-								sourceFeatureNeurons = selectDrawBranch(observedColumn.featureNeurons, drawBranches)
-								if(drawBranches):
-									sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
-							else:
-								sourceFeatureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 3, conceptIndex)
-								sourceFeatureNeurons = selectDrawBranch(sourceFeatureNeurons, drawBranches)
-								if(drawBranches):
-									sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
-			useSparseConnections = featureConnections.is_sparse and not drawSequenceObservedColumns
-			if(useSparseConnections):
-				hasBranchDim = featureConnections.dim() == 6
-				useBranchKey = drawBranches and hasBranchDim
-				connectionLookup = buildSparseConnectionLookup(featureConnections, drawSegments, drawBranches)
-				sourceFeatureIndexToWord = observedColumn.featureIndexToWord
-				for key, entry in connectionLookup.items():
-					branchIndex = 0
-					if(drawSegments):
-						if(useBranchKey):
-							branchIndex, segmentIndex, fIdx, otherCIdx, otherFIdx = key
-						else:
-							segmentIndex, fIdx, otherCIdx, otherFIdx = key
-					else:
-						segmentIndex = None
-						if(useBranchKey):
-							branchIndex, fIdx, otherCIdx, otherFIdx = key
-						else:
-							fIdx, otherCIdx, otherFIdx = key
-					if(entry["strength"] <= 0 or entry["permanence"] <= 0):
-						continue
-					sourceFeatureWord = sourceFeatureIndexToWord.get(fIdx)
-					if(sourceFeatureWord is None):
-						continue
-					sourceNode = f"{lemma}_{sourceFeatureWord}_{fIdx}"
-					if not G.has_node(sourceNode):
-						continue
-					internalConnection = (otherCIdx == cIdx)
-					if(internalConnection and fIdx == otherFIdx):
-						continue
-					if(otherCIdx < 0 or otherCIdx >= len(databaseNetworkObject.conceptColumnsList)):
-						continue
-					otherLemma = databaseNetworkObject.conceptColumnsList[otherCIdx]
-					otherObservedColumn = observedColumnsDict.get(otherLemma)
-					if(otherObservedColumn is None):
-						continue
-					targetFeatureWord = otherObservedColumn.featureIndexToWord.get(otherFIdx)
-					if(targetFeatureWord is None):
-						continue
-					targetNode = f"{otherLemma}_{targetFeatureWord}_{otherFIdx}"
-					if not G.has_node(targetNode):
-						continue
-					if(drawSegments):
-						connectionColor = segmentColours[segmentIndex]
-					elif(drawBranches):
-						connectionColor = branchColours[branchIndex]
-					elif(drawRelationTypes):
-						if(drawRelationTypesConnectionsFromSource):
-							if(sourceFeatureNeurons is not None):
-								posValue = getFeaturePosValue(databaseNetworkObject, sourceFeatureNeurons, fIdx, relationSegmentIndex)
-								connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, sourceFeatureWord, internalConnection=internalConnection)
-							else:
-								connectionColor = relationTypeOtherCol
-						else:
-							posValueTensor = pt.tensor(entry["pos"])
-							connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValueTensor, sourceFeatureWord, internalConnection=internalConnection)
-					elif(drawDelimiters):
-						if(internalConnection):
-							connectionColor = defaultConnectionColourInternal
-						else:
-							delimiterColour = getDelimiterFeatureColour(databaseNetworkObject, sourceFeatureWord)
-							if(delimiterColour is not None):
-								connectionColor = delimiterColour
-							else:
-								connectionColor = defaultConnectionColourExternal
-					elif(drawDefault):
-						connectionColor = defaultConnectionColourInternal if internalConnection else defaultConnectionColourExternal
-					G.add_edge(sourceNode, targetNode, color=connectionColor)
-			else:
-				hasBranchDim = featureConnections.dim() == 6
-				if(drawSegments):
-					if featureConnections.is_sparse:
-						featureConnections = featureConnections.to_dense()
-					numberOfSegmentsToIterate = arrayNumberOfSegments
-				else:
-					numberOfSegmentsToIterate = 1
-					if(hasBranchDim):
-						featureConnectionsCollapsed = pt.sum(featureConnections, dim=2)	#sum along sequential segment index (draw connections to all segments)
-					else:
-						featureConnectionsCollapsed = pt.sum(featureConnections, dim=1)	#sum along sequential segment index (draw connections to all segments)
-				if(drawBranches and hasBranchDim):
-					if(debugOnlyDrawBranchIndexConnections):
-						if(debugOnlyDrawBranchIndexX >= 0 and debugOnlyDrawBranchIndexX < featureConnections.size(1)):
-							branchIndices = [debugOnlyDrawBranchIndexX]
-						else:
-							branchIndices = []
-					else:
-						branchIndices = range(featureConnections.size(1))
-				else:
-					if(drawBranches and debugOnlyDrawBranchIndexConnections):
-						if(debugOnlyDrawBranchIndexX == 0):
-							branchIndices = [0]
-						else:
-							branchIndices = []
-					else:
-						branchIndices = [0]
+	# Draw concept columns
+	posDict = {}
+	nodeNameMap = {}
+	xOffset = 0
+	for lemma, observedColumn in observedColumnsDict.items():
+		conceptIndex = observedColumn.conceptIndex
 		
-				# Internal connections (yellow)
-				for branchIndex in branchIndices:
-					for segmentIndex in range(numberOfSegmentsToIterate):
-						if(drawSegments):
-							if(hasBranchDim):
-								featureConnectionsSegment = featureConnections[:, branchIndex, segmentIndex]
-							else:
-								featureConnectionsSegment =	featureConnections[:, segmentIndex]
-						else:
-							if(hasBranchDim):
-								if(featureConnectionsCollapsed.is_sparse):
-									featureConnectionsSegment = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsCollapsed, 1, branchIndex)
-								else:
-									featureConnectionsSegment = featureConnectionsCollapsed[:, branchIndex]
-							else:
-								featureConnectionsSegment = featureConnectionsCollapsed
-
-						for featureWord, featureIndexInObservedColumn in featureWordToIndex.items():
-							sourceNode = f"{lemma}_{featureWord}_{featureIndexInObservedColumn}"
-							if G.has_node(sourceNode):
-								for otherFeatureWord, otherFeatureIndexInObservedColumn in featureWordToIndex.items():
-									targetNode = f"{lemma}_{otherFeatureWord}_{otherFeatureIndexInObservedColumn}"
-									if G.has_node(targetNode):
-										if featureWord != otherFeatureWord:
-											fIdx = featureWordToIndex[featureWord]
-											otherFIdx = featureWordToIndex[otherFeatureWord]
-											
-											featurePresent = False
-											if(databaseNetworkObject.arrayIndexPropertiesPermanenceIndex is not None):
-												if(featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, fIdx, cIdx, otherFIdx] > 0 and featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesPermanenceIndex, fIdx, cIdx, otherFIdx] > 0):
-													featurePresent = True
-											else:
-												if(featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, fIdx, cIdx, otherFIdx] > 0):
-													featurePresent = True
-											
-											if(drawSegments):
-												connectionColor = segmentColours[segmentIndex]
-											elif(drawBranches):
-												connectionColor = branchColours[branchIndex]
-											elif(drawRelationTypes):
-												if(drawRelationTypesConnectionsFromSource):
-													if(sourceFeatureNeurons is not None):
-														posValue = getFeaturePosValue(databaseNetworkObject, sourceFeatureNeurons, fIdx, relationSegmentIndex)
-														connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, internalConnection=True)
-													else:
-														connectionColor = relationTypeOtherCol
-												else:
-													if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
-														connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesPosIndex, fIdx, cIdx, otherFIdx], featureWord, internalConnection=True)
-													else:
-														connectionColor = defaultConnectionColourExternal
-											elif(drawDelimiters):
-												connectionColor = defaultConnectionColourInternal
-											elif(drawDefault):
-												connectionColor = defaultConnectionColourInternal
-												
-											if(featurePresent):
-												G.add_edge(sourceNode, targetNode, color=connectionColor)
-					
-						# External connections (orange)
-						for featureWord, featureIndexInObservedColumn in featureWordToIndex.items():
-							sourceNode = f"{lemma}_{featureWord}_{featureIndexInObservedColumn}"
-							if G.has_node(sourceNode):
-								for otherLemma, otherObservedColumn in observedColumnsDict.items():
-									if(drawSequenceObservedColumns):
-										otherFeatureWordToIndex = sequenceObservedColumns.featureWordToIndex
-									else:
-										otherFeatureWordToIndex = otherObservedColumn.featureWordToIndex
-									for otherFeatureWord, otherFeatureIndexInObservedColumn in otherFeatureWordToIndex.items():
-										targetNode = f"{otherLemma}_{otherFeatureWord}_{otherFeatureIndexInObservedColumn}"
-										if G.has_node(targetNode):
-											fIdx = featureWordToIndex[featureWord]
-											otherFIdx = otherFeatureWordToIndex[otherFeatureWord]
-											
-											externalConnection = False
-											if(drawSequenceObservedColumns):
-												otherCIdx = sequenceObservedColumns.conceptNameToIndex[otherLemma]
-												if otherCIdx != cIdx:
-													externalConnection = True
-											else:
-												otherCIdx = databaseNetworkObject.conceptColumnsDict[otherLemma]
-												if lemma != otherLemma:
-													externalConnection = True
-									
-											featurePresent = False
-											if(externalConnection):
-												if(databaseNetworkObject.arrayIndexPropertiesPermanenceIndex is not None):
-													if(featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, fIdx, otherCIdx, otherFIdx] > 0 and featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesPermanenceIndex, fIdx, otherCIdx, otherFIdx] > 0):
-														featurePresent = True
-												else:
-													if(featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, fIdx, otherCIdx, otherFIdx] > 0):
-														featurePresent = True
-
-											if(drawSegments):
-												connectionColor = segmentColours[segmentIndex]
-											elif(drawBranches):
-												connectionColor = branchColours[branchIndex]
-											elif(drawRelationTypes):
-												if(drawRelationTypesConnectionsFromSource):
-													if(sourceFeatureNeurons is not None):
-														posValue = getFeaturePosValue(databaseNetworkObject, sourceFeatureNeurons, fIdx, relationSegmentIndex)
-														connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, internalConnection=False)
-													else:
-														connectionColor = relationTypeOtherCol
-												else:
-													if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
-														connectionColor = generateFeatureNeuronColour(databaseNetworkObject, featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesPosIndex, fIdx, otherCIdx, otherFIdx], featureWord, internalConnection=False)
-													else:
-														connectionColor = defaultConnectionColourExternal
-											elif(drawDelimiters):
-												delimiterColour = getDelimiterFeatureColour(databaseNetworkObject, featureWord)
-												if(delimiterColour is not None):
-													connectionColor = delimiterColour
-												else:
-													connectionColor = defaultConnectionColourExternal
-											elif(drawDefault):
-												connectionColor = defaultConnectionColourExternal
-												
-											if(featurePresent):
-												G.add_edge(sourceNode, targetNode, color=connectionColor)
-		return nodeNameMap
-else:
-	def drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, drawRelationTypes, drawSegments, drawBranches, drawDelimiters, drawDefault, inferenceMode):
-
-		# Draw concept columns
-		posDict = {}
-		nodeNameMap = {}
-		xOffset = 0
-		for lemma, observedColumn in observedColumnsDict.items():
-			conceptIndex = observedColumn.conceptIndex
-			
-			if(drawSequenceObservedColumns):
-				featureWordToIndex = sequenceObservedColumns.featureWordToIndex
-				yOffset = 1 + 1	#reserve space at bottom of column for prime concept feature neuron
-				cIdx = sequenceObservedColumns.conceptNameToIndex[lemma]
-				featureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons, drawBranches)
+		if(drawSequenceObservedColumns):
+			featureWordToIndex = sequenceObservedColumns.featureWordToIndex
+			yOffset = 1 + 1	#reserve space at bottom of column for prime concept feature neuron
+			cIdx = sequenceObservedColumns.conceptNameToIndex[lemma]
+			featureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons, drawBranches)
+			if(drawBranches):
+				featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
+			featureNeurons = featureNeurons[:, :, cIdx]
+		else:
+			featureWordToIndex = observedColumn.featureWordToIndex
+			yOffset = 1
+			if not storeDatabaseGlobalFeatureNeuronsInRam:
+				featureNeurons = selectDrawBranch(observedColumn.featureNeurons, drawBranches)
 				if(drawBranches):
 					featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
-				featureNeurons = featureNeurons[:, :, cIdx]
 			else:
-				featureWordToIndex = observedColumn.featureWordToIndex
-				yOffset = 1
-				if not storeDatabaseGlobalFeatureNeuronsInRam:
-					featureNeurons = selectDrawBranch(observedColumn.featureNeurons, drawBranches)
-					if(drawBranches):
-						featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
-				else:
-					featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 3, conceptIndex)
-					featureNeurons = selectDrawBranch(featureNeurons, drawBranches)
-					if(drawBranches):
-						featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
-					#featureNeurons = databaseNetworkObject.globalFeatureNeurons[:, :, conceptIndex]	#operation not supported for sparse tensors
-			
-			# Draw feature neurons
-			for featureWord, featureIndexInObservedColumn in featureWordToIndex.items():
-				primeConceptNeuronFeature = False
-				if(useDedicatedConceptNames and useDedicatedConceptNames2):
-					if featureWord == variablePrimeConceptFeatureNeuronName:
-						neuronColor = defaultColourConceptFeature
-						neuronName = observedColumn.conceptName
-						primeConceptNeuronFeature = True
-						#print("\nvisualizeGraph: primeConceptNeuronFeature neuronName = ", neuronName)
-					else:
-						neuronColor = defaultColourFeature
-						neuronName = featureWord
+				featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 3, conceptIndex)
+				featureNeurons = selectDrawBranch(featureNeurons, drawBranches)
+				if(drawBranches):
+					featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
+				#featureNeurons = databaseNetworkObject.globalFeatureNeurons[:, :, conceptIndex]	#operation not supported for sparse tensors
+		
+		# Draw feature neurons
+		for featureWord, featureIndexInObservedColumn in featureWordToIndex.items():
+			primeConceptNeuronFeature = False
+			if(useDedicatedConceptNames and useDedicatedConceptNames2):
+				if featureWord == variablePrimeConceptFeatureNeuronName:
+					neuronColor = defaultColourConceptFeature
+					neuronName = observedColumn.conceptName
+					primeConceptNeuronFeature = True
+					#print("\nvisualizeGraph: primeConceptNeuronFeature neuronName = ", neuronName)
 				else:
 					neuronColor = defaultColourFeature
 					neuronName = featureWord
-
-				fIdx = featureIndexInObservedColumn	#not used
-			
-				featurePresent = False
-				featureActive = False
-				if(neuronIsActive(featureNeurons, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndexInObservedColumn, "doNotEnforceActivationAcrossSegments")):	#if not useSANI: and neuronIsActive(featureNeurons, databaseNetworkObject.arrayIndexPropertiesPermanenceIndex, featureIndexInObservedColumn)
-					featurePresent = True
-				if(neuronIsActive(featureNeurons, databaseNetworkObject.arrayIndexPropertiesActivationIndex, featureIndexInObservedColumn, "doNotEnforceActivationAcrossSegments")):	#default: algorithmMatrixSANImethod
-					featureActive = True
-					
-				if(featurePresent):
-					if(drawRelationTypes):
-						if not primeConceptNeuronFeature:
-							if(useSANI and useSANIcolumns):
-								segmentIndex = arrayIndexSegmentAdjacentColumn #arrayIndexSegmentAdjacentColumn has a higher probability of being filled than arrayIndexSegmentLast
-							else:
-								segmentIndex = arrayIndexSegmentLast
-							if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
-								posValue = getFeaturePosValue(databaseNetworkObject, featureNeurons, featureIndexInObservedColumn, segmentIndex)
-								neuronColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, drawFeatureNodes=True)
-					elif(drawDelimiters):
-						if not primeConceptNeuronFeature:
-							delimiterColour = getDelimiterFeatureColour(databaseNetworkObject, featureWord)
-							if(delimiterColour is not None):
-								neuronColor = delimiterColour
-					elif(drawDefault):
-						if(featureActive):
-							if(primeConceptNeuronFeature):
-								neuronColor = defaultColourConceptFeatureActive
-							else:
-								neuronColor = defaultColourFeatureActive
-
-					if(inferenceMode):	
-						if(debugDrawNeuronActivations):
-							neuronName = createNeuronLabelWithActivation(neuronName, neuronActivationString(featureNeurons, databaseNetworkObject.arrayIndexPropertiesActivationIndex, featureIndexInObservedColumn))
-
-					featureNode = f"{lemma}_{featureWord}_{fIdx}"
-					if(randomiseColumnFeatureXposition and not primeConceptNeuronFeature):
-						xOffsetShuffled = xOffset + random.uniform(-0.5, 0.5)
-					else:
-						xOffsetShuffled = xOffset
-					if(drawSequenceObservedColumns and primeConceptNeuronFeature):
-						yOffsetPrev = yOffset
-						yOffset = 1
-					G.add_node(featureNode, pos=(xOffsetShuffled, yOffset), color=neuronColor, label=neuronName)
-					nodeNameMap[(lemma, featureIndexInObservedColumn)] = featureNode
-					if(drawSequenceObservedColumns and primeConceptNeuronFeature):
-						yOffset = yOffsetPrev
-					else:
-						yOffset += 1
-
-			# Draw rectangle around the column
-			plt.gca().add_patch(plt.Rectangle((xOffset - 0.5, -0.5), 1, max(yOffset, 1) + 0.5, fill=False, edgecolor='black'))
-			xOffset += 2  # Adjust xOffset for the next column
-
-		# Draw connections
-		for lemma, observedColumn in observedColumnsDict.items():
-			
-			conceptIndex = observedColumn.conceptIndex
-			if(drawSequenceObservedColumns):
-				featureWordToIndex = sequenceObservedColumns.featureWordToIndex
-				otherFeatureWordToIndex = sequenceObservedColumns.featureWordToIndex
-				cIdx = sequenceObservedColumns.conceptNameToIndex[lemma]
-				featureConnections = selectDrawBranch(sequenceObservedColumns.featureConnections, drawBranches)
-				if(featureConnections.dim() == 7):
-					featureConnections = featureConnections[:, :, :, cIdx]
-				else:
-					featureConnections = featureConnections[:, :, cIdx]
 			else:
-				featureWordToIndex = observedColumn.featureWordToIndex
-				otherFeatureWordToIndex = observedColumn.featureWordToIndex
-				cIdx = databaseNetworkObject.conceptColumnsDict[lemma]
-				featureConnections = selectDrawBranch(observedColumn.materialiseFeatureConnections(loadAllStored=True, targetDevice=deviceSparse), drawBranches)
-			if(drawRelationTypesConnectionsFromSource):
-				sourceFeatureNeurons = None
+				neuronColor = defaultColourFeature
+				neuronName = featureWord
+
+			fIdx = featureIndexInObservedColumn	#not used
+		
+			featurePresent = False
+			featureActive = False
+			if(neuronIsActive(featureNeurons, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndexInObservedColumn, "doNotEnforceActivationAcrossSegments")):
+				featurePresent = True
+			if(neuronIsActive(featureNeurons, databaseNetworkObject.arrayIndexPropertiesActivationIndex, featureIndexInObservedColumn, "doNotEnforceActivationAcrossSegments")):
+				featureActive = True
+				
+			if(featurePresent):
 				if(drawRelationTypes):
-					relationSegmentIndex = arrayIndexSegmentLast
-					if(useSANI and useSANIcolumns):
-						relationSegmentIndex = arrayIndexSegmentAdjacentColumn
-					if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
-						if(drawSequenceObservedColumns):
-							sourceFeatureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons, drawBranches)
+					if not primeConceptNeuronFeature:
+						if(useSANI and useSANIcolumns):
+							segmentIndex = arrayIndexSegmentAdjacentColumn #arrayIndexSegmentAdjacentColumn has a higher probability of being filled than arrayIndexSegmentLast
+						else:
+							segmentIndex = arrayIndexSegmentLast
+						if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
+							posValue = getFeaturePosValue(databaseNetworkObject, featureNeurons, featureIndexInObservedColumn, segmentIndex)
+							neuronColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, featureWord, drawFeatureNodes=True)
+				elif(drawDelimiters):
+					if not primeConceptNeuronFeature:
+						delimiterColour = getDelimiterFeatureColour(databaseNetworkObject, featureWord)
+						if(delimiterColour is not None):
+							neuronColor = delimiterColour
+				elif(drawDefault):
+					if(featureActive):
+						if(primeConceptNeuronFeature):
+							neuronColor = defaultColourConceptFeatureActive
+						else:
+							neuronColor = defaultColourFeatureActive
+
+				if(inferenceMode):	
+					if(debugDrawNeuronActivations):
+						neuronName = createNeuronLabelWithActivation(neuronName, neuronActivationString(featureNeurons, databaseNetworkObject.arrayIndexPropertiesActivationIndex, featureIndexInObservedColumn))
+
+				featureNode = f"{lemma}_{featureWord}_{fIdx}"
+				if(randomiseColumnFeatureXposition and not primeConceptNeuronFeature):
+					xOffsetShuffled = xOffset + random.uniform(-0.5, 0.5)
+				else:
+					xOffsetShuffled = xOffset
+				if(drawSequenceObservedColumns and primeConceptNeuronFeature):
+					yOffsetPrev = yOffset
+					yOffset = 1
+				G.add_node(featureNode, pos=(xOffsetShuffled, yOffset), color=neuronColor, label=neuronName)
+				nodeNameMap[(lemma, featureIndexInObservedColumn)] = featureNode
+				if(drawSequenceObservedColumns and primeConceptNeuronFeature):
+					yOffset = yOffsetPrev
+				else:
+					yOffset += 1
+
+		# Draw rectangle around the column
+		plt.gca().add_patch(plt.Rectangle((xOffset - 0.5, -0.5), 1, max(yOffset, 1) + 0.5, fill=False, edgecolor='black'))
+		xOffset += 2  # Adjust xOffset for the next column
+
+	# Draw connections
+	for lemma, observedColumn in observedColumnsDict.items():
+		
+		conceptIndex = observedColumn.conceptIndex
+		if(drawSequenceObservedColumns):
+			featureWordToIndex = sequenceObservedColumns.featureWordToIndex
+			otherFeatureWordToIndex = sequenceObservedColumns.featureWordToIndex
+			cIdx = sequenceObservedColumns.conceptNameToIndex[lemma]
+			featureConnections = selectDrawBranch(sequenceObservedColumns.featureConnections, drawBranches)
+			if(featureConnections.dim() == 7):
+				featureConnections = featureConnections[:, :, :, cIdx]
+			else:
+				featureConnections = featureConnections[:, :, cIdx]
+		else:
+			featureWordToIndex = observedColumn.featureWordToIndex
+			otherFeatureWordToIndex = observedColumn.featureWordToIndex
+			cIdx = databaseNetworkObject.conceptColumnsDict[lemma]
+			featureConnections = selectDrawBranch(observedColumn.materialiseFeatureConnections(loadAllStored=True, targetDevice=deviceSparse), drawBranches)
+		if(drawRelationTypesConnectionsFromSource):
+			sourceFeatureNeurons = None
+			if(drawRelationTypes):
+				relationSegmentIndex = arrayIndexSegmentLast
+				if(useSANI and useSANIcolumns):
+					relationSegmentIndex = arrayIndexSegmentAdjacentColumn
+				if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
+					if(drawSequenceObservedColumns):
+						sourceFeatureNeurons = selectDrawBranch(sequenceObservedColumns.featureNeurons, drawBranches)
+						if(drawBranches):
+							sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
+						sourceFeatureNeurons = sourceFeatureNeurons[:, :, cIdx]
+					else:
+						if not storeDatabaseGlobalFeatureNeuronsInRam:
+							sourceFeatureNeurons = selectDrawBranch(observedColumn.featureNeurons, drawBranches)
 							if(drawBranches):
 								sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
-							sourceFeatureNeurons = sourceFeatureNeurons[:, :, cIdx]
 						else:
-							if not storeDatabaseGlobalFeatureNeuronsInRam:
-								sourceFeatureNeurons = selectDrawBranch(observedColumn.featureNeurons, drawBranches)
-								if(drawBranches):
-									sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
-							else:
-								sourceFeatureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 3, conceptIndex)
-								sourceFeatureNeurons = selectDrawBranch(sourceFeatureNeurons, drawBranches)
-								if(drawBranches):
-									sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
-			
+							sourceFeatureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 3, conceptIndex)
+							sourceFeatureNeurons = selectDrawBranch(sourceFeatureNeurons, drawBranches)
+							if(drawBranches):
+								sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
+		if(drawSparseArrays and featureConnections.is_sparse and not drawSequenceObservedColumns):
+			#print("drawSparseArrays")
+			hasBranchDim = featureConnections.dim() == 6
+			useBranchKey = drawBranches and hasBranchDim
+			connectionLookup = buildDrawConnectionLookup(featureConnections, databaseNetworkObject, drawSegments, drawBranches)
+			sourceFeatureIndexToWord = observedColumn.featureIndexToWord
+			for key, entry in connectionLookup.items():
+				branchIndex = 0
+				if(drawSegments):
+					if(useBranchKey):
+						branchIndex, segmentIndex, fIdx, otherCIdx, otherFIdx = key
+					else:
+						segmentIndex, fIdx, otherCIdx, otherFIdx = key
+				else:
+					segmentIndex = None
+					if(useBranchKey):
+						branchIndex, fIdx, otherCIdx, otherFIdx = key
+					else:
+						fIdx, otherCIdx, otherFIdx = key
+				if(entry["strength"] <= 0):
+					continue
+				sourceFeatureWord = sourceFeatureIndexToWord.get(fIdx)
+				if(sourceFeatureWord is None):
+					continue
+				sourceNode = f"{lemma}_{sourceFeatureWord}_{fIdx}"
+				if not G.has_node(sourceNode):
+					continue
+				internalConnection = (otherCIdx == cIdx)
+				if(internalConnection and fIdx == otherFIdx):
+					continue
+				if(otherCIdx < 0 or otherCIdx >= len(databaseNetworkObject.conceptColumnsList)):
+					continue
+				otherLemma = databaseNetworkObject.conceptColumnsList[otherCIdx]
+				otherObservedColumn = observedColumnsDict.get(otherLemma)
+				if(otherObservedColumn is None):
+					continue
+				targetFeatureWord = otherObservedColumn.featureIndexToWord.get(otherFIdx)
+				if(targetFeatureWord is None):
+					continue
+				targetNode = f"{otherLemma}_{targetFeatureWord}_{otherFIdx}"
+				if not G.has_node(targetNode):
+					continue
+				if(drawSegments):
+					connectionColor = segmentColours[segmentIndex]
+				elif(drawBranches):
+					connectionColor = branchColours[branchIndex]
+				elif(drawRelationTypes):
+					if(drawRelationTypesConnectionsFromSource):
+						if(sourceFeatureNeurons is not None):
+							posValue = getFeaturePosValue(databaseNetworkObject, sourceFeatureNeurons, fIdx, relationSegmentIndex)
+							connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValue, sourceFeatureWord, internalConnection=internalConnection)
+						else:
+							connectionColor = relationTypeOtherCol
+					else:
+						if(databaseNetworkObject.arrayIndexPropertiesPosIndex is not None):
+							posValueTensor = pt.tensor(entry["pos"], dtype=arrayType)
+							connectionColor = generateFeatureNeuronColour(databaseNetworkObject, posValueTensor, sourceFeatureWord, internalConnection=internalConnection)
+						else:
+							connectionColor = defaultConnectionColourExternal
+				elif(drawDelimiters):
+					if(internalConnection):
+						connectionColor = defaultConnectionColourInternal
+					else:
+						delimiterColour = getDelimiterFeatureColour(databaseNetworkObject, sourceFeatureWord)
+						if(delimiterColour is not None):
+							connectionColor = delimiterColour
+						else:
+							connectionColor = defaultConnectionColourExternal
+				elif(drawDefault):
+					connectionColor = defaultConnectionColourInternal if internalConnection else defaultConnectionColourExternal
+				G.add_edge(sourceNode, targetNode, color=connectionColor)
+		else:
+			#print("drawDenseArrays")
 			hasBranchDim = featureConnections.dim() == 6
 			if(drawSegments):
 				if featureConnections.is_sparse:
@@ -882,7 +558,7 @@ else:
 						branchIndices = []
 				else:
 					branchIndices = [0]
-		
+	
 			# Internal connections (yellow)
 			for branchIndex in branchIndices:
 				for segmentIndex in range(numberOfSegmentsToIterate):
@@ -910,13 +586,7 @@ else:
 										fIdx = featureWordToIndex[featureWord]
 										otherFIdx = featureWordToIndex[otherFeatureWord]
 										
-										featurePresent = False
-										if(databaseNetworkObject.arrayIndexPropertiesPermanenceIndex is not None):
-											if(featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, fIdx, cIdx, otherFIdx] > 0 and featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesPermanenceIndex, fIdx, cIdx, otherFIdx] > 0):
-												featurePresent = True
-										else:
-											if(featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, fIdx, cIdx, otherFIdx] > 0):
-												featurePresent = True
+										featurePresent = connectionStrengthPresent(featureConnectionsSegment, databaseNetworkObject, fIdx, cIdx, otherFIdx)
 										
 										if(drawSegments):
 											connectionColor = segmentColours[segmentIndex]
@@ -941,7 +611,7 @@ else:
 											
 										if(featurePresent):
 											G.add_edge(sourceNode, targetNode, color=connectionColor)
-			
+		
 					# External connections (orange)
 					for featureWord, featureIndexInObservedColumn in featureWordToIndex.items():
 						sourceNode = f"{lemma}_{featureWord}_{featureIndexInObservedColumn}"
@@ -969,12 +639,7 @@ else:
 								
 										featurePresent = False
 										if(externalConnection):
-											if(databaseNetworkObject.arrayIndexPropertiesPermanenceIndex is not None):
-												if(featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, fIdx, otherCIdx, otherFIdx] > 0 and featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesPermanenceIndex, fIdx, otherCIdx, otherFIdx] > 0):
-													featurePresent = True
-											else:
-												if(featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, fIdx, otherCIdx, otherFIdx] > 0):
-													featurePresent = True
+											featurePresent = connectionStrengthPresent(featureConnectionsSegment, databaseNetworkObject, fIdx, otherCIdx, otherFIdx)
 
 										if(drawSegments):
 											connectionColor = segmentColours[segmentIndex]
@@ -1000,10 +665,70 @@ else:
 												connectionColor = defaultConnectionColourExternal
 										elif(drawDefault):
 											connectionColor = defaultConnectionColourExternal
-											
+										
 										if(featurePresent):
 											G.add_edge(sourceNode, targetNode, color=connectionColor)
-		return nodeNameMap
+	return nodeNameMap
+
+def buildDrawConnectionLookup(featureConnectionsSparse, databaseNetworkObject, drawSegments, drawBranches):
+	connectionLookup = {}
+	featureConnectionsSparse = featureConnectionsSparse.coalesce()
+	indices = featureConnectionsSparse.indices()
+	values = featureConnectionsSparse.values()
+	hasBranchDim = featureConnectionsSparse.dim() == 6
+	useBranchKey = drawBranches and hasBranchDim
+	posIndexEnabled = databaseNetworkObject.arrayIndexPropertiesPosIndex is not None
+	for entryIndex in range(values.shape[0]):
+		propertyIndex = int(indices[0, entryIndex].item())
+		validPropertyIndex = propertyIndex == databaseNetworkObject.arrayIndexPropertiesStrengthIndex
+		if(posIndexEnabled):
+			if(propertyIndex == databaseNetworkObject.arrayIndexPropertiesPosIndex):
+				validPropertyIndex = True
+		if(not validPropertyIndex):
+			continue
+		if(hasBranchDim):
+			branchIndex = int(indices[1, entryIndex].item())
+			segmentIndex = int(indices[2, entryIndex].item())
+			sourceFeatureIndex = int(indices[3, entryIndex].item())
+			targetColumnIndex = int(indices[4, entryIndex].item())
+			targetFeatureIndex = int(indices[5, entryIndex].item())
+		else:
+			branchIndex = 0
+			segmentIndex = int(indices[1, entryIndex].item())
+			sourceFeatureIndex = int(indices[2, entryIndex].item())
+			targetColumnIndex = int(indices[3, entryIndex].item())
+			targetFeatureIndex = int(indices[4, entryIndex].item())
+		if(drawBranches and debugOnlyDrawBranchIndexConnections):
+			if(branchIndex != debugOnlyDrawBranchIndexX):
+				continue
+		if(drawSegments):
+			if(useBranchKey):
+				key = (branchIndex, segmentIndex, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex)
+			else:
+				key = (segmentIndex, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex)
+		else:
+			if(useBranchKey):
+				key = (branchIndex, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex)
+			else:
+				key = (sourceFeatureIndex, targetColumnIndex, targetFeatureIndex)
+		entry = connectionLookup.get(key)
+		if(entry is None):
+			entry = {"strength": 0.0, "pos": 0.0}
+			connectionLookup[key] = entry
+		value = float(values[entryIndex].item())
+		if(propertyIndex == databaseNetworkObject.arrayIndexPropertiesStrengthIndex):
+			entry["strength"] += value
+		elif(posIndexEnabled and propertyIndex == databaseNetworkObject.arrayIndexPropertiesPosIndex):
+			entry["pos"] += value
+	return connectionLookup
+
+def connectionStrengthPresent(featureConnectionsSegment, databaseNetworkObject, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex):
+	result = False
+	if(databaseNetworkObject.arrayIndexPropertiesStrengthIndex is None):
+		raise RuntimeError("connectionStrengthPresent error: databaseNetworkObject.arrayIndexPropertiesStrengthIndex is None")
+	if(featureConnectionsSegment[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, sourceFeatureIndex, targetColumnIndex, targetFeatureIndex] > 0):
+		result = True
+	return result
 
 
 

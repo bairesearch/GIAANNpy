@@ -728,3 +728,26 @@ v1m (Codex IDE GPT-5.4) [under development]:
 	To count the number of assigned neurons; if any branch segment strength value for a given column feature is > 0, then count this as one neuron. 
 	In countParametersAndSize.py, the value of storeDatabaseGlobalFeatureNeuronsInRam is unknown, so detect whether globalFeatureNeurons.pt exists in the database. If so perform method a), else perform method b).
 - move all printCountTotalParametersRun() functions to file GIAANNproto_count.py
+- implement new option useDrawNetworkIndependently, which upon startup draws the entire database (drawAllColumns=True). 
+	It supports both storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True/False and storeDatabaseGlobalFeatureNeuronsInRam=True/False:
+	1. 
+	- If storeDatabaseGlobalFeatureNeuronsInRam=True, it will load and draw the column neurons (non-progressively) from ram.
+	- If storeDatabaseGlobalFeatureNeuronsInRam=False, it will load and draw the column neurons progressively from RAM  (if storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True) or progressively from filesystem (if storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=False).
+	2.    
+	- If storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True, it will load and draw the column connections progressively from RAM. 
+	- If storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=False, it will load and draw the column connections progressively from filesystem.
+	Additional requirements;
+	- It does not display the network, it just saves it to file (svg).
+	- After drawing the network it exits.
+	- GIAANNproto_databaseNetworkDraw.visualizeGraph will need to be upgraded to support new parameter "display", where display=True by default, although is set to False when executed by useDrawNetworkIndependently.
+	- when drawing the network via this mode if(useDrawNetworkIndependently=True), it does not draw the feature (word) names or complex shapes (like circles), it only draws simple square objects for nodes and simple line objects for connections.
+	- the useDrawNetworkIndependently implementation should support the settings used by whatever executionMode the network was trained on (usually this will be "train" but during debug it may be "trainAndInference").
+- write all draw output files to the database folder
+- implement option drawEfficient=True (which is False by default, but always set to True if useDrawNetworkIndependently==True). 
+	As a minimum requirement for option drawEfficient=True, the G nodes positions need to be programmatically generated via function getNodePosition() such that when drawing each connection its associated source/target node does not need to be searched for serially in the G object, but its position can be instantaneously calculated by getNodePosition(). 
+	The formula in getNodePosition() should be dependent on a neuron column (c) and feature (f) index;
+	- When drawEfficientGrid=True, then the node position should equal to the column index (x) and the feature index (y) - it will result in a squarish rectagular grid, as c and f are usually each quite high.
+	- When drawEfficientCompact=True, then the node x position should equal to the column index. The y position should be equal to the recorded position (along the feature dimension) of the strength value in the sparse tensor. Remember that one feature neuron is drawn if any branch segment of a feature in a column of the featureNeuron/globalFeatureNeuron tensor has strength property value > 0. This will result in a very elongated (horizontal) rectangular grid, with far more column (x) space than feature (y) space, similar to the original draw method drawEfficient=False. The primary difference between drawEfficientCompact and drawEfficient=False is that with drawEfficient=False a random horizontal offset is added to each drawn feature node, but this is not possible with the efficient draw method specified (getNodePosition).
+	When drawEfficient=False, absolutely no changes to any code should be made to any draw code - the draw code should execute exactly as before.
+- move the useDrawNetworkIndependently and drawEfficient code to a new file called GIAANNproto_databaseNetworkDrawLarge.py
+- set drawSparseArrays = True by default - improve the default performance of the drawEfficient=False execution path

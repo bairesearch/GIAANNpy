@@ -132,24 +132,29 @@ if storeDatabaseGlobalFeatureNeuronsInRam:
 			#print("initialiseFeatureNeuronsGlobal: globalFeatureNeurons = ", globalFeatureNeurons)
 		return globalFeatureNeurons
 
-def generateHighMemGlobalFeatureNeuronsForInferenceStartup(databaseNetworkObject):
+def generateGlobalFeatureNeuronsForStartup(databaseNetworkObject, saveToDisk, useRAMcolumnFeatureNeurons):
 	if(not inferenceStartGenerateGlobalFeatureNeuronsTensor):
-		raise RuntimeError("generateHighMemGlobalFeatureNeuronsForInferenceStartup error: inferenceStartGenerateGlobalFeatureNeuronsTensor is disabled")
+		raise RuntimeError("generateGlobalFeatureNeuronsForStartup error: inferenceStartGenerateGlobalFeatureNeuronsTensor is disabled")
 	if(databaseNetworkObject is None):
-		raise RuntimeError("generateHighMemGlobalFeatureNeuronsForInferenceStartup error: databaseNetworkObject is None")
-	if(not databaseNetworkObject.inferenceMode):
-		raise RuntimeError("generateHighMemGlobalFeatureNeuronsForInferenceStartup error: inferenceMode must be True")
-	if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
-		if(not databaseNetworkObject.observedColumnsRAMLoaded):
-			loadAllObservedColumnsToRam(databaseNetworkObject)
-	globalFeatureNeurons = GIAANNproto_databaseNetworkFiles.generateGlobalFeatureNeuronsTensor(databaseNetworkObject, useRAMcolumnFeatureNeurons=False)
-	GIAANNproto_databaseNetworkFiles.saveTensor(globalFeatureNeurons, databaseFolder, globalFeatureNeuronsFile)
+		raise RuntimeError("generateGlobalFeatureNeuronsForStartup error: databaseNetworkObject is None")
+	globalFeatureNeurons = GIAANNproto_databaseNetworkFiles.generateGlobalFeatureNeuronsTensor(databaseNetworkObject, useRAMcolumnFeatureNeurons=useRAMcolumnFeatureNeurons)
+	if(saveToDisk):
+		GIAANNproto_databaseNetworkFiles.saveTensor(globalFeatureNeurons, databaseFolder, globalFeatureNeuronsFile)
 	if(globalFeatureNeurons.device != deviceSparse):
 		globalFeatureNeurons = globalFeatureNeurons.to(deviceSparse)
 	databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
 	return
 
-def initialiseDatabaseNetwork(inferenceMode):
+def generateHighMemGlobalFeatureNeuronsForInferenceStartup(databaseNetworkObject):
+	if(not databaseNetworkObject.inferenceMode):
+		raise RuntimeError("generateHighMemGlobalFeatureNeuronsForInferenceStartup error: inferenceMode must be True")
+	if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
+		if(not databaseNetworkObject.observedColumnsRAMLoaded):
+			loadAllObservedColumnsToRam(databaseNetworkObject)
+	generateGlobalFeatureNeuronsForStartup(databaseNetworkObject, saveToDisk=True, useRAMcolumnFeatureNeurons=False)
+	return
+
+def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False):
 
 	conceptColumnsDict = {}  # key: lemma, value: index
 	conceptColumnsList = []  # list of concept column names (lemmas)
@@ -160,7 +165,7 @@ def initialiseDatabaseNetwork(inferenceMode):
 	conceptFeaturesReferenceSetDelimiterList = []
 	conceptFeaturesReferenceSetDelimiterDeterministicList = []
 	conceptFeaturesReferenceSetDelimiterProbabilisticList = []
-	loadExistingDatabase = inferenceMode or (trainLoadExistingDatabase and GIAANNproto_databaseNetworkFiles.pathExists(conceptColumnsDictFile))
+	loadExistingDatabase = inferenceMode or loadExistingDatabaseOverride or (trainLoadExistingDatabase and GIAANNproto_databaseNetworkFiles.pathExists(conceptColumnsDictFile))
 
 	# Initialize the concept columns dictionary
 	if(loadExistingDatabase and GIAANNproto_databaseNetworkFiles.pathExists(conceptColumnsDictFile)):
@@ -286,7 +291,9 @@ def loadObservedColumnToRamStartup(databaseNetworkObject, conceptIndex, lemma, i
 		raise RuntimeError("loadObservedColumnToRamStartup error: observedColumnsRAMLoaded is already True")
 	GIAANNproto_databaseNetworkFiles.validateObservedColumnStorageFormat(conceptIndex)
 	metadataFile = GIAANNproto_databaseNetworkFiles.getObservedColumnMetadataFile(conceptIndex)
-	if(GIAANNproto_databaseNetworkFiles.pathExists(metadataFile)):
+	if(GIAANNproto_databaseNetworkFiles.observedColumnHasPersistedData(conceptIndex)):
+		if(not GIAANNproto_databaseNetworkFiles.observedColumnHasConsistentPersistedMetadata(conceptIndex)):
+			raise RuntimeError(f"loadObservedColumnToRamStartup error: inconsistent observed column storage for conceptIndex {conceptIndex}, lemma {lemma}")
 		result = ObservedColumn.loadFromDisk(databaseNetworkObject, conceptIndex, lemma, i, targetDevice=deviceDatabase, loadAllSourceFeatures=True, resizeFeatureTensorsToCurrentSize=resizeTensorsOnRAMdatabaseLoad)
 	else:
 		result = ObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)

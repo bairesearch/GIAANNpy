@@ -29,6 +29,7 @@ import sys
 useQuickExecution = True	#default: False	#orig: True
 useBenchmark = False		#use benchmark file naming schemes and evals
 useAutoresearch = False
+useDrawNetworkIndependently = False	#default: False	#default: True
 #useDefault = True	#default: True
 inferenceTrainFirstSequences = False	#dependent var
 if(useQuickExecution):
@@ -38,6 +39,8 @@ elif(useBenchmark):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
+elif(useDrawNetworkIndependently):
+	executionMode = "train"	#default: "train" or "trainAndInference" #set to the execution mode the network was trained on
 else:
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
 	
@@ -45,7 +48,6 @@ else:
 #Primary Draw settings:
 drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
 drawNetworkDuringInference = False	#default: False
-
 
 #Inference settings:
 numSeedTokensInference = 8	#default: 5, 8, 12, 16	#this is also set during train phase only so that the derived numberOfSegments always matches inference phase
@@ -98,11 +100,15 @@ if(useQuickExecution):
 	trainMaxSequences = 10	#N/A: auto generated from inference_prompt.txt.trainAndInference
 	databaseFolderBase = "../database"	#default: "../database/"
 elif(useBenchmark):
-	trainMaxSequences = 200000	#5000, 200000, 1000000
+	trainMaxSequences = 5000	#5000, 200000, 1000000
 	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"
 elif(useAutoresearch):
 	trainMaxSequences = 5000
 	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"
+elif(useDrawNetworkIndependently):
+	trainMaxSequences = 0	#not used
+	#databaseFolderBase = "../database"	#default: "../database"	
+	#databaseFolderBase = "/media/user/ssdpro/GIAANN/databaseOscar1000-numSeedTokensInference8-spacyPipelineOptimisations"
 else:
 	trainMaxSequences = 1000000	#dev: 10, 500, 5000, 10000, 200000 	#default: 1000000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = "../database"
@@ -210,11 +216,13 @@ runtimeReleaseGPUMemoryEverySequenceCount = 1	#default: 1	#only apply release ev
 if(runtimeReleaseGPUMemory):
 	assert runtimeReleaseGPUMemoryEverySequenceCount > 0, "runtimeReleaseGPUMemoryEverySequenceCount must be > 0"
 useGPUfileio = False	#default: useGPUsparse	#orig: useGPUsparse
+
 storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = True	#default: True	#orig: False
 if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 	useGPUdatabase = False	#default: False	#default: False
 	resizeTensorsOnRAMdatabaseSave = False	#default: False #orig: True	#resize all feature neuron and connections tensors during final RAM database save
 	resizeTensorsOnRAMdatabaseLoad = False	#default: False #orig: True	#resize all feature neuron and connections tensors during initial RAM database load
+
 trainEndGenerateGlobalFeatureNeuronsTensor = False	#derived var
 inferenceStartGenerateGlobalFeatureNeuronsTensor = False	#derived var
 if(executionMode=="train"):
@@ -435,6 +443,17 @@ optimisationArrayIndexPropertiesEfficientSerialNeurons = False	#default: False #
 
 #Draw;
 #select a single draw method (colouring scheme);
+if(useDrawNetworkIndependently):
+	drawEfficient = True
+else:
+	drawEfficient = False
+if(drawEfficient):
+	drawEfficientDrawDeadNeurons = True
+	drawEfficientGrid = False	#default: True
+	drawEfficientCompact = True	#better emulates the original draw visualisation of drawEfficient=False (but still not the same as no randomised horizontal position of nodes within columns)
+	if(drawEfficientGrid == drawEfficientCompact):
+		printe("drawEfficient configuration error: exactly one of drawEfficientGrid or drawEfficientCompact must be True")
+
 drawSegments = False and useSANI	#optional
 drawBranches = False and multipleDendriticBranches	#optional
 drawRelationTypes = False and not arrayIndexPropertiesEfficient	#optional
@@ -447,9 +466,13 @@ if(executionMode=="inference" or executionMode=="trainAndInference"):
 	drawAllColumns = False	#mandatory
 else:
 	drawSequenceObservedColumns = False	#default: False	#optional	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !trainSequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns	#optional (will affect which network changes can be visualised)
-	drawAllColumns = False	#default: False	#optional	#draw all columns in network (only used for automated visualisation; drawNetworkDuringTrainSave)	#requires !drawSequenceObservedColumns
-	if(drawAllColumns):
-		assert not trainSequenceObservedColumnsUseSequenceFeaturesOnly
+	if(useDrawNetworkIndependently):
+		drawAllColumns = True	#mandatory
+	else:
+		drawAllColumns = False	#default: False	#optional	#draw all columns in network (only used for automated visualisation; drawNetworkDuringTrainSave)	#requires !drawSequenceObservedColumns
+		if(drawAllColumns):
+			assert not trainSequenceObservedColumnsUseSequenceFeaturesOnly
+
 drawNetworkSaveFormatVector = True	#default: False	#orig: False	#True: save matplotlib network images as svg instead of png
 drawSegmentsTrain = False	#derived
 drawSegmentsInference = False	#derived
@@ -478,11 +501,13 @@ elif(drawDefault):
 	drawDefaultInference = True	#False: draw activation status
 else:
 	printe("warning: draw scheme not defined")
+
 drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSequenceIndex"
 drawNetworkDuringInferenceSaveFilenamePrepend = "GIAANNproto1cSequenceObservedColumnsInferenceTokenIndex"
+drawNetworkIndependentSaveFilename = "GIAANNproto1cAllColumnsDraw"
 drawHighResolutionFigure = True	#required for inference debug
 ignoreNewlineCharacters = True
-drawSparseArrays = False	#default: False	#orig: False	#can draw sequences contained within much larger databases without running out of memory (due to densifying arrays)
+drawSparseArrays = True	#default: True	#orig: False	#can draw sequences contained within larger databases without running out of memory (due to densifying arrays). drawEfficient=True is required to draw even large sized databases (>10000 neurons)
 if(trainSequenceObservedColumnsMatchSequenceWords):
 	#sumChangesToConceptNeuronSequenceInstances = True	#mandatory	#for multiple instances of concept in sequence, need to take the sum of the changes between the existing and modified arrays for each instance of a same concept in the sequence
 	assert not drawSequenceObservedColumns, "trainSequenceObservedColumnsMatchSequenceWords does not currently support drawSequenceObservedColumns; requires concept_name_to_index (i.e. one-to-one mapping between name and feature index in SequenceObservedColumns arrays) etc"

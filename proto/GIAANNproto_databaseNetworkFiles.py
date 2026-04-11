@@ -29,6 +29,10 @@ import GIAANNproto_count
 
 
 def prepareDatabaseFilesStartup():
+	if(useDrawNetworkIndependently):
+		if(not os.path.isdir(databaseFolder)):
+			raise RuntimeError("prepareDatabaseFilesStartup error: useDrawNetworkIndependently requires existing databaseFolder = " + databaseFolder)
+		return
 	if(os.path.isdir(observedColumnsDir)):
 		if(not trainLoadExistingDatabase):
 			clearDatabaseFiles()
@@ -132,6 +136,31 @@ def validateObservedColumnStorageFormat(conceptIndex):
 def observedColumnMetadataExists(conceptIndex):
 	validateObservedColumnStorageFormat(conceptIndex)
 	result = pathExists(getObservedColumnMetadataFile(conceptIndex))
+	return result
+
+def observedColumnHasPersistedData(conceptIndex):
+	validateObservedColumnStorageFormat(conceptIndex)
+	result = False
+	columnFolder = getObservedColumnFolder(conceptIndex)
+	connectionsFolder = getObservedColumnFeatureConnectionsFolder(conceptIndex)
+	featureNeuronsFile = os.path.join(columnFolder, getObservedColumnFeatureNeuronsFileBaseName() + pytorchTensorFileExtension)
+	if(pathExists(getObservedColumnMetadataFile(conceptIndex))):
+		result = True
+	elif(pathExists(featureNeuronsFile)):
+		result = True
+	elif(pathExists(connectionsFolder)):
+		for fileName in os.listdir(connectionsFolder):
+			if(fileName.endswith(pytorchTensorFileExtension)):
+				result = True
+				break
+	return result
+
+def observedColumnHasConsistentPersistedMetadata(conceptIndex):
+	validateObservedColumnStorageFormat(conceptIndex)
+	result = True
+	if(observedColumnHasPersistedData(conceptIndex)):
+		if(not observedColumnMetadataExists(conceptIndex)):
+			result = False
 	return result
 
 def listObservedColumnSourceFeatureIndices(conceptIndex):
@@ -413,8 +442,6 @@ def generateGlobalFeatureNeuronsTensor(databaseNetworkObject, useRAMcolumnFeatur
 		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: trainEndGenerateGlobalFeatureNeuronsTensor or inferenceStartGenerateGlobalFeatureNeuronsTensor must be True")
 	if(databaseNetworkObject is None):
 		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: databaseNetworkObject is None")
-	if(useRAMcolumnFeatureNeurons and storeDatabaseGlobalFeatureNeuronsInRam):
-		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: useRAMcolumnFeatureNeurons requires storeDatabaseGlobalFeatureNeuronsInRam to be False")
 	conceptIndices = sorted(int(conceptIndex) for conceptIndex in databaseNetworkObject.conceptColumnsDict.values())
 	if(len(conceptIndices) != databaseNetworkObject.c):
 		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: concept index count mismatch")
@@ -452,8 +479,7 @@ def generateGlobalFeatureNeuronsTensor(databaseNetworkObject, useRAMcolumnFeatur
 		else:
 			featureNeuronsFilePath = os.path.join(getObservedColumnFolder(conceptIndex), getObservedColumnFeatureNeuronsFileBaseName() + pytorchTensorFileExtension)
 			if(pathExists(featureNeuronsFilePath)):
-				featureNeurons = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, loadTensor(getObservedColumnFolder(conceptIndex), getObservedColumnFeatureNeuronsFileBaseName(), targetDevice=deviceFileIO), featureNeuronsTensorName)
-				featureNeurons = adjustBranchDimensions(featureNeurons, featureNeuronsTensorName, expectedRank=4)
+				featureNeurons = loadObservedColumnFeatureNeuronsTensor(databaseNetworkObject, conceptIndex, targetDevice=deviceFileIO, ensureCurrentSizeOnLoad=False)
 			else:
 				emptyIndices = pt.empty((4, 0), dtype=pt.long, device=deviceFileIO)
 				emptyValues = pt.empty((0,), dtype=arrayType, device=deviceFileIO)
@@ -560,6 +586,20 @@ def loadObservedColumnSourceFeatureConnectionsTensor(databaseNetworkObject, conc
 		tensor = ensureFeatureConnectionsSourceTensorCurrentSize(tensor, databaseNetworkObject.c, databaseNetworkObject.f, tensorName)
 	return tensor
 
+def loadObservedColumnFeatureNeuronsTensor(databaseNetworkObject, conceptIndex, targetDevice=None, ensureCurrentSizeOnLoad=False):
+	featureNeuronsFilePath = os.path.join(getObservedColumnFolder(conceptIndex), getObservedColumnFeatureNeuronsFileBaseName() + pytorchTensorFileExtension)
+	tensorName = f"observedColumn.featureNeurons[{conceptIndex}]"
+	if(not pathExists(featureNeuronsFilePath)):
+		raise RuntimeError(f"loadObservedColumnFeatureNeuronsTensor error: missing feature neurons tensor for conceptIndex {conceptIndex}")
+	featureNeuronTargetDevice = targetDevice if targetDevice is not None else deviceDatabase
+	tensor = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, loadTensor(getObservedColumnFolder(conceptIndex), getObservedColumnFeatureNeuronsFileBaseName(), targetDevice=featureNeuronTargetDevice), tensorName)
+	tensor = adjustBranchDimensions(tensor, tensorName, expectedRank=4)
+	if(debugLimitFeatures):
+		tensor = GIAANNproto_count.applyDebugLimitFeatureNeuronsTensor(tensor, databaseNetworkObject.f, tensorName)
+	if(ensureCurrentSizeOnLoad):
+		tensor = ensureFeatureNeuronsTensorCurrentSize(tensor, databaseNetworkObject.f, tensorName)
+	return tensor
+
 def saveObservedColumnSourceFeatureConnectionsTensor(conceptIndex, sourceFeatureIndex, tensor):
 	connectionsFolder = getObservedColumnFeatureConnectionsFolder(conceptIndex)
 	fileBaseName = getObservedColumnSourceFeatureConnectionsFileBaseName(sourceFeatureIndex)
@@ -578,7 +618,7 @@ def saveObservedColumnSourceFeatureConnectionsTensor(conceptIndex, sourceFeature
 			os.remove(filePath)
 	return
 
-def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i, targetDevice=None, loadAllSourceFeatures=False, resizeFeatureTensorsToCurrentSize=False):
+def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i, targetDevice=None, loadAllSourceFeatures=False, resizeFeatureTensorsToCurrentSize=False, loadFeatureNeurons=True):
 	"""
 	Load the observed column data from disk.
 	"""
@@ -587,6 +627,8 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 	with open(metadataFile, 'rb') as f:
 		data = pickle.load(f)
 	instance = cls(databaseNetworkObject, conceptIndex, lemma, i)
+	if((not storeDatabaseGlobalFeatureNeuronsInRam) and (not loadFeatureNeurons) and hasattr(instance, "featureNeurons")):
+		del instance.featureNeurons
 	if(data.get('featureConnectionsFormat') != observedColumnFeatureConnectionsFormat):
 		raise RuntimeError(f"Unsupported observed column connection storage format for conceptIndex={conceptIndex}. Clear and rebuild the database.")
 	instance.savedMetadataSignature = generateObservedColumnMetadataSignature(data)
@@ -604,14 +646,8 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 				raise RuntimeError("observedColumnLoadFromDisk error: nextFeatureIndex < 0")
 			if(instance.nextFeatureIndex > databaseNetworkObject.f):
 				instance.nextFeatureIndex = databaseNetworkObject.f
-	if not storeDatabaseGlobalFeatureNeuronsInRam:
-		featureNeuronTargetDevice = targetDevice if targetDevice is not None else deviceDatabase
-		instance.featureNeurons = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, loadTensor(getObservedColumnFolder(conceptIndex), getObservedColumnFeatureNeuronsFileBaseName(), targetDevice=featureNeuronTargetDevice), f"observedColumn.featureNeurons[{conceptIndex}]")
-		instance.featureNeurons = adjustBranchDimensions(instance.featureNeurons, f"observedColumn.featureNeurons[{conceptIndex}]", expectedRank=4)
-		if(debugLimitFeatures):
-			instance.featureNeurons = GIAANNproto_count.applyDebugLimitFeatureNeuronsTensor(instance.featureNeurons, databaseNetworkObject.f, f"observedColumn.featureNeurons[{conceptIndex}]")
-		if(resizeFeatureTensorsToCurrentSize):
-			instance.featureNeurons = ensureFeatureNeuronsTensorCurrentSize(instance.featureNeurons, databaseNetworkObject.f, f"observedColumn.featureNeurons[{conceptIndex}]")
+	if((not storeDatabaseGlobalFeatureNeuronsInRam) and loadFeatureNeurons):
+		instance.featureNeurons = loadObservedColumnFeatureNeuronsTensor(databaseNetworkObject, conceptIndex, targetDevice=targetDevice, ensureCurrentSizeOnLoad=resizeFeatureTensorsToCurrentSize)
 	if(loadAllSourceFeatures):
 		sourceFeatureIndices = listObservedColumnSourceFeatureIndices(conceptIndex)
 		loadTargetDevice = targetDevice if targetDevice is not None else deviceDatabase

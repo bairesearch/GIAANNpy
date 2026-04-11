@@ -44,6 +44,7 @@ import GIAANNproto_sparseTensors
 import GIAANNproto_databaseNetwork
 import GIAANNproto_databaseNetworkFiles
 import GIAANNproto_databaseNetworkDraw
+import GIAANNproto_databaseNetworkDrawLarge
 import GIAANNproto_sequenceTokens
 import GIAANNproto_sequenceConcepts
 import GIAANNproto_sequenceObservedColumns
@@ -66,7 +67,7 @@ if(printTimeDatabaseLoadSaveTimes):
 	debugPrintTimeDatabaseLoadSaveTimesProgramExecutionStartTime = time.perf_counter()
 
 # Load the selected dataset using Hugging Face datasets
-if(datasetType != "textfile" and executionMode != "inference"):
+if(datasetType != "textfile" and executionMode != "inference" and not useDrawNetworkIndependently):
 	import GIAANNproto_datasets
 	if(printTimeDatabaseLoadSaveTimes):
 		debugPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadStartTime = time.perf_counter()
@@ -81,7 +82,10 @@ if(debugPrintSpacySectionTimes):
 	processArticlePart2count = 0
 
 # Initialize spaCy model
-if(spacyPipelineSingleParse):
+if(useDrawNetworkIndependently):
+	nlpArticle = None
+	nlpSequence = None
+elif(spacyPipelineSingleParse):
 	if(spacyPipelineMinimalComponents or spacyPipelineLightweightSentenceSegmentation):
 		spacyArticleDisableComponents = []
 		if(spacyPipelineMinimalComponents):
@@ -110,6 +114,9 @@ def main():
 	GIAANNproto_databaseNetworkFiles.prepareDatabaseFilesStartup()
 	if(printRamMaxUsage or debugPrintRamMaxUsagePhaseLocal):
 		GIAANNproto_debug.debugResetGpuRamMaxUsage()
+	if(useDrawNetworkIndependently):
+		executeDrawMode()
+		return
 	if(executionMode=="inference"):
 		executeMode(True)
 	elif(executionMode=="trainAndInference"):
@@ -121,8 +128,37 @@ def main():
 		GIAANNproto_debug.debugPrintRamUsageSummary()
 	if(debugPrintRamMaxUsagePhaseLocal):
 		GIAANNproto_debug.debugPrintGpuRamMaxUsagePhaseLocalSummary()
-	if(printRamMaxUsage):
-		GIAANNproto_debug.debugPrintGpuRamMaxUsageSummary()
+		if(printRamMaxUsage):
+			GIAANNproto_debug.debugPrintGpuRamMaxUsageSummary()
+
+def getDrawModeDatabaseInferenceMode():
+	if(executionMode == "train"):
+		inferenceMode = False
+	elif(executionMode == "trainAndInference"):
+		inferenceMode = True
+	elif(executionMode == "inference"):
+		inferenceMode = True
+	else:
+		raise RuntimeError(f"getDrawModeDatabaseInferenceMode error: unsupported executionMode {executionMode}")
+	return inferenceMode
+
+def validateDrawModeExistingDatabaseFiles():
+	if(not GIAANNproto_databaseNetworkFiles.pathExists(conceptColumnsDictFile)):
+		raise RuntimeError(f"validateDrawModeExistingDatabaseFiles error: missing conceptColumnsDictFile {conceptColumnsDictFile}")
+	if(not GIAANNproto_databaseNetworkFiles.pathExists(conceptFeaturesDictFile)):
+		raise RuntimeError(f"validateDrawModeExistingDatabaseFiles error: missing conceptFeaturesDictFile {conceptFeaturesDictFile}")
+	if(storeDatabaseGlobalFeatureNeuronsInRam):
+		if(not GIAANNproto_databaseNetworkFiles.pathExists(globalFeatureNeuronsFileFull)):
+			raise RuntimeError(f"validateDrawModeExistingDatabaseFiles error: missing globalFeatureNeuronsFileFull {globalFeatureNeuronsFileFull}")
+	return
+
+def executeDrawMode():
+	validateDrawModeExistingDatabaseFiles()
+	databaseNetworkObject = GIAANNproto_databaseNetwork.initialiseDatabaseNetwork(getDrawModeDatabaseInferenceMode(), loadExistingDatabaseOverride=True)
+	if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
+		GIAANNproto_databaseNetwork.loadAllObservedColumnsToRam(databaseNetworkObject)
+	GIAANNproto_databaseNetworkDrawLarge.drawDatabaseGraphStandalone(databaseNetworkObject, save=True, fileName=drawNetworkIndependentSaveFilename, display=False)
+	return
 	
 def executeMode(inferenceMode):
 	if(printTimeDatabaseLoadSaveTimes):
