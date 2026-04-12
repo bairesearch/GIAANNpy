@@ -47,7 +47,7 @@ def drawDatabaseGraphStandalone(databaseNetworkObject, save=False, fileName=None
 		raise RuntimeError("drawDatabaseGraphStandalone error: databaseNetworkObject is None")
 	if(not drawEfficient):
 		printe("drawDatabaseGraphStandalone requires drawEfficient")
-	sortedConceptColumns, activeFeatureSetsByConceptIndex, compactFeaturePositionsByConceptIndex, primeFeatureIndexByConceptIndex, nodeXs, nodeYs, nodeColors, columnRectangles, maxConceptIndex, maxFeaturePosition = prepareStandaloneDrawEfficientLayout(databaseNetworkObject)
+	sortedConceptColumns, activeFeatureSetsByConceptIndex, compactFeaturePositionsByConceptIndex, primeFeatureIndexByConceptIndex, nodeXs, nodeYs, nodeColors, columnRectangles, maxConceptIndex, maxFeaturePosition, minDrawXPosition, maxDrawXPosition = prepareStandaloneDrawEfficientLayout(databaseNetworkObject)
 	lineSegments, lineColours = prepareStandaloneDrawEfficientConnectionSegments(databaseNetworkObject, sortedConceptColumns, activeFeatureSetsByConceptIndex, compactFeaturePositionsByConceptIndex)
 	if(drawEfficientFormat3D):
 		if(not save):
@@ -59,7 +59,10 @@ def drawDatabaseGraphStandalone(databaseNetworkObject, save=False, fileName=None
 		outputFileName = resolveStandaloneDrawEfficient3DOutputFileName(fileName)
 		saveStandaloneDrawEfficientLdrFile(outputFileName, sortedConceptColumns, nodeXs, nodeYs, nodeColors, columnRectangles, lineSegments, lineColours)
 	else:
-		figureWidth = max(16.0, (float(maxConceptIndex) * 0.08) + 4.0)
+		if(drawEfficientIntracolumnHorizontalOffset):
+			figureWidth = max(16.0, (float(maxDrawXPosition - minDrawXPosition) * 0.08) + 4.0)
+		else:
+			figureWidth = max(16.0, (float(maxConceptIndex) * 0.08) + 4.0)
 		figureHeight = max(9.0, (float(maxFeaturePosition) * 0.04) + 4.0)
 		fig, ax = createStandaloneDrawEfficientFigure(figureWidth, figureHeight, save, display)
 		if(len(lineSegments) > 0):
@@ -69,7 +72,7 @@ def drawDatabaseGraphStandalone(databaseNetworkObject, save=False, fileName=None
 			ax.add_patch(plt.Rectangle((rectangleX, rectangleY), rectangleWidth, rectangleHeight, fill=False, edgecolor='black', linewidth=0.5, zorder=2))
 		if(len(nodeXs) > 0):
 			ax.scatter(nodeXs, nodeYs, marker='s', s=9, c=nodeColors, edgecolors=nodeColors, linewidths=0.0, zorder=3)
-		ax.set_xlim(-1.5, max(float(maxConceptIndex) + 1.5, 1.5))
+		ax.set_xlim(minDrawXPosition - 1.0, max(maxDrawXPosition + 1.0, 1.5))
 		ax.set_ylim(-1.0, max(float(maxFeaturePosition) + 1.5, 1.5))
 		ax.axis('off')
 		ax.margins(0.0)
@@ -206,8 +209,9 @@ def getStandaloneDrawEfficientLdrRectanglePoints(totalNumberColumns, totalNumber
 		raise RuntimeError("getStandaloneDrawEfficientLdrRectanglePoints error: rectangle must have four entries")
 	rectangleX, rectangleY, rectangleWidth, rectangleHeight = rectangle
 	conceptIndex = getStandaloneDrawEfficientLdrConceptIndex(float(rectangleX) + (float(rectangleWidth)/2.0))
-	frontPoints = [generateGridCoordinates(conceptIndex, rectangleY, totalNumberColumns, totalNumberFeatures, pointXOffset=-(float(rectangleWidth)/2.0), pointZOffset=-(standaloneDrawEfficient3DLdrColumnDepth/2.0)), generateGridCoordinates(conceptIndex, rectangleY, totalNumberColumns, totalNumberFeatures, pointXOffset=(float(rectangleWidth)/2.0), pointZOffset=-(standaloneDrawEfficient3DLdrColumnDepth/2.0)), generateGridCoordinates(conceptIndex, float(rectangleY) + float(rectangleHeight), totalNumberColumns, totalNumberFeatures, pointXOffset=(float(rectangleWidth)/2.0), pointZOffset=-(standaloneDrawEfficient3DLdrColumnDepth/2.0)), generateGridCoordinates(conceptIndex, float(rectangleY) + float(rectangleHeight), totalNumberColumns, totalNumberFeatures, pointXOffset=-(float(rectangleWidth)/2.0), pointZOffset=-(standaloneDrawEfficient3DLdrColumnDepth/2.0))]
-	backPoints = [generateGridCoordinates(conceptIndex, rectangleY, totalNumberColumns, totalNumberFeatures, pointXOffset=-(float(rectangleWidth)/2.0), pointZOffset=(standaloneDrawEfficient3DLdrColumnDepth/2.0)), generateGridCoordinates(conceptIndex, rectangleY, totalNumberColumns, totalNumberFeatures, pointXOffset=(float(rectangleWidth)/2.0), pointZOffset=(standaloneDrawEfficient3DLdrColumnDepth/2.0)), generateGridCoordinates(conceptIndex, float(rectangleY) + float(rectangleHeight), totalNumberColumns, totalNumberFeatures, pointXOffset=(float(rectangleWidth)/2.0), pointZOffset=(standaloneDrawEfficient3DLdrColumnDepth/2.0)), generateGridCoordinates(conceptIndex, float(rectangleY) + float(rectangleHeight), totalNumberColumns, totalNumberFeatures, pointXOffset=-(float(rectangleWidth)/2.0), pointZOffset=(standaloneDrawEfficient3DLdrColumnDepth/2.0))]
+	columnBreadth = calculateStandaloneDrawEfficient3DColumnBreadth()
+	frontPoints = [generateGridCoordinates(conceptIndex, rectangleY, totalNumberColumns, totalNumberFeatures, pointXOffset=-(float(rectangleWidth)/2.0), pointZOffset=-(columnBreadth/2.0), applyIntracolumnHorizontalOffset=False), generateGridCoordinates(conceptIndex, rectangleY, totalNumberColumns, totalNumberFeatures, pointXOffset=(float(rectangleWidth)/2.0), pointZOffset=-(columnBreadth/2.0), applyIntracolumnHorizontalOffset=False), generateGridCoordinates(conceptIndex, float(rectangleY) + float(rectangleHeight), totalNumberColumns, totalNumberFeatures, pointXOffset=(float(rectangleWidth)/2.0), pointZOffset=-(columnBreadth/2.0), applyIntracolumnHorizontalOffset=False), generateGridCoordinates(conceptIndex, float(rectangleY) + float(rectangleHeight), totalNumberColumns, totalNumberFeatures, pointXOffset=-(float(rectangleWidth)/2.0), pointZOffset=-(columnBreadth/2.0), applyIntracolumnHorizontalOffset=False)]
+	backPoints = [generateGridCoordinates(conceptIndex, rectangleY, totalNumberColumns, totalNumberFeatures, pointXOffset=-(float(rectangleWidth)/2.0), pointZOffset=(columnBreadth/2.0), applyIntracolumnHorizontalOffset=False), generateGridCoordinates(conceptIndex, rectangleY, totalNumberColumns, totalNumberFeatures, pointXOffset=(float(rectangleWidth)/2.0), pointZOffset=(columnBreadth/2.0), applyIntracolumnHorizontalOffset=False), generateGridCoordinates(conceptIndex, float(rectangleY) + float(rectangleHeight), totalNumberColumns, totalNumberFeatures, pointXOffset=(float(rectangleWidth)/2.0), pointZOffset=(columnBreadth/2.0), applyIntracolumnHorizontalOffset=False), generateGridCoordinates(conceptIndex, float(rectangleY) + float(rectangleHeight), totalNumberColumns, totalNumberFeatures, pointXOffset=-(float(rectangleWidth)/2.0), pointZOffset=(columnBreadth/2.0), applyIntracolumnHorizontalOffset=False)]
 	result = (frontPoints, backPoints)
 	return result
 
@@ -243,22 +247,28 @@ def calculateStandaloneDrawEfficientLdrPrismGridWidth(totalNumberColumns):
 	result = int(math.ceil(math.sqrt(float(totalNumberColumns))))
 	return result
 
-def generateGridCoordinates(conceptIndex, featureIndex, totalNumberColumns, totalNumberFeatures, pointXOffset=0.0, pointZOffset=0.0):
+def generateGridCoordinates(conceptIndex, featureIndex, totalNumberColumns, totalNumberFeatures, pointXOffset=0.0, pointZOffset=0.0, applyIntracolumnHorizontalOffset=True):
 	if(conceptIndex < 0):
 		raise RuntimeError("generateGridCoordinates error: conceptIndex must be >= 0")
 	if(totalNumberColumns <= 0):
 		raise RuntimeError("generateGridCoordinates error: totalNumberColumns must be > 0")
 	if(conceptIndex >= totalNumberColumns):
 		raise RuntimeError(f"generateGridCoordinates error: conceptIndex {conceptIndex} >= totalNumberColumns {totalNumberColumns}")
+	columnCentreSpacing = calculateStandaloneDrawEfficient3DColumnCentreSpacing()
 	if(drawEfficientFormat3Dprism):
 		gridWidth = calculateStandaloneDrawEfficientLdrPrismGridWidth(totalNumberColumns)
 		gridColumnIndex = int(conceptIndex % gridWidth)
 		gridRowIndex = int(conceptIndex // gridWidth)
-		xPosition = (float(gridColumnIndex) + float(pointXOffset)) * standaloneDrawEfficient3DLdrColumnSpacing
-		zPosition = (float(gridRowIndex) * standaloneDrawEfficient3DLdrColumnSpacing) + float(pointZOffset)
+		xPosition = (float(gridColumnIndex) * columnCentreSpacing) + (float(pointXOffset) * standaloneDrawEfficient3DLdrColumnSpacing)
+		zPosition = (float(gridRowIndex) * columnCentreSpacing) + float(pointZOffset)
 	else:
-		xPosition = (float(conceptIndex) + float(pointXOffset)) * standaloneDrawEfficient3DLdrColumnSpacing
+		xPosition = (float(conceptIndex) * columnCentreSpacing) + (float(pointXOffset) * standaloneDrawEfficient3DLdrColumnSpacing)
 		zPosition = float(pointZOffset)
+	if(drawEfficientIntracolumnHorizontalOffset):
+		if(applyIntracolumnHorizontalOffset):
+			intracolumnHorizontalOffset = calculateStandaloneDrawEfficientIntracolumnHorizontalOffset(featureIndex)
+			xPosition = xPosition + (intracolumnHorizontalOffset * standaloneDrawEfficient3DLdrColumnSpacing)
+			zPosition = zPosition + (intracolumnHorizontalOffset * calculateStandaloneDrawEfficient3DColumnBreadthUnit())
 	yPosition = getStandaloneDrawEfficientLdrHeightPosition(featureIndex)
 	result = (xPosition, yPosition, zPosition)
 	return result
@@ -328,6 +338,9 @@ def prepareStandaloneDrawEfficientLayout(databaseNetworkObject):
 	columnRectangles = []
 	maxConceptIndex = 0
 	maxFeaturePosition = 0.0
+	minDrawXPosition = 0.0
+	maxDrawXPosition = 0.0
+	columnWidth = calculateStandaloneDrawEfficientColumnWidth()
 	for lemma, conceptIndex, sequenceIndex in sortedConceptColumns:
 		activeFeatureIndices = activeFeatureIndicesByConceptIndex[conceptIndex]
 		topFeaturePosition = 0.0
@@ -347,8 +360,14 @@ def prepareStandaloneDrawEfficientLayout(databaseNetworkObject):
 				topFeaturePosition = nodePosition[1]
 			if(nodePosition[1] > maxFeaturePosition):
 				maxFeaturePosition = nodePosition[1]
-		columnRectangles.append((float(conceptIndex) - 0.5, -0.5, 1.0, topFeaturePosition + 1.0))
-	result = (sortedConceptColumns, activeFeatureSetsByConceptIndex, compactFeaturePositionsByConceptIndex, primeFeatureIndexByConceptIndex, nodeXs, nodeYs, nodeColors, columnRectangles, maxConceptIndex, maxFeaturePosition)
+		columnCentrePosition = calculateStandaloneDrawEfficientColumnCentrePosition(conceptIndex)
+		columnRectangleX = columnCentrePosition - (columnWidth/2.0)
+		columnRectangles.append((columnRectangleX, -0.5, columnWidth, topFeaturePosition + 1.0))
+		if(columnRectangleX < minDrawXPosition):
+			minDrawXPosition = columnRectangleX
+		if(columnRectangleX + columnWidth > maxDrawXPosition):
+			maxDrawXPosition = columnRectangleX + columnWidth
+	result = (sortedConceptColumns, activeFeatureSetsByConceptIndex, compactFeaturePositionsByConceptIndex, primeFeatureIndexByConceptIndex, nodeXs, nodeYs, nodeColors, columnRectangles, maxConceptIndex, maxFeaturePosition, minDrawXPosition, maxDrawXPosition)
 	return result
 
 def prepareStandaloneDrawEfficientConnectionSegments(databaseNetworkObject, sortedConceptColumns, activeFeatureSetsByConceptIndex, compactFeaturePositionsByConceptIndex):
@@ -607,7 +626,7 @@ def getNodePosition(conceptIndex, featureIndex, compactFeaturePositionsByConcept
 	if(not drawEfficient):
 		raise RuntimeError("getNodePosition error: drawEfficient is False")
 	if(drawEfficientGrid):
-		xPosition = float(conceptIndex)
+		baseXPosition = calculateStandaloneDrawEfficientColumnCentrePosition(conceptIndex)
 		yPosition = float(featureIndex)
 	elif(drawEfficientCompact):
 		if(compactFeaturePositionsByConceptIndex is None):
@@ -616,11 +635,66 @@ def getNodePosition(conceptIndex, featureIndex, compactFeaturePositionsByConcept
 			raise RuntimeError(f"getNodePosition error: missing compact feature positions for conceptIndex {conceptIndex}")
 		if(featureIndex not in compactFeaturePositionsByConceptIndex[conceptIndex]):
 			raise RuntimeError(f"getNodePosition error: missing compact feature position for conceptIndex {conceptIndex}, featureIndex {featureIndex}")
-		xPosition = float(conceptIndex)
+		baseXPosition = calculateStandaloneDrawEfficientColumnCentrePosition(conceptIndex)
 		yPosition = float(compactFeaturePositionsByConceptIndex[conceptIndex][featureIndex])
 	else:
 		raise RuntimeError("getNodePosition error: unsupported drawEfficient configuration")
+	if(drawEfficientIntracolumnHorizontalOffset):
+		if(drawEfficientFormat3D):
+			xPosition = baseXPosition
+		else:
+			xPosition = baseXPosition + calculateStandaloneDrawEfficientIntracolumnHorizontalOffset(yPosition)
+	else:
+		xPosition = baseXPosition
 	result = (xPosition, yPosition)
+	return result
+
+def calculateStandaloneDrawEfficientColumnCentrePosition(conceptIndex):
+	result = float(conceptIndex)
+	if(not drawEfficientFormat3D):
+		result = result * calculateStandaloneDrawEfficientColumnSpacingMultiplier()
+	return result
+
+def calculateStandaloneDrawEfficientColumnSpacingMultiplier():
+	if(drawEfficientIntracolumnHorizontalOffset):
+		result = calculateStandaloneDrawEfficientIntracolumnHorizontalOffsetWidth()
+	else:
+		result = 1.0
+	return result
+
+def calculateStandaloneDrawEfficientColumnWidth():
+	if(drawEfficientIntracolumnHorizontalOffset):
+		result = calculateStandaloneDrawEfficientIntracolumnHorizontalOffsetWidth()
+	else:
+		result = 1.0
+	return result
+
+def calculateStandaloneDrawEfficient3DColumnCentreSpacing():
+	result = standaloneDrawEfficient3DLdrColumnSpacing * calculateStandaloneDrawEfficientColumnSpacingMultiplier()
+	return result
+
+def calculateStandaloneDrawEfficient3DColumnBreadthUnit():
+	if(drawEfficientFormat3Dprism):
+		result = standaloneDrawEfficient3DLdrColumnSpacing
+	else:
+		result = standaloneDrawEfficient3DLdrColumnDepth
+	return result
+
+def calculateStandaloneDrawEfficient3DColumnBreadth():
+	result = calculateStandaloneDrawEfficient3DColumnBreadthUnit()
+	if(drawEfficientIntracolumnHorizontalOffset):
+		result = result * calculateStandaloneDrawEfficientIntracolumnHorizontalOffsetWidth()
+	return result
+
+def calculateStandaloneDrawEfficientIntracolumnHorizontalOffset(featurePosition):
+	width = calculateStandaloneDrawEfficientIntracolumnHorizontalOffsetWidth()
+	result = math.fmod(float(featurePosition), width) - (width/2.0)
+	return result
+
+def calculateStandaloneDrawEfficientIntracolumnHorizontalOffsetWidth():
+	result = float(drawEfficientIntracolumnHorizontalOffsetWidth)
+	if(result <= 0.0):
+		raise RuntimeError("calculateStandaloneDrawEfficientIntracolumnHorizontalOffsetWidth error: drawEfficientIntracolumnHorizontalOffsetWidth must be > 0")
 	return result
 
 def buildStandaloneDrawConnectionLookup(databaseNetworkObject, sourceConnections):

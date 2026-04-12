@@ -33,7 +33,8 @@ def printCountTotalParametersRun(databaseNetworkObject):
 		raise RuntimeError("printCountTotalParametersRun error: conceptColumnsList is empty")
 	totalConnections = 0
 	totalFeatureNeurons = 0
-	if(storeDatabaseGlobalFeatureNeuronsInRam):
+	usePersistedGlobalFeatureNeurons = countUsesPersistedGlobalFeatureNeurons()
+	if(usePersistedGlobalFeatureNeurons):
 		if(databaseNetworkObject.globalFeatureNeurons is None):
 			raise RuntimeError("printCountTotalParametersRun error: databaseNetworkObject.globalFeatureNeurons is None")
 		totalFeatureNeurons = countAssignedFeatureNeuronsInTensor(databaseNetworkObject.globalFeatureNeurons, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, "databaseNetworkObject.globalFeatureNeurons")
@@ -43,7 +44,7 @@ def printCountTotalParametersRun(databaseNetworkObject):
 			raise RuntimeError("printCountTotalParametersRun error: conceptIndex is None for lemma = " + lemma)
 		columnConnections = debugCountObservedColumnConnections(databaseNetworkObject, conceptIndex, lemma, columnIndex)
 		totalConnections += columnConnections
-		if(not storeDatabaseGlobalFeatureNeuronsInRam):
+		if(not usePersistedGlobalFeatureNeurons):
 			totalFeatureNeurons += loadAndCountObservedColumnFeatureNeurons(databaseNetworkObject, conceptIndex)
 	databasePtSizeGb = debugCalculateDatabasePtSizeGiB()
 	memoryGb = debugCalculateDatabaseSizeGiB()
@@ -60,6 +61,13 @@ def printCountTotalParametersRun(databaseNetworkObject):
 		print(f"features: {numberFeatures}")
 		print(f"database size (uncompressed GB): {databaseSizeGB:.3f}")
 	return memoryGb
+
+def countUsesPersistedGlobalFeatureNeurons():
+	import GIAANNproto_databaseNetworkFiles
+	result = False
+	if(storeDatabaseGlobalFeatureNeuronsInRam):
+		result = GIAANNproto_databaseNetworkFiles.pathExists(globalFeatureNeuronsFileFull)
+	return result
 
 def debugCountObservedColumnConnections(databaseNetworkObject, conceptIndex, lemma, columnIndex):
 	import GIAANNproto_databaseNetworkFiles

@@ -36,35 +36,38 @@ if(useQuickExecution):
 	executionMode = "inference" 	#mandatory: "inference" (effective trainAndInference but uses a text datafile)
 	inferenceTrainFirstSequences = True	#trains first sequences in inference_prompt.txt, performs inference only on last sequence
 elif(useBenchmark):
-	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
 	executionMode = "train"	#default: "train" or "trainAndInference" #set to the execution mode the network was trained on
 else:
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
-	
-
-#useDrawNetworkIndependently;
-#select a single draw method (colouring scheme);
-if(useDrawNetworkIndependently):
-	drawEfficient = True
-else:
-	drawEfficient = False
-if(drawEfficient):
-	drawEfficientFormat3D = True	#default: False	#True: save standalone drawEfficient large-network output in LDraw .ldr format instead of 2D matplotlib output
-	if(drawEfficientFormat3D):
-		drawEfficientFormat3Dprism = True	#default: False	#True: position standalone drawEfficient 3D columns on a square 2D grid and draw each column as a rectangular prism
-	drawEfficientDrawDeadNeurons = True	#default: True	#draw empty columns with no connected neurons
-	drawEfficientGrid = True	#default: True
-	drawEfficientCompact = False	#better emulates the original draw visualisation of drawEfficient=False (but still not the same as no randomised horizontal position of nodes within columns)
-	if(drawEfficientGrid == drawEfficientCompact):
-		printe("drawEfficient configuration error: exactly one of drawEfficientGrid or drawEfficientCompact must be True")
 
 
 #Primary Draw settings:
 drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
 drawNetworkDuringInference = False	#default: False
+
+
+#Draw Network Independently;
+if(useDrawNetworkIndependently):
+	drawEfficient = True
+else:
+	drawEfficient = False
+if(drawEfficient):
+	drawEfficientFormat3D = False	#default: False	#optional	#True: save standalone drawEfficient large-network output in LDraw .ldr format #False: save in 2D matplotlib .svg format
+	if(drawEfficientFormat3D):
+		drawEfficientFormat3Dprism = True	#default: False	#True: position standalone drawEfficient 3D columns on a square 2D grid and draw each column as a rectangular prism
+	drawEfficientIntracolumnHorizontalOffset = True #default: True	#feature neurons within columns have a horizontal x (or xy) offset applied
+	if(drawEfficientIntracolumnHorizontalOffset):
+		drawEfficientIntracolumnHorizontalOffsetWidth = 5	#default: 5
+	drawEfficientGrid = False	#default: False #draws column feature neuron y positions at their real featureIndex
+	drawEfficientCompact = True	#default: True	#better emulates the original draw visualisation of drawEfficient=False (but still not the same as no randomised horizontal position of nodes within columns)
+	if(drawEfficientGrid == drawEfficientCompact):
+		printe("drawEfficient configuration error: exactly one of drawEfficientGrid or drawEfficientCompact must be True")
+	drawEfficientDrawDeadNeurons = True	#default: True	#draw empty columns with no connected neurons
+
 
 #Inference settings:
 numSeedTokensInference = 8	#default: 5, 8, 12, 16	#this is also set during train phase only so that the derived numberOfSegments always matches inference phase
@@ -124,10 +127,10 @@ elif(useAutoresearch):
 	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"
 elif(useDrawNetworkIndependently):
 	trainMaxSequences = 0	#not used
-	#databaseFolderBase = "../database"	#default: "../database"	
-	databaseFolderBase = "/media/user/ssdpro/GIAANN/databaseOscar10000-numSeedTokensInference8-spacyPipelineOptimisations"
+	databaseFolderBase = "../database"	#default: "../database"	
+	#databaseFolderBase = "/media/user/ssdpro/GIAANN/databaseOscar100000-numSeedTokensInference8-spacyPipelineOptimisations"
 else:
-	trainMaxSequences = 1000000	#dev: 10, 500, 5000, 10000, 200000 	#default: 1000000	  #adjust as needed	#max sequences for train
+	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = "../database"
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
@@ -507,9 +510,9 @@ elif(drawDefault):
 else:
 	printe("warning: draw scheme not defined")
 
-drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1cAllColumnsTrainSequenceIndex"
-drawNetworkDuringInferenceSaveFilenamePrepend = "GIAANNproto1cSequenceObservedColumnsInferenceTokenIndex"
-drawNetworkIndependentSaveFilename = "GIAANNproto1cAllColumnsDraw"
+drawNetworkDuringTrainSaveFilenamePrepend = "GIAANNproto1xAllColumnsTrainSequenceIndex"
+drawNetworkDuringInferenceSaveFilenamePrepend = "GIAANNproto1xSequenceObservedColumnsInferenceTokenIndex"
+drawNetworkIndependentSaveFilename = "GIAANNproto1xAllColumnsDraw"
 drawHighResolutionFigure = True	#required for inference debug
 ignoreNewlineCharacters = True
 drawSparseArrays = True	#default: True	#orig: False	#can draw sequences contained within larger databases without running out of memory (due to densifying arrays). drawEfficient=True is required to draw even large sized databases (>10000 neurons)
@@ -551,8 +554,10 @@ randomiseColumnFeatureXposition = True	#shuffle x position of column internal fe
 #Information vars;
 printTimeDatabaseLoadSaveTimes = False
 printRamMaxUsage = False
-
-printCountTotalParameters = False	#count number of connections in network
+if(useDrawNetworkIndependently):
+	printCountTotalParameters = True	#count number of connections in network
+else:
+	printCountTotalParameters = False	
 printInferenceTop1Accuracy = True	#default: True	#print inference top-1 accuracy
 printInferenceTop1AccuracyBitsPerByte = False	#dependent var
 printInferenceTop1AccuracyBitsPerByteModified = False	#dependent var
@@ -1021,6 +1026,18 @@ if(printConfiguration):
 	print("#Primary Draw settings;")
 	print("drawNetworkDuringTrain:", drawNetworkDuringTrain)
 	print("drawNetworkDuringInference:", drawNetworkDuringInference)
+	if(drawEfficient):
+		print("")
+		print("#Draw Network Independently;")
+		print("drawEfficient:", drawEfficient)
+		print("drawEfficientFormat3D:", drawEfficientFormat3D)
+		if(drawEfficientFormat3D):
+			print("drawEfficientFormat3Dprism:", drawEfficientFormat3Dprism)
+		print("drawEfficientIntracolumnHorizontalOffset:", drawEfficientIntracolumnHorizontalOffset)
+		if(drawEfficientIntracolumnHorizontalOffset):
+			print("drawEfficientIntracolumnHorizontalOffsetWidth:", drawEfficientIntracolumnHorizontalOffsetWidth)
+		print("drawEfficientGrid:", drawEfficientGrid)
+		print("drawEfficientCompact:", drawEfficientCompact)
 	print("")
 	print("#Inference settings;")
 	print("numSeedTokensInference:", numSeedTokensInference)
@@ -1134,10 +1151,6 @@ if(printConfiguration):
 	if(useInference):
 		print("drawNetworkDuringInferenceSave:", drawNetworkDuringInferenceSave)
 	print("drawNetworkSaveFormatVector:", drawNetworkSaveFormatVector)
-	if(drawEfficient):
-		print("drawEfficientFormat3D:", drawEfficientFormat3D)
-		if(drawEfficientFormat3D):
-			print("drawEfficientFormat3Dprism:", drawEfficientFormat3Dprism)
 	print("")
 	print("#Database save paths;")
 	if(executionMode=="inference" or executionMode=="trainAndInference"):

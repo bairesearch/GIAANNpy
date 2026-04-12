@@ -70,30 +70,30 @@ It likewise supports a number features of classical artificial neural networks s
 
 ## Configuration
 
-All settings are located in GIAANNproto_globalDefs.py.
+All settings are located in `proto/GIAANNproto_globalDefs.py`.
 
 See the repository [README](https://github.com/bairesearch/GIAANNpy/blob/main/README.md) for a summary of the main options.
 
 ### Train/inference mode selection
 
-#### Quick execution (demo)
+##### Quick execution (demo)
 
 For quick execution (train and inference);
-* set useQuickExecution = True 
+* set `useQuickExecution = True`
 
 This will;
-* automatically set useInference=True and inferenceTrainFirstSequences=True 
-* train the database using all sequences in "database/inference_prompt.txt.trainAndInference" except for the last (*numSentencesPerSequence) sequences, and then;
-* perform inference on the last (*numSentencesPerSequence) sequences.
+* automatically set `executionMode="inference"` and `inferenceTrainFirstSequences=True` 
+* train the database using all sequences in `"database/inference_prompt.txt.trainAndInference"` except for the last (`*numSentencesPerSequence`) sequences, and then;
+* perform inference on the last (`*numSentencesPerSequence`) sequences.
 
-The database/inference_prompt.txt.trainAndInference provided is taken from the first sentences from the first article of the dataset (Wikipedia).
+The `database/inference_prompt.txt.trainAndInference` provided is taken from the first sentences from the first article of the dataset (Wikipedia).
 
-#### Standard execution
+##### Standard execution
 
 For standard execution (train or inference);
-* set useQuickExecution = False
-* set useInference = False to train the network from a huggingface dataset (e.g. Wikipedia/OSCAR-2201), or;
-* set useInference = True to perform inference on a seeded prompt (prompt_inference.txt.*)
+* set `useQuickExecution = False`
+* set `executionMode="train"` to train the network from a huggingface dataset (e.g. `Wikipedia/OSCAR-2201`), or;
+* set `executionMode="inference"` to perform inference on a seeded prompt (`prompt_inference.txt.*`)
 
 See the repository [README](https://github.com/bairesearch/GIAANNpy/blob/main/README.md) for more configuration details.
 
