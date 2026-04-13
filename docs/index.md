@@ -61,7 +61,7 @@ GIA ANN is designed to be a biologically feasible algorithm, and exhibits these 
 * inductive bias for reasoning (generalisation from concepts).
 * training speed (number of experience samples required).
 * online learning (unbatched, limited precise short term memory; store in network activations themselves).
-* continuous learning (dynamic update of network knowledge without compromising prior learning).
+* continual learning (dynamic update of network knowledge without compromising prior learning).
 * unlimited context windows.
 * biologically feasible circuitry and learning algorithm (no backpropagation).
 * robustness to hallucination.
@@ -92,7 +92,7 @@ The `database/inference_prompt.txt.trainAndInference` provided is taken from the
 
 For standard execution (train or inference);
 * set `useQuickExecution = False`
-* set `executionMode="train"` to train the network from a huggingface dataset (e.g. `Wikipedia/OSCAR-2201`), or;
+* set `executionMode="train"` to train the network from a huggingface dataset (e.g. Wikipedia/OSCAR-2201), or;
 * set `executionMode="inference"` to perform inference on a seeded prompt (`prompt_inference.txt.*`)
 
 See the repository [README](https://github.com/bairesearch/GIAANNpy/blob/main/README.md) for more configuration details.

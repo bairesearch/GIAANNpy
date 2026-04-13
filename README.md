@@ -71,7 +71,7 @@ GIA ANN is designed to be a biologically feasible algorithm, and exhibits these 
 * inductive bias for reasoning (generalisation from concepts).
 * training speed (number of experience samples required).
 * online learning (unbatched, limited precise short term memory; store in network activations themselves).
-* continuous learning (dynamic update of network knowledge without compromising prior learning).
+* continual learning (dynamic update of network knowledge without compromising prior learning).
 * unlimited context windows.
 * biologically feasible circuitry and learning algorithm (no backpropagation).
 * robustness to hallucination.
@@ -100,7 +100,7 @@ The `database/inference_prompt.txt.trainAndInference` provided is taken from the
 
 For standard execution (train or inference);
 * set `useQuickExecution = False`
-* set `executionMode="train"` to train the network from a huggingface dataset (e.g. `Wikipedia/OSCAR-2201`), or;
+* set `executionMode="train"` to train the network from a huggingface dataset (e.g. Wikipedia/OSCAR-2201), or;
 * set `executionMode="inference"` to perform inference on a seeded prompt (`prompt_inference.txt.*`)
 
 #### Primary Draw settings
@@ -110,8 +110,8 @@ For standard execution (train or inference);
 
 #### Inference settings
 
-* `numSeedTokensInference` - the number of tokens used for the seed (vs prediction) phase of inference. Note arrayNumberOfSegments is derived from this parameter.
-* `inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False` for benchmarking top-1 accuracy (fires targets rather than predictions).
+* `numSeedTokensInference` - the number of tokens used for the seed (vs prediction) phase of inference. Note arrayNumberOfSegments is derived from this parameter
+* `inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures` - set `True` for standard inference, or `False` for benchmarking top-1 accuracy (fires targets rather than predictions)
 * `useBenchmarkDefaultsEvalTestSet` - select default inference settings for eval using training-set or test-set data
 * `inferenceEvaluateTestSet` -  eval using training-set or test-set data
 * `inferenceSegmentTiming` - "none"/"biased"/"seq"/"exact" (from least restrictive to most restrictive):
@@ -148,22 +148,26 @@ For standard execution (train or inference);
 #### Dataset
 
 * `datasetsLibrary4plus` - selects compatible dataset for datasets library
-* `datasetName` - wikipedia dataset name
-* `datasetCfg` - wikipedia dataset cfg
+* `datasetName` - dataset name
+* `datasetCfg` - dataset cfg
 * `useLocalDataset` - use local dataset (else stream)
 * `datasetFolder` - folder to store dataset
 
 #### RAM
 
-* `useGPUdense=True` (and useGPUsparse=True) during train (sequence size dependent)
+* `useGPUdense=True` (and optionally `useGPUsparse=True`) during train (sequence size dependent)
 * `useGPUsparse=False` during inference (network size dependent)
-* `storeDatabaseInRam`
-* `useGPUdatabase=False` (assume CPU has more RAM)
-		
+* `trainSparseConnectionsTensor` - use sparse connections tensor during training of sequence
+* `trainSparseNeuronsTensor` - use sparse neurons tensor during training of sequence
+* `storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam` - store database feature connections and column separated feature neuron data in RAM, else dynamically load these from filesystem per sequence
+* `storeDatabaseGlobalFeatureNeuronsInRam` - use global feature neuron tensors, else use feature neuron tensors in observed columns (note feature connection tensors are always in observed columns)
+
+<!--
 #### Segment activation time
 
 * `inferenceUseNeuronFeaturePropertiesTime` - record segment activation times and use them to bias feature selection during inference based on their proximity to their ideal (i.e. trained) timings
 * `inferenceUseNeuronFeaturePropertiesTimeExact` - most strict time selection
+-->
 
 #### Array properties
 
@@ -175,7 +179,7 @@ For standard execution (train or inference);
 
 #### Immediate (direct) connections
 
-* `enforceDirectConnections=True`(by default it uses useSANI to enforce direct connections between predicted features).
+* `enforceDirectConnections=True` - by default it uses useSANI to enforce direct connections between predicted features
 
 #### Concept column delimiters
 
@@ -191,25 +195,29 @@ For standard execution (train or inference);
 * `inferenceBeamWidth` - width of beam search
 * `inferenceBeamDepth` - depth of beam search
 
+<!--
 #### Inference activations
 
 * `inferenceConnectionsStrengthBoolean`
 * `inferenceSegmentActivationsBoolean`
 * `inferenceSegmentActivationsBooleanFeatureSegmentsOnly`
 * `inferenceSourceActivationsBoolean`
+-->
 
+<!--
 #### Train optimisations
 
-* `trainSequenceObservedColumnsUseSequenceFeaturesOnly=True` - only loads sequence features into dense tensors for train.
-* `trainSequenceObservedColumnsMatchSequenceWords=True` is now mandatory (originally GIAANN proto was not guaranteed to independently train a feature for every token instance in the sequence).
+* `trainSequenceObservedColumnsUseSequenceFeaturesOnly=True` - only loads sequence features into dense tensors for train
+* `trainSequenceObservedColumnsMatchSequenceWords=True` is now mandatory (originally GIAANN proto was not guaranteed to independently train a feature for every token instance in the sequence)
+-->
 
 #### Draw
 
-* `drawSegments` - draw independent segments (connections) in different colours.
-* `drawBranches` - draw independent branches (connections and features) in different colours.
-* `drawRelationTypes` - draw feature POS types (and their connections) in different colours.
-* `drawDelimiters` - draws feature neuron column delimiters (and their external connections) in different colours.
-* `drawDefault` - draws prime concept feature/instance feature node types (and their internal/external connections) in different colours. If `executionMode="inference"` or `executionMode="trainAndInference"` and in inference phase then will draw activation status of network.
+* `drawSegments` - draw independent segments (connections) in different colours
+* `drawBranches` - draw independent branches (connections and features) in different colours
+* `drawRelationTypes` - draw feature POS types (and their connections) in different colours
+* `drawDelimiters` - draws feature neuron column delimiters (and their external connections) in different colours
+* `drawDefault` - draws prime concept feature/instance feature node types (and their internal/external connections) in different colours. If `executionMode="inference"` or `executionMode="trainAndInference"` and in inference phase then will draw activation status of network
 
 ##### drawSegments
 ![GIAANNdemo-drawSegments-SMALL.png](https://github.com/bairesearch/GIAANNpy/releases/download/assets/GIAANNdemo-drawSegments-SMALL.png)
@@ -237,17 +245,19 @@ For standard execution (train or inference);
 
 #### SANI settings
 
-* `useSANIcolumns` - assign segments by concept column proximity to connection target during train.
-* `useSANIfeatures` - assign segments by feature proximity to connection target during train.
-* `useSANIfeaturesAndColumns` - assign segments by column proximity first then feature proximity.
-* `algorithmMatrixSANImethod="enforceActivationAcrossSegments"` - only activate a segment under conditions.
-* `algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"` - only activate neuron if last segment active.
-* `enforceSequentialActivation` - only activate a segment if previous segment was active.
+* `useSANIcolumns` - assign segments by concept column proximity to connection target during train
+* `useSANIfeatures` - assign segments by feature proximity to connection target during train
+* `useSANIfeaturesAndColumns` - assign segments by column proximity first then feature proximity
+<!--
+* `algorithmMatrixSANImethod="enforceActivationAcrossSegments"` - only activate a segment under conditions
+* `algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"` - only activate neuron if last segment active
+* `enforceSequentialActivation` - only activate a segment if previous segment was active
+-->
 
 #### POS
 
-* `useSpacyForConceptNounPOSdetection` - use spacy for prime concept feature identification (dynamic context dependent pos detection), else use GIAANNproto_sequencePOS.
-* 'reference set delimiter' identification (token column assignment) uses predetermined word-POS dictionary (GIAANNproto_sequencePOS).
+* `useSpacyForConceptNounPOSdetection` - use spacy for prime concept feature identification (dynamic context dependent pos detection), else use GIAANNproto_sequencePOS
+* 'reference set delimiter' identification (token column assignment) uses predetermined word-POS dictionary (GIAANNproto_sequencePOS)
 
 ### Paper
 
@@ -286,11 +296,11 @@ edit GIAANNproto_globalDefs.py;
 * select the database folder, e.g. `databaseFolderBase = "../database"`
 * select the `drawEfficient` settings:
   * `drawEfficientFormat3D` - save standalone drawEfficient large-network output in LDraw .ldr format instead of 2D matplotlib .svg output
-    * `drawEfficientFormat3Dprism` - position standalone drawEfficient 3D columns on a square 2D grid and draw each column as a rectangular prism
-  *	`drawEfficientIntracolumnHorizontalOffset` - feature neurons within columns have a horizontal x (or xy) offset applied
+    * `drawEfficientFormat3Dprism` - position standalone `drawEfficient` 3D columns on a square 2D grid and draw each column as a rectangular prism
+  * `drawEfficientIntracolumnHorizontalOffset` - feature neurons within columns have a horizontal x (or xy) offset applied
+  * `drawEfficientGrid` - draws column feature neuron y positions at their real `featureIndex`
+  * `drawEfficientCompact` - emulates the original draw visualisation of `drawEfficient=False` (but still not the same as no randomised horizontal position of nodes within columns)
   * `drawEfficientDrawDeadNeurons` - draw empty columns with no connected neurons
-  * `drawEfficientGrid` - draws column feature neuron y positions at their real featureIndex
-  ` drawEfficientCompact`	- emulates the original draw visualisation of drawEfficient=False (but still not the same as no randomised horizontal position of nodes within columns)
 * `python GIAANNproto_main.py`
 
 ##### 2D visualisation (drawEfficientFormat3D=False)

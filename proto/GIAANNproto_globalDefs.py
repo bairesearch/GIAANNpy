@@ -50,30 +50,14 @@ drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype 
 drawNetworkDuringInference = False	#default: False
 
 
-#Draw Network Independently;
-if(useDrawNetworkIndependently):
-	drawEfficient = True
-else:
-	drawEfficient = False
-if(drawEfficient):
-	drawEfficientFormat3D = False	#default: False	#optional	#True: save standalone drawEfficient large-network output in LDraw .ldr format #False: save in 2D matplotlib .svg format
-	if(drawEfficientFormat3D):
-		drawEfficientFormat3Dprism = True	#default: False	#True: position standalone drawEfficient 3D columns on a square 2D grid and draw each column as a rectangular prism
-	drawEfficientIntracolumnHorizontalOffset = True #default: True	#feature neurons within columns have a horizontal x (or xy) offset applied
-	if(drawEfficientIntracolumnHorizontalOffset):
-		drawEfficientIntracolumnHorizontalOffsetWidth = 5	#default: 5
-	drawEfficientGrid = False	#default: False #draws column feature neuron y positions at their real featureIndex
-	drawEfficientCompact = True	#default: True	#better emulates the original draw visualisation of drawEfficient=False (but still not the same as no randomised horizontal position of nodes within columns)
-	if(drawEfficientGrid == drawEfficientCompact):
-		printe("drawEfficient configuration error: exactly one of drawEfficientGrid or drawEfficientCompact must be True")
-	drawEfficientDrawDeadNeurons = True	#default: True	#draw empty columns with no connected neurons
-
-
 #Inference settings:
 numSeedTokensInference = 8	#default: 5, 8, 12, 16	#this is also set during train phase only so that the derived numberOfSegments always matches inference phase
 useInference = True  #mandatory: True	#enable options that support inference mode
 if(useInference):
-	inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: True	#True: activate next column features using current prediction; False: use current target (default top-1 accuracy measurement)
+	if(useBenchmark or useAutoresearch):
+		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: False	#False: use current target (default top-1 accuracy measurement)
+	else:
+		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True		#True: activate next column features using current prediction
 inferenceAddNewFeatures = True	#default: True	#orig: False	#run a controlled expansion pass during inference to add missing columns/features without training updates
 if(useQuickExecution):
 	useBenchmarkDefaultsEvalTestSet = False	#default: False: eval training-set
@@ -237,12 +221,12 @@ if(useGPUsparse):
 	trainSparseConnectionsTensor = False	#default: False	#orig: False
 	trainSparseNeuronsTensor = False	#default: False	#orig: False
 else:
-	trainSparseConnectionsTensor = True	#default: True	#orig: True
-	trainSparseNeuronsTensor = True		#default: True	#orig: True
+	trainSparseConnectionsTensor = True	#default: True	#orig: True	#use sparse connections tensor during training of sequence
+	trainSparseNeuronsTensor = True		#default: True	#orig: True	#use sparse neurons tensor during training of sequence
 if(trainSparseNeuronsTensor):
 	assert trainSparseConnectionsTensor, "trainSparseNeuronsTensor requires trainSparseConnectionsTensor=True"
 
-storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = True	#default: True	#orig: False	#optional
+storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = True	#default: True	#orig: False	#optional	#store database feature connections and column separated feature neuron data in RAM, else dynamically load these from filesystem per sequence
 if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 	useGPUdatabase = False	#default: False	#default: False
 	resizeTensorsOnRAMdatabaseSave = False	#default: False #orig: True	#resize all feature neuron and connections tensors during final RAM database save
@@ -1008,6 +992,25 @@ def getTensorSizeInMB(tensor):
 
 def generateDrawSequenceIndex(sequenceWordIndex):
 	return str(sequenceWordIndex).zfill(3)
+
+
+#Draw Network Independently;
+if(useDrawNetworkIndependently):
+	drawEfficient = True
+else:
+	drawEfficient = False
+if(drawEfficient):
+	drawEfficientFormat3D = False	#default: False	#optional	#True: save standalone drawEfficient large-network output in LDraw .ldr format #False: save in 2D matplotlib .svg format
+	if(drawEfficientFormat3D):
+		drawEfficientFormat3Dprism = True	#default: False	#True: position standalone drawEfficient 3D columns on a square 2D grid and draw each column as a rectangular prism
+	drawEfficientIntracolumnHorizontalOffset = True #default: True	#feature neurons within columns have a horizontal x (or xy) offset applied
+	if(drawEfficientIntracolumnHorizontalOffset):
+		drawEfficientIntracolumnHorizontalOffsetWidth = 5	#default: 5
+	drawEfficientGrid = False	#default: False #draws column feature neuron y positions at their real featureIndex
+	drawEfficientCompact = True	#default: True	#better emulates the original draw visualisation of drawEfficient=False (but still not the same as no randomised horizontal position of nodes within columns)
+	if(drawEfficientGrid == drawEfficientCompact):
+		printe("drawEfficient configuration error: exactly one of drawEfficientGrid or drawEfficientCompact must be True")
+	drawEfficientDrawDeadNeurons = True	#default: True	#draw empty columns with no connected neurons
 
 
 #printConfiguration;
