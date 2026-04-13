@@ -266,9 +266,10 @@ def generateGridCoordinates(conceptIndex, featureIndex, totalNumberColumns, tota
 		zPosition = float(pointZOffset)
 	if(drawEfficientIntracolumnHorizontalOffset):
 		if(applyIntracolumnHorizontalOffset):
-			intracolumnHorizontalOffset = calculateStandaloneDrawEfficientIntracolumnHorizontalOffset(featureIndex)
-			xPosition = xPosition + (intracolumnHorizontalOffset * standaloneDrawEfficient3DLdrColumnSpacing)
-			zPosition = zPosition + (intracolumnHorizontalOffset * calculateStandaloneDrawEfficient3DColumnBreadthUnit())
+			intracolumnHorizontalOffsetX = calculateStandaloneDrawEfficientIntracolumnHorizontalOffset(featureIndex)
+			intracolumnHorizontalOffsetY = calculateStandaloneDrawEfficientIntracolumnHorizontalOffsetShifted(featureIndex)
+			xPosition = xPosition + (intracolumnHorizontalOffsetX * standaloneDrawEfficient3DLdrColumnSpacing)
+			zPosition = zPosition + (intracolumnHorizontalOffsetY * calculateStandaloneDrawEfficient3DColumnBreadthUnit())
 	yPosition = getStandaloneDrawEfficientLdrHeightPosition(featureIndex)
 	result = (xPosition, yPosition, zPosition)
 	return result
@@ -689,6 +690,11 @@ def calculateStandaloneDrawEfficient3DColumnBreadth():
 def calculateStandaloneDrawEfficientIntracolumnHorizontalOffset(featurePosition):
 	width = calculateStandaloneDrawEfficientIntracolumnHorizontalOffsetWidth()
 	result = math.fmod(float(featurePosition), width) - (width/2.0)
+	return result
+
+def calculateStandaloneDrawEfficientIntracolumnHorizontalOffsetShifted(featurePosition):
+	width = calculateStandaloneDrawEfficientIntracolumnHorizontalOffsetWidth()
+	result = math.fmod(float(featurePosition) + (width/2.0), width) - (width/2.0)
 	return result
 
 def calculateStandaloneDrawEfficientIntracolumnHorizontalOffsetWidth():

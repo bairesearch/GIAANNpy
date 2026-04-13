@@ -128,7 +128,7 @@ elif(useAutoresearch):
 elif(useDrawNetworkIndependently):
 	trainMaxSequences = 0	#not used
 	databaseFolderBase = "../database"	#default: "../database"	
-	#databaseFolderBase = "/media/user/ssdpro/GIAANN/databaseOscar100000-numSeedTokensInference8-spacyPipelineOptimisations"
+	#databaseFolderBase = "/media/user/ssdpro/GIAANN/databaseOscar1000-numSeedTokensInference8-spacyPipelineOptimisations"
 else:
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = "../database"
