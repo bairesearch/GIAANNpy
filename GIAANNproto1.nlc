@@ -764,3 +764,4 @@ MANUAL; - set trainSparseConnectionsTensor/trainSparseNeuronsTensor=True by defa
 - update drawEfficientIntracolumnHorizontalOffset implementation with offsetY = mod(Z+(drawEfficientIntracolumnHorizontalOffsetWidth/2), drawEfficientIntracolumnHorizontalOffsetWidth) - (drawEfficientIntracolumnHorizontalOffsetWidth/2)
 MANUAL; - only if(useBenchmark or useAutoresearch): set inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=False, else: restore inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=True
 MANUAL; - update readme
+- patch main() so printRamMaxUsage works independently of debugPrintRamMaxUsagePhaseLocal

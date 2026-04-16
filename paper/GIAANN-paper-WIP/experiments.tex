@@ -591,7 +591,9 @@ The filesystem database is stored on a locally connected SSD drive.
 
 \Cref{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse} contains OSCAR-2201 training performance measurements for different train phase feature neuron tensor types (\texttt{trainSparseNeuronsTensor=True/False}) and connection tensor types (\texttt{trainSparseConnectionsTensor=True/False}); dense or sparse, tensor device (GPU/CPU; \texttt{useGPUsparse=True/False}), and training sizes, with store database feature neurons and connections actively in RAM (\texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True}), and feature neuron sparse tensors stored independently for each column (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}). The device indicated is assigned to both tensor types; sparse/dense (\texttt{useGPUsparse}/\texttt{useGPUdense}).
 
-\Cref{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse-storeDatabase} contains OSCAR-2201 training performance measurements for different database feature connections active storage location (RAM/filesystem; \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True/False}) and training sizes, with train phase feature neuron and connection sparse tensors  (\texttt{trainSparseNeuronsTensor=True}, \texttt{trainSparseConnectionsTensor=True}), sparse tensor device CPU (\texttt{useGPUsparse=False}), and feature neuron sparse tensors stored independently for each column (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}).
+\Cref{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse-storeDatabase} contains OSCAR-2201 training performance measurements for different database feature connections active storage location (RAM/filesystem; \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True/False}) and training sizes, with train phase feature neuron and connection sparse tensors (\texttt{trainSparseNeuronsTensor=True}, \texttt{trainSparseConnectionsTensor=True}), sparse tensor device CPU (\texttt{useGPUsparse=False}), and feature neuron sparse tensors stored independently for each column (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}).
+
+\Cref{tab:oscar-performance-storeDatabaseFeatureNeuronsInRamFalse-storeDatabase} contains OSCAR-2201 training performance measurements for different database feature connections active storage location (RAM/filesystem; \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True/False}) and training sizes, with train phase feature neuron and connection dense tensors (\texttt{trainSparseNeuronsTensor=False}, \texttt{trainSparseConnectionsTensor=False}), dense tensor device GPU (\texttt{useGPUdense=True}), and feature neuron sparse tensors stored independently for each column (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}).
 
 \begin{table}[H]
 \centering
@@ -712,6 +714,25 @@ The filesystem database is stored on a locally connected SSD drive.
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{table}[H]
+\centering
+\caption{OSCAR-2201 training performance measurements for different database feature connections active storage location (RAM/filesystem) and training sizes, with train phase feature neuron and connection dense tensors, dense tensor device GPU, and feature neuron sparse tensors stored independently for each column}
+\label{tab:oscar-performance-storeDatabaseFeatureNeuronsInRamFalse-storeDatabase}
+\begin{tabular}{rrrrrrrrrrrrr}
+\toprule
+\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{database} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{gpu ram} & \textbf{cpu ram} \\
+\midrule
+8 & 3 & 5 & 5,000       & RAM & 00:01:04 & 00:00:55 & 00:00:09 & 0.9GB & 2.1GB \\
+8 & 3 & 5 & 200,000     & RAM & 00:41:04 & 00:37:28 & 00:03:35 & 1.4GB & 8.0GB \\
+8 & 3 & 5 & 1,000,000   & RAM & 03:44:37 & 03:25:47 & 00:18:50 & 2.9GB & 34.1GB \\
+8 & 3 & 5 & 5,000       & filesys & 00:01:29 & 00:01:29 & 00:00:00 & 0.9GB & 1.9GB \\
+8 & 3 & 5 & 200,000     & filesys & 01:10:29 & 01:10:29 & 00:00:00 & 1.1GB & 2.2GB \\
+8 & 3 & 5 & 1,000,000   & filesys & 08:04:29 & 08:04:29 & 00:00:00 & 2.1GB & 3.0GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 
 \FloatBarrier
 

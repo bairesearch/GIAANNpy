@@ -36,7 +36,7 @@ if(useQuickExecution):
 	executionMode = "inference" 	#mandatory: "inference" (effective trainAndInference but uses a text datafile)
 	inferenceTrainFirstSequences = True	#trains first sequences in inference_prompt.txt, performs inference only on last sequence
 elif(useBenchmark):
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -536,8 +536,13 @@ randomiseColumnFeatureXposition = True	#shuffle x position of column internal fe
 
 
 #Information vars;
-printTimeDatabaseLoadSaveTimes = False
-printRamMaxUsage = False
+
+if(useBenchmark):
+	printTimeDatabaseLoadSaveTimes = True
+	printRamMaxUsage = True
+else:
+	printTimeDatabaseLoadSaveTimes = False
+	printRamMaxUsage = False
 if(useDrawNetworkIndependently):
 	printCountTotalParameters = True	#count number of connections in network
 else:

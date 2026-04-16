@@ -285,13 +285,19 @@ For standard execution (train or inference);
 #### Independent Database Draw execution
 
 ##### Generate the database
-edit GIAANNproto_globalDefs.py;
+
+edit `GIAANNproto_globalDefs.py`;
+
 * set `useDrawNetworkIndependently=False`
 * set `executionMode="train"`
 * select the database folder, e.g. `databaseFolderBase = "../database"`
-* `python GIAANNproto_main.py`
+
+`python GIAANNproto_main.py`
 
 ##### Generate the database svg/ldr files
+
+edit `GIAANNproto_globalDefs.py`;
+
 * set `useDrawNetworkIndependently=True`
 * select the database folder, e.g. `databaseFolderBase = "../database"`
 * select the `drawEfficient` settings:
@@ -301,7 +307,8 @@ edit GIAANNproto_globalDefs.py;
   * `drawEfficientGrid` - draws column feature neuron y positions at their real `featureIndex`
   * `drawEfficientCompact` - emulates the original draw visualisation of `drawEfficient=False` (but still not the same as no randomised horizontal position of nodes within columns)
   * `drawEfficientDrawDeadNeurons` - draw empty columns with no connected neurons
-* `python GIAANNproto_main.py`
+
+`python GIAANNproto_main.py`
 
 ##### 2D visualisation (drawEfficientFormat3D=False)
 
@@ -317,6 +324,12 @@ rustup default stable
 sudo apt install git build-essential pkg-config
 git clone -b branch-lineRendering --single-branch https://github.com/bairesearch/ldr_wgpu.git
 ```
+
+###### Set ldr_wgpu line draw distance
+
+edit `ldr_wgpu/src/lib.rs`;
+
+* set `pub const DRAW_DISTANCE: f32 = 100_000.0;`
 
 ###### Install LDRAW parts library
 ```

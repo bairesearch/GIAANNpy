@@ -116,20 +116,20 @@ def main():
 		GIAANNproto_debug.debugResetGpuRamMaxUsage()
 	if(useDrawNetworkIndependently):
 		executeDrawMode()
-		return
-	if(executionMode=="inference"):
-		executeMode(True)
-	elif(executionMode=="trainAndInference"):
-		executeMode(False) 
-		executeMode(True)
-	elif(executionMode=="train"):
-		executeMode(False)
+	else:
+		if(executionMode=="inference"):
+			executeMode(True)
+		elif(executionMode=="trainAndInference"):
+			executeMode(False) 
+			executeMode(True)
+		elif(executionMode=="train"):
+			executeMode(False)
 	if(debugPrintRamAverageUsage and not debugPrintRamCurrentUsage):
 		GIAANNproto_debug.debugPrintRamUsageSummary()
 	if(debugPrintRamMaxUsagePhaseLocal):
 		GIAANNproto_debug.debugPrintGpuRamMaxUsagePhaseLocalSummary()
-		if(printRamMaxUsage):
-			GIAANNproto_debug.debugPrintGpuRamMaxUsageSummary()
+	if(printRamMaxUsage):
+		GIAANNproto_debug.debugPrintGpuRamMaxUsageSummary()
 
 def getDrawModeDatabaseInferenceMode():
 	if(executionMode == "train"):
