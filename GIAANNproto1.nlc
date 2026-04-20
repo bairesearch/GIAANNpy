@@ -769,3 +769,5 @@ MANUAL; - set storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=False 
 MANUAL; - add option inferenceEvaluateTestSetTrainMaxSequences10M - create new version of longTestOscar2 that supports > 10m training sequences
 - upgrade useAutoresearch (printInferenceTop1Accuracy(), program.md) to also print training_seconds:, total_seconds:, peak_vram_mb:, peak_ram_mb:  (in addition to averageTop1Accuracy:, databaseMemoryGb:). Use autoresearchExecutionTimeInference and autoresearchExecutionTimeTrain.	
 MANUAL; - move all the "print vars (Information)" code from GIAANNproto_debug.py to GIAANNproto_count.py
+- patch GIAANNproto_databaseNetworkFiles:prepareDatabaseFilesStartup clear script path
+- patch clear.sh so the cleanup commands use rm -f -- ... at lines 2-5. Missing *.pkl, *.pt, GIAANNproto*.png, or POS/* no longer make the script exit with code 1.

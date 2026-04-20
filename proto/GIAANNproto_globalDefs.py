@@ -108,8 +108,9 @@ elif(useBenchmark):
 	trainMaxSequences = 5000	#5000, 200000, 1000000
 	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"
 elif(useAutoresearch):
-	trainMaxSequences = 5000
-	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"
+	trainMaxSequences = 500	#5000
+	#databaseFolderBase = "../database"
+	databaseFolderBase = "/media/user/ssdpro/GIAANN/databaseAutoresearch"
 elif(useDrawNetworkIndependently):
 	trainMaxSequences = 0	#not used
 	databaseFolderBase = "../database"	#default: "../database"	
@@ -289,6 +290,7 @@ if(useBenchmark):
 else:
 	databaseFolder = databaseFolderBase
 databaseFolder = databaseFolder + "/"
+databaseClearScriptName = "clear.sh"
 
 
 #Optimisations;

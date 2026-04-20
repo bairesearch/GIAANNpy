@@ -41,12 +41,14 @@ def prepareDatabaseFilesStartup():
 	return
 
 def clearDatabaseFiles():
-	clearScriptPath = os.path.join(databaseFolder, "clear.sh")
-	if(not os.path.isdir(databaseFolder)):
-		raise RuntimeError("clearDatabaseFiles error: missing databaseFolder = " + databaseFolder)
+	databaseFolderPath = os.path.abspath(os.path.join(os.path.dirname(__file__), databaseFolder))
+	clearScriptPath = os.path.join(databaseFolderPath, databaseClearScriptName)
+	clearScriptExecutionPath = "./" + databaseClearScriptName
+	if(not os.path.isdir(databaseFolderPath)):
+		raise RuntimeError("clearDatabaseFiles error: missing databaseFolder = " + databaseFolderPath)
 	if(not os.path.isfile(clearScriptPath)):
 		raise RuntimeError("clearDatabaseFiles error: missing clear.sh = " + clearScriptPath)
-	clearResult = subprocess.run(["bash", clearScriptPath], cwd=databaseFolder, check=False)
+	clearResult = subprocess.run(["bash", clearScriptExecutionPath], cwd=databaseFolderPath, check=False)
 	if(clearResult.returncode != 0):
 		raise RuntimeError("clearDatabaseFiles error: clear.sh failed with return code " + str(clearResult.returncode))
 	return
