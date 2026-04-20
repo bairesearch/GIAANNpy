@@ -20,6 +20,7 @@ GIA ANN proto debug helpers
 import torch as pt
 
 from GIAANNproto_globalDefs import *
+import GIAANNproto_count
 
 debugPrintGPUramUsage = debugPrintRamCurrentUsage or debugPrintRamAverageUsage or printRamMaxUsage or debugPrintRamMaxUsagePhaseLocal
 totalInferenceTokensSeed = 0
@@ -65,22 +66,11 @@ if(debugPrintGPUramUsage):
 				print(printText)
 		return
 
-	def debugResetGpuRamMaxUsage():
-		if(printRamMaxUsage or debugPrintRamMaxUsagePhaseLocal):
-			global debugPrintGpuRamMaxUsageProgramAllocatedBytes
-			global debugPrintGpuRamMaxUsageProgramReservedBytes
-			debugPrintGpuRamMaxUsageProgramAllocatedBytes = 0
-			debugPrintGpuRamMaxUsageProgramReservedBytes = 0
-			gpuRamUsageDevice = debugGetGpuRamUsageDevice()
-			if(gpuRamUsageDevice is not None):
-				pt.cuda.reset_peak_memory_stats(gpuRamUsageDevice)
-		return
-
 	def debugResetGpuRamMaxUsagePhaseLocal(label):
 		if(debugPrintRamMaxUsagePhaseLocal):
 			if(label is None or label == ""):
 				raise RuntimeError("debugResetGpuRamMaxUsagePhaseLocal error: label must not be empty")
-			gpuRamUsageDevice = debugGetGpuRamUsageDevice()
+			gpuRamUsageDevice = GIAANNproto_count.countGetGpuRamUsageDevice()
 			if(gpuRamUsageDevice is not None):
 				pt.cuda.reset_peak_memory_stats(gpuRamUsageDevice)
 		return
@@ -89,8 +79,8 @@ if(debugPrintGPUramUsage):
 		if(debugPrintRamMaxUsagePhaseLocal):
 			if(label is None or label == ""):
 				raise RuntimeError("debugRecordGpuRamMaxUsagePhaseLocal error: label must not be empty")
-			gpuRamMaxAllocatedUsageBytes = debugGetGpuRamMaxAllocatedUsageBytes()
-			gpuRamMaxReservedUsageBytes = debugGetGpuRamMaxReservedUsageBytes()
+			gpuRamMaxAllocatedUsageBytes = GIAANNproto_count.countGetGpuRamMaxAllocatedUsageBytes()
+			gpuRamMaxReservedUsageBytes = GIAANNproto_count.countGetGpuRamMaxReservedUsageBytes()
 			debugRecordGpuRamMaxUsagePhaseLocalValue(label, gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes)
 		return
 
@@ -115,14 +105,47 @@ if(debugPrintGPUramUsage):
 			phaseLocalStatistics["sampleCount"] = phaseLocalStatistics["sampleCount"] + 1
 		return
 
+	def debugUpdateGpuRamMaxUsageProgramStatistics(gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes):
+		global debugPrintGpuRamMaxUsageProgramAllocatedBytes
+		global debugPrintGpuRamMaxUsageProgramReservedBytes
+		if(gpuRamMaxAllocatedUsageBytes < 0):
+			raise RuntimeError("debugUpdateGpuRamMaxUsageProgramStatistics error: gpuRamMaxAllocatedUsageBytes must be >= 0")
+		if(gpuRamMaxReservedUsageBytes < 0):
+			raise RuntimeError("debugUpdateGpuRamMaxUsageProgramStatistics error: gpuRamMaxReservedUsageBytes must be >= 0")
+		if(gpuRamMaxAllocatedUsageBytes > debugPrintGpuRamMaxUsageProgramAllocatedBytes):
+			debugPrintGpuRamMaxUsageProgramAllocatedBytes = gpuRamMaxAllocatedUsageBytes
+		if(gpuRamMaxReservedUsageBytes > debugPrintGpuRamMaxUsageProgramReservedBytes):
+			debugPrintGpuRamMaxUsageProgramReservedBytes = gpuRamMaxReservedUsageBytes
+		return
+
+	def debugResetPhaseLocalProgramPeakTracking():
+		if(debugPrintRamMaxUsagePhaseLocal):
+			global debugPrintGpuRamMaxUsageProgramAllocatedBytes
+			global debugPrintGpuRamMaxUsageProgramReservedBytes
+			debugPrintGpuRamMaxUsageProgramAllocatedBytes = 0
+			debugPrintGpuRamMaxUsageProgramReservedBytes = 0
+			gpuRamUsageDevice = GIAANNproto_count.countGetGpuRamUsageDevice()
+			if(gpuRamUsageDevice is not None):
+				pt.cuda.reset_peak_memory_stats(gpuRamUsageDevice)
+		return
+
+	def debugPrintPhaseLocalProgramPeakSummary():
+		if(debugPrintRamMaxUsagePhaseLocal):
+			gpuRamMaxAllocatedUsageBytes = debugPrintGpuRamMaxUsageProgramAllocatedBytes
+			gpuRamMaxReservedUsageBytes = debugPrintGpuRamMaxUsageProgramReservedBytes
+			cpuRamMaxUsageBytes = GIAANNproto_count.countGetCpuRamMaxUsageBytes()
+			printText = "debugPrintGPUramUsage max: program, gpuRamMaxAllocatedUsageGb = " + debugConvertRamUsageBytesToGigabytesText(gpuRamMaxAllocatedUsageBytes) + ", gpuRamMaxReservedUsageGb = " + debugConvertRamUsageBytesToGigabytesText(gpuRamMaxReservedUsageBytes) + ", cpuRamMaxUsageGb = " + debugConvertRamUsageBytesToGigabytesText(cpuRamMaxUsageBytes)
+			print(printText)
+		return
+
 	def debugRecordGpuRamMaxUsagePhaseLocalGrouped(label, aggregateLabel=None):
 		if(debugPrintRamMaxUsagePhaseLocal):
 			if(label is None or label == ""):
 				raise RuntimeError("debugRecordGpuRamMaxUsagePhaseLocalGrouped error: label must not be empty")
 			if(aggregateLabel is not None and aggregateLabel == ""):
 				raise RuntimeError("debugRecordGpuRamMaxUsagePhaseLocalGrouped error: aggregateLabel must not be empty")
-			gpuRamMaxAllocatedUsageBytes = debugGetGpuRamMaxAllocatedUsageBytes()
-			gpuRamMaxReservedUsageBytes = debugGetGpuRamMaxReservedUsageBytes()
+			gpuRamMaxAllocatedUsageBytes = GIAANNproto_count.countGetGpuRamMaxAllocatedUsageBytes()
+			gpuRamMaxReservedUsageBytes = GIAANNproto_count.countGetGpuRamMaxReservedUsageBytes()
 			debugRecordGpuRamMaxUsagePhaseLocalValue(label, gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes)
 			if(aggregateLabel is not None):
 				debugRecordGpuRamMaxUsagePhaseLocalValue(aggregateLabel, gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes)
@@ -139,32 +162,6 @@ if(debugPrintGPUramUsage):
 				gpuRamMaxReservedUsageBytes = phaseLocalStatistics["gpuRamMaxReservedUsageBytes"]
 				printText = "debugPrintGPUramUsage max phase-local: " + label + ", gpuRamMaxAllocatedUsageGb = " + debugConvertRamUsageBytesToGigabytesText(gpuRamMaxAllocatedUsageBytes) + ", gpuRamMaxReservedUsageGb = " + debugConvertRamUsageBytesToGigabytesText(gpuRamMaxReservedUsageBytes) + ", sampleCount = " + str(sampleCount)
 				print(printText)
-		return
-
-	def debugPrintGpuRamMaxUsageSummary():
-		if(printRamMaxUsage):
-			gpuRamMaxAllocatedUsageBytes = debugGetGpuRamMaxAllocatedUsageBytes()
-			gpuRamMaxReservedUsageBytes = debugGetGpuRamMaxReservedUsageBytes()
-			cpuRamMaxUsageBytes = debugGetCpuRamMaxUsageBytes()
-			if(debugPrintRamMaxUsagePhaseLocal):
-				debugUpdateGpuRamMaxUsageProgramStatistics(gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes)
-				gpuRamMaxAllocatedUsageBytes = debugPrintGpuRamMaxUsageProgramAllocatedBytes
-				gpuRamMaxReservedUsageBytes = debugPrintGpuRamMaxUsageProgramReservedBytes
-			printText = "debugPrintGPUramUsage max: program, gpuRamMaxAllocatedUsageGb = " + debugConvertRamUsageBytesToGigabytesText(gpuRamMaxAllocatedUsageBytes) + ", gpuRamMaxReservedUsageGb = " + debugConvertRamUsageBytesToGigabytesText(gpuRamMaxReservedUsageBytes) + ", cpuRamMaxUsageGb = " + debugConvertRamUsageBytesToGigabytesText(cpuRamMaxUsageBytes)
-			print(printText)
-		return
-
-	def debugUpdateGpuRamMaxUsageProgramStatistics(gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes):
-		global debugPrintGpuRamMaxUsageProgramAllocatedBytes
-		global debugPrintGpuRamMaxUsageProgramReservedBytes
-		if(gpuRamMaxAllocatedUsageBytes < 0):
-			raise RuntimeError("debugUpdateGpuRamMaxUsageProgramStatistics error: gpuRamMaxAllocatedUsageBytes must be >= 0")
-		if(gpuRamMaxReservedUsageBytes < 0):
-			raise RuntimeError("debugUpdateGpuRamMaxUsageProgramStatistics error: gpuRamMaxReservedUsageBytes must be >= 0")
-		if(gpuRamMaxAllocatedUsageBytes > debugPrintGpuRamMaxUsageProgramAllocatedBytes):
-			debugPrintGpuRamMaxUsageProgramAllocatedBytes = gpuRamMaxAllocatedUsageBytes
-		if(gpuRamMaxReservedUsageBytes > debugPrintGpuRamMaxUsageProgramReservedBytes):
-			debugPrintGpuRamMaxUsageProgramReservedBytes = gpuRamMaxReservedUsageBytes
 		return
 
 	def debugGetRamUsageStatistics(label, gpuRamCurrentAllocatedUsageBytes, gpuRamCurrentReservedUsageBytes, cpuRamCurrentUsageBytes):
@@ -193,77 +190,24 @@ if(debugPrintGPUramUsage):
 
 	def debugGetGpuRamCurrentAllocatedUsageBytes():
 		result = 0
-		gpuRamUsageDevice = debugGetGpuRamUsageDevice()
+		gpuRamUsageDevice = GIAANNproto_count.countGetGpuRamUsageDevice()
 		if(gpuRamUsageDevice is not None):
 			result = int(pt.cuda.memory_allocated(gpuRamUsageDevice))
 		return result
 
 	def debugGetGpuRamCurrentReservedUsageBytes():
 		result = 0
-		gpuRamUsageDevice = debugGetGpuRamUsageDevice()
+		gpuRamUsageDevice = GIAANNproto_count.countGetGpuRamUsageDevice()
 		if(gpuRamUsageDevice is not None):
 			result = int(pt.cuda.memory_reserved(gpuRamUsageDevice))
 		return result
 
-	def debugGetGpuRamMaxAllocatedUsageBytes():
-		result = 0
-		gpuRamUsageDevice = debugGetGpuRamUsageDevice()
-		if(gpuRamUsageDevice is not None):
-			result = int(pt.cuda.max_memory_allocated(gpuRamUsageDevice))
-		return result
-
-	def debugGetGpuRamMaxReservedUsageBytes():
-		result = 0
-		gpuRamUsageDevice = debugGetGpuRamUsageDevice()
-		if(gpuRamUsageDevice is not None):
-			result = int(pt.cuda.max_memory_reserved(gpuRamUsageDevice))
-		return result
-
-	def debugGetGpuRamUsageDevice():
-		result = None
-		if(deviceDense.type == "cuda"):
-			result = deviceDense
-		elif(deviceSparse.type == "cuda"):
-			result = deviceSparse
-		elif(deviceFileIO.type == "cuda"):
-			result = deviceFileIO
-		elif(deviceDatabase.type == "cuda"):
-			result = deviceDatabase
-		elif(pt.cuda.is_available()):
-			result = pt.device("cuda")
-		return result
-
 	def debugGetCpuRamCurrentUsageBytes():
-		result = debugGetCpuRamUsageBytesByProcStatusField("VmRSS", "debugGetCpuRamCurrentUsageBytes")
-		return result
-
-	def debugGetCpuRamMaxUsageBytes():
-		result = debugGetCpuRamUsageBytesByProcStatusField("VmHWM", "debugGetCpuRamMaxUsageBytes")
-		return result
-
-	def debugGetCpuRamUsageBytesByProcStatusField(memoryFieldName, functionName):
-		if(memoryFieldName is None or memoryFieldName == ""):
-			raise RuntimeError("debugGetCpuRamUsageBytesByProcStatusField error: memoryFieldName must not be empty")
-		if(functionName is None or functionName == ""):
-			raise RuntimeError("debugGetCpuRamUsageBytesByProcStatusField error: functionName must not be empty")
-		result = None
-		processStatusFieldKey = memoryFieldName + ":"
-		with open("/proc/self/status", "r") as processStatusFile:
-			for processStatusLine in processStatusFile:
-				if(processStatusLine.startswith(processStatusFieldKey)):
-					processStatusFields = processStatusLine.split()
-					if(len(processStatusFields) < 2):
-						raise RuntimeError(functionName + " error: " + processStatusFieldKey + " line is malformed")
-					result = int(processStatusFields[1]) * 1024
-		if(result is None):
-			raise RuntimeError(functionName + " error: " + processStatusFieldKey + " not found in /proc/self/status")
+		result = GIAANNproto_count.countGetCpuRamUsageBytesByProcStatusField("VmRSS", "debugGetCpuRamCurrentUsageBytes")
 		return result
 
 	def debugConvertRamUsageBytesToGigabytesText(ramUsageBytes):
-		if(ramUsageBytes < 0):
-			raise RuntimeError("debugConvertRamUsageBytesToGigabytesText error: ramUsageBytes must be >= 0")
-		result = f"{(float(ramUsageBytes) / (1024.0*1024.0*1024.0)):.4f}"
-		return result
+		return GIAANNproto_count.countConvertRamUsageBytesToGigabytesText(ramUsageBytes)
 
 def resetTotalInferenceTokens():
 	if(debugPrintTotalInferenceTokens):
@@ -292,51 +236,6 @@ def addTotalInferenceTokens(seedTokensCount, predictionTokensCount):
 def printTotalInferenceTokens():
 	if(debugPrintTotalInferenceTokens):
 		print("debugPrintTotalInferenceTokens: seedPhaseTokens = ", totalInferenceTokensSeed, ", predictionPhaseTokens = ", totalInferenceTokensPrediction, ", totalInferenceTokens = ", totalInferenceTokensAll)
-	return
-
-def getDebugPrintTimeDatabaseLoadSaveTimesExecutionModeCount():
-	result = 0
-	if(executionMode=="inference"):
-		result = 1
-	elif(executionMode=="trainAndInference"):
-		result = 2
-	elif(executionMode=="train"):
-		result = 1
-	else:
-		raise RuntimeError("getDebugPrintTimeDatabaseLoadSaveTimesExecutionModeCount error: unsupported executionMode = " + str(executionMode))
-	return result
-
-def getDebugPrintTimeDatabaseLoadSaveTimesHoursMinutesSecondsText(executionTimeSeconds):
-	if(executionTimeSeconds < 0):
-		raise RuntimeError("getDebugPrintTimeDatabaseLoadSaveTimesHoursMinutesSecondsText error: executionTimeSeconds must be >= 0")
-	totalExecutionTimeSecondsInteger = int(executionTimeSeconds)
-	executionHours = totalExecutionTimeSecondsInteger // 3600
-	executionMinutes = (totalExecutionTimeSecondsInteger % 3600) // 60
-	executionSeconds = totalExecutionTimeSecondsInteger % 60
-	result = f"{executionHours:02d}:{executionMinutes:02d}:{executionSeconds:02d}"
-	return result
-
-def getDebugPrintTimeDatabaseLoadSaveTimesText(executionTimeSeconds):
-	if(executionTimeSeconds < 0):
-		raise RuntimeError("getDebugPrintTimeDatabaseLoadSaveTimesText error: executionTimeSeconds must be >= 0")
-	executionTimeHoursMinutesSecondsText = getDebugPrintTimeDatabaseLoadSaveTimesHoursMinutesSecondsText(executionTimeSeconds)
-	result = executionTimeHoursMinutesSecondsText + " [" + f"{executionTimeSeconds:.6f}" + " seconds]"
-	return result
-
-def printDebugPrintTimeDatabaseLoadSaveTimesEntry(executionTimeName, executionTimeSeconds):
-	executionTimeText = getDebugPrintTimeDatabaseLoadSaveTimesText(executionTimeSeconds)
-	print(executionTimeName + ": " + executionTimeText)
-	return
-
-def printDebugPrintTimeDatabaseLoadSaveTimesSummary(summaryName, totalExecutionTimeSeconds, loadAllObservedColumnsToRamExecutionTimeSeconds, saveAllObservedColumnsToDiskExecutionTimeSeconds):
-	processingExecutionTimeSeconds = totalExecutionTimeSeconds - loadAllObservedColumnsToRamExecutionTimeSeconds - saveAllObservedColumnsToDiskExecutionTimeSeconds
-	if(processingExecutionTimeSeconds < 0):
-		raise RuntimeError("printDebugPrintTimeDatabaseLoadSaveTimesSummary error: processingExecutionTimeSeconds must be >= 0")
-	print(summaryName)
-	printDebugPrintTimeDatabaseLoadSaveTimesEntry("total execution time", totalExecutionTimeSeconds)
-	printDebugPrintTimeDatabaseLoadSaveTimesEntry("loadAllObservedColumnsToRam execution time", loadAllObservedColumnsToRamExecutionTimeSeconds)
-	printDebugPrintTimeDatabaseLoadSaveTimesEntry("saveAllObservedColumnsToDisk execution time", saveAllObservedColumnsToDiskExecutionTimeSeconds)
-	printDebugPrintTimeDatabaseLoadSaveTimesEntry("processing time", processingExecutionTimeSeconds)
 	return
 
 def debugTrainSectionTimesReset(databaseNetworkObject, sequenceCount):

@@ -47,20 +47,20 @@ def printCountTotalParametersRun(databaseNetworkObject):
 		if(not usePersistedGlobalFeatureNeurons):
 			totalFeatureNeurons += loadAndCountObservedColumnFeatureNeurons(databaseNetworkObject, conceptIndex)
 	databasePtSizeGb = debugCalculateDatabasePtSizeGiB()
-	memoryGb = debugCalculateDatabaseSizeGiB()
+	databaseMemoryGb = debugCalculateDatabaseSizeGiB()
 	if(printCountTotalParameters):
 		numberNeurons = totalFeatureNeurons
 		numberConnections = totalConnections
 		numberColumns = totalColumns
 		numberFeatures = databaseNetworkObject.f
-		databaseSizeGB = memoryGb
+		databaseSizeGB = databaseMemoryGb
 		#print(f"Total .pt size (uncompressed GB): {databasePtSizeGb:.3f}")
 		print(f"neurons: {numberNeurons}")
 		print(f"connections: {numberConnections}")
 		print(f"columns: {numberColumns}")
 		print(f"features: {numberFeatures}")
 		print(f"database size (uncompressed GB): {databaseSizeGB:.3f}")
-	return memoryGb
+	return databaseMemoryGb
 
 def countUsesPersistedGlobalFeatureNeurons():
 	import GIAANNproto_databaseNetworkFiles
@@ -195,4 +195,124 @@ def applyDebugLimitFeatureNeuronsTensor(tensor, fLimit, tensorName):
 				result = pt.sparse_coo_tensor(indices, values, size=newSize, dtype=tensor.dtype, device=tensor.device).coalesce()
 			else:
 				result = tensor[:, :, :, :capF]
+	return result
+
+def countResetGpuRamMaxUsage():
+	if(printRamMaxUsage or useAutoresearch):
+		gpuRamUsageDevice = countGetGpuRamUsageDevice()
+		if(gpuRamUsageDevice is not None):
+			pt.cuda.reset_peak_memory_stats(gpuRamUsageDevice)
+	return
+
+def countPrintGpuRamMaxUsageSummary():
+	if(printRamMaxUsage):
+		gpuRamMaxAllocatedUsageBytes = countGetGpuRamMaxAllocatedUsageBytes()
+		gpuRamMaxReservedUsageBytes = countGetGpuRamMaxReservedUsageBytes()
+		cpuRamMaxUsageBytes = countGetCpuRamMaxUsageBytes()
+		if(useAutoresearch):
+			raise RuntimeError("countPrintGpuRamMaxUsageSummary error: useAutoresearch path is not implemented")
+		else:
+			printText = "debugPrintGPUramUsage max: program, gpuRamMaxAllocatedUsageGb = " + countConvertRamUsageBytesToGigabytesText(gpuRamMaxAllocatedUsageBytes) + ", gpuRamMaxReservedUsageGb = " + countConvertRamUsageBytesToGigabytesText(gpuRamMaxReservedUsageBytes) + ", cpuRamMaxUsageGb = " + countConvertRamUsageBytesToGigabytesText(cpuRamMaxUsageBytes)
+		print(printText)
+	return
+
+def countConvertRamUsageBytesToGigabytesText(ramUsageBytes):
+	if(ramUsageBytes < 0):
+		raise RuntimeError("countConvertRamUsageBytesToGigabytesText error: ramUsageBytes must be >= 0")
+	result = f"{(float(ramUsageBytes) / (1024.0*1024.0*1024.0)):.4f}"
+	return result
+	
+def countGetGpuRamMaxAllocatedUsageBytes():
+	result = 0
+	gpuRamUsageDevice = countGetGpuRamUsageDevice()
+	if(gpuRamUsageDevice is not None):
+		result = int(pt.cuda.max_memory_allocated(gpuRamUsageDevice))
+	return result
+
+def countGetGpuRamMaxReservedUsageBytes():
+	result = 0
+	gpuRamUsageDevice = countGetGpuRamUsageDevice()
+	if(gpuRamUsageDevice is not None):
+		result = int(pt.cuda.max_memory_reserved(gpuRamUsageDevice))
+	return result
+
+def countGetCpuRamMaxUsageBytes():
+	result = countGetCpuRamUsageBytesByProcStatusField("VmHWM", "countGetCpuRamMaxUsageBytes")
+	return result
+
+def countGetCpuRamUsageBytesByProcStatusField(memoryFieldName, functionName):
+	if(memoryFieldName is None or memoryFieldName == ""):
+		raise RuntimeError("countGetCpuRamUsageBytesByProcStatusField error: memoryFieldName must not be empty")
+	if(functionName is None or functionName == ""):
+		raise RuntimeError("countGetCpuRamUsageBytesByProcStatusField error: functionName must not be empty")
+	result = None
+	processStatusFieldKey = memoryFieldName + ":"
+	with open("/proc/self/status", "r") as processStatusFile:
+		for processStatusLine in processStatusFile:
+			if(processStatusLine.startswith(processStatusFieldKey)):
+				processStatusFields = processStatusLine.split()
+				if(len(processStatusFields) < 2):
+					raise RuntimeError(functionName + " error: " + processStatusFieldKey + " line is malformed")
+				result = int(processStatusFields[1]) * 1024
+	if(result is None):
+		raise RuntimeError(functionName + " error: " + processStatusFieldKey + " not found in /proc/self/status")
+	return result
+
+def countGetGpuRamUsageDevice():
+	result = None
+	if(deviceDense.type == "cuda"):
+		result = deviceDense
+	elif(deviceSparse.type == "cuda"):
+		result = deviceSparse
+	elif(deviceFileIO.type == "cuda"):
+		result = deviceFileIO
+	elif(deviceDatabase.type == "cuda"):
+		result = deviceDatabase
+	elif(pt.cuda.is_available()):
+		result = pt.device("cuda")
+	return result
+
+def printCountPrintTimeDatabaseLoadSaveTimesSummary(summaryName, totalExecutionTimeSeconds, loadAllObservedColumnsToRamExecutionTimeSeconds, saveAllObservedColumnsToDiskExecutionTimeSeconds):
+	processingExecutionTimeSeconds = totalExecutionTimeSeconds - loadAllObservedColumnsToRamExecutionTimeSeconds - saveAllObservedColumnsToDiskExecutionTimeSeconds
+	if(processingExecutionTimeSeconds < 0):
+		raise RuntimeError("printCountPrintTimeDatabaseLoadSaveTimesSummary error: processingExecutionTimeSeconds must be >= 0")
+	print(summaryName)
+	printCountPrintTimeDatabaseLoadSaveTimesEntry("total execution time", totalExecutionTimeSeconds)
+	printCountPrintTimeDatabaseLoadSaveTimesEntry("loadAllObservedColumnsToRam execution time", loadAllObservedColumnsToRamExecutionTimeSeconds)
+	printCountPrintTimeDatabaseLoadSaveTimesEntry("saveAllObservedColumnsToDisk execution time", saveAllObservedColumnsToDiskExecutionTimeSeconds)
+	printCountPrintTimeDatabaseLoadSaveTimesEntry("processing time", processingExecutionTimeSeconds)
+	return
+
+def printCountPrintTimeDatabaseLoadSaveTimesEntry(executionTimeName, executionTimeSeconds):
+	executionTimeText = getCountPrintTimeDatabaseLoadSaveTimesText(executionTimeSeconds)
+	print(executionTimeName + ": " + executionTimeText)
+	return
+
+def getCountPrintTimeDatabaseLoadSaveTimesText(executionTimeSeconds):
+	if(executionTimeSeconds < 0):
+		raise RuntimeError("getCountPrintTimeDatabaseLoadSaveTimesText error: executionTimeSeconds must be >= 0")
+	executionTimeHoursMinutesSecondsText = getCountPrintTimeDatabaseLoadSaveTimesHoursMinutesSecondsText(executionTimeSeconds)
+	result = executionTimeHoursMinutesSecondsText + " [" + f"{executionTimeSeconds:.6f}" + " seconds]"
+	return result
+
+def getCountPrintTimeDatabaseLoadSaveTimesHoursMinutesSecondsText(executionTimeSeconds):
+	if(executionTimeSeconds < 0):
+		raise RuntimeError("getCountPrintTimeDatabaseLoadSaveTimesHoursMinutesSecondsText error: executionTimeSeconds must be >= 0")
+	totalExecutionTimeSecondsInteger = int(executionTimeSeconds)
+	executionHours = totalExecutionTimeSecondsInteger // 3600
+	executionMinutes = (totalExecutionTimeSecondsInteger % 3600) // 60
+	executionSeconds = totalExecutionTimeSecondsInteger % 60
+	result = f"{executionHours:02d}:{executionMinutes:02d}:{executionSeconds:02d}"
+	return result
+
+def getCountPrintTimeDatabaseLoadSaveTimesExecutionModeCount():
+	result = 0
+	if(executionMode=="inference"):
+		result = 1
+	elif(executionMode=="trainAndInference"):
+		result = 2
+	elif(executionMode=="train"):
+		result = 1
+	else:
+		raise RuntimeError("getCountPrintTimeDatabaseLoadSaveTimesExecutionModeCount error: unsupported executionMode = " + str(executionMode))
 	return result

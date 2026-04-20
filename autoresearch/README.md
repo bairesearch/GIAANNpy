@@ -2,7 +2,7 @@
 
 This is a readme for the GIAANN autoresearch project. See ../README.md for the repository readme file.
 
-The idea: give an AI agent a small but real GIAANN model training setup and let it experiment autonomously overnight. It modifies the code, trains for 5 minutes, checks if the result improved, keeps or discards, and repeats. You wake up in the morning to a log of experiments and (hopefully) a better model. The training code is GIAANN/proto. The core idea is that you're not touching any of the Python files like you normally would as a researcher. Instead, you are programming the `program.md` Markdown files that provide context to the AI agents and set up your autonomous research org. The default `program.md` in this repo is intentionally kept as a bare bones baseline, though it's obvious how one would iterate on it over time to find the "research org code" that achieves the fastest research progress, how you'd add more agents to the mix, etc.
+The idea: the human researcher gives an AI agent a small but real GIAANN model training setup and lets it experiment autonomously overnight. It modifies the code, trains for approximately 5 minutes, checks if the result improved, keeps or discards, and repeats. You wake up in the morning to a log of experiments and (hopefully) a better model. The training code is in GIAANN/proto. The core idea is that the human researcher is not touching any of the Python files like they normally would. Instead, they are programming the `program.md` Markdown files that provide context to the AI agents and set up their autonomous research org. The default `program.md` in this repo is intentionally kept as a bare bones baseline, though it's obvious how they would iterate on it over time to find the "research org code" that achieves the fastest research progress, how they would add more agents to the mix, etc.
 
 ## How it works
 
@@ -23,7 +23,7 @@ See paper/GIAANN-paper-WIP/*.tex
 
 ## Running the agent
 
-Simply spin up your Codex in this repo (and disable all permissions), then you can prompt something like:
+Simply spin up your Codex in this repo (set permissions), then you can prompt something like:
 
 ```
 Hi have a look at program.md and let's kick off a new experiment! let's do the setup first.

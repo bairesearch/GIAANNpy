@@ -107,7 +107,7 @@ def addInferenceTop1AccuracyBitsPerByteBytes(sequenceRaw):
 		totalInferenceTop1BitsPerByteBytes += sequenceBytes
 	return
 
-def printInferenceTop1Accuracy(databaseNetworkObject):
+def printInferenceTop1Accuracy(databaseNetworkObject, autoresearchExecutionTimeInference=None, autoresearchExecutionTimeTrain=None):
 	if(printInferenceTop1Accuracy):
 		if(printInferenceTop1AccuracyBitsPerByte):
 			if(totalInferenceTop1BitsPerByteTokens <= 0):
@@ -139,13 +139,10 @@ def printInferenceTop1Accuracy(databaseNetworkObject):
 						valLoss = totalInferenceTop1NegativeLogProbabilitySum / totalInferenceTop1BitsPerByteTokens
 						bitsPerByte = (valLoss / math.log(2.0)) * (totalInferenceTop1BitsPerByteTokens / totalInferenceTop1BitsPerByteBytes)
 				if(useAutoresearch):
-					print("---")
 					if(printInferenceTop1AccuracyBitsPerByteModified):
-						print("averageTop1BitsPerByteModified: ", bitsPerByte)
+						printInferenceTop1AccuracyAutoresearchSummary(databaseNetworkObject, "averageTop1BitsPerByteModified", bitsPerByte, autoresearchExecutionTimeInference, autoresearchExecutionTimeTrain)
 					else:
-						print("averageTop1BitsPerByte: ", bitsPerByte)
-					memory_gb = GIAANNproto_count.printCountTotalParametersRun(databaseNetworkObject)
-					print("memory_gb: ", memory_gb)
+						printInferenceTop1AccuracyAutoresearchSummary(databaseNetworkObject, "averageTop1BitsPerByte", bitsPerByte, autoresearchExecutionTimeInference, autoresearchExecutionTimeTrain)
 				else:
 					if(printInferenceTop1AccuracyBitsPerByteModified):
 						print("averageTop1BitsPerByteModified: bitsPerByte = ", bitsPerByte, ", valLoss = ", valLoss, ", averageProbability = ", averageProbabilityModified, ", inferenceTokens = ", totalInferenceTop1BitsPerByteTokens, ", inferenceBytes = ", totalInferenceTop1BitsPerByteBytes)
@@ -157,15 +154,44 @@ def printInferenceTop1Accuracy(databaseNetworkObject):
 			predictionAccuracy = totalInferenceTop1PredictionMatches / totalInferenceTop1PredictionTokens
 			inferenceAccuracy = totalInferenceTop1Matches / totalInferenceTop1Tokens
 			if(useAutoresearch):
-				print("---")
-				print("averageTop1Accuracy: ", predictionAccuracy)
-				memory_gb = GIAANNproto_count.printCountTotalParametersRun(databaseNetworkObject)
-				print("memory_gb: ", memory_gb)
+				printInferenceTop1AccuracyAutoresearchSummary(databaseNetworkObject, "averageTop1Accuracy", predictionAccuracy, autoresearchExecutionTimeInference, autoresearchExecutionTimeTrain)
 			else:
 				if(inferenceReportTokenAccuracyConstrainByColumn):
 					print("averageTop1Accuracy (col): predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
 				else:
 					print("averageTop1Accuracy: predictionTokens = ", predictionAccuracy, ", inferenceTokens = ", inferenceAccuracy)
+	return
+
+def printInferenceTop1AccuracyAutoresearchSummary(databaseNetworkObject, metricName, metricValue, autoresearchExecutionTimeInference, autoresearchExecutionTimeTrain):
+	if(databaseNetworkObject is None):
+		raise RuntimeError("printInferenceTop1AccuracyAutoresearchSummary error: databaseNetworkObject is None")
+	if(metricName is None or metricName == ""):
+		raise RuntimeError("printInferenceTop1AccuracyAutoresearchSummary error: metricName must not be empty")
+	if(metricValue is None):
+		raise RuntimeError("printInferenceTop1AccuracyAutoresearchSummary error: metricValue is None")
+	if(autoresearchExecutionTimeInference is None):
+		raise RuntimeError("printInferenceTop1AccuracyAutoresearchSummary error: autoresearchExecutionTimeInference is None")
+	if(autoresearchExecutionTimeTrain is None):
+		raise RuntimeError("printInferenceTop1AccuracyAutoresearchSummary error: autoresearchExecutionTimeTrain is None")
+	if(autoresearchExecutionTimeInference < 0.0):
+		raise RuntimeError("printInferenceTop1AccuracyAutoresearchSummary error: autoresearchExecutionTimeInference must be >= 0")
+	if(autoresearchExecutionTimeTrain < 0.0):
+		raise RuntimeError("printInferenceTop1AccuracyAutoresearchSummary error: autoresearchExecutionTimeTrain must be >= 0")
+	totalExecutionTimeSeconds = autoresearchExecutionTimeTrain + autoresearchExecutionTimeInference
+	if(totalExecutionTimeSeconds < 0.0):
+		raise RuntimeError("printInferenceTop1AccuracyAutoresearchSummary error: totalExecutionTimeSeconds must be >= 0")
+	peakVramBytes = max(GIAANNproto_count.countGetGpuRamMaxAllocatedUsageBytes(), GIAANNproto_count.countGetGpuRamMaxReservedUsageBytes())
+	peakRamBytes = GIAANNproto_count.countGetCpuRamMaxUsageBytes()
+	peakVramMb = float(peakVramBytes) / (1024.0 * 1024.0)
+	peakRamMb = float(peakRamBytes) / (1024.0 * 1024.0)
+	print("---")
+	print(metricName + ": ", metricValue)
+	databaseMemoryGb = GIAANNproto_count.printCountTotalParametersRun(databaseNetworkObject)
+	print("databaseMemoryGb: ", databaseMemoryGb)
+	print("training_seconds: ", autoresearchExecutionTimeTrain)
+	print("total_seconds: ", totalExecutionTimeSeconds)
+	print("peak_vram_mb: ", peakVramMb)
+	print("peak_ram_mb: ", peakRamMb)
 	return
 
 def addInferenceTop1AccuracyCountPadding(numSeedTokens, numPredictionTokens, seedTokensProcessed, predictionTokensProcessed):

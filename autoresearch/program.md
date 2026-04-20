@@ -49,14 +49,18 @@ Once the code finishes it prints a summary like this:
 ```
 ---
 averageTop1Accuracy: 0.8108882521489972
-memory_gb: 2.4
+databaseMemoryGb: 2.4
+training_seconds: 298.4125513479953
+total_seconds: 307.1849021180244
+peak_vram_mb: 11872.53125
+peak_ram_mb: 18463.75
 ```
 
 Note that the code (when useAutoresearch=True) is configured to always train the first 5000 oscar dataset sequences, and test using the sequences within inference_prompt.txt.longTestOscar (during inferenceMode).
 
-You can extract the key metric from the log file:
+You can extract the key metrics from the log file:
 
-grep "^averageTop1Accuracy:" run.log
+grep "^averageTop1Accuracy:\|^databaseMemoryGb:\|^training_seconds:\|^total_seconds:\|^peak_vram_mb:\|^peak_ram_mb:" run.log
 
 ## Logging results
 
@@ -65,19 +69,19 @@ When an experiment is done, log the results to `results.tsv` (tab-separated, NOT
 The TSV has a header row and 5 columns:
 
 ```
-commit	averageTop1Accuracy	memory_gb	status	description
+commit	averageTop1Accuracy	databaseMemoryGb	status	description
 ```
 
 1. git commit hash (short, 7 chars)
 2. averageTop1Accuracy achieved (e.g. 0.8108882) - use 0.000000 for crashes
-3. memory_gb (database memory in GB), round to .1f (e.g. 2.4) - use 0.0 for crashes
+3. databaseMemoryGb (database memory in GB), round to .1f (e.g. 2.4) - use 0.0 for crashes
 4. status: `keep`, `discard`, or `crash`
 5. short text description of what this experiment tried
 
 Example:
 
 ```
-commit	averageTop1Accuracy	memory_gb	status	description
+commit	averageTop1Accuracy	databaseMemoryGb	status	description
 a1b2c3d	0.810888	2.4	keep	baseline
 b2c3d4e	0.823200	2.8	keep	increase segment count to 18
 c3d4e5f	0.805000	2.4	discard	decrease segment count to 4
@@ -106,7 +110,7 @@ cd ../autoresearch/
 
 > (redirect everything - do NOT use tee or let output flood your context)
 
-5. Read out the results: `grep "^averageTop1Accuracy:\|^memory_gb:" run.log`
+5. Read out the results: `grep "^averageTop1Accuracy:\|^databaseMemoryGb:\|^training_seconds:\|^total_seconds:\|^peak_vram_mb:\|^peak_ram_mb:" run.log`
 
 6. If the grep output is empty, the run crashed. Run `tail -n 50 run.log` to read the Python stack trace and attempt a fix. If you can't get things to work after more than a few attempts, give up.
 

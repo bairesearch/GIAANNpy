@@ -36,7 +36,7 @@ if(useQuickExecution):
 	executionMode = "inference" 	#mandatory: "inference" (effective trainAndInference but uses a text datafile)
 	inferenceTrainFirstSequences = True	#trains first sequences in inference_prompt.txt, performs inference only on last sequence
 elif(useBenchmark):
-	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -69,6 +69,7 @@ else:
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 if(useBenchmarkDefaultsEvalTestSet):
 	inferenceEvaluateTestSet = True
+	inferenceEvaluateTestSetTrainMaxSequences10M = False	#default: False	#orig: False	#required if performing test-set eval on database trained with > 3M sequences (based on how the original test-set was generated)
 	#inferenceSegmentTiming = "none"	#~optimum
 	inferenceSegmentTiming = "biased"	#default
 	#inferenceSegmentTiming = "exact"
@@ -96,7 +97,7 @@ elif(useBenchmark):
 elif(useAutoresearch):
 	datasetType = "oscar"
 else:
-	datasetType = "wikipedia"	#"oscar" / "wikipedia" / "textfile" [experimental]
+	datasetType = "oscar"	#"oscar" / "wikipedia" / "textfile" [experimental]
 
 
 #Database;
@@ -115,7 +116,7 @@ elif(useDrawNetworkIndependently):
 	#databaseFolderBase = "/media/user/ssdpro/GIAANN/databaseOscar1000-numSeedTokensInference8-spacyPipelineOptimisations"
 else:
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
-	databaseFolderBase = "../database"
+	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"	#"../database"
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 
@@ -149,6 +150,10 @@ def printe(str):
 #Dataset;
 datasetsLibrary4plus = False	#default: False	#orig: False	#set False during dev to maintain benchmark consistency
 trainTestSet = False	#default: False	#only set True to generate an inference test set (with printTrainSequenceRaw=True)
+if(trainTestSet):
+	generateEvalText = True	#mandatory: True
+else:
+	generateEvalText = False	#optional
 if(useQuickExecution):
 	trainLoadExistingDatabase = True	#default: True	#set true for safety only (users must manually delete their databases)
 elif(useAutoresearch):
@@ -190,7 +195,7 @@ if(not datasetType=="textfile"):
 			testSetRatio = 0.1	#ratio of articles in dataset to be used for test (vs train) set - taken from end of dataset
 			assert useLocalDataset	#required for efficiency
 		elif(datasetType=="oscar"):
-			trainMaxSequencesEver = 1000000	#highest value of trainMaxSequences expected during current dev (using this instead of a much high value closer to 1-testSetRatio because testSetStartOffset takes time to load)
+			trainMaxSequencesEver = 10000000	#highest value of trainMaxSequences expected during current dev (using this instead of a much high value closer to 1-testSetRatio because testSetStartOffset takes time to load)
 			numSentencesPerSequenceEver = 3
 			datasetOscarAverageEligibleSentencesPerArticle = 32	#measured across 1m raw sentences (therefore appropriate for trainMaxSequencesEver=1m)
 			testSetStartOffset = int(trainMaxSequencesEver / datasetOscarAverageEligibleSentencesPerArticle)*numSentencesPerSequenceEver
@@ -199,7 +204,7 @@ if(not datasetType=="textfile"):
 			printe("trainTestSet configuration error: unsupported dataset selection")
 		trainSetStartOffsetSequences = 0
 	else:
-		trainSetStartOffsetSequences = 0	#200000	#1000000	#default: 0	#orig: 0	
+		trainSetStartOffsetSequences = 0	#2000000	#1000000	#default: 0	#orig: 0	
 		if(datasetType=="oscar"):
 			maxSentencesPerArticle = 100	#CHECKTHIS
 		elif(datasetType=="wikipedia"):
@@ -209,11 +214,15 @@ else:
 
 
 #RAM;
-useGPUdense = True	#default: True
-if(executionMode=="inference" or executionMode=="trainAndInference"):
-	useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors	#inference can be slightly faster CPU sparse tensor operations
-elif(executionMode=="train"):
-	useGPUsparse = True	#default: True		#slight performance increase during train (does not use significant additional GPU ram during train)
+if(useAutoresearch):
+	useGPUdense = False
+	useGPUsparse = False
+else:
+	useGPUdense = True	#default: True
+	if(executionMode=="inference" or executionMode=="trainAndInference"):
+		useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors	#inference can be slightly faster CPU sparse tensor operations
+	elif(executionMode=="train"):
+		useGPUsparse = True	#default: True		#slight performance increase during train (does not use significant additional GPU ram during train)
 useGPUsparseStrict = True	#default: True	#orig: False	#optional	#enforce strict sparse device during transfer to/from dense tensors (make conversion process always use sparse device)	 #no significant difference in speed; can theoretically affect peak CPU or GPU RAM
 useGPUfileio = False	#default: False	#orig: useGPUsparse
 
@@ -226,7 +235,7 @@ else:
 if(trainSparseNeuronsTensor):
 	assert trainSparseConnectionsTensor, "trainSparseNeuronsTensor requires trainSparseConnectionsTensor=True"
 
-storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = True	#default: True	#orig: False	#optional	#store database feature connections and column separated feature neuron data in RAM, else dynamically load these from filesystem per sequence
+storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = False	#default: False	#orig2: True	#orig1: False	#optional	#store database feature connections and column separated feature neuron data in RAM, else dynamically load these from filesystem per sequence
 if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 	useGPUdatabase = False	#default: False	#default: False
 	resizeTensorsOnRAMdatabaseSave = False	#default: False #orig: True	#resize all feature neuron and connections tensors during final RAM database save
@@ -535,7 +544,7 @@ useParallelProcessing = True	#mandatory (else restore original code pre-GIAANNpr
 randomiseColumnFeatureXposition = True	#shuffle x position of column internal features such that their connections can be better visualised
 
 
-#Information vars;
+#print vars (Information);
 
 if(useBenchmark):
 	printTimeDatabaseLoadSaveTimes = True
@@ -577,11 +586,13 @@ printTrainSequenceDelimiters = False	#print each training sequence with delimite
 printTrainSequencePOS = False	#print each training sequence with POS tags
 printTrainSequenceCount = False	#print each training sequence count
 if(not useAutoresearch):
-	if(datasetType=="oscar"):
-		printTrainSequenceCount = True	#non-visible characters affect terminal print consistency
-		#printTrainSequenceRaw = True
-	elif(datasetType=="wikipedia"):
-		printTrainSequenceDefault = True
+	if(generateEvalText):
+		printTrainSequenceRaw = True
+	else:
+		if(datasetType=="oscar"):
+			printTrainSequenceCount = True	#non-visible characters affect terminal print consistency
+		elif(datasetType=="wikipedia"):
+			printTrainSequenceDefault = True
 		
 
 #Debug vars;
@@ -590,6 +601,8 @@ debugPrintTrainSectionTimesSourceFeatureConnections = False	#print granular sour
 debugPrintRamCurrentUsage = False
 debugPrintRamAverageUsage = False
 debugPrintRamMaxUsagePhaseLocal = False
+if(debugPrintRamMaxUsagePhaseLocal):
+	assert not printRamMaxUsage
 
 debugPrintTotalInferenceTokens = False	#print total number of inference tokens in seed phase, prediction phase, and both phases (summed across all sequences) 
 debugPrintSpacySectionTimes = False	#print spacy preprocessing times
@@ -701,7 +714,10 @@ if(useInference):
 		elif(datasetType=="oscar"):
 			if(multisentencePredictions):
 				if(inferenceEvaluateTestSet):
-					inferencePromptFileName = 'inference_prompt.txt.longTestOscarMultiSentence'
+					if(inferenceEvaluateTestSetTrainMaxSequences10M):
+						inferencePromptFileName = 'inference_prompt.txt.longTestOscarMultiSentence2'
+					else:
+						inferencePromptFileName = 'inference_prompt.txt.longTestOscarMultiSentence'
 				else:
 					#ensure within distribution trainset;
 					if(not useBenchmarkDefaults):
@@ -713,7 +729,10 @@ if(useInference):
 			else:
 				if(useBenchmarkDefaults):
 					if(inferenceEvaluateTestSet):
-						inferencePromptFileName = 'inference_prompt.txt.longTestOscar'
+						if(inferenceEvaluateTestSetTrainMaxSequences10M):
+							inferencePromptFileName = 'inference_prompt.txt.longTestOscar2'
+						else:
+							inferencePromptFileName = 'inference_prompt.txt.longTestOscar'
 					else:
 						#ensure within distribution trainset ;
 						if(spacyPipelineOptimisations):

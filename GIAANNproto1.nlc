@@ -765,3 +765,7 @@ MANUAL; - set trainSparseConnectionsTensor/trainSparseNeuronsTensor=True by defa
 MANUAL; - only if(useBenchmark or useAutoresearch): set inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=False, else: restore inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=True
 MANUAL; - update readme
 - patch main() so printRamMaxUsage works independently of debugPrintRamMaxUsagePhaseLocal
+MANUAL; - set storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=False by default
+MANUAL; - add option inferenceEvaluateTestSetTrainMaxSequences10M - create new version of longTestOscar2 that supports > 10m training sequences
+- upgrade useAutoresearch (printInferenceTop1Accuracy(), program.md) to also print training_seconds:, total_seconds:, peak_vram_mb:, peak_ram_mb:  (in addition to averageTop1Accuracy:, databaseMemoryGb:). Use autoresearchExecutionTimeInference and autoresearchExecutionTimeTrain.	
+MANUAL; - move all the "print vars (Information)" code from GIAANNproto_debug.py to GIAANNproto_count.py

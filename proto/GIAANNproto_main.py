@@ -53,18 +53,22 @@ if(executionMode=="inference" or executionMode=="trainAndInference"):
 	import GIAANNproto_prediction
 
 if(printTimeDatabaseLoadSaveTimes):
-	debugPrintTimeDatabaseLoadSaveTimesExecutionModeCount = GIAANNproto_debug.getDebugPrintTimeDatabaseLoadSaveTimesExecutionModeCount()
-	debugPrintTimeDatabaseLoadSaveTimesCompletedExecutionModeCount = 0
-	debugPrintTimeDatabaseLoadSaveTimesProgramExecutionStartTime = 0.0
-	debugPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadExecutionTime = 0.0
-	debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime = 0.0
-	debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime = 0.0
+	countPrintTimeDatabaseLoadSaveTimesExecutionModeCount = GIAANNproto_count.getCountPrintTimeDatabaseLoadSaveTimesExecutionModeCount()
+	countPrintTimeDatabaseLoadSaveTimesCompletedExecutionModeCount = 0
+	countPrintTimeDatabaseLoadSaveTimesProgramExecutionStartTime = 0.0
+	countPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadExecutionTime = 0.0
+	countPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime = 0.0
+	countPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime = 0.0
 	debugPrintTimeDatabaseLoadSaveTimesExecuteModeStartTime = 0.0
-	debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamStartTime = 0.0
+	countPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamStartTime = 0.0
 	debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskStartTime = 0.0
 
 if(printTimeDatabaseLoadSaveTimes):
-	debugPrintTimeDatabaseLoadSaveTimesProgramExecutionStartTime = time.perf_counter()
+	countPrintTimeDatabaseLoadSaveTimesProgramExecutionStartTime = time.perf_counter()
+
+if(useAutoresearch):
+	autoresearchExecutionTimeTrain = None
+	autoresearchExecutionTimeInference = None
 
 # Load the selected dataset using Hugging Face datasets
 if(datasetType != "textfile" and executionMode != "inference" and not useDrawNetworkIndependently):
@@ -73,7 +77,7 @@ if(datasetType != "textfile" and executionMode != "inference" and not useDrawNet
 		debugPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadStartTime = time.perf_counter()
 	dataset = GIAANNproto_datasets.loadDataset()
 	if(printTimeDatabaseLoadSaveTimes):
-		debugPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadExecutionTime = debugPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadExecutionTime + (time.perf_counter() - debugPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadStartTime)
+		countPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadExecutionTime = countPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadExecutionTime + (time.perf_counter() - debugPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadStartTime)
 
 if(debugPrintSpacySectionTimes):
 	processArticlePart1totalTime = 0
@@ -112,8 +116,12 @@ else:
 
 def main():
 	GIAANNproto_databaseNetworkFiles.prepareDatabaseFilesStartup()
-	if(printRamMaxUsage or debugPrintRamMaxUsagePhaseLocal):
-		GIAANNproto_debug.debugResetGpuRamMaxUsage()
+	
+	if(printRamMaxUsage or useAutoresearch):
+		GIAANNproto_count.countResetGpuRamMaxUsage()
+	if(debugPrintRamMaxUsagePhaseLocal):
+		GIAANNproto_debug.debugResetPhaseLocalProgramPeakTracking()
+	
 	if(useDrawNetworkIndependently):
 		executeDrawMode()
 	else:
@@ -124,12 +132,15 @@ def main():
 			executeMode(True)
 		elif(executionMode=="train"):
 			executeMode(False)
+	
+	if(printRamMaxUsage):
+		GIAANNproto_count.countPrintGpuRamMaxUsageSummary()
 	if(debugPrintRamAverageUsage and not debugPrintRamCurrentUsage):
 		GIAANNproto_debug.debugPrintRamUsageSummary()
 	if(debugPrintRamMaxUsagePhaseLocal):
 		GIAANNproto_debug.debugPrintGpuRamMaxUsagePhaseLocalSummary()
-	if(printRamMaxUsage):
-		GIAANNproto_debug.debugPrintGpuRamMaxUsageSummary()
+		GIAANNproto_debug.debugPrintPhaseLocalProgramPeakSummary()
+
 
 def getDrawModeDatabaseInferenceMode():
 	if(executionMode == "train"):
@@ -163,13 +174,15 @@ def executeDrawMode():
 def executeMode(inferenceMode):
 	if(printTimeDatabaseLoadSaveTimes):
 		global debugPrintTimeDatabaseLoadSaveTimesExecuteModeStartTime
-		global debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamStartTime
-		global debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime
+		global countPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamStartTime
+		global countPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime
 		global debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskStartTime
-		global debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime
-		global debugPrintTimeDatabaseLoadSaveTimesCompletedExecutionModeCount
+		global countPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime
+		global countPrintTimeDatabaseLoadSaveTimesCompletedExecutionModeCount
 		debugPrintTimeDatabaseLoadSaveTimesExecuteModeStartTime = time.perf_counter()
-	
+	if(useAutoresearch):
+		autoresearchExecutionTimeStart = time.perf_counter()
+
 	databaseNetworkObject = GIAANNproto_databaseNetwork.initialiseDatabaseNetwork(inferenceMode)
 	databaseNetworkObject.nlp = nlpSequence	#used by posStringToPosInt
 	if(inferenceMode):
@@ -181,16 +194,18 @@ def executeMode(inferenceMode):
 			GIAANNproto_count.printCountTotalParametersRun(databaseNetworkObject)
 		else:
 			print("printCountTotalParameters totalColumns = 0 (empty database)")
+	
 	if(usePOS):
 		GIAANNproto_sequenceTokens.loadPOSdatabase()
 	if(inferenceMode and not inferenceTrainFirstSequences):
 		GIAANNproto_databaseNetwork.backupGlobalArrays(databaseNetworkObject)
+	
 	if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 		if(printTimeDatabaseLoadSaveTimes):
-			debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamStartTime = time.perf_counter()
+			countPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamStartTime = time.perf_counter()
 		GIAANNproto_databaseNetwork.loadAllObservedColumnsToRam(databaseNetworkObject)
 		if(printTimeDatabaseLoadSaveTimes):
-			debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime = debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime + (time.perf_counter() - debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamStartTime)
+			countPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime = countPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime + (time.perf_counter() - countPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamStartTime)
 		
 	for epochIndex in range(numberEpochs):
 		#print("\nepochIndex = ", epochIndex)
@@ -206,7 +221,7 @@ def executeMode(inferenceMode):
 			sequenceCount = processDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset)
 		if(inferenceMode and debugPrintTotalInferenceTokens):
 			GIAANNproto_debug.printTotalInferenceTokens()
-		if(inferenceMode and printInferenceTop1Accuracy):
+		if(inferenceMode and printInferenceTop1Accuracy and not useAutoresearch):
 			GIAANNproto_prediction.printInferenceTop1Accuracy(databaseNetworkObject)
 
 	if(debugPrintSpacySectionTimes):
@@ -223,7 +238,7 @@ def executeMode(inferenceMode):
 					debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskStartTime = time.perf_counter()
 				GIAANNproto_databaseNetwork.saveAllObservedColumnsToDisk(databaseNetworkObject)
 				if(printTimeDatabaseLoadSaveTimes):
-					debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime = debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime + (time.perf_counter() - debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskStartTime)
+					countPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime = countPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime + (time.perf_counter() - debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskStartTime)
 				if(debugPrintRamMaxUsagePhaseLocal):
 					GIAANNproto_debug.debugRecordGpuRamMaxUsagePhaseLocal("saveAllObservedColumnsToDisk")
 			if(debugPrintRamMaxUsagePhaseLocal):
@@ -234,17 +249,29 @@ def executeMode(inferenceMode):
 			#only required if trainMaxSequences%saveGlobalFeatureNeuronsRate != 0
 
 	if(printTimeDatabaseLoadSaveTimes):
-		debugPrintTimeDatabaseLoadSaveTimesProgramExecutionEndTime = time.perf_counter()
-		debugPrintTimeDatabaseLoadSaveTimesTotalExecutionTime = debugPrintTimeDatabaseLoadSaveTimesProgramExecutionEndTime - debugPrintTimeDatabaseLoadSaveTimesProgramExecutionStartTime
-		debugPrintTimeDatabaseLoadSaveTimesCompletedExecutionModeCount = debugPrintTimeDatabaseLoadSaveTimesCompletedExecutionModeCount + 1
-		if(debugPrintTimeDatabaseLoadSaveTimesCompletedExecutionModeCount == debugPrintTimeDatabaseLoadSaveTimesExecutionModeCount):
-			debugPrintTimeDatabaseLoadSaveTimesHuggingFaceAdjustedTotalExecutionTime = debugPrintTimeDatabaseLoadSaveTimesTotalExecutionTime - debugPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadExecutionTime
-			if(debugPrintTimeDatabaseLoadSaveTimesHuggingFaceAdjustedTotalExecutionTime < 0):
-				raise RuntimeError("executeMode error: debugPrintTimeDatabaseLoadSaveTimesHuggingFaceAdjustedTotalExecutionTime must be >= 0")
-			GIAANNproto_debug.printDebugPrintTimeDatabaseLoadSaveTimesEntry("Hugging Face dataset load execution time", debugPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadExecutionTime)
-			GIAANNproto_debug.printDebugPrintTimeDatabaseLoadSaveTimesSummary("printTimeDatabaseLoadSaveTimes execution times:", debugPrintTimeDatabaseLoadSaveTimesTotalExecutionTime, debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime, debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime)
-			GIAANNproto_debug.printDebugPrintTimeDatabaseLoadSaveTimesSummary("printTimeDatabaseLoadSaveTimes execution times with Hugging Face dataset load time subtracted from total execution time:", debugPrintTimeDatabaseLoadSaveTimesHuggingFaceAdjustedTotalExecutionTime, debugPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime, debugPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime)
-	
+		countPrintTimeDatabaseLoadSaveTimesProgramExecutionEndTime = time.perf_counter()
+		countPrintTimeDatabaseLoadSaveTimesTotalExecutionTime = countPrintTimeDatabaseLoadSaveTimesProgramExecutionEndTime - countPrintTimeDatabaseLoadSaveTimesProgramExecutionStartTime
+		countPrintTimeDatabaseLoadSaveTimesCompletedExecutionModeCount = countPrintTimeDatabaseLoadSaveTimesCompletedExecutionModeCount + 1
+		if(countPrintTimeDatabaseLoadSaveTimesCompletedExecutionModeCount == countPrintTimeDatabaseLoadSaveTimesExecutionModeCount):
+			countPrintTimeDatabaseLoadSaveTimesHuggingFaceAdjustedTotalExecutionTime = countPrintTimeDatabaseLoadSaveTimesTotalExecutionTime - countPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadExecutionTime
+			if(countPrintTimeDatabaseLoadSaveTimesHuggingFaceAdjustedTotalExecutionTime < 0):
+				raise RuntimeError("executeMode error: countPrintTimeDatabaseLoadSaveTimesHuggingFaceAdjustedTotalExecutionTime must be >= 0")
+			GIAANNproto_count.printCountPrintTimeDatabaseLoadSaveTimesEntry("Hugging Face dataset load execution time", countPrintTimeDatabaseLoadSaveTimesHuggingFaceDatasetLoadExecutionTime)
+			GIAANNproto_count.printCountPrintTimeDatabaseLoadSaveTimesSummary("printTimeDatabaseLoadSaveTimes execution times:", countPrintTimeDatabaseLoadSaveTimesTotalExecutionTime, countPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime, countPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime)
+			GIAANNproto_count.printCountPrintTimeDatabaseLoadSaveTimesSummary("printTimeDatabaseLoadSaveTimes execution times with Hugging Face dataset load time subtracted from total execution time:", countPrintTimeDatabaseLoadSaveTimesHuggingFaceAdjustedTotalExecutionTime, countPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime, countPrintTimeDatabaseLoadSaveTimesSaveAllObservedColumnsToDiskExecutionTime)
+	if(useAutoresearch):
+		autoresearchExecutionTimeEnd = time.perf_counter()
+		autoresearchExecutionTime = autoresearchExecutionTimeEnd - autoresearchExecutionTimeStart
+		if(inferenceMode):
+			global autoresearchExecutionTimeInference
+			autoresearchExecutionTimeInference = autoresearchExecutionTime
+		else:
+			global autoresearchExecutionTimeTrain
+			autoresearchExecutionTimeTrain = autoresearchExecutionTime
+		if(inferenceMode and printInferenceTop1Accuracy):
+			GIAANNproto_prediction.printInferenceTop1Accuracy(databaseNetworkObject, autoresearchExecutionTimeInference, autoresearchExecutionTimeTrain)
+			
+		
 def releaseRuntimeGpuMemory(sequenceCount):
 	if(sequenceCount < 0):
 		raise RuntimeError("releaseRuntimeGpuMemory error: sequenceCount must be >= 0")
