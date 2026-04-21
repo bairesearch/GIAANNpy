@@ -67,24 +67,60 @@ def processPrompt(databaseNetworkObject, inferenceMode, sequenceCount):
 	# GIAANNor_main.processPrompt() for modalityName=="OR" should use a testset part of the OR dataset as a prompt (rather than an independent prompt file).
 	result = sequenceCount
 	promptDataset = GIAANNor_datasets.loadPromptDataset()
-	result = processDataset(databaseNetworkObject, False, result, promptDataset)
+	if(submodalityName=="image"):
+		result = processImageDataset(databaseNetworkObject, False, result, promptDataset, modalityORdatasetPromptMaxSequences)
+	elif(submodalityName=="video"):
+		result = processVideoDataset(databaseNetworkObject, False, result, promptDataset)
+	else:
+		printe("submodalityName = ", submodalityName)
 	return result
 
 
-def processDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset):
+def processVideoDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset):
 	result = sequenceCount
 	ensureORruntimeInitialised(databaseNetworkObject)
+	if(submodalityName=="video"):
+		for articleIndex, datasetEntry in enumerate(dataset):
+			sequence = GIAANNor_datasets.sampleVideoSnapshots(datasetEntry)
+			processSequence(databaseNetworkObject, False, result, articleIndex, 0, sequence, datasetEntry)
+			result = result + 1
+			if(result == trainMaxSequences and inferenceMode == False):
+				break
+	elif(submodalityName=="image"):
+		result = processImageDataset(databaseNetworkObject, inferenceMode, result, dataset, None)
+	else:
+		raise RuntimeError("processVideoDataset error: unsupported OR submodalityName " + str(submodalityName))
+	return result
+
+
+def processImageDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset, sequenceLimit):
+	result = sequenceCount
+	processedSequenceCount = 0
+	if(sequenceLimit is not None):
+		if(not isinstance(sequenceLimit, int)):
+			raise RuntimeError("processImageDataset error: sequenceLimit must be an int or None")
+		if(sequenceLimit <= 0):
+			raise RuntimeError("processImageDataset error: sequenceLimit must be > 0")
+	ensureORruntimeInitialised(databaseNetworkObject)
 	for articleIndex, datasetEntry in enumerate(dataset):
-		sequence = GIAANNor_datasets.sampleVideoSnapshots(datasetEntry)
-		processSequence(databaseNetworkObject, False, result, articleIndex, 0, sequence, datasetEntry)
-		result = result + 1
+		sequences = GIAANNor_datasets.sampleImageSaccadeSequences(datasetEntry)
+		for sequenceIndex, sequence in enumerate(sequences):
+			processSequence(databaseNetworkObject, False, result, articleIndex, sequenceIndex, sequence, datasetEntry)
+			result = result + 1
+			processedSequenceCount = processedSequenceCount + 1
+			if(sequenceLimit is not None and processedSequenceCount == sequenceLimit):
+				break
+			if(result == trainMaxSequences and inferenceMode == False):
+				break
+		if(sequenceLimit is not None and processedSequenceCount == sequenceLimit):
+			break
 		if(result == trainMaxSequences and inferenceMode == False):
 			break
 	return result
 
 
 def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw):
-	# processSequenceTemplate() for each video stream (sequence):
+	# processSequenceTemplate() for each OR sequence:
 	ensureORruntimeInitialised(databaseNetworkObject)
 	if(inferenceMode):
 		raise RuntimeError("processSequenceTemplate error: OR inference prediction is not implemented in GIAANNproto2a1a")
@@ -97,6 +133,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		sequenceColumnCounts = calculateSequenceColumnCounts(tokenisedSnapshots, selectedFilterIndices)
 		printSequenceColumnCounts(sequenceCount, sequenceColumnCounts)
 	sequenceData = GIAANNor_sequenceConcepts.generateSequenceData(databaseNetworkObject, tokenisedSnapshots["columnMetadataList"], selectedFilterIndices, databaseNetworkObject.orRFfilters, True)
+	
 	if(sequenceData is not None):
 
 		if(printTrainSequenceDefault):

@@ -17,6 +17,7 @@ GIA ANN or datasets
 
 """
 
+import math
 import json
 import subprocess
 import torch as pt
@@ -24,6 +25,7 @@ import torch as pt
 from GIAANNcmn_globalDefs import *
 
 _datasetIndexCache = None
+_imageDatasetCache = {}
 
 
 def requireHuggingFaceHub():
@@ -36,6 +38,16 @@ def requireHuggingFaceHub():
 	except Exception as exception:
 		raise RuntimeError("requireHuggingFaceHub error: missing huggingface_hub (pip install huggingface_hub)") from exception
 	return HfApi, hf_hub_download
+
+
+def requireHuggingFaceDatasets():
+	result = None
+	try:
+		from datasets import load_dataset as load_datasetImport
+		result = load_datasetImport
+	except Exception as exception:
+		raise RuntimeError("requireHuggingFaceDatasets error: missing datasets (pip install datasets)") from exception
+	return result
 
 
 def timecodeToSeconds(timecode, frameRate):
@@ -145,16 +157,19 @@ def loadDataset(split="train"):
 	datasetEntries = None
 	trainEntries = None
 	testEntries = None
-	if(datasetType != "soccer_events"):
-		raise RuntimeError("loadDataset error: unsupported OR datasetType " + str(datasetType))
 	if(split != "train" and split != "test"):
 		raise RuntimeError("loadDataset error: split must be 'train' or 'test'")
-	datasetEntries = loadDatasetIndex()
-	trainEntries, testEntries = splitDatasetEntries(datasetEntries)
-	if(split == "train"):
-		result = trainEntries
+	if(datasetType == "soccer_events"):
+		datasetEntries = loadDatasetIndex()
+		trainEntries, testEntries = splitDatasetEntries(datasetEntries)
+		if(split == "train"):
+			result = trainEntries
+		else:
+			result = testEntries
+	elif(datasetType == "cifar10"):
+		result = loadImageDatasetSplit(split)
 	else:
-		result = testEntries
+		raise RuntimeError("loadDataset error: unsupported OR datasetType " + str(datasetType))
 	return result
 
 
@@ -162,7 +177,10 @@ def loadPromptDataset():
 	result = None
 	testEntries = loadDataset("test")
 	if(len(testEntries) > modalityORdatasetPromptMaxSequences):
-		result = testEntries[:modalityORdatasetPromptMaxSequences]
+		if(hasattr(testEntries, "select")):
+			result = testEntries.select(range(modalityORdatasetPromptMaxSequences))
+		else:
+			result = testEntries[:modalityORdatasetPromptMaxSequences]
 	else:
 		result = testEntries
 	return result
@@ -190,7 +208,7 @@ def probeVideoStream(videoFile):
 
 
 def sampleVideoSnapshots(datasetEntry):
-	# sample the video into a series of sequence snapshots using modalityORframesPerSnapshot (do not apply any averaging, just skip frames as necessary).
+	# sample the video into a series of sequence snapshots using modalityORvideoFramesPerSnapshot (do not apply any averaging, just skip frames as necessary).
 	result = None
 	videoFile = None
 	streamInfo = None
@@ -209,7 +227,7 @@ def sampleVideoSnapshots(datasetEntry):
 	frameHeight = int(modalityORsnapshotHeight)
 	if(frameWidth <= 0 or frameHeight <= 0):
 		raise RuntimeError("sampleVideoSnapshots error: modalityORsnapshotWidth/modalityORsnapshotHeight must be > 0")
-	filterText = "select='not(mod(n\\," + str(modalityORframesPerSnapshot) + "))',scale=" + str(frameWidth) + ":" + str(frameHeight) + ":flags=bilinear"
+	filterText = "select='not(mod(n\\," + str(modalityORvideoFramesPerSnapshot) + "))',scale=" + str(frameWidth) + ":" + str(frameHeight) + ":flags=bilinear"
 	command = ["ffmpeg", "-v", "error", "-i", videoFile, "-vf", filterText, "-vsync", "vfr", "-pix_fmt", "rgb24", "-f", "rawvideo", "-"]
 	ffmpegProcess = subprocess.run(command, capture_output=True, check=True)
 	rawFrameBytes = ffmpegProcess.stdout
@@ -223,4 +241,189 @@ def sampleVideoSnapshots(datasetEntry):
 		raise RuntimeError("sampleVideoSnapshots error: numberOfFrames must be > 0")
 	frameTensor = pt.frombuffer(bytearray(rawFrameBytes), dtype=pt.uint8).clone().view(numberOfFrames, frameHeight, frameWidth, 3).permute(0, 3, 1, 2).to(deviceDense, dtype=arrayType)/255.0
 	result = frameTensor
+	return result
+
+
+def loadImageDatasetSplit(split):
+	result = None
+	load_dataset = None
+	if(datasetType != "cifar10"):
+		raise RuntimeError("loadImageDatasetSplit error: unsupported image datasetType " + str(datasetType))
+	if(split != "train" and split != "test"):
+		raise RuntimeError("loadImageDatasetSplit error: split must be 'train' or 'test'")
+	if(useLocalDataset and datasetFolder == ""):
+		raise RuntimeError("loadImageDatasetSplit error: datasetFolder must not be empty while useLocalDataset is True")
+	if(split not in _imageDatasetCache):
+		load_dataset = requireHuggingFaceDatasets()
+		if(datasetCfg == ""):
+			if(useLocalDataset):
+				_imageDatasetCache[split] = load_dataset(datasetName, split=split, trust_remote_code=True, cache_dir=datasetFolder)
+			else:
+				_imageDatasetCache[split] = load_dataset(datasetName, split=split, trust_remote_code=True)
+		else:
+			if(useLocalDataset):
+				_imageDatasetCache[split] = load_dataset(datasetName, datasetCfg, split=split, trust_remote_code=True, cache_dir=datasetFolder)
+			else:
+				_imageDatasetCache[split] = load_dataset(datasetName, datasetCfg, split=split, trust_remote_code=True)
+	result = _imageDatasetCache[split]
+	return result
+
+
+def sampleImageSaccadeSequences(datasetEntry):
+	# generate sequence data by augmenting each image:
+	# for each image, generate modalityORimageSaccadesPerImage sequences by performing modalityORimageSaccadesPerImage augmentations:
+	result = []
+	preparedImageTensor = None
+	cropMarginX = None
+	cropMarginY = None
+	targetOffsetX = None
+	targetOffsetY = None
+	sequence = None
+	if(modalityORimageSaccadesPerImage <= 0):
+		raise RuntimeError("sampleImageSaccadeSequences error: modalityORimageSaccadesPerImage must be > 0")
+	if(modalityORimageSnapshotsPerSaccade <= 0):
+		raise RuntimeError("sampleImageSaccadeSequences error: modalityORimageSnapshotsPerSaccade must be > 0")
+	cropMarginX, cropMarginY = calculateImageSaccadeCropMargins()
+	preparedImageTensor = prepareImageTensorForSaccades(datasetEntry, int(modalityORsnapshotWidth) + (2*cropMarginX), int(modalityORsnapshotHeight) + (2*cropMarginY))
+	for _ in range(modalityORimageSaccadesPerImage):
+		targetOffsetX, targetOffsetY = sampleRandomImageSaccadeOffset(cropMarginX, cropMarginY)
+		sequence = generateImageSaccadeSequence(preparedImageTensor, targetOffsetX, targetOffsetY, cropMarginX, cropMarginY)
+		result.append(sequence)
+	return result
+
+
+def generateImageSaccadeSequence(preparedImageTensor, targetOffsetX, targetOffsetY, cropMarginX, cropMarginY):
+	# for each saccade (sequence) generate modalityORimageSnapshotsPerSaccade by taking snapshots along a linear pathway of the saccade offset:
+	# crop each augmented snapshot by a predefined amount (dependent on modalityORimageSaccadesMaxAngularOffsetDegrees) so that every snapshot contains only image data (no pixels outside the original image data).
+	result = None
+	snapshotSequenceTensor = None
+	workHeight = None
+	workWidth = None
+	snapshotIndexFraction = None
+	snapshotOffsetX = None
+	snapshotOffsetY = None
+	startX = None
+	startY = None
+	endX = None
+	endY = None
+	snapshotTensor = None
+	if(not pt.is_tensor(preparedImageTensor)):
+		raise RuntimeError("generateImageSaccadeSequence error: preparedImageTensor must be a tensor")
+	if(preparedImageTensor.dim() != 3):
+		raise RuntimeError("generateImageSaccadeSequence error: preparedImageTensor rank must be 3")
+	if(preparedImageTensor.shape[0] != 3):
+		raise RuntimeError("generateImageSaccadeSequence error: preparedImageTensor channel count must be 3")
+	workHeight = int(preparedImageTensor.shape[1])
+	workWidth = int(preparedImageTensor.shape[2])
+	snapshotSequenceTensor = pt.zeros((modalityORimageSnapshotsPerSaccade, 3, modalityORsnapshotHeight, modalityORsnapshotWidth), dtype=arrayType, device=deviceDense)
+	for snapshotIndex in range(modalityORimageSnapshotsPerSaccade):
+		if(modalityORimageSnapshotsPerSaccade == 1):
+			snapshotIndexFraction = 1.0
+		else:
+			snapshotIndexFraction = float(snapshotIndex)/float(modalityORimageSnapshotsPerSaccade - 1)
+		snapshotOffsetX = int(round(float(targetOffsetX)*snapshotIndexFraction))
+		snapshotOffsetY = int(round(float(targetOffsetY)*snapshotIndexFraction))
+		startX = int(cropMarginX) + snapshotOffsetX
+		startY = int(cropMarginY) + snapshotOffsetY
+		endX = startX + int(modalityORsnapshotWidth)
+		endY = startY + int(modalityORsnapshotHeight)
+		if(startX < 0 or startY < 0 or endX > workWidth or endY > workHeight):
+			raise RuntimeError("generateImageSaccadeSequence error: computed crop window exceeds preparedImageTensor bounds")
+		snapshotTensor = preparedImageTensor[:, startY:endY, startX:endX]
+		if(snapshotTensor.shape[1] != modalityORsnapshotHeight or snapshotTensor.shape[2] != modalityORsnapshotWidth):
+			raise RuntimeError("generateImageSaccadeSequence error: snapshotTensor shape mismatch")
+		snapshotSequenceTensor[snapshotIndex] = snapshotTensor
+	result = snapshotSequenceTensor
+	return result
+
+
+def sampleRandomImageSaccadeOffset(cropMarginX, cropMarginY):
+	# saccade augmentations are calculated by translating the image to a random polar coordinates offset from the centre (using modalityORimageSaccadesMaxAngularOffsetDegrees)
+	result = None
+	angleRadians = None
+	radiusScale = None
+	offsetX = None
+	offsetY = None
+	if(cropMarginX < 0 or cropMarginY < 0):
+		raise RuntimeError("sampleRandomImageSaccadeOffset error: cropMarginX/cropMarginY must be >= 0")
+	angleRadians = float(pt.rand(1).item())*(2.0*math.pi)
+	radiusScale = float(pt.rand(1).item())
+	offsetX = math.cos(angleRadians)*float(cropMarginX)*radiusScale
+	offsetY = math.sin(angleRadians)*float(cropMarginY)*radiusScale
+	result = (offsetX, offsetY)
+	return result
+
+
+def calculateImageSaccadeCropMargins():
+	result = None
+	angleRadians = None
+	cropMarginX = None
+	cropMarginY = None
+	if(modalityORsnapshotWidth <= 0 or modalityORsnapshotHeight <= 0):
+		raise RuntimeError("calculateImageSaccadeCropMargins error: modalityORsnapshotWidth/modalityORsnapshotHeight must be > 0")
+	if(modalityORimageSaccadesMaxAngularOffsetDegrees < 0 or modalityORimageSaccadesMaxAngularOffsetDegrees >= 90):
+		raise RuntimeError("calculateImageSaccadeCropMargins error: modalityORimageSaccadesMaxAngularOffsetDegrees must be >= 0 and < 90")
+	angleRadians = math.radians(float(modalityORimageSaccadesMaxAngularOffsetDegrees))
+	cropMarginX = int(math.ceil((float(modalityORsnapshotWidth)/2.0)*math.tan(angleRadians)))
+	cropMarginY = int(math.ceil((float(modalityORsnapshotHeight)/2.0)*math.tan(angleRadians)))
+	result = (cropMarginX, cropMarginY)
+	return result
+
+
+def prepareImageTensorForSaccades(datasetEntry, workWidth, workHeight):
+	result = None
+	imageTensor = None
+	imageHeight = None
+	imageWidth = None
+	scale = None
+	resizedHeight = None
+	resizedWidth = None
+	resizedImageTensor = None
+	cropStartX = None
+	cropStartY = None
+	if(workWidth <= 0 or workHeight <= 0):
+		raise RuntimeError("prepareImageTensorForSaccades error: workWidth/workHeight must be > 0")
+	imageTensor = convertDatasetEntryToImageTensor(datasetEntry)
+	imageHeight = int(imageTensor.shape[1])
+	imageWidth = int(imageTensor.shape[2])
+	scale = max(float(workWidth)/float(imageWidth), float(workHeight)/float(imageHeight))
+	resizedHeight = int(math.ceil(float(imageHeight)*scale))
+	resizedWidth = int(math.ceil(float(imageWidth)*scale))
+	if(resizedWidth < workWidth or resizedHeight < workHeight):
+		raise RuntimeError("prepareImageTensorForSaccades error: resized image must cover workWidth/workHeight")
+	resizedImageTensor = pt.nn.functional.interpolate(imageTensor.unsqueeze(0), size=(resizedHeight, resizedWidth), mode="bilinear", align_corners=False)[0]
+	cropStartX = int((resizedWidth - workWidth)//2)
+	cropStartY = int((resizedHeight - workHeight)//2)
+	result = resizedImageTensor[:, cropStartY:cropStartY + workHeight, cropStartX:cropStartX + workWidth].contiguous()
+	if(result.shape[1] != workHeight or result.shape[2] != workWidth):
+		raise RuntimeError("prepareImageTensorForSaccades error: prepared image crop shape mismatch")
+	return result
+
+
+def convertDatasetEntryToImageTensor(datasetEntry):
+	result = None
+	imageObject = None
+	imageWidth = None
+	imageHeight = None
+	rawImageBytes = None
+	expectedByteCount = None
+	if(not isinstance(datasetEntry, dict)):
+		raise RuntimeError("convertDatasetEntryToImageTensor error: datasetEntry must be a dict")
+	if("img" in datasetEntry):
+		imageObject = datasetEntry["img"]
+	elif("image" in datasetEntry):
+		imageObject = datasetEntry["image"]
+	else:
+		raise RuntimeError("convertDatasetEntryToImageTensor error: datasetEntry missing img/image field")
+	if(not hasattr(imageObject, "convert") or not hasattr(imageObject, "tobytes") or not hasattr(imageObject, "size")):
+		raise RuntimeError("convertDatasetEntryToImageTensor error: imageObject must provide convert/tobytes/size")
+	imageObject = imageObject.convert("RGB")
+	imageWidth, imageHeight = imageObject.size
+	if(imageWidth <= 0 or imageHeight <= 0):
+		raise RuntimeError("convertDatasetEntryToImageTensor error: image size must be > 0")
+	rawImageBytes = imageObject.tobytes()
+	expectedByteCount = int(imageWidth)*int(imageHeight)*3
+	if(len(rawImageBytes) != expectedByteCount):
+		raise RuntimeError("convertDatasetEntryToImageTensor error: rawImageBytes length mismatch")
+	result = pt.frombuffer(bytearray(rawImageBytes), dtype=pt.uint8).clone().view(imageHeight, imageWidth, 3).permute(2, 0, 1).contiguous().to(deviceDense, dtype=arrayType)/255.0
 	return result

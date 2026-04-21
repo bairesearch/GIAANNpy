@@ -467,6 +467,8 @@ if(not useAutoresearch):
 			printTrainSequenceDefault = True
 		elif(datasetType=="soccer_events"):
 			printTrainSequenceDefault = True
+		elif(datasetType=="cifar10"):
+			printTrainSequenceDefault = True
 			#printTrainSequenceCount = True
 		
 

@@ -47,3 +47,14 @@ v2a (Codex IDE GPT-5.4) [under development]:
 		- ensure to add comments to the code you create using the exact text from the specification for GIAANNproto2a1a.
 		- it is recommended to use pytorch or pytorch3D library for GPU accelerated execution of multiple 2D filters in parallel (see above): never execute filters serially.
 		/MANUAL; - ensure to modify and use the GIAANNor_main:processSequenceTemplate() code based on GIAANNnlp_main:processSequence() - it does not replicate any print (GIAANNcmn_count) or debug (GIAANNcmn_debug) code so it is easier to understand.
+- implement useModalityOR option submodalityName = "image":
+	- GIAANNor_datasets.py: add huggingface datasetType for images (find an appropriate dataset for low to moderate resolution images that has both train and test partitions).
+	- use the same GIAANNor_main.py:processSequence() template code as submodalityName=="video" (except for the sequence generation):
+	- generate sequence data by augmenting each image:
+		- for each image, generate modalityORimageSaccadesPerImage sequences by performing modalityORimageSaccadesPerImage augmentations:
+			- saccade augmentations are calculated by translating the image to a random polar coordinates offset from the centre (using modalityORimageSaccadesMaxAngularOffsetDegrees)
+			- for each saccade (sequence) generate modalityORimageSnapshotsPerSaccade by taking snapshots along a linear pathway of the saccade offset:
+				- crop each augmented snapshot by a predefined amount (dependent on modalityORimageSaccadesMaxAngularOffsetDegrees) so that every snapshot contains only image data (no pixels outside the original image data).
+	Implementation notes:
+		- ensure the upgrade is performed within context if(submodalityName=="image"). If submodalityName=="video" no changes can be made to the effective execution of the codebase.
+
