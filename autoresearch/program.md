@@ -24,7 +24,7 @@ You launch train phase, and then inference phase using these commands:
 
 ```
 cd ../proto/
-python GIAANNproto_main.py
+python GIAANNcmn_main.py
 cd ../autoresearch/
 ```
 
@@ -104,7 +104,7 @@ LOOP FOREVER:
 
 ```
 cd ../proto/
-python GIAANNproto_main.py > ../autoresearch/run.log 2>&1
+python GIAANNcmn_main.py > ../autoresearch/run.log 2>&1
 cd ../autoresearch/
 ```
 

@@ -1,4 +1,4 @@
-"""GIAANNproto_databaseNetworkDrawLarge.py
+"""GIAANNcmn_databaseNetworkDrawLarge.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -7,10 +7,10 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Usage:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Description:
 GIA ANN proto database Network Draw Large
@@ -25,10 +25,10 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_svg import FigureCanvasSVG
 import torch as pt
 
-from GIAANNproto_globalDefs import *
-import GIAANNproto_databaseNetworkDraw
-import GIAANNproto_databaseNetworkFiles
-from GIAANNproto_databaseNetworkObservedColumn import ObservedColumn
+from GIAANNcmn_globalDefs import *
+import GIAANNcmn_databaseNetworkDraw
+import GIAANNcmn_databaseNetworkFiles
+from GIAANNcmn_databaseNetworkObservedColumn import ObservedColumn
 
 standaloneDrawEfficient3DLdrNodePartFile = "4-4CUBE.DAT"
 standaloneDrawEfficient3DLdrNodeScale = 4.0
@@ -80,7 +80,7 @@ def drawDatabaseGraphStandalone(databaseNetworkObject, save=False, fileName=None
 		if(save):
 			if(fileName is None):
 				fileName = drawNetworkIndependentSaveFilename
-			outputFileName = GIAANNproto_databaseNetworkDraw.resolveGraphOutputFileName(fileName)
+			outputFileName = GIAANNcmn_databaseNetworkDraw.resolveGraphOutputFileName(fileName)
 			if(drawNetworkSaveFormatVector):
 				fig.savefig(outputFileName, format="svg", bbox_inches='tight', pad_inches=0.0)
 			else:
@@ -280,18 +280,18 @@ def convertStandaloneDrawEfficientPointToLdrPosition(totalNumberColumns, totalNu
 	return result
 
 def getStandaloneDrawEfficientLdrColourFromNodeColour(nodeColour):
-	if(nodeColour == GIAANNproto_databaseNetworkDraw.defaultColourConceptFeature):
+	if(nodeColour == GIAANNcmn_databaseNetworkDraw.defaultColourConceptFeature):
 		result = standaloneDrawEfficient3DLdrColourConceptNode
-	elif(nodeColour == GIAANNproto_databaseNetworkDraw.defaultColourFeature):
+	elif(nodeColour == GIAANNcmn_databaseNetworkDraw.defaultColourFeature):
 		result = standaloneDrawEfficient3DLdrColourFeatureNode
 	else:
 		raise RuntimeError(f"getStandaloneDrawEfficientLdrColourFromNodeColour error: unsupported node colour {nodeColour}")
 	return result
 
 def getStandaloneDrawEfficientLdrColourFromConnectionColour(connectionColour):
-	if(connectionColour == GIAANNproto_databaseNetworkDraw.defaultConnectionColourInternal):
+	if(connectionColour == GIAANNcmn_databaseNetworkDraw.defaultConnectionColourInternal):
 		result = standaloneDrawEfficient3DLdrColourInternalConnection
-	elif(connectionColour == GIAANNproto_databaseNetworkDraw.defaultConnectionColourExternal):
+	elif(connectionColour == GIAANNcmn_databaseNetworkDraw.defaultConnectionColourExternal):
 		result = standaloneDrawEfficient3DLdrColourExternalConnection
 	else:
 		raise RuntimeError(f"getStandaloneDrawEfficientLdrColourFromConnectionColour error: unsupported connection colour {connectionColour}")
@@ -354,9 +354,9 @@ def prepareStandaloneDrawEfficientLayout(databaseNetworkObject):
 			nodeYs.append(nodePosition[1])
 			primeConceptNeuronFeature = useDedicatedConceptNames and useDedicatedConceptNames2 and (primeFeatureIndex is not None) and (featureIndex == primeFeatureIndex)
 			if(primeConceptNeuronFeature):
-				nodeColors.append(GIAANNproto_databaseNetworkDraw.defaultColourConceptFeature)
+				nodeColors.append(GIAANNcmn_databaseNetworkDraw.defaultColourConceptFeature)
 			else:
-				nodeColors.append(GIAANNproto_databaseNetworkDraw.defaultColourFeature)
+				nodeColors.append(GIAANNcmn_databaseNetworkDraw.defaultColourFeature)
 			if(nodePosition[1] > topFeaturePosition):
 				topFeaturePosition = nodePosition[1]
 			if(nodePosition[1] > maxFeaturePosition):
@@ -407,9 +407,9 @@ def prepareStandaloneDrawEfficientConnectionSegments(databaseNetworkObject, sort
 				targetNodePosition = getNodePosition(targetColumnIndex, targetFeatureIndex, compactFeaturePositionsByConceptIndex)
 				lineSegments.append([sourceNodePosition, targetNodePosition])
 				if(targetColumnIndex == conceptIndex):
-					lineColours.append(GIAANNproto_databaseNetworkDraw.defaultConnectionColourInternal)
+					lineColours.append(GIAANNcmn_databaseNetworkDraw.defaultConnectionColourInternal)
 				else:
-					lineColours.append(GIAANNproto_databaseNetworkDraw.defaultConnectionColourExternal)
+					lineColours.append(GIAANNcmn_databaseNetworkDraw.defaultConnectionColourExternal)
 			if(not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 				observedColumn.unloadLoadedSourceFeatureConnections([sourceFeatureIndex])
 	result = (lineSegments, lineColours)
@@ -477,8 +477,8 @@ def getStandaloneDrawObservedColumn(databaseNetworkObject, conceptIndex, lemma, 
 		if(loadFeatureNeurons and (not storeDatabaseGlobalFeatureNeuronsInRam) and (not hasattr(observedColumn, "featureNeurons"))):
 			raise RuntimeError(f"getStandaloneDrawObservedColumn error: RAM observed column missing featureNeurons for lemma {lemma}")
 	else:
-		if(GIAANNproto_databaseNetworkFiles.observedColumnHasPersistedData(conceptIndex)):
-			if(not GIAANNproto_databaseNetworkFiles.observedColumnHasConsistentPersistedMetadata(conceptIndex)):
+		if(GIAANNcmn_databaseNetworkFiles.observedColumnHasPersistedData(conceptIndex)):
+			if(not GIAANNcmn_databaseNetworkFiles.observedColumnHasConsistentPersistedMetadata(conceptIndex)):
 				raise RuntimeError(f"getStandaloneDrawObservedColumn error: inconsistent observed column storage for conceptIndex {conceptIndex}, lemma {lemma}")
 			observedColumn = ObservedColumn.loadFromDisk(databaseNetworkObject, conceptIndex, lemma, sequenceIndex, targetDevice=deviceDatabase, loadAllSourceFeatures=False, resizeFeatureTensorsToCurrentSize=False, loadFeatureNeurons=loadFeatureNeurons)
 		else:

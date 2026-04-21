@@ -1,0 +1,480 @@
+"""GIAANNnlp_main.py
+
+# Author:
+Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
+
+# License:
+MIT License
+
+# Installation:
+see GIAANNcmn_main.py
+
+# Usage:
+see GIAANNcmn_main.py
+
+# Description:
+GIA ANN NLP main
+
+"""
+
+# Import necessary libraries
+import gc
+import time
+import torch as pt
+import spacy
+
+pt.set_grad_enabled(False)
+
+from GIAANNcmn_globalDefs import *
+import GIAANNcmn_debug
+import GIAANNcmn_sparseTensors
+import GIAANNcmn_databaseNetwork
+import GIAANNcmn_databaseNetworkFiles
+import GIAANNcmn_databaseNetworkDraw
+import GIAANNcmn_databaseNetworkDrawLarge
+import GIAANNnlp_sequenceTokens
+import GIAANNnlp_sequenceConcepts
+import GIAANNcmn_sequenceObservedColumns
+import GIAANNcmn_databaseNetworkTrain
+if(executionMode=="inference" or executionMode=="trainAndInference"):
+	import GIAANNcmn_prediction
+if(datasetType != "textfile" and executionMode != "inference" and not useDrawNetworkIndependently):
+	import GIAANNnlp_datasets
+
+def loadPOSdatabase():
+	if(usePOS):
+		GIAANNnlp_sequenceTokens.loadPOSdatabase()
+
+# Initialize spaCy model
+if(useDrawNetworkIndependently):
+	nlpArticle = None
+	nlpSequence = None
+elif(spacyPipelineSingleParse):
+	if(spacyPipelineMinimalComponents or spacyPipelineLightweightSentenceSegmentation):
+		spacyArticleDisableComponents = []
+		if(spacyPipelineMinimalComponents):
+			spacyArticleDisableComponents.append("ner")
+		nlpArticle = spacy.load(spacyModelName, disable=spacyArticleDisableComponents)
+	else:
+		nlpArticle = spacy.load(spacyModelName)
+	nlpSequence = nlpArticle
+else:
+	if(spacyPipelineLightweightSentenceSegmentation):
+		nlpArticle = spacy.blank("en")
+		nlpArticle.add_pipe("sentencizer")
+		if(spacyPipelineMinimalComponents):
+			nlpSequence = spacy.load(spacyModelName, disable=["ner", "parser"])
+		else:
+			nlpSequence = spacy.load(spacyModelName)
+	else:
+		if(spacyPipelineMinimalComponents):
+			nlpArticle = spacy.load(spacyModelName, disable=["ner"])
+			nlpSequence = spacy.load(spacyModelName, disable=["ner", "parser"])
+		else:
+			nlpArticle = spacy.load(spacyModelName)
+			nlpSequence = nlpArticle
+			
+			
+def buildSequenceWithDelimiters(sequence, tokens):
+	if(conceptColumnsDelimitByPOS):
+		delimiterTypes = []
+		for tokenIndex, token in enumerate(tokens):
+			_, isDelimiterDeterministic, isDelimiterProbabilistic = GIAANNnlp_sequenceConcepts.isFeaturePOSreferenceSetDelimiterType(token.word, token, tokens, tokenIndex)
+			if(isDelimiterDeterministic):
+				delimiterTypes.append("Dd")	#deterministic
+			elif(isDelimiterProbabilistic):
+				delimiterTypes.append("Di")	#indeterministic
+			elif(GIAANNnlp_sequenceTokens.isConcept(token)):
+				delimiterTypes.append("C")	#concept
+			else:
+				delimiterTypes.append("")	#non
+	else:
+		printe("conceptColumnsDelimitByPOS is required")
+	sentenceWithDelimiters = " ".join(
+		f"{token.text} ({tokenIndex}:{delimiterTypes[tokenIndex]})"
+		for tokenIndex, token in enumerate(sequence)
+	)
+	return sentenceWithDelimiters
+
+			
+def processPrompt(databaseNetworkObject, inferenceMode, sequenceCount):
+	with open(inferencePromptFile, 'r', encoding='utf-8') as file:
+		text = file.read()
+	articleIndex = 0
+	sequenceCount = processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, articleIndex)
+	return sequenceCount
+
+def expandSequenceForInference(databaseNetworkObject, sequence):
+	conceptsFound = False
+	conceptMask = None
+	tokens = None
+	observedColumnsDict = None
+	observedColumnsSequenceWordIndexDict = None
+	conceptsFound, conceptMask = GIAANNnlp_sequenceConcepts.firstPass(databaseNetworkObject, sequence, True)
+	if(conceptsFound):
+		tokens = GIAANNnlp_sequenceTokens.getTokens(sequence)
+		if not (useDedicatedFeatureLists):
+			GIAANNnlp_sequenceConcepts.detectNewFeatures(databaseNetworkObject, tokens, True)
+		observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNnlp_sequenceConcepts.secondPass(databaseNetworkObject, tokens, False)
+	GIAANNcmn_databaseNetwork.ensureGlobalFeatureNeuronsSize(databaseNetworkObject, True)
+	return
+	
+def processDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset):
+	for articleIndex, datasetEntry in enumerate(dataset):
+		if(debugPrintSpacySectionTimes):
+			getDatasetEntryTextStartTime = None
+			getDatasetEntryTextDuration = 0.0
+			getDatasetEntryTextStartTime = time.perf_counter()
+		text = GIAANNnlp_datasets.getDatasetEntryText(datasetEntry, articleIndex)
+		if(debugPrintSpacySectionTimes):
+			getDatasetEntryTextDuration = time.perf_counter() - getDatasetEntryTextStartTime
+			print(f"debugPrintSpacySectionTimes: articleIndex={articleIndex} sequenceCount={sequenceCount} sequenceCount={sequenceCount} datasetEntryTextSeconds={getDatasetEntryTextDuration:.6f}")
+		sequenceCount = processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, articleIndex)
+		if(sequenceCount == trainMaxSequences and inferenceMode==False):
+			break
+	return sequenceCount
+
+def processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, articleIndex):
+	#sequences = sent_tokenize(text)
+	if(debugPrintSpacySectionTimes):
+		processArticlePart1StartTime = None
+		processArticlePart1Duration = 0.0
+		processArticlePart1StartTime = time.perf_counter()
+
+	if(ignoreNewlineCharacters):
+		text = text.replace('\n', ' ')
+	textParsed = nlpArticle(text)
+
+	if(executionMode=="inference"):
+		skipMode = False	
+	else:
+		if(datasetType=="textfile"):	#executionMode=="trainAndInference":
+			skipMode = False
+		else:	#executionMode=="train": 
+			if(trainTestSet):
+				skipMode = False
+			else:
+				skipMode = (sequenceCount < (trainSetStartOffsetSequences-maxSentencesPerArticle))
+	sequences, sequencesRaw = generateSeqencesBatchOrSerial(textParsed, skipMode)
+
+	if(debugPrintSpacySectionTimes):
+		processArticlePart1Duration = time.perf_counter() - processArticlePart1StartTime
+		processArticlePart2StartTime = None
+		processArticlePart2Duration = 0.0
+		processArticlePart2StartTime = time.perf_counter()
+
+	numberOfSequences = len(sequences)
+	for sequenceIndex, sequence in enumerate(sequences):
+		sequenceRaw = sequencesRaw[sequenceIndex]
+		inferenceSequenceInPrompt = False
+		if(inferenceMode):
+			if(inferenceTrainFirstSequences):	#inferenceTrainFirstSequences assumes processArticle() is executed with inferenceMode==True
+				if(sequenceIndex == numberOfSequences-1):
+					if(printHeaderDuringInferencePredict):
+						print("\ninferenceTrainFirstSequences: executing inference:")
+					inferenceSequenceInPrompt = True
+				else:
+					if(sequenceIndex==0):
+						if(printHeaderDuringInferencePredict):
+							print("\ninferenceTrainFirstSequences: executing train:")
+			else:
+				inferenceSequenceInPrompt = True
+				if(sequenceIndex==0):
+					if(printHeaderDuringInferencePredict):
+						print("\n!inferenceTrainFirstSequences: executing inference:")
+		if(len(sequence) <= maxSequenceLength):
+			if(sequenceCount >= trainSetStartOffsetSequences):
+				processSequence(databaseNetworkObject, inferenceSequenceInPrompt, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw)
+			else:
+				#if(printTrainSequenceCount):
+				print(f"(sequenceCount < trainSetStartOffsetSequences: Processing sequenceCount: {sequenceCount}")	
+			sequenceCount += 1
+		if(sequenceCount == trainMaxSequences and inferenceMode==False):
+			break
+
+	if(debugPrintSpacySectionTimes):
+		processArticlePart2Duration = time.perf_counter() - processArticlePart2StartTime
+		print(f"debugPrintSpacySectionTimes: articleIndex={articleIndex} sequenceCount={sequenceCount} processArticlePart1Seconds={processArticlePart1Duration:.6f} processArticlePart2Seconds={processArticlePart2Duration:.6f}")
+		global processArticlePart1totalTime
+		global processArticlePart2totalTime
+		global processArticlePart1count
+		global processArticlePart2count
+		processArticlePart1totalTime += processArticlePart1Duration
+		processArticlePart2totalTime += processArticlePart2Duration
+		processArticlePart1count += 1
+		processArticlePart2count += 1
+
+	return sequenceCount
+
+def generateSeqencesBatchOrSerial(textParsed, skipMode):
+	sentences = list(textParsed.sents)
+	minSequenceLength = numSeedTokensInference + 1
+	sequences = []
+	sequencesRaw = []
+	sequencesText = []
+	if(multisentencePredictions):
+		for i in range(0, len(sentences), numSentencesPerSequence):
+			startIndex = sentences[i].start
+			endIndex = sentences[min(i + numSentencesPerSequence, len(sentences)) - 1].end
+			span = textParsed[startIndex:endIndex]
+			sequenceText = span.text
+			if(not sequenceText.strip()):
+				continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
+			sequenceText = sequenceText.lstrip()
+			if(not spacyPipelineBatchSequences):
+				if(spacyPipelineSingleParse or skipMode):
+					sequenceParsed = span.as_doc()
+				else:
+					sequenceParsed = nlpSequence(sequenceText)
+				if(len(sequenceParsed) == 0):
+					continue
+				if(len(sequenceParsed) < minSequenceLength):
+					continue
+				sequences.append(sequenceParsed)
+				sequencesRaw.append(sequenceText)
+			else:
+				sequencesText.append(sequenceText)
+	else:
+		for sentence in sentences:
+			sequenceText = sentence.text
+			if(not sequenceText.strip()):
+				continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
+			sequenceText = sequenceText.lstrip()
+			if(not spacyPipelineBatchSequences):
+				if(spacyPipelineSingleParse or skipMode):
+					sequenceParsed = sentence.as_doc()
+				else:
+					sequenceParsed = nlpSequence(sequenceText)
+				if(len(sequenceParsed) == 0):
+					continue
+				if(len(sequenceParsed) < minSequenceLength):
+					continue
+				sequences.append(sequenceParsed)
+				sequencesRaw.append(sequenceText)
+			else:
+				sequencesText.append(sequenceText)
+	if(spacyPipelineBatchSequences):
+		for sequenceIndex, sequenceParsed in enumerate(nlpSequence.pipe(sequencesText)):
+			if(len(sequenceParsed) == 0):
+				continue
+			if(len(sequenceParsed) < minSequenceLength):
+				continue
+			sequences.append(sequenceParsed)
+			sequencesRaw.append(sequencesText[sequenceIndex])
+	return sequences, sequencesRaw
+
+
+def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw):
+	trainMode = not inferenceMode
+	
+	sequenceTrainTotalStartTime = None
+	if(debugPrintTrainSectionTimes and trainMode):
+		GIAANNcmn_debug.debugTrainSectionTimesReset(databaseNetworkObject, sequenceCount)
+		sequenceTrainTotalStartTime = time.perf_counter()
+	preprocessSequenceStartTime = None
+	if(debugPrintTrainSectionTimes and trainMode):
+		preprocessSequenceStartTime = time.perf_counter()
+
+	sequence = GIAANNnlp_sequenceTokens.preprocessSequence(sequence)
+	
+	if(debugPrintTrainSectionTimes and trainMode):
+		GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "preprocessSequence", time.perf_counter() - preprocessSequenceStartTime)
+	if(debugReloadGlobalFeatureNeuronsEverySequence):
+		GIAANNcmn_databaseNetwork.initialiseDatabaseNetwork(inferenceMode)
+		if(storeDatabaseGlobalFeatureNeuronsInRam):
+			databaseNetworkObject.globalFeatureNeurons = GIAANNcmn_databaseNetwork.initialiseFeatureNeuronsGlobal(inferenceMode, databaseNetworkObject.c, databaseNetworkObject.f)
+	
+	if(inferenceMode):
+		if(not inferenceTrainFirstSequences):
+			GIAANNcmn_databaseNetwork.restoreGlobalArrays(databaseNetworkObject)	#reset activations so each prompt sequence is independent
+	
+	databaseNetworkObject.articleIndexDebug = articleIndex
+	databaseNetworkObject.sequenceIndexDebug = sequenceIndex
+	
+	# Refresh the observed columns dictionary for each new sequence
+	observedColumnsDict = {}  # key: lemma, value: ObservedColumn
+	observedColumnsSequenceWordIndexDict = {}  # key: sequence word index, value: ObservedColumn
+	
+	if(inferenceMode):
+		if(numSeedTokens >= len(sequence)):
+			return
+		sequenceSeed = sequence[0:numSeedTokens]	#prompt
+		sequencePredict = sequence[numSeedTokens:]
+	
+	allowNewFeatures = True
+	if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
+		if(not databaseNetworkObject.observedColumnsRAMLoaded):
+			raise RuntimeError("processSequence error: storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam requires observedColumnsRAMLoaded after startup")
+	if(inferenceMode and inferenceAddNewFeatures):
+		expandSequenceForInference(databaseNetworkObject, sequence)
+		allowNewFeatures = False
+
+	# First pass: Extract words, lemmas, pos, tags, and update concept_columns_dict and c
+	firstPassStartTime = None
+	if(debugPrintTrainSectionTimes and trainMode):
+		firstPassStartTime = time.perf_counter()
+	if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
+		GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("firstPass")
+	
+	conceptsFound, conceptMask = GIAANNnlp_sequenceConcepts.firstPass(databaseNetworkObject, sequence, allowNewFeatures)
+	
+	if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
+		GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("firstPass")
+	if(debugPrintTrainSectionTimes and trainMode):
+		GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "firstPass", time.perf_counter() - firstPassStartTime)
+	
+	if(conceptsFound):
+		getTokensStartTime = None
+		if(debugPrintTrainSectionTimes and trainMode):
+			getTokensStartTime = time.perf_counter()
+		
+		tokens = GIAANNnlp_sequenceTokens.getTokens(sequence)
+		
+		if(debugPrintTrainSectionTimes and trainMode):
+			GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "getTokens", time.perf_counter() - getTokensStartTime)
+
+		# When usePOS is enabled, detect all possible new features in the sequence
+		detectNewFeaturesStartTime = None
+		if not (useDedicatedFeatureLists):
+			if(debugPrintTrainSectionTimes and trainMode):
+				detectNewFeaturesStartTime = time.perf_counter()
+			if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
+				GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("detectNewFeatures")
+			
+			GIAANNnlp_sequenceConcepts.detectNewFeatures(databaseNetworkObject, tokens, allowNewFeatures)
+			
+			if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
+				GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("detectNewFeatures")
+			if(debugPrintTrainSectionTimes and trainMode):
+				GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "detectNewFeatures", time.perf_counter() - detectNewFeaturesStartTime)
+
+		if(printTrainSequencePOS):
+			sentenceWithPOS = " ".join(f"{token.text} ({tokenIndex}:{token.pos_})" for tokenIndex, token in enumerate(sequence))
+			print(f"Processing sequenceCount: {sequenceCount}, {sentenceWithPOS}")	#article: {articleIndex}, sequence: {sequenceIndex}
+		if(printTrainSequenceDelimiters):
+			sentenceWithDelimiters = buildSequenceWithDelimiters(sequence, tokens)
+			print(f"Processing sequenceCount: {sequenceCount}, {sentenceWithDelimiters}")	#article: {articleIndex}, sequence: {sequenceIndex}
+		if(printTrainSequenceRaw):
+			print(sequenceRaw)
+		if(printTrainSequenceDefault):
+			print(f"Processing sequenceCount: {sequenceCount}, {sequence.text}")	#"{sequence.text}"	#"Processing sequenceCount: {sequenceCount}, {sequence.text}"	#article: {articleIndex}, sequence: {sequenceIndex}
+		if(printTrainSequenceCount):
+			print(f"Processing sequenceCount: {sequenceCount}")	
+			
+		# Second pass: Create observed_columns_dict
+		secondPassStartTime = None
+		if(debugPrintTrainSectionTimes and trainMode):
+			secondPassStartTime = time.perf_counter()
+		if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
+			GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("secondPass")
+		
+		observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNnlp_sequenceConcepts.secondPass(databaseNetworkObject, tokens, inferenceMode)
+		
+		if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
+			GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("secondPass")
+		if(debugPrintTrainSectionTimes and trainMode):
+			GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "secondPass", time.perf_counter() - secondPassStartTime)
+
+		# Create the sequence observed columns object
+		sequenceObservedColumnsInitStartTime = None
+		if(debugPrintTrainSectionTimes and trainMode):
+			sequenceObservedColumnsInitStartTime = time.perf_counter()
+		if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
+			GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("SequenceObservedColumns.__init__")
+		
+		sequenceObservedColumns = GIAANNcmn_sequenceObservedColumns.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict, inferenceMode)
+		
+		if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
+			GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("SequenceObservedColumns.__init__")
+		if(debugPrintTrainSectionTimes and trainMode):
+			GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "SequenceObservedColumns.__init__", time.perf_counter() - sequenceObservedColumnsInitStartTime)
+
+		if(inferenceMode):
+			if(conceptColumnsDelimitByPOS and sequenceObservedColumns.noDelimiterDetectedBetweenConceptTokens):
+				if(debugWarningInferenceNoDelimiterDetectedBetweenConceptTokens):
+					print("warning: inference skipped due to missing concept column delimiter detection in sequence")
+			else:
+				# Process each concept word in the sequence (predict)
+				GIAANNcmn_prediction.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens, sequenceRaw)
+		else:
+			# Process each concept word in the sequence (train)
+			requiredSourceFeatureIndicesByObservedColumn = sequenceObservedColumns.getTrainRequiredSourceFeatureIndicesByObservedColumn()
+			
+			if(debugPrintRamMaxUsagePhaseLocal):
+				GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("prepareObservedColumnsForTrainSequence")
+				
+			GIAANNcmn_databaseNetwork.prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFeatureIndicesByObservedColumn)
+			
+			if(debugPrintRamMaxUsagePhaseLocal):
+				GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("prepareObservedColumnsForTrainSequence")
+			if(debugPrintRamMaxUsagePhaseLocal):
+				GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("trainConceptWords")
+			
+			trained = GIAANNcmn_databaseNetworkTrain.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)
+			
+			if(debugPrintRamMaxUsagePhaseLocal):
+				GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("trainConceptWords")
+			
+			if(trained):
+				# Update observed columns from sequence observed columns
+				updateObservedColumnsWrapperStartTime = None
+				
+				if(debugPrintTrainSectionTimes and trainMode):
+					updateObservedColumnsWrapperStartTime = time.perf_counter()
+				if(debugPrintRamMaxUsagePhaseLocal):
+					GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("updateObservedColumnsWrapper")
+				
+				sequenceObservedColumns.updateObservedColumnsWrapper()
+				
+				if(debugPrintRamMaxUsagePhaseLocal):
+					GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("updateObservedColumnsWrapper")
+				if(debugPrintTrainSectionTimes and trainMode):
+					GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "updateObservedColumnsWrapper", time.perf_counter() - updateObservedColumnsWrapperStartTime)
+
+				# Save observed columns to disk
+				if(useSaveData):
+					if(not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
+						if(debugPrintRamMaxUsagePhaseLocal):
+							GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("saveData(sequence)")
+						GIAANNcmn_databaseNetworkFiles.saveData(databaseNetworkObject, observedColumnsDict, sequenceCount)
+						if(debugPrintRamMaxUsagePhaseLocal):
+							GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("saveData(sequence)")
+
+				if(drawNetworkDuringTrain):
+					# Visualize the complete graph every time a new sequence is parsed by the application.
+					GIAANNcmn_databaseNetworkDraw.visualizeGraph(sequenceObservedColumns, False, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+generateDrawSequenceIndex(sequenceIndex))
+
+		if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
+			GIAANNcmn_databaseNetwork.moveObservedColumnsDictConnectionsToDatabaseAfterTrain(observedColumnsDict, inferenceMode)
+
+		releaseRuntimeGpuMemoryStartTime = None
+		if(debugPrintTrainSectionTimes and trainMode):
+			releaseRuntimeGpuMemoryStartTime = time.perf_counter()
+		releaseRuntimeGpuMemory(sequenceCount)
+		if(debugPrintTrainSectionTimes and trainMode):
+			GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "releaseRuntimeGpuMemory", time.perf_counter() - releaseRuntimeGpuMemoryStartTime)
+
+	if(debugPrintTrainSectionTimes and trainMode):
+		GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "totalSequenceTrain", time.perf_counter() - sequenceTrainTotalStartTime)
+		GIAANNcmn_debug.debugTrainSectionTimesPrint(databaseNetworkObject)
+
+	#note sequenceCount can be used as sequenceIndex (independent of index in sequenceList) because sequenceIndex is only used to index sequence time (same for all sequences in sequenceList)
+
+		
+def releaseRuntimeGpuMemory(sequenceCount):
+	if(sequenceCount < 0):
+		raise RuntimeError("releaseRuntimeGpuMemory error: sequenceCount must be >= 0")
+	releaseGpuMemory = False
+	if(debugRuntimeReleaseGPUMemory):
+		if(debugRuntimeReleaseGPUMemoryEverySequenceCount <= 0):
+			raise RuntimeError("releaseRuntimeGpuMemory error: debugRuntimeReleaseGPUMemoryEverySequenceCount must be > 0")
+		if((sequenceCount % debugRuntimeReleaseGPUMemoryEverySequenceCount) == 0):
+			releaseGpuMemory = True
+	if(debugDeleteGPUcache):
+		releaseGpuMemory = True
+	if(releaseGpuMemory):
+		if(pt.cuda.is_available()):
+			gc.collect()
+			pt.cuda.empty_cache()
+			pt.cuda.ipc_collect()
+	return

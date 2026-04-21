@@ -1,4 +1,4 @@
-"""GIAANNproto_databaseNetwork.py
+"""GIAANNcmn_databaseNetwork.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -7,23 +7,23 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Usage:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Description:
-GIA ANN proto database Network
+GIA ANN common database Network
 
 """
 
 import torch as pt
 
-from GIAANNproto_globalDefs import *
-import GIAANNproto_debug
-import GIAANNproto_databaseNetworkFiles
-from GIAANNproto_databaseNetworkObservedColumn import ObservedColumn, ObservedColumnConnectionBase, ObservedColumnProxy, ObservedColumnStub
-import GIAANNproto_sparseTensors
+from GIAANNcmn_globalDefs import *
+import GIAANNcmn_debug
+import GIAANNcmn_databaseNetworkFiles
+from GIAANNcmn_databaseNetworkObservedColumn import ObservedColumn, ObservedColumnConnectionBase, ObservedColumnProxy, ObservedColumnStub
+import GIAANNcmn_sparseTensors
 
 def calculateArrayNumberOfProperties(inferenceMode):
 	if(inferenceMode):
@@ -102,12 +102,12 @@ def ensureGlobalFeatureNeuronsSize(databaseNetworkObject, updateBackup):
 		raise RuntimeError("ensureGlobalFeatureNeuronsSize error: globalFeatureNeurons is None")
 	if(databaseNetworkObject.globalFeatureNeurons.shape[3] < databaseNetworkObject.c or databaseNetworkObject.globalFeatureNeurons.shape[4] < databaseNetworkObject.f):
 		newShape = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
-		databaseNetworkObject.globalFeatureNeurons = GIAANNproto_databaseNetworkFiles.expandSparseTensorSize(databaseNetworkObject.globalFeatureNeurons, newShape, "ensureGlobalFeatureNeuronsSize.globalFeatureNeurons")
+		databaseNetworkObject.globalFeatureNeurons = GIAANNcmn_databaseNetworkFiles.expandSparseTensorSize(databaseNetworkObject.globalFeatureNeurons, newShape, "ensureGlobalFeatureNeuronsSize.globalFeatureNeurons")
 		expanded = True
 	if(updateBackup and databaseNetworkObject.globalFeatureNeuronsBackup is not None):
 		if(databaseNetworkObject.globalFeatureNeuronsBackup.shape[3] < databaseNetworkObject.c or databaseNetworkObject.globalFeatureNeuronsBackup.shape[4] < databaseNetworkObject.f):
 			newBackupShape = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
-			databaseNetworkObject.globalFeatureNeuronsBackup = GIAANNproto_databaseNetworkFiles.expandSparseTensorSize(databaseNetworkObject.globalFeatureNeuronsBackup, newBackupShape, "ensureGlobalFeatureNeuronsSize.globalFeatureNeuronsBackup")
+			databaseNetworkObject.globalFeatureNeuronsBackup = GIAANNcmn_databaseNetworkFiles.expandSparseTensorSize(databaseNetworkObject.globalFeatureNeuronsBackup, newBackupShape, "ensureGlobalFeatureNeuronsSize.globalFeatureNeuronsBackup")
 			expanded = True
 	return expanded
 
@@ -115,14 +115,14 @@ def ensureGlobalFeatureNeuronsSize(databaseNetworkObject, updateBackup):
 if storeDatabaseGlobalFeatureNeuronsInRam:
 	def initialiseFeatureNeuronsGlobal(inferenceMode, c, f):
 		arrayNumberOfProperties = calculateArrayNumberOfProperties(inferenceMode)
-		globalFeatureNeurons = GIAANNproto_sparseTensors.createEmptySparseTensor((arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, c, f))
+		globalFeatureNeurons = GIAANNcmn_sparseTensors.createEmptySparseTensor((arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, c, f))
 		return globalFeatureNeurons
 		
 	def loadFeatureNeuronsGlobal(inferenceMode, c, f):
-		if GIAANNproto_databaseNetworkFiles.pathExists(globalFeatureNeuronsFileFull):
-			globalFeatureNeurons = GIAANNproto_databaseNetworkFiles.loadFeatureNeuronsGlobalFile(inferenceMode)
+		if GIAANNcmn_databaseNetworkFiles.pathExists(globalFeatureNeuronsFileFull):
+			globalFeatureNeurons = GIAANNcmn_databaseNetworkFiles.loadFeatureNeuronsGlobalFile(inferenceMode)
 			if(debugLimitFeatures):
-				globalFeatureNeurons = GIAANNproto_debug.applyDebugLimitGlobalFeatureNeuronsTensor(globalFeatureNeurons, c, f, "globalFeatureNeurons")
+				globalFeatureNeurons = GIAANNcmn_debug.applyDebugLimitGlobalFeatureNeuronsTensor(globalFeatureNeurons, c, f, "globalFeatureNeurons")
 				if(globalFeatureNeurons.size(3) < c or globalFeatureNeurons.size(4) < f):
 					print("globalFeatureNeurons.size(3) = ", globalFeatureNeurons.size(3))
 					print("globalFeatureNeurons.size(4) = ", globalFeatureNeurons.size(4))
@@ -137,9 +137,9 @@ def generateGlobalFeatureNeuronsForStartup(databaseNetworkObject, saveToDisk, us
 		raise RuntimeError("generateGlobalFeatureNeuronsForStartup error: inferenceStartGenerateGlobalFeatureNeuronsTensor is disabled")
 	if(databaseNetworkObject is None):
 		raise RuntimeError("generateGlobalFeatureNeuronsForStartup error: databaseNetworkObject is None")
-	globalFeatureNeurons = GIAANNproto_databaseNetworkFiles.generateGlobalFeatureNeuronsTensor(databaseNetworkObject, useRAMcolumnFeatureNeurons=useRAMcolumnFeatureNeurons)
+	globalFeatureNeurons = GIAANNcmn_databaseNetworkFiles.generateGlobalFeatureNeuronsTensor(databaseNetworkObject, useRAMcolumnFeatureNeurons=useRAMcolumnFeatureNeurons)
 	if(saveToDisk):
-		GIAANNproto_databaseNetworkFiles.saveTensor(globalFeatureNeurons, databaseFolder, globalFeatureNeuronsFile)
+		GIAANNcmn_databaseNetworkFiles.saveTensor(globalFeatureNeurons, databaseFolder, globalFeatureNeuronsFile)
 	if(globalFeatureNeurons.device != deviceSparse):
 		globalFeatureNeurons = globalFeatureNeurons.to(deviceSparse)
 	databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
@@ -165,38 +165,38 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 	conceptFeaturesReferenceSetDelimiterList = []
 	conceptFeaturesReferenceSetDelimiterDeterministicList = []
 	conceptFeaturesReferenceSetDelimiterProbabilisticList = []
-	loadExistingDatabase = inferenceMode or loadExistingDatabaseOverride or (trainLoadExistingDatabase and GIAANNproto_databaseNetworkFiles.pathExists(conceptColumnsDictFile))
+	loadExistingDatabase = inferenceMode or loadExistingDatabaseOverride or (trainLoadExistingDatabase and GIAANNcmn_databaseNetworkFiles.pathExists(conceptColumnsDictFile))
 
 	# Initialize the concept columns dictionary
-	if(loadExistingDatabase and GIAANNproto_databaseNetworkFiles.pathExists(conceptColumnsDictFile)):
-		conceptColumnsDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptColumnsDictFile)
+	if(loadExistingDatabase and GIAANNcmn_databaseNetworkFiles.pathExists(conceptColumnsDictFile)):
+		conceptColumnsDict = GIAANNcmn_databaseNetworkFiles.loadDictFile(conceptColumnsDictFile)
 		c = len(conceptColumnsDict)
 		conceptColumnsList = list(conceptColumnsDict.keys())
-		conceptFeaturesDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesDictFile)
+		conceptFeaturesDict = GIAANNcmn_databaseNetworkFiles.loadDictFile(conceptFeaturesDictFile)
 		f = len(conceptFeaturesDict)
 		conceptFeaturesList = list(conceptFeaturesDict.keys())
 		if(conceptColumnsDelimitByPOS):
 			if(detectReferenceSetDelimitersBetweenNouns):	
-				conceptFeaturesReferenceSetDelimiterDeterministicDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterDeterministicListFile)
+				conceptFeaturesReferenceSetDelimiterDeterministicDict = GIAANNcmn_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterDeterministicListFile)
 				conceptFeaturesReferenceSetDelimiterDeterministicList = list(conceptFeaturesReferenceSetDelimiterDeterministicDict.values())
-				conceptFeaturesReferenceSetDelimiterProbabilisticDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterProbabilisticListFile)
+				conceptFeaturesReferenceSetDelimiterProbabilisticDict = GIAANNcmn_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterProbabilisticListFile)
 				conceptFeaturesReferenceSetDelimiterProbabilisticList = list(conceptFeaturesReferenceSetDelimiterProbabilisticDict.values())
 			else:
-				conceptFeaturesReferenceSetDelimiterDict = GIAANNproto_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterListFile)
+				conceptFeaturesReferenceSetDelimiterDict = GIAANNcmn_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterListFile)
 				conceptFeaturesReferenceSetDelimiterList = list(conceptFeaturesReferenceSetDelimiterDict.values())
 		if(debugLimitFeatures):
-			conceptColumnsDict = GIAANNproto_debug.applyDebugLimitIndexDict(conceptColumnsDict, debugLimitFeaturesCMax, "conceptColumnsDict")
-			conceptColumnsList = GIAANNproto_debug.buildIndexListFromDict(conceptColumnsDict, "conceptColumnsDict")
+			conceptColumnsDict = GIAANNcmn_debug.applyDebugLimitIndexDict(conceptColumnsDict, debugLimitFeaturesCMax, "conceptColumnsDict")
+			conceptColumnsList = GIAANNcmn_debug.buildIndexListFromDict(conceptColumnsDict, "conceptColumnsDict")
 			c = len(conceptColumnsList)
-			conceptFeaturesDict = GIAANNproto_debug.applyDebugLimitIndexDict(conceptFeaturesDict, debugLimitFeaturesFMax, "conceptFeaturesDict")
-			conceptFeaturesList = GIAANNproto_debug.buildIndexListFromDict(conceptFeaturesDict, "conceptFeaturesDict")
+			conceptFeaturesDict = GIAANNcmn_debug.applyDebugLimitIndexDict(conceptFeaturesDict, debugLimitFeaturesFMax, "conceptFeaturesDict")
+			conceptFeaturesList = GIAANNcmn_debug.buildIndexListFromDict(conceptFeaturesDict, "conceptFeaturesDict")
 			f = len(conceptFeaturesList)
 			if(conceptColumnsDelimitByPOS):
 				if(detectReferenceSetDelimitersBetweenNouns):
-					conceptFeaturesReferenceSetDelimiterDeterministicList = GIAANNproto_debug.applyDebugLimitList(conceptFeaturesReferenceSetDelimiterDeterministicList, f, "conceptFeaturesReferenceSetDelimiterDeterministicList")
-					conceptFeaturesReferenceSetDelimiterProbabilisticList = GIAANNproto_debug.applyDebugLimitList(conceptFeaturesReferenceSetDelimiterProbabilisticList, f, "conceptFeaturesReferenceSetDelimiterProbabilisticList")
+					conceptFeaturesReferenceSetDelimiterDeterministicList = GIAANNcmn_debug.applyDebugLimitList(conceptFeaturesReferenceSetDelimiterDeterministicList, f, "conceptFeaturesReferenceSetDelimiterDeterministicList")
+					conceptFeaturesReferenceSetDelimiterProbabilisticList = GIAANNcmn_debug.applyDebugLimitList(conceptFeaturesReferenceSetDelimiterProbabilisticList, f, "conceptFeaturesReferenceSetDelimiterProbabilisticList")
 				else:
-					conceptFeaturesReferenceSetDelimiterList = GIAANNproto_debug.applyDebugLimitList(conceptFeaturesReferenceSetDelimiterList, f, "conceptFeaturesReferenceSetDelimiterList")
+					conceptFeaturesReferenceSetDelimiterList = GIAANNcmn_debug.applyDebugLimitList(conceptFeaturesReferenceSetDelimiterList, f, "conceptFeaturesReferenceSetDelimiterList")
 	else:
 		if(useDedicatedConceptNames):
 			# Add dummy feature for prime concept neuron (different per concept column)
@@ -260,8 +260,8 @@ def loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, ta
 			databaseNetworkObject.observedColumnsDictRAM[lemma] = observedColumn
 		observedColumn.ensureObservedColumnFeatureArraysFeatures(databaseNetworkObject.f)
 	else:
-		GIAANNproto_databaseNetworkFiles.validateObservedColumnStorageFormat(conceptIndex)
-		if GIAANNproto_databaseNetworkFiles.observedColumnMetadataExists(conceptIndex):
+		GIAANNcmn_databaseNetworkFiles.validateObservedColumnStorageFormat(conceptIndex)
+		if GIAANNcmn_databaseNetworkFiles.observedColumnMetadataExists(conceptIndex):
 			observedColumn = ObservedColumn.loadFromDisk(databaseNetworkObject, conceptIndex, lemma, i, targetDevice=deviceDatabase, loadAllSourceFeatures=loadAllSourceFeatures)
 		else:
 			observedColumn = ObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
@@ -289,10 +289,10 @@ def loadObservedColumnToRamStartup(databaseNetworkObject, conceptIndex, lemma, i
 		raise RuntimeError("loadObservedColumnToRamStartup error: storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam is False")
 	if(databaseNetworkObject.observedColumnsRAMLoaded):
 		raise RuntimeError("loadObservedColumnToRamStartup error: observedColumnsRAMLoaded is already True")
-	GIAANNproto_databaseNetworkFiles.validateObservedColumnStorageFormat(conceptIndex)
-	metadataFile = GIAANNproto_databaseNetworkFiles.getObservedColumnMetadataFile(conceptIndex)
-	if(GIAANNproto_databaseNetworkFiles.observedColumnHasPersistedData(conceptIndex)):
-		if(not GIAANNproto_databaseNetworkFiles.observedColumnHasConsistentPersistedMetadata(conceptIndex)):
+	GIAANNcmn_databaseNetworkFiles.validateObservedColumnStorageFormat(conceptIndex)
+	metadataFile = GIAANNcmn_databaseNetworkFiles.getObservedColumnMetadataFile(conceptIndex)
+	if(GIAANNcmn_databaseNetworkFiles.observedColumnHasPersistedData(conceptIndex)):
+		if(not GIAANNcmn_databaseNetworkFiles.observedColumnHasConsistentPersistedMetadata(conceptIndex)):
 			raise RuntimeError(f"loadObservedColumnToRamStartup error: inconsistent observed column storage for conceptIndex {conceptIndex}, lemma {lemma}")
 		result = ObservedColumn.loadFromDisk(databaseNetworkObject, conceptIndex, lemma, i, targetDevice=deviceDatabase, loadAllSourceFeatures=True, resizeFeatureTensorsToCurrentSize=resizeTensorsOnRAMdatabaseLoad)
 	else:

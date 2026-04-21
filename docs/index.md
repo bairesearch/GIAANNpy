@@ -28,7 +28,7 @@ pip install nltk
 - Run the prototype from the `proto` directory.
 ```
 source activate pytorchsenv
-python GIAANNproto_main.py
+python GIAANNcmn_main.py
 ```
 
 ## Algorithm
@@ -70,7 +70,7 @@ It likewise supports a number features of classical artificial neural networks s
 
 ## Configuration
 
-All settings are located in `proto/GIAANNproto_globalDefs.py`.
+All settings are located in `proto/GIAANN*_globalDefs.py`.
 
 See the repository [README](https://github.com/bairesearch/GIAANNpy/blob/main/README.md) for a summary of the main options.
 

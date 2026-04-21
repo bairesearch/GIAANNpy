@@ -1,4 +1,4 @@
-"""GIAANNproto_databaseNetworkObservedColumn.py
+"""GIAANNcmn_databaseNetworkObservedColumn.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -7,22 +7,22 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Usage:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Description:
-GIA ANN proto database Network Observed Column
+GIA ANN common database Network Observed Column
 
 """
 
 import torch as pt
 import time
 
-from GIAANNproto_globalDefs import *
-import GIAANNproto_debug
-import GIAANNproto_databaseNetworkFiles
+from GIAANNcmn_globalDefs import *
+import GIAANNcmn_debug
+import GIAANNcmn_databaseNetworkFiles
 
 
 class ObservedColumnConnectionBase:
@@ -165,7 +165,7 @@ class ObservedColumnConnectionBase:
 			loadC = sourceTensor.shape[3]
 			if(newC > loadC):
 				expandedSize = (sourceTensor.shape[0], sourceTensor.shape[1], sourceTensor.shape[2], newC, sourceTensor.shape[4])
-				sourceTensor = GIAANNproto_databaseNetworkFiles.expandSparseTensorSize(sourceTensor, expandedSize, f"{self.getObservedColumnErrorName()}.expandFeatureConnectionsArraysConcepts")
+				sourceTensor = GIAANNcmn_databaseNetworkFiles.expandSparseTensorSize(sourceTensor, expandedSize, f"{self.getObservedColumnErrorName()}.expandFeatureConnectionsArraysConcepts")
 				self.featureConnectionsBySourceFeature[sourceFeatureIndex] = sourceTensor
 		return
 
@@ -184,7 +184,7 @@ class ObservedColumnConnectionBase:
 				raise RuntimeError(f"{self.getObservedColumnErrorName()}.expandFeatureNeuronArraysFeatures error: featureNeurons missing while storeDatabaseGlobalFeatureNeuronsInRam is False")
 			if(newF > self.featureNeurons.shape[3]):
 				expandedSizeNeurons = (self.featureNeurons.shape[0], self.featureNeurons.shape[1], self.featureNeurons.shape[2], newF)
-				self.featureNeurons = GIAANNproto_databaseNetworkFiles.expandSparseTensorSize(self.featureNeurons, expandedSizeNeurons, f"{self.getObservedColumnErrorName()}.expandFeatureNeuronArraysFeatures")
+				self.featureNeurons = GIAANNcmn_databaseNetworkFiles.expandSparseTensorSize(self.featureNeurons, expandedSizeNeurons, f"{self.getObservedColumnErrorName()}.expandFeatureNeuronArraysFeatures")
 		return
 
 	def requiresExpandFeatureMapsFeatures(self, newF):
@@ -228,7 +228,7 @@ class ObservedColumnConnectionBase:
 			loadF = sourceTensor.shape[4]
 			if(newF > loadF):
 				expandedSizeConnections = (sourceTensor.shape[0], sourceTensor.shape[1], sourceTensor.shape[2], sourceTensor.shape[3], newF)
-				sourceTensor = GIAANNproto_databaseNetworkFiles.expandSparseTensorSize(sourceTensor, expandedSizeConnections, f"{self.getObservedColumnErrorName()}.expandFeatureConnectionsArraysFeatures")
+				sourceTensor = GIAANNcmn_databaseNetworkFiles.expandSparseTensorSize(sourceTensor, expandedSizeConnections, f"{self.getObservedColumnErrorName()}.expandFeatureConnectionsArraysFeatures")
 				self.featureConnectionsBySourceFeature[sourceFeatureIndex] = sourceTensor
 		return
 
@@ -251,7 +251,7 @@ class ObservedColumnConnectionBase:
 
 	def setFeatureConnectionsForSourceFeature(self, sourceFeatureIndex, tensor):
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
-			debugSectionName = GIAANNproto_debug.getSourceFeatureConnectionsDebugSectionName(self.databaseNetworkObject, "setFeatureConnectionsForSourceFeature")
+			debugSectionName = GIAANNcmn_debug.getSourceFeatureConnectionsDebugSectionName(self.databaseNetworkObject, "setFeatureConnectionsForSourceFeature")
 			debugSectionStartTime = None
 			if(debugSectionName is not None):
 				debugSectionStartTime = time.perf_counter()
@@ -272,7 +272,7 @@ class ObservedColumnConnectionBase:
 		self.loadedSourceFeatureIndices.add(normalisedSourceFeatureIndex)
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
 			if(debugSectionName is not None):
-				GIAANNproto_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, debugSectionName, time.perf_counter() - debugSectionStartTime)
+				GIAANNcmn_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, debugSectionName, time.perf_counter() - debugSectionStartTime)
 		return
 
 	def unloadLoadedSourceFeatureConnections(self, sourceFeatureIndices=None):
@@ -367,10 +367,10 @@ class ObservedColumn(ObservedColumnConnectionBase):
 			combinedIndices = set(self.featureConnectionsBySourceFeature.keys())
 		elif(optimisationGetFeatureConnectionsForSourceFeatureCache):
 			if(self.storedSourceFeatureIndicesCache is None):
-				self.storedSourceFeatureIndicesCache = set(GIAANNproto_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(self.conceptIndex))
+				self.storedSourceFeatureIndicesCache = set(GIAANNcmn_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(self.conceptIndex))
 			combinedIndices = set(self.storedSourceFeatureIndicesCache)
 		else:
-			combinedIndices = set(GIAANNproto_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(self.conceptIndex))
+			combinedIndices = set(GIAANNcmn_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(self.conceptIndex))
 		for sourceFeatureIndex in self.featureConnectionsBySourceFeature.keys():
 			combinedIndices.add(self.normaliseSourceFeatureIndex(sourceFeatureIndex))
 		result = sorted(combinedIndices)
@@ -378,7 +378,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 
 	def getFeatureConnectionsForSourceFeature(self, sourceFeatureIndex, targetDevice=None, createMissing=False, ensureCurrentSizeOnLoad=False):
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
-			debugSectionName = GIAANNproto_debug.getSourceFeatureConnectionsDebugSectionName(self.databaseNetworkObject, "getFeatureConnectionsForSourceFeature")
+			debugSectionName = GIAANNcmn_debug.getSourceFeatureConnectionsDebugSectionName(self.databaseNetworkObject, "getFeatureConnectionsForSourceFeature")
 			debugSectionStartTime = None
 			if(debugSectionName is not None):
 				debugSectionStartTime = time.perf_counter()
@@ -391,12 +391,12 @@ class ObservedColumn(ObservedColumnConnectionBase):
 			else:
 				if(optimisationGetFeatureConnectionsForSourceFeatureCache):
 					if(self.storedSourceFeatureIndicesCache is None):
-						self.storedSourceFeatureIndicesCache = set(GIAANNproto_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(self.conceptIndex))
+						self.storedSourceFeatureIndicesCache = set(GIAANNcmn_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(self.conceptIndex))
 					storedSourceFeatureIndices = self.storedSourceFeatureIndicesCache
 				else:
 					storedSourceFeatureIndices = self.listStoredSourceFeatureIndices()
 				if(normalisedSourceFeatureIndex in storedSourceFeatureIndices):
-					result = GIAANNproto_databaseNetworkFiles.loadObservedColumnSourceFeatureConnectionsTensor(self.databaseNetworkObject, self.conceptIndex, normalisedSourceFeatureIndex, resolvedTargetDevice, ensureCurrentSizeOnLoad=ensureCurrentSizeOnLoad)
+					result = GIAANNcmn_databaseNetworkFiles.loadObservedColumnSourceFeatureConnectionsTensor(self.databaseNetworkObject, self.conceptIndex, normalisedSourceFeatureIndex, resolvedTargetDevice, ensureCurrentSizeOnLoad=ensureCurrentSizeOnLoad)
 				else:
 					result = self.initialiseFeatureConnections(self.databaseNetworkObject.c, self.databaseNetworkObject.f, resolvedTargetDevice)
 			self.featureConnectionsBySourceFeature[normalisedSourceFeatureIndex] = result
@@ -406,7 +406,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		self.loadedSourceFeatureIndices.add(normalisedSourceFeatureIndex)
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
 			if(debugSectionName is not None):
-				GIAANNproto_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, debugSectionName, time.perf_counter() - debugSectionStartTime)
+				GIAANNcmn_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, debugSectionName, time.perf_counter() - debugSectionStartTime)
 		return result
 
 	def saveLoadedSourceFeatureConnectionsToDisk(self, sourceFeatureIndices=None):
@@ -416,12 +416,12 @@ class ObservedColumn(ObservedColumnConnectionBase):
 			resolvedSourceFeatureIndices = self.normaliseSourceFeatureIndices(sourceFeatureIndices)
 		if(optimisationGetFeatureConnectionsForSourceFeatureCache):
 			if(self.storedSourceFeatureIndicesCache is None):
-				self.storedSourceFeatureIndicesCache = set(GIAANNproto_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(self.conceptIndex))
+				self.storedSourceFeatureIndicesCache = set(GIAANNcmn_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(self.conceptIndex))
 		for sourceFeatureIndex in resolvedSourceFeatureIndices:
 			if(sourceFeatureIndex not in self.featureConnectionsBySourceFeature):
 				raise RuntimeError(f"saveLoadedSourceFeatureConnectionsToDisk error: missing loaded source feature tensor {sourceFeatureIndex}")
 			sourceTensor = self.featureConnectionsBySourceFeature[sourceFeatureIndex]
-			GIAANNproto_databaseNetworkFiles.saveObservedColumnSourceFeatureConnectionsTensor(self.conceptIndex, sourceFeatureIndex, sourceTensor)
+			GIAANNcmn_databaseNetworkFiles.saveObservedColumnSourceFeatureConnectionsTensor(self.conceptIndex, sourceFeatureIndex, sourceTensor)
 			if(optimisationGetFeatureConnectionsForSourceFeatureCache):
 				if(sourceTensor.is_sparse):
 					sourceTensor = sourceTensor.coalesce()
@@ -435,12 +435,12 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		return
 
 	def saveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsToCurrentSize=False):
-		GIAANNproto_databaseNetworkFiles.observedColumnSaveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize)
+		GIAANNcmn_databaseNetworkFiles.observedColumnSaveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize)
 		return
 
 	@classmethod
 	def loadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i, targetDevice=None, loadAllSourceFeatures=False, resizeFeatureTensorsToCurrentSize=False, loadFeatureNeurons=True):
-		result = GIAANNproto_databaseNetworkFiles.observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i, targetDevice=targetDevice, loadAllSourceFeatures=loadAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize, loadFeatureNeurons=loadFeatureNeurons)
+		result = GIAANNcmn_databaseNetworkFiles.observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, i, targetDevice=targetDevice, loadAllSourceFeatures=loadAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize, loadFeatureNeurons=loadFeatureNeurons)
 		return result
 
 

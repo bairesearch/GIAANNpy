@@ -1,4 +1,4 @@
-"""GIAANNproto_count.py
+"""GIAANNcmn_count.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -7,20 +7,20 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Usage:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Description:
-GIA ANN proto count helpers
+GIA ANN common count helpers
 
 """
 
 import os
 import torch as pt
 
-from GIAANNproto_globalDefs import *
+from GIAANNcmn_globalDefs import *
 
 def printCountTotalParametersRun(databaseNetworkObject):
 	assert arrayIndexPropertiesEfficient 	#only databaseNetworkObject.arrayIndexPropertiesStrengthIndex stored in database, all tensors are coalesced
@@ -63,19 +63,19 @@ def printCountTotalParametersRun(databaseNetworkObject):
 	return databaseMemoryGb
 
 def countUsesPersistedGlobalFeatureNeurons():
-	import GIAANNproto_databaseNetworkFiles
+	import GIAANNcmn_databaseNetworkFiles
 	result = False
 	if(storeDatabaseGlobalFeatureNeuronsInRam):
-		result = GIAANNproto_databaseNetworkFiles.pathExists(globalFeatureNeuronsFileFull)
+		result = GIAANNcmn_databaseNetworkFiles.pathExists(globalFeatureNeuronsFileFull)
 	return result
 
 def debugCountObservedColumnConnections(databaseNetworkObject, conceptIndex, lemma, columnIndex):
-	import GIAANNproto_databaseNetworkFiles
+	import GIAANNcmn_databaseNetworkFiles
 	columnConnections = 0
-	if(GIAANNproto_databaseNetworkFiles.observedColumnMetadataExists(conceptIndex)):
-		sourceFeatureIndices = GIAANNproto_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(conceptIndex)
+	if(GIAANNcmn_databaseNetworkFiles.observedColumnMetadataExists(conceptIndex)):
+		sourceFeatureIndices = GIAANNcmn_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(conceptIndex)
 		for sourceFeatureIndex in sourceFeatureIndices:
-			featureConnections = GIAANNproto_databaseNetworkFiles.loadObservedColumnSourceFeatureConnectionsTensor(databaseNetworkObject, conceptIndex, sourceFeatureIndex, deviceDatabase)
+			featureConnections = GIAANNcmn_databaseNetworkFiles.loadObservedColumnSourceFeatureConnectionsTensor(databaseNetworkObject, conceptIndex, sourceFeatureIndex, deviceDatabase)
 			if(featureConnections is None):
 				raise RuntimeError("debugCountObservedColumnConnections error: featureConnections is None for conceptIndex = " + str(conceptIndex) + ", sourceFeatureIndex = " + str(sourceFeatureIndex))
 			if(databaseNetworkObject.arrayIndexPropertiesStrengthIndex < 0 or databaseNetworkObject.arrayIndexPropertiesStrengthIndex >= featureConnections.shape[0]):
@@ -88,18 +88,18 @@ def debugCountObservedColumnConnections(databaseNetworkObject, conceptIndex, lem
 	return columnConnections
 
 def loadAndCountObservedColumnFeatureNeurons(databaseNetworkObject, conceptIndex):
-	import GIAANNproto_databaseNetworkFiles
+	import GIAANNcmn_databaseNetworkFiles
 	result = 0
 	if(databaseNetworkObject is None):
 		raise RuntimeError("loadAndCountObservedColumnFeatureNeurons error: databaseNetworkObject is None")
 	if(conceptIndex is None):
 		raise RuntimeError("loadAndCountObservedColumnFeatureNeurons error: conceptIndex is None")
-	if(not GIAANNproto_databaseNetworkFiles.observedColumnMetadataExists(conceptIndex)):
+	if(not GIAANNcmn_databaseNetworkFiles.observedColumnMetadataExists(conceptIndex)):
 		raise RuntimeError("loadAndCountObservedColumnFeatureNeurons error: observed column metadata does not exist for conceptIndex = " + str(conceptIndex))
 	featureNeuronsTensorName = f"observedColumn.featureNeurons[{conceptIndex}]"
-	featureNeurons = GIAANNproto_databaseNetworkFiles.loadTensor(GIAANNproto_databaseNetworkFiles.getObservedColumnFolder(conceptIndex), GIAANNproto_databaseNetworkFiles.getObservedColumnFeatureNeuronsFileBaseName(), targetDevice=deviceDatabase)
-	featureNeurons = GIAANNproto_databaseNetworkFiles.adjustPropertyDimensions(databaseNetworkObject.inferenceMode, featureNeurons, featureNeuronsTensorName)
-	featureNeurons = GIAANNproto_databaseNetworkFiles.adjustBranchDimensions(featureNeurons, featureNeuronsTensorName, expectedRank=4)
+	featureNeurons = GIAANNcmn_databaseNetworkFiles.loadTensor(GIAANNcmn_databaseNetworkFiles.getObservedColumnFolder(conceptIndex), GIAANNcmn_databaseNetworkFiles.getObservedColumnFeatureNeuronsFileBaseName(), targetDevice=deviceDatabase)
+	featureNeurons = GIAANNcmn_databaseNetworkFiles.adjustPropertyDimensions(databaseNetworkObject.inferenceMode, featureNeurons, featureNeuronsTensorName)
+	featureNeurons = GIAANNcmn_databaseNetworkFiles.adjustBranchDimensions(featureNeurons, featureNeuronsTensorName, expectedRank=4)
 	if(debugLimitFeatures):
 		featureNeurons = applyDebugLimitFeatureNeuronsTensor(featureNeurons, databaseNetworkObject.f, featureNeuronsTensorName)
 	result = countAssignedFeatureNeuronsInTensor(featureNeurons, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureNeuronsTensorName)

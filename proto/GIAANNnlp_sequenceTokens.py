@@ -1,4 +1,4 @@
-"""GIAANNproto_sequenceTokens.py
+"""GIAANNnlp_sequenceTokens.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -7,33 +7,33 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Usage:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Description:
-GIA ANN proto sequence Tokens
+GIA ANN NLP sequence Tokens
 
 """
 
 import torch as pt
 
-from GIAANNproto_globalDefs import *
+from GIAANNcmn_globalDefs import *
 
 if(usePOS):
-	import GIAANNproto_sequencePOS
+	import GIAANNnlp_sequencePOS
 
 def loadPOSdatabase():
-	GIAANNproto_sequencePOS.loadPOSdatabase()
+	GIAANNnlp_sequencePOS.loadPOSdatabase()
 
 def isTokenReferenceSetDelimiterDeterministic(token):
 	result = False
 	if(token.word in conceptColumnsDelimiterWordTypes or token.tag in conceptColumnsDelimiterTagTypes):
 		result = True
-	elif(GIAANNproto_sequencePOS.isWordEverInPOStypeList(token.word, conceptColumnsDelimiterPOStypes)):
+	elif(GIAANNnlp_sequencePOS.isWordEverInPOStypeList(token.word, conceptColumnsDelimiterPOStypes)):
 		result = True
-	elif(token.lemma is not None and GIAANNproto_sequencePOS.isWordEverInPOStypeList(token.lemma, conceptColumnsDelimiterPOStypes)):
+	elif(token.lemma is not None and GIAANNnlp_sequencePOS.isWordEverInPOStypeList(token.lemma, conceptColumnsDelimiterPOStypes)):
 		result = True
 	return result
 	
@@ -41,9 +41,9 @@ def isTokenReferenceSetDelimiterProbabilistic(token):
 	result = False
 	if(token.word in detectReferenceSetDelimitersBetweenNounsWordTypes or token.tag in detectReferenceSetDelimitersBetweenNounsTagTypes):
 		result = True
-	elif(GIAANNproto_sequencePOS.isWordEverInPOStypeList(token.word, detectReferenceSetDelimitersBetweenNounsPOStypes)):
+	elif(GIAANNnlp_sequencePOS.isWordEverInPOStypeList(token.word, detectReferenceSetDelimitersBetweenNounsPOStypes)):
 		result = True
-	elif(token.lemma is not None and GIAANNproto_sequencePOS.isWordEverInPOStypeList(token.lemma, detectReferenceSetDelimitersBetweenNounsPOStypes)):
+	elif(token.lemma is not None and GIAANNnlp_sequencePOS.isWordEverInPOStypeList(token.lemma, detectReferenceSetDelimitersBetweenNounsPOStypes)):
 		result = True
 	return result
 	
@@ -279,9 +279,9 @@ def isConcept(token, pretrain=False):
 		#	result = True
 	else:
 		nounNounCandidateDetected = False
-		if(GIAANNproto_sequencePOS.isWordEverInPOStypeList(tokenWord, nonNounPos)):
+		if(GIAANNnlp_sequencePOS.isWordEverInPOStypeList(tokenWord, nonNounPos)):
 			nounNounCandidateDetected = True
-		elif(tokenLemma is not None and GIAANNproto_sequencePOS.isWordEverInPOStypeList(tokenLemma, nonNounPos)):
+		elif(tokenLemma is not None and GIAANNnlp_sequencePOS.isWordEverInPOStypeList(tokenLemma, nonNounPos)):
 			nounNounCandidateDetected = True
 		if(not nounNounCandidateDetected):
 			result = True

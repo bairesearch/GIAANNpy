@@ -1,4 +1,4 @@
-"""GIAANNproto_datasets.py
+"""GIAANNnlp_datasets.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -7,10 +7,10 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Usage:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Description:
 GIA ANN proto datasets
@@ -22,7 +22,7 @@ import os
 import shutil
 from datasets import load_dataset, load_from_disk
 
-from GIAANNproto_globalDefs import *
+from GIAANNcmn_globalDefs import *
 
 def loadDatasetFromHuggingFace(streaming, cacheDirectory):
 	dataset = None

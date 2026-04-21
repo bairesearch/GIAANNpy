@@ -710,7 +710,7 @@ MANUAL; - split options optimisationArrayIndexPropertiesEfficientSerialConnectio
 - implement Phase-local peak profiling within context if(debugPrintRamMaxUsagePhaseLocal==True)
 
 ---
-v1m (Codex IDE GPT-5.4) [under development]:
+v1m (Codex IDE GPT-5.4):
 - add proto GIAANNproto1m1a - remove options enforceDirectConnectionsMinWordDistance and arrayIndexPropertiesMinWordDistance entirely from the codebase (assume they are both False).
 - implement option trainSparseConnectionsTensor=True (it should be compatible with both optimisationArrayIndexPropertiesEfficient and optimisationArrayIndexPropertiesVerbose) 
 - update debugPrintRamMaxUsagePhaseLocal to add sub-phase-local max profiling inside updateObservedColumnsEfficient()

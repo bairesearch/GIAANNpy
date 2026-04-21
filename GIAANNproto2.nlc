@@ -1,0 +1,49 @@
+//GIAANNpy Specification (prompts):
+
+---
+v2a (Codex IDE GPT-5.4) [under development]:
+- add proto GIAANNproto2a1a - start option useModalityOR=True:
+	- GIAANNor_datasets.py: add huggingface datasetType for video (find an appropriate dataset for short approx 1-3 minute lengthed, low to moderate resolution, video streams).
+	- GIAANNor_RFfilters.py: initialise a set of receptive field (RF) filters:
+		- it is recommended you both a) reuse and b) implement from scratch a GPU accelerated library for generating and applying natural RFs based on option modalityORuseExternalRFfilterLibrary:
+			- any RF filter code should be added to new file GIAANNor_RFfilters.py.
+			- the natural RF filters can be a combination of ellipsoidal and gabor filters.
+			- RF filter creation examples:
+				- see ATORpt_RF (https://github.com/bairesearch/ATORpt) for creating a variety of natural contrastive ellipsoidal filters.
+				- see SANIORpt (https://github.com/bairesearch/SANIORpt) dev/SANI-2DObjectRecognitionArchitectureDevelopment-20August2022a.pdf coloured low level ellipsoidal filters.
+		- these RF filters will be independently applied to each token in each layer, and will take the most activated filter for any given sequence iteration (train snapshot).
+		- for this initial implementation, the RFs will only be applied to layer l=0 (do not apply RFs to higher layers).
+	- GIAANNor_main.py:processSequenceTemplate() for each video stream (sequence):
+		- GIAANNor_datasets.py: sample the video into a series of sequence snapshots using modalityORframesPerSnapshot (do not apply any averaging, just skip frames as necessary).
+		- GIAANNor_tokens.py: tokenise each snapshot into a series of columns using modalityORpixelsPerColumn (executed in parallel using pytorch):
+			- each column in modalityName=="OR" represents a particular a) x token and b) y token in the snapshot (forming a 2D map like the visual cortex V1), and c) a particular layer l in the substrate (forming a hierarchical visual cortex).
+			- for this initial implementation, only train layer l=0 (do not train the higher layers).
+		- GIAANNor_RFfilters.py: for each token in the snapshot (executed in parallel using pytorch):
+			- apply the RF filters to the token (executed in parallel using pytorch):
+				- apply a threshold and take the a) most activated filter in the column, and b) only if it is above modalityORRFfilterThreshold.
+				- this selects a feature for the column in the layer (if any were selected).
+				- each layer column has a maximum of 1 feature trained for every iteration in a sequence.
+				- note in the modalityName=="NLP" implementation, only 1 feature of 1 column is trained for every iteration in a sequence (modalityName=="OR" is different in that multiple columns can be simulataneously activated by a snapshot).
+				- if no RF filters are active in a column for a given snapshot, that column is not trained.
+			- use a predefined function to convert the RFfilter index selected into an ASCII textual code (this becomes the feature "word" and "lemma" used by GIAANN).
+		- GIAANNor_sequenceConcepts.py:
+			- create a new function to generate the sequence data in the correct format expected by GIAANNcmn_databaseNetworkTrain.
+				- see for example processSequenceTemplate(): "GIAANNnlp_sequenceConcepts.detectNewFeatures(databaseNetworkObject, tokens, allowNewFeatures)".
+		- GIAANNcmn_sequenceObservedColumns.py (or GIAANNor_sequenceObservedColumns.py): generate sequenceObservedColumns object for modalityName=="OR":
+			- see for example processSequenceTemplate(): "sequenceObservedColumns = GIAANNcmn_sequenceObservedColumns.SequenceObservedColumns()".
+			- ensure that class GIAANNcmn_sequenceObservedColumns.py:SequenceObservedColumns can be easily upgraded to support modalityName=="OR" (not just modalityName=="NLP"):
+				- if not create new file GIAANNor_sequenceObservedColumns.py, and move GIAANNcmn_sequenceObservedColumns.py NLP specific code to new file GIAANNnlp_sequenceObservedColumns.py.
+		- GIAANNcmn_databaseNetworkTrain.py: execute the existing train code on the entire sequence of snapshots (selected column features):
+			- see for example processSequenceTemplate(): "GIAANNcmn_prediction.processConceptWordsInference()" and "trained = GIAANNcmn_databaseNetworkTrain.trainConceptWords()".
+			- the existing GIAANNcmn_databaseNetworkTrain.py code should support multiple columns features being simultaneously active per time step in the trained sequence (even though this is not used by modalityName=="NLP").
+		 		- if it does not, split the relevant incompatible sections of train code based on modalityName=="OR"/"NLP".
+	Implementation notes:
+		- ensure all GIAANNproto2a1a upgrades are performed within context if(modalityName=="OR"). If modalityName=="NLP" no changes can be made to the effective execution of the codebase.
+		/MANUAL; - I have marked all files/functions that require editing with #TODO (in particular GIAANNor_main.py, GIAANNor_datasets.py, GIAANNor_sequenceConcepts.py, GIAANNor_sequenceTokens.py, GIAANNor_globalDefs.py, etc).
+		- try not to edit GIAANNcmn_*.py or GIAANNnlp_*.py files unless absolutely necessary; create new GIAANNor_*.py files/functions as necessary.
+		/MANUAL; - GIAANNcmn_main.py calls GIAANNor_main.processPrompt()/GIAANNor_main.processDataset(), which executes similar functionality to GIAANNnlp_main.py but for modalityName=="OR".
+		- GIAANNor_main.processPrompt() for modalityName=="OR" should use a testset part of the OR dataset as a prompt (rather than an independent prompt file).
+		/MANUAL; - I have separated common (GIAANNcmn_*.py), NLP (GIAANNnlp_*.py), and OR (GIAANNor_*.py) code already, however this separation may not be perfect. If you detect any erors in this separation process please correct them (e.g. the presence of common code in nlp files, or the presence of nlp files in common files).
+		- ensure to add comments to the code you create using the exact text from the specification for GIAANNproto2a1a.
+		- it is recommended to use pytorch or pytorch3D library for GPU accelerated execution of multiple 2D filters in parallel (see above): never execute filters serially.
+		/MANUAL; - ensure to modify and use the GIAANNor_main:processSequenceTemplate() code based on GIAANNnlp_main:processSequence() - it does not replicate any print (GIAANNcmn_count) or debug (GIAANNcmn_debug) code so it is easier to understand.

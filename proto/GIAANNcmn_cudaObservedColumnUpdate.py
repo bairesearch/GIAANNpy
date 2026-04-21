@@ -1,4 +1,4 @@
-"""GIAANNproto_cudaObservedColumnUpdate.py
+"""GIAANNcmn_cudaObservedColumnUpdate.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -7,13 +7,13 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Usage:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Description:
-GIA ANN proto CUDA sparse accumulator extension loader/wrapper for observed column updates
+GIA ANN common CUDA sparse accumulator extension loader/wrapper for observed column updates
 
 """
 

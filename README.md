@@ -32,7 +32,7 @@ pip install nltk
 ### Execution
 ```
 source activate pytorchsenv
-python GIAANNproto_main.py
+python GIAANNcmn_main.py
 ```
 
 ### Overview
@@ -80,7 +80,7 @@ It likewise supports a number features of classical artificial neural networks s
 
 ### Configuration
 
-All settings are located in `proto/GIAANNproto_globalDefs.py`.
+All settings are located in `proto/GIAANN*_globalDefs.py`.
 
 #### Train/inference mode selection
 
@@ -286,17 +286,17 @@ For standard execution (train or inference);
 
 ##### Generate the database
 
-edit `GIAANNproto_globalDefs.py`;
+edit `GIAANN*_globalDefs.py`;
 
 * set `useDrawNetworkIndependently=False`
 * set `executionMode="train"`
 * select the database folder, e.g. `databaseFolderBase = "../database"`
 
-`python GIAANNproto_main.py`
+`python GIAANNcmn_main.py`
 
 ##### Generate the database svg/ldr files
 
-edit `GIAANNproto_globalDefs.py`;
+edit `GIAANN*_globalDefs.py`;
 
 * set `useDrawNetworkIndependently=True`
 * select the database folder, e.g. `databaseFolderBase = "../database"`
@@ -308,7 +308,7 @@ edit `GIAANNproto_globalDefs.py`;
   * `drawEfficientCompact` - emulates the original draw visualisation of `drawEfficient=False` (but still not the same as no randomised horizontal position of nodes within columns)
   * `drawEfficientDrawDeadNeurons` - draw empty columns with no connected neurons
 
-`python GIAANNproto_main.py`
+`python GIAANNcmn_main.py`
 
 ##### 2D visualisation (drawEfficientFormat3D=False)
 

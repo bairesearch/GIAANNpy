@@ -1,4 +1,4 @@
-"""GIAANNproto_sequencePOS.py
+"""GIAANNnlp_sequencePOS.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -7,13 +7,13 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Usage:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Description:
-GIA ANN proto sequence POS
+GIA ANN NLP sequence POS
 
 # EVER-POS (all spaCy POS types) - FULL, CORRECT, FAST SOLUTION
 # =============================================================
@@ -38,7 +38,7 @@ from functools import lru_cache
 from typing import Dict, Set, Any, Optional
 import nltk
 
-from GIAANNproto_globalDefs import *
+from GIAANNcmn_globalDefs import *
 
 from nltk.corpus import wordnet as wn
 from nltk.corpus import treebank

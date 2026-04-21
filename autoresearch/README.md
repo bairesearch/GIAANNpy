@@ -26,7 +26,7 @@ See paper/GIAANN-paper-WIP/*.tex
 Simply spin up your Codex in this repo (set permissions), then you can prompt something like:
 
 ```
-Hi have a look at program.md and let's kick off a new experiment! let's do the setup first.
+Hi have a look at autoresearch/program.md and let's kick off a new experiment! let's do the setup first.
 ```
 
 The `program.md` file is essentially a super lightweight "skill".
@@ -34,8 +34,8 @@ The `program.md` file is essentially a super lightweight "skill".
 ## Project structure
 
 ```
-../proto/GIAANNproto_globalDefs.py      all configurable parameters
-../proto/GIAANNproto_main.py       entry point (train/inference)
+../proto/GIAANN*_globalDefs.py      all configurable parameters
+../proto/GIAANNcmn_main.py       entry point (train/inference)
 ../proto/*.py 	all other optimisable code
 program.md      agent instructions
 ```

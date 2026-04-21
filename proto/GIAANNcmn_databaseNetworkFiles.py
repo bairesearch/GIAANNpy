@@ -1,4 +1,4 @@
-"""GIAANNproto_databaseNetworkFiles.py
+"""GIAANNcmn_databaseNetworkFiles.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -7,13 +7,13 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Usage:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Description:
-GIA ANN proto database Network Files
+GIA ANN common database Network Files
 
 """
 
@@ -23,9 +23,9 @@ import os
 import time
 import subprocess
 
-from GIAANNproto_globalDefs import *
-import GIAANNproto_debug
-import GIAANNproto_count
+from GIAANNcmn_globalDefs import *
+import GIAANNcmn_debug
+import GIAANNcmn_count
 
 
 def prepareDatabaseFilesStartup():
@@ -405,9 +405,9 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 				saveAllSourceFeatures = False
 				observedColumn.saveToDisk(saveAllSourceFeatures)
 			if(debugPrintTrainSectionTimes):
-				GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "saveData.observedColumn.saveToDisk", time.perf_counter() - saveObservedColumnsStartTime)
+				GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "saveData.observedColumn.saveToDisk", time.perf_counter() - saveObservedColumnsStartTime)
 		else:
-			printe("GIAANNproto_databaseNetworkFiles:saveData():!forceSaveGlobalState requires !storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam")
+			printe("GIAANNcmn_databaseNetworkFiles:saveData():!forceSaveGlobalState requires !storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam")
 			
 	saveGlobalState = ((sequenceCount + 1) % saveGlobalFeatureNeuronsRate == 0) or forceSaveGlobalState
 	if(saveGlobalState):
@@ -434,7 +434,7 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 				saveDictFile(conceptFeaturesReferenceSetDelimiterListFile, conceptFeaturesReferenceSetDelimiterDict)
 	
 	if(debugPrintTrainSectionTimes):
-		GIAANNproto_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "saveData.total", time.perf_counter() - saveDataStartTime)
+		GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "saveData.total", time.perf_counter() - saveDataStartTime)
 
 def generateGlobalFeatureNeuronsTensor(databaseNetworkObject, useRAMcolumnFeatureNeurons):
 	if(storeDatabaseGlobalFeatureNeuronsInRam):
@@ -583,7 +583,7 @@ def loadObservedColumnSourceFeatureConnectionsTensor(databaseNetworkObject, conc
 	tensor = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, loadTensor(connectionsFolder, fileBaseName, targetDevice=targetDevice), tensorName)
 	tensor = adjustBranchDimensions(tensor, tensorName, expectedRank=5)
 	if(debugLimitFeatures):
-		tensor = GIAANNproto_debug.applyDebugLimitFeatureConnectionsSourceTensor(tensor, databaseNetworkObject.c, databaseNetworkObject.f, tensorName)
+		tensor = GIAANNcmn_debug.applyDebugLimitFeatureConnectionsSourceTensor(tensor, databaseNetworkObject.c, databaseNetworkObject.f, tensorName)
 	if(ensureCurrentSizeOnLoad):
 		tensor = ensureFeatureConnectionsSourceTensorCurrentSize(tensor, databaseNetworkObject.c, databaseNetworkObject.f, tensorName)
 	return tensor
@@ -597,7 +597,7 @@ def loadObservedColumnFeatureNeuronsTensor(databaseNetworkObject, conceptIndex, 
 	tensor = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, loadTensor(getObservedColumnFolder(conceptIndex), getObservedColumnFeatureNeuronsFileBaseName(), targetDevice=featureNeuronTargetDevice), tensorName)
 	tensor = adjustBranchDimensions(tensor, tensorName, expectedRank=4)
 	if(debugLimitFeatures):
-		tensor = GIAANNproto_count.applyDebugLimitFeatureNeuronsTensor(tensor, databaseNetworkObject.f, tensorName)
+		tensor = GIAANNcmn_count.applyDebugLimitFeatureNeuronsTensor(tensor, databaseNetworkObject.f, tensorName)
 	if(ensureCurrentSizeOnLoad):
 		tensor = ensureFeatureNeuronsTensorCurrentSize(tensor, databaseNetworkObject.f, tensorName)
 	return tensor
@@ -643,7 +643,7 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 		instance.featureIndexToWord = data['featureIndexToWord']
 		instance.nextFeatureIndex = data['nextFeatureIndex']
 		if(debugLimitFeatures):
-			instance.featureWordToIndex, instance.featureIndexToWord = GIAANNproto_debug.applyDebugLimitFeatureIndexMaps(instance.featureWordToIndex, instance.featureIndexToWord, databaseNetworkObject.f, f"observedColumn.featureIndexMaps[{conceptIndex}]")
+			instance.featureWordToIndex, instance.featureIndexToWord = GIAANNcmn_debug.applyDebugLimitFeatureIndexMaps(instance.featureWordToIndex, instance.featureIndexToWord, databaseNetworkObject.f, f"observedColumn.featureIndexMaps[{conceptIndex}]")
 			if(instance.nextFeatureIndex < 0):
 				raise RuntimeError("observedColumnLoadFromDisk error: nextFeatureIndex < 0")
 			if(instance.nextFeatureIndex > databaseNetworkObject.f):

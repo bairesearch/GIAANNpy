@@ -1,4 +1,4 @@
-"""GIAANNproto_sequenceObservedColumns.py
+"""GIAANNcmn_sequenceObservedColumns.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -7,25 +7,25 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Usage:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Description:
-GIA ANN proto sequence Observed Columns
+GIA ANN common sequence Observed Columns
 
 """
 
 import torch as pt
 import time
 
-from GIAANNproto_globalDefs import *
-import GIAANNproto_debug
-import GIAANNproto_sparseTensors
-import GIAANNproto_sequenceConcepts
+from GIAANNcmn_globalDefs import *
+import GIAANNcmn_debug
+import GIAANNcmn_sparseTensors
+import GIAANNnlp_sequenceConcepts
 if(optimisationUseCUDAObservedColumnUpdateKernel):
-	import GIAANNproto_cudaObservedColumnUpdate
+	import GIAANNcmn_cudaObservedColumnUpdate
 
 # Define the SequenceObservedColumns class
 class SequenceObservedColumns:
@@ -123,7 +123,7 @@ class SequenceObservedColumns:
 			self.columnEndIndicesTensor = None
 			self.columnFeatureLocalIndices = None
 			if(conceptColumnsDelimitByPOS):
-				GIAANNproto_sequenceConcepts.processConceptWords(self, 0, tokens, tokens)
+				GIAANNnlp_sequenceConcepts.processConceptWords(self, 0, tokens, tokens)
 			self.featureNeurons = None
 			self.featureConnections = None
 
@@ -167,7 +167,7 @@ class SequenceObservedColumns:
 
 	def ensureTokenConceptColumnIndexList(self):
 		if(not hasattr(self, "tokenConceptColumnIndexList") or self.tokenConceptColumnIndexList is None or len(self.tokenConceptColumnIndexList) != len(self.tokens)):
-			result = GIAANNproto_sequenceConcepts.processConceptWords(self, 0, self.tokens, self.tokens)
+			result = GIAANNnlp_sequenceConcepts.processConceptWords(self, 0, self.tokens, self.tokens)
 			if(result is None):
 				raise RuntimeError("ensureTokenConceptColumnIndexList error: failed to compute token concept column assignment")
 			if(not hasattr(self, "tokenConceptColumnIndexList") or self.tokenConceptColumnIndexList is None):
@@ -469,7 +469,7 @@ class SequenceObservedColumns:
 		if(not trainSequenceObservedColumnsMatchSequenceWords):
 			return
 		try:
-			result = GIAANNproto_sequenceConcepts.processConceptWords(self, 0, tokens, tokens)
+			result = GIAANNnlp_sequenceConcepts.processConceptWords(self, 0, tokens, tokens)
 		except Exception:
 			result = None
 		if(not result):
@@ -522,7 +522,7 @@ class SequenceObservedColumns:
 						branchIndex = int(branchList[idx])
 						candidateIndex = branchIndex if branchIndex < len(candidates) else len(candidates) - 1
 						if(randomlyAssignBranches and conceptIndexKey is not None):
-							branchOrder = GIAANNproto_sequenceConcepts.buildDeterministicBranchOrder(conceptIndexKey, int(globalValue))
+							branchOrder = GIAANNnlp_sequenceConcepts.buildDeterministicBranchOrder(conceptIndexKey, int(globalValue))
 							if(branchIndex in branchOrder):
 								candidateIndex = branchOrder.index(branchIndex)
 								if(candidateIndex >= len(candidates)):
@@ -561,7 +561,7 @@ class SequenceObservedColumns:
 				featureNeurons = observedColumn.featureNeurons.coalesce()
 			else:
 				# Slice the globalFeatureNeurons as before
-				featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(self.databaseNetworkObject.globalFeatureNeurons, 3, observedColumn.conceptIndex)
+				featureNeurons = GIAANNcmn_sparseTensors.sliceSparseTensor(self.databaseNetworkObject.globalFeatureNeurons, 3, observedColumn.conceptIndex)
 
 			if(not useGPUsparseStrict and useGPUdense and not useGPUsparse):
 				featureNeurons = featureNeurons.to(deviceDense)
@@ -740,16 +740,16 @@ class SequenceObservedColumns:
 				updateObservedColumnsEfficientStartTime = time.perf_counter()
 			self.updateObservedColumnsEfficient(sequenceObservedColumnsDict, mode)
 			if(debugPrintTrainSectionTimes):
-				GIAANNproto_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient", time.perf_counter() - updateObservedColumnsEfficientStartTime)
+				GIAANNcmn_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient", time.perf_counter() - updateObservedColumnsEfficientStartTime)
 		else:
 			self.updateObservedColumnsVerbose(sequenceObservedColumnsDict, mode)
 	
 	def updateObservedColumnsVerbose(self, sequenceObservedColumnsDict, mode):
 		databaseNetworkObject = self.databaseNetworkObject
 		# Update observed columns with data from sequence arrays
-		if(GIAANNproto_debug.debugPrintGPUramUsage):
+		if(GIAANNcmn_debug.debugPrintGPUramUsage):
 			if(executionMode=="train"):
-				GIAANNproto_debug.debugPrintRamUsage("updateObservedColumnsVerbose:start", "mode = " + str(mode))
+				GIAANNcmn_debug.debugPrintRamUsage("updateObservedColumnsVerbose:start", "mode = " + str(mode))
 
 		inferenceConceptUpdateCounts = self.inferenceConceptUpdateCounts if getattr(self, "debugInferenceActive", False) else None
 		featureNeuronsDelta = self.featureNeurons
@@ -966,15 +966,15 @@ class SequenceObservedColumns:
 
 		if storeDatabaseGlobalFeatureNeuronsInRam:
 			self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
-		if(GIAANNproto_debug.debugPrintGPUramUsage):
+		if(GIAANNcmn_debug.debugPrintGPUramUsage):
 			if(executionMode=="train"):
-				GIAANNproto_debug.debugPrintRamUsage("updateObservedColumnsVerbose:end", "mode = " + str(mode))
+				GIAANNcmn_debug.debugPrintRamUsage("updateObservedColumnsVerbose:end", "mode = " + str(mode))
 
 	def updateObservedColumnsEfficient(self, sequenceObservedColumnsDict, mode):
 		databaseNetworkObject = self.databaseNetworkObject
-		if(GIAANNproto_debug.debugPrintGPUramUsage):
+		if(GIAANNcmn_debug.debugPrintGPUramUsage):
 			if(executionMode=="train"):
-				GIAANNproto_debug.debugPrintRamUsage("updateObservedColumnsEfficient:start", "mode = " + str(mode))
+				GIAANNcmn_debug.debugPrintRamUsage("updateObservedColumnsEfficient:start", "mode = " + str(mode))
 		if not arrayIndexPropertiesStrength:
 			return
 		updateObservedColumnsEfficientAggregatePhaseLabel = None
@@ -986,7 +986,7 @@ class SequenceObservedColumns:
 			updateObservedColumnsEfficientPreparePhaseLabel = "updateObservedColumnsEfficient:prepare"
 			updateObservedColumnsEfficientFeatureNeuronsPhaseLabel = "updateObservedColumnsEfficient:#A feature neurons"
 			updateObservedColumnsEfficientFeatureConnectionsPhaseLabel = "updateObservedColumnsEfficient:#B feature connections"
-			GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal(updateObservedColumnsEfficientPreparePhaseLabel)
+			GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal(updateObservedColumnsEfficientPreparePhaseLabel)
 
 		featureNeuronsDelta = None
 		featureConnectionsDelta = None
@@ -1046,12 +1046,12 @@ class SequenceObservedColumns:
 		observedColumnsByConceptIndex = self.getObservedColumnsByConceptIndex(sequenceObservedColumnsDict)
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
 			if(debugPrintTrainSectionTimes):
-				GIAANNproto_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient:getObservedColumnsByConceptIndex", time.perf_counter() - getObservedColumnsByConceptIndexStartTime)
+				GIAANNcmn_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient:getObservedColumnsByConceptIndex", time.perf_counter() - getObservedColumnsByConceptIndexStartTime)
 		conceptIndicesFeatureTensor = self.conceptIndicesInSequenceObservedTensor.to(featureDevice)
 		conceptIndicesConnectionTensor = self.conceptIndicesInSequenceObservedTensor.to(connectionDevice)
 		if(updateObservedColumnsEfficientPreparePhaseLabel is not None):
-			GIAANNproto_debug.debugRecordGpuRamMaxUsagePhaseLocalGrouped(updateObservedColumnsEfficientPreparePhaseLabel, updateObservedColumnsEfficientAggregatePhaseLabel)
-			GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal(updateObservedColumnsEfficientFeatureNeuronsPhaseLabel)
+			GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocalGrouped(updateObservedColumnsEfficientPreparePhaseLabel, updateObservedColumnsEfficientAggregatePhaseLabel)
+			GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal(updateObservedColumnsEfficientFeatureNeuronsPhaseLabel)
 
 		#A: update feature neurons;
 		if(optimisationArrayIndexPropertiesEfficientSerialNeurons):
@@ -1116,8 +1116,8 @@ class SequenceObservedColumns:
 					globalFeatureNeurons = self.addSparseUpdateNonNegative(globalFeatureNeurons, featureUpdates)
 					self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
 		if(updateObservedColumnsEfficientFeatureNeuronsPhaseLabel is not None):
-			GIAANNproto_debug.debugRecordGpuRamMaxUsagePhaseLocalGrouped(updateObservedColumnsEfficientFeatureNeuronsPhaseLabel, updateObservedColumnsEfficientAggregatePhaseLabel)
-			GIAANNproto_debug.debugResetGpuRamMaxUsagePhaseLocal(updateObservedColumnsEfficientFeatureConnectionsPhaseLabel)
+			GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocalGrouped(updateObservedColumnsEfficientFeatureNeuronsPhaseLabel, updateObservedColumnsEfficientAggregatePhaseLabel)
+			GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal(updateObservedColumnsEfficientFeatureConnectionsPhaseLabel)
 
 		#B: update feature connections;
 		if(optimisationArrayIndexPropertiesEfficientSerialConnections):
@@ -1152,11 +1152,11 @@ class SequenceObservedColumns:
 					connectionTargetSparse = self.addSparseUpdateNonNegative(connectionTargetSparse, connectionUpdates)
 				self.scatterConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionTargetSparse)
 		if(updateObservedColumnsEfficientFeatureConnectionsPhaseLabel is not None):
-			GIAANNproto_debug.debugRecordGpuRamMaxUsagePhaseLocalGrouped(updateObservedColumnsEfficientFeatureConnectionsPhaseLabel, updateObservedColumnsEfficientAggregatePhaseLabel)
+			GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocalGrouped(updateObservedColumnsEfficientFeatureConnectionsPhaseLabel, updateObservedColumnsEfficientAggregatePhaseLabel)
 			
-		if(GIAANNproto_debug.debugPrintGPUramUsage):
+		if(GIAANNcmn_debug.debugPrintGPUramUsage):
 			if(executionMode=="train"):
-				GIAANNproto_debug.debugPrintRamUsage("updateObservedColumnsEfficient:end", "mode = " + str(mode))
+				GIAANNcmn_debug.debugPrintRamUsage("updateObservedColumnsEfficient:end", "mode = " + str(mode))
 
 	def getObservedColumnsByConceptIndex(self, sequenceObservedColumnsDict):
 		result = {}
@@ -1284,7 +1284,7 @@ class SequenceObservedColumns:
 			gatherConnectionSourceBucketTensorStartTime = None
 			if(debugPrintTrainSectionTimes):
 				gatherConnectionSourceBucketTensorStartTime = time.perf_counter()
-				GIAANNproto_debug.debugTrainSectionTimesContextPush(self.databaseNetworkObject, "updateObservedColumnsEfficient:gatherConnectionSourceBucketTensor")
+				GIAANNcmn_debug.debugTrainSectionTimesContextPush(self.databaseNetworkObject, "updateObservedColumnsEfficient:gatherConnectionSourceBucketTensor")
 		combinedIndicesList = []
 		combinedValuesList = []
 		sourceConceptIndexList = pt.div(sourceCombinedKeysUnique, self.databaseNetworkObject.f, rounding_mode='floor').detach().cpu().tolist()
@@ -1309,8 +1309,8 @@ class SequenceObservedColumns:
 			result = self.initialiseSparseTensor(targetSize, targetDevice)
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
 			if(debugPrintTrainSectionTimes):
-				GIAANNproto_debug.debugTrainSectionTimesContextPop(self.databaseNetworkObject)
-				GIAANNproto_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient:gatherConnectionSourceBucketTensor", time.perf_counter() - gatherConnectionSourceBucketTensorStartTime)
+				GIAANNcmn_debug.debugTrainSectionTimesContextPop(self.databaseNetworkObject)
+				GIAANNcmn_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient:gatherConnectionSourceBucketTensor", time.perf_counter() - gatherConnectionSourceBucketTensorStartTime)
 		return result
 
 	def scatterConnectionSourceBucketTensor(self, observedColumnsByConceptIndex, sourceCombinedKeysUnique, connectionTargetSparse):
@@ -1318,7 +1318,7 @@ class SequenceObservedColumns:
 			scatterConnectionSourceBucketTensorStartTime = None
 			if(debugPrintTrainSectionTimes):
 				scatterConnectionSourceBucketTensorStartTime = time.perf_counter()
-				GIAANNproto_debug.debugTrainSectionTimesContextPush(self.databaseNetworkObject, "updateObservedColumnsEfficient:scatterConnectionSourceBucketTensor")
+				GIAANNcmn_debug.debugTrainSectionTimesContextPush(self.databaseNetworkObject, "updateObservedColumnsEfficient:scatterConnectionSourceBucketTensor")
 		connectionTargetSparse = connectionTargetSparse.coalesce()
 		connectionTargetIndices = connectionTargetSparse.indices()
 		connectionTargetValues = connectionTargetSparse.values()
@@ -1353,8 +1353,8 @@ class SequenceObservedColumns:
 			observedColumn.setFeatureConnectionsForSourceFeature(int(sourceFeatureIndexValue), sourceTensor)
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
 			if(debugPrintTrainSectionTimes):
-				GIAANNproto_debug.debugTrainSectionTimesContextPop(self.databaseNetworkObject)
-				GIAANNproto_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient:scatterConnectionSourceBucketTensor", time.perf_counter() - scatterConnectionSourceBucketTensorStartTime)
+				GIAANNcmn_debug.debugTrainSectionTimesContextPop(self.databaseNetworkObject)
+				GIAANNcmn_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient:scatterConnectionSourceBucketTensor", time.perf_counter() - scatterConnectionSourceBucketTensorStartTime)
 		return
 
 	def buildMaskLookup(self, maskSize, indices, device):
@@ -1469,9 +1469,9 @@ class SequenceObservedColumns:
 			targetNNZ = max(1, int(targetSparse._nnz()))
 			updateNNZ = int(updateSparse._nnz())
 			overflowCapacityMultiplier = max(1.0, float(updateNNZ) / float(targetNNZ))
-			accumulator = GIAANNproto_cudaObservedColumnUpdate.build_sparse_accumulator(targetSparse.indices(), targetSparse.values(), targetSparse.size(), overflowCapacityMultiplier=overflowCapacityMultiplier)
-			accumulator = GIAANNproto_cudaObservedColumnUpdate.accumulate_sparse_updates(accumulator, updateSparse.indices(), updateSparse.values())
-			exportIndices, exportValues, exportStats = GIAANNproto_cudaObservedColumnUpdate.export_coo(accumulator)
+			accumulator = GIAANNcmn_cudaObservedColumnUpdate.build_sparse_accumulator(targetSparse.indices(), targetSparse.values(), targetSparse.size(), overflowCapacityMultiplier=overflowCapacityMultiplier)
+			accumulator = GIAANNcmn_cudaObservedColumnUpdate.accumulate_sparse_updates(accumulator, updateSparse.indices(), updateSparse.values())
+			exportIndices, exportValues, exportStats = GIAANNcmn_cudaObservedColumnUpdate.export_coo(accumulator)
 			self.recordCUDAObservedColumnUpdateStats(exportStats)
 			resultSparse = pt.sparse_coo_tensor(exportIndices, exportValues, size=targetSparse.size(), dtype=arrayType, device=targetSparse.device)
 		else:

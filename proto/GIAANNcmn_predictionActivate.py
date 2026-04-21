@@ -1,4 +1,4 @@
-"""GIAANNproto_predictionActivate.py
+"""GIAANNcmn_predictionActivate.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -7,20 +7,20 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Usage:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Description:
-GIA ANN proto Prediction Activate
+GIA ANN common Prediction Activate
 
 """
 
 import torch as pt
 
-from GIAANNproto_globalDefs import *
-import GIAANNproto_sparseTensors
+from GIAANNcmn_globalDefs import *
+import GIAANNcmn_sparseTensors
 
 
 def decrementActivationDense(featureNeuronsActivation, activationDecrement):
@@ -34,7 +34,7 @@ def decrementActivation(featureNeuronsActivation, activationDecrement):
 	if(inferenceDecrementActivationsNonlinear):
 		featureNeuronsActivation = featureNeuronsActivation * (1-activationDecrement)
 	else:
-		featureNeuronsActivation = GIAANNproto_sparseTensors.subtractValueFromSparseTensorValues(featureNeuronsActivation, activationDecrementPerPredictedSequence)
+		featureNeuronsActivation = GIAANNcmn_sparseTensors.subtractValueFromSparseTensorValues(featureNeuronsActivation, activationDecrementPerPredictedSequence)
 	return featureNeuronsActivation
 
 if(inferenceSegmentActivationsBoolean):
@@ -441,7 +441,7 @@ def processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuro
 
 def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None):
 		
-	featureNeuronsActive = GIAANNproto_sparseTensors.neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANImethod)
+	featureNeuronsActive = GIAANNcmn_sparseTensors.neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANImethod)
 	
 	sourceColumnIndex = int(sourceColumnIndex)
 	sourceFeatureIndex = int(sourceFeatureIndex)
@@ -497,9 +497,9 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 		if(featureNeuronsActive.dim() == 0):
 			branchCount = featureConnectionsStrength.size(0)
 			branchValues = pt.full((branchCount,), featureNeuronsActive.item(), dtype=featureNeuronsActive.dtype, device=featureNeuronsActive.device)
-			featureNeuronsTargetActivation = GIAANNproto_sparseTensors.scaleSparseTensorByBranchValues(featureConnectionsStrength, branchValues)
+			featureNeuronsTargetActivation = GIAANNcmn_sparseTensors.scaleSparseTensorByBranchValues(featureConnectionsStrength, branchValues)
 		else:
-			featureNeuronsTargetActivation = GIAANNproto_sparseTensors.scaleSparseTensorByBranchValues(featureConnectionsStrength, featureNeuronsActive)
+			featureNeuronsTargetActivation = GIAANNcmn_sparseTensors.scaleSparseTensorByBranchValues(featureConnectionsStrength, featureNeuronsActive)
 	else:
 		if(featureNeuronsActive.dim() == 0):
 			featureNeuronsTargetActivation = featureConnectionsStrength * featureNeuronsActive

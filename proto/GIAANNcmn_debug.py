@@ -1,4 +1,4 @@
-"""GIAANNproto_debug.py
+"""GIAANNcmn_debug.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -7,20 +7,20 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Usage:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Description:
-GIA ANN proto debug helpers
+GIA ANN common debug helpers
 
 """
 
 import torch as pt
 
-from GIAANNproto_globalDefs import *
-import GIAANNproto_count
+from GIAANNcmn_globalDefs import *
+import GIAANNcmn_count
 
 debugPrintGPUramUsage = debugPrintRamCurrentUsage or debugPrintRamAverageUsage or printRamMaxUsage or debugPrintRamMaxUsagePhaseLocal
 totalInferenceTokensSeed = 0
@@ -70,7 +70,7 @@ if(debugPrintGPUramUsage):
 		if(debugPrintRamMaxUsagePhaseLocal):
 			if(label is None or label == ""):
 				raise RuntimeError("debugResetGpuRamMaxUsagePhaseLocal error: label must not be empty")
-			gpuRamUsageDevice = GIAANNproto_count.countGetGpuRamUsageDevice()
+			gpuRamUsageDevice = GIAANNcmn_count.countGetGpuRamUsageDevice()
 			if(gpuRamUsageDevice is not None):
 				pt.cuda.reset_peak_memory_stats(gpuRamUsageDevice)
 		return
@@ -79,8 +79,8 @@ if(debugPrintGPUramUsage):
 		if(debugPrintRamMaxUsagePhaseLocal):
 			if(label is None or label == ""):
 				raise RuntimeError("debugRecordGpuRamMaxUsagePhaseLocal error: label must not be empty")
-			gpuRamMaxAllocatedUsageBytes = GIAANNproto_count.countGetGpuRamMaxAllocatedUsageBytes()
-			gpuRamMaxReservedUsageBytes = GIAANNproto_count.countGetGpuRamMaxReservedUsageBytes()
+			gpuRamMaxAllocatedUsageBytes = GIAANNcmn_count.countGetGpuRamMaxAllocatedUsageBytes()
+			gpuRamMaxReservedUsageBytes = GIAANNcmn_count.countGetGpuRamMaxReservedUsageBytes()
 			debugRecordGpuRamMaxUsagePhaseLocalValue(label, gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes)
 		return
 
@@ -124,7 +124,7 @@ if(debugPrintGPUramUsage):
 			global debugPrintGpuRamMaxUsageProgramReservedBytes
 			debugPrintGpuRamMaxUsageProgramAllocatedBytes = 0
 			debugPrintGpuRamMaxUsageProgramReservedBytes = 0
-			gpuRamUsageDevice = GIAANNproto_count.countGetGpuRamUsageDevice()
+			gpuRamUsageDevice = GIAANNcmn_count.countGetGpuRamUsageDevice()
 			if(gpuRamUsageDevice is not None):
 				pt.cuda.reset_peak_memory_stats(gpuRamUsageDevice)
 		return
@@ -133,7 +133,7 @@ if(debugPrintGPUramUsage):
 		if(debugPrintRamMaxUsagePhaseLocal):
 			gpuRamMaxAllocatedUsageBytes = debugPrintGpuRamMaxUsageProgramAllocatedBytes
 			gpuRamMaxReservedUsageBytes = debugPrintGpuRamMaxUsageProgramReservedBytes
-			cpuRamMaxUsageBytes = GIAANNproto_count.countGetCpuRamMaxUsageBytes()
+			cpuRamMaxUsageBytes = GIAANNcmn_count.countGetCpuRamMaxUsageBytes()
 			printText = "debugPrintGPUramUsage max: program, gpuRamMaxAllocatedUsageGb = " + debugConvertRamUsageBytesToGigabytesText(gpuRamMaxAllocatedUsageBytes) + ", gpuRamMaxReservedUsageGb = " + debugConvertRamUsageBytesToGigabytesText(gpuRamMaxReservedUsageBytes) + ", cpuRamMaxUsageGb = " + debugConvertRamUsageBytesToGigabytesText(cpuRamMaxUsageBytes)
 			print(printText)
 		return
@@ -144,8 +144,8 @@ if(debugPrintGPUramUsage):
 				raise RuntimeError("debugRecordGpuRamMaxUsagePhaseLocalGrouped error: label must not be empty")
 			if(aggregateLabel is not None and aggregateLabel == ""):
 				raise RuntimeError("debugRecordGpuRamMaxUsagePhaseLocalGrouped error: aggregateLabel must not be empty")
-			gpuRamMaxAllocatedUsageBytes = GIAANNproto_count.countGetGpuRamMaxAllocatedUsageBytes()
-			gpuRamMaxReservedUsageBytes = GIAANNproto_count.countGetGpuRamMaxReservedUsageBytes()
+			gpuRamMaxAllocatedUsageBytes = GIAANNcmn_count.countGetGpuRamMaxAllocatedUsageBytes()
+			gpuRamMaxReservedUsageBytes = GIAANNcmn_count.countGetGpuRamMaxReservedUsageBytes()
 			debugRecordGpuRamMaxUsagePhaseLocalValue(label, gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes)
 			if(aggregateLabel is not None):
 				debugRecordGpuRamMaxUsagePhaseLocalValue(aggregateLabel, gpuRamMaxAllocatedUsageBytes, gpuRamMaxReservedUsageBytes)
@@ -190,24 +190,24 @@ if(debugPrintGPUramUsage):
 
 	def debugGetGpuRamCurrentAllocatedUsageBytes():
 		result = 0
-		gpuRamUsageDevice = GIAANNproto_count.countGetGpuRamUsageDevice()
+		gpuRamUsageDevice = GIAANNcmn_count.countGetGpuRamUsageDevice()
 		if(gpuRamUsageDevice is not None):
 			result = int(pt.cuda.memory_allocated(gpuRamUsageDevice))
 		return result
 
 	def debugGetGpuRamCurrentReservedUsageBytes():
 		result = 0
-		gpuRamUsageDevice = GIAANNproto_count.countGetGpuRamUsageDevice()
+		gpuRamUsageDevice = GIAANNcmn_count.countGetGpuRamUsageDevice()
 		if(gpuRamUsageDevice is not None):
 			result = int(pt.cuda.memory_reserved(gpuRamUsageDevice))
 		return result
 
 	def debugGetCpuRamCurrentUsageBytes():
-		result = GIAANNproto_count.countGetCpuRamUsageBytesByProcStatusField("VmRSS", "debugGetCpuRamCurrentUsageBytes")
+		result = GIAANNcmn_count.countGetCpuRamUsageBytesByProcStatusField("VmRSS", "debugGetCpuRamCurrentUsageBytes")
 		return result
 
 	def debugConvertRamUsageBytesToGigabytesText(ramUsageBytes):
-		return GIAANNproto_count.countConvertRamUsageBytesToGigabytesText(ramUsageBytes)
+		return GIAANNcmn_count.countConvertRamUsageBytesToGigabytesText(ramUsageBytes)
 
 def resetTotalInferenceTokens():
 	if(debugPrintTotalInferenceTokens):

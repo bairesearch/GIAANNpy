@@ -1,4 +1,4 @@
-"""GIAANNproto_databaseNetworkTrain.py
+"""GIAANNcmn_databaseNetworkTrain.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -7,30 +7,30 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Usage:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Description:
-GIA ANN proto database Network Train
+GIA ANN common database Network Train
 
 """
 
 import torch as pt
 import time
 
-from GIAANNproto_globalDefs import *
-import GIAANNproto_debug
-import GIAANNproto_sparseTensors
-import GIAANNproto_sequenceConcepts
+from GIAANNcmn_globalDefs import *
+import GIAANNcmn_debug
+import GIAANNcmn_sparseTensors
+import GIAANNnlp_sequenceConcepts
 
 	
 def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 	trainConceptWordsStartTime = None
 	if(debugPrintTrainSectionTimes):
 		trainConceptWordsStartTime = time.perf_counter()
-	result = GIAANNproto_sequenceConcepts.processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens)
+	result = GIAANNnlp_sequenceConcepts.processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens)
 	if(printTrainSequenceConceptAssignment):
 		print(f"Processing sequenceCount: {sequenceIndex}, {sequenceObservedColumns.sentenceWithConceptAssignment}")	
 		if(printTrainSequenceConceptAssignmentByLine):
@@ -38,11 +38,11 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 	if(result is None):
 		return False
 	conceptIndices, startIndices, endIndices = result
-	featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask = GIAANNproto_sequenceConcepts.processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices)
+	featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask = GIAANNnlp_sequenceConcepts.processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices)
 
 	featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex)
 	if(debugPrintTrainSectionTimes):
-		GIAANNproto_debug.debugTrainSectionTimesAdd(sequenceObservedColumns.databaseNetworkObject, "trainConceptWords", time.perf_counter() - trainConceptWordsStartTime)
+		GIAANNcmn_debug.debugTrainSectionTimesAdd(sequenceObservedColumns.databaseNetworkObject, "trainConceptWords", time.perf_counter() - trainConceptWordsStartTime)
 
 	return True
 
@@ -94,7 +94,7 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 	if(arrayIndexPropertiesStrength):
 		applyTrainConnectionStrengthLimits(sequenceObservedColumns)
 	if(debugPrintTrainSectionTimes):
-		GIAANNproto_debug.debugTrainSectionTimesAdd(sequenceObservedColumns.databaseNetworkObject, "processFeaturesActiveTrain", time.perf_counter() - processFeaturesActiveTrainStartTime)
+		GIAANNcmn_debug.debugTrainSectionTimesAdd(sequenceObservedColumns.databaseNetworkObject, "processFeaturesActiveTrain", time.perf_counter() - processFeaturesActiveTrainStartTime)
 
 	return featureConnectionsActive, featureConnectionsSegmentMask
 

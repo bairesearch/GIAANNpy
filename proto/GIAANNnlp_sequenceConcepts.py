@@ -1,4 +1,4 @@
-"""GIAANNproto_sequenceConcepts.py
+"""GIAANNnlp_sequenceConcepts.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -7,22 +7,22 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Usage:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Description:
-GIA ANN proto sequence Concepts (and feature detection)
+GIA ANN NLP sequence Concepts (and feature detection)
 
 """
 
 import random
 import torch as pt
 
-from GIAANNproto_globalDefs import *
-import GIAANNproto_databaseNetwork
-import GIAANNproto_sequenceTokens
+from GIAANNcmn_globalDefs import *
+import GIAANNcmn_databaseNetwork
+import GIAANNnlp_sequenceTokens
 
 
 def firstPass(databaseNetworkObject, sequence, allowNewFeatures):
@@ -31,11 +31,11 @@ def firstPass(databaseNetworkObject, sequence, allowNewFeatures):
 	conceptMask = []
 	
 	for preprocessedToken in sequence:
-		token = GIAANNproto_sequenceTokens.convertPreprocessedTokenToSequenceToken(preprocessedToken)
+		token = GIAANNnlp_sequenceTokens.convertPreprocessedTokenToSequenceToken(preprocessedToken)
 
 		conceptFound = False
 		if usePOS:
-			if GIAANNproto_sequenceTokens.isConcept(token):
+			if GIAANNnlp_sequenceTokens.isConcept(token):
 				# Only assign unique concept columns for nouns
 				conceptFound = True
 		else:
@@ -44,7 +44,7 @@ def firstPass(databaseNetworkObject, sequence, allowNewFeatures):
 		
 		if(conceptFound):
 			if(allowNewFeatures):
-				conceptsFound, newConceptsAdded = GIAANNproto_databaseNetwork.addConceptToConceptColumnsDict(databaseNetworkObject, token.lemma, conceptsFound, newConceptsAdded)
+				conceptsFound, newConceptsAdded = GIAANNcmn_databaseNetwork.addConceptToConceptColumnsDict(databaseNetworkObject, token.lemma, conceptsFound, newConceptsAdded)
 			else:
 				if(token.lemma not in databaseNetworkObject.conceptColumnsDict):
 					raise RuntimeError("firstPass error: concept lemma not found while allowNewFeatures is False (" + token.lemma + ")")
@@ -71,10 +71,10 @@ def secondPass(databaseNetworkObject, tokens, inferenceMode):
 		lemma = token.lemma
 		pos = token.pos
 		if usePOS:
-			if GIAANNproto_sequenceTokens.isConcept(token):
+			if GIAANNnlp_sequenceTokens.isConcept(token):
 				conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
 				if(inferenceMode and inferenceOnlyRetainPredictedTargetObservedColumn):
-					observedColumn = GIAANNproto_databaseNetwork.ObservedColumnStub(databaseNetworkObject, conceptIndex, lemma, i)
+					observedColumn = GIAANNcmn_databaseNetwork.ObservedColumnStub(databaseNetworkObject, conceptIndex, lemma, i)
 					observedColumnsSequenceWordIndexDict[i] = observedColumn
 				else:
 					# Load observed column from disk or create new one (reuse per-lemma instance for multi-occurrence concepts)
@@ -82,15 +82,15 @@ def secondPass(databaseNetworkObject, tokens, inferenceMode):
 						observedColumn = observedColumnsDict[lemma]
 					else:
 						if(inferenceMode):
-							observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, deviceLoadColumnInference, inferenceMode and deviceLoadColumnInferenceCopy)
+							observedColumn = GIAANNcmn_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, deviceLoadColumnInference, inferenceMode and deviceLoadColumnInferenceCopy)
 						else:
-							observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
+							observedColumn = GIAANNcmn_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
 						observedColumnsDict[lemma] = observedColumn
 					observedColumnsSequenceWordIndexDict[i] = observedColumn
 		else:
 			conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
 			if(inferenceMode and inferenceOnlyRetainPredictedTargetObservedColumn):
-				observedColumn = GIAANNproto_databaseNetwork.ObservedColumnStub(databaseNetworkObject, conceptIndex, lemma, i)
+				observedColumn = GIAANNcmn_databaseNetwork.ObservedColumnStub(databaseNetworkObject, conceptIndex, lemma, i)
 				observedColumnsSequenceWordIndexDict[i] = observedColumn
 			else:
 				# Load observed column from disk or create new one (reuse per-lemma instance for multi-occurrence concepts)
@@ -98,9 +98,9 @@ def secondPass(databaseNetworkObject, tokens, inferenceMode):
 					observedColumn = observedColumnsDict[lemma]
 				else:
 					if(inferenceMode):
-						observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, deviceLoadColumnInference, inferenceMode and deviceLoadColumnInferenceCopy)
+						observedColumn = GIAANNcmn_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, deviceLoadColumnInference, inferenceMode and deviceLoadColumnInferenceCopy)
 					else:
-						observedColumn = GIAANNproto_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
+						observedColumn = GIAANNcmn_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
 					observedColumnsDict[lemma] = observedColumn
 				observedColumnsSequenceWordIndexDict[i] = observedColumn
 	return observedColumnsDict, observedColumnsSequenceWordIndexDict
@@ -139,7 +139,7 @@ def processFeatureDetection(databaseNetworkObject, tokenIndex, token, tokens, al
 	
 	featureWord = token.word
 
-	if usePOS and (GIAANNproto_sequenceTokens.isConcept(token)):
+	if usePOS and (GIAANNnlp_sequenceTokens.isConcept(token)):
 		return False  # Skip nouns as features
 	else:
 		if featureWord not in databaseNetworkObject.conceptFeaturesDict:
@@ -173,7 +173,7 @@ def isFeaturePOSreferenceSetDelimiterType(nodeNameString, token, tokens, tokenIn
 	isDelimiterProbabilistic = False
 	if(conceptColumnsDelimitByPOS):
 		nodeWordLower = nodeNameString.lower()
-		if(GIAANNproto_sequenceTokens.isTokenReferenceSetDelimiterDeterministic(token)):
+		if(GIAANNnlp_sequenceTokens.isTokenReferenceSetDelimiterDeterministic(token)):
 			isDelimiterDeterministic = True
 		if(detectReferenceSetDelimitersBetweenNouns and not isDelimiterDeterministic):
 			isDelimiterProbabilistic = detectProbabilisticReferenceSetDelimiterBetweenNouns(nodeWordLower, token, tokens, tokenIndex)
@@ -186,7 +186,7 @@ def isFeaturePOSreferenceSetDelimiterType(nodeNameString, token, tokens, tokenIn
 def detectProbabilisticReferenceSetDelimiterBetweenNouns(nodeWordLower, token, tokens, tokenIndex):
 	if(tokenIndex < 0 or tokenIndex >= len(tokens)):
 		return False
-	if(not GIAANNproto_sequenceTokens.isTokenReferenceSetDelimiterProbabilistic(token)):
+	if(not GIAANNnlp_sequenceTokens.isTokenReferenceSetDelimiterProbabilistic(token)):
 		return False
 	leftNounIndex = findNearestNounIndex(tokens, tokenIndex-1, -1)
 	rightNounIndex = findNearestNounIndex(tokens, tokenIndex+1, 1)
@@ -206,7 +206,7 @@ def detectProbabilisticReferenceSetDelimiterBetweenNouns(nodeWordLower, token, t
 def findNearestNounIndex(tokens, startIndex, step):
 	index = startIndex
 	while(0 <= index < len(tokens)):
-		if GIAANNproto_sequenceTokens.isConcept(tokens[index]):
+		if GIAANNnlp_sequenceTokens.isConcept(tokens[index]):
 			return index
 		index += step
 	return None
@@ -214,7 +214,7 @@ def findNearestNounIndex(tokens, startIndex, step):
 def hasDeterministicDelimiterBetween(tokens, startIndex, endIndex):
 	for idx in range(startIndex+1, endIndex):
 		token = tokens[idx]
-		if(GIAANNproto_sequenceTokens.isTokenReferenceSetDelimiterDeterministic(token)):
+		if(GIAANNnlp_sequenceTokens.isTokenReferenceSetDelimiterDeterministic(token)):
 			return True
 	return False
 
@@ -222,8 +222,8 @@ def collectProbabilisticDelimiterIndices(tokens, startIndex, endIndex):
 	candidateIndices = []
 	for idx in range(startIndex+1, endIndex):
 		token = tokens[idx]
-		if(GIAANNproto_sequenceTokens.isTokenReferenceSetDelimiterProbabilistic(token)):
-			if(not GIAANNproto_sequenceTokens.isTokenReferenceSetDelimiterDeterministic(token)):
+		if(GIAANNnlp_sequenceTokens.isTokenReferenceSetDelimiterProbabilistic(token)):
+			if(not GIAANNnlp_sequenceTokens.isTokenReferenceSetDelimiterDeterministic(token)):
 				candidateIndices.append(idx)
 	return candidateIndices
 	

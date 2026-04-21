@@ -1,4 +1,4 @@
-"""GIAANNproto_databaseNetworkDraw.py
+"""GIAANNcmn_databaseNetworkDraw.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -7,13 +7,13 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Usage:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Description:
-GIA ANN proto database Network Draw
+GIA ANN common database Network Draw
 
 """
 
@@ -22,10 +22,10 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import random
 import torch as pt
-import GIAANNproto_sparseTensors
+import GIAANNcmn_sparseTensors
 
-from GIAANNproto_globalDefs import *
-import GIAANNproto_databaseNetwork
+from GIAANNcmn_globalDefs import *
+import GIAANNcmn_databaseNetwork
 
 
 #if(drawDefault):
@@ -137,7 +137,7 @@ def selectDrawBranch(tensor, drawBranches):
 		if(drawBranches):
 			return tensor
 		if(tensor.is_sparse):
-			return GIAANNproto_sparseTensors.sliceSparseTensor(tensor, 1, 0)
+			return GIAANNcmn_sparseTensors.sliceSparseTensor(tensor, 1, 0)
 		return tensor[:, 0]
 	return tensor
 
@@ -157,7 +157,7 @@ def collapseBranchDimensionForNodes(tensor, drawBranches):
 			reorderedIndices = pt.cat([indices[1:2], indices[0:1], indices[2:]], dim=0)
 			reorderedSize = (tensorCoalesced.size(1), tensorCoalesced.size(0)) + tensorCoalesced.size()[2:]
 			reorderedTensor = pt.sparse_coo_tensor(reorderedIndices, values, size=reorderedSize, device=tensorCoalesced.device).coalesce()
-			result = GIAANNproto_sparseTensors.reduceSparseBranchMax(reorderedTensor)
+			result = GIAANNcmn_sparseTensors.reduceSparseBranchMax(reorderedTensor)
 		else:
 			result = tensor.max(dim=1).values
 	return result
@@ -258,7 +258,7 @@ def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=
 	G.clear()
 
 	if(drawAllColumns):
-		observedColumnsDict = GIAANNproto_databaseNetwork.loadAllColumns(databaseNetworkObject)
+		observedColumnsDict = GIAANNcmn_databaseNetwork.loadAllColumns(databaseNetworkObject)
 	else:
 		observedColumnsDict = sequenceObservedColumns.observedColumnsDict
 	
@@ -342,7 +342,7 @@ def drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, d
 				if(drawBranches):
 					featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
 			else:
-				featureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 3, conceptIndex)
+				featureNeurons = GIAANNcmn_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 3, conceptIndex)
 				featureNeurons = selectDrawBranch(featureNeurons, drawBranches)
 				if(drawBranches):
 					featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
@@ -454,7 +454,7 @@ def drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, d
 							if(drawBranches):
 								sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
 						else:
-							sourceFeatureNeurons = GIAANNproto_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 3, conceptIndex)
+							sourceFeatureNeurons = GIAANNcmn_sparseTensors.sliceSparseTensor(databaseNetworkObject.globalFeatureNeurons, 3, conceptIndex)
 							sourceFeatureNeurons = selectDrawBranch(sourceFeatureNeurons, drawBranches)
 							if(drawBranches):
 								sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
@@ -570,7 +570,7 @@ def drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, d
 					else:
 						if(hasBranchDim):
 							if(featureConnectionsCollapsed.is_sparse):
-								featureConnectionsSegment = GIAANNproto_sparseTensors.sliceSparseTensor(featureConnectionsCollapsed, 1, branchIndex)
+								featureConnectionsSegment = GIAANNcmn_sparseTensors.sliceSparseTensor(featureConnectionsCollapsed, 1, branchIndex)
 							else:
 								featureConnectionsSegment = featureConnectionsCollapsed[:, branchIndex]
 						else:
@@ -743,7 +743,7 @@ def neuronActivation(featureNeurons, arrayIndexProperties, featureIndexInObserve
 	if(arrayIndexProperties is None):
 		return None
 	featureNeuronsActivation = featureNeurons[arrayIndexProperties]
-	featureNeuronsActivation = GIAANNproto_sparseTensors.neuronActivationSparse(featureNeuronsActivation, algorithmMatrixSANImethod)	#algorithmMatrixSANImethod
+	featureNeuronsActivation = GIAANNcmn_sparseTensors.neuronActivationSparse(featureNeuronsActivation, algorithmMatrixSANImethod)	#algorithmMatrixSANImethod
 	featureNeuronsActivation = featureNeuronsActivation[featureIndexInObservedColumn]
 	return featureNeuronsActivation
 

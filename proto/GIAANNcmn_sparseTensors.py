@@ -1,4 +1,4 @@
-"""GIAANNproto_sparseTensors.py
+"""GIAANNcmn_sparseTensors.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -7,19 +7,19 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
 MIT License
 
 # Installation:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Usage:
-see GIAANNproto_main.py
+see GIAANNcmn_main.py
 
 # Description:
-GIA ANN proto predictive sparse Tensors
+GIA ANN common predictive sparse Tensors
 
 """
 
 import torch as pt
 
-from GIAANNproto_globalDefs import *
+from GIAANNcmn_globalDefs import *
 
 def createEmptySparseTensor(shape):
 	sparseZeroTensor = pt.sparse_coo_tensor(indices=pt.empty((len(shape), 0), dtype=pt.long), values=pt.empty(0), size=shape, device=deviceSparse)
