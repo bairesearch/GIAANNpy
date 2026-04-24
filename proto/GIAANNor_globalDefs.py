@@ -23,9 +23,15 @@ from GIAANNcmn_globalDefs import useAutoresearch
 from GIAANNcmn_globalDefs import useDrawNetworkIndependently
 
 
-#recent print vars;
+#submodality selection;
 #submodalityName = "video"	#default
 submodalityName = "image"
+
+
+#recent debug vars;
+debugPrintNumberFeatures = True
+debugPrintInsufficientUsableFeaturesWarning = True
+
 
 #recent print vars;
 printSequenceNumberColumns = True
@@ -49,9 +55,9 @@ if(submodalityName=="video"):
 	inferencePromptFileName = "inference_prompt_or.txt"
 	databaseFolderExtension = "-ORvideo"
 elif(submodalityName=="image"):
-	datasetType = "cifar10"
-	datasetName = "uoft-cs/cifar10"
-	datasetCfg = "plain_text"
+	datasetType = "cityscapes"
+	datasetName = "Chris1/cityscapes"
+	datasetCfg = ""
 	datasetsLibrary4plus = True
 	useLocalDataset = False
 	useLocalDatasetDownloadManual = False
@@ -104,10 +110,35 @@ if(submodalityName=="video"):
 	modalityORvideoMaxDurationSeconds = 180.0
 	modalityORdatasetPromptRatio = 0.1
 	modalityORdatasetPromptMaxSequences = 2
+	modalityORvideoStreamFrames = False	#orig: False
 elif(submodalityName=="image"):
 	#saccade augmentations are calculated by translating the image to a random polar coordinates offset from the centre
-	modalityORimageSaccadesMaxAngularOffsetDegrees = 15	#effective augmentations compatible with SANI
 	modalityORimageSaccadesPerImage = 5
 	modalityORimageSnapshotsPerSaccade = 3
+	# upgrade submodalityName=="image" to perform saccades augomentations between nearby (i.e. adjacent) salient regions of the image: a) segment centres and b) corner features
+	modalityORimageSaccadesUseAdjacentSalientRegions = True
+	modalityORimageSaccadesSkipInsufficientUsableFeatures = True
+	if modalityORimageSaccadesUseAdjacentSalientRegions:
+		modalityORimageSaccadesCrop = False
+	else:
+		modalityORimageSaccadesMaxAngularOffsetDegrees = 15	#effective augmentations compatible with SANI
+		modalityORimageSaccadesCrop = False	#uses modalityORimageSaccadesMaxAngularOffsetDegrees to determine crop distance (ensures to not produce augmentations with blank areas)
+	modalityORimageFeatureDetectionCorners = True
+	modalityORimageFeatureDetectionSegmentCentres = True
+	modalityORimageFeatureDetectionSegmentPostProcessing = True
+	modalityORimageFeatureDetectionSegmentMetadata = True
+	modalityORimageFeatureDetectionFilterSegments = True
+	modalityORimageFeatureDetectionFilterSegmentsWholeImageThreshold = 0.85
+	modalityORimageFeatureDetectionFilterSegmentsBackgroundColourThreshold = 15
+	modalityORfeatureDetectionSAMversion = 1	#1=sam1(segment-anything), 2=sam2, 3=sam3
+	modalityORfeatureDetectionSAM1modelName = "vit_h"
+	modalityORfeatureDetectionSAM1checkpoint = "../../models/segmentAnythingViTHSAM/sam_vit_h_4b8939.pth"
+	modalityORfeatureDetectionSAM1checkpointAutoDownload = True
+	modalityORfeatureDetectionSAM2modelId = "facebook/sam2.1-hiera-large"
+	modalityORfeatureDetectionSAM2configFile = "configs/sam2.1/sam2.1_hiera_l.yaml"
+	modalityORfeatureDetectionSAM2checkpoint = ""
+	modalityORfeatureDetectionSAM3checkpoint = ""
+	modalityORfeatureDetectionSAM3textPrompt = "object"
+	modalityORfeatureDetectionSAM3confidenceThreshold = 0.5
 	modalityORdatasetPromptRatio = 0.1
 	modalityORdatasetPromptMaxSequences = 2

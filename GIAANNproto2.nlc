@@ -3,7 +3,7 @@
 ---
 v2a (Codex IDE GPT-5.4) [under development]:
 - add proto GIAANNproto2a1a - start option useModalityOR=True:
-	- GIAANNor_datasets.py: add huggingface datasetType for video (find an appropriate dataset for short approx 1-3 minute lengthed, low to moderate resolution, video streams).
+	- GIAANNor_datasets.py: add huggingface datasetType for video (find an appropriate dataset for short approx 1-3 minute lengthed, moderate resolution, video streams).
 	- GIAANNor_RFfilters.py: initialise a set of receptive field (RF) filters:
 		- it is recommended you both a) reuse and b) implement from scratch a GPU accelerated library for generating and applying natural RFs based on option modalityORuseExternalRFfilterLibrary:
 			- any RF filter code should be added to new file GIAANNor_RFfilters.py.
@@ -48,7 +48,7 @@ v2a (Codex IDE GPT-5.4) [under development]:
 		- it is recommended to use pytorch or pytorch3D library for GPU accelerated execution of multiple 2D filters in parallel (see above): never execute filters serially.
 		/MANUAL; - ensure to modify and use the GIAANNor_main:processSequenceTemplate() code based on GIAANNnlp_main:processSequence() - it does not replicate any print (GIAANNcmn_count) or debug (GIAANNcmn_debug) code so it is easier to understand.
 - implement useModalityOR option submodalityName = "image":
-	- GIAANNor_datasets.py: add huggingface datasetType for images (find an appropriate dataset for low to moderate resolution images that has both train and test partitions).
+	- GIAANNor_datasets.py: add huggingface datasetType for images (find an appropriate dataset for moderate resolution images that has both train and test partitions).
 	- use the same GIAANNor_main.py:processSequence() template code as submodalityName=="video" (except for the sequence generation):
 	- generate sequence data by augmenting each image:
 		- for each image, generate modalityORimageSaccadesPerImage sequences by performing modalityORimageSaccadesPerImage augmentations:
@@ -57,4 +57,6 @@ v2a (Codex IDE GPT-5.4) [under development]:
 				- crop each augmented snapshot by a predefined amount (dependent on modalityORimageSaccadesMaxAngularOffsetDegrees) so that every snapshot contains only image data (no pixels outside the original image data).
 	Implementation notes:
 		- ensure the upgrade is performed within context if(submodalityName=="image"). If submodalityName=="video" no changes can be made to the effective execution of the codebase.
-
+- upgrade submodalityName=="image" to perform saccade augmentations between nearby (i.e. adjacent) salient regions of the image: a) segment centres and b) corner features:
+	- create GIAANNor_features.py - copy the ATORpt feature detection code that uses the Segment Anything library and OpenCV (https://github.com/bairesearch/ATORpt ATORpt_PTfeatures.py/ATORpt_RFmainSA.py)
+- patch submodalityName=="image" to use higher resolution image dataset

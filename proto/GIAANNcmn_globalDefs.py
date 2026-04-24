@@ -245,7 +245,6 @@ arrayIndexPropertiesActivationCreateInference = arrayIndexPropertiesActivation o
 arrayIndexPropertiesTimeCreateInference = arrayIndexPropertiesTime or inferenceUseNeuronFeaturePropertiesTime
 
 
-
 #Immediate (direct) connections;
 enforceDirectConnections = True	#default: True	#orig: False	#prediction requires a direct connection from previous prediction as observed during training (ie adjacent tokens)
 if(enforceDirectConnections):
@@ -458,18 +457,19 @@ printTrainSequenceDelimiters = False	#print each training sequence with delimite
 printTrainSequencePOS = False	#print each training sequence with POS tags
 printTrainSequenceCount = False	#print each training sequence count
 if(not useAutoresearch):
-	if(generateEvalText):
-		printTrainSequenceRaw = True
+	if(useModalityOR):
+		printTrainSequenceDefault = True
 	else:
-		if(datasetType=="oscar"):
-			printTrainSequenceCount = True	#non-visible characters affect terminal print consistency
-		elif(datasetType=="wikipedia"):
-			printTrainSequenceDefault = True
-		elif(datasetType=="soccer_events"):
-			printTrainSequenceDefault = True
-		elif(datasetType=="cifar10"):
-			printTrainSequenceDefault = True
-			#printTrainSequenceCount = True
+		if(generateEvalText):
+			printTrainSequenceRaw = True
+		else:
+			if(datasetType=="oscar"):
+				printTrainSequenceCount = True	#non-visible characters affect terminal print consistency
+			elif(datasetType=="wikipedia"):
+				printTrainSequenceDefault = True
+			elif(datasetType=="cifar10" or datasetType=="cityscapes"):
+				printTrainSequenceDefault = True
+				#printTrainSequenceCount = True
 		
 
 #Debug vars;

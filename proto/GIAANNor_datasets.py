@@ -23,6 +23,7 @@ import subprocess
 import torch as pt
 
 from GIAANNcmn_globalDefs import *
+import GIAANNor_features
 
 _datasetIndexCache = None
 _imageDatasetCache = {}
@@ -166,7 +167,7 @@ def loadDataset(split="train"):
 			result = trainEntries
 		else:
 			result = testEntries
-	elif(datasetType == "cifar10"):
+	elif(datasetType == "cifar10" or datasetType == "cityscapes"):
 		result = loadImageDatasetSplit(split)
 	else:
 		raise RuntimeError("loadDataset error: unsupported OR datasetType " + str(datasetType))
@@ -176,13 +177,31 @@ def loadDataset(split="train"):
 def loadPromptDataset():
 	result = None
 	testEntries = loadDataset("test")
-	if(len(testEntries) > modalityORdatasetPromptMaxSequences):
-		if(hasattr(testEntries, "select")):
-			result = testEntries.select(range(modalityORdatasetPromptMaxSequences))
+	result = limitDatasetEntries(testEntries, modalityORdatasetPromptMaxSequences)
+	return result
+
+
+def limitDatasetEntries(datasetEntries, maxEntries):
+	result = None
+	datasetLength = None
+	if(not isinstance(maxEntries, int)):
+		raise RuntimeError("limitDatasetEntries error: maxEntries must be an int")
+	if(maxEntries <= 0):
+		raise RuntimeError("limitDatasetEntries error: maxEntries must be > 0")
+	if(hasattr(datasetEntries, "take")):
+		result = datasetEntries.take(maxEntries)
+	elif(hasattr(datasetEntries, "select")):
+		datasetLength = len(datasetEntries)
+		if(datasetLength > maxEntries):
+			result = datasetEntries.select(range(maxEntries))
 		else:
-			result = testEntries[:modalityORdatasetPromptMaxSequences]
+			result = datasetEntries
 	else:
-		result = testEntries
+		datasetLength = len(datasetEntries)
+		if(datasetLength > maxEntries):
+			result = datasetEntries[:maxEntries]
+		else:
+			result = datasetEntries
 	return result
 
 
@@ -229,42 +248,83 @@ def sampleVideoSnapshots(datasetEntry):
 		raise RuntimeError("sampleVideoSnapshots error: modalityORsnapshotWidth/modalityORsnapshotHeight must be > 0")
 	filterText = "select='not(mod(n\\," + str(modalityORvideoFramesPerSnapshot) + "))',scale=" + str(frameWidth) + ":" + str(frameHeight) + ":flags=bilinear"
 	command = ["ffmpeg", "-v", "error", "-i", videoFile, "-vf", filterText, "-vsync", "vfr", "-pix_fmt", "rgb24", "-f", "rawvideo", "-"]
-	ffmpegProcess = subprocess.run(command, capture_output=True, check=True)
-	rawFrameBytes = ffmpegProcess.stdout
 	frameSizeBytes = frameWidth*frameHeight*3
 	if(frameSizeBytes <= 0):
 		raise RuntimeError("sampleVideoSnapshots error: frameSizeBytes must be > 0")
-	if(len(rawFrameBytes) % frameSizeBytes != 0):
-		raise RuntimeError("sampleVideoSnapshots error: ffmpeg raw frame byte count is not divisible by frameSizeBytes")
-	numberOfFrames = len(rawFrameBytes)//frameSizeBytes
-	if(numberOfFrames <= 0):
-		raise RuntimeError("sampleVideoSnapshots error: numberOfFrames must be > 0")
-	frameTensor = pt.frombuffer(bytearray(rawFrameBytes), dtype=pt.uint8).clone().view(numberOfFrames, frameHeight, frameWidth, 3).permute(0, 3, 1, 2).to(deviceDense, dtype=arrayType)/255.0
+	if(modalityORvideoStreamFrames):
+		frameTensor = sampleVideoSnapshotsStreamFrames(command, frameWidth, frameHeight, frameSizeBytes)
+	else:
+		ffmpegProcess = subprocess.run(command, capture_output=True, check=True)
+		rawFrameBytes = ffmpegProcess.stdout
+		if(len(rawFrameBytes) % frameSizeBytes != 0):
+			raise RuntimeError("sampleVideoSnapshots error: ffmpeg raw frame byte count is not divisible by frameSizeBytes")
+		numberOfFrames = len(rawFrameBytes)//frameSizeBytes
+		if(numberOfFrames <= 0):
+			raise RuntimeError("sampleVideoSnapshots error: numberOfFrames must be > 0")
+		frameTensor = pt.frombuffer(bytearray(rawFrameBytes), dtype=pt.uint8).clone().view(numberOfFrames, frameHeight, frameWidth, 3).permute(0, 3, 1, 2).to(deviceDense, dtype=arrayType)/255.0
 	result = frameTensor
+	return result
+
+
+def sampleVideoSnapshotsStreamFrames(command, frameWidth, frameHeight, frameSizeBytes):
+	result = None
+	ffmpegProcess = None
+	frameTensors = None
+	rawFrameBytes = None
+	stderrBytes = None
+	returnCode = None
+	numberOfFrames = None
+	if(not isinstance(command, list)):
+		raise RuntimeError("sampleVideoSnapshotsStreamFrames error: command must be a list")
+	if(frameWidth <= 0 or frameHeight <= 0 or frameSizeBytes <= 0):
+		raise RuntimeError("sampleVideoSnapshotsStreamFrames error: frameWidth/frameHeight/frameSizeBytes must be > 0")
+	frameTensors = []
+	ffmpegProcess = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	if(ffmpegProcess.stdout is None or ffmpegProcess.stderr is None):
+		raise RuntimeError("sampleVideoSnapshotsStreamFrames error: failed to open ffmpeg pipes")
+	while True:
+		rawFrameBytes = ffmpegProcess.stdout.read(frameSizeBytes)
+		if(rawFrameBytes == b""):
+			break
+		if(len(rawFrameBytes) != frameSizeBytes):
+			ffmpegProcess.kill()
+			ffmpegProcess.wait()
+			raise RuntimeError("sampleVideoSnapshotsStreamFrames error: incomplete raw frame read from ffmpeg stdout")
+		frameTensors.append(pt.frombuffer(bytearray(rawFrameBytes), dtype=pt.uint8).clone().view(frameHeight, frameWidth, 3).permute(2, 0, 1))
+	stderrBytes = ffmpegProcess.stderr.read()
+	returnCode = ffmpegProcess.wait()
+	if(returnCode != 0):
+		raise RuntimeError("sampleVideoSnapshotsStreamFrames error: ffmpeg failed with stderr=" + stderrBytes.decode("utf-8", errors="replace"))
+	numberOfFrames = len(frameTensors)
+	if(numberOfFrames <= 0):
+		raise RuntimeError("sampleVideoSnapshotsStreamFrames error: numberOfFrames must be > 0")
+	result = pt.stack(frameTensors, dim=0).to(deviceDense, dtype=arrayType)/255.0
 	return result
 
 
 def loadImageDatasetSplit(split):
 	result = None
 	load_dataset = None
-	if(datasetType != "cifar10"):
+	streaming = None
+	if(datasetType != "cifar10" and datasetType != "cityscapes"):
 		raise RuntimeError("loadImageDatasetSplit error: unsupported image datasetType " + str(datasetType))
 	if(split != "train" and split != "test"):
 		raise RuntimeError("loadImageDatasetSplit error: split must be 'train' or 'test'")
 	if(useLocalDataset and datasetFolder == ""):
 		raise RuntimeError("loadImageDatasetSplit error: datasetFolder must not be empty while useLocalDataset is True")
+	streaming = not useLocalDataset
 	if(split not in _imageDatasetCache):
 		load_dataset = requireHuggingFaceDatasets()
 		if(datasetCfg == ""):
 			if(useLocalDataset):
-				_imageDatasetCache[split] = load_dataset(datasetName, split=split, trust_remote_code=True, cache_dir=datasetFolder)
+				_imageDatasetCache[split] = load_dataset(datasetName, split=split, streaming=streaming, trust_remote_code=True, cache_dir=datasetFolder)
 			else:
-				_imageDatasetCache[split] = load_dataset(datasetName, split=split, trust_remote_code=True)
+				_imageDatasetCache[split] = load_dataset(datasetName, split=split, streaming=streaming, trust_remote_code=True)
 		else:
 			if(useLocalDataset):
-				_imageDatasetCache[split] = load_dataset(datasetName, datasetCfg, split=split, trust_remote_code=True, cache_dir=datasetFolder)
+				_imageDatasetCache[split] = load_dataset(datasetName, datasetCfg, split=split, streaming=streaming, trust_remote_code=True, cache_dir=datasetFolder)
 			else:
-				_imageDatasetCache[split] = load_dataset(datasetName, datasetCfg, split=split, trust_remote_code=True)
+				_imageDatasetCache[split] = load_dataset(datasetName, datasetCfg, split=split, streaming=streaming, trust_remote_code=True)
 	result = _imageDatasetCache[split]
 	return result
 
@@ -276,6 +336,10 @@ def sampleImageSaccadeSequences(datasetEntry):
 	preparedImageTensor = None
 	cropMarginX = None
 	cropMarginY = None
+	preparedImageWorkWidth = None
+	preparedImageWorkHeight = None
+	saccadeOffsetPairs = None
+	saccadeOffsetPair = None
 	targetOffsetX = None
 	targetOffsetY = None
 	sequence = None
@@ -283,12 +347,230 @@ def sampleImageSaccadeSequences(datasetEntry):
 		raise RuntimeError("sampleImageSaccadeSequences error: modalityORimageSaccadesPerImage must be > 0")
 	if(modalityORimageSnapshotsPerSaccade <= 0):
 		raise RuntimeError("sampleImageSaccadeSequences error: modalityORimageSnapshotsPerSaccade must be > 0")
-	cropMarginX, cropMarginY = calculateImageSaccadeCropMargins()
-	preparedImageTensor = prepareImageTensorForSaccades(datasetEntry, int(modalityORsnapshotWidth) + (2*cropMarginX), int(modalityORsnapshotHeight) + (2*cropMarginY))
-	for _ in range(modalityORimageSaccadesPerImage):
-		targetOffsetX, targetOffsetY = sampleRandomImageSaccadeOffset(cropMarginX, cropMarginY)
-		sequence = generateImageSaccadeSequence(preparedImageTensor, targetOffsetX, targetOffsetY, cropMarginX, cropMarginY)
-		result.append(sequence)
+	if(modalityORimageSaccadesCrop):
+		cropMarginX, cropMarginY = calculateImageSaccadeCropMargins()
+		preparedImageWorkWidth = int(modalityORsnapshotWidth) + (2*cropMarginX)
+		preparedImageWorkHeight = int(modalityORsnapshotHeight) + (2*cropMarginY)
+		preparedImageTensor = prepareImageTensorForSaccades(datasetEntry, preparedImageWorkWidth, preparedImageWorkHeight)
+	else:
+		preparedImageTensor = prepareImageTensorForSaccades(datasetEntry, int(modalityORsnapshotWidth), int(modalityORsnapshotHeight))
+		cropMarginX, cropMarginY = calculateImageSaccadeCropMarginsFromPreparedImage(preparedImageTensor)
+	if(submodalityName=="image"):
+		if(modalityORimageSaccadesUseAdjacentSalientRegions):
+			saccadeOffsetPairs = sampleAdjacentSalientImageSaccadeOffsetPairs(preparedImageTensor, cropMarginX, cropMarginY)
+			if(saccadeOffsetPairs is None):
+				result = None
+			else:
+				for saccadeOffsetPair in saccadeOffsetPairs:
+					sequence = generateImageSaccadeSequenceBetweenOffsets(preparedImageTensor, float(saccadeOffsetPair[0].item()), float(saccadeOffsetPair[1].item()), float(saccadeOffsetPair[2].item()), float(saccadeOffsetPair[3].item()), cropMarginX, cropMarginY)
+					result.append(sequence)
+		else:
+			for _ in range(modalityORimageSaccadesPerImage):
+				targetOffsetX, targetOffsetY = sampleRandomImageSaccadeOffset(cropMarginX, cropMarginY)
+				sequence = generateImageSaccadeSequence(preparedImageTensor, targetOffsetX, targetOffsetY, cropMarginX, cropMarginY)
+				result.append(sequence)
+	else:
+		for _ in range(modalityORimageSaccadesPerImage):
+			targetOffsetX, targetOffsetY = sampleRandomImageSaccadeOffset(cropMarginX, cropMarginY)
+			sequence = generateImageSaccadeSequence(preparedImageTensor, targetOffsetX, targetOffsetY, cropMarginX, cropMarginY)
+			result.append(sequence)
+	return result
+
+
+def sampleAdjacentSalientImageSaccadeOffsetPairs(preparedImageTensor, cropMarginX, cropMarginY):
+	# upgrade submodalityName=="image" to perform saccades augomentations between nearby (i.e. adjacent) salient regions of the image: a) segment centres and b) corner features.
+	result = None
+	salientFeatureCoordinates = None
+	reachableFeatureCoordinates = None
+	workHeight = None
+	workWidth = None
+	if(not pt.is_tensor(preparedImageTensor)):
+		raise RuntimeError("sampleAdjacentSalientImageSaccadeOffsetPairs error: preparedImageTensor must be a tensor")
+	if(preparedImageTensor.dim() != 3):
+		raise RuntimeError("sampleAdjacentSalientImageSaccadeOffsetPairs error: preparedImageTensor rank must be 3")
+	if(cropMarginX < 0 or cropMarginY < 0):
+		raise RuntimeError("sampleAdjacentSalientImageSaccadeOffsetPairs error: cropMarginX/cropMarginY must be >= 0")
+	workHeight = int(preparedImageTensor.shape[1])
+	workWidth = int(preparedImageTensor.shape[2])
+	salientFeatureCoordinates = GIAANNor_features.detectSalientFeatureCoordinatesFromImageTensor(preparedImageTensor)
+	if(salientFeatureCoordinates.shape[0] < 2):
+		result = None
+		return result
+	reachableFeatureCoordinates = filterReachableSalientImageFeatureCoordinates(salientFeatureCoordinates, workWidth, workHeight)
+	result = calculateAdjacentSalientImageSaccadeOffsetPairs(reachableFeatureCoordinates, workWidth, workHeight)
+	return result
+
+
+def filterReachableSalientImageFeatureCoordinates(featureCoordinates, workWidth, workHeight):
+	result = None
+	reachableWindowBounds = None
+	minFeatureCoordinateX = None
+	maxFeatureCoordinateX = None
+	minFeatureCoordinateY = None
+	maxFeatureCoordinateY = None
+	projectedFeatureCoordinates = None
+	if(not pt.is_tensor(featureCoordinates)):
+		raise RuntimeError("filterReachableSalientImageFeatureCoordinates error: featureCoordinates must be a tensor")
+	if(featureCoordinates.dim() != 2):
+		raise RuntimeError("filterReachableSalientImageFeatureCoordinates error: featureCoordinates rank must be 2")
+	if(int(featureCoordinates.shape[1]) != 2):
+		raise RuntimeError("filterReachableSalientImageFeatureCoordinates error: featureCoordinates last dimension must equal 2")
+	if(workWidth <= 0 or workHeight <= 0):
+		raise RuntimeError("filterReachableSalientImageFeatureCoordinates error: workWidth/workHeight must be > 0")
+	reachableWindowBounds = calculateReachableFeatureCoordinateBounds(workWidth, workHeight)
+	minFeatureCoordinateX = reachableWindowBounds[0]
+	maxFeatureCoordinateX = reachableWindowBounds[1]
+	minFeatureCoordinateY = reachableWindowBounds[2]
+	maxFeatureCoordinateY = reachableWindowBounds[3]
+	projectedFeatureCoordinates = featureCoordinates.clone()
+	projectedFeatureCoordinates[:, 0] = projectedFeatureCoordinates[:, 0].clamp(min=minFeatureCoordinateX, max=maxFeatureCoordinateX)
+	projectedFeatureCoordinates[:, 1] = projectedFeatureCoordinates[:, 1].clamp(min=minFeatureCoordinateY, max=maxFeatureCoordinateY)
+	result = pt.unique(projectedFeatureCoordinates, dim=0)
+	if(debugPrintNumberFeatures):
+		printReachableFeatureDetectionCount(result)
+	return result
+
+
+def calculateReachableFeatureCoordinateBounds(workWidth, workHeight):
+	result = None
+	minFeatureCoordinateX = None
+	maxFeatureCoordinateX = None
+	minFeatureCoordinateY = None
+	maxFeatureCoordinateY = None
+	if(workWidth <= 0 or workHeight <= 0):
+		raise RuntimeError("calculateReachableFeatureCoordinateBounds error: workWidth/workHeight must be > 0")
+	minFeatureCoordinateX = float(modalityORsnapshotWidth)/2.0
+	maxFeatureCoordinateX = float(workWidth) - (float(modalityORsnapshotWidth)/2.0)
+	minFeatureCoordinateY = float(modalityORsnapshotHeight)/2.0
+	maxFeatureCoordinateY = float(workHeight) - (float(modalityORsnapshotHeight)/2.0)
+	if(minFeatureCoordinateX > maxFeatureCoordinateX or minFeatureCoordinateY > maxFeatureCoordinateY):
+		raise RuntimeError("calculateReachableFeatureCoordinateBounds error: reachable feature coordinate window is invalid for current snapshot/work dimensions")
+	result = (minFeatureCoordinateX, maxFeatureCoordinateX, minFeatureCoordinateY, maxFeatureCoordinateY)
+	return result
+
+
+def printReachableFeatureDetectionCount(reachableFeatureCoordinates):
+	result = None
+	numReachableFeatureCoordinates = None
+	if(not pt.is_tensor(reachableFeatureCoordinates)):
+		raise RuntimeError("printReachableFeatureDetectionCount error: reachableFeatureCoordinates must be a tensor")
+	if(reachableFeatureCoordinates.dim() != 2):
+		raise RuntimeError("printReachableFeatureDetectionCount error: reachableFeatureCoordinates rank must be 2")
+	numReachableFeatureCoordinates = int(reachableFeatureCoordinates.shape[0])
+	print("featureDetection: numReachableFeaturesDetected = ", numReachableFeatureCoordinates)
+	return result
+
+
+def printAdjacentFeaturePairCount(pairIndices):
+	result = None
+	numAdjacentFeaturePairs = None
+	if(not pt.is_tensor(pairIndices)):
+		raise RuntimeError("printAdjacentFeaturePairCount error: pairIndices must be a tensor")
+	if(pairIndices.dim() != 2):
+		raise RuntimeError("printAdjacentFeaturePairCount error: pairIndices rank must be 2")
+	numAdjacentFeaturePairs = int(pairIndices.shape[0])
+	print("featureDetection: numAdjacentFeaturePairsDetected = ", numAdjacentFeaturePairs)
+	return result
+
+
+def calculateAdjacentSalientImageSaccadeOffsetPairs(featureCoordinates, workWidth, workHeight):
+	result = None
+	pairIndices = None
+	startFeatureCoordinates = None
+	endFeatureCoordinates = None
+	pairDistances = None
+	sortOrder = None
+	selectedPairIndices = None
+	requiredPairIndices = None
+	repeatCount = None
+	imageCentreCoordinate = None
+	startDistanceToCentre = None
+	endDistanceToCentre = None
+	swapMask = None
+	tempFeatureCoordinates = None
+	startOffsets = None
+	endOffsets = None
+	if(not pt.is_tensor(featureCoordinates)):
+		raise RuntimeError("calculateAdjacentSalientImageSaccadeOffsetPairs error: featureCoordinates must be a tensor")
+	if(featureCoordinates.dim() != 2):
+		raise RuntimeError("calculateAdjacentSalientImageSaccadeOffsetPairs error: featureCoordinates rank must be 2")
+	if(modalityORimageSaccadesPerImage <= 0):
+		raise RuntimeError("calculateAdjacentSalientImageSaccadeOffsetPairs error: modalityORimageSaccadesPerImage must be > 0")
+	pairIndices = pt.combinations(pt.arange(featureCoordinates.shape[0], device=featureCoordinates.device), r=2)
+	if(debugPrintNumberFeatures):
+		printAdjacentFeaturePairCount(pairIndices)
+	if(int(pairIndices.shape[0]) <= 0):
+		result = None
+		return result
+	startFeatureCoordinates = featureCoordinates.index_select(0, pairIndices[:, 0])
+	endFeatureCoordinates = featureCoordinates.index_select(0, pairIndices[:, 1])
+	pairDistances = pt.linalg.vector_norm(endFeatureCoordinates - startFeatureCoordinates, dim=1)
+	sortOrder = pt.argsort(pairDistances, descending=False)
+	selectedPairIndices = pairIndices.index_select(0, sortOrder)
+	if(int(selectedPairIndices.shape[0]) >= int(modalityORimageSaccadesPerImage)):
+		requiredPairIndices = pt.arange(int(modalityORimageSaccadesPerImage), device=featureCoordinates.device)
+		selectedPairIndices = selectedPairIndices.index_select(0, requiredPairIndices)
+	else:
+		repeatCount = int((int(modalityORimageSaccadesPerImage) + int(selectedPairIndices.shape[0]) - 1)/int(selectedPairIndices.shape[0]))
+		selectedPairIndices = selectedPairIndices.repeat((repeatCount, 1))
+		requiredPairIndices = pt.arange(int(modalityORimageSaccadesPerImage), device=featureCoordinates.device)
+		selectedPairIndices = selectedPairIndices.index_select(0, requiredPairIndices)
+	imageCentreCoordinate = pt.tensor((float(workWidth)/2.0, float(workHeight)/2.0), dtype=featureCoordinates.dtype, device=featureCoordinates.device)
+	startFeatureCoordinates = featureCoordinates.index_select(0, selectedPairIndices[:, 0])
+	endFeatureCoordinates = featureCoordinates.index_select(0, selectedPairIndices[:, 1])
+	startDistanceToCentre = pt.linalg.vector_norm(startFeatureCoordinates - imageCentreCoordinate, dim=1)
+	endDistanceToCentre = pt.linalg.vector_norm(endFeatureCoordinates - imageCentreCoordinate, dim=1)
+	swapMask = startDistanceToCentre > endDistanceToCentre
+	if(pt.any(swapMask)):
+		tempFeatureCoordinates = startFeatureCoordinates[swapMask].clone()
+		startFeatureCoordinates[swapMask] = endFeatureCoordinates[swapMask]
+		endFeatureCoordinates[swapMask] = tempFeatureCoordinates
+	startOffsets = startFeatureCoordinates - imageCentreCoordinate
+	endOffsets = endFeatureCoordinates - imageCentreCoordinate
+	result = pt.cat((startOffsets, endOffsets), dim=1)
+	return result
+
+
+def generateImageSaccadeSequenceBetweenOffsets(preparedImageTensor, startOffsetX, startOffsetY, endOffsetX, endOffsetY, cropMarginX, cropMarginY):
+	result = None
+	snapshotSequenceTensor = None
+	workHeight = None
+	workWidth = None
+	snapshotIndexFraction = None
+	snapshotOffsetX = None
+	snapshotOffsetY = None
+	startX = None
+	startY = None
+	endX = None
+	endY = None
+	snapshotTensor = None
+	if(not pt.is_tensor(preparedImageTensor)):
+		raise RuntimeError("generateImageSaccadeSequenceBetweenOffsets error: preparedImageTensor must be a tensor")
+	if(preparedImageTensor.dim() != 3):
+		raise RuntimeError("generateImageSaccadeSequenceBetweenOffsets error: preparedImageTensor rank must be 3")
+	if(preparedImageTensor.shape[0] != 3):
+		raise RuntimeError("generateImageSaccadeSequenceBetweenOffsets error: preparedImageTensor channel count must be 3")
+	workHeight = int(preparedImageTensor.shape[1])
+	workWidth = int(preparedImageTensor.shape[2])
+	snapshotSequenceTensor = pt.zeros((modalityORimageSnapshotsPerSaccade, 3, modalityORsnapshotHeight, modalityORsnapshotWidth), dtype=arrayType, device=deviceDense)
+	for snapshotIndex in range(modalityORimageSnapshotsPerSaccade):
+		if(modalityORimageSnapshotsPerSaccade == 1):
+			snapshotIndexFraction = 1.0
+		else:
+			snapshotIndexFraction = float(snapshotIndex)/float(modalityORimageSnapshotsPerSaccade - 1)
+		snapshotOffsetX = float(startOffsetX) + (float(endOffsetX - startOffsetX)*snapshotIndexFraction)
+		snapshotOffsetY = float(startOffsetY) + (float(endOffsetY - startOffsetY)*snapshotIndexFraction)
+		startX = int(cropMarginX) + int(round(snapshotOffsetX))
+		startY = int(cropMarginY) + int(round(snapshotOffsetY))
+		endX = startX + int(modalityORsnapshotWidth)
+		endY = startY + int(modalityORsnapshotHeight)
+		if(startX < 0 or startY < 0 or endX > workWidth or endY > workHeight):
+			raise RuntimeError("generateImageSaccadeSequenceBetweenOffsets error: computed crop window exceeds preparedImageTensor bounds")
+		snapshotTensor = preparedImageTensor[:, startY:endY, startX:endX]
+		if(snapshotTensor.shape[1] != modalityORsnapshotHeight or snapshotTensor.shape[2] != modalityORsnapshotWidth):
+			raise RuntimeError("generateImageSaccadeSequenceBetweenOffsets error: snapshotTensor shape mismatch")
+		snapshotSequenceTensor[snapshotIndex] = snapshotTensor
+	result = snapshotSequenceTensor
 	return result
 
 
@@ -370,15 +652,33 @@ def calculateImageSaccadeCropMargins():
 	return result
 
 
+def calculateImageSaccadeCropMarginsFromPreparedImage(preparedImageTensor):
+	result = None
+	workHeight = None
+	workWidth = None
+	cropMarginX = None
+	cropMarginY = None
+	if(not pt.is_tensor(preparedImageTensor)):
+		raise RuntimeError("calculateImageSaccadeCropMarginsFromPreparedImage error: preparedImageTensor must be a tensor")
+	if(preparedImageTensor.dim() != 3):
+		raise RuntimeError("calculateImageSaccadeCropMarginsFromPreparedImage error: preparedImageTensor rank must be 3")
+	if(preparedImageTensor.shape[0] != 3):
+		raise RuntimeError("calculateImageSaccadeCropMarginsFromPreparedImage error: preparedImageTensor channel count must be 3")
+	workHeight = int(preparedImageTensor.shape[1])
+	workWidth = int(preparedImageTensor.shape[2])
+	if(workWidth < int(modalityORsnapshotWidth) or workHeight < int(modalityORsnapshotHeight)):
+		raise RuntimeError("calculateImageSaccadeCropMarginsFromPreparedImage error: prepared image must be at least as large as modalityORsnapshotWidth/modalityORsnapshotHeight")
+	cropMarginX = int((float(workWidth) - float(modalityORsnapshotWidth))/2.0)
+	cropMarginY = int((float(workHeight) - float(modalityORsnapshotHeight))/2.0)
+	result = (cropMarginX, cropMarginY)
+	return result
+
+
 def prepareImageTensorForSaccades(datasetEntry, workWidth, workHeight):
 	result = None
 	imageTensor = None
 	imageHeight = None
 	imageWidth = None
-	scale = None
-	resizedHeight = None
-	resizedWidth = None
-	resizedImageTensor = None
 	cropStartX = None
 	cropStartY = None
 	if(workWidth <= 0 or workHeight <= 0):
@@ -386,17 +686,18 @@ def prepareImageTensorForSaccades(datasetEntry, workWidth, workHeight):
 	imageTensor = convertDatasetEntryToImageTensor(datasetEntry)
 	imageHeight = int(imageTensor.shape[1])
 	imageWidth = int(imageTensor.shape[2])
-	scale = max(float(workWidth)/float(imageWidth), float(workHeight)/float(imageHeight))
-	resizedHeight = int(math.ceil(float(imageHeight)*scale))
-	resizedWidth = int(math.ceil(float(imageWidth)*scale))
-	if(resizedWidth < workWidth or resizedHeight < workHeight):
-		raise RuntimeError("prepareImageTensorForSaccades error: resized image must cover workWidth/workHeight")
-	resizedImageTensor = pt.nn.functional.interpolate(imageTensor.unsqueeze(0), size=(resizedHeight, resizedWidth), mode="bilinear", align_corners=False)[0]
-	cropStartX = int((resizedWidth - workWidth)//2)
-	cropStartY = int((resizedHeight - workHeight)//2)
-	result = resizedImageTensor[:, cropStartY:cropStartY + workHeight, cropStartX:cropStartX + workWidth].contiguous()
-	if(result.shape[1] != workHeight or result.shape[2] != workWidth):
-		raise RuntimeError("prepareImageTensorForSaccades error: prepared image crop shape mismatch")
+	if(imageWidth < workWidth or imageHeight < workHeight):
+		raise RuntimeError("prepareImageTensorForSaccades error: input image must cover workWidth/workHeight without resizing")
+	if(modalityORimageSaccadesCrop):
+		cropStartX = int((imageWidth - workWidth)//2)
+		cropStartY = int((imageHeight - workHeight)//2)
+		result = imageTensor[:, cropStartY:cropStartY + workHeight, cropStartX:cropStartX + workWidth].contiguous()
+		if(result.shape[1] != workHeight or result.shape[2] != workWidth):
+			raise RuntimeError("prepareImageTensorForSaccades error: prepared image crop shape mismatch")
+	else:
+		result = imageTensor.contiguous()
+		if(result.shape[1] < workHeight or result.shape[2] < workWidth):
+			raise RuntimeError("prepareImageTensorForSaccades error: prepared image shape must cover workWidth/workHeight")
 	return result
 
 

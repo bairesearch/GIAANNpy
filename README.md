@@ -14,8 +14,9 @@ MIT License
 
 ### Installation
 
+#### common
 
-```
+```bash
 conda create -n pytorchsenv
 source activate pytorchsenv
 conda install python=3.12
@@ -23,10 +24,25 @@ python -m pip install --upgrade pip
 pip install networkx
 pip install matplotlib
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
-pip install spacy
 datasetsLibrary4plus=False: pip install "datasets<4" "fsspec==2024.6.1" "gcsfs==2024.6.1"
+```
+
+#### modality NLP
+
+```bash
+pip install spacy
 python -m spacy download en_core_web_sm [spacyModelName]
 pip install nltk
+```
+
+#### modality OR
+
+```bash
+pip install opencv-python
+pip install git+https://github.com/facebookresearch/segment-anything.git [if modalityORfeatureDetectionSAMversion==1]
+pip install git+https://github.com/facebookresearch/sam2.git [if modalityORfeatureDetectionSAMversion==2]
+pip install git+https://github.com/facebookresearch/sam3.git [if modalityORfeatureDetectionSAMversion==3]
+hf auth login [if modalityORfeatureDetectionSAMversion==3 and modalityORfeatureDetectionSAM3checkpoint==""]
 ```
 
 ### Execution
@@ -343,4 +359,3 @@ mv GIAANNpy/database/4-4CUBE.DAT ldraw/parts/4-4cube.dat
 cd ldr_wgpu
 cargo run --release -p ldr_viewer "../ldraw" "../GIAANNpy/database/GIAANNproto1xAllColumnsDraw.ldr"
 ```
-

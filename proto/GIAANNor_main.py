@@ -76,6 +76,17 @@ def processPrompt(databaseNetworkObject, inferenceMode, sequenceCount):
 	return result
 
 
+def processDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset):
+	result = sequenceCount
+	if(submodalityName=="video"):
+		result = processVideoDataset(databaseNetworkObject, inferenceMode, result, dataset)
+	elif(submodalityName=="image"):
+		result = processImageDataset(databaseNetworkObject, inferenceMode, result, dataset, None)
+	else:
+		raise RuntimeError("processDataset error: unsupported OR submodalityName " + str(submodalityName))
+	return result
+
+
 def processVideoDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset):
 	result = sequenceCount
 	ensureORruntimeInitialised(databaseNetworkObject)
@@ -96,6 +107,7 @@ def processVideoDataset(databaseNetworkObject, inferenceMode, sequenceCount, dat
 def processImageDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset, sequenceLimit):
 	result = sequenceCount
 	processedSequenceCount = 0
+	sequences = None
 	if(sequenceLimit is not None):
 		if(not isinstance(sequenceLimit, int)):
 			raise RuntimeError("processImageDataset error: sequenceLimit must be an int or None")
@@ -104,6 +116,13 @@ def processImageDataset(databaseNetworkObject, inferenceMode, sequenceCount, dat
 	ensureORruntimeInitialised(databaseNetworkObject)
 	for articleIndex, datasetEntry in enumerate(dataset):
 		sequences = GIAANNor_datasets.sampleImageSaccadeSequences(datasetEntry)
+		if(sequences is None):
+			if(modalityORimageSaccadesSkipInsufficientUsableFeatures):
+				if(debugPrintInsufficientUsableFeaturesWarning):
+					printInsufficientUsableFeaturesWarning(articleIndex, result)
+				continue
+			else:
+				raise RuntimeError("processImageDataset error: sampleImageSaccadeSequences returned no usable sequences for current image")
 		for sequenceIndex, sequence in enumerate(sequences):
 			processSequence(databaseNetworkObject, False, result, articleIndex, sequenceIndex, sequence, datasetEntry)
 			result = result + 1
@@ -116,6 +135,12 @@ def processImageDataset(databaseNetworkObject, inferenceMode, sequenceCount, dat
 			break
 		if(result == trainMaxSequences and inferenceMode == False):
 			break
+	return result
+
+
+def printInsufficientUsableFeaturesWarning(articleIndex, sequenceCount):
+	result = None
+	print("Warning: skipping image due to insufficient usable features; articleIndex = ", articleIndex, ", sequenceCount = ", sequenceCount)
 	return result
 
 
