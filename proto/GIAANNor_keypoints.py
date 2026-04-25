@@ -20,7 +20,7 @@ GIA ANN or keypoints
 import torch as pt
 
 from GIAANNcmn_globalDefs import *
-import GIAANNor_features
+import GIAANNor_features as GIAANNor_featureDetection
 
 
 def sampleAdjacentSalientImageSaccadeOffsetPairs(preparedImageTensor, cropMarginX, cropMarginY):
@@ -38,11 +38,127 @@ def sampleAdjacentSalientImageSaccadeOffsetPairs(preparedImageTensor, cropMargin
 		raise RuntimeError("sampleAdjacentSalientImageSaccadeOffsetPairs error: cropMarginX/cropMarginY must be >= 0")
 	workHeight = int(preparedImageTensor.shape[1])
 	workWidth = int(preparedImageTensor.shape[2])
-	salientFeatureCoordinates = GIAANNor_features.detectSalientFeatureCoordinatesFromImageTensor(preparedImageTensor)
+	salientFeatureCoordinates = GIAANNor_featureDetection.detectSalientFeatureCoordinatesFromImageTensor(preparedImageTensor)
 	if(salientFeatureCoordinates.shape[0] >= 2):
 		reachableFeatureCoordinates = filterReachableSalientImageFeatureCoordinates(salientFeatureCoordinates, workWidth, workHeight)
 		if(reachableFeatureCoordinates.shape[0] >= 2):
 			result = calculateAdjacentSalientImageSaccadeOffsetPairs(reachableFeatureCoordinates, workWidth, workHeight)
+	return result
+
+
+def detectReachableSalientImageFeatureCoordinates(preparedImageTensor):
+	result = None
+	salientFeatureCoordinates = None
+	workHeight = None
+	workWidth = None
+	if(not pt.is_tensor(preparedImageTensor)):
+		raise RuntimeError("detectReachableSalientImageFeatureCoordinates error: preparedImageTensor must be a tensor")
+	if(preparedImageTensor.dim() != 3):
+		raise RuntimeError("detectReachableSalientImageFeatureCoordinates error: preparedImageTensor rank must be 3")
+	if(int(preparedImageTensor.shape[0]) != 3):
+		raise RuntimeError("detectReachableSalientImageFeatureCoordinates error: preparedImageTensor channel count must equal 3")
+	workHeight = int(preparedImageTensor.shape[1])
+	workWidth = int(preparedImageTensor.shape[2])
+	salientFeatureCoordinates = GIAANNor_featureDetection.detectSalientFeatureCoordinatesFromImageTensor(preparedImageTensor)
+	if(salientFeatureCoordinates.shape[0] > 0):
+		result = filterReachableSalientImageFeatureCoordinates(salientFeatureCoordinates, workWidth, workHeight)
+	else:
+		result = salientFeatureCoordinates
+		if(debugPrintNumberFeatures):
+			printReachableFeatureDetectionCount(result)
+	return result
+
+
+def alignVideoFrameKeypointsToSubsequences(videoFrameFeatureCoordinateList):
+	result = None
+	alignedFeatureCoordinateList = None
+	numberOfSubsequences = None
+	frameFeatureCoordinates = None
+	selectedFeatureIndices = None
+	if(submodalityName=="video" and modalityORvideoGenerateMultipleSnapshotsPerFrame):
+		if(not isinstance(videoFrameFeatureCoordinateList, list)):
+			raise RuntimeError("alignVideoFrameKeypointsToSubsequences error: videoFrameFeatureCoordinateList must be a list")
+		if(len(videoFrameFeatureCoordinateList) <= 0):
+			raise RuntimeError("alignVideoFrameKeypointsToSubsequences error: videoFrameFeatureCoordinateList must not be empty")
+		if(not pt.is_tensor(videoFrameFeatureCoordinateList[0])):
+			raise RuntimeError("alignVideoFrameKeypointsToSubsequences error: first frame feature coordinates must be a tensor")
+		if(videoFrameFeatureCoordinateList[0].dim() != 2):
+			raise RuntimeError("alignVideoFrameKeypointsToSubsequences error: first frame feature coordinates rank must be 2")
+		if(int(videoFrameFeatureCoordinateList[0].shape[1]) != 2):
+			raise RuntimeError("alignVideoFrameKeypointsToSubsequences error: first frame feature coordinates last dimension must equal 2")
+		numberOfSubsequences = int(videoFrameFeatureCoordinateList[0].shape[0])
+		if(numberOfSubsequences <= 0):
+			raise RuntimeError("alignVideoFrameKeypointsToSubsequences error: first sequence iteration must contain at least one reachable keypoint")
+		alignedFeatureCoordinateList = []
+		alignedFeatureCoordinateList.append(videoFrameFeatureCoordinateList[0])
+		for frameFeatureCoordinates in videoFrameFeatureCoordinateList[1:]:
+			if(not pt.is_tensor(frameFeatureCoordinates)):
+				raise RuntimeError("alignVideoFrameKeypointsToSubsequences error: frame feature coordinates must be a tensor")
+			if(frameFeatureCoordinates.dim() != 2):
+				raise RuntimeError("alignVideoFrameKeypointsToSubsequences error: frame feature coordinates rank must be 2")
+			if(int(frameFeatureCoordinates.shape[1]) != 2):
+				raise RuntimeError("alignVideoFrameKeypointsToSubsequences error: frame feature coordinates last dimension must equal 2")
+			if(int(frameFeatureCoordinates.shape[0]) < numberOfSubsequences):
+				raise RuntimeError("alignVideoFrameKeypointsToSubsequences error: frame contains fewer reachable keypoints than the first sequence iteration")
+			selectedFeatureIndices = calculateNearestUniqueFeatureIndices(alignedFeatureCoordinateList[-1], frameFeatureCoordinates)
+			alignedFeatureCoordinateList.append(frameFeatureCoordinates.index_select(0, selectedFeatureIndices))
+		result = pt.stack(alignedFeatureCoordinateList, dim=0)
+	else:
+		raise RuntimeError("alignVideoFrameKeypointsToSubsequences error: requires submodalityName=='video' and modalityORvideoGenerateMultipleSnapshotsPerFrame")
+	return result
+
+
+def calculateNearestUniqueFeatureIndices(sourceFeatureCoordinates, targetFeatureCoordinates):
+	result = None
+	distanceMatrix = None
+	flatDistanceSortIndices = None
+	numberOfSourceFeatures = None
+	numberOfTargetFeatures = None
+	selectedSourceMask = None
+	selectedTargetMask = None
+	selectedTargetIndices = None
+	numberOfSelectedFeatures = None
+	flatDistanceSortIndex = None
+	sourceFeatureIndex = None
+	targetFeatureIndex = None
+	if(submodalityName=="video" and modalityORvideoGenerateMultipleSnapshotsPerFrame):
+		if(not pt.is_tensor(sourceFeatureCoordinates)):
+			raise RuntimeError("calculateNearestUniqueFeatureIndices error: sourceFeatureCoordinates must be a tensor")
+		if(not pt.is_tensor(targetFeatureCoordinates)):
+			raise RuntimeError("calculateNearestUniqueFeatureIndices error: targetFeatureCoordinates must be a tensor")
+		if(sourceFeatureCoordinates.dim() != 2 or targetFeatureCoordinates.dim() != 2):
+			raise RuntimeError("calculateNearestUniqueFeatureIndices error: feature coordinate tensors must be rank 2")
+		if(int(sourceFeatureCoordinates.shape[1]) != 2 or int(targetFeatureCoordinates.shape[1]) != 2):
+			raise RuntimeError("calculateNearestUniqueFeatureIndices error: feature coordinate tensors last dimension must equal 2")
+		if(sourceFeatureCoordinates.device != targetFeatureCoordinates.device):
+			raise RuntimeError("calculateNearestUniqueFeatureIndices error: sourceFeatureCoordinates and targetFeatureCoordinates must be on the same device")
+		numberOfSourceFeatures = int(sourceFeatureCoordinates.shape[0])
+		numberOfTargetFeatures = int(targetFeatureCoordinates.shape[0])
+		if(numberOfSourceFeatures <= 0):
+			raise RuntimeError("calculateNearestUniqueFeatureIndices error: numberOfSourceFeatures must be > 0")
+		if(numberOfTargetFeatures < numberOfSourceFeatures):
+			raise RuntimeError("calculateNearestUniqueFeatureIndices error: numberOfTargetFeatures must be >= numberOfSourceFeatures")
+		distanceMatrix = pt.cdist(sourceFeatureCoordinates.to(dtype=pt.float32), targetFeatureCoordinates.to(dtype=pt.float32))
+		flatDistanceSortIndices = pt.argsort(distanceMatrix.reshape(-1), descending=False)
+		selectedSourceMask = pt.zeros(numberOfSourceFeatures, dtype=pt.bool, device=sourceFeatureCoordinates.device)
+		selectedTargetMask = pt.zeros(numberOfTargetFeatures, dtype=pt.bool, device=sourceFeatureCoordinates.device)
+		selectedTargetIndices = pt.full((numberOfSourceFeatures,), -1, dtype=pt.long, device=sourceFeatureCoordinates.device)
+		numberOfSelectedFeatures = 0
+		for flatDistanceSortIndex in flatDistanceSortIndices:
+			sourceFeatureIndex = int(flatDistanceSortIndex.item())//numberOfTargetFeatures
+			targetFeatureIndex = int(flatDistanceSortIndex.item())%numberOfTargetFeatures
+			if(not bool(selectedSourceMask[sourceFeatureIndex].item()) and not bool(selectedTargetMask[targetFeatureIndex].item())):
+				selectedSourceMask[sourceFeatureIndex] = True
+				selectedTargetMask[targetFeatureIndex] = True
+				selectedTargetIndices[sourceFeatureIndex] = targetFeatureIndex
+				numberOfSelectedFeatures = numberOfSelectedFeatures + 1
+				if(numberOfSelectedFeatures == numberOfSourceFeatures):
+					break
+		if(numberOfSelectedFeatures != numberOfSourceFeatures):
+			raise RuntimeError("calculateNearestUniqueFeatureIndices error: failed to align all source features")
+		result = selectedTargetIndices
+	else:
+		raise RuntimeError("calculateNearestUniqueFeatureIndices error: requires submodalityName=='video' and modalityORvideoGenerateMultipleSnapshotsPerFrame")
 	return result
 
 

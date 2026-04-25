@@ -26,6 +26,7 @@ import GIAANNcmn_databaseNetwork
 import GIAANNcmn_databaseNetworkFiles
 import GIAANNcmn_databaseNetworkDraw
 import GIAANNor_datasets
+import GIAANNor_snapshots
 import GIAANNor_RFfilters
 import GIAANNor_sequenceConcepts
 import GIAANNor_sequenceTokens
@@ -89,12 +90,22 @@ def processDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset)
 
 def processVideoDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset):
 	result = sequenceCount
+	frameTensor = None
+	sequences = None
+	sequence = None
+	videoFile = None
 	ensureORruntimeInitialised(databaseNetworkObject)
 	if(submodalityName=="video"):
 		for articleIndex, datasetEntry in enumerate(dataset):
-			sequence = GIAANNor_datasets.sampleVideoSnapshots(datasetEntry)
-			processSequence(databaseNetworkObject, False, result, articleIndex, 0, sequence, datasetEntry)
-			result = result + 1
+			videoFile = GIAANNor_datasets.downloadVideoFile(datasetEntry)
+			if(modalityORvideoGenerateMultipleSnapshotsPerFrame):
+				frameTensor = GIAANNor_datasets.extractVideoFramesForSnapshotSubsequences(videoFile)
+				sequences = GIAANNor_snapshots.sampleVideoSnapshotSubsequences(frameTensor, articleIndex, result)
+				result = processVideoSnapshotSubsequences(databaseNetworkObject, inferenceMode, result, articleIndex, sequences, datasetEntry)
+			else:
+				sequence = GIAANNor_datasets.extractVideoSnapshots(videoFile)
+				processSequence(databaseNetworkObject, False, result, articleIndex, 0, sequence, datasetEntry)
+				result = result + 1
 			if(result == trainMaxSequences and inferenceMode == False):
 				break
 	elif(submodalityName=="image"):
@@ -104,9 +115,90 @@ def processVideoDataset(databaseNetworkObject, inferenceMode, sequenceCount, dat
 	return result
 
 
+def processVideoSnapshotSubsequences(databaseNetworkObject, inferenceMode, sequenceCount, articleIndex, sequences, datasetEntry):
+	result = sequenceCount
+	sequenceIndex = None
+	if(submodalityName=="video" and modalityORvideoGenerateMultipleSnapshotsPerFrame):
+		validateVideoSnapshotSubsequenceTensor(sequences, "processVideoSnapshotSubsequences")
+		if(modalityORvideoGenerateMultipleSnapshotsPerFrameParallel):
+			result = processVideoSnapshotSubsequencesParallel(databaseNetworkObject, inferenceMode, result, articleIndex, sequences, datasetEntry)
+		else:
+			for sequenceIndex in range(int(sequences.shape[0])):
+				processSequence(databaseNetworkObject, False, result, articleIndex, sequenceIndex, sequences[sequenceIndex], datasetEntry)
+				result = result + 1
+				if(result == trainMaxSequences and inferenceMode == False):
+					break
+	else:
+		raise RuntimeError("processVideoSnapshotSubsequences error: requires submodalityName=='video' and modalityORvideoGenerateMultipleSnapshotsPerFrame")
+	return result
+
+
+def processVideoSnapshotSubsequencesParallel(databaseNetworkObject, inferenceMode, sequenceCount, articleIndex, sequences, datasetEntry):
+	result = sequenceCount
+	numberOfSubsequences = None
+	numberOfFrames = None
+	remainingTrainSequences = None
+	flatSequences = None
+	tokenisedSnapshots = None
+	selectedFilterIndices = None
+	selectedFilterResponses = None
+	sequenceIndex = None
+	sequenceStartIndex = None
+	sequenceEndIndex = None
+	tokenisedSequenceSnapshots = None
+	selectedSequenceFilterIndices = None
+	if(submodalityName=="video" and modalityORvideoGenerateMultipleSnapshotsPerFrame and modalityORvideoGenerateMultipleSnapshotsPerFrameParallel):
+		validateVideoSnapshotSubsequenceTensor(sequences, "processVideoSnapshotSubsequencesParallel")
+		numberOfSubsequences = int(sequences.shape[0])
+		numberOfFrames = int(sequences.shape[1])
+		if(inferenceMode == False):
+			remainingTrainSequences = int(trainMaxSequences) - int(result)
+			if(remainingTrainSequences <= 0):
+				raise RuntimeError("processVideoSnapshotSubsequencesParallel error: remainingTrainSequences must be > 0")
+			if(numberOfSubsequences > remainingTrainSequences):
+				numberOfSubsequences = remainingTrainSequences
+				sequences = sequences[:numberOfSubsequences]
+		if(numberOfSubsequences <= 0):
+			raise RuntimeError("processVideoSnapshotSubsequencesParallel error: numberOfSubsequences must be > 0")
+		flatSequences = sequences.reshape(numberOfSubsequences*numberOfFrames, int(sequences.shape[2]), int(sequences.shape[3]), int(sequences.shape[4]))
+		tokenisedSnapshots = GIAANNor_sequenceTokens.tokeniseSnapshotsToColumns(flatSequences)
+		selectedFilterIndices, selectedFilterResponses = GIAANNor_RFfilters.applyRFfilters(databaseNetworkObject.orRFfilters, tokenisedSnapshots["columnTensor"])
+		for sequenceIndex in range(numberOfSubsequences):
+			sequenceStartIndex = sequenceIndex*numberOfFrames
+			sequenceEndIndex = sequenceStartIndex + numberOfFrames
+			tokenisedSequenceSnapshots = {"columnTensor": tokenisedSnapshots["columnTensor"][sequenceStartIndex:sequenceEndIndex], "columnMetadataList": tokenisedSnapshots["columnMetadataList"], "gridHeight": tokenisedSnapshots["gridHeight"], "gridWidth": tokenisedSnapshots["gridWidth"]}
+			selectedSequenceFilterIndices = selectedFilterIndices[sequenceStartIndex:sequenceEndIndex]
+			processTokenisedSequence(databaseNetworkObject, False, result, articleIndex, sequenceIndex, tokenisedSequenceSnapshots, selectedSequenceFilterIndices)
+			result = result + 1
+	else:
+		raise RuntimeError("processVideoSnapshotSubsequencesParallel error: requires submodalityName=='video', modalityORvideoGenerateMultipleSnapshotsPerFrame, and modalityORvideoGenerateMultipleSnapshotsPerFrameParallel")
+	return result
+
+
+def validateVideoSnapshotSubsequenceTensor(sequences, functionName):
+	result = None
+	if(submodalityName=="video" and modalityORvideoGenerateMultipleSnapshotsPerFrame):
+		if(functionName == ""):
+			raise RuntimeError("validateVideoSnapshotSubsequenceTensor error: functionName must not be empty")
+		if(not pt.is_tensor(sequences)):
+			raise RuntimeError(functionName + " error: sequences must be a tensor")
+		if(sequences.dim() != 5):
+			raise RuntimeError(functionName + " error: sequences rank must be 5")
+		if(int(sequences.shape[0]) <= 0 or int(sequences.shape[1]) <= 0):
+			raise RuntimeError(functionName + " error: sequences subsequence/frame counts must be > 0")
+		if(int(sequences.shape[2]) != 3):
+			raise RuntimeError(functionName + " error: sequences channel count must equal 3")
+		if(int(sequences.shape[3]) != int(modalityORsnapshotHeight) or int(sequences.shape[4]) != int(modalityORsnapshotWidth)):
+			raise RuntimeError(functionName + " error: sequence snapshot dimensions must equal modalityORsnapshotHeight/modalityORsnapshotWidth")
+	else:
+		raise RuntimeError("validateVideoSnapshotSubsequenceTensor error: requires submodalityName=='video' and modalityORvideoGenerateMultipleSnapshotsPerFrame")
+	return result
+
+
 def processImageDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset, sequenceLimit):
 	result = sequenceCount
 	processedSequenceCount = 0
+	imageTensor = None
 	sequences = None
 	if(sequenceLimit is not None):
 		if(not isinstance(sequenceLimit, int)):
@@ -115,7 +207,8 @@ def processImageDataset(databaseNetworkObject, inferenceMode, sequenceCount, dat
 			raise RuntimeError("processImageDataset error: sequenceLimit must be > 0")
 	ensureORruntimeInitialised(databaseNetworkObject)
 	for articleIndex, datasetEntry in enumerate(dataset):
-		sequences = GIAANNor_datasets.sampleImageSaccadeSequences(datasetEntry)
+		imageTensor = GIAANNor_datasets.convertDatasetEntryToImageTensor(datasetEntry)
+		sequences = GIAANNor_snapshots.sampleImageSaccadeSequences(imageTensor)
 		if(sequences is None):
 			if(modalityORimageSaccadesSkipInsufficientUsableFeatures):
 				if(debugPrintInsufficientUsableFeaturesWarning):
@@ -154,6 +247,17 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 	tokenisedSnapshots = GIAANNor_sequenceTokens.tokeniseSnapshotsToColumns(sequence)
 	# apply the RF filters to the token (executed in parallel using pytorch):
 	selectedFilterIndices, selectedFilterResponses = GIAANNor_RFfilters.applyRFfilters(databaseNetworkObject.orRFfilters, tokenisedSnapshots["columnTensor"])
+	processTokenisedSequence(databaseNetworkObject, inferenceMode, sequenceCount, articleIndex, sequenceIndex, tokenisedSnapshots, selectedFilterIndices)
+	return
+
+
+def processTokenisedSequence(databaseNetworkObject, inferenceMode, sequenceCount, articleIndex, sequenceIndex, tokenisedSnapshots, selectedFilterIndices):
+	# processSequenceTemplate() for each OR sequence:
+	ensureORruntimeInitialised(databaseNetworkObject)
+	if(inferenceMode):
+		raise RuntimeError("processSequenceTemplate error: OR inference prediction is not implemented in GIAANNproto2a1a")
+	databaseNetworkObject.articleIndexDebug = articleIndex
+	databaseNetworkObject.sequenceIndexDebug = sequenceIndex
 	if(printSequenceNumberColumns):
 		sequenceColumnCounts = calculateSequenceColumnCounts(tokenisedSnapshots, selectedFilterIndices)
 		printSequenceColumnCounts(sequenceCount, sequenceColumnCounts)

@@ -1,4 +1,4 @@
-"""GIAANNor_features.py
+"""GIAANNor_featureDetection.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 Baxter AI (baxterai.com)
@@ -100,7 +100,7 @@ def createEmptyFeatureCoordinatesTensor():
 
 
 def detectSalientFeatureCoordinatesFromImage(imageSource, zoomIndex=0):
-	# create GIAANNor_features.py - copy the ATORpt feature detection code that uses the Segment Anything library and OpenCV.
+	# create GIAANNor_featureDetection.py - copy the ATORpt feature detection code that uses the Segment Anything library and OpenCV.
 	result = None
 	image = None
 	featureCoordinates = None
@@ -118,7 +118,7 @@ def detectSalientFeatureCoordinatesFromImage(imageSource, zoomIndex=0):
 
 
 def detectSalientFeatureCoordinatesFromImageTensor(imageTensor):
-	# create GIAANNor_features.py - copy the ATORpt feature detection code that uses the Segment Anything library and OpenCV.
+	# create GIAANNor_featureDetection.py - copy the ATORpt feature detection code that uses the Segment Anything library and OpenCV.
 	result = None
 	image = None
 	image = convertImageTensorToNumpyRGB(imageTensor)
@@ -145,10 +145,10 @@ def featureDetection(image, zoomIndex):
 	imageFeatureCoordinates = pt.zeros((0, 2), dtype=pt.float32, device=deviceDense)
 	cornerFeatureCoordinates = pt.zeros((0, 2), dtype=pt.float32, device=deviceDense)
 	segmentFeatureCoordinates = pt.zeros((0, 2), dtype=pt.float32, device=deviceDense)
-	if(modalityORimageFeatureDetectionCorners):
+	if(modalityORfeatureDetectionCorners):
 		cornerFeatureCoordinates = featureDetectionCornerOpenCVHarris(image)
 		imageFeatureCoordinates = pt.cat((imageFeatureCoordinates, cornerFeatureCoordinates), dim=0)
-	if(modalityORimageFeatureDetectionSegmentCentres):
+	if(modalityORfeatureDetectionSegmentCentres):
 		segmentFeatureCoordinates = featureDetectionCentroidFBSegmentAnything(image)
 		imageFeatureCoordinates = pt.cat((imageFeatureCoordinates, segmentFeatureCoordinates), dim=0)
 	if(debugPrintNumberFeatures):
@@ -420,7 +420,7 @@ def featureDetectionCentroidFBSegmentAnything(image):
 	segmentAnythingFeatures = None
 	masks = None
 	segmentationMask = None
-	if(modalityORimageFeatureDetectionSegmentPostProcessing):
+	if(modalityORfeatureDetectionSegmentPostProcessing):
 		segmentAnythingFeatures = detectSegmentAnythingFeatures(image)
 		centroidFeatureList = convertCentroidPointsToCoordinatePairs(segmentAnythingFeatures["centroid_points"])
 	else:
@@ -499,10 +499,10 @@ def detectSegmentAnythingFeatures(image):
 		segmentation = extractSegmentAnythingBinaryMask(segmentationMask)
 		colourSegment = calculateSegmentMeanColour(image, segmentation)
 		segFilterPass = True
-		if(modalityORimageFeatureDetectionFilterSegments):
+		if(modalityORfeatureDetectionFilterSegments):
 			segFilterPass = segmentPassesFilter(segmentationMask, segmentation, height, width, colourSegment)
 		if(segFilterPass):
-			if(modalityORimageFeatureDetectionSegmentMetadata):
+			if(modalityORfeatureDetectionSegmentMetadata):
 				segmentPoints.append(extractSegmentPoints(segmentation))
 				edgePoints.append(extractSegmentEdgePoints(segmentation, imageContrast, width, height))
 				colourPoints.append(colourSegment)
@@ -555,10 +555,10 @@ def segmentPassesFilter(segmentationMask, segmentation, imageHeight, imageWidth,
 		raise RuntimeError("segmentPassesFilter error: segmentationMask must be a dict")
 	if(imageHeight <= 0 or imageWidth <= 0):
 		raise RuntimeError("segmentPassesFilter error: imageHeight/imageWidth must be > 0")
-	if(modalityORimageFeatureDetectionFilterSegmentsWholeImageThreshold <= 0.0 or modalityORimageFeatureDetectionFilterSegmentsWholeImageThreshold > 1.0):
-		raise RuntimeError("segmentPassesFilter error: modalityORimageFeatureDetectionFilterSegmentsWholeImageThreshold must be > 0.0 and <= 1.0")
-	if(modalityORimageFeatureDetectionFilterSegmentsBackgroundColourThreshold < 0.0 or modalityORimageFeatureDetectionFilterSegmentsBackgroundColourThreshold > 255.0):
-		raise RuntimeError("segmentPassesFilter error: modalityORimageFeatureDetectionFilterSegmentsBackgroundColourThreshold must be >= 0.0 and <= 255.0")
+	if(modalityORfeatureDetectionFilterSegmentsWholeImageThreshold <= 0.0 or modalityORfeatureDetectionFilterSegmentsWholeImageThreshold > 1.0):
+		raise RuntimeError("segmentPassesFilter error: modalityORfeatureDetectionFilterSegmentsWholeImageThreshold must be > 0.0 and <= 1.0")
+	if(modalityORfeatureDetectionFilterSegmentsBackgroundColourThreshold < 0.0 or modalityORfeatureDetectionFilterSegmentsBackgroundColourThreshold > 255.0):
+		raise RuntimeError("segmentPassesFilter error: modalityORfeatureDetectionFilterSegmentsBackgroundColourThreshold must be >= 0.0 and <= 255.0")
 	if(len(colourSegment) != 3):
 		raise RuntimeError("segmentPassesFilter error: colourSegment must contain 3 channel means")
 	imageArea = float(imageHeight*imageWidth)
@@ -568,9 +568,9 @@ def segmentPassesFilter(segmentationMask, segmentation, imageHeight, imageWidth,
 		maskArea = float(segmentation.sum())
 	maskRatio = maskArea/imageArea
 	colourSegmentLum = float(sum(colourSegment))/3.0
-	if(maskRatio > modalityORimageFeatureDetectionFilterSegmentsWholeImageThreshold):
+	if(maskRatio > modalityORfeatureDetectionFilterSegmentsWholeImageThreshold):
 		result = False
-	if(colourSegmentLum < modalityORimageFeatureDetectionFilterSegmentsBackgroundColourThreshold):
+	if(colourSegmentLum < modalityORfeatureDetectionFilterSegmentsBackgroundColourThreshold):
 		result = False
 	return result
 

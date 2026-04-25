@@ -53,6 +53,7 @@ if(submodalityName=="video"):
 	trainSetStartOffsetSequences = 0
 	inferencePromptFileName = "inference_prompt_or.txt"
 	databaseFolderExtension = "-ORvideo"
+	modalityORdatasetHasBackground = False
 elif(submodalityName=="image"):
 	datasetType = "cityscapes"
 	datasetName = "Chris1/cityscapes"
@@ -68,7 +69,7 @@ elif(submodalityName=="image"):
 	trainSetStartOffsetSequences = 0
 	inferencePromptFileName = "inference_prompt_or.txt"
 	databaseFolderExtension = "-ORimage"
-
+	modalityORdatasetHasBackground = False
 
 #unused nlp settings;
 	#Multisequence settings;
@@ -103,7 +104,10 @@ modalityORsnapshotWidth = 160
 modalityORsnapshotHeight = 90
 
 if(submodalityName=="video"):
-	modalityORvideoFramesPerSnapshot = 30
+	modalityORvideoGenerateMultipleSnapshotsPerFrame = True	#default: True #orig: False	#modality OR video generate multiple snapshots per frame using detected keypoints
+	modalityORvideoGenerateMultipleSnapshotsPerFrameParallel = True
+	modalityORvideoFrameRate = 30
+	modalityORvideoFramesPerSequenceIteration = 30
 	modalityORvideoMinDurationSeconds = 60.0
 	modalityORvideoMaxDurationSeconds = 180.0
 	modalityORdatasetPromptRatio = 0.1
@@ -122,22 +126,28 @@ elif(submodalityName=="image"):
 	else:
 		modalityORimageSaccadesMaxAngularOffsetDegrees = 15	#effective augmentations compatible with SANI
 		modalityORimageSaccadesCrop = False	#uses modalityORimageSaccadesMaxAngularOffsetDegrees to determine crop distance (ensures to not produce augmentations with blank areas)
-	modalityORimageFeatureDetectionCorners = False
-	modalityORimageFeatureDetectionSegmentCentres = True
-	modalityORimageFeatureDetectionSegmentPostProcessing = True
-	modalityORimageFeatureDetectionSegmentMetadata = True
-	modalityORimageFeatureDetectionFilterSegments = True
-	modalityORimageFeatureDetectionFilterSegmentsWholeImageThreshold = 0.85
-	modalityORimageFeatureDetectionFilterSegmentsBackgroundColourThreshold = 15
-	modalityORfeatureDetectionSAMversion = 2	#1=sam1(segment-anything), 2=sam2, 3=sam3
-	modalityORfeatureDetectionSAM1modelName = "vit_h"
-	modalityORfeatureDetectionSAM1checkpoint = "../../models/segmentAnythingViTHSAM/sam_vit_h_4b8939.pth"
-	modalityORfeatureDetectionSAM1checkpointAutoDownload = True
-	modalityORfeatureDetectionSAM2modelId = "facebook/sam2.1-hiera-large"
-	modalityORfeatureDetectionSAM2configFile = "configs/sam2.1/sam2.1_hiera_l.yaml"
-	modalityORfeatureDetectionSAM2checkpoint = ""
-	modalityORfeatureDetectionSAM3checkpoint = ""
-	modalityORfeatureDetectionSAM3textPrompt = "object"
-	modalityORfeatureDetectionSAM3confidenceThreshold = 0.5
 	modalityORdatasetPromptRatio = 0.1
 	modalityORdatasetPromptMaxSequences = 2
+
+#feature detection (for keypoints);
+modalityORfeatureDetectionCorners = False	#default: False
+modalityORfeatureDetectionSegmentCentres = True	#default: True
+modalityORfeatureDetectionSegmentPostProcessing = True
+modalityORfeatureDetectionSegmentMetadata = True
+modalityORfeatureDetectionFilterSegments = True
+if(modalityORdatasetHasBackground):
+	modalityORfeatureDetectionFilterSegmentsWholeImageThreshold = 0.85	#requires adjusting for dataset
+	modalityORfeatureDetectionFilterSegmentsBackgroundColourThreshold = 15	#requires adjusting for dataset
+else:
+	modalityORfeatureDetectionFilterSegmentsWholeImageThreshold = 1.0	#set modalityORfeatureDetectionFilterSegmentsWholeImageThreshold=1.0 to reject whole-image segments (for image datasets that do not have a background colour)
+	modalityORfeatureDetectionFilterSegmentsBackgroundColourThreshold = 0
+modalityORfeatureDetectionSAMversion = 2	#1=sam1(segment-anything), 2=sam2, 3=sam3
+modalityORfeatureDetectionSAM1modelName = "vit_h"
+modalityORfeatureDetectionSAM1checkpoint = "../../models/segmentAnythingViTHSAM/sam_vit_h_4b8939.pth"
+modalityORfeatureDetectionSAM1checkpointAutoDownload = True
+modalityORfeatureDetectionSAM2modelId = "facebook/sam2.1-hiera-large"
+modalityORfeatureDetectionSAM2configFile = "configs/sam2.1/sam2.1_hiera_l.yaml"
+modalityORfeatureDetectionSAM2checkpoint = ""
+modalityORfeatureDetectionSAM3checkpoint = ""
+modalityORfeatureDetectionSAM3textPrompt = "object"
+modalityORfeatureDetectionSAM3confidenceThreshold = 0.5
