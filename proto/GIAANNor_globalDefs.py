@@ -24,8 +24,7 @@ from GIAANNcmn_globalDefs import useDrawNetworkIndependently
 
 
 #submodality selection;
-#submodalityName = "video"	#default
-submodalityName = "image"
+submodalityName = "image"	#image, video
 
 
 #recent debug vars;
@@ -44,7 +43,7 @@ if(submodalityName=="video"):
 	datasetName = "infactory-ai/soccer-events"
 	datasetCfg = ""
 	datasetsLibrary4plus = True
-	useLocalDataset = False
+	useLocalDataset = True
 	useLocalDatasetDownloadManual = False
 	datasetFolder = "../../dataset/or/"
 	datasetProcessedCacheFolder = ""
@@ -59,7 +58,7 @@ elif(submodalityName=="image"):
 	datasetName = "Chris1/cityscapes"
 	datasetCfg = ""
 	datasetsLibrary4plus = True
-	useLocalDataset = False
+	useLocalDataset = True
 	useLocalDatasetDownloadManual = False
 	datasetFolder = "../../dataset/or/"
 	datasetProcessedCacheFolder = ""
@@ -103,7 +102,6 @@ modalityORRFfilterThreshold = 0.2
 modalityORsnapshotWidth = 160
 modalityORsnapshotHeight = 90
 
-#modality OR video:
 if(submodalityName=="video"):
 	modalityORvideoFramesPerSnapshot = 30
 	modalityORvideoMinDurationSeconds = 60.0

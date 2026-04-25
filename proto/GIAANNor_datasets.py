@@ -17,6 +17,7 @@ GIA ANN or datasets
 
 """
 
+import os
 import math
 import json
 import subprocess
@@ -43,11 +44,16 @@ def requireHuggingFaceHub():
 
 def requireHuggingFaceDatasets():
 	result = None
+	load_dataset = None
+	DownloadConfig = None
 	try:
 		from datasets import load_dataset as load_datasetImport
-		result = load_datasetImport
+		from datasets import DownloadConfig as DownloadConfigImport
+		load_dataset = load_datasetImport
+		DownloadConfig = DownloadConfigImport
 	except Exception as exception:
 		raise RuntimeError("requireHuggingFaceDatasets error: missing datasets (pip install datasets)") from exception
+	result = load_dataset, DownloadConfig
 	return result
 
 
@@ -78,8 +84,7 @@ def buildDatasetEntry(datasetJsonFile):
 	durationSeconds = None
 	if(not datasetJsonFile.startswith("data/") or not datasetJsonFile.endswith(".json")):
 		raise RuntimeError("buildDatasetEntry error: datasetJsonFile must be a data/*.json file")
-	_, hf_hub_download = requireHuggingFaceHub()
-	localJsonFile = hf_hub_download(datasetName, repo_type="dataset", filename=datasetJsonFile)
+	localJsonFile = downloadHuggingFaceDatasetFile(datasetJsonFile)
 	with open(localJsonFile, "r", encoding="utf-8") as fileObject:
 		metadata = json.load(fileObject)
 	if("asset_id" not in metadata):
@@ -95,6 +100,26 @@ def buildDatasetEntry(datasetJsonFile):
 	if(durationSeconds <= 0):
 		raise RuntimeError("buildDatasetEntry error: durationSeconds must be > 0")
 	result = {"assetId": metadata["asset_id"], "jsonFile": datasetJsonFile, "videoFile": datasetJsonFile.replace(".json", ".mp4"), "metadata": metadata, "frameRate": frameRate, "durationSeconds": durationSeconds}
+	return result
+
+
+def downloadHuggingFaceDatasetFile(filename):
+	result = None
+	hf_hub_download = None
+	datasetFolderAbsolute = None
+	datasetCacheDirectory = None
+	downloadCacheDirectory = None
+	assetsCacheDirectory = None
+	if(not isinstance(filename, str)):
+		raise RuntimeError("downloadHuggingFaceDatasetFile error: filename must be a string")
+	if(filename == ""):
+		raise RuntimeError("downloadHuggingFaceDatasetFile error: filename must not be empty")
+	_, hf_hub_download = requireHuggingFaceHub()
+	if(useLocalDataset):
+		datasetFolderAbsolute, datasetCacheDirectory, downloadCacheDirectory, assetsCacheDirectory = buildLocalDatasetCacheDirectories()
+		result = hf_hub_download(repo_id=datasetName, repo_type="dataset", filename=filename, cache_dir=downloadCacheDirectory, local_dir=datasetFolderAbsolute, local_dir_use_symlinks=False)
+	else:
+		result = hf_hub_download(datasetName, repo_type="dataset", filename=filename)
 	return result
 
 
@@ -207,8 +232,9 @@ def limitDatasetEntries(datasetEntries, maxEntries):
 
 def downloadVideoFile(datasetEntry):
 	result = None
-	_, hf_hub_download = requireHuggingFaceHub()
-	result = hf_hub_download(datasetName, repo_type="dataset", filename=datasetEntry["videoFile"])
+	if("videoFile" not in datasetEntry):
+		raise RuntimeError("downloadVideoFile error: datasetEntry missing videoFile")
+	result = downloadHuggingFaceDatasetFile(datasetEntry["videoFile"])
 	return result
 
 
@@ -305,6 +331,12 @@ def sampleVideoSnapshotsStreamFrames(command, frameWidth, frameHeight, frameSize
 def loadImageDatasetSplit(split):
 	result = None
 	load_dataset = None
+	DownloadConfig = None
+	datasetFolderAbsolute = None
+	datasetCacheDirectory = None
+	downloadCacheDirectory = None
+	assetsCacheDirectory = None
+	downloadConfig = None
 	streaming = None
 	if(datasetType != "cifar10" and datasetType != "cityscapes"):
 		raise RuntimeError("loadImageDatasetSplit error: unsupported image datasetType " + str(datasetType))
@@ -312,20 +344,51 @@ def loadImageDatasetSplit(split):
 		raise RuntimeError("loadImageDatasetSplit error: split must be 'train' or 'test'")
 	if(useLocalDataset and datasetFolder == ""):
 		raise RuntimeError("loadImageDatasetSplit error: datasetFolder must not be empty while useLocalDataset is True")
+	if(useLocalDataset):
+		datasetFolderAbsolute, datasetCacheDirectory, downloadCacheDirectory, assetsCacheDirectory = buildLocalDatasetCacheDirectories()
 	streaming = not useLocalDataset
 	if(split not in _imageDatasetCache):
-		load_dataset = requireHuggingFaceDatasets()
+		load_dataset, DownloadConfig = requireHuggingFaceDatasets()
+		if(useLocalDataset):
+			downloadConfig = DownloadConfig(cache_dir=downloadCacheDirectory)
 		if(datasetCfg == ""):
 			if(useLocalDataset):
-				_imageDatasetCache[split] = load_dataset(datasetName, split=split, streaming=streaming, trust_remote_code=True, cache_dir=datasetFolder)
+				_imageDatasetCache[split] = load_dataset(datasetName, split=split, streaming=streaming, trust_remote_code=True, cache_dir=datasetCacheDirectory, download_config=downloadConfig)
 			else:
 				_imageDatasetCache[split] = load_dataset(datasetName, split=split, streaming=streaming, trust_remote_code=True)
 		else:
 			if(useLocalDataset):
-				_imageDatasetCache[split] = load_dataset(datasetName, datasetCfg, split=split, streaming=streaming, trust_remote_code=True, cache_dir=datasetFolder)
+				_imageDatasetCache[split] = load_dataset(datasetName, datasetCfg, split=split, streaming=streaming, trust_remote_code=True, cache_dir=datasetCacheDirectory, download_config=downloadConfig)
 			else:
 				_imageDatasetCache[split] = load_dataset(datasetName, datasetCfg, split=split, streaming=streaming, trust_remote_code=True)
 	result = _imageDatasetCache[split]
+	return result
+
+
+def buildLocalDatasetCacheDirectories():
+	result = None
+	datasetFolderAbsolute = None
+	datasetCacheDirectory = None
+	downloadCacheDirectory = None
+	assetsCacheDirectory = None
+	if(datasetFolder == ""):
+		raise RuntimeError("buildLocalDatasetCacheDirectories error: datasetFolder must not be empty")
+	if(os.path.exists(datasetFolder) and not os.path.isdir(datasetFolder)):
+		raise RuntimeError("buildLocalDatasetCacheDirectories error: datasetFolder exists but is not a directory: " + str(datasetFolder))
+	os.makedirs(datasetFolder, exist_ok=True)
+	datasetFolderAbsolute = os.path.abspath(datasetFolder)
+	datasetCacheDirectory = os.path.join(datasetFolderAbsolute, "datasets_cache")
+	downloadCacheDirectory = os.path.join(datasetFolderAbsolute, "downloads_cache")
+	assetsCacheDirectory = os.path.join(datasetFolderAbsolute, "assets_cache")
+	os.makedirs(datasetCacheDirectory, exist_ok=True)
+	os.makedirs(downloadCacheDirectory, exist_ok=True)
+	os.makedirs(assetsCacheDirectory, exist_ok=True)
+	os.environ["HF_HOME"] = datasetFolderAbsolute
+	os.environ["HF_DATASETS_CACHE"] = datasetCacheDirectory
+	os.environ["HF_HUB_CACHE"] = downloadCacheDirectory
+	os.environ["HUGGINGFACE_HUB_CACHE"] = downloadCacheDirectory
+	os.environ["HF_ASSETS_CACHE"] = assetsCacheDirectory
+	result = datasetFolderAbsolute, datasetCacheDirectory, downloadCacheDirectory, assetsCacheDirectory
 	return result
 
 

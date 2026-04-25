@@ -87,6 +87,7 @@ if(useBenchmarkDefaultsEvalTestSet):
 	#inferenceActivationsType = "intf+c" 	#~optimum
 else:
 	inferenceEvaluateTestSet = False
+	inferenceEvaluateTestSetTrainMaxSequences10M = False
 	#inferenceSegmentTiming = "none"
 	#inferenceSegmentTiming = "biased"
 	inferenceSegmentTiming = "exact"		#default

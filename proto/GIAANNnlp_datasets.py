@@ -20,27 +20,59 @@ GIA ANN proto datasets
 
 import os
 import shutil
-from datasets import load_dataset, load_from_disk
+from datasets import load_dataset, load_from_disk, DownloadConfig
 
 from GIAANNcmn_globalDefs import *
 
 def loadDatasetFromHuggingFace(streaming, cacheDirectory):
 	dataset = None
+	datasetCacheDirectory = None
+	downloadCacheDirectory = None
+	downloadConfig = None
 	if(not isinstance(streaming, bool)):
 		raise RuntimeError("loadDatasetFromHuggingFace error: streaming must be a bool")
 	if(cacheDirectory is not None and not isinstance(cacheDirectory, str)):
 		raise RuntimeError("loadDatasetFromHuggingFace error: cacheDirectory must be a string or None")
+	if(cacheDirectory is not None):
+		datasetCacheDirectory, downloadCacheDirectory = buildLocalDatasetCacheDirectories(cacheDirectory)
+		downloadConfig = DownloadConfig(cache_dir=downloadCacheDirectory)
 	if(datasetCfg == ""):
 		if(cacheDirectory is None):
 			dataset = load_dataset(datasetName, split="train", streaming=streaming, trust_remote_code=True)
 		else:
-			dataset = load_dataset(datasetName, split="train", streaming=streaming, trust_remote_code=True, cache_dir=cacheDirectory)
+			dataset = load_dataset(datasetName, split="train", streaming=streaming, trust_remote_code=True, cache_dir=datasetCacheDirectory, download_config=downloadConfig)
 	else:
 		if(cacheDirectory is None):
 			dataset = load_dataset(datasetName, datasetCfg, split="train", streaming=streaming, trust_remote_code=True)
 		else:
-			dataset = load_dataset(datasetName, datasetCfg, split="train", streaming=streaming, trust_remote_code=True, cache_dir=cacheDirectory)
+			dataset = load_dataset(datasetName, datasetCfg, split="train", streaming=streaming, trust_remote_code=True, cache_dir=datasetCacheDirectory, download_config=downloadConfig)
 	return dataset
+
+def buildLocalDatasetCacheDirectories(cacheDirectory):
+	result = None
+	datasetFolderAbsolute = None
+	datasetCacheDirectory = None
+	downloadCacheDirectory = None
+	assetsCacheDirectory = None
+	if(cacheDirectory == ""):
+		raise RuntimeError("buildLocalDatasetCacheDirectories error: cacheDirectory must not be empty")
+	if(os.path.exists(cacheDirectory) and not os.path.isdir(cacheDirectory)):
+		raise RuntimeError("buildLocalDatasetCacheDirectories error: cacheDirectory exists but is not a directory: " + str(cacheDirectory))
+	os.makedirs(cacheDirectory, exist_ok=True)
+	datasetFolderAbsolute = os.path.abspath(cacheDirectory)
+	datasetCacheDirectory = os.path.join(datasetFolderAbsolute, "datasets_cache")
+	downloadCacheDirectory = os.path.join(datasetFolderAbsolute, "downloads_cache")
+	assetsCacheDirectory = os.path.join(datasetFolderAbsolute, "assets_cache")
+	os.makedirs(datasetCacheDirectory, exist_ok=True)
+	os.makedirs(downloadCacheDirectory, exist_ok=True)
+	os.makedirs(assetsCacheDirectory, exist_ok=True)
+	os.environ["HF_HOME"] = datasetFolderAbsolute
+	os.environ["HF_DATASETS_CACHE"] = datasetCacheDirectory
+	os.environ["HF_HUB_CACHE"] = downloadCacheDirectory
+	os.environ["HUGGINGFACE_HUB_CACHE"] = downloadCacheDirectory
+	os.environ["HF_ASSETS_CACHE"] = assetsCacheDirectory
+	result = datasetCacheDirectory, downloadCacheDirectory
+	return result
 
 def loadDataset():
 	dataset = None
@@ -205,11 +237,14 @@ if(useLocalDatasetDownloadManual):
 		datasetFiles = []
 		HfApi, hf_hub_download = requireHuggingFaceHub()
 		repoId = getDatasetRepoId()
+		datasetCacheDirectory = None
+		downloadCacheDirectory = None
 		datasetFiles = getManualDatasetFileList()
+		datasetCacheDirectory, downloadCacheDirectory = buildLocalDatasetCacheDirectories(datasetFolder)
 		for filePath in datasetFiles:
 			localFilePath = os.path.join(datasetFolder, filePath)
 			if(not os.path.isfile(localFilePath)):
-				hf_hub_download(repo_id=repoId, repo_type="dataset", filename=filePath, local_dir=datasetFolder, local_dir_use_symlinks=False)
+				hf_hub_download(repo_id=repoId, repo_type="dataset", filename=filePath, cache_dir=downloadCacheDirectory, local_dir=datasetFolder, local_dir_use_symlinks=False)
 		return datasetFiles
 
 	def buildLocalDatasetFilePaths(datasetFiles):

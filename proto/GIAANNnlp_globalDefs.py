@@ -94,7 +94,7 @@ else:
 	printe("Dataset selection error: enable either datasetType==textfile or datasetType==oscar or datasetType==wikipedia")
 if(not datasetType=="textfile"):
 	if(useLocalDataset):
-		datasetFolder = "../../dataset/"
+		datasetFolder = "../../dataset/nlp/"
 		if(datasetType=="wikipedia"):
 			useLocalDatasetDownloadManual = True	#default: True	#manual download dataset files into datasetFolder	#automatic huggingface access to dataset is unreliable
 		elif(datasetType=="oscar"):
@@ -210,47 +210,52 @@ if(useInference):
 		else:
 			printe("useQuickExecution requires datasetType==textfile")
 	else:
-		if(datasetType=="wikipedia"):
-			if(inferenceEvaluateTestSet):
-				inferencePromptFileName = 'inference_prompt.txt.longTestWikipedia'
-			else:
-				inferencePromptFileName = 'inference_prompt.txt.longTrainWikipedia'	
-		elif(datasetType=="oscar"):
-			if(multisentencePredictions):
+		if(datasetType=="wikipedia"):	
+			if(useBenchmark):
 				if(inferenceEvaluateTestSet):
-					if(inferenceEvaluateTestSetTrainMaxSequences10M):
-						inferencePromptFileName = 'inference_prompt.txt.longTestOscarMultiSentence2'
-					else:
-						inferencePromptFileName = 'inference_prompt.txt.longTestOscarMultiSentence'
+					inferencePromptFileName = 'inference_prompt.txt.longTestWikipedia'
 				else:
-					#ensure within distribution trainset;
-					if(not useBenchmarkDefaults):
-						inferencePromptFileName = 'inference_prompt.txt.longTrainOscarMultiSentence'
-					elif(spacyPipelineOptimisations):
-						printe("datasetType==oscar multisentencePredictions was trained with useBenchmarkDefaults=False")
-					else:
-						printe("datasetType==oscar multisentencePredictions was trained with useBenchmarkDefaults=False")
+					inferencePromptFileName = 'inference_prompt.txt.longTrainWikipedia'	
 			else:
-				if(useBenchmarkDefaults):
+				inferencePromptFileName = 'inference_prompt.txt'
+		elif(datasetType=="oscar"):
+			if(useBenchmark):
+				if(multisentencePredictions):
 					if(inferenceEvaluateTestSet):
 						if(inferenceEvaluateTestSetTrainMaxSequences10M):
-							inferencePromptFileName = 'inference_prompt.txt.longTestOscar2'
+							inferencePromptFileName = 'inference_prompt.txt.longTestOscarMultiSentence2'
 						else:
-							inferencePromptFileName = 'inference_prompt.txt.longTestOscar'
+							inferencePromptFileName = 'inference_prompt.txt.longTestOscarMultiSentence'
 					else:
-						#ensure within distribution trainset ;
-						if(spacyPipelineOptimisations):
-							inferencePromptFileName = 'inference_prompt.txt.longTrainOscarOptim'
+						#ensure within distribution trainset;
+						if(not useBenchmarkDefaults):
+							inferencePromptFileName = 'inference_prompt.txt.longTrainOscarMultiSentence'
+						elif(spacyPipelineOptimisations):
+							printe("datasetType==oscar multisentencePredictions was trained with useBenchmarkDefaults=False")
 						else:
-							inferencePromptFileName = 'inference_prompt.txt.longTrainOscar'
+							printe("datasetType==oscar multisentencePredictions was trained with useBenchmarkDefaults=False")
 				else:
-					if(inferenceEvaluateTestSet):
-						inferencePromptFileName = 'inference_prompt.txt.longTestOscar-useBenchmarkDefaultsFalse'
-						#printe("inference_prompt.txt.longTestOscar-useBenchmarkDefaultsFalse not yet created")
+					if(useBenchmarkDefaults):
+						if(inferenceEvaluateTestSet):
+							if(inferenceEvaluateTestSetTrainMaxSequences10M):
+								inferencePromptFileName = 'inference_prompt.txt.longTestOscar2'
+							else:
+								inferencePromptFileName = 'inference_prompt.txt.longTestOscar'
+						else:
+							#ensure within distribution trainset ;
+							if(spacyPipelineOptimisations):
+								inferencePromptFileName = 'inference_prompt.txt.longTrainOscarOptim'
+							else:
+								inferencePromptFileName = 'inference_prompt.txt.longTrainOscar'
 					else:
-						inferencePromptFileName = 'inference_prompt.txt.longTrainOscar-useBenchmarkDefaultsFalse'
-						#printe("inference_prompt.txt.longTrainOscar-useBenchmarkDefaultsFalse.txt not yet created")
-						
+						if(inferenceEvaluateTestSet):
+							inferencePromptFileName = 'inference_prompt.txt.longTestOscar-useBenchmarkDefaultsFalse'
+							#printe("inference_prompt.txt.longTestOscar-useBenchmarkDefaultsFalse not yet created")
+						else:
+							inferencePromptFileName = 'inference_prompt.txt.longTrainOscar-useBenchmarkDefaultsFalse'
+							#printe("inference_prompt.txt.longTrainOscar-useBenchmarkDefaultsFalse.txt not yet created")
+			else:
+				inferencePromptFileName = 'inference_prompt.txt'
 		elif(datasetType=="textfile"):
 			#experimental (untested)
 			trainPromptFileName = datasetName	#"train_prompt.txt"
