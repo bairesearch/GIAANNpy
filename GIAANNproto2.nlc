@@ -60,3 +60,6 @@ v2a (Codex IDE GPT-5.4) [under development]:
 - upgrade submodalityName=="image" to perform saccade augmentations between nearby (i.e. adjacent) salient regions of the image: a) segment centres and b) corner features:
 	- create GIAANNor_features.py - copy the ATORpt feature detection code that uses the Segment Anything library and OpenCV (https://github.com/bairesearch/ATORpt ATORpt_PTfeatures.py/ATORpt_RFmainSA.py)
 - patch submodalityName=="image" to use higher resolution image dataset
+- patch numAdjacentFeaturePairsDetected so only adjacent pairs are used for saccades (not all combinations of pairs)
+- implement modalityORimageSaccadesNumberOfNearbyPairs (for modalityORimageSaccadesUseAdjacentSalientRegions) where this is set to 2 by default - it selects the number of pairs constructed for each feature in the image.
+- move image keypoint feature-pair detection and selected-pair-to-saccade-offset conversion code from GIAANNor_datasets.py to GIAANNor_keypoints.py.

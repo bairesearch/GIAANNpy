@@ -120,17 +120,18 @@ elif(submodalityName=="image"):
 	modalityORimageSaccadesSkipInsufficientUsableFeatures = True
 	if modalityORimageSaccadesUseAdjacentSalientRegions:
 		modalityORimageSaccadesCrop = False
+		modalityORimageSaccadesNumberOfNearbyPairs = 4	#default: 3	#orig: 2
 	else:
 		modalityORimageSaccadesMaxAngularOffsetDegrees = 15	#effective augmentations compatible with SANI
 		modalityORimageSaccadesCrop = False	#uses modalityORimageSaccadesMaxAngularOffsetDegrees to determine crop distance (ensures to not produce augmentations with blank areas)
-	modalityORimageFeatureDetectionCorners = True
+	modalityORimageFeatureDetectionCorners = False
 	modalityORimageFeatureDetectionSegmentCentres = True
 	modalityORimageFeatureDetectionSegmentPostProcessing = True
 	modalityORimageFeatureDetectionSegmentMetadata = True
 	modalityORimageFeatureDetectionFilterSegments = True
 	modalityORimageFeatureDetectionFilterSegmentsWholeImageThreshold = 0.85
 	modalityORimageFeatureDetectionFilterSegmentsBackgroundColourThreshold = 15
-	modalityORfeatureDetectionSAMversion = 1	#1=sam1(segment-anything), 2=sam2, 3=sam3
+	modalityORfeatureDetectionSAMversion = 2	#1=sam1(segment-anything), 2=sam2, 3=sam3
 	modalityORfeatureDetectionSAM1modelName = "vit_h"
 	modalityORfeatureDetectionSAM1checkpoint = "../../models/segmentAnythingViTHSAM/sam_vit_h_4b8939.pth"
 	modalityORfeatureDetectionSAM1checkpointAutoDownload = True
