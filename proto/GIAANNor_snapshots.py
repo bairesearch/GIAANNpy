@@ -22,6 +22,7 @@ import torch as pt
 
 from GIAANNcmn_globalDefs import *
 import GIAANNor_keypoints
+import GIAANNor_snapshotDimensions
 
 
 def sampleVideoSnapshotSubsequences(frameTensor, articleIndex, sequenceCount):
@@ -47,6 +48,8 @@ def sampleImageSaccadeSequences(imageTensor):
 	preparedImageTensor = None
 	cropMarginX = None
 	cropMarginY = None
+	snapshotWidth = None
+	snapshotHeight = None
 	preparedImageWorkWidth = None
 	preparedImageWorkHeight = None
 	saccadeOffsetPairs = None
@@ -58,32 +61,39 @@ def sampleImageSaccadeSequences(imageTensor):
 		raise RuntimeError("sampleImageSaccadeSequences error: modalityORimageSaccadesPerImage must be > 0")
 	if(modalityORimageSnapshotsPerSaccade <= 0):
 		raise RuntimeError("sampleImageSaccadeSequences error: modalityORimageSnapshotsPerSaccade must be > 0")
+	if(not pt.is_tensor(imageTensor)):
+		raise RuntimeError("sampleImageSaccadeSequences error: imageTensor must be a tensor")
+	if(imageTensor.dim() != 3):
+		raise RuntimeError("sampleImageSaccadeSequences error: imageTensor rank must be 3")
+	if(int(imageTensor.shape[0]) != 3):
+		raise RuntimeError("sampleImageSaccadeSequences error: imageTensor channel count must equal 3")
+	snapshotWidth, snapshotHeight = GIAANNor_snapshotDimensions.calculateSnapshotDimensionsFromImageDimensions(int(imageTensor.shape[2]), int(imageTensor.shape[1]), "sampleImageSaccadeSequences")
 	if(modalityORimageSaccadesCrop):
-		cropMarginX, cropMarginY = calculateImageSaccadeCropMargins()
-		preparedImageWorkWidth = int(modalityORsnapshotWidth) + (2*cropMarginX)
-		preparedImageWorkHeight = int(modalityORsnapshotHeight) + (2*cropMarginY)
+		cropMarginX, cropMarginY = calculateImageSaccadeCropMargins(snapshotWidth, snapshotHeight)
+		preparedImageWorkWidth = int(snapshotWidth) + (2*cropMarginX)
+		preparedImageWorkHeight = int(snapshotHeight) + (2*cropMarginY)
 		preparedImageTensor = prepareImageTensorForSaccades(imageTensor, preparedImageWorkWidth, preparedImageWorkHeight)
 	else:
-		preparedImageTensor = prepareImageTensorForSaccades(imageTensor, int(modalityORsnapshotWidth), int(modalityORsnapshotHeight))
-		cropMarginX, cropMarginY = calculateImageSaccadeCropMarginsFromPreparedImage(preparedImageTensor)
+		preparedImageTensor = prepareImageTensorForSaccades(imageTensor, int(snapshotWidth), int(snapshotHeight))
+		cropMarginX, cropMarginY = calculateImageSaccadeCropMarginsFromPreparedImage(preparedImageTensor, snapshotWidth, snapshotHeight)
 	if(submodalityName=="image"):
 		if(modalityORimageSaccadesUseAdjacentSalientRegions):
-			saccadeOffsetPairs = GIAANNor_keypoints.sampleAdjacentSalientImageSaccadeOffsetPairs(preparedImageTensor, cropMarginX, cropMarginY)
+			saccadeOffsetPairs = GIAANNor_keypoints.sampleAdjacentSalientImageSaccadeOffsetPairs(preparedImageTensor, cropMarginX, cropMarginY, snapshotWidth, snapshotHeight)
 			if(saccadeOffsetPairs is None):
 				result = None
 			else:
 				for saccadeOffsetPair in saccadeOffsetPairs:
-					sequence = generateImageSaccadeSequenceBetweenOffsets(preparedImageTensor, float(saccadeOffsetPair[0].item()), float(saccadeOffsetPair[1].item()), float(saccadeOffsetPair[2].item()), float(saccadeOffsetPair[3].item()), cropMarginX, cropMarginY)
+					sequence = generateImageSaccadeSequenceBetweenOffsets(preparedImageTensor, float(saccadeOffsetPair[0].item()), float(saccadeOffsetPair[1].item()), float(saccadeOffsetPair[2].item()), float(saccadeOffsetPair[3].item()), cropMarginX, cropMarginY, snapshotWidth, snapshotHeight)
 					result.append(sequence)
 		else:
 			for _ in range(modalityORimageSaccadesPerImage):
 				targetOffsetX, targetOffsetY = sampleRandomImageSaccadeOffset(cropMarginX, cropMarginY)
-				sequence = generateImageSaccadeSequence(preparedImageTensor, targetOffsetX, targetOffsetY, cropMarginX, cropMarginY)
+				sequence = generateImageSaccadeSequence(preparedImageTensor, targetOffsetX, targetOffsetY, cropMarginX, cropMarginY, snapshotWidth, snapshotHeight)
 				result.append(sequence)
 	else:
 		for _ in range(modalityORimageSaccadesPerImage):
 			targetOffsetX, targetOffsetY = sampleRandomImageSaccadeOffset(cropMarginX, cropMarginY)
-			sequence = generateImageSaccadeSequence(preparedImageTensor, targetOffsetX, targetOffsetY, cropMarginX, cropMarginY)
+			sequence = generateImageSaccadeSequence(preparedImageTensor, targetOffsetX, targetOffsetY, cropMarginX, cropMarginY, snapshotWidth, snapshotHeight)
 			result.append(sequence)
 	return result
 
@@ -92,13 +102,16 @@ def detectVideoFrameFeatureCoordinateList(frameTensor, articleIndex, sequenceCou
 	result = None
 	frameIndex = None
 	frameFeatureCoordinates = None
+	snapshotWidth = None
+	snapshotHeight = None
 	if(submodalityName=="video" and modalityORvideoGenerateMultipleSnapshotsPerFrame):
 		validateVideoFrameTensor(frameTensor, "detectVideoFrameFeatureCoordinateList")
 		validateVideoFeatureDetectionProgressInputs(articleIndex, sequenceCount)
+		snapshotWidth, snapshotHeight = GIAANNor_snapshotDimensions.calculateSnapshotDimensionsFromImageDimensions(int(frameTensor.shape[3]), int(frameTensor.shape[2]), "detectVideoFrameFeatureCoordinateList")
 		result = []
 		for frameIndex in range(int(frameTensor.shape[0])):
 			printVideoFeatureDetectionSequenceIterationProgress(articleIndex, sequenceCount, frameIndex, int(frameTensor.shape[0]))
-			frameFeatureCoordinates = GIAANNor_keypoints.detectReachableSalientImageFeatureCoordinates(frameTensor[frameIndex])
+			frameFeatureCoordinates = GIAANNor_keypoints.detectReachableSalientImageFeatureCoordinates(frameTensor[frameIndex], snapshotWidth, snapshotHeight)
 			result.append(frameFeatureCoordinates)
 	else:
 		raise RuntimeError("detectVideoFrameFeatureCoordinateList error: requires submodalityName=='video' and modalityORvideoGenerateMultipleSnapshotsPerFrame")
@@ -124,8 +137,7 @@ def generateVideoSnapshotSubsequencesParallel(frameTensor, alignedFeatureCoordin
 		startXTensor, startYTensor = calculateVideoSnapshotStartCoordinateTensors(alignedFeatureCoordinates, int(frameTensor.shape[3]), int(frameTensor.shape[2]))
 		numberOfFrames = int(frameTensor.shape[0])
 		numberOfSubsequences = int(alignedFeatureCoordinates.shape[1])
-		snapshotHeight = int(modalityORsnapshotHeight)
-		snapshotWidth = int(modalityORsnapshotWidth)
+		snapshotWidth, snapshotHeight = GIAANNor_snapshotDimensions.calculateSnapshotDimensionsFromImageDimensions(int(frameTensor.shape[3]), int(frameTensor.shape[2]), "generateVideoSnapshotSubsequencesParallel")
 		frameIndexTensor = pt.arange(numberOfFrames, device=frameTensor.device).view(numberOfFrames, 1, 1, 1).expand(numberOfFrames, numberOfSubsequences, snapshotHeight, snapshotWidth)
 		rowIndexTensor = pt.arange(snapshotHeight, device=frameTensor.device).view(1, 1, snapshotHeight, 1)
 		columnIndexTensor = pt.arange(snapshotWidth, device=frameTensor.device).view(1, 1, 1, snapshotWidth)
@@ -152,8 +164,7 @@ def generateVideoSnapshotSubsequencesSequential(frameTensor, alignedFeatureCoord
 		startXTensor, startYTensor = calculateVideoSnapshotStartCoordinateTensors(alignedFeatureCoordinates, int(frameTensor.shape[3]), int(frameTensor.shape[2]))
 		numberOfFrames = int(frameTensor.shape[0])
 		numberOfSubsequences = int(alignedFeatureCoordinates.shape[1])
-		snapshotHeight = int(modalityORsnapshotHeight)
-		snapshotWidth = int(modalityORsnapshotWidth)
+		snapshotWidth, snapshotHeight = GIAANNor_snapshotDimensions.calculateSnapshotDimensionsFromImageDimensions(int(frameTensor.shape[3]), int(frameTensor.shape[2]), "generateVideoSnapshotSubsequencesSequential")
 		result = pt.empty((numberOfSubsequences, numberOfFrames, 3, snapshotHeight, snapshotWidth), dtype=frameTensor.dtype, device=frameTensor.device)
 		for subsequenceIndex in range(numberOfSubsequences):
 			result[subsequenceIndex] = generateVideoSnapshotSubsequence(frameTensor, startXTensor[:, subsequenceIndex], startYTensor[:, subsequenceIndex])
@@ -181,8 +192,7 @@ def generateVideoSnapshotSubsequence(frameTensor, startXTensor, startYTensor):
 		numberOfFrames = int(frameTensor.shape[0])
 		if(int(startXTensor.shape[0]) != numberOfFrames or int(startYTensor.shape[0]) != numberOfFrames):
 			raise RuntimeError("generateVideoSnapshotSubsequence error: startXTensor/startYTensor length mismatch")
-		snapshotHeight = int(modalityORsnapshotHeight)
-		snapshotWidth = int(modalityORsnapshotWidth)
+		snapshotWidth, snapshotHeight = GIAANNor_snapshotDimensions.calculateSnapshotDimensionsFromImageDimensions(int(frameTensor.shape[3]), int(frameTensor.shape[2]), "generateVideoSnapshotSubsequence")
 		result = pt.empty((numberOfFrames, 3, snapshotHeight, snapshotWidth), dtype=frameTensor.dtype, device=frameTensor.device)
 		for frameIndex in range(numberOfFrames):
 			startX = int(startXTensor[frameIndex].item())
@@ -197,7 +207,7 @@ def generateVideoSnapshotSubsequence(frameTensor, startXTensor, startYTensor):
 	return result
 
 
-def generateImageSaccadeSequenceBetweenOffsets(preparedImageTensor, startOffsetX, startOffsetY, endOffsetX, endOffsetY, cropMarginX, cropMarginY):
+def generateImageSaccadeSequenceBetweenOffsets(preparedImageTensor, startOffsetX, startOffsetY, endOffsetX, endOffsetY, cropMarginX, cropMarginY, snapshotWidth, snapshotHeight):
 	result = None
 	snapshotSequenceTensor = None
 	workHeight = None
@@ -216,9 +226,11 @@ def generateImageSaccadeSequenceBetweenOffsets(preparedImageTensor, startOffsetX
 		raise RuntimeError("generateImageSaccadeSequenceBetweenOffsets error: preparedImageTensor rank must be 3")
 	if(preparedImageTensor.shape[0] != 3):
 		raise RuntimeError("generateImageSaccadeSequenceBetweenOffsets error: preparedImageTensor channel count must be 3")
+	if(snapshotWidth <= 0 or snapshotHeight <= 0):
+		raise RuntimeError("generateImageSaccadeSequenceBetweenOffsets error: snapshotWidth/snapshotHeight must be > 0")
 	workHeight = int(preparedImageTensor.shape[1])
 	workWidth = int(preparedImageTensor.shape[2])
-	snapshotSequenceTensor = pt.zeros((modalityORimageSnapshotsPerSaccade, 3, modalityORsnapshotHeight, modalityORsnapshotWidth), dtype=arrayType, device=deviceDense)
+	snapshotSequenceTensor = pt.zeros((modalityORimageSnapshotsPerSaccade, 3, snapshotHeight, snapshotWidth), dtype=arrayType, device=deviceDense)
 	for snapshotIndex in range(modalityORimageSnapshotsPerSaccade):
 		if(modalityORimageSnapshotsPerSaccade == 1):
 			snapshotIndexFraction = 1.0
@@ -228,19 +240,19 @@ def generateImageSaccadeSequenceBetweenOffsets(preparedImageTensor, startOffsetX
 		snapshotOffsetY = float(startOffsetY) + (float(endOffsetY - startOffsetY)*snapshotIndexFraction)
 		startX = int(cropMarginX) + int(round(snapshotOffsetX))
 		startY = int(cropMarginY) + int(round(snapshotOffsetY))
-		endX = startX + int(modalityORsnapshotWidth)
-		endY = startY + int(modalityORsnapshotHeight)
+		endX = startX + int(snapshotWidth)
+		endY = startY + int(snapshotHeight)
 		if(startX < 0 or startY < 0 or endX > workWidth or endY > workHeight):
 			raise RuntimeError("generateImageSaccadeSequenceBetweenOffsets error: computed crop window exceeds preparedImageTensor bounds")
 		snapshotTensor = preparedImageTensor[:, startY:endY, startX:endX]
-		if(snapshotTensor.shape[1] != modalityORsnapshotHeight or snapshotTensor.shape[2] != modalityORsnapshotWidth):
+		if(snapshotTensor.shape[1] != snapshotHeight or snapshotTensor.shape[2] != snapshotWidth):
 			raise RuntimeError("generateImageSaccadeSequenceBetweenOffsets error: snapshotTensor shape mismatch")
 		snapshotSequenceTensor[snapshotIndex] = snapshotTensor
 	result = snapshotSequenceTensor
 	return result
 
 
-def generateImageSaccadeSequence(preparedImageTensor, targetOffsetX, targetOffsetY, cropMarginX, cropMarginY):
+def generateImageSaccadeSequence(preparedImageTensor, targetOffsetX, targetOffsetY, cropMarginX, cropMarginY, snapshotWidth, snapshotHeight):
 	# for each saccade (sequence) generate modalityORimageSnapshotsPerSaccade by taking snapshots along a linear pathway of the saccade offset:
 	# crop each augmented snapshot by a predefined amount (dependent on modalityORimageSaccadesMaxAngularOffsetDegrees) so that every snapshot contains only image data (no pixels outside the original image data).
 	result = None
@@ -261,9 +273,11 @@ def generateImageSaccadeSequence(preparedImageTensor, targetOffsetX, targetOffse
 		raise RuntimeError("generateImageSaccadeSequence error: preparedImageTensor rank must be 3")
 	if(preparedImageTensor.shape[0] != 3):
 		raise RuntimeError("generateImageSaccadeSequence error: preparedImageTensor channel count must be 3")
+	if(snapshotWidth <= 0 or snapshotHeight <= 0):
+		raise RuntimeError("generateImageSaccadeSequence error: snapshotWidth/snapshotHeight must be > 0")
 	workHeight = int(preparedImageTensor.shape[1])
 	workWidth = int(preparedImageTensor.shape[2])
-	snapshotSequenceTensor = pt.zeros((modalityORimageSnapshotsPerSaccade, 3, modalityORsnapshotHeight, modalityORsnapshotWidth), dtype=arrayType, device=deviceDense)
+	snapshotSequenceTensor = pt.zeros((modalityORimageSnapshotsPerSaccade, 3, snapshotHeight, snapshotWidth), dtype=arrayType, device=deviceDense)
 	for snapshotIndex in range(modalityORimageSnapshotsPerSaccade):
 		if(modalityORimageSnapshotsPerSaccade == 1):
 			snapshotIndexFraction = 1.0
@@ -273,12 +287,12 @@ def generateImageSaccadeSequence(preparedImageTensor, targetOffsetX, targetOffse
 		snapshotOffsetY = int(round(float(targetOffsetY)*snapshotIndexFraction))
 		startX = int(cropMarginX) + snapshotOffsetX
 		startY = int(cropMarginY) + snapshotOffsetY
-		endX = startX + int(modalityORsnapshotWidth)
-		endY = startY + int(modalityORsnapshotHeight)
+		endX = startX + int(snapshotWidth)
+		endY = startY + int(snapshotHeight)
 		if(startX < 0 or startY < 0 or endX > workWidth or endY > workHeight):
 			raise RuntimeError("generateImageSaccadeSequence error: computed crop window exceeds preparedImageTensor bounds")
 		snapshotTensor = preparedImageTensor[:, startY:endY, startX:endX]
-		if(snapshotTensor.shape[1] != modalityORsnapshotHeight or snapshotTensor.shape[2] != modalityORsnapshotWidth):
+		if(snapshotTensor.shape[1] != snapshotHeight or snapshotTensor.shape[2] != snapshotWidth):
 			raise RuntimeError("generateImageSaccadeSequence error: snapshotTensor shape mismatch")
 		snapshotSequenceTensor[snapshotIndex] = snapshotTensor
 	result = snapshotSequenceTensor
@@ -302,23 +316,23 @@ def sampleRandomImageSaccadeOffset(cropMarginX, cropMarginY):
 	return result
 
 
-def calculateImageSaccadeCropMargins():
+def calculateImageSaccadeCropMargins(snapshotWidth, snapshotHeight):
 	result = None
 	angleRadians = None
 	cropMarginX = None
 	cropMarginY = None
-	if(modalityORsnapshotWidth <= 0 or modalityORsnapshotHeight <= 0):
-		raise RuntimeError("calculateImageSaccadeCropMargins error: modalityORsnapshotWidth/modalityORsnapshotHeight must be > 0")
+	if(snapshotWidth <= 0 or snapshotHeight <= 0):
+		raise RuntimeError("calculateImageSaccadeCropMargins error: snapshotWidth/snapshotHeight must be > 0")
 	if(modalityORimageSaccadesMaxAngularOffsetDegrees < 0 or modalityORimageSaccadesMaxAngularOffsetDegrees >= 90):
 		raise RuntimeError("calculateImageSaccadeCropMargins error: modalityORimageSaccadesMaxAngularOffsetDegrees must be >= 0 and < 90")
 	angleRadians = math.radians(float(modalityORimageSaccadesMaxAngularOffsetDegrees))
-	cropMarginX = int(math.ceil((float(modalityORsnapshotWidth)/2.0)*math.tan(angleRadians)))
-	cropMarginY = int(math.ceil((float(modalityORsnapshotHeight)/2.0)*math.tan(angleRadians)))
+	cropMarginX = int(math.ceil((float(snapshotWidth)/2.0)*math.tan(angleRadians)))
+	cropMarginY = int(math.ceil((float(snapshotHeight)/2.0)*math.tan(angleRadians)))
 	result = (cropMarginX, cropMarginY)
 	return result
 
 
-def calculateImageSaccadeCropMarginsFromPreparedImage(preparedImageTensor):
+def calculateImageSaccadeCropMarginsFromPreparedImage(preparedImageTensor, snapshotWidth, snapshotHeight):
 	result = None
 	workHeight = None
 	workWidth = None
@@ -330,12 +344,14 @@ def calculateImageSaccadeCropMarginsFromPreparedImage(preparedImageTensor):
 		raise RuntimeError("calculateImageSaccadeCropMarginsFromPreparedImage error: preparedImageTensor rank must be 3")
 	if(preparedImageTensor.shape[0] != 3):
 		raise RuntimeError("calculateImageSaccadeCropMarginsFromPreparedImage error: preparedImageTensor channel count must be 3")
+	if(snapshotWidth <= 0 or snapshotHeight <= 0):
+		raise RuntimeError("calculateImageSaccadeCropMarginsFromPreparedImage error: snapshotWidth/snapshotHeight must be > 0")
 	workHeight = int(preparedImageTensor.shape[1])
 	workWidth = int(preparedImageTensor.shape[2])
-	if(workWidth < int(modalityORsnapshotWidth) or workHeight < int(modalityORsnapshotHeight)):
-		raise RuntimeError("calculateImageSaccadeCropMarginsFromPreparedImage error: prepared image must be at least as large as modalityORsnapshotWidth/modalityORsnapshotHeight")
-	cropMarginX = int((float(workWidth) - float(modalityORsnapshotWidth))/2.0)
-	cropMarginY = int((float(workHeight) - float(modalityORsnapshotHeight))/2.0)
+	if(workWidth < int(snapshotWidth) or workHeight < int(snapshotHeight)):
+		raise RuntimeError("calculateImageSaccadeCropMarginsFromPreparedImage error: prepared image must be at least as large as snapshotWidth/snapshotHeight")
+	cropMarginX = int((float(workWidth) - float(snapshotWidth))/2.0)
+	cropMarginY = int((float(workHeight) - float(snapshotHeight))/2.0)
 	result = (cropMarginX, cropMarginY)
 	return result
 
@@ -414,10 +430,9 @@ def calculateVideoSnapshotStartCoordinateTensors(alignedFeatureCoordinates, fram
 			raise RuntimeError("calculateVideoSnapshotStartCoordinateTensors error: alignedFeatureCoordinates last dimension must equal 2")
 		if(frameWidth <= 0 or frameHeight <= 0):
 			raise RuntimeError("calculateVideoSnapshotStartCoordinateTensors error: frameWidth/frameHeight must be > 0")
-		snapshotWidth = int(modalityORsnapshotWidth)
-		snapshotHeight = int(modalityORsnapshotHeight)
+		snapshotWidth, snapshotHeight = GIAANNor_snapshotDimensions.calculateSnapshotDimensionsFromImageDimensions(frameWidth, frameHeight, "calculateVideoSnapshotStartCoordinateTensors")
 		if(snapshotWidth <= 0 or snapshotHeight <= 0):
-			raise RuntimeError("calculateVideoSnapshotStartCoordinateTensors error: modalityORsnapshotWidth/modalityORsnapshotHeight must be > 0")
+			raise RuntimeError("calculateVideoSnapshotStartCoordinateTensors error: snapshotWidth/snapshotHeight must be > 0")
 		startXTensor = pt.round(alignedFeatureCoordinates[:, :, 0] - (float(snapshotWidth)/2.0)).to(dtype=pt.long)
 		startYTensor = pt.round(alignedFeatureCoordinates[:, :, 1] - (float(snapshotHeight)/2.0)).to(dtype=pt.long)
 		if(bool(pt.any(startXTensor < 0).item()) or bool(pt.any(startYTensor < 0).item())):
@@ -464,8 +479,7 @@ def validateVideoFrameTensor(frameTensor, functionName):
 			raise RuntimeError(functionName + " error: frameTensor frame count must be > 0")
 		if(int(frameTensor.shape[1]) != 3):
 			raise RuntimeError(functionName + " error: frameTensor channel count must equal 3")
-		if(int(frameTensor.shape[2]) < int(modalityORsnapshotHeight) or int(frameTensor.shape[3]) < int(modalityORsnapshotWidth)):
-			raise RuntimeError(functionName + " error: frameTensor spatial dimensions must be >= modalityORsnapshotWidth/modalityORsnapshotHeight")
+		GIAANNor_snapshotDimensions.calculateSnapshotDimensionsFromImageDimensions(int(frameTensor.shape[3]), int(frameTensor.shape[2]), functionName)
 	else:
 		raise RuntimeError("validateVideoFrameTensor error: requires submodalityName=='video' and modalityORvideoGenerateMultipleSnapshotsPerFrame")
 	return result

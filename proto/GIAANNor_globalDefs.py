@@ -54,6 +54,8 @@ if(submodalityName=="video"):
 	inferencePromptFileName = "inference_prompt_or.txt"
 	databaseFolderExtension = "-ORvideo"
 	modalityORdatasetHasBackground = False
+	datasetCameraHorizontalFOV = 50.0	#estimated dataset-level FOV for infactory-ai/soccer-events 1280x720 professional soccer broadcast clips; source footage is variable-zoom and has no published per-clip intrinsics.
+	datasetCameraFOV = datasetCameraHorizontalFOV/2.0	#retinotopic table uses eccentricity/radius from fixation, not full horizontal FOV
 elif(submodalityName=="image"):
 	datasetType = "cityscapes"
 	datasetName = "Chris1/cityscapes"
@@ -70,6 +72,8 @@ elif(submodalityName=="image"):
 	inferencePromptFileName = "inference_prompt_or.txt"
 	databaseFolderExtension = "-ORimage"
 	modalityORdatasetHasBackground = False
+	datasetCameraHorizontalFOV = 50.0	#48.70231915612077	#derived from Cityscapes K: fx=2262.52, width=2048; 2*atan(width/(2*fx))
+	datasetCameraFOV = datasetCameraHorizontalFOV/2.0	#retinotopic table uses eccentricity/radius from fixation, not full horizontal FOV
 
 #unused nlp settings;
 	#Multisequence settings;
@@ -100,8 +104,12 @@ modalityORtrainMaxLayerIndex = 0
 modalityORuseExternalRFfilterLibrary = False
 modalityORexternalRFfilterLibraryModuleName = "ATORpt_RF"
 modalityORRFfilterThreshold = 0.2
-modalityORsnapshotWidth = 160
-modalityORsnapshotHeight = 90
+modalityORsnapshotFractionOfImage = 0.25
+modalityORsnapshotRetinotopicFieldBias = True
+if(modalityORsnapshotRetinotopicFieldBias):
+	modalityORsnapshotRetinotopicFieldMaxDegrees = modalityORsnapshotFractionOfImage*datasetCameraFOV
+else:
+	modalityORsnapshotRetinotopicFieldMaxDegrees = None
 
 if(submodalityName=="video"):
 	modalityORvideoGenerateMultipleSnapshotsPerFrame = True	#default: True #orig: False	#modality OR video generate multiple snapshots per frame using detected keypoints

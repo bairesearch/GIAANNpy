@@ -23,6 +23,7 @@ import subprocess
 import torch as pt
 
 from GIAANNcmn_globalDefs import *
+import GIAANNor_snapshotDimensions
 
 _datasetIndexCache = None
 _imageDatasetCache = {}
@@ -276,10 +277,7 @@ def extractVideoSnapshots(videoFile):
 	if(videoFile == ""):
 		raise RuntimeError("extractVideoSnapshots error: videoFile must not be empty")
 	streamInfo = probeVideoStream(videoFile)
-	frameWidth = int(modalityORsnapshotWidth)
-	frameHeight = int(modalityORsnapshotHeight)
-	if(frameWidth <= 0 or frameHeight <= 0):
-		raise RuntimeError("extractVideoSnapshots error: modalityORsnapshotWidth/modalityORsnapshotHeight must be > 0")
+	frameWidth, frameHeight = GIAANNor_snapshotDimensions.calculateSnapshotDimensionsFromImageDimensions(int(streamInfo["width"]), int(streamInfo["height"]), "extractVideoSnapshots")
 	filterText = "select='not(mod(n\\," + str(modalityORvideoFramesPerSequenceIteration) + "))',scale=" + str(frameWidth) + ":" + str(frameHeight) + ":flags=bilinear"
 	command = ["ffmpeg", "-v", "error", "-i", videoFile, "-vf", filterText, "-vsync", "vfr", "-pix_fmt", "rgb24", "-f", "rawvideo", "-"]
 	frameSizeBytes = frameWidth*frameHeight*3
@@ -324,13 +322,10 @@ def extractVideoFramesForSnapshotSubsequences(videoFile):
 			raise RuntimeError("extractVideoFramesForSnapshotSubsequences error: modalityORvideoFramesPerSequenceIteration must be an int")
 		if(modalityORvideoFramesPerSequenceIteration <= 0):
 			raise RuntimeError("extractVideoFramesForSnapshotSubsequences error: modalityORvideoFramesPerSequenceIteration must be > 0")
-		if(modalityORsnapshotWidth <= 0 or modalityORsnapshotHeight <= 0):
-			raise RuntimeError("extractVideoFramesForSnapshotSubsequences error: modalityORsnapshotWidth/modalityORsnapshotHeight must be > 0")
 		streamInfo = probeVideoStream(videoFile)
 		frameWidth = int(streamInfo["width"])
 		frameHeight = int(streamInfo["height"])
-		if(frameWidth < int(modalityORsnapshotWidth) or frameHeight < int(modalityORsnapshotHeight)):
-			raise RuntimeError("extractVideoFramesForSnapshotSubsequences error: video frame dimensions must be >= modalityORsnapshotWidth/modalityORsnapshotHeight")
+		GIAANNor_snapshotDimensions.calculateSnapshotDimensionsFromImageDimensions(frameWidth, frameHeight, "extractVideoFramesForSnapshotSubsequences")
 		filterText = "fps=" + str(modalityORvideoFrameRate) + ",select='not(mod(n\\," + str(modalityORvideoFramesPerSequenceIteration) + "))'"
 		command = ["ffmpeg", "-v", "error", "-i", videoFile, "-vf", filterText, "-vsync", "vfr", "-pix_fmt", "rgb24", "-f", "rawvideo", "-"]
 		frameSizeBytes = frameWidth*frameHeight*3

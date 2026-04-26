@@ -188,8 +188,8 @@ def validateVideoSnapshotSubsequenceTensor(sequences, functionName):
 			raise RuntimeError(functionName + " error: sequences subsequence/frame counts must be > 0")
 		if(int(sequences.shape[2]) != 3):
 			raise RuntimeError(functionName + " error: sequences channel count must equal 3")
-		if(int(sequences.shape[3]) != int(modalityORsnapshotHeight) or int(sequences.shape[4]) != int(modalityORsnapshotWidth)):
-			raise RuntimeError(functionName + " error: sequence snapshot dimensions must equal modalityORsnapshotHeight/modalityORsnapshotWidth")
+		if(int(sequences.shape[3]) <= 0 or int(sequences.shape[4]) <= 0):
+			raise RuntimeError(functionName + " error: sequence snapshot spatial dimensions must be > 0")
 	else:
 		raise RuntimeError("validateVideoSnapshotSubsequenceTensor error: requires submodalityName=='video' and modalityORvideoGenerateMultipleSnapshotsPerFrame")
 	return result

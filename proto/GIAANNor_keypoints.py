@@ -23,7 +23,7 @@ from GIAANNcmn_globalDefs import *
 import GIAANNor_features as GIAANNor_featureDetection
 
 
-def sampleAdjacentSalientImageSaccadeOffsetPairs(preparedImageTensor, cropMarginX, cropMarginY):
+def sampleAdjacentSalientImageSaccadeOffsetPairs(preparedImageTensor, cropMarginX, cropMarginY, snapshotWidth, snapshotHeight):
 	# upgrade submodalityName=="image" to perform saccades augomentations between nearby (i.e. adjacent) salient regions of the image: a) segment centres and b) corner features.
 	result = None
 	salientFeatureCoordinates = None
@@ -36,17 +36,19 @@ def sampleAdjacentSalientImageSaccadeOffsetPairs(preparedImageTensor, cropMargin
 		raise RuntimeError("sampleAdjacentSalientImageSaccadeOffsetPairs error: preparedImageTensor rank must be 3")
 	if(cropMarginX < 0 or cropMarginY < 0):
 		raise RuntimeError("sampleAdjacentSalientImageSaccadeOffsetPairs error: cropMarginX/cropMarginY must be >= 0")
+	if(snapshotWidth <= 0 or snapshotHeight <= 0):
+		raise RuntimeError("sampleAdjacentSalientImageSaccadeOffsetPairs error: snapshotWidth/snapshotHeight must be > 0")
 	workHeight = int(preparedImageTensor.shape[1])
 	workWidth = int(preparedImageTensor.shape[2])
 	salientFeatureCoordinates = GIAANNor_featureDetection.detectSalientFeatureCoordinatesFromImageTensor(preparedImageTensor)
 	if(salientFeatureCoordinates.shape[0] >= 2):
-		reachableFeatureCoordinates = filterReachableSalientImageFeatureCoordinates(salientFeatureCoordinates, workWidth, workHeight)
+		reachableFeatureCoordinates = filterReachableSalientImageFeatureCoordinates(salientFeatureCoordinates, workWidth, workHeight, snapshotWidth, snapshotHeight)
 		if(reachableFeatureCoordinates.shape[0] >= 2):
 			result = calculateAdjacentSalientImageSaccadeOffsetPairs(reachableFeatureCoordinates, workWidth, workHeight)
 	return result
 
 
-def detectReachableSalientImageFeatureCoordinates(preparedImageTensor):
+def detectReachableSalientImageFeatureCoordinates(preparedImageTensor, snapshotWidth, snapshotHeight):
 	result = None
 	salientFeatureCoordinates = None
 	workHeight = None
@@ -57,11 +59,13 @@ def detectReachableSalientImageFeatureCoordinates(preparedImageTensor):
 		raise RuntimeError("detectReachableSalientImageFeatureCoordinates error: preparedImageTensor rank must be 3")
 	if(int(preparedImageTensor.shape[0]) != 3):
 		raise RuntimeError("detectReachableSalientImageFeatureCoordinates error: preparedImageTensor channel count must equal 3")
+	if(snapshotWidth <= 0 or snapshotHeight <= 0):
+		raise RuntimeError("detectReachableSalientImageFeatureCoordinates error: snapshotWidth/snapshotHeight must be > 0")
 	workHeight = int(preparedImageTensor.shape[1])
 	workWidth = int(preparedImageTensor.shape[2])
 	salientFeatureCoordinates = GIAANNor_featureDetection.detectSalientFeatureCoordinatesFromImageTensor(preparedImageTensor)
 	if(salientFeatureCoordinates.shape[0] > 0):
-		result = filterReachableSalientImageFeatureCoordinates(salientFeatureCoordinates, workWidth, workHeight)
+		result = filterReachableSalientImageFeatureCoordinates(salientFeatureCoordinates, workWidth, workHeight, snapshotWidth, snapshotHeight)
 	else:
 		result = salientFeatureCoordinates
 		if(debugPrintNumberFeatures):
@@ -162,7 +166,7 @@ def calculateNearestUniqueFeatureIndices(sourceFeatureCoordinates, targetFeature
 	return result
 
 
-def filterReachableSalientImageFeatureCoordinates(featureCoordinates, workWidth, workHeight):
+def filterReachableSalientImageFeatureCoordinates(featureCoordinates, workWidth, workHeight, snapshotWidth, snapshotHeight):
 	result = None
 	reachableWindowBounds = None
 	minFeatureCoordinateX = None
@@ -178,7 +182,9 @@ def filterReachableSalientImageFeatureCoordinates(featureCoordinates, workWidth,
 		raise RuntimeError("filterReachableSalientImageFeatureCoordinates error: featureCoordinates last dimension must equal 2")
 	if(workWidth <= 0 or workHeight <= 0):
 		raise RuntimeError("filterReachableSalientImageFeatureCoordinates error: workWidth/workHeight must be > 0")
-	reachableWindowBounds = calculateReachableFeatureCoordinateBounds(workWidth, workHeight)
+	if(snapshotWidth <= 0 or snapshotHeight <= 0):
+		raise RuntimeError("filterReachableSalientImageFeatureCoordinates error: snapshotWidth/snapshotHeight must be > 0")
+	reachableWindowBounds = calculateReachableFeatureCoordinateBounds(workWidth, workHeight, snapshotWidth, snapshotHeight)
 	minFeatureCoordinateX = reachableWindowBounds[0]
 	maxFeatureCoordinateX = reachableWindowBounds[1]
 	minFeatureCoordinateY = reachableWindowBounds[2]
@@ -192,7 +198,7 @@ def filterReachableSalientImageFeatureCoordinates(featureCoordinates, workWidth,
 	return result
 
 
-def calculateReachableFeatureCoordinateBounds(workWidth, workHeight):
+def calculateReachableFeatureCoordinateBounds(workWidth, workHeight, snapshotWidth, snapshotHeight):
 	result = None
 	minFeatureCoordinateX = None
 	maxFeatureCoordinateX = None
@@ -200,10 +206,12 @@ def calculateReachableFeatureCoordinateBounds(workWidth, workHeight):
 	maxFeatureCoordinateY = None
 	if(workWidth <= 0 or workHeight <= 0):
 		raise RuntimeError("calculateReachableFeatureCoordinateBounds error: workWidth/workHeight must be > 0")
-	minFeatureCoordinateX = float(modalityORsnapshotWidth)/2.0
-	maxFeatureCoordinateX = float(workWidth) - (float(modalityORsnapshotWidth)/2.0)
-	minFeatureCoordinateY = float(modalityORsnapshotHeight)/2.0
-	maxFeatureCoordinateY = float(workHeight) - (float(modalityORsnapshotHeight)/2.0)
+	if(snapshotWidth <= 0 or snapshotHeight <= 0):
+		raise RuntimeError("calculateReachableFeatureCoordinateBounds error: snapshotWidth/snapshotHeight must be > 0")
+	minFeatureCoordinateX = float(snapshotWidth)/2.0
+	maxFeatureCoordinateX = float(workWidth) - (float(snapshotWidth)/2.0)
+	minFeatureCoordinateY = float(snapshotHeight)/2.0
+	maxFeatureCoordinateY = float(workHeight) - (float(snapshotHeight)/2.0)
 	if(minFeatureCoordinateX > maxFeatureCoordinateX or minFeatureCoordinateY > maxFeatureCoordinateY):
 		raise RuntimeError("calculateReachableFeatureCoordinateBounds error: reachable feature coordinate window is invalid for current snapshot/work dimensions")
 	result = (minFeatureCoordinateX, maxFeatureCoordinateX, minFeatureCoordinateY, maxFeatureCoordinateY)
