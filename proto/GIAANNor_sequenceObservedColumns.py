@@ -31,6 +31,7 @@ class SequenceObservedColumns(GIAANNcmn_sequenceObservedColumns.SequenceObserved
 		self.sequenceData = sequenceData
 		self.noDelimiterDetectedBetweenConceptTokens = False
 		self.requiredSourceFeatureIndicesByObservedColumn = None
+		self.trainConnectionsIncludeSameTimeIndex = False
 		self.columnsIndexSequenceWordIndexDict = {}
 		self.sequenceObservedColumnsDict = {}
 		self.conceptIndicesInObservedList = []
@@ -75,4 +76,3 @@ class SequenceObservedColumns(GIAANNcmn_sequenceObservedColumns.SequenceObserved
 				raise RuntimeError("getTrainRequiredSourceFeatureIndicesByObservedColumn error: no required source features for conceptName " + conceptName)
 		self.requiredSourceFeatureIndicesByObservedColumn = result
 		return result
-

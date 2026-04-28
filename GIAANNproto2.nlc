@@ -82,3 +82,4 @@ MANUAL; - update database save paths to only use specialised inference_prompt.tx
 	- update modalityORimageSnapshotsPerSaccade implementation - if modalityORimageSnapshotsPerSaccade=1: no temporal encoding of saccade movements. if modalityORimageSnapshotsPerSaccade=2: encode start and end of saccade only, if modalityORimageSnapshotsPerSaccade>2: encode start and end of saccade and modalityORimageSnapshotsPerSaccade-2 interpolations between these points.
 [GPT-5.5:] - change the modalityORimageSaccadesPerImage interpretation to the max number saccades per image (i.e. do not repeat pairs if there are too few pairs in the list).
 [GPT-5.5:] - modify modalityORsnapshotFractionOfImage implementation so that snapshots taken are always square irrespective of the aspect ratio of the dataset image.
+[GPT-5.5:] - if modalityORimageSaccadesEncode=False, ensure GIAANN training trains connections between column features if their timeIndex is the same as each other.

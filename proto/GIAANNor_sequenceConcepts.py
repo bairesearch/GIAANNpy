@@ -194,6 +194,16 @@ def getActiveSegmentsForSnapshot(snapshotIndex, targetDevice):
 	return result
 
 
+def configureTrainConnectionsForImageSaccadeEncoding(sequenceObservedColumns):
+	result = None
+	if(submodalityName=="image"):
+		if(not isinstance(modalityORimageSaccadesEncode, bool)):
+			raise RuntimeError("configureTrainConnectionsForImageSaccadeEncoding error: modalityORimageSaccadesEncode must be a bool")
+		if(not modalityORimageSaccadesEncode):
+			sequenceObservedColumns.trainConnectionsIncludeSameTimeIndex = True
+	return result
+
+
 def buildTrainTensors(sequenceObservedColumns, sequenceData):
 	result = None
 	targetDevice = deviceDense
@@ -203,11 +213,14 @@ def buildTrainTensors(sequenceObservedColumns, sequenceData):
 	featureNeuronsWordOrder = pt.zeros((sequenceObservedColumns.cs, sequenceObservedColumns.fs), dtype=pt.long, device=targetDevice)
 	featureNeuronsPos = pt.zeros((sequenceObservedColumns.cs, sequenceObservedColumns.fs), dtype=arrayType, device=targetDevice)
 	featureNeuronsSegmentMask = pt.ones((arrayNumberOfSegments, sequenceObservedColumns.cs), dtype=arrayType, device=targetDevice)
+	configureTrainConnectionsForImageSaccadeEncoding(sequenceObservedColumns)
 	for activation in sequenceData["activationList"]:
 		# each layer column has a maximum of 1 feature trained for every iteration in a sequence.
 		sequenceConceptIndex = int(activation["sequenceConceptIndex"])
 		localFeatureIndex = int(activation["localFeatureIndex"])
 		snapshotIndex = int(activation["snapshotIndex"])
+		if(submodalityName=="image" and not modalityORimageSaccadesEncode and snapshotIndex != 0):
+			raise RuntimeError("buildTrainTensors error: snapshotIndex must be 0 when modalityORimageSaccadesEncode is False")
 		activeSegments = getActiveSegmentsForSnapshot(snapshotIndex, targetDevice)
 		featureNeuronsActive[0, activeSegments, sequenceConceptIndex, localFeatureIndex] = 1
 		featureNeuronsWordOrder[sequenceConceptIndex, localFeatureIndex] = snapshotIndex

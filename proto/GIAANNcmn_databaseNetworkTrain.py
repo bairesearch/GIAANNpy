@@ -46,6 +46,32 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 
 	return True
 
+def getTrainConnectionsIncludeSameTimeIndex(sequenceObservedColumns):
+	result = None
+	if(not hasattr(sequenceObservedColumns, "trainConnectionsIncludeSameTimeIndex")):
+		raise RuntimeError("getTrainConnectionsIncludeSameTimeIndex error: sequenceObservedColumns missing trainConnectionsIncludeSameTimeIndex")
+	if(not isinstance(sequenceObservedColumns.trainConnectionsIncludeSameTimeIndex, bool)):
+		raise RuntimeError("getTrainConnectionsIncludeSameTimeIndex error: trainConnectionsIncludeSameTimeIndex must be a bool")
+	result = sequenceObservedColumns.trainConnectionsIncludeSameTimeIndex
+	return result
+
+def createFeatureWordOrderConnectionMask(sourceWordOrder, targetWordOrder, trainConnectionsIncludeSameTimeIndex):
+	result = None
+	if(not isinstance(trainConnectionsIncludeSameTimeIndex, bool)):
+		raise RuntimeError("createFeatureWordOrderConnectionMask error: trainConnectionsIncludeSameTimeIndex must be a bool")
+	if(debugConnectNodesToNextNodesInSequenceOnly):
+		wordOrderUpperBound = sourceWordOrder + 1
+		if(trainConnectionsIncludeSameTimeIndex):
+			result = pt.logical_and(targetWordOrder >= sourceWordOrder, targetWordOrder <= wordOrderUpperBound)
+		else:
+			result = pt.logical_and(targetWordOrder > sourceWordOrder, targetWordOrder <= wordOrderUpperBound)
+	else:
+		if(trainConnectionsIncludeSameTimeIndex):
+			result = targetWordOrder >= sourceWordOrder
+		else:
+			result = targetWordOrder > sourceWordOrder
+	return result
+
 #first dim cs1 pertains to every concept node in sequence
 def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex):
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
@@ -124,6 +150,7 @@ def processFeaturesActiveTrainSparseNeurons(sequenceObservedColumns, featureNeur
 
 def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, useSparseSequenceConnections):
 
+	trainConnectionsIncludeSameTimeIndex = getTrainConnectionsIncludeSameTimeIndex(sequenceObservedColumns)
 	if(useSANI):
 		featureConnectionsActive = None
 		featureConnectionsSegmentMask = None
@@ -131,7 +158,7 @@ def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceOb
 			segmentActive = featureNeuronsActive[:, segmentIndex]
 			if not pt.any(segmentActive):
 				continue
-			segmentConnectionsActive, segmentMask = createFeatureConnectionsActiveTrain(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder)
+			segmentConnectionsActive, segmentMask = createFeatureConnectionsActiveTrain(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex)
 			if featureConnectionsActive is None:
 				featureConnectionsActive = segmentConnectionsActive
 				featureConnectionsSegmentMask = segmentMask
@@ -143,7 +170,7 @@ def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceOb
 			#featureConnectionsActive = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=arrayType)
 			#featureConnectionsSegmentMask = pt.zeros_like(featureConnectionsActive, dtype=pt.bool)
 	else:
-		featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[:, arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder)
+		featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[:, arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex)
 
 	featureConnectionsPos = None
 	if(arrayIndexPropertiesPos or (arrayIndexPropertiesStrength and trainConnectionStrengthPOSdependence)):
@@ -192,7 +219,8 @@ def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceOb
 
 def processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos):
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
-	connectionActiveSparse = createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder)
+	trainConnectionsIncludeSameTimeIndex = getTrainConnectionsIncludeSameTimeIndex(sequenceObservedColumns)
+	connectionActiveSparse = createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex)
 	connectionActiveIndices = connectionActiveSparse.indices()
 	connectionActiveValues = connectionActiveSparse.values()
 	if(featureNeuronsWordOrder.device != connectionActiveIndices.device):
@@ -242,7 +270,7 @@ def processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, feature
 		setSequenceFeatureConnectionsProperty(sequenceObservedColumns, databaseNetworkObject.arrayIndexPropertiesPosIndex, posSparse)
 	return
 
-def createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder):
+def createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex):
 	connectionTargetSize = (numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs)
 	connectionDevice = featureNeuronsActive.device
 	combinedIndices = pt.empty((len(connectionTargetSize), 0), dtype=pt.long, device=connectionDevice)
@@ -252,11 +280,11 @@ def createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, colu
 		for segmentIndex in range(arrayNumberOfSegments):
 			segmentActive = featureNeuronsActive[:, segmentIndex]
 			if(pt.any(segmentActive)):
-				segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder)
+				segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex)
 				if(segmentConnectionIndices.numel() > 0):
 					indicesList.append(segmentConnectionIndices)
 	else:
-		segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(featureNeuronsActive[:, arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder)
+		segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(featureNeuronsActive[:, arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex)
 		if(segmentConnectionIndices.numel() > 0):
 			indicesList.append(segmentConnectionIndices)
 	if(len(indicesList) > 0):
@@ -267,7 +295,7 @@ def createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, colu
 		result.values().clamp_(max=1.0)
 	return result
 
-def createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder):
+def createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex):
 	connectionDevice = segmentActive.device
 	combinedIndices = pt.empty((6, 0), dtype=pt.long, device=connectionDevice)
 	indicesList = []
@@ -277,20 +305,20 @@ def createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, colu
 		repeatedFeatureMask = (segmentActive > 0).sum(dim=0) > 1
 		for branchIndex in range(segmentActive.shape[0]):
 			targetIndices = pt.nonzero(segmentActive[branchIndex] > 0, as_tuple=False)
-			branchConnectionIndices = createFeatureConnectionsActiveTrainSparseBranch(branchIndex, sourceIndices, targetIndices, repeatedFeatureMask, columnsWordOrder, featureNeuronsWordOrder)
+			branchConnectionIndices = createFeatureConnectionsActiveTrainSparseBranch(branchIndex, sourceIndices, targetIndices, repeatedFeatureMask, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex)
 			if(branchConnectionIndices.numel() > 0):
 				indicesList.append(branchConnectionIndices)
 	else:
 		sourceIndices = pt.nonzero(segmentActive[0] > 0, as_tuple=False)
 		targetIndices = sourceIndices
-		branchConnectionIndices = createFeatureConnectionsActiveTrainSparseBranch(0, sourceIndices, targetIndices, None, columnsWordOrder, featureNeuronsWordOrder)
+		branchConnectionIndices = createFeatureConnectionsActiveTrainSparseBranch(0, sourceIndices, targetIndices, None, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex)
 		if(branchConnectionIndices.numel() > 0):
 			indicesList.append(branchConnectionIndices)
 	if(len(indicesList) > 0):
 		combinedIndices = pt.cat(indicesList, dim=1)
 	return combinedIndices
 
-def createFeatureConnectionsActiveTrainSparseBranch(branchIndex, sourceIndices, targetIndices, repeatedFeatureMask, columnsWordOrder, featureNeuronsWordOrder):
+def createFeatureConnectionsActiveTrainSparseBranch(branchIndex, sourceIndices, targetIndices, repeatedFeatureMask, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex):
 	connectionDevice = sourceIndices.device
 	result = pt.empty((6, 0), dtype=pt.long, device=connectionDevice)
 	if(sourceIndices.shape[0] > 0 and targetIndices.shape[0] > 0):
@@ -304,11 +332,7 @@ def createFeatureConnectionsActiveTrainSparseBranch(branchIndex, sourceIndices, 
 		targetWordOrder = featureNeuronsWordOrder[targetConceptIndices, targetFeatureIndices]
 		connectionMask = pt.ones((sourceConceptIndices.shape[0],), dtype=pt.bool, device=connectionDevice)
 		if(featureNeuronsWordOrder is not None):
-			if(debugConnectNodesToNextNodesInSequenceOnly):
-				wordOrderUpperBound = sourceWordOrder + 1
-				connectionMask = connectionMask & pt.logical_and(targetWordOrder > sourceWordOrder, targetWordOrder <= wordOrderUpperBound)
-			else:
-				connectionMask = connectionMask & (targetWordOrder > sourceWordOrder)
+			connectionMask = connectionMask & createFeatureWordOrderConnectionMask(sourceWordOrder, targetWordOrder, trainConnectionsIncludeSameTimeIndex)
 		if(columnsWordOrder is not None):
 			sourceColumnWordOrder = columnsWordOrder[sourceConceptIndices]
 			targetColumnWordOrder = columnsWordOrder[targetConceptIndices]
@@ -469,7 +493,7 @@ def setSequenceFeatureConnectionsProperty(sequenceObservedColumns, propertyIndex
 			sequenceObservedColumns.featureConnections[propertyIndex, :, :, :, :, :, :] = propertyTensor
 	return
 
-def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder):
+def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex):
 
 	if featureNeuronsActive.dim() == 3:
 		branchCount = featureNeuronsActive.shape[0]
@@ -488,11 +512,7 @@ def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWor
 	if(featureNeuronsWordOrder is not None):
 		featureNeuronsWordOrderExpanded1 = featureNeuronsWordOrder.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
 		featureNeuronsWordOrderExpanded2 = featureNeuronsWordOrder.view(1, 1, cs, fs).expand(cs, fs, cs, fs)
-		if(debugConnectNodesToNextNodesInSequenceOnly):
-			wordOrderUpperBound = featureNeuronsWordOrderExpanded1 + 1
-			wordOrderMask = pt.logical_and(featureNeuronsWordOrderExpanded2 > featureNeuronsWordOrderExpanded1, featureNeuronsWordOrderExpanded2 <= wordOrderUpperBound)
-		else:
-			wordOrderMask = featureNeuronsWordOrderExpanded2 > featureNeuronsWordOrderExpanded1
+		wordOrderMask = createFeatureWordOrderConnectionMask(featureNeuronsWordOrderExpanded1, featureNeuronsWordOrderExpanded2, trainConnectionsIncludeSameTimeIndex)
 		featureConnectionsActive = featureConnectionsActive * wordOrderMask
 	if(columnsWordOrder is not None):
 		columnsWordOrderExpanded1 = columnsWordOrder.view(cs, 1, 1, 1).expand(cs, fs, cs, fs)

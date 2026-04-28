@@ -40,6 +40,7 @@ class SequenceObservedColumns:
 		self.observedColumnsSequenceWordIndexDict = observedColumnsSequenceWordIndexDict	# key: sequence word index, value: ObservedColumn
 		self.noDelimiterDetectedBetweenConceptTokens = False
 		self.requiredSourceFeatureIndicesByObservedColumn = None
+		self.trainConnectionsIncludeSameTimeIndex = False
 
 		if(trainSequenceObservedColumnsMatchSequenceWords):
 			self.cs = len(observedColumnsSequenceWordIndexDict)
