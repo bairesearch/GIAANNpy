@@ -251,7 +251,7 @@ def calculateAdjacentSalientImageSaccadeOffsetPairs(featureCoordinates, workWidt
 	sortOrder = None
 	selectedPairIndices = None
 	requiredPairIndices = None
-	repeatCount = None
+	selectedPairCount = None
 	imageCentreCoordinate = None
 	startDistanceToCentre = None
 	endDistanceToCentre = None
@@ -278,14 +278,9 @@ def calculateAdjacentSalientImageSaccadeOffsetPairs(featureCoordinates, workWidt
 		pairDistances = pt.linalg.vector_norm(endFeatureCoordinates - startFeatureCoordinates, dim=1)
 		sortOrder = pt.argsort(pairDistances, descending=False)
 		selectedPairIndices = pairIndices.index_select(0, sortOrder)
-		if(int(selectedPairIndices.shape[0]) >= int(modalityORimageSaccadesPerImage)):
-			requiredPairIndices = pt.arange(int(modalityORimageSaccadesPerImage), device=featureCoordinates.device)
-			selectedPairIndices = selectedPairIndices.index_select(0, requiredPairIndices)
-		else:
-			repeatCount = int((int(modalityORimageSaccadesPerImage) + int(selectedPairIndices.shape[0]) - 1)/int(selectedPairIndices.shape[0]))
-			selectedPairIndices = selectedPairIndices.repeat((repeatCount, 1))
-			requiredPairIndices = pt.arange(int(modalityORimageSaccadesPerImage), device=featureCoordinates.device)
-			selectedPairIndices = selectedPairIndices.index_select(0, requiredPairIndices)
+		selectedPairCount = min(int(selectedPairIndices.shape[0]), int(modalityORimageSaccadesPerImage))
+		requiredPairIndices = pt.arange(selectedPairCount, device=featureCoordinates.device)
+		selectedPairIndices = selectedPairIndices.index_select(0, requiredPairIndices)
 		imageCentreCoordinate = pt.tensor((float(workWidth)/2.0, float(workHeight)/2.0), dtype=featureCoordinates.dtype, device=featureCoordinates.device)
 		startFeatureCoordinates = featureCoordinates.index_select(0, selectedPairIndices[:, 0])
 		endFeatureCoordinates = featureCoordinates.index_select(0, selectedPairIndices[:, 1])

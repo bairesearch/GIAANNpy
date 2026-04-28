@@ -24,12 +24,14 @@ def calculateSnapshotDimensionsFromImageDimensions(imageWidth, imageHeight, func
 	result = None
 	snapshotWidth = None
 	snapshotHeight = None
+	snapshotDimension = None
 	if(functionName == ""):
 		raise RuntimeError("calculateSnapshotDimensionsFromImageDimensions error: functionName must not be empty")
 	validateSnapshotImageDimensions(imageWidth, imageHeight, functionName)
 	validateSnapshotFraction(functionName)
-	snapshotWidth = calculateSnapshotDimension(imageWidth, functionName)
-	snapshotHeight = calculateSnapshotDimension(imageHeight, functionName)
+	snapshotDimension = calculateSquareSnapshotDimension(imageWidth, imageHeight, functionName)
+	snapshotWidth = snapshotDimension
+	snapshotHeight = snapshotDimension
 	if(snapshotWidth > imageWidth or snapshotHeight > imageHeight):
 		raise RuntimeError(functionName + " error: calculated snapshot dimensions exceed image dimensions")
 	result = snapshotWidth, snapshotHeight
@@ -54,10 +56,12 @@ def validateSnapshotFraction(functionName):
 	return result
 
 
-def calculateSnapshotDimension(imageDimension, functionName):
+def calculateSquareSnapshotDimension(imageWidth, imageHeight, functionName):
 	result = None
+	imageDimension = None
 	snapshotDimensionFloat = None
 	snapshotDimension = None
+	imageDimension = min(imageWidth, imageHeight)
 	snapshotDimensionFloat = float(imageDimension)*float(modalityORsnapshotFractionOfImage)
 	if(snapshotDimensionFloat < 1.0):
 		raise RuntimeError(functionName + " error: modalityORsnapshotFractionOfImage produces a snapshot dimension < 1 pixel")

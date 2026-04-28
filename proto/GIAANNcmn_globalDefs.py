@@ -810,6 +810,9 @@ if(drawEfficient):
 if(printConfiguration): 
 	print("***** printConfiguration: ***** ")
 	print("")
+	print("#Modality selection;")
+	print("modalityName:", modalityName)
+	print("")
 	print("#Execution mode selection;")
 	print("useQuickExecution:", useQuickExecution)
 	print("useBenchmark:", useBenchmark)

@@ -27,6 +27,10 @@ from GIAANNcmn_globalDefs import useDrawNetworkIndependently
 submodalityName = "image"	#image, video
 
 
+#algorithm selection
+tokensiationMethodOneColumnPerSnapshotPixel = True	#default: True #orig: False
+
+
 #recent debug vars;
 debugPrintNumberFeatures = True
 debugPrintInsufficientUsableFeaturesWarning = True
@@ -98,7 +102,13 @@ inferenceConnectionStrengthPOSdependence = False
 
 
 #modality OR;
-modalityORpixelsPerColumn = 20
+if(tokensiationMethodOneColumnPerSnapshotPixel):
+	modalityORnumberOfColumns = 1000
+	modalityORfilterWidth = 5
+	modalityORfilterChannels = 100
+	modalityORnumberOfFeaturesPerColumn = modalityORfilterWidth*modalityORfilterWidth*modalityORfilterChannels
+else:
+	modalityORpixelsPerColumn = 20
 modalityORnumberOfLayers = 5
 modalityORtrainMaxLayerIndex = 0
 modalityORuseExternalRFfilterLibrary = False
@@ -122,9 +132,13 @@ if(submodalityName=="video"):
 	modalityORdatasetPromptMaxSequences = 2
 	modalityORvideoStreamFrames = False	#orig: False
 elif(submodalityName=="image"):
+	modalityORimageSaccadesEncode = False	#default: False	#orig: True
 	#saccade augmentations are calculated by translating the image to a random polar coordinates offset from the centre
-	modalityORimageSaccadesPerImage = 5
-	modalityORimageSnapshotsPerSaccade = 3
+	modalityORimageSaccadesPerImage = 5		#max number saccades per image
+	if(modalityORimageSaccadesEncode):
+		modalityORimageSnapshotsPerSaccade = 2	#default: 2	#if 2: start and end of saccade, if >2 start and end of saccade and modalityORimageSnapshotsPerSaccade-2 interpolations between these.
+	else:
+		modalityORimageSnapshotsPerSaccade = 1 #mandatory: 1	#if 1: no temporal encoding of saccade movements
 	# upgrade submodalityName=="image" to perform saccades augomentations between nearby (i.e. adjacent) salient regions of the image: a) segment centres and b) corner features
 	modalityORimageSaccadesUseAdjacentSalientRegions = True
 	modalityORimageSaccadesSkipInsufficientUsableFeatures = True

@@ -43,7 +43,7 @@ def sampleVideoSnapshotSubsequences(frameTensor, articleIndex, sequenceCount):
 
 def sampleImageSaccadeSequences(imageTensor):
 	# generate sequence data by augmenting each image:
-	# for each image, generate modalityORimageSaccadesPerImage sequences by performing modalityORimageSaccadesPerImage augmentations:
+	# for each image, generate up to modalityORimageSaccadesPerImage sequences by performing saccade augmentations:
 	result = []
 	preparedImageTensor = None
 	cropMarginX = None
@@ -61,6 +61,7 @@ def sampleImageSaccadeSequences(imageTensor):
 		raise RuntimeError("sampleImageSaccadeSequences error: modalityORimageSaccadesPerImage must be > 0")
 	if(modalityORimageSnapshotsPerSaccade <= 0):
 		raise RuntimeError("sampleImageSaccadeSequences error: modalityORimageSnapshotsPerSaccade must be > 0")
+	validateImageSaccadeEncodingParameters()
 	if(not pt.is_tensor(imageTensor)):
 		raise RuntimeError("sampleImageSaccadeSequences error: imageTensor must be a tensor")
 	if(imageTensor.dim() != 3):
@@ -95,6 +96,19 @@ def sampleImageSaccadeSequences(imageTensor):
 			targetOffsetX, targetOffsetY = sampleRandomImageSaccadeOffset(cropMarginX, cropMarginY)
 			sequence = generateImageSaccadeSequence(preparedImageTensor, targetOffsetX, targetOffsetY, cropMarginX, cropMarginY, snapshotWidth, snapshotHeight)
 			result.append(sequence)
+	return result
+
+
+def validateImageSaccadeEncodingParameters():
+	result = None
+	if(not isinstance(modalityORimageSaccadesEncode, bool)):
+		raise RuntimeError("validateImageSaccadeEncodingParameters error: modalityORimageSaccadesEncode must be a bool")
+	if(modalityORimageSnapshotsPerSaccade <= 0):
+		raise RuntimeError("validateImageSaccadeEncodingParameters error: modalityORimageSnapshotsPerSaccade must be > 0")
+	if(not modalityORimageSaccadesEncode and modalityORimageSnapshotsPerSaccade != 1):
+		raise RuntimeError("validateImageSaccadeEncodingParameters error: modalityORimageSnapshotsPerSaccade must equal 1 when modalityORimageSaccadesEncode is False")
+	if(modalityORimageSaccadesEncode and modalityORimageSnapshotsPerSaccade < 2):
+		raise RuntimeError("validateImageSaccadeEncodingParameters error: modalityORimageSnapshotsPerSaccade must be >= 2 when modalityORimageSaccadesEncode is True")
 	return result
 
 
@@ -232,10 +246,7 @@ def generateImageSaccadeSequenceBetweenOffsets(preparedImageTensor, startOffsetX
 	workWidth = int(preparedImageTensor.shape[2])
 	snapshotSequenceTensor = pt.zeros((modalityORimageSnapshotsPerSaccade, 3, snapshotHeight, snapshotWidth), dtype=arrayType, device=deviceDense)
 	for snapshotIndex in range(modalityORimageSnapshotsPerSaccade):
-		if(modalityORimageSnapshotsPerSaccade == 1):
-			snapshotIndexFraction = 1.0
-		else:
-			snapshotIndexFraction = float(snapshotIndex)/float(modalityORimageSnapshotsPerSaccade - 1)
+		snapshotIndexFraction = calculateImageSaccadeSnapshotIndexFraction(snapshotIndex)
 		snapshotOffsetX = float(startOffsetX) + (float(endOffsetX - startOffsetX)*snapshotIndexFraction)
 		snapshotOffsetY = float(startOffsetY) + (float(endOffsetY - startOffsetY)*snapshotIndexFraction)
 		startX = int(cropMarginX) + int(round(snapshotOffsetX))
@@ -279,10 +290,7 @@ def generateImageSaccadeSequence(preparedImageTensor, targetOffsetX, targetOffse
 	workWidth = int(preparedImageTensor.shape[2])
 	snapshotSequenceTensor = pt.zeros((modalityORimageSnapshotsPerSaccade, 3, snapshotHeight, snapshotWidth), dtype=arrayType, device=deviceDense)
 	for snapshotIndex in range(modalityORimageSnapshotsPerSaccade):
-		if(modalityORimageSnapshotsPerSaccade == 1):
-			snapshotIndexFraction = 1.0
-		else:
-			snapshotIndexFraction = float(snapshotIndex)/float(modalityORimageSnapshotsPerSaccade - 1)
+		snapshotIndexFraction = calculateImageSaccadeSnapshotIndexFraction(snapshotIndex)
 		snapshotOffsetX = int(round(float(targetOffsetX)*snapshotIndexFraction))
 		snapshotOffsetY = int(round(float(targetOffsetY)*snapshotIndexFraction))
 		startX = int(cropMarginX) + snapshotOffsetX
@@ -296,6 +304,21 @@ def generateImageSaccadeSequence(preparedImageTensor, targetOffsetX, targetOffse
 			raise RuntimeError("generateImageSaccadeSequence error: snapshotTensor shape mismatch")
 		snapshotSequenceTensor[snapshotIndex] = snapshotTensor
 	result = snapshotSequenceTensor
+	return result
+
+
+def calculateImageSaccadeSnapshotIndexFraction(snapshotIndex):
+	result = None
+	if(not isinstance(snapshotIndex, int)):
+		raise RuntimeError("calculateImageSaccadeSnapshotIndexFraction error: snapshotIndex must be an int")
+	if(snapshotIndex < 0 or snapshotIndex >= modalityORimageSnapshotsPerSaccade):
+		raise RuntimeError("calculateImageSaccadeSnapshotIndexFraction error: snapshotIndex out of range")
+	if(modalityORimageSnapshotsPerSaccade == 1):
+		result = 1.0
+	elif(modalityORimageSnapshotsPerSaccade == 2):
+		result = float(snapshotIndex)
+	else:
+		result = float(snapshotIndex)/float(modalityORimageSnapshotsPerSaccade - 1)
 	return result
 
 

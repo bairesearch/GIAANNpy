@@ -47,9 +47,15 @@ def initialiseRFfiltersExternal():
 	module = None
 	module = importlib.import_module(modalityORexternalRFfilterLibraryModuleName)
 	if(hasattr(module, "initialiseRFfilters")):
-		externalResult = module.initialiseRFfilters(modalityORpixelsPerColumn)
+		if(tokensiationMethodOneColumnPerSnapshotPixel):
+			externalResult = module.initialiseRFfilters(modalityORfilterWidth)
+		else:
+			externalResult = module.initialiseRFfilters(modalityORpixelsPerColumn)
 	elif(hasattr(module, "createRFfilters")):
-		externalResult = module.createRFfilters(modalityORpixelsPerColumn)
+		if(tokensiationMethodOneColumnPerSnapshotPixel):
+			externalResult = module.createRFfilters(modalityORfilterWidth)
+		else:
+			externalResult = module.createRFfilters(modalityORpixelsPerColumn)
 	else:
 		raise RuntimeError("initialiseRFfiltersExternal error: external RF filter library must expose initialiseRFfilters(filterSize) or createRFfilters(filterSize)")
 	result = adaptExternalRFfilters(externalResult)
@@ -94,14 +100,134 @@ def buildInternalRFfilterBank():
 	gaborFilters, gaborCodes = buildGaborRFfilters()
 	resultFilterTensor = pt.cat((ellipsoidalFilters, gaborFilters), dim=0)
 	resultFilterCodeList = ellipsoidalCodes + gaborCodes
+	if(tokensiationMethodOneColumnPerSnapshotPixel):
+		resultFilterTensor, resultFilterCodeList = adjustInternalRFfilterBankToPixelColumnFilterChannels(resultFilterTensor, resultFilterCodeList)
 	return resultFilterTensor, resultFilterCodeList
+
+
+if(tokensiationMethodOneColumnPerSnapshotPixel):
+	def validatePixelColumnRFfilterParameters():
+		result = None
+		if(tokensiationMethodOneColumnPerSnapshotPixel):
+			if(not isinstance(modalityORfilterWidth, int)):
+				raise RuntimeError("validatePixelColumnRFfilterParameters error: modalityORfilterWidth must be an int")
+			if(modalityORfilterWidth < 3):
+				raise RuntimeError("validatePixelColumnRFfilterParameters error: modalityORfilterWidth must be >= 3")
+			if(modalityORfilterWidth%2 != 1):
+				raise RuntimeError("validatePixelColumnRFfilterParameters error: modalityORfilterWidth must be odd")
+			if(not isinstance(modalityORfilterChannels, int)):
+				raise RuntimeError("validatePixelColumnRFfilterParameters error: modalityORfilterChannels must be an int")
+			if(modalityORfilterChannels <= 0):
+				raise RuntimeError("validatePixelColumnRFfilterParameters error: modalityORfilterChannels must be > 0")
+			if(not isinstance(modalityORnumberOfFeaturesPerColumn, int)):
+				raise RuntimeError("validatePixelColumnRFfilterParameters error: modalityORnumberOfFeaturesPerColumn must be an int")
+			if(modalityORnumberOfFeaturesPerColumn != modalityORfilterWidth*modalityORfilterWidth*modalityORfilterChannels):
+				raise RuntimeError("validatePixelColumnRFfilterParameters error: modalityORnumberOfFeaturesPerColumn must equal modalityORfilterWidth*modalityORfilterWidth*modalityORfilterChannels")
+		else:
+			raise RuntimeError("validatePixelColumnRFfilterParameters error: requires tokensiationMethodOneColumnPerSnapshotPixel")
+		return result
+
+
+	def adjustInternalRFfilterBankToPixelColumnFilterChannels(filterTensor, filterCodeList):
+		resultFilterTensor = None
+		resultFilterCodeList = None
+		numberOfSupplementaryFilters = None
+		supplementaryFilterTensor = None
+		supplementaryFilterCodeList = None
+		if(tokensiationMethodOneColumnPerSnapshotPixel):
+			validatePixelColumnRFfilterParameters()
+			if(not pt.is_tensor(filterTensor)):
+				raise RuntimeError("adjustInternalRFfilterBankToPixelColumnFilterChannels error: filterTensor must be a tensor")
+			if(filterTensor.dim() != 4):
+				raise RuntimeError("adjustInternalRFfilterBankToPixelColumnFilterChannels error: filterTensor rank must be 4")
+			if(len(filterCodeList) != int(filterTensor.shape[0])):
+				raise RuntimeError("adjustInternalRFfilterBankToPixelColumnFilterChannels error: filterCodeList length mismatch")
+			if(int(filterTensor.shape[0]) > int(modalityORfilterChannels)):
+				resultFilterTensor = filterTensor[:int(modalityORfilterChannels)]
+				resultFilterCodeList = list(filterCodeList[:int(modalityORfilterChannels)])
+			elif(int(filterTensor.shape[0]) < int(modalityORfilterChannels)):
+				numberOfSupplementaryFilters = int(modalityORfilterChannels) - int(filterTensor.shape[0])
+				supplementaryFilterTensor, supplementaryFilterCodeList = buildSupplementaryPixelColumnRFfilters(numberOfSupplementaryFilters, int(filterTensor.shape[2]))
+				resultFilterTensor = pt.cat((filterTensor, supplementaryFilterTensor), dim=0)
+				resultFilterCodeList = list(filterCodeList) + supplementaryFilterCodeList
+			else:
+				resultFilterTensor = filterTensor
+				resultFilterCodeList = list(filterCodeList)
+		else:
+			raise RuntimeError("adjustInternalRFfilterBankToPixelColumnFilterChannels error: requires tokensiationMethodOneColumnPerSnapshotPixel")
+		return resultFilterTensor, resultFilterCodeList
+
+
+	def buildSupplementaryPixelColumnRFfilters(numberOfFilters, size):
+		resultFilterTensor = None
+		resultFilterCodeList = []
+		filterList = []
+		yGrid = None
+		xGrid = None
+		colourWeightsList = None
+		colourIndex = None
+		polarityIndex = None
+		baseKernel = None
+		if(tokensiationMethodOneColumnPerSnapshotPixel):
+			if(numberOfFilters <= 0):
+				raise RuntimeError("buildSupplementaryPixelColumnRFfilters error: numberOfFilters must be > 0")
+			if(size != int(modalityORfilterWidth)):
+				raise RuntimeError("buildSupplementaryPixelColumnRFfilters error: size must equal modalityORfilterWidth")
+			yGrid, xGrid = createRotationGrid(size)
+			colourWeightsList = buildColourWeights()
+			for filterIndex in range(numberOfFilters):
+				colourIndex = filterIndex%len(colourWeightsList)
+				polarityIndex = int(filterIndex//len(colourWeightsList))%2
+				baseKernel = createSupplementaryPixelColumnRFfilterKernel(xGrid, yGrid, filterIndex, polarityIndex)
+				filterList.append(applyColourWeights(baseKernel, colourWeightsList[colourIndex]))
+				resultFilterCodeList.append(buildRFfilterCode("PIX", filterIndex, 0, colourIndex, polarityIndex))
+			resultFilterTensor = stackRFfilters(filterList)
+		else:
+			raise RuntimeError("buildSupplementaryPixelColumnRFfilters error: requires tokensiationMethodOneColumnPerSnapshotPixel")
+		return resultFilterTensor, resultFilterCodeList
+
+
+	def createSupplementaryPixelColumnRFfilterKernel(xGrid, yGrid, filterIndex, polarityIndex):
+		result = None
+		orientationIndex = None
+		radiusIndex = None
+		angleRadians = None
+		radius = None
+		centreX = None
+		centreY = None
+		sigma = None
+		innerMask = None
+		outerMask = None
+		if(tokensiationMethodOneColumnPerSnapshotPixel):
+			orientationIndex = filterIndex%8
+			radiusIndex = int(filterIndex//8)%2
+			angleRadians = (2.0*math.pi*float(orientationIndex))/8.0
+			radius = 0.0
+			if(radiusIndex == 1):
+				radius = 0.35
+			centreX = math.cos(angleRadians)*radius
+			centreY = math.sin(angleRadians)*radius
+			sigma = 0.2 + (0.05*float(int(filterIndex//16)%3))
+			innerMask = pt.exp(-0.5*(((xGrid - centreX)/sigma)**2 + ((yGrid - centreY)/sigma)**2))
+			outerMask = pt.exp(-0.5*((xGrid/(sigma*2.0))**2 + (yGrid/(sigma*2.0))**2))
+			result = innerMask - (0.5*outerMask)
+			if(polarityIndex == 1):
+				result = -result
+			result = normaliseRFfilter2d(result)
+		else:
+			raise RuntimeError("createSupplementaryPixelColumnRFfilterKernel error: requires tokensiationMethodOneColumnPerSnapshotPixel")
+		return result
 
 
 def buildEllipsoidalRFfilters():
 	filterTensor = None
 	filterCodeList = []
 	filterList = []
-	size = modalityORpixelsPerColumn
+	size = None
+	if(tokensiationMethodOneColumnPerSnapshotPixel):
+		size = modalityORfilterWidth
+	else:
+		size = modalityORpixelsPerColumn
 	yGrid, xGrid = createRotationGrid(size)
 	orientationList = [0.0, math.pi/4.0, math.pi/2.0, 3.0*math.pi/4.0]
 	colourWeightsList = buildColourWeights()
@@ -120,7 +246,11 @@ def buildGaborRFfilters():
 	filterTensor = None
 	filterCodeList = []
 	filterList = []
-	size = modalityORpixelsPerColumn
+	size = None
+	if(tokensiationMethodOneColumnPerSnapshotPixel):
+		size = modalityORfilterWidth
+	else:
+		size = modalityORpixelsPerColumn
 	yGrid, xGrid = createRotationGrid(size)
 	orientationList = [0.0, math.pi/4.0, math.pi/2.0, 3.0*math.pi/4.0]
 	frequencyList = [0.15, 0.25]
@@ -285,8 +415,15 @@ def createRFfilterContainer(filterTensor, filterCodeList, filterWordList=None):
 		raise RuntimeError("createRFfilterContainer error: filterTensor rank must be 4")
 	if(filterTensor.shape[1] != 3):
 		raise RuntimeError("createRFfilterContainer error: filterTensor channel count must be 3")
-	if(filterTensor.shape[2] != modalityORpixelsPerColumn or filterTensor.shape[3] != modalityORpixelsPerColumn):
-		raise RuntimeError("createRFfilterContainer error: filterTensor spatial size must equal modalityORpixelsPerColumn")
+	if(tokensiationMethodOneColumnPerSnapshotPixel):
+		validatePixelColumnRFfilterParameters()
+		if(filterTensor.shape[2] != modalityORfilterWidth or filterTensor.shape[3] != modalityORfilterWidth):
+			raise RuntimeError("createRFfilterContainer error: filterTensor spatial size must equal modalityORfilterWidth")
+		if(filterTensor.shape[0] != modalityORfilterChannels):
+			raise RuntimeError("createRFfilterContainer error: filterTensor filter count must equal modalityORfilterChannels")
+	else:
+		if(filterTensor.shape[2] != modalityORpixelsPerColumn or filterTensor.shape[3] != modalityORpixelsPerColumn):
+			raise RuntimeError("createRFfilterContainer error: filterTensor spatial size must equal modalityORpixelsPerColumn")
 	if(len(filterCodeList) != filterTensor.shape[0]):
 		raise RuntimeError("createRFfilterContainer error: filterCodeList length mismatch")
 	if(filterWordList is None):
@@ -317,34 +454,112 @@ def applyRFfilters(rfFilters, columnPatches):
 		raise RuntimeError("applyRFfilters error: rfFilters must be an ORRFfilters instance")
 	if(not pt.is_tensor(columnPatches)):
 		raise RuntimeError("applyRFfilters error: columnPatches must be a tensor")
-	if(columnPatches.dim() == 5):
-		leadingShape = columnPatches.shape[0:2]
-		flatColumnPatches = columnPatches.reshape(columnPatches.shape[0]*columnPatches.shape[1], columnPatches.shape[2], columnPatches.shape[3], columnPatches.shape[4])
-	elif(columnPatches.dim() == 4):
-		leadingShape = columnPatches.shape[0:1]
-		flatColumnPatches = columnPatches
+	if(tokensiationMethodOneColumnPerSnapshotPixel):
+		selectedFilterIndices, selectedFilterResponses = applyRFfiltersToPixelColumns(rfFilters, columnPatches)
 	else:
-		raise RuntimeError("applyRFfilters error: columnPatches rank must be 4 or 5")
-	if(flatColumnPatches.shape[1] != 3):
-		raise RuntimeError("applyRFfilters error: columnPatches channel count must be 3")
-	if(flatColumnPatches.shape[2] != modalityORpixelsPerColumn or flatColumnPatches.shape[3] != modalityORpixelsPerColumn):
-		raise RuntimeError("applyRFfilters error: columnPatches spatial size must equal modalityORpixelsPerColumn")
-	if(flatColumnPatches.shape[0] == 0):
-		selectedFilterIndices = pt.empty(leadingShape, dtype=pt.long, device=columnPatches.device)
-		selectedFilterResponses = pt.empty(leadingShape, dtype=arrayType, device=columnPatches.device)
-	else:
-		flatColumnPatches = normaliseColumnPatches(flatColumnPatches.to(deviceDense, dtype=arrayType))
-		filterResponses = pt.einsum("nchw,fchw->nf", flatColumnPatches, rfFilters.filterTensor)
-		maxResponses, maxIndices = pt.max(filterResponses, dim=1)
-		inactiveIndices = pt.full_like(maxIndices, -1)
-		selectedFilterIndices = pt.where(maxResponses >= modalityORRFfilterThreshold, maxIndices, inactiveIndices)
-		selectedFilterResponses = maxResponses
-		if(columnPatches.device != selectedFilterIndices.device):
-			selectedFilterIndices = selectedFilterIndices.to(columnPatches.device)
-			selectedFilterResponses = selectedFilterResponses.to(columnPatches.device)
-		selectedFilterIndices = selectedFilterIndices.reshape(leadingShape)
-		selectedFilterResponses = selectedFilterResponses.reshape(leadingShape)
+		if(columnPatches.dim() == 5):
+			leadingShape = columnPatches.shape[0:2]
+			flatColumnPatches = columnPatches.reshape(columnPatches.shape[0]*columnPatches.shape[1], columnPatches.shape[2], columnPatches.shape[3], columnPatches.shape[4])
+		elif(columnPatches.dim() == 4):
+			leadingShape = columnPatches.shape[0:1]
+			flatColumnPatches = columnPatches
+		else:
+			raise RuntimeError("applyRFfilters error: columnPatches rank must be 4 or 5")
+		if(flatColumnPatches.shape[1] != 3):
+			raise RuntimeError("applyRFfilters error: columnPatches channel count must be 3")
+		if(flatColumnPatches.shape[2] != modalityORpixelsPerColumn or flatColumnPatches.shape[3] != modalityORpixelsPerColumn):
+			raise RuntimeError("applyRFfilters error: columnPatches spatial size must equal modalityORpixelsPerColumn")
+		if(flatColumnPatches.shape[0] == 0):
+			selectedFilterIndices = pt.empty(leadingShape, dtype=pt.long, device=columnPatches.device)
+			selectedFilterResponses = pt.empty(leadingShape, dtype=arrayType, device=columnPatches.device)
+		else:
+			flatColumnPatches = normaliseColumnPatches(flatColumnPatches.to(deviceDense, dtype=arrayType))
+			filterResponses = pt.einsum("nchw,fchw->nf", flatColumnPatches, rfFilters.filterTensor)
+			maxResponses, maxIndices = pt.max(filterResponses, dim=1)
+			inactiveIndices = pt.full_like(maxIndices, -1)
+			selectedFilterIndices = pt.where(maxResponses >= modalityORRFfilterThreshold, maxIndices, inactiveIndices)
+			selectedFilterResponses = maxResponses
+			if(columnPatches.device != selectedFilterIndices.device):
+				selectedFilterIndices = selectedFilterIndices.to(columnPatches.device)
+				selectedFilterResponses = selectedFilterResponses.to(columnPatches.device)
+			selectedFilterIndices = selectedFilterIndices.reshape(leadingShape)
+			selectedFilterResponses = selectedFilterResponses.reshape(leadingShape)
 	return selectedFilterIndices, selectedFilterResponses
+
+
+if(tokensiationMethodOneColumnPerSnapshotPixel):
+	def applyRFfiltersToPixelColumns(rfFilters, transformedSnapshotTensor):
+		resultSelectedFilterIndices = None
+		resultSelectedFilterResponses = None
+		pixelColumnPatches = None
+		flatColumnPatches = None
+		leadingShape = None
+		filterResponses = None
+		maxResponses = None
+		maxIndices = None
+		inactiveIndices = None
+		if(tokensiationMethodOneColumnPerSnapshotPixel):
+			validatePixelColumnRFfilterParameters()
+			if(not isinstance(rfFilters, ORRFfilters)):
+				raise RuntimeError("applyRFfiltersToPixelColumns error: rfFilters must be an ORRFfilters instance")
+			if(not pt.is_tensor(transformedSnapshotTensor)):
+				raise RuntimeError("applyRFfiltersToPixelColumns error: transformedSnapshotTensor must be a tensor")
+			if(transformedSnapshotTensor.dim() != 4):
+				raise RuntimeError("applyRFfiltersToPixelColumns error: transformedSnapshotTensor rank must be 4")
+			if(int(transformedSnapshotTensor.shape[1]) != 3):
+				raise RuntimeError("applyRFfiltersToPixelColumns error: transformedSnapshotTensor channel count must be 3")
+			if(int(transformedSnapshotTensor.shape[2])*int(transformedSnapshotTensor.shape[3]) != int(modalityORnumberOfColumns)):
+				raise RuntimeError("applyRFfiltersToPixelColumns error: transformed snapshot pixel count must equal modalityORnumberOfColumns")
+			if(int(rfFilters.filterTensor.shape[0]) != int(modalityORfilterChannels)):
+				raise RuntimeError("applyRFfiltersToPixelColumns error: rfFilters filter count must equal modalityORfilterChannels")
+			if(int(rfFilters.filterTensor.shape[2]) != int(modalityORfilterWidth) or int(rfFilters.filterTensor.shape[3]) != int(modalityORfilterWidth)):
+				raise RuntimeError("applyRFfiltersToPixelColumns error: rfFilters spatial size must equal modalityORfilterWidth")
+			leadingShape = (int(transformedSnapshotTensor.shape[0]), int(transformedSnapshotTensor.shape[2])*int(transformedSnapshotTensor.shape[3]))
+			if(int(transformedSnapshotTensor.shape[0]) == 0):
+				resultSelectedFilterIndices = pt.empty(leadingShape, dtype=pt.long, device=transformedSnapshotTensor.device)
+				resultSelectedFilterResponses = pt.empty(leadingShape, dtype=arrayType, device=transformedSnapshotTensor.device)
+			else:
+				pixelColumnPatches = extractPixelColumnFilterPatches(transformedSnapshotTensor.to(dtype=arrayType))
+				flatColumnPatches = pixelColumnPatches.reshape(pixelColumnPatches.shape[0]*pixelColumnPatches.shape[1], pixelColumnPatches.shape[2], pixelColumnPatches.shape[3], pixelColumnPatches.shape[4])
+				flatColumnPatches = normaliseColumnPatches(flatColumnPatches.to(deviceDense, dtype=arrayType))
+				filterResponses = pt.einsum("nchw,fchw->nf", flatColumnPatches, rfFilters.filterTensor)
+				maxResponses, maxIndices = pt.max(filterResponses, dim=1)
+				inactiveIndices = pt.full_like(maxIndices, -1)
+				resultSelectedFilterIndices = pt.where(maxResponses >= modalityORRFfilterThreshold, maxIndices, inactiveIndices)
+				resultSelectedFilterResponses = maxResponses
+				if(transformedSnapshotTensor.device != resultSelectedFilterIndices.device):
+					resultSelectedFilterIndices = resultSelectedFilterIndices.to(transformedSnapshotTensor.device)
+					resultSelectedFilterResponses = resultSelectedFilterResponses.to(transformedSnapshotTensor.device)
+				resultSelectedFilterIndices = resultSelectedFilterIndices.reshape(leadingShape)
+				resultSelectedFilterResponses = resultSelectedFilterResponses.reshape(leadingShape)
+		else:
+			raise RuntimeError("applyRFfiltersToPixelColumns error: requires tokensiationMethodOneColumnPerSnapshotPixel")
+		return resultSelectedFilterIndices, resultSelectedFilterResponses
+
+
+	def extractPixelColumnFilterPatches(transformedSnapshotTensor):
+		result = None
+		padding = None
+		paddedSnapshotTensor = None
+		patchTensor = None
+		if(tokensiationMethodOneColumnPerSnapshotPixel):
+			validatePixelColumnRFfilterParameters()
+			if(not pt.is_tensor(transformedSnapshotTensor)):
+				raise RuntimeError("extractPixelColumnFilterPatches error: transformedSnapshotTensor must be a tensor")
+			if(transformedSnapshotTensor.dim() != 4):
+				raise RuntimeError("extractPixelColumnFilterPatches error: transformedSnapshotTensor rank must be 4")
+			if(int(transformedSnapshotTensor.shape[1]) != 3):
+				raise RuntimeError("extractPixelColumnFilterPatches error: transformedSnapshotTensor channel count must be 3")
+			if(int(transformedSnapshotTensor.shape[2])*int(transformedSnapshotTensor.shape[3]) != int(modalityORnumberOfColumns)):
+				raise RuntimeError("extractPixelColumnFilterPatches error: transformed snapshot pixel count must equal modalityORnumberOfColumns")
+			padding = int(modalityORfilterWidth//2)
+			paddedSnapshotTensor = pt.nn.functional.pad(transformedSnapshotTensor, (padding, padding, padding, padding), mode="replicate")
+			patchTensor = paddedSnapshotTensor.unfold(2, int(modalityORfilterWidth), 1).unfold(3, int(modalityORfilterWidth), 1)
+			patchTensor = patchTensor.permute(0, 2, 3, 1, 4, 5).contiguous()
+			result = patchTensor.view(int(transformedSnapshotTensor.shape[0]), int(transformedSnapshotTensor.shape[2])*int(transformedSnapshotTensor.shape[3]), 3, int(modalityORfilterWidth), int(modalityORfilterWidth))
+		else:
+			raise RuntimeError("extractPixelColumnFilterPatches error: requires tokensiationMethodOneColumnPerSnapshotPixel")
+		return result
 
 
 def convertRFfilterIndexToASCIItext(rfFilters, rfFilterIndex):

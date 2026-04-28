@@ -56,22 +56,210 @@ def tokeniseSnapshotsToColumns(snapshotTensor):
 		raise RuntimeError("tokeniseSnapshotsToColumns error: snapshotTensor rank must be 4")
 	if(snapshotTensor.shape[1] != 3):
 		raise RuntimeError("tokeniseSnapshotsToColumns error: snapshotTensor channel count must be 3")
-	if(modalityORpixelsPerColumn <= 0):
-		raise RuntimeError("tokeniseSnapshotsToColumns error: modalityORpixelsPerColumn must be > 0")
-	gridHeight = int(snapshotTensor.shape[2]//modalityORpixelsPerColumn)
-	gridWidth = int(snapshotTensor.shape[3]//modalityORpixelsPerColumn)
-	if(gridHeight <= 0 or gridWidth <= 0):
-		raise RuntimeError("tokeniseSnapshotsToColumns error: snapshotTensor is smaller than modalityORpixelsPerColumn")
-	snapshotTensorTrimmed = snapshotTensor[:, :, :gridHeight*modalityORpixelsPerColumn, :gridWidth*modalityORpixelsPerColumn]
-	if(modalityORsnapshotRetinotopicFieldBias):
-		columnTensor, columnMetadataList = tokeniseSnapshotsToRetinotopicColumns(snapshotTensorTrimmed, gridHeight, gridWidth)
+	if(tokensiationMethodOneColumnPerSnapshotPixel):
+		result = tokeniseSnapshotsToPixelColumns(snapshotTensor)
 	else:
-		patchTensor = snapshotTensorTrimmed.unfold(2, modalityORpixelsPerColumn, modalityORpixelsPerColumn).unfold(3, modalityORpixelsPerColumn, modalityORpixelsPerColumn)
-		patchTensor = patchTensor.permute(0, 2, 3, 1, 4, 5).contiguous()
-		columnTensor = patchTensor.view(patchTensor.shape[0], gridHeight*gridWidth, patchTensor.shape[3], patchTensor.shape[4], patchTensor.shape[5])
-		columnMetadataList = buildColumnMetadataList(gridHeight, gridWidth)
-	result = {"columnTensor": columnTensor, "columnMetadataList": columnMetadataList, "gridHeight": gridHeight, "gridWidth": gridWidth}
+		if(modalityORpixelsPerColumn <= 0):
+			raise RuntimeError("tokeniseSnapshotsToColumns error: modalityORpixelsPerColumn must be > 0")
+		gridHeight = int(snapshotTensor.shape[2]//modalityORpixelsPerColumn)
+		gridWidth = int(snapshotTensor.shape[3]//modalityORpixelsPerColumn)
+		if(gridHeight <= 0 or gridWidth <= 0):
+			raise RuntimeError("tokeniseSnapshotsToColumns error: snapshotTensor is smaller than modalityORpixelsPerColumn")
+		snapshotTensorTrimmed = snapshotTensor[:, :, :gridHeight*modalityORpixelsPerColumn, :gridWidth*modalityORpixelsPerColumn]
+		if(modalityORsnapshotRetinotopicFieldBias):
+			columnTensor, columnMetadataList = tokeniseSnapshotsToRetinotopicColumns(snapshotTensorTrimmed, gridHeight, gridWidth)
+		else:
+			patchTensor = snapshotTensorTrimmed.unfold(2, modalityORpixelsPerColumn, modalityORpixelsPerColumn).unfold(3, modalityORpixelsPerColumn, modalityORpixelsPerColumn)
+			patchTensor = patchTensor.permute(0, 2, 3, 1, 4, 5).contiguous()
+			columnTensor = patchTensor.view(patchTensor.shape[0], gridHeight*gridWidth, patchTensor.shape[3], patchTensor.shape[4], patchTensor.shape[5])
+			columnMetadataList = buildColumnMetadataList(gridHeight, gridWidth)
+		result = {"columnTensor": columnTensor, "columnMetadataList": columnMetadataList, "gridHeight": gridHeight, "gridWidth": gridWidth}
 	return result
+
+
+if(tokensiationMethodOneColumnPerSnapshotPixel):
+	def tokeniseSnapshotsToPixelColumns(snapshotTensor):
+		result = None
+		gridHeight = None
+		gridWidth = None
+		columnTensor = None
+		columnMetadataList = None
+		validatePixelColumnTokenisationParameters(snapshotTensor)
+		gridHeight, gridWidth = calculatePixelColumnGridDimensions(int(snapshotTensor.shape[2]), int(snapshotTensor.shape[3]))
+		columnTensor = transformSnapshotsToPixelColumnTensor(snapshotTensor, gridHeight, gridWidth)
+		if(int(columnTensor.shape[2])*int(columnTensor.shape[3]) != int(modalityORnumberOfColumns)):
+			raise RuntimeError("tokeniseSnapshotsToPixelColumns error: transformed snapshot pixel count must equal modalityORnumberOfColumns")
+		columnMetadataList = buildColumnMetadataList(gridHeight, gridWidth)
+		result = {"columnTensor": columnTensor, "columnMetadataList": columnMetadataList, "gridHeight": gridHeight, "gridWidth": gridWidth}
+		return result
+
+
+	def validatePixelColumnTokenisationParameters(snapshotTensor):
+		result = None
+		if(tokensiationMethodOneColumnPerSnapshotPixel):
+			if(not pt.is_tensor(snapshotTensor)):
+				raise RuntimeError("validatePixelColumnTokenisationParameters error: snapshotTensor must be a tensor")
+			if(snapshotTensor.dim() != 4):
+				raise RuntimeError("validatePixelColumnTokenisationParameters error: snapshotTensor rank must be 4")
+			if(int(snapshotTensor.shape[1]) != 3):
+				raise RuntimeError("validatePixelColumnTokenisationParameters error: snapshotTensor channel count must be 3")
+			if(not isinstance(modalityORnumberOfColumns, int)):
+				raise RuntimeError("validatePixelColumnTokenisationParameters error: modalityORnumberOfColumns must be an int")
+			if(modalityORnumberOfColumns <= 0):
+				raise RuntimeError("validatePixelColumnTokenisationParameters error: modalityORnumberOfColumns must be > 0")
+			if(modalityORsnapshotRetinotopicFieldBias):
+				validateRetinotopicFieldBiasParameters()
+		else:
+			raise RuntimeError("validatePixelColumnTokenisationParameters error: requires tokensiationMethodOneColumnPerSnapshotPixel")
+		return result
+
+
+	def calculatePixelColumnGridDimensions(snapshotHeight, snapshotWidth):
+		result = None
+		targetAspectRatio = None
+		candidateHeight = None
+		candidateWidth = None
+		candidateAspectRatio = None
+		candidateDifference = None
+		bestDifference = None
+		bestGridHeight = None
+		bestGridWidth = None
+		if(tokensiationMethodOneColumnPerSnapshotPixel):
+			if(snapshotHeight <= 0 or snapshotWidth <= 0):
+				raise RuntimeError("calculatePixelColumnGridDimensions error: snapshotHeight/snapshotWidth must be > 0")
+			if(not isinstance(modalityORnumberOfColumns, int)):
+				raise RuntimeError("calculatePixelColumnGridDimensions error: modalityORnumberOfColumns must be an int")
+			if(modalityORnumberOfColumns <= 0):
+				raise RuntimeError("calculatePixelColumnGridDimensions error: modalityORnumberOfColumns must be > 0")
+			targetAspectRatio = float(snapshotWidth)/float(snapshotHeight)
+			candidateHeight = 1
+			while(candidateHeight*candidateHeight <= int(modalityORnumberOfColumns)):
+				if(int(modalityORnumberOfColumns)%candidateHeight == 0):
+					candidateWidth = int(modalityORnumberOfColumns)//candidateHeight
+					candidateAspectRatio = float(candidateWidth)/float(candidateHeight)
+					candidateDifference = abs(candidateAspectRatio - targetAspectRatio)/targetAspectRatio
+					if(bestDifference is None or candidateDifference < bestDifference):
+						bestDifference = candidateDifference
+						bestGridHeight = candidateHeight
+						bestGridWidth = candidateWidth
+					candidateAspectRatio = float(candidateHeight)/float(candidateWidth)
+					candidateDifference = abs(candidateAspectRatio - targetAspectRatio)/targetAspectRatio
+					if(bestDifference is None or candidateDifference < bestDifference):
+						bestDifference = candidateDifference
+						bestGridHeight = candidateWidth
+						bestGridWidth = candidateHeight
+				candidateHeight = candidateHeight + 1
+			if(bestGridHeight is None or bestGridWidth is None):
+				raise RuntimeError("calculatePixelColumnGridDimensions error: failed to calculate grid dimensions")
+			result = bestGridHeight, bestGridWidth
+		else:
+			raise RuntimeError("calculatePixelColumnGridDimensions error: requires tokensiationMethodOneColumnPerSnapshotPixel")
+		return result
+
+
+	def transformSnapshotsToPixelColumnTensor(snapshotTensor, gridHeight, gridWidth):
+		result = None
+		if(tokensiationMethodOneColumnPerSnapshotPixel):
+			if(gridHeight <= 0 or gridWidth <= 0):
+				raise RuntimeError("transformSnapshotsToPixelColumnTensor error: gridHeight/gridWidth must be > 0")
+			if(int(gridHeight)*int(gridWidth) != int(modalityORnumberOfColumns)):
+				raise RuntimeError("transformSnapshotsToPixelColumnTensor error: gridHeight*gridWidth must equal modalityORnumberOfColumns")
+			if(modalityORsnapshotRetinotopicFieldBias):
+				result = transformSnapshotsToRetinotopicPixelColumnTensor(snapshotTensor, gridHeight, gridWidth)
+			else:
+				result = pt.nn.functional.interpolate(snapshotTensor.to(dtype=arrayType), size=(gridHeight, gridWidth), mode="bilinear", align_corners=False)
+			if(result.dim() != 4):
+				raise RuntimeError("transformSnapshotsToPixelColumnTensor error: transformed snapshot rank must be 4")
+			if(int(result.shape[1]) != 3 or int(result.shape[2]) != int(gridHeight) or int(result.shape[3]) != int(gridWidth)):
+				raise RuntimeError("transformSnapshotsToPixelColumnTensor error: transformed snapshot shape mismatch")
+		else:
+			raise RuntimeError("transformSnapshotsToPixelColumnTensor error: requires tokensiationMethodOneColumnPerSnapshotPixel")
+		return result
+
+
+	def transformSnapshotsToRetinotopicPixelColumnTensor(snapshotTensor, gridHeight, gridWidth):
+		result = None
+		sourceCoordinateTensor = None
+		samplingGrid = None
+		if(tokensiationMethodOneColumnPerSnapshotPixel):
+			if(not modalityORsnapshotRetinotopicFieldBias):
+				raise RuntimeError("transformSnapshotsToRetinotopicPixelColumnTensor error: requires modalityORsnapshotRetinotopicFieldBias")
+			sourceCoordinateTensor = calculateRetinotopicPixelColumnSourceCoordinateTensor(gridHeight, gridWidth, snapshotTensor.device)
+			samplingGrid = sourceCoordinateTensor.view(gridHeight, gridWidth, 2).unsqueeze(0).expand(int(snapshotTensor.shape[0]), gridHeight, gridWidth, 2)
+			result = pt.nn.functional.grid_sample(snapshotTensor.to(dtype=arrayType), samplingGrid, mode="bilinear", padding_mode="border", align_corners=True)
+		else:
+			raise RuntimeError("transformSnapshotsToRetinotopicPixelColumnTensor error: requires tokensiationMethodOneColumnPerSnapshotPixel")
+		return result
+
+
+	def calculateRetinotopicPixelColumnSourceCoordinateTensor(gridHeight, gridWidth, targetDevice):
+		result = None
+		numberOfColumns = None
+		xGrid = None
+		yGrid = None
+		xFlat = None
+		yFlat = None
+		centreX = None
+		centreY = None
+		deltaX = None
+		deltaY = None
+		corticalDistanceTensor = None
+		distanceSortIndices = None
+		corticalColumnFractionTensor = None
+		columnFractionValues = None
+		visualRadiusFractionTensor = None
+		directionX = None
+		directionY = None
+		nonzeroDistanceMask = None
+		radiusLimitX = None
+		radiusLimitY = None
+		maxRadiusToRectangle = None
+		sourceXCoordinate = None
+		sourceYCoordinate = None
+		if(tokensiationMethodOneColumnPerSnapshotPixel):
+			if(not modalityORsnapshotRetinotopicFieldBias):
+				raise RuntimeError("calculateRetinotopicPixelColumnSourceCoordinateTensor error: requires modalityORsnapshotRetinotopicFieldBias")
+			if(gridHeight <= 0 or gridWidth <= 0):
+				raise RuntimeError("calculateRetinotopicPixelColumnSourceCoordinateTensor error: gridHeight/gridWidth must be > 0")
+			if(int(gridHeight)*int(gridWidth) != int(modalityORnumberOfColumns)):
+				raise RuntimeError("calculateRetinotopicPixelColumnSourceCoordinateTensor error: gridHeight*gridWidth must equal modalityORnumberOfColumns")
+			validateRetinotopicFieldBiasParameters()
+			numberOfColumns = int(gridHeight)*int(gridWidth)
+			yGrid, xGrid = pt.meshgrid(pt.arange(gridHeight, dtype=arrayType, device=targetDevice), pt.arange(gridWidth, dtype=arrayType, device=targetDevice), indexing="ij")
+			xFlat = xGrid.reshape(-1)
+			yFlat = yGrid.reshape(-1)
+			centreX = (float(gridWidth) - 1.0)/2.0
+			centreY = (float(gridHeight) - 1.0)/2.0
+			deltaX = xFlat - centreX
+			deltaY = yFlat - centreY
+			corticalDistanceTensor = pt.sqrt((deltaX*deltaX) + (deltaY*deltaY))
+			distanceSortIndices = pt.argsort(corticalDistanceTensor, descending=False)
+			corticalColumnFractionTensor = pt.zeros(numberOfColumns, dtype=arrayType, device=targetDevice)
+			if(numberOfColumns > 1):
+				columnFractionValues = pt.arange(numberOfColumns, dtype=arrayType, device=targetDevice)/float(numberOfColumns - 1)
+				corticalColumnFractionTensor[distanceSortIndices] = columnFractionValues
+			visualRadiusFractionTensor = calculateRetinotopicVisualRadiusFractionTensor(corticalColumnFractionTensor, targetDevice)
+			directionX = pt.zeros(numberOfColumns, dtype=arrayType, device=targetDevice)
+			directionY = pt.zeros(numberOfColumns, dtype=arrayType, device=targetDevice)
+			nonzeroDistanceMask = corticalDistanceTensor > 0.0
+			directionX[nonzeroDistanceMask] = deltaX[nonzeroDistanceMask]/corticalDistanceTensor[nonzeroDistanceMask]
+			directionY[nonzeroDistanceMask] = deltaY[nonzeroDistanceMask]/corticalDistanceTensor[nonzeroDistanceMask]
+			radiusLimitX = pt.full((numberOfColumns,), float("inf"), dtype=arrayType, device=targetDevice)
+			radiusLimitY = pt.full((numberOfColumns,), float("inf"), dtype=arrayType, device=targetDevice)
+			radiusLimitX[directionX != 0.0] = 1.0/pt.abs(directionX[directionX != 0.0])
+			radiusLimitY[directionY != 0.0] = 1.0/pt.abs(directionY[directionY != 0.0])
+			maxRadiusToRectangle = pt.minimum(radiusLimitX, radiusLimitY)
+			maxRadiusToRectangle[~nonzeroDistanceMask] = 0.0
+			sourceXCoordinate = directionX*visualRadiusFractionTensor*maxRadiusToRectangle
+			sourceYCoordinate = directionY*visualRadiusFractionTensor*maxRadiusToRectangle
+			if(bool(pt.any(sourceXCoordinate < -1.0).item()) or bool(pt.any(sourceYCoordinate < -1.0).item())):
+				raise RuntimeError("calculateRetinotopicPixelColumnSourceCoordinateTensor error: calculated source coordinate is < -1")
+			if(bool(pt.any(sourceXCoordinate > 1.0).item()) or bool(pt.any(sourceYCoordinate > 1.0).item())):
+				raise RuntimeError("calculateRetinotopicPixelColumnSourceCoordinateTensor error: calculated source coordinate is > 1")
+			result = pt.stack((sourceXCoordinate, sourceYCoordinate), dim=1)
+		else:
+			raise RuntimeError("calculateRetinotopicPixelColumnSourceCoordinateTensor error: requires tokensiationMethodOneColumnPerSnapshotPixel")
+		return result
 
 
 def tokeniseSnapshotsToRetinotopicColumns(snapshotTensorTrimmed, gridHeight, gridWidth):
