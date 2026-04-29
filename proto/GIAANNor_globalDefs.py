@@ -103,9 +103,9 @@ inferenceConnectionStrengthPOSdependence = False
 
 #modality OR;
 if(tokensiationMethodOneColumnPerSnapshotPixel):
-	modalityORnumberOfColumns = 1000
-	modalityORfilterWidth = 5
-	modalityORfilterChannels = 100
+	modalityORnumberOfColumns = 1000	#default: 1000	#~1000 hypercolumns in V1 
+	modalityORfilterWidth = 5	#default: TODO
+	modalityORfilterChannels = 100	#default: 15000*18	#~18 orientation columns per hypercolumn in V1	#~15000 neuron per orientation column
 	modalityORnumberOfFeaturesPerColumn = modalityORfilterWidth*modalityORfilterWidth*modalityORfilterChannels
 else:
 	modalityORpixelsPerColumn = 20
@@ -132,13 +132,15 @@ if(submodalityName=="video"):
 	modalityORdatasetPromptMaxSequences = 2
 	modalityORvideoStreamFrames = False	#orig: False
 elif(submodalityName=="image"):
-	modalityORimageSaccadesEncode = False	#default: False	#orig: True
+	modalityORimageSaccadesEncode = True	#default: True	#orig: True
 	#saccade augmentations are calculated by translating the image to a random polar coordinates offset from the centre
-	modalityORimageSaccadesPerImage = 5		#max number saccades per image
+	modalityORimageMaxSequencesPerImage = 5		#max independent sequences per image (lists of saccade keypoints) 
 	if(modalityORimageSaccadesEncode):
-		modalityORimageSnapshotsPerSaccade = 2	#default: 2	#if 2: start and end of saccade, if >2 start and end of saccade and modalityORimageSnapshotsPerSaccade-2 interpolations between these.
+		modalityORimageSaccadeKeypointsPerEncoding = 3	#default: 3	#orig: 2	# the number of saccade keypoints (transition points) used to encode the context of each selected column feature neuron
+		modalityORimageSnapshotsPerSaccade = 1	#default: 1	#if 1: one snapshot per saccade (plus the start point), if >1 add interpolation between saccade keypoints.
 	else:
-		modalityORimageSnapshotsPerSaccade = 1 #mandatory: 1	#if 1: no temporal encoding of saccade movements
+		modalityORimageSaccadeKeypointsPerEncoding = 1	#mandatory: 1
+		modalityORimageSnapshotsPerSaccade = 0 #mandatory: 0	#if 0: no temporal encoding of saccade movements
 	# upgrade submodalityName=="image" to perform saccades augomentations between nearby (i.e. adjacent) salient regions of the image: a) segment centres and b) corner features
 	modalityORimageSaccadesUseAdjacentSalientRegions = True
 	modalityORimageSaccadesSkipInsufficientUsableFeatures = True
