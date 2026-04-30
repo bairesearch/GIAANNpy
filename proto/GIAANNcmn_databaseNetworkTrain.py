@@ -55,6 +55,37 @@ def getTrainConnectionsIncludeSameTimeIndex(sequenceObservedColumns):
 	result = sequenceObservedColumns.trainConnectionsIncludeSameTimeIndex
 	return result
 
+def getTrainConnectionsUseSpatialDistance(sequenceObservedColumns):
+	result = None
+	if(not hasattr(sequenceObservedColumns, "trainConnectionsUseSpatialDistance")):
+		raise RuntimeError("getTrainConnectionsUseSpatialDistance error: sequenceObservedColumns missing trainConnectionsUseSpatialDistance")
+	if(not isinstance(sequenceObservedColumns.trainConnectionsUseSpatialDistance, bool)):
+		raise RuntimeError("getTrainConnectionsUseSpatialDistance error: trainConnectionsUseSpatialDistance must be a bool")
+	result = sequenceObservedColumns.trainConnectionsUseSpatialDistance
+	return result
+
+def getSequenceConceptFieldCoordinates(sequenceObservedColumns, targetDevice):
+	result = None
+	fieldXTensor = None
+	fieldYTensor = None
+	if(getTrainConnectionsUseSpatialDistance(sequenceObservedColumns)):
+		if(not hasattr(sequenceObservedColumns, "sequenceConceptFieldXTensor") or not hasattr(sequenceObservedColumns, "sequenceConceptFieldYTensor")):
+			raise RuntimeError("getSequenceConceptFieldCoordinates error: sequenceObservedColumns missing sequence concept field coordinate tensors")
+		fieldXTensor = sequenceObservedColumns.sequenceConceptFieldXTensor
+		fieldYTensor = sequenceObservedColumns.sequenceConceptFieldYTensor
+		if(fieldXTensor is None or fieldYTensor is None):
+			raise RuntimeError("getSequenceConceptFieldCoordinates error: sequence concept field coordinate tensors must not be None")
+		if(not pt.is_tensor(fieldXTensor) or not pt.is_tensor(fieldYTensor)):
+			raise RuntimeError("getSequenceConceptFieldCoordinates error: sequence concept field coordinate tensors must be tensors")
+		if(fieldXTensor.dim() != 1 or fieldYTensor.dim() != 1):
+			raise RuntimeError("getSequenceConceptFieldCoordinates error: sequence concept field coordinate tensors must be rank 1")
+		if(int(fieldXTensor.shape[0]) != int(sequenceObservedColumns.cs) or int(fieldYTensor.shape[0]) != int(sequenceObservedColumns.cs)):
+			raise RuntimeError("getSequenceConceptFieldCoordinates error: sequence concept field coordinate tensor lengths must equal cs")
+		result = (fieldXTensor.to(device=targetDevice), fieldYTensor.to(device=targetDevice))
+	else:
+		raise RuntimeError("getSequenceConceptFieldCoordinates error: requires trainConnectionsUseSpatialDistance")
+	return result
+
 def createFeatureWordOrderConnectionMask(sourceWordOrder, targetWordOrder, trainConnectionsIncludeSameTimeIndex):
 	result = None
 	if(not isinstance(trainConnectionsIncludeSameTimeIndex, bool)):
@@ -158,7 +189,7 @@ def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceOb
 			segmentActive = featureNeuronsActive[:, segmentIndex]
 			if not pt.any(segmentActive):
 				continue
-			segmentConnectionsActive, segmentMask = createFeatureConnectionsActiveTrain(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex)
+			segmentConnectionsActive, segmentMask = createFeatureConnectionsActiveTrain(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
 			if featureConnectionsActive is None:
 				featureConnectionsActive = segmentConnectionsActive
 				featureConnectionsSegmentMask = segmentMask
@@ -170,7 +201,7 @@ def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceOb
 			#featureConnectionsActive = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=arrayType)
 			#featureConnectionsSegmentMask = pt.zeros_like(featureConnectionsActive, dtype=pt.bool)
 	else:
-		featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[:, arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex)
+		featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[:, arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
 
 	featureConnectionsPos = None
 	if(arrayIndexPropertiesPos or (arrayIndexPropertiesStrength and trainConnectionStrengthPOSdependence)):
@@ -182,8 +213,11 @@ def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceOb
 
 	if(arrayIndexPropertiesStrength):
 		if(trainConnectionStrengthNormaliseWrtContextLength):
-			featureNeuronsWordOrder1d = featureNeuronsWordOrder.flatten()
-			featureConnectionsDistances = pt.abs(featureNeuronsWordOrder1d.unsqueeze(1) - featureNeuronsWordOrder1d).reshape(cs, fs, cs, fs)
+			if(getTrainConnectionsUseSpatialDistance(sequenceObservedColumns)):
+				featureConnectionsDistances = calculateFeatureConnectionsSpatialDistanceTensor(sequenceObservedColumns, cs, fs, featureConnectionsActive.device)
+			else:
+				featureNeuronsWordOrder1d = featureNeuronsWordOrder.flatten()
+				featureConnectionsDistances = pt.abs(featureNeuronsWordOrder1d.unsqueeze(1) - featureNeuronsWordOrder1d).reshape(cs, fs, cs, fs)
 			featureConnectionsProximity = 1/(featureConnectionsDistances + 1) * 10
 			featureConnectionsProximity.unsqueeze(0)
 			featureConnectionsStrengthUpdate = featureConnectionsActive*featureConnectionsProximity
@@ -220,7 +254,7 @@ def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceOb
 def processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos):
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 	trainConnectionsIncludeSameTimeIndex = getTrainConnectionsIncludeSameTimeIndex(sequenceObservedColumns)
-	connectionActiveSparse = createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex)
+	connectionActiveSparse = createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
 	connectionActiveIndices = connectionActiveSparse.indices()
 	connectionActiveValues = connectionActiveSparse.values()
 	if(featureNeuronsWordOrder.device != connectionActiveIndices.device):
@@ -240,9 +274,12 @@ def processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, feature
 		strengthValues = connectionActiveValues
 		if(connectionActiveIndices.numel() > 0):
 			if(trainConnectionStrengthNormaliseWrtContextLength):
-				sourceWordOrder = featureNeuronsWordOrder[sourceConceptIndices, sourceFeatureIndices].to(connectionActiveValues.dtype)
-				targetWordOrder = featureNeuronsWordOrder[targetConceptIndices, targetFeatureIndices].to(connectionActiveValues.dtype)
-				connectionDistances = pt.abs(targetWordOrder - sourceWordOrder)
+				if(getTrainConnectionsUseSpatialDistance(sequenceObservedColumns)):
+					connectionDistances = calculateSparseFeatureConnectionsSpatialDistanceTensor(sequenceObservedColumns, sourceConceptIndices, targetConceptIndices, connectionActiveValues.device).to(connectionActiveValues.dtype)
+				else:
+					sourceWordOrder = featureNeuronsWordOrder[sourceConceptIndices, sourceFeatureIndices].to(connectionActiveValues.dtype)
+					targetWordOrder = featureNeuronsWordOrder[targetConceptIndices, targetFeatureIndices].to(connectionActiveValues.dtype)
+					connectionDistances = pt.abs(targetWordOrder - sourceWordOrder)
 				connectionProximity = 1/(connectionDistances + 1) * 10
 				strengthValues = strengthValues * connectionProximity
 			if(trainConnectionStrengthIncreaseColumnInternal):
@@ -270,7 +307,7 @@ def processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, feature
 		setSequenceFeatureConnectionsProperty(sequenceObservedColumns, databaseNetworkObject.arrayIndexPropertiesPosIndex, posSparse)
 	return
 
-def createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex):
+def createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns):
 	connectionTargetSize = (numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs)
 	connectionDevice = featureNeuronsActive.device
 	combinedIndices = pt.empty((len(connectionTargetSize), 0), dtype=pt.long, device=connectionDevice)
@@ -280,11 +317,11 @@ def createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, colu
 		for segmentIndex in range(arrayNumberOfSegments):
 			segmentActive = featureNeuronsActive[:, segmentIndex]
 			if(pt.any(segmentActive)):
-				segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex)
+				segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
 				if(segmentConnectionIndices.numel() > 0):
 					indicesList.append(segmentConnectionIndices)
 	else:
-		segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(featureNeuronsActive[:, arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex)
+		segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(featureNeuronsActive[:, arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
 		if(segmentConnectionIndices.numel() > 0):
 			indicesList.append(segmentConnectionIndices)
 	if(len(indicesList) > 0):
@@ -295,7 +332,7 @@ def createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, colu
 		result.values().clamp_(max=1.0)
 	return result
 
-def createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex):
+def createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns):
 	connectionDevice = segmentActive.device
 	combinedIndices = pt.empty((6, 0), dtype=pt.long, device=connectionDevice)
 	indicesList = []
@@ -305,20 +342,20 @@ def createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, colu
 		repeatedFeatureMask = (segmentActive > 0).sum(dim=0) > 1
 		for branchIndex in range(segmentActive.shape[0]):
 			targetIndices = pt.nonzero(segmentActive[branchIndex] > 0, as_tuple=False)
-			branchConnectionIndices = createFeatureConnectionsActiveTrainSparseBranch(branchIndex, sourceIndices, targetIndices, repeatedFeatureMask, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex)
+			branchConnectionIndices = createFeatureConnectionsActiveTrainSparseBranch(branchIndex, sourceIndices, targetIndices, repeatedFeatureMask, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
 			if(branchConnectionIndices.numel() > 0):
 				indicesList.append(branchConnectionIndices)
 	else:
 		sourceIndices = pt.nonzero(segmentActive[0] > 0, as_tuple=False)
 		targetIndices = sourceIndices
-		branchConnectionIndices = createFeatureConnectionsActiveTrainSparseBranch(0, sourceIndices, targetIndices, None, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex)
+		branchConnectionIndices = createFeatureConnectionsActiveTrainSparseBranch(0, sourceIndices, targetIndices, None, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
 		if(branchConnectionIndices.numel() > 0):
 			indicesList.append(branchConnectionIndices)
 	if(len(indicesList) > 0):
 		combinedIndices = pt.cat(indicesList, dim=1)
 	return combinedIndices
 
-def createFeatureConnectionsActiveTrainSparseBranch(branchIndex, sourceIndices, targetIndices, repeatedFeatureMask, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex):
+def createFeatureConnectionsActiveTrainSparseBranch(branchIndex, sourceIndices, targetIndices, repeatedFeatureMask, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns):
 	connectionDevice = sourceIndices.device
 	result = pt.empty((6, 0), dtype=pt.long, device=connectionDevice)
 	if(sourceIndices.shape[0] > 0 and targetIndices.shape[0] > 0):
@@ -353,13 +390,16 @@ def createFeatureConnectionsActiveTrainSparseBranch(branchIndex, sourceIndices, 
 			sourceWordOrder = sourceWordOrder[connectionMask]
 			targetWordOrder = targetWordOrder[connectionMask]
 			branchIndices = pt.full((sourceConceptIndices.shape[0],), branchIndex, dtype=pt.long, device=connectionDevice)
-			result = assignFeatureConnectionsToTargetSegmentsSparse(branchIndices, sourceConceptIndices, sourceFeatureIndices, targetConceptIndices, targetFeatureIndices, sourceWordOrder, targetWordOrder)
+			result = assignFeatureConnectionsToTargetSegmentsSparse(branchIndices, sourceConceptIndices, sourceFeatureIndices, targetConceptIndices, targetFeatureIndices, sourceWordOrder, targetWordOrder, sequenceObservedColumns)
 	return result
 
-def assignFeatureConnectionsToTargetSegmentsSparse(branchIndices, sourceConceptIndices, sourceFeatureIndices, targetConceptIndices, targetFeatureIndices, sourceWordOrder, targetWordOrder):
+def assignFeatureConnectionsToTargetSegmentsSparse(branchIndices, sourceConceptIndices, sourceFeatureIndices, targetConceptIndices, targetFeatureIndices, sourceWordOrder, targetWordOrder, sequenceObservedColumns):
 	connectionDevice = branchIndices.device
 	indicesList = []
-	if(useSANIcolumns):
+	if(getTrainConnectionsUseSpatialDistance(sequenceObservedColumns)):
+		connectionsSegmentIndex = calculateSparseFeatureConnectionsSpatialDistanceTensor(sequenceObservedColumns, sourceConceptIndices, targetConceptIndices, connectionDevice)
+		indicesList.append(pt.stack((branchIndices, connectionsSegmentIndex, sourceConceptIndices, sourceFeatureIndices, targetConceptIndices, targetFeatureIndices), dim=0))
+	elif(useSANIcolumns):
 		conceptDistances = pt.abs(targetConceptIndices - sourceConceptIndices)
 		connectionsSegmentIndex = arrayNumberOfSegments - conceptDistances - 1
 		connectionsSegmentIndex = pt.clamp(connectionsSegmentIndex, min=0)
@@ -493,7 +533,7 @@ def setSequenceFeatureConnectionsProperty(sequenceObservedColumns, propertyIndex
 			sequenceObservedColumns.featureConnections[propertyIndex, :, :, :, :, :, :] = propertyTensor
 	return
 
-def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex):
+def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns):
 
 	if featureNeuronsActive.dim() == 3:
 		branchCount = featureNeuronsActive.shape[0]
@@ -537,7 +577,7 @@ def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWor
 	featureConnectionsActive = featureConnectionsActive * identityMask
 
 	if(useSANI):
-		featureConnectionsActive, featureConnectionsSegmentMask = assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, featureNeuronsWordOrder)
+		featureConnectionsActive, featureConnectionsSegmentMask = assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, featureNeuronsWordOrder, sequenceObservedColumns)
 	else:
 		if featureConnectionsActive.dim() == 5:
 			featureConnectionsActive = featureConnectionsActive.unsqueeze(1)
@@ -547,10 +587,12 @@ def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWor
 	
 	return featureConnectionsActive, featureConnectionsSegmentMask
 
-def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, featureNeuronsWordOrder):
+def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, featureNeuronsWordOrder, sequenceObservedColumns):
 	hasBranchDim = featureConnectionsActive.dim() == 5
 	branchCount = featureConnectionsActive.shape[0] if hasBranchDim else 1
-	if(useSANIcolumns):
+	if(getTrainConnectionsUseSpatialDistance(sequenceObservedColumns)):
+		featureConnectionsSegmentMask = calculateFeatureConnectionsSpatialDistanceSegmentMask(sequenceObservedColumns, cs, fs, featureConnectionsActive.device)
+	elif(useSANIcolumns):
 		conceptNeuronsConceptOrder1d = pt.arange(cs)
 		conceptNeuronsDistances = pt.abs(conceptNeuronsConceptOrder1d.unsqueeze(1) - conceptNeuronsConceptOrder1d).reshape(cs, cs)
 		connectionsSegmentIndex = arrayNumberOfSegments-conceptNeuronsDistances-1
@@ -625,6 +667,72 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 		featureConnectionsActive = featureConnectionsSegmentMask * featureConnectionsActive.unsqueeze(0)
 
 	return featureConnectionsActive, featureConnectionsSegmentMask
+
+
+def calculateFeatureConnectionsSpatialDistanceSegmentMask(sequenceObservedColumns, cs, fs, targetDevice):
+	result = None
+	connectionsSegmentIndex = None
+	if(getTrainConnectionsUseSpatialDistance(sequenceObservedColumns)):
+		connectionsSegmentIndex = calculateFeatureConnectionsSpatialDistanceTensor(sequenceObservedColumns, cs, fs, targetDevice).long()
+		if(bool(pt.any(connectionsSegmentIndex < 0).item()) or bool(pt.any(connectionsSegmentIndex >= arrayNumberOfSegments).item())):
+			raise RuntimeError("calculateFeatureConnectionsSpatialDistanceSegmentMask error: calculated segment index out of range")
+		result = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=targetDevice)
+		result.scatter_(0, connectionsSegmentIndex.unsqueeze(0), True)
+	else:
+		raise RuntimeError("calculateFeatureConnectionsSpatialDistanceSegmentMask error: requires trainConnectionsUseSpatialDistance")
+	return result
+
+
+def calculateFeatureConnectionsSpatialDistanceTensor(sequenceObservedColumns, cs, fs, targetDevice):
+	result = None
+	fieldXTensor = None
+	fieldYTensor = None
+	sourceFieldX = None
+	sourceFieldY = None
+	targetFieldX = None
+	targetFieldY = None
+	deltaX = None
+	deltaY = None
+	distanceSquared = None
+	if(getTrainConnectionsUseSpatialDistance(sequenceObservedColumns)):
+		fieldXTensor, fieldYTensor = getSequenceConceptFieldCoordinates(sequenceObservedColumns, targetDevice)
+		if(int(fieldXTensor.shape[0]) != int(cs) or int(fieldYTensor.shape[0]) != int(cs)):
+			raise RuntimeError("calculateFeatureConnectionsSpatialDistanceTensor error: sequence concept field coordinate tensor lengths must equal cs")
+		sourceFieldX = fieldXTensor.view(cs, 1, 1, 1).expand(cs, fs, cs, fs)
+		sourceFieldY = fieldYTensor.view(cs, 1, 1, 1).expand(cs, fs, cs, fs)
+		targetFieldX = fieldXTensor.view(1, 1, cs, 1).expand(cs, fs, cs, fs)
+		targetFieldY = fieldYTensor.view(1, 1, cs, 1).expand(cs, fs, cs, fs)
+		deltaX = pt.abs(targetFieldX - sourceFieldX)
+		deltaY = pt.abs(targetFieldY - sourceFieldY)
+		distanceSquared = (deltaX*deltaX + deltaY*deltaY).to(arrayType)
+		result = pt.ceil(pt.sqrt(distanceSquared)).long()
+	else:
+		raise RuntimeError("calculateFeatureConnectionsSpatialDistanceTensor error: requires trainConnectionsUseSpatialDistance")
+	return result
+
+
+def calculateSparseFeatureConnectionsSpatialDistanceTensor(sequenceObservedColumns, sourceConceptIndices, targetConceptIndices, targetDevice):
+	result = None
+	fieldXTensor = None
+	fieldYTensor = None
+	deltaX = None
+	deltaY = None
+	distanceSquared = None
+	if(getTrainConnectionsUseSpatialDistance(sequenceObservedColumns)):
+		if(not pt.is_tensor(sourceConceptIndices) or not pt.is_tensor(targetConceptIndices)):
+			raise RuntimeError("calculateSparseFeatureConnectionsSpatialDistanceTensor error: sourceConceptIndices/targetConceptIndices must be tensors")
+		if(sourceConceptIndices.shape != targetConceptIndices.shape):
+			raise RuntimeError("calculateSparseFeatureConnectionsSpatialDistanceTensor error: sourceConceptIndices/targetConceptIndices shape mismatch")
+		fieldXTensor, fieldYTensor = getSequenceConceptFieldCoordinates(sequenceObservedColumns, targetDevice)
+		deltaX = pt.abs(fieldXTensor[targetConceptIndices] - fieldXTensor[sourceConceptIndices])
+		deltaY = pt.abs(fieldYTensor[targetConceptIndices] - fieldYTensor[sourceConceptIndices])
+		distanceSquared = (deltaX*deltaX + deltaY*deltaY).to(arrayType)
+		result = pt.ceil(pt.sqrt(distanceSquared)).long()
+		if(bool(pt.any(result < 0).item()) or bool(pt.any(result >= arrayNumberOfSegments).item())):
+			raise RuntimeError("calculateSparseFeatureConnectionsSpatialDistanceTensor error: calculated segment index out of range")
+	else:
+		raise RuntimeError("calculateSparseFeatureConnectionsSpatialDistanceTensor error: requires trainConnectionsUseSpatialDistance")
+	return result
 
 
 def decreasePermanenceActive(sequenceObservedColumns, featureNeuronsActive, featureNeuronsInactive, sequenceConceptIndexMask, featureNeuronsSegmentMask, featureConnectionsSegmentMask):

@@ -41,6 +41,9 @@ class SequenceObservedColumns:
 		self.noDelimiterDetectedBetweenConceptTokens = False
 		self.requiredSourceFeatureIndicesByObservedColumn = None
 		self.trainConnectionsIncludeSameTimeIndex = False
+		self.trainConnectionsUseSpatialDistance = False
+		self.sequenceConceptFieldXTensor = None
+		self.sequenceConceptFieldYTensor = None
 
 		if(trainSequenceObservedColumnsMatchSequenceWords):
 			self.cs = len(observedColumnsSequenceWordIndexDict)

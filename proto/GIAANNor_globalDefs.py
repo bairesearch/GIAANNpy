@@ -130,17 +130,27 @@ if(submodalityName=="video"):
 	modalityORvideoMaxDurationSeconds = 180.0
 	modalityORdatasetPromptRatio = 0.1
 	modalityORdatasetPromptMaxSequences = 2
+	modalityORvideoMaxEncodedSnapshotsPerSequence = 10	#max value:  int((float(modalityORvideoMaxDurationSeconds)*float(modalityORvideoFrameRate))/float(modalityORvideoFramesPerSequenceIteration))
 	modalityORvideoStreamFrames = False	#orig: False
 elif(submodalityName=="image"):
-	modalityORimageSaccadesEncode = True	#default: True	#orig: True
-	#saccade augmentations are calculated by translating the image to a random polar coordinates offset from the centre
+	modalityORimageSequenceEncode = "distance"	#orig: "saccades"	#options: "saccades", "distance", "none"
+	#saccade augmentations are calculated by translating the image to a polar coordinates offset from the centre
 	modalityORimageMaxSequencesPerImage = 5		#max independent sequences per image (lists of saccade keypoints) 
-	if(modalityORimageSaccadesEncode):
+	if(modalityORimageSequenceEncode=="saccades"):
 		modalityORimageSaccadeKeypointsPerEncoding = 3	#default: 3	#orig: 2	# the number of saccade keypoints (transition points) used to encode the context of each selected column feature neuron
 		modalityORimageSnapshotsPerSaccade = 1	#default: 1	#if 1: one snapshot per saccade (plus the start point), if >1 add interpolation between saccade keypoints.
-	else:
+		modalityORimageSnapshotsPerSequence = modalityORimageSaccadeKeypointsPerEncoding*modalityORimageSnapshotsPerSaccade+1
+	elif(modalityORimageSequenceEncode=="distance"):
+		modalityORimageSequenceEncodeDistanceFieldSegments = 8	#total number of segments to divide the snapshot visual field into (x or y)
 		modalityORimageSaccadeKeypointsPerEncoding = 1	#mandatory: 1
 		modalityORimageSnapshotsPerSaccade = 0 #mandatory: 0	#if 0: no temporal encoding of saccade movements
+		modalityORimageSnapshotsPerSequence = 1
+	elif(modalityORimageSequenceEncode=="none"):
+		modalityORimageSaccadeKeypointsPerEncoding = 1	#mandatory: 1
+		modalityORimageSnapshotsPerSaccade = 0 #mandatory: 0	#if 0: no temporal encoding of saccade movements
+		modalityORimageSnapshotsPerSequence = 1
+	else:
+		raise RuntimeError("GIAANNor_globalDefs error: modalityORimageSequenceEncode must be 'saccades', 'distance', or 'none'")
 	# upgrade submodalityName=="image" to perform saccades augomentations between nearby (i.e. adjacent) salient regions of the image: a) segment centres and b) corner features
 	modalityORimageSaccadesUseAdjacentSalientRegions = True
 	modalityORimageSaccadesSkipInsufficientUsableFeatures = True

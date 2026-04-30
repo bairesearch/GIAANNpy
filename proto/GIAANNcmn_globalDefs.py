@@ -642,35 +642,47 @@ if(useSANI):
 		useSANIcolumns = False
 		useSANIfeatures = True
 		useSANIfeaturesAndColumns = False
-	elif(enforceDirectConnectionsSANIminimal):
-		useSANIcolumns = False
-		useSANIfeatures = True
-		useSANIfeaturesAndColumns = False
+		if(submodalityName=="image"):
+			if(modalityORimageSequenceEncode=="saccades"):
+				arrayNumberOfSegments = modalityORimageSnapshotsPerSequence
+			elif(modalityORimageSequenceEncode=="distance"):
+				arrayNumberOfSegments = int(math.ceil(math.sqrt(float((modalityORimageSequenceEncodeDistanceFieldSegments - 1)*(modalityORimageSequenceEncodeDistanceFieldSegments - 1)*2)))) + 1
+			elif(modalityORimageSequenceEncode=="none"):
+				arrayNumberOfSegments = 1
+			else:
+				raise RuntimeError("GIAANNcmn_globalDefs error: modalityORimageSequenceEncode must be 'saccades', 'distance', or 'none'")
+		elif(submodalityName=="video"):
+			arrayNumberOfSegments = modalityORvideoMaxEncodedSnapshotsPerSequence
 	else:
-		useSANIcolumns = False	#assign segments by concept column proximity to connection target during train (includes internal concept column)
-		useSANIfeatures = False #assign segments by feature proximity to connection target during train
-		useSANIfeaturesAndColumns = True	#assign segments by column proximity first then feature proximity
-
-	if(useSANIfeaturesAndColumns):
-		useSANIfeaturesAndColumnsInternal = True	#default: True	#orig: False	#also include internal columns in column segments (not just external columns)
-		#these are highly dependent on numSeedTokensInference and the specific seed text (ie number of features per column);
-		arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#orig: + 1	#min number of concept/column segments (if useSANIfeaturesAndColumnsInternal, includes internal column segment)
-		arrayNumberOfSegmentsFeatureDistance = math.ceil(numSeedTokensInference / 2) + 1 	#number of nearest features to target node
-		arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance + arrayNumberOfSegmentsFeatureDistance
-	elif(useSANIcolumns):
-		if(multisentencePredictions):
-			arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#orig: + 1	#* numSentencesPerSequence 	#default: 5	#min number of external and internal column connections to target node (note first segment captures all other external columns)
-		else:
-			arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#orig: + 1	#default: 2	#orig:3		#min number of external and internal column connections to target node (note first segment captures all other external columns)
-				#max number of SANI segments per sequence (= max number of concept columns per sequence - 1)
-				#note if arrayNumberOfSegments=3 then;	sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: all other column connections
-				#must be less than the (total number of concepts in a sequence - total number of concepts in effective predictive seed sequence)
-	elif(useSANIfeatures):
 		if(enforceDirectConnectionsSANIminimal):
-			arrayNumberOfSegments = 2
+			useSANIcolumns = False
+			useSANIfeatures = True
+			useSANIfeaturesAndColumns = False
 		else:
-			arrayNumberOfSegments = numSeedTokensInference	#default: 5	#min number of nearest features to target node (note first segment captures all other features)
-			#arrayNumberOfSegments = math.ceil(numSeedTokensInference / 2) + 1	#temp for benchmarking compared to useSANIfeaturesAndColumns/useSANIcolumns [remove this]
+			useSANIcolumns = False	#assign segments by concept column proximity to connection target during train (includes internal concept column)
+			useSANIfeatures = False #assign segments by feature proximity to connection target during train
+			useSANIfeaturesAndColumns = True	#assign segments by column proximity first then feature proximity
+
+		if(useSANIfeaturesAndColumns):
+			useSANIfeaturesAndColumnsInternal = True	#default: True	#orig: False	#also include internal columns in column segments (not just external columns)
+			#these are highly dependent on numSeedTokensInference and the specific seed text (ie number of features per column);
+			arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#orig: + 1	#min number of concept/column segments (if useSANIfeaturesAndColumnsInternal, includes internal column segment)
+			arrayNumberOfSegmentsFeatureDistance = math.ceil(numSeedTokensInference / 2) + 1 	#number of nearest features to target node
+			arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance + arrayNumberOfSegmentsFeatureDistance
+		elif(useSANIcolumns):
+			if(multisentencePredictions):
+				arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#orig: + 1	#* numSentencesPerSequence 	#default: 5	#min number of external and internal column connections to target node (note first segment captures all other external columns)
+			else:
+				arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#orig: + 1	#default: 2	#orig:3		#min number of external and internal column connections to target node (note first segment captures all other external columns)
+					#max number of SANI segments per sequence (= max number of concept columns per sequence - 1)
+					#note if arrayNumberOfSegments=3 then;	sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: all other column connections
+					#must be less than the (total number of concepts in a sequence - total number of concepts in effective predictive seed sequence)
+		elif(useSANIfeatures):
+			if(enforceDirectConnectionsSANIminimal):
+				arrayNumberOfSegments = 2
+			else:
+				arrayNumberOfSegments = numSeedTokensInference	#default: 5	#min number of nearest features to target node (note first segment captures all other features)
+				#arrayNumberOfSegments = math.ceil(numSeedTokensInference / 2) + 1	#temp for benchmarking compared to useSANIfeaturesAndColumns/useSANIcolumns [remove this]
 	
 	algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment under conditions		
 	#algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI
