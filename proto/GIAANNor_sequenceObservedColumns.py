@@ -21,6 +21,7 @@ import torch as pt
 
 from GIAANNcmn_globalDefs import *
 import GIAANNcmn_sequenceObservedColumns
+import GIAANNor_sequenceDistance
 
 
 class SequenceObservedColumns(GIAANNcmn_sequenceObservedColumns.SequenceObservedColumns):
@@ -57,7 +58,7 @@ class SequenceObservedColumns(GIAANNcmn_sequenceObservedColumns.SequenceObserved
 			self.featureWordToIndex[featureWord] = featureIndex
 			self.indexToFeatureWord[featureIndex] = featureWord
 		if(submodalityName=="image" and modalityORimageSequenceEncode=="distance"):
-			self.initialiseImageDistanceFieldCoordinates(sequenceData)
+			GIAANNor_sequenceDistance.initialiseImageDistanceFieldCoordinates(self, sequenceData)
 		self.columnStartIndicesTensor = None
 		self.columnEndIndicesTensor = None
 		self.columnFeatureLocalIndices = None
@@ -70,33 +71,6 @@ class SequenceObservedColumns(GIAANNcmn_sequenceObservedColumns.SequenceObserved
 			self.featureConnections = self.initialiseFeatureConnectionsSequenceSparse(self.cs, self.fs)
 		else:
 			self.featureConnections = self.initialiseFeatureConnectionsSequence(self.cs, self.fs)
-
-	def initialiseImageDistanceFieldCoordinates(self, sequenceData):
-		result = None
-		fieldCoordinatesByConceptName = None
-		fieldCoordinates = None
-		fieldXList = []
-		fieldYList = []
-		if(submodalityName=="image" and modalityORimageSequenceEncode=="distance"):
-			if("imageDistanceFieldCoordinatesByConceptName" not in sequenceData):
-				raise RuntimeError("initialiseImageDistanceFieldCoordinates error: sequenceData missing imageDistanceFieldCoordinatesByConceptName")
-			fieldCoordinatesByConceptName = sequenceData["imageDistanceFieldCoordinatesByConceptName"]
-			for conceptName in sequenceData["orderedConceptNameList"]:
-				if(conceptName not in fieldCoordinatesByConceptName):
-					raise RuntimeError("initialiseImageDistanceFieldCoordinates error: conceptName missing image distance field coordinates (" + conceptName + ")")
-				fieldCoordinates = fieldCoordinatesByConceptName[conceptName]
-				if(not isinstance(fieldCoordinates, tuple) or len(fieldCoordinates) != 2):
-					raise RuntimeError("initialiseImageDistanceFieldCoordinates error: fieldCoordinates must be a tuple of length 2")
-				if(not isinstance(fieldCoordinates[0], int) or isinstance(fieldCoordinates[0], bool) or not isinstance(fieldCoordinates[1], int) or isinstance(fieldCoordinates[1], bool)):
-					raise RuntimeError("initialiseImageDistanceFieldCoordinates error: fieldCoordinates values must be ints")
-				fieldXList.append(int(fieldCoordinates[0]))
-				fieldYList.append(int(fieldCoordinates[1]))
-			self.trainConnectionsUseSpatialDistance = True
-			self.sequenceConceptFieldXTensor = pt.tensor(fieldXList, dtype=pt.long)
-			self.sequenceConceptFieldYTensor = pt.tensor(fieldYList, dtype=pt.long)
-		else:
-			raise RuntimeError("initialiseImageDistanceFieldCoordinates error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance'")
-		return result
 
 	def getTrainRequiredSourceFeatureIndicesByObservedColumn(self):
 		result = {}
