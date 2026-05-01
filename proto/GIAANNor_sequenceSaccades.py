@@ -85,8 +85,8 @@ def validateImageSaccadeEncodingParameters():
 	result = None
 	if(not isinstance(modalityORimageSequenceEncode, str)):
 		raise RuntimeError("validateImageSaccadeEncodingParameters error: modalityORimageSequenceEncode must be a string")
-	if(modalityORimageSequenceEncode!="saccades" and modalityORimageSequenceEncode!="distance" and modalityORimageSequenceEncode!="none"):
-		raise RuntimeError("validateImageSaccadeEncodingParameters error: modalityORimageSequenceEncode must be 'saccades', 'distance', or 'none'")
+	if(modalityORimageSequenceEncode!="saccades" and modalityORimageSequenceEncode!="distance" and modalityORimageSequenceEncode!="axis" and modalityORimageSequenceEncode!="none"):
+		raise RuntimeError("validateImageSaccadeEncodingParameters error: modalityORimageSequenceEncode must be 'saccades', 'distance', 'axis', or 'none'")
 	if(not isinstance(modalityORimageSaccadeKeypointsPerEncoding, int) or isinstance(modalityORimageSaccadeKeypointsPerEncoding, bool)):
 		raise RuntimeError("validateImageSaccadeEncodingParameters error: modalityORimageSaccadeKeypointsPerEncoding must be an int")
 	if(modalityORimageSaccadeKeypointsPerEncoding <= 0):
@@ -95,10 +95,10 @@ def validateImageSaccadeEncodingParameters():
 		raise RuntimeError("validateImageSaccadeEncodingParameters error: modalityORimageSnapshotsPerSaccade must be an int")
 	if(modalityORimageSnapshotsPerSaccade < 0):
 		raise RuntimeError("validateImageSaccadeEncodingParameters error: modalityORimageSnapshotsPerSaccade must be >= 0")
-	if((modalityORimageSequenceEncode=="distance" or modalityORimageSequenceEncode=="none") and modalityORimageSaccadeKeypointsPerEncoding != 1):
-		raise RuntimeError("validateImageSaccadeEncodingParameters error: modalityORimageSaccadeKeypointsPerEncoding must equal 1 when modalityORimageSequenceEncode is 'distance' or 'none'")
-	if((modalityORimageSequenceEncode=="distance" or modalityORimageSequenceEncode=="none") and modalityORimageSnapshotsPerSaccade != 0):
-		raise RuntimeError("validateImageSaccadeEncodingParameters error: modalityORimageSnapshotsPerSaccade must equal 0 when modalityORimageSequenceEncode is 'distance' or 'none'")
+	if((modalityORimageSequenceEncode=="distance" or modalityORimageSequenceEncode=="axis" or modalityORimageSequenceEncode=="none") and modalityORimageSaccadeKeypointsPerEncoding != 1):
+		raise RuntimeError("validateImageSaccadeEncodingParameters error: modalityORimageSaccadeKeypointsPerEncoding must equal 1 when modalityORimageSequenceEncode is 'distance', 'axis', or 'none'")
+	if((modalityORimageSequenceEncode=="distance" or modalityORimageSequenceEncode=="axis" or modalityORimageSequenceEncode=="none") and modalityORimageSnapshotsPerSaccade != 0):
+		raise RuntimeError("validateImageSaccadeEncodingParameters error: modalityORimageSnapshotsPerSaccade must equal 0 when modalityORimageSequenceEncode is 'distance', 'axis', or 'none'")
 	if(modalityORimageSequenceEncode=="saccades" and modalityORimageSnapshotsPerSaccade < 1):
 		raise RuntimeError("validateImageSaccadeEncodingParameters error: modalityORimageSnapshotsPerSaccade must be >= 1 when modalityORimageSequenceEncode is 'saccades'")
 	return result

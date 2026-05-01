@@ -21,6 +21,7 @@ import torch as pt
 
 from GIAANNcmn_globalDefs import *
 import GIAANNcmn_sequenceObservedColumns
+import GIAANNor_sequenceAxis
 import GIAANNor_sequenceDistance
 
 
@@ -34,8 +35,11 @@ class SequenceObservedColumns(GIAANNcmn_sequenceObservedColumns.SequenceObserved
 		self.requiredSourceFeatureIndicesByObservedColumn = None
 		self.trainConnectionsIncludeSameTimeIndex = False
 		self.trainConnectionsUseSpatialDistance = False
+		self.trainConnectionsUseSpatialAxis = False
 		self.sequenceConceptFieldXTensor = None
 		self.sequenceConceptFieldYTensor = None
+		self.sequenceConceptAxisXTensor = None
+		self.sequenceConceptAxisYTensor = None
 		self.columnsIndexSequenceWordIndexDict = {}
 		self.sequenceObservedColumnsDict = {}
 		self.conceptIndicesInObservedList = []
@@ -59,6 +63,8 @@ class SequenceObservedColumns(GIAANNcmn_sequenceObservedColumns.SequenceObserved
 			self.indexToFeatureWord[featureIndex] = featureWord
 		if(submodalityName=="image" and modalityORimageSequenceEncode=="distance"):
 			GIAANNor_sequenceDistance.initialiseImageDistanceFieldCoordinates(self, sequenceData)
+		elif(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
+			GIAANNor_sequenceAxis.initialiseImageAxisCoordinates(self, sequenceData)
 		self.columnStartIndicesTensor = None
 		self.columnEndIndicesTensor = None
 		self.columnFeatureLocalIndices = None

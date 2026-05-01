@@ -23,6 +23,7 @@ from GIAANNcmn_globalDefs import *
 import GIAANNcmn_databaseNetwork
 import GIAANNcmn_databaseNetworkTrain
 import GIAANNor_RFfilters
+import GIAANNor_sequenceAxis
 import GIAANNor_sequenceDistance
 import GIAANNor_sequenceObservedColumns
 import GIAANNor_sequenceSaccades
@@ -66,6 +67,7 @@ def generateSequenceData(databaseNetworkObject, columnMetadataList, selectedFilt
 	globalFeatureIndices = []
 	requiredSourceFeatureIndicesByConceptName = {}
 	imageDistanceFieldCoordinatesByConceptName = None
+	imageAxisColumnCoordinatesByConceptName = None
 	seenConceptNames = set()
 	if(not pt.is_tensor(selectedFilterIndices)):
 		raise RuntimeError("generateSequenceData error: selectedFilterIndices must be a tensor")
@@ -75,6 +77,9 @@ def generateSequenceData(databaseNetworkObject, columnMetadataList, selectedFilt
 		raise RuntimeError("generateSequenceData error: selectedFilterIndices column count mismatch")
 	if(submodalityName=="image" and modalityORimageSequenceEncode=="distance"):
 		imageDistanceFieldCoordinatesByConceptName = GIAANNor_sequenceDistance.buildImageDistanceFieldCoordinatesByConceptName(columnMetadataList)
+	elif(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
+		imageDistanceFieldCoordinatesByConceptName = GIAANNor_sequenceDistance.buildImageDistanceFieldCoordinatesByConceptName(columnMetadataList)
+		imageAxisColumnCoordinatesByConceptName = GIAANNor_sequenceAxis.buildImageAxisColumnCoordinatesByConceptName(columnMetadataList)
 	ensureConceptColumns(databaseNetworkObject, columnMetadataList, allowNewFeatures)
 	for columnMetadata in columnMetadataList:
 		requiredSourceFeatureIndicesByConceptName[columnMetadata["conceptName"]] = []
@@ -93,6 +98,8 @@ def generateSequenceData(databaseNetworkObject, columnMetadataList, selectedFilt
 				activationList.append({"snapshotIndex": snapshotIndex, "columnIndex": columnIndex, "conceptName": conceptName, "featureWord": featureWord, "featureWordVerbose": featureWordVerbose, "globalFeatureIndex": globalFeatureIndex})
 				featureWords.append(featureWord)
 				globalFeatureIndices.append(globalFeatureIndex)
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
+		GIAANNor_sequenceAxis.expandImageAxisSequenceConcepts(orderedConceptNameList, requiredSourceFeatureIndicesByConceptName, activationList, columnMetadataList, imageAxisColumnCoordinatesByConceptName)
 	for conceptName in list(requiredSourceFeatureIndicesByConceptName.keys()):
 		requiredSourceFeatureIndicesByConceptName[conceptName] = sorted(set(requiredSourceFeatureIndicesByConceptName[conceptName]))
 	if(len(activationList) > 0):
@@ -105,6 +112,9 @@ def generateSequenceData(databaseNetworkObject, columnMetadataList, selectedFilt
 		result = {"orderedConceptNameList": orderedConceptNameList, "activationList": activationList, "featureWords": featureWords, "globalFeatureIndices": globalFeatureIndices, "requiredSourceFeatureIndicesByConceptName": requiredSourceFeatureIndicesByConceptName, "numberOfSnapshots": int(selectedFilterIndices.shape[0]), "numberOfColumns": int(selectedFilterIndices.shape[1])}
 		if(submodalityName=="image" and modalityORimageSequenceEncode=="distance"):
 			result["imageDistanceFieldCoordinatesByConceptName"] = imageDistanceFieldCoordinatesByConceptName
+		elif(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
+			result["imageDistanceFieldCoordinatesByConceptName"] = imageDistanceFieldCoordinatesByConceptName
+			result["imageAxisColumnCoordinatesByConceptName"] = imageAxisColumnCoordinatesByConceptName
 	return result
 
 
@@ -210,10 +220,12 @@ def configureTrainConnectionsForImageSequenceEncoding(sequenceObservedColumns):
 			GIAANNor_sequenceSaccades.configureTrainConnectionsForImageSaccadeEncoding(sequenceObservedColumns)
 		elif(modalityORimageSequenceEncode=="distance"):
 			GIAANNor_sequenceDistance.configureTrainConnectionsForImageDistanceEncoding(sequenceObservedColumns)
+		elif(modalityORimageSequenceEncode=="axis"):
+			GIAANNor_sequenceAxis.configureTrainConnectionsForImageAxisEncoding(sequenceObservedColumns)
 		elif(modalityORimageSequenceEncode=="none"):
 			sequenceObservedColumns.trainConnectionsIncludeSameTimeIndex = True
 		else:
-			raise RuntimeError("configureTrainConnectionsForImageSequenceEncoding error: modalityORimageSequenceEncode must be 'saccades', 'distance', or 'none'")
+			raise RuntimeError("configureTrainConnectionsForImageSequenceEncoding error: modalityORimageSequenceEncode must be 'saccades', 'distance', 'axis', or 'none'")
 	return result
 
 
@@ -235,6 +247,10 @@ def buildTrainTensors(sequenceObservedColumns, sequenceData):
 		if(submodalityName=="image" and modalityORimageSequenceEncode=="distance"):
 			GIAANNor_sequenceDistance.validateImageDistanceSnapshotIndex(snapshotIndex)
 			activeSegments = GIAANNor_sequenceDistance.getActiveSegmentsForImageDistanceEncoding(sequenceObservedColumns, sequenceConceptIndex, targetDevice)
+			featureNeuronsWordOrder[sequenceConceptIndex, localFeatureIndex] = 0
+		elif(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
+			GIAANNor_sequenceAxis.validateImageAxisSnapshotIndex(snapshotIndex)
+			activeSegments = GIAANNor_sequenceAxis.getActiveSegmentsForImageAxisEncoding(sequenceObservedColumns, sequenceConceptIndex, targetDevice)
 			featureNeuronsWordOrder[sequenceConceptIndex, localFeatureIndex] = 0
 		elif(submodalityName=="image" and modalityORimageSequenceEncode=="none"):
 			if(snapshotIndex != 0):

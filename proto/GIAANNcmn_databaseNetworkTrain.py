@@ -64,6 +64,15 @@ def getTrainConnectionsUseSpatialDistance(sequenceObservedColumns):
 	result = sequenceObservedColumns.trainConnectionsUseSpatialDistance
 	return result
 
+def getTrainConnectionsUseSpatialAxis(sequenceObservedColumns):
+	result = None
+	if(not hasattr(sequenceObservedColumns, "trainConnectionsUseSpatialAxis")):
+		raise RuntimeError("getTrainConnectionsUseSpatialAxis error: sequenceObservedColumns missing trainConnectionsUseSpatialAxis")
+	if(not isinstance(sequenceObservedColumns.trainConnectionsUseSpatialAxis, bool)):
+		raise RuntimeError("getTrainConnectionsUseSpatialAxis error: trainConnectionsUseSpatialAxis must be a bool")
+	result = sequenceObservedColumns.trainConnectionsUseSpatialAxis
+	return result
+
 def getSequenceConceptFieldCoordinates(sequenceObservedColumns, targetDevice):
 	result = None
 	fieldXTensor = None
@@ -84,6 +93,28 @@ def getSequenceConceptFieldCoordinates(sequenceObservedColumns, targetDevice):
 		result = (fieldXTensor.to(device=targetDevice), fieldYTensor.to(device=targetDevice))
 	else:
 		raise RuntimeError("getSequenceConceptFieldCoordinates error: requires trainConnectionsUseSpatialDistance")
+	return result
+
+def getSequenceConceptAxisCoordinates(sequenceObservedColumns, targetDevice):
+	result = None
+	axisXTensor = None
+	axisYTensor = None
+	if(getTrainConnectionsUseSpatialAxis(sequenceObservedColumns)):
+		if(not hasattr(sequenceObservedColumns, "sequenceConceptAxisXTensor") or not hasattr(sequenceObservedColumns, "sequenceConceptAxisYTensor")):
+			raise RuntimeError("getSequenceConceptAxisCoordinates error: sequenceObservedColumns missing sequence concept axis coordinate tensors")
+		axisXTensor = sequenceObservedColumns.sequenceConceptAxisXTensor
+		axisYTensor = sequenceObservedColumns.sequenceConceptAxisYTensor
+		if(axisXTensor is None or axisYTensor is None):
+			raise RuntimeError("getSequenceConceptAxisCoordinates error: sequence concept axis coordinate tensors must not be None")
+		if(not pt.is_tensor(axisXTensor) or not pt.is_tensor(axisYTensor)):
+			raise RuntimeError("getSequenceConceptAxisCoordinates error: sequence concept axis coordinate tensors must be tensors")
+		if(axisXTensor.dim() != 1 or axisYTensor.dim() != 1):
+			raise RuntimeError("getSequenceConceptAxisCoordinates error: sequence concept axis coordinate tensors must be rank 1")
+		if(int(axisXTensor.shape[0]) != int(sequenceObservedColumns.cs) or int(axisYTensor.shape[0]) != int(sequenceObservedColumns.cs)):
+			raise RuntimeError("getSequenceConceptAxisCoordinates error: sequence concept axis coordinate tensor lengths must equal cs")
+		result = (axisXTensor.to(device=targetDevice), axisYTensor.to(device=targetDevice))
+	else:
+		raise RuntimeError("getSequenceConceptAxisCoordinates error: requires trainConnectionsUseSpatialAxis")
 	return result
 
 def createFeatureWordOrderConnectionMask(sourceWordOrder, targetWordOrder, trainConnectionsIncludeSameTimeIndex):
@@ -213,7 +244,9 @@ def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceOb
 
 	if(arrayIndexPropertiesStrength):
 		if(trainConnectionStrengthNormaliseWrtContextLength):
-			if(getTrainConnectionsUseSpatialDistance(sequenceObservedColumns)):
+			if(getTrainConnectionsUseSpatialAxis(sequenceObservedColumns)):
+				featureConnectionsDistances = calculateFeatureConnectionsActiveSegmentIndexTensor(featureConnectionsActive)
+			elif(getTrainConnectionsUseSpatialDistance(sequenceObservedColumns)):
 				featureConnectionsDistances = calculateFeatureConnectionsSpatialDistanceTensor(sequenceObservedColumns, cs, fs, featureConnectionsActive.device)
 			else:
 				featureNeuronsWordOrder1d = featureNeuronsWordOrder.flatten()
@@ -274,7 +307,9 @@ def processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, feature
 		strengthValues = connectionActiveValues
 		if(connectionActiveIndices.numel() > 0):
 			if(trainConnectionStrengthNormaliseWrtContextLength):
-				if(getTrainConnectionsUseSpatialDistance(sequenceObservedColumns)):
+				if(getTrainConnectionsUseSpatialAxis(sequenceObservedColumns)):
+					connectionDistances = connectionActiveIndices[1].to(connectionActiveValues.dtype)
+				elif(getTrainConnectionsUseSpatialDistance(sequenceObservedColumns)):
 					connectionDistances = calculateSparseFeatureConnectionsSpatialDistanceTensor(sequenceObservedColumns, sourceConceptIndices, targetConceptIndices, connectionActiveValues.device).to(connectionActiveValues.dtype)
 				else:
 					sourceWordOrder = featureNeuronsWordOrder[sourceConceptIndices, sourceFeatureIndices].to(connectionActiveValues.dtype)
@@ -398,7 +433,10 @@ def assignFeatureConnectionsToTargetSegmentsSparse(branchIndices, sourceConceptI
 	indicesList = []
 	if(getTrainConnectionsUseSpatialDistance(sequenceObservedColumns)):
 		connectionsSegmentIndex = calculateSparseFeatureConnectionsSpatialDistanceTensor(sequenceObservedColumns, sourceConceptIndices, targetConceptIndices, connectionDevice)
-		indicesList.append(pt.stack((branchIndices, connectionsSegmentIndex, sourceConceptIndices, sourceFeatureIndices, targetConceptIndices, targetFeatureIndices), dim=0))
+		if(getTrainConnectionsUseSpatialAxis(sequenceObservedColumns)):
+			indicesList.append(expandFeatureConnectionsSpatialAxisSparse(sequenceObservedColumns, branchIndices, connectionsSegmentIndex, sourceConceptIndices, sourceFeatureIndices, targetConceptIndices, targetFeatureIndices, connectionDevice))
+		else:
+			indicesList.append(pt.stack((branchIndices, connectionsSegmentIndex, sourceConceptIndices, sourceFeatureIndices, targetConceptIndices, targetFeatureIndices), dim=0))
 	elif(useSANIcolumns):
 		conceptDistances = pt.abs(targetConceptIndices - sourceConceptIndices)
 		connectionsSegmentIndex = arrayNumberOfSegments - conceptDistances - 1
@@ -665,6 +703,8 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 		featureConnectionsActive = featureConnectionsSegmentMask * featureConnectionsActive.unsqueeze(1)
 	else:
 		featureConnectionsActive = featureConnectionsSegmentMask * featureConnectionsActive.unsqueeze(0)
+	if(getTrainConnectionsUseSpatialAxis(sequenceObservedColumns)):
+		featureConnectionsActive, featureConnectionsSegmentMask = expandFeatureConnectionsSpatialAxis(sequenceObservedColumns, featureConnectionsActive, featureConnectionsSegmentMask, cs)
 
 	return featureConnectionsActive, featureConnectionsSegmentMask
 
@@ -680,6 +720,119 @@ def calculateFeatureConnectionsSpatialDistanceSegmentMask(sequenceObservedColumn
 		result.scatter_(0, connectionsSegmentIndex.unsqueeze(0), True)
 	else:
 		raise RuntimeError("calculateFeatureConnectionsSpatialDistanceSegmentMask error: requires trainConnectionsUseSpatialDistance")
+	return result
+
+
+def calculateFeatureConnectionsSpatialAxisSourceMask(sequenceObservedColumns, cs, targetDevice):
+	result = None
+	axisXTensor = None
+	axisYTensor = None
+	axisSourceX = None
+	axisSourceY = None
+	axisExpandedX = None
+	axisExpandedY = None
+	if(getTrainConnectionsUseSpatialAxis(sequenceObservedColumns)):
+		axisXTensor, axisYTensor = getSequenceConceptAxisCoordinates(sequenceObservedColumns, targetDevice)
+		if(int(axisXTensor.shape[0]) != int(cs) or int(axisYTensor.shape[0]) != int(cs)):
+			raise RuntimeError("calculateFeatureConnectionsSpatialAxisSourceMask error: sequence concept axis coordinate tensor lengths must equal cs")
+		axisSourceX = axisXTensor.view(cs, 1).expand(cs, cs)
+		axisSourceY = axisYTensor.view(cs, 1).expand(cs, cs)
+		axisExpandedX = axisXTensor.view(1, cs).expand(cs, cs)
+		axisExpandedY = axisYTensor.view(1, cs).expand(cs, cs)
+		result = (axisSourceX == axisExpandedX) | (axisSourceY == axisExpandedY)
+	else:
+		raise RuntimeError("calculateFeatureConnectionsSpatialAxisSourceMask error: requires trainConnectionsUseSpatialAxis")
+	return result
+
+
+def expandFeatureConnectionsSpatialAxis(sequenceObservedColumns, featureConnectionsActive, featureConnectionsSegmentMask, cs):
+	result = None
+	axisSourceMask = None
+	if(getTrainConnectionsUseSpatialAxis(sequenceObservedColumns)):
+		if(featureConnectionsActive.device != featureConnectionsSegmentMask.device):
+			raise RuntimeError("expandFeatureConnectionsSpatialAxis error: featureConnectionsActive and featureConnectionsSegmentMask device mismatch")
+		axisSourceMask = calculateFeatureConnectionsSpatialAxisSourceMask(sequenceObservedColumns, cs, featureConnectionsActive.device)
+		featureConnectionsActive = expandFeatureConnectionsSpatialAxisTensor(featureConnectionsActive, axisSourceMask)
+		featureConnectionsSegmentMask = expandFeatureConnectionsSpatialAxisMask(featureConnectionsSegmentMask, axisSourceMask)
+		result = (featureConnectionsActive, featureConnectionsSegmentMask)
+	else:
+		raise RuntimeError("expandFeatureConnectionsSpatialAxis error: requires trainConnectionsUseSpatialAxis")
+	return result
+
+
+def expandFeatureConnectionsSpatialAxisTensor(featureConnectionsTensor, axisSourceMask):
+	result = None
+	axisSourceMaskType = None
+	if(not pt.is_tensor(featureConnectionsTensor)):
+		raise RuntimeError("expandFeatureConnectionsSpatialAxisTensor error: featureConnectionsTensor must be a tensor")
+	if(not pt.is_tensor(axisSourceMask)):
+		raise RuntimeError("expandFeatureConnectionsSpatialAxisTensor error: axisSourceMask must be a tensor")
+	if(featureConnectionsTensor.dim() == 6):
+		axisSourceMaskType = axisSourceMask.to(dtype=featureConnectionsTensor.dtype)
+		result = pt.einsum("bsaftg,ae->bseftg", featureConnectionsTensor, axisSourceMaskType).clamp(max=1)
+	elif(featureConnectionsTensor.dim() == 5):
+		axisSourceMaskType = axisSourceMask.to(dtype=featureConnectionsTensor.dtype)
+		result = pt.einsum("saftg,ae->seftg", featureConnectionsTensor, axisSourceMaskType).clamp(max=1)
+	else:
+		raise RuntimeError("expandFeatureConnectionsSpatialAxisTensor error: featureConnectionsTensor rank must be 5 or 6")
+	return result
+
+
+def expandFeatureConnectionsSpatialAxisMask(featureConnectionsSegmentMask, axisSourceMask):
+	result = None
+	featureConnectionsSegmentMaskType = None
+	axisSourceMaskType = None
+	if(not pt.is_tensor(featureConnectionsSegmentMask)):
+		raise RuntimeError("expandFeatureConnectionsSpatialAxisMask error: featureConnectionsSegmentMask must be a tensor")
+	if(not pt.is_tensor(axisSourceMask)):
+		raise RuntimeError("expandFeatureConnectionsSpatialAxisMask error: axisSourceMask must be a tensor")
+	featureConnectionsSegmentMaskType = featureConnectionsSegmentMask.to(dtype=arrayType)
+	axisSourceMaskType = axisSourceMask.to(dtype=arrayType)
+	if(featureConnectionsSegmentMask.dim() == 6):
+		result = pt.einsum("bsaftg,ae->bseftg", featureConnectionsSegmentMaskType, axisSourceMaskType) > 0
+	elif(featureConnectionsSegmentMask.dim() == 5):
+		result = pt.einsum("saftg,ae->seftg", featureConnectionsSegmentMaskType, axisSourceMaskType) > 0
+	else:
+		raise RuntimeError("expandFeatureConnectionsSpatialAxisMask error: featureConnectionsSegmentMask rank must be 5 or 6")
+	return result
+
+
+def calculateFeatureConnectionsActiveSegmentIndexTensor(featureConnectionsActive):
+	result = None
+	segmentIndexTensor = None
+	if(not pt.is_tensor(featureConnectionsActive)):
+		raise RuntimeError("calculateFeatureConnectionsActiveSegmentIndexTensor error: featureConnectionsActive must be a tensor")
+	if(featureConnectionsActive.dim() == 6):
+		segmentIndexTensor = pt.arange(arrayNumberOfSegments, device=featureConnectionsActive.device, dtype=arrayType)
+		result = segmentIndexTensor.view(1, arrayNumberOfSegments, 1, 1, 1, 1)
+	elif(featureConnectionsActive.dim() == 5):
+		segmentIndexTensor = pt.arange(arrayNumberOfSegments, device=featureConnectionsActive.device, dtype=arrayType)
+		result = segmentIndexTensor.view(arrayNumberOfSegments, 1, 1, 1, 1)
+	else:
+		raise RuntimeError("calculateFeatureConnectionsActiveSegmentIndexTensor error: featureConnectionsActive rank must be 5 or 6")
+	return result
+
+
+def expandFeatureConnectionsSpatialAxisSparse(sequenceObservedColumns, branchIndices, connectionsSegmentIndex, sourceConceptIndices, sourceFeatureIndices, targetConceptIndices, targetFeatureIndices, targetDevice):
+	result = None
+	axisSourceMask = None
+	connectionAxisMask = None
+	connectionIndices = None
+	expandedSourceConceptIndices = None
+	if(getTrainConnectionsUseSpatialAxis(sequenceObservedColumns)):
+		if(not pt.is_tensor(branchIndices) or not pt.is_tensor(connectionsSegmentIndex) or not pt.is_tensor(sourceConceptIndices) or not pt.is_tensor(sourceFeatureIndices) or not pt.is_tensor(targetConceptIndices) or not pt.is_tensor(targetFeatureIndices)):
+			raise RuntimeError("expandFeatureConnectionsSpatialAxisSparse error: connection index inputs must be tensors")
+		if(branchIndices.shape != connectionsSegmentIndex.shape or branchIndices.shape != sourceConceptIndices.shape or branchIndices.shape != sourceFeatureIndices.shape or branchIndices.shape != targetConceptIndices.shape or branchIndices.shape != targetFeatureIndices.shape):
+			raise RuntimeError("expandFeatureConnectionsSpatialAxisSparse error: connection index input shape mismatch")
+		axisSourceMask = calculateFeatureConnectionsSpatialAxisSourceMask(sequenceObservedColumns, int(sequenceObservedColumns.cs), targetDevice)
+		connectionAxisMask = axisSourceMask[sourceConceptIndices]
+		connectionIndices, expandedSourceConceptIndices = pt.nonzero(connectionAxisMask, as_tuple=True)
+		if(connectionIndices.numel() > 0):
+			result = pt.stack((branchIndices[connectionIndices], connectionsSegmentIndex[connectionIndices], expandedSourceConceptIndices, sourceFeatureIndices[connectionIndices], targetConceptIndices[connectionIndices], targetFeatureIndices[connectionIndices]), dim=0)
+		else:
+			result = pt.empty((6, 0), dtype=pt.long, device=targetDevice)
+	else:
+		raise RuntimeError("expandFeatureConnectionsSpatialAxisSparse error: requires trainConnectionsUseSpatialAxis")
 	return result
 
 

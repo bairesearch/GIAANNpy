@@ -162,15 +162,19 @@ def printe(str):
 
 
 #RAM;
-if(useAutoresearch):
+if(useModalityOR):
 	useGPUdense = False
 	useGPUsparse = False
 else:
-	useGPUdense = True	#default: True
-	if(executionMode=="inference" or executionMode=="trainAndInference"):
-		useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors	#inference can be slightly faster CPU sparse tensor operations
-	elif(executionMode=="train"):
-		useGPUsparse = True	#default: True		#slight performance increase during train (does not use significant additional GPU ram during train)
+	if(useAutoresearch):
+		useGPUdense = False
+		useGPUsparse = False
+	else:
+		useGPUdense = True	#default: True
+		if(executionMode=="inference" or executionMode=="trainAndInference"):
+			useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors	#inference can be slightly faster CPU sparse tensor operations
+		elif(executionMode=="train"):
+			useGPUsparse = True	#default: True		#slight performance increase during train (does not use significant additional GPU ram during train)
 useGPUsparseStrict = True	#default: True	#orig: False	#optional	#enforce strict sparse device during transfer to/from dense tensors (make conversion process always use sparse device)	 #no significant difference in speed; can theoretically affect peak CPU or GPU RAM
 useGPUfileio = False	#default: False	#orig: useGPUsparse
 
@@ -645,12 +649,12 @@ if(useSANI):
 		if(submodalityName=="image"):
 			if(modalityORimageSequenceEncode=="saccades"):
 				arrayNumberOfSegments = modalityORimageSnapshotsPerSequence
-			elif(modalityORimageSequenceEncode=="distance"):
+			elif(modalityORimageSequenceEncode=="distance" or modalityORimageSequenceEncode=="axis"):
 				arrayNumberOfSegments = int(math.ceil(math.sqrt(float((modalityORimageSequenceEncodeDistanceFieldSegments - 1)*(modalityORimageSequenceEncodeDistanceFieldSegments - 1)*2)))) + 1
 			elif(modalityORimageSequenceEncode=="none"):
 				arrayNumberOfSegments = 1
 			else:
-				raise RuntimeError("GIAANNcmn_globalDefs error: modalityORimageSequenceEncode must be 'saccades', 'distance', or 'none'")
+				raise RuntimeError("GIAANNcmn_globalDefs error: modalityORimageSequenceEncode must be 'saccades', 'distance', 'axis', or 'none'")
 		elif(submodalityName=="video"):
 			arrayNumberOfSegments = modalityORvideoMaxEncodedSnapshotsPerSequence
 	else:
