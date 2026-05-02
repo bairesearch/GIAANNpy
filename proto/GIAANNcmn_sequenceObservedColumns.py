@@ -48,6 +48,11 @@ class SequenceObservedColumns:
 		self.sequenceConceptFieldYTensor = None
 		self.sequenceConceptAxisXTensor = None
 		self.sequenceConceptAxisYTensor = None
+		self.imageAxesFeatureFieldXTensor = None
+		self.imageAxesFeatureFieldYTensor = None
+		self.imageAxesFeatureAxisMaskTensor = None
+		self.imageAxesCentralFieldX = None
+		self.imageAxesCentralFieldY = None
 
 		if(trainSequenceObservedColumnsMatchSequenceWords):
 			self.cs = len(observedColumnsSequenceWordIndexDict)

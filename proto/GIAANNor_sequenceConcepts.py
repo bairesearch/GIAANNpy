@@ -69,6 +69,7 @@ def generateSequenceData(databaseNetworkObject, columnMetadataList, selectedFilt
 	requiredSourceFeatureIndicesByConceptName = {}
 	imageDistanceFieldCoordinatesByConceptName = None
 	imageAxisColumnCoordinatesByConceptName = None
+	imageAxesSequenceTensorData = None
 	seenConceptNames = set()
 	if(not pt.is_tensor(selectedFilterIndices)):
 		raise RuntimeError("generateSequenceData error: selectedFilterIndices must be a tensor")
@@ -76,54 +77,115 @@ def generateSequenceData(databaseNetworkObject, columnMetadataList, selectedFilt
 		raise RuntimeError("generateSequenceData error: selectedFilterIndices rank must be 2")
 	if(selectedFilterIndices.shape[1] != len(columnMetadataList)):
 		raise RuntimeError("generateSequenceData error: selectedFilterIndices column count mismatch")
-	if(submodalityName=="image" and modalityORimageSequenceEncode=="distance"):
-		imageDistanceFieldCoordinatesByConceptName = GIAANNor_sequenceDistance.buildImageDistanceFieldCoordinatesByConceptName(columnMetadataList)
-	elif(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
-		imageDistanceFieldCoordinatesByConceptName = GIAANNor_sequenceDistance.buildImageDistanceFieldCoordinatesByConceptName(columnMetadataList)
-		imageAxisColumnCoordinatesByConceptName = GIAANNor_sequenceAxis.buildImageAxisColumnCoordinatesByConceptName(columnMetadataList)
-	elif(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
-		imageDistanceFieldCoordinatesByConceptName = GIAANNor_sequenceDistance.buildImageDistanceFieldCoordinatesByConceptName(columnMetadataList)
-		imageAxisColumnCoordinatesByConceptName = GIAANNor_sequenceAxes.buildImageAxesColumnCoordinatesByConceptName(columnMetadataList)
-	ensureConceptColumns(databaseNetworkObject, columnMetadataList, allowNewFeatures)
-	for columnMetadata in columnMetadataList:
-		requiredSourceFeatureIndicesByConceptName[columnMetadata["conceptName"]] = []
-	for snapshotIndex in range(selectedFilterIndices.shape[0]):
-		for columnIndex, columnMetadata in enumerate(columnMetadataList):
-			rfFilterIndex = int(selectedFilterIndices[snapshotIndex, columnIndex].item())
-			if(rfFilterIndex >= 0):
-				conceptName = columnMetadata["conceptName"]
-				featureWord = GIAANNor_RFfilters.convertRFfilterIndexToASCIItext(rfFilters, rfFilterIndex)
-				featureWordVerbose = GIAANNor_RFfilters.convertRFfilterIndexToASCIItextVerbose(rfFilters, rfFilterIndex)
-				globalFeatureIndex = ensureFeatureIndex(databaseNetworkObject, featureWord, allowNewFeatures)
-				if(conceptName not in seenConceptNames):
-					orderedConceptNameList.append(conceptName)
-					seenConceptNames.add(conceptName)
-				requiredSourceFeatureIndicesByConceptName[conceptName].append(globalFeatureIndex)
-				activationList.append({"snapshotIndex": snapshotIndex, "columnIndex": columnIndex, "conceptName": conceptName, "featureWord": featureWord, "featureWordVerbose": featureWordVerbose, "globalFeatureIndex": globalFeatureIndex})
-				featureWords.append(featureWord)
-				globalFeatureIndices.append(globalFeatureIndex)
-	if(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
-		GIAANNor_sequenceAxis.expandImageAxisSequenceConcepts(orderedConceptNameList, requiredSourceFeatureIndicesByConceptName, activationList, columnMetadataList, imageAxisColumnCoordinatesByConceptName)
-	elif(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
-		GIAANNor_sequenceAxes.expandImageAxesSequenceConcepts(orderedConceptNameList, requiredSourceFeatureIndicesByConceptName, activationList, columnMetadataList, imageAxisColumnCoordinatesByConceptName)
-	for conceptName in list(requiredSourceFeatureIndicesByConceptName.keys()):
-		requiredSourceFeatureIndicesByConceptName[conceptName] = sorted(set(requiredSourceFeatureIndicesByConceptName[conceptName]))
-	if(len(activationList) > 0):
-		columnConceptIndexMap = {}
-		for sequenceConceptIndex, conceptName in enumerate(orderedConceptNameList):
-			columnConceptIndexMap[conceptName] = sequenceConceptIndex
-		for localFeatureIndex, activation in enumerate(activationList):
-			activation["localFeatureIndex"] = localFeatureIndex
-			activation["sequenceConceptIndex"] = int(columnConceptIndexMap[activation["conceptName"]])
-		result = {"orderedConceptNameList": orderedConceptNameList, "activationList": activationList, "featureWords": featureWords, "globalFeatureIndices": globalFeatureIndices, "requiredSourceFeatureIndicesByConceptName": requiredSourceFeatureIndicesByConceptName, "numberOfSnapshots": int(selectedFilterIndices.shape[0]), "numberOfColumns": int(selectedFilterIndices.shape[1])}
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		result = generateSequenceDataImageAxes(databaseNetworkObject, columnMetadataList, selectedFilterIndices, rfFilters, allowNewFeatures)
+	else:
 		if(submodalityName=="image" and modalityORimageSequenceEncode=="distance"):
-			result["imageDistanceFieldCoordinatesByConceptName"] = imageDistanceFieldCoordinatesByConceptName
+			imageDistanceFieldCoordinatesByConceptName = GIAANNor_sequenceDistance.buildImageDistanceFieldCoordinatesByConceptName(columnMetadataList)
 		elif(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
-			result["imageDistanceFieldCoordinatesByConceptName"] = imageDistanceFieldCoordinatesByConceptName
-			result["imageAxisColumnCoordinatesByConceptName"] = imageAxisColumnCoordinatesByConceptName
-		elif(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
-			result["imageDistanceFieldCoordinatesByConceptName"] = imageDistanceFieldCoordinatesByConceptName
-			result["imageAxisColumnCoordinatesByConceptName"] = imageAxisColumnCoordinatesByConceptName
+			imageDistanceFieldCoordinatesByConceptName = GIAANNor_sequenceDistance.buildImageDistanceFieldCoordinatesByConceptName(columnMetadataList)
+			imageAxisColumnCoordinatesByConceptName = GIAANNor_sequenceAxis.buildImageAxisColumnCoordinatesByConceptName(columnMetadataList)
+		ensureConceptColumns(databaseNetworkObject, columnMetadataList, allowNewFeatures)
+		for columnMetadata in columnMetadataList:
+			requiredSourceFeatureIndicesByConceptName[columnMetadata["conceptName"]] = []
+		for snapshotIndex in range(selectedFilterIndices.shape[0]):
+			for columnIndex, columnMetadata in enumerate(columnMetadataList):
+				rfFilterIndex = int(selectedFilterIndices[snapshotIndex, columnIndex].item())
+				if(rfFilterIndex >= 0):
+					conceptName = columnMetadata["conceptName"]
+					featureWord = GIAANNor_RFfilters.convertRFfilterIndexToASCIItext(rfFilters, rfFilterIndex)
+					featureWordVerbose = GIAANNor_RFfilters.convertRFfilterIndexToASCIItextVerbose(rfFilters, rfFilterIndex)
+					globalFeatureIndex = ensureFeatureIndex(databaseNetworkObject, featureWord, allowNewFeatures)
+					if(conceptName not in seenConceptNames):
+						orderedConceptNameList.append(conceptName)
+						seenConceptNames.add(conceptName)
+					requiredSourceFeatureIndicesByConceptName[conceptName].append(globalFeatureIndex)
+					activationList.append({"snapshotIndex": snapshotIndex, "columnIndex": columnIndex, "conceptName": conceptName, "featureWord": featureWord, "featureWordVerbose": featureWordVerbose, "globalFeatureIndex": globalFeatureIndex})
+					featureWords.append(featureWord)
+					globalFeatureIndices.append(globalFeatureIndex)
+		if(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
+			GIAANNor_sequenceAxis.expandImageAxisSequenceConcepts(orderedConceptNameList, requiredSourceFeatureIndicesByConceptName, activationList, columnMetadataList, imageAxisColumnCoordinatesByConceptName)
+		for conceptName in list(requiredSourceFeatureIndicesByConceptName.keys()):
+			requiredSourceFeatureIndicesByConceptName[conceptName] = sorted(set(requiredSourceFeatureIndicesByConceptName[conceptName]))
+		if(len(activationList) > 0):
+			columnConceptIndexMap = {}
+			for sequenceConceptIndex, conceptName in enumerate(orderedConceptNameList):
+				columnConceptIndexMap[conceptName] = sequenceConceptIndex
+			for localFeatureIndex, activation in enumerate(activationList):
+				activation["localFeatureIndex"] = localFeatureIndex
+				activation["sequenceConceptIndex"] = int(columnConceptIndexMap[activation["conceptName"]])
+			result = {"orderedConceptNameList": orderedConceptNameList, "activationList": activationList, "featureWords": featureWords, "globalFeatureIndices": globalFeatureIndices, "requiredSourceFeatureIndicesByConceptName": requiredSourceFeatureIndicesByConceptName, "numberOfSnapshots": int(selectedFilterIndices.shape[0]), "numberOfColumns": int(selectedFilterIndices.shape[1])}
+			if(submodalityName=="image" and modalityORimageSequenceEncode=="distance"):
+				result["imageDistanceFieldCoordinatesByConceptName"] = imageDistanceFieldCoordinatesByConceptName
+			elif(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
+				result["imageDistanceFieldCoordinatesByConceptName"] = imageDistanceFieldCoordinatesByConceptName
+				result["imageAxisColumnCoordinatesByConceptName"] = imageAxisColumnCoordinatesByConceptName
+	return result
+
+
+def generateSequenceDataImageAxes(databaseNetworkObject, columnMetadataList, selectedFilterIndices, rfFilters, allowNewFeatures):
+	result = None
+	imageAxesSequenceTensorData = None
+	activeCoordinateTensor = None
+	activeFilterIndexTensor = None
+	uniqueFilterIndexTensor = None
+	inverseFilterIndexTensor = None
+	uniqueFilterIndexList = None
+	uniqueFeatureWords = None
+	uniqueFeatureWordsVerbose = None
+	uniqueGlobalFeatureIndices = None
+	uniqueGlobalFeatureIndexTensor = None
+	globalFeatureIndexTensor = None
+	centralConceptName = None
+	featureWords = None
+	featureWordsVerbose = None
+	globalFeatureIndices = None
+	requiredSourceFeatureIndicesByConceptName = None
+	activationList = None
+	activationTupleIterable = None
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		imageAxesSequenceTensorData = GIAANNor_sequenceAxes.buildImageAxesSequenceTensorData(columnMetadataList, selectedFilterIndices)
+		activeCoordinateTensor = pt.nonzero(selectedFilterIndices >= 0, as_tuple=False)
+		if(activeCoordinateTensor.shape[0] > 0):
+			centralConceptName = imageAxesSequenceTensorData["centralConceptName"]
+			ensureConceptColumns(databaseNetworkObject, [columnMetadataList[int(imageAxesSequenceTensorData["centralColumnIndex"])]], allowNewFeatures)
+			activeFilterIndexTensor = selectedFilterIndices[activeCoordinateTensor[:, 0], activeCoordinateTensor[:, 1]].to(dtype=pt.long, device=selectedFilterIndices.device)
+			uniqueFilterIndexTensor, inverseFilterIndexTensor = pt.unique(activeFilterIndexTensor, sorted=True, return_inverse=True)
+			uniqueFilterIndexList = uniqueFilterIndexTensor.detach().cpu().tolist()
+			uniqueFeatureWords = list(map(lambda rfFilterIndex: GIAANNor_RFfilters.convertRFfilterIndexToASCIItext(rfFilters, int(rfFilterIndex)), uniqueFilterIndexList))
+			uniqueFeatureWordsVerbose = list(map(lambda rfFilterIndex: GIAANNor_RFfilters.convertRFfilterIndexToASCIItextVerbose(rfFilters, int(rfFilterIndex)), uniqueFilterIndexList))
+			uniqueGlobalFeatureIndices = list(map(lambda featureWord: ensureFeatureIndex(databaseNetworkObject, featureWord, allowNewFeatures), uniqueFeatureWords))
+			uniqueGlobalFeatureIndexTensor = pt.tensor(uniqueGlobalFeatureIndices, dtype=pt.long, device=inverseFilterIndexTensor.device)
+			globalFeatureIndexTensor = uniqueGlobalFeatureIndexTensor.index_select(0, inverseFilterIndexTensor)
+			featureWords = list(map(uniqueFeatureWords.__getitem__, inverseFilterIndexTensor.detach().cpu().tolist()))
+			featureWordsVerbose = list(map(uniqueFeatureWordsVerbose.__getitem__, inverseFilterIndexTensor.detach().cpu().tolist()))
+			globalFeatureIndices = globalFeatureIndexTensor.detach().cpu().tolist()
+			requiredSourceFeatureIndicesByConceptName = {centralConceptName: sorted(uniqueGlobalFeatureIndices)}
+			activationTupleIterable = zip(range(int(activeCoordinateTensor.shape[0])), activeCoordinateTensor[:, 0].detach().cpu().tolist(), activeCoordinateTensor[:, 1].detach().cpu().tolist(), featureWords, featureWordsVerbose, globalFeatureIndices)
+			activationList = list(map(lambda activationTuple: buildImageAxesActivation(activationTuple, centralConceptName), activationTupleIterable))
+			result = {"orderedConceptNameList": [centralConceptName], "activationList": activationList, "featureWords": featureWords, "globalFeatureIndices": globalFeatureIndices, "requiredSourceFeatureIndicesByConceptName": requiredSourceFeatureIndicesByConceptName, "numberOfSnapshots": int(selectedFilterIndices.shape[0]), "numberOfColumns": int(selectedFilterIndices.shape[1]), "imageAxesFeatureFieldXTensor": imageAxesSequenceTensorData["featureFieldXTensor"], "imageAxesFeatureFieldYTensor": imageAxesSequenceTensorData["featureFieldYTensor"], "imageAxesFeatureAxisMaskTensor": imageAxesSequenceTensorData["featureAxisMaskTensor"], "imageAxesCentralFieldX": imageAxesSequenceTensorData["centralFieldX"], "imageAxesCentralFieldY": imageAxesSequenceTensorData["centralFieldY"]}
+	else:
+		raise RuntimeError("generateSequenceDataImageAxes error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
+	return result
+
+
+def buildImageAxesActivation(activationTuple, centralConceptName):
+	result = None
+	localFeatureIndex = None
+	snapshotIndex = None
+	columnIndex = None
+	featureWord = None
+	featureWordVerbose = None
+	globalFeatureIndex = None
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		if(not isinstance(activationTuple, tuple) or len(activationTuple) != 6):
+			raise RuntimeError("buildImageAxesActivation error: activationTuple must be a tuple of length 6")
+		if(not isinstance(centralConceptName, str) or centralConceptName == ""):
+			raise RuntimeError("buildImageAxesActivation error: centralConceptName must be a non-empty string")
+		localFeatureIndex, snapshotIndex, columnIndex, featureWord, featureWordVerbose, globalFeatureIndex = activationTuple
+		result = {"snapshotIndex": int(snapshotIndex), "columnIndex": int(columnIndex), "conceptName": centralConceptName, "featureWord": featureWord, "featureWordVerbose": featureWordVerbose, "globalFeatureIndex": int(globalFeatureIndex), "localFeatureIndex": int(localFeatureIndex), "sequenceConceptIndex": int(modalityORimageSequenceEncodeAxesColumnIndex)}
+	else:
+		raise RuntimeError("buildImageAxesActivation error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
 	return result
 
 
@@ -250,32 +312,31 @@ def buildTrainTensors(sequenceObservedColumns, sequenceData):
 	featureNeuronsPos = pt.zeros((sequenceObservedColumns.cs, sequenceObservedColumns.fs), dtype=arrayType, device=targetDevice)
 	featureNeuronsSegmentMask = pt.ones((arrayNumberOfSegments, sequenceObservedColumns.cs), dtype=arrayType, device=targetDevice)
 	configureTrainConnectionsForImageSequenceEncoding(sequenceObservedColumns)
-	for activation in sequenceData["activationList"]:
-		# each layer column has a maximum of 1 feature trained for every iteration in a sequence.
-		sequenceConceptIndex = int(activation["sequenceConceptIndex"])
-		localFeatureIndex = int(activation["localFeatureIndex"])
-		snapshotIndex = int(activation["snapshotIndex"])
-		if(submodalityName=="image" and modalityORimageSequenceEncode=="distance"):
-			GIAANNor_sequenceDistance.validateImageDistanceSnapshotIndex(snapshotIndex)
-			activeSegments = GIAANNor_sequenceDistance.getActiveSegmentsForImageDistanceEncoding(sequenceObservedColumns, sequenceConceptIndex, targetDevice)
-			featureNeuronsWordOrder[sequenceConceptIndex, localFeatureIndex] = 0
-		elif(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
-			GIAANNor_sequenceAxis.validateImageAxisSnapshotIndex(snapshotIndex)
-			activeSegments = GIAANNor_sequenceAxis.getActiveSegmentsForImageAxisEncoding(sequenceObservedColumns, sequenceConceptIndex, targetDevice)
-			featureNeuronsWordOrder[sequenceConceptIndex, localFeatureIndex] = 0
-		elif(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
-			GIAANNor_sequenceAxes.validateImageAxesSnapshotIndex(snapshotIndex)
-			activeSegments = GIAANNor_sequenceAxes.getActiveSegmentsForImageAxesEncoding(sequenceObservedColumns, sequenceConceptIndex, targetDevice)
-			featureNeuronsWordOrder[sequenceConceptIndex, localFeatureIndex] = 0
-		elif(submodalityName=="image" and modalityORimageSequenceEncode=="none"):
-			if(snapshotIndex != 0):
-				raise RuntimeError("buildTrainTensors error: snapshotIndex must be 0 when modalityORimageSequenceEncode is 'none'")
-			activeSegments = getActiveSegmentsForSnapshot(snapshotIndex, targetDevice)
-			featureNeuronsWordOrder[sequenceConceptIndex, localFeatureIndex] = snapshotIndex
-		else:
-			activeSegments = getActiveSegmentsForSnapshot(snapshotIndex, targetDevice)
-			featureNeuronsWordOrder[sequenceConceptIndex, localFeatureIndex] = snapshotIndex
-		featureNeuronsActive[0, activeSegments, sequenceConceptIndex, localFeatureIndex] = 1
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		GIAANNor_sequenceAxes.populateImageAxesTrainTensors(sequenceObservedColumns, featureNeuronsActive, featureNeuronsWordOrder, targetDevice)
+	else:
+		for activation in sequenceData["activationList"]:
+			# each layer column has a maximum of 1 feature trained for every iteration in a sequence.
+			sequenceConceptIndex = int(activation["sequenceConceptIndex"])
+			localFeatureIndex = int(activation["localFeatureIndex"])
+			snapshotIndex = int(activation["snapshotIndex"])
+			if(submodalityName=="image" and modalityORimageSequenceEncode=="distance"):
+				GIAANNor_sequenceDistance.validateImageDistanceSnapshotIndex(snapshotIndex)
+				activeSegments = GIAANNor_sequenceDistance.getActiveSegmentsForImageDistanceEncoding(sequenceObservedColumns, sequenceConceptIndex, targetDevice)
+				featureNeuronsWordOrder[sequenceConceptIndex, localFeatureIndex] = 0
+			elif(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
+				GIAANNor_sequenceAxis.validateImageAxisSnapshotIndex(snapshotIndex)
+				activeSegments = GIAANNor_sequenceAxis.getActiveSegmentsForImageAxisEncoding(sequenceObservedColumns, sequenceConceptIndex, targetDevice)
+				featureNeuronsWordOrder[sequenceConceptIndex, localFeatureIndex] = 0
+			elif(submodalityName=="image" and modalityORimageSequenceEncode=="none"):
+				if(snapshotIndex != 0):
+					raise RuntimeError("buildTrainTensors error: snapshotIndex must be 0 when modalityORimageSequenceEncode is 'none'")
+				activeSegments = getActiveSegmentsForSnapshot(snapshotIndex, targetDevice)
+				featureNeuronsWordOrder[sequenceConceptIndex, localFeatureIndex] = snapshotIndex
+			else:
+				activeSegments = getActiveSegmentsForSnapshot(snapshotIndex, targetDevice)
+				featureNeuronsWordOrder[sequenceConceptIndex, localFeatureIndex] = snapshotIndex
+			featureNeuronsActive[0, activeSegments, sequenceConceptIndex, localFeatureIndex] = 1
 	result = (featureNeuronsActive, sequenceObservedColumns.cs, sequenceObservedColumns.fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask)
 	return result
 

@@ -107,4 +107,5 @@ MANUAL; - update database save paths to only use specialised inference_prompt.tx
 		- for each axis (e.g. X), for every central target neuron (i.e. central active column feature in the retinotopic map) segment, for every source neuron associated with that segment along the axis X at position y=centre (i.e. active column feature in its corresponding retinotopic map segment), a target segment input is trained for the particular source neuron feature index. The source and target neuron column index information is discarded during training.
 	- Implementation notes:	
 		- when modalityORimageSequenceEncode=="axes", GIAANNcmn_databaseNetworkTrain effectively only saves connection source feature feature index (not column index) - it does this by setting all trained connection source and target column indices to columnIndex=0.
+[GPT-5.5:] - upgrade the modalityORimageSequenceEncode = "axes" implementation such that it is completely vectorised.
 
