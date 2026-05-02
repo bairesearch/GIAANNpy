@@ -143,10 +143,12 @@ def generateSequenceDataImageAxes(databaseNetworkObject, columnMetadataList, sel
 	requiredSourceFeatureIndicesByConceptName = None
 	activationList = None
 	activationTupleIterable = None
+	centralTargetActive = None
 	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
 		imageAxesSequenceTensorData = GIAANNor_sequenceAxes.buildImageAxesSequenceTensorData(columnMetadataList, selectedFilterIndices)
 		activeCoordinateTensor = pt.nonzero(selectedFilterIndices >= 0, as_tuple=False)
-		if(activeCoordinateTensor.shape[0] > 0):
+		centralTargetActive = bool(pt.any(imageAxesSequenceTensorData["featureCentralColumnMaskTensor"]).item())
+		if(activeCoordinateTensor.shape[0] > 0 and centralTargetActive):
 			centralConceptName = imageAxesSequenceTensorData["centralConceptName"]
 			ensureConceptColumns(databaseNetworkObject, [columnMetadataList[int(imageAxesSequenceTensorData["centralColumnIndex"])]], allowNewFeatures)
 			activeFilterIndexTensor = selectedFilterIndices[activeCoordinateTensor[:, 0], activeCoordinateTensor[:, 1]].to(dtype=pt.long, device=selectedFilterIndices.device)
@@ -163,7 +165,7 @@ def generateSequenceDataImageAxes(databaseNetworkObject, columnMetadataList, sel
 			requiredSourceFeatureIndicesByConceptName = {centralConceptName: sorted(uniqueGlobalFeatureIndices)}
 			activationTupleIterable = zip(range(int(activeCoordinateTensor.shape[0])), activeCoordinateTensor[:, 0].detach().cpu().tolist(), activeCoordinateTensor[:, 1].detach().cpu().tolist(), featureWords, featureWordsVerbose, globalFeatureIndices)
 			activationList = list(map(lambda activationTuple: buildImageAxesActivation(activationTuple, centralConceptName), activationTupleIterable))
-			result = {"orderedConceptNameList": [centralConceptName], "activationList": activationList, "featureWords": featureWords, "globalFeatureIndices": globalFeatureIndices, "requiredSourceFeatureIndicesByConceptName": requiredSourceFeatureIndicesByConceptName, "numberOfSnapshots": int(selectedFilterIndices.shape[0]), "numberOfColumns": int(selectedFilterIndices.shape[1]), "imageAxesFeatureFieldXTensor": imageAxesSequenceTensorData["featureFieldXTensor"], "imageAxesFeatureFieldYTensor": imageAxesSequenceTensorData["featureFieldYTensor"], "imageAxesFeatureAxisMaskTensor": imageAxesSequenceTensorData["featureAxisMaskTensor"], "imageAxesCentralFieldX": imageAxesSequenceTensorData["centralFieldX"], "imageAxesCentralFieldY": imageAxesSequenceTensorData["centralFieldY"]}
+			result = {"orderedConceptNameList": [centralConceptName], "activationList": activationList, "featureWords": featureWords, "globalFeatureIndices": globalFeatureIndices, "requiredSourceFeatureIndicesByConceptName": requiredSourceFeatureIndicesByConceptName, "numberOfSnapshots": int(selectedFilterIndices.shape[0]), "numberOfColumns": int(selectedFilterIndices.shape[1]), "imageAxesFeatureFieldXTensor": imageAxesSequenceTensorData["featureFieldXTensor"], "imageAxesFeatureFieldYTensor": imageAxesSequenceTensorData["featureFieldYTensor"], "imageAxesFeatureAxisMaskTensor": imageAxesSequenceTensorData["featureAxisMaskTensor"], "imageAxesFeatureCentralColumnMaskTensor": imageAxesSequenceTensorData["featureCentralColumnMaskTensor"], "imageAxesCentralFieldX": imageAxesSequenceTensorData["centralFieldX"], "imageAxesCentralFieldY": imageAxesSequenceTensorData["centralFieldY"]}
 	else:
 		raise RuntimeError("generateSequenceDataImageAxes error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
 	return result
@@ -203,22 +205,111 @@ def generateSequenceDataText(sequenceData):
 		raise RuntimeError("generateSequenceDataText error: sequenceData missing numberOfSnapshots")
 	if("numberOfColumns" not in sequenceData):
 		raise RuntimeError("generateSequenceDataText error: sequenceData missing numberOfColumns")
-	maxFeatureCount = int(sequenceData["numberOfSnapshots"])*int(sequenceData["numberOfColumns"])
-	if(len(sequenceData["activationList"]) > maxFeatureCount):
-		raise RuntimeError("generateSequenceDataText error: activationList length exceeds numberOfSnapshots*numberOfColumns")
-	for activation in sequenceData["activationList"]:
-		snapshotIndex = int(activation["snapshotIndex"])
-		columnIndex = int(activation["columnIndex"])
-		activationKey = (snapshotIndex, columnIndex)
-		if(activationKey in activationKeySet):
-			raise RuntimeError("generateSequenceDataText error: duplicate activation detected for snapshotIndex/columnIndex")
-		activationKeySet.add(activationKey)
-		if(snapshotIndex not in snapshotActivationDict):
-			snapshotActivationDict[snapshotIndex] = []
-		snapshotActivationDict[snapshotIndex].append(activation)
-	for snapshotIndex in sorted(snapshotActivationDict.keys()):
-		snapshotTextList.append(generateSnapshotDataText(snapshotIndex, snapshotActivationDict[snapshotIndex]))
-	result = " | ".join(snapshotTextList)
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		result = generateImageAxesSequenceDataText(sequenceData)
+	else:
+		maxFeatureCount = int(sequenceData["numberOfSnapshots"])*int(sequenceData["numberOfColumns"])
+		if(len(sequenceData["activationList"]) > maxFeatureCount):
+			raise RuntimeError("generateSequenceDataText error: activationList length exceeds numberOfSnapshots*numberOfColumns")
+		for activation in sequenceData["activationList"]:
+			snapshotIndex = int(activation["snapshotIndex"])
+			columnIndex = int(activation["columnIndex"])
+			activationKey = (snapshotIndex, columnIndex)
+			if(activationKey in activationKeySet):
+				raise RuntimeError("generateSequenceDataText error: duplicate activation detected for snapshotIndex/columnIndex")
+			activationKeySet.add(activationKey)
+			if(snapshotIndex not in snapshotActivationDict):
+				snapshotActivationDict[snapshotIndex] = []
+			snapshotActivationDict[snapshotIndex].append(activation)
+		for snapshotIndex in sorted(snapshotActivationDict.keys()):
+			snapshotTextList.append(generateSnapshotDataText(snapshotIndex, snapshotActivationDict[snapshotIndex]))
+		result = modalityORsequenceDataTextSnapshotDelimiter.join(snapshotTextList)
+	return result
+
+
+def generateImageAxesSequenceDataText(sequenceData):
+	result = None
+	fieldXTensor = None
+	fieldYTensor = None
+	axisMaskTensor = None
+	centralFieldX = None
+	centralFieldY = None
+	deltaX = None
+	deltaY = None
+	segmentIndexTensor = None
+	segmentActivationDict = {}
+	segmentTextList = []
+	localFeatureIndex = None
+	segmentIndex = None
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		if("imageAxesFeatureFieldXTensor" not in sequenceData or "imageAxesFeatureFieldYTensor" not in sequenceData or "imageAxesFeatureAxisMaskTensor" not in sequenceData or "imageAxesCentralFieldX" not in sequenceData or "imageAxesCentralFieldY" not in sequenceData):
+			raise RuntimeError("generateImageAxesSequenceDataText error: sequenceData missing image axes tensors")
+		fieldXTensor = sequenceData["imageAxesFeatureFieldXTensor"]
+		fieldYTensor = sequenceData["imageAxesFeatureFieldYTensor"]
+		axisMaskTensor = sequenceData["imageAxesFeatureAxisMaskTensor"]
+		if(not pt.is_tensor(fieldXTensor) or not pt.is_tensor(fieldYTensor) or not pt.is_tensor(axisMaskTensor)):
+			raise RuntimeError("generateImageAxesSequenceDataText error: image axes fields and mask must be tensors")
+		if(fieldXTensor.dim() != 1 or fieldYTensor.dim() != 1 or axisMaskTensor.dim() != 1):
+			raise RuntimeError("generateImageAxesSequenceDataText error: image axes fields and mask must be rank 1")
+		if(int(fieldXTensor.shape[0]) != len(sequenceData["activationList"]) or int(fieldYTensor.shape[0]) != len(sequenceData["activationList"]) or int(axisMaskTensor.shape[0]) != len(sequenceData["activationList"])):
+			raise RuntimeError("generateImageAxesSequenceDataText error: image axes tensor lengths must match activationList")
+		centralFieldX = int(sequenceData["imageAxesCentralFieldX"])
+		centralFieldY = int(sequenceData["imageAxesCentralFieldY"])
+		deltaX = pt.abs(centralFieldX - fieldXTensor)
+		deltaY = pt.abs(centralFieldY - fieldYTensor)
+		segmentIndexTensor = pt.ceil(pt.sqrt((deltaX*deltaX + deltaY*deltaY).to(arrayType))).long()
+		if(bool(pt.any(segmentIndexTensor < 0).item()) or bool(pt.any(segmentIndexTensor >= int(arrayNumberOfSegments)).item())):
+			raise RuntimeError("generateImageAxesSequenceDataText error: calculated segment index out of range")
+		for activation in sequenceData["activationList"]:
+			localFeatureIndex = int(activation["localFeatureIndex"])
+			if(localFeatureIndex < 0 or localFeatureIndex >= int(axisMaskTensor.shape[0])):
+				raise RuntimeError("generateImageAxesSequenceDataText error: activation localFeatureIndex out of range")
+			if(bool(axisMaskTensor[localFeatureIndex].item())):
+				segmentIndex = int(segmentIndexTensor[localFeatureIndex].item())
+				if(segmentIndex not in segmentActivationDict):
+					segmentActivationDict[segmentIndex] = []
+				segmentActivationDict[segmentIndex].append(activation)
+		for segmentIndex in sorted(segmentActivationDict.keys()):
+			segmentTextList.append(generateImageAxesSegmentDataText(segmentIndex, segmentActivationDict[segmentIndex]))
+		result = modalityORsequenceDataTextSegmentDelimiter.join(segmentTextList)
+	else:
+		raise RuntimeError("generateImageAxesSequenceDataText error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
+	return result
+
+
+def generateImageAxesSegmentDataText(segmentIndex, segmentActivationList):
+	result = None
+	activationTextList = []
+	segmentActivationListSorted = None
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		if(not isinstance(segmentIndex, int) or isinstance(segmentIndex, bool)):
+			raise RuntimeError("generateImageAxesSegmentDataText error: segmentIndex must be an int")
+		if(segmentIndex < 0 or segmentIndex >= int(arrayNumberOfSegments)):
+			raise RuntimeError("generateImageAxesSegmentDataText error: segmentIndex out of range")
+		if(not isinstance(segmentActivationList, list)):
+			raise RuntimeError("generateImageAxesSegmentDataText error: segmentActivationList must be a list")
+		segmentActivationListSorted = sorted(segmentActivationList, key=lambda activation: int(activation["columnIndex"]))
+		for activation in segmentActivationListSorted:
+			activationTextList.append(generateImageAxesActivationText(activation))
+		result = modalityORsequenceDataTextSegmentPrefix + str(segmentIndex).zfill(int(modalityORsequenceDataTextIndexDigits)) + modalityORsequenceDataTextLabelSuffix + modalityORsequenceDataTextFeatureDelimiter.join(activationTextList)
+	else:
+		raise RuntimeError("generateImageAxesSegmentDataText error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
+	return result
+
+
+def generateImageAxesActivationText(activation):
+	result = None
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		if(modalityORRFfilterNamesVerbose):
+			if("featureWordVerbose" not in activation):
+				raise RuntimeError("generateImageAxesActivationText error: activation missing featureWordVerbose")
+			result = activation["featureWordVerbose"]
+		else:
+			if("featureWord" not in activation):
+				raise RuntimeError("generateImageAxesActivationText error: activation missing featureWord")
+			result = activation["featureWord"]
+	else:
+		raise RuntimeError("generateImageAxesActivationText error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
 	return result
 
 

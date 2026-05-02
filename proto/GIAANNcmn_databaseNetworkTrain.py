@@ -436,6 +436,7 @@ def calculateFeatureConnectionsActiveTrainSpatialAxesSparseIndices(featureNeuron
 	encodedSourceConceptIndices = None
 	encodedTargetConceptIndices = None
 	featureAxisMaskTensor = None
+	featureCentralColumnMaskTensor = None
 	if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
 		if(not pt.is_tensor(featureNeuronsActive)):
 			raise RuntimeError("calculateFeatureConnectionsActiveTrainSpatialAxesSparseIndices error: featureNeuronsActive must be a tensor")
@@ -449,9 +450,10 @@ def calculateFeatureConnectionsActiveTrainSpatialAxesSparseIndices(featureNeuron
 			raise RuntimeError("calculateFeatureConnectionsActiveTrainSpatialAxesSparseIndices error: featureNeuronsWordOrder dimensions mismatch")
 		connectionDevice = featureNeuronsActive.device
 		targetActive = featureNeuronsActive.amax(dim=1) > 0
-		sourceActive = targetActive.amax(dim=0) > 0
 		featureAxisMaskTensor = getImageAxesFeatureAxisMask(sequenceObservedColumns, connectionDevice)
-		sourceActive = sourceActive & featureAxisMaskTensor.view(1, fs)
+		sourceActive = featureAxisMaskTensor.view(1, fs)
+		featureCentralColumnMaskTensor = getImageAxesFeatureCentralColumnMask(sequenceObservedColumns, connectionDevice)
+		targetActive = targetActive & featureCentralColumnMaskTensor.view(1, 1, fs)
 		sourceIndices = pt.nonzero(sourceActive, as_tuple=False)
 		targetIndices = pt.nonzero(targetActive, as_tuple=False)
 		result = pt.empty((6, 0), dtype=pt.long, device=connectionDevice)
@@ -489,6 +491,7 @@ def calculateFeatureConnectionsSpatialAxesSegmentMaskTensor(sequenceObservedColu
 	segmentMaskCollapsed = None
 	axesColumnIndex = None
 	featureAxisMaskTensor = None
+	featureCentralColumnMaskTensor = None
 	if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
 		axesColumnIndex = getImageSequenceEncodeAxesColumnIndex(cs)
 		segmentIndexTensor = calculateFeatureConnectionsSpatialAxesFeatureSegmentIndexMatrix(sequenceObservedColumns, fs, targetDevice)
@@ -496,6 +499,8 @@ def calculateFeatureConnectionsSpatialAxesSegmentMaskTensor(sequenceObservedColu
 		segmentMaskCollapsed.scatter_(0, segmentIndexTensor.unsqueeze(0), True)
 		featureAxisMaskTensor = getImageAxesFeatureAxisMask(sequenceObservedColumns, targetDevice)
 		segmentMaskCollapsed = segmentMaskCollapsed & featureAxisMaskTensor.view(1, fs, 1)
+		featureCentralColumnMaskTensor = getImageAxesFeatureCentralColumnMask(sequenceObservedColumns, targetDevice)
+		segmentMaskCollapsed = segmentMaskCollapsed & featureCentralColumnMaskTensor.view(1, 1, fs)
 		result = pt.zeros((numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=targetDevice)
 		result[:, :, axesColumnIndex, :, axesColumnIndex, :] = segmentMaskCollapsed
 	else:
@@ -581,6 +586,28 @@ def getImageAxesFeatureAxisMask(sequenceObservedColumns, targetDevice):
 	else:
 		raise RuntimeError("getImageAxesFeatureAxisMask error: requires trainConnectionsUseSpatialAxes")
 	return result
+
+
+def getImageAxesFeatureCentralColumnMask(sequenceObservedColumns, targetDevice):
+	result = None
+	featureCentralColumnMaskTensor = None
+	if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
+		if(not hasattr(sequenceObservedColumns, "imageAxesFeatureCentralColumnMaskTensor")):
+			raise RuntimeError("getImageAxesFeatureCentralColumnMask error: sequenceObservedColumns missing imageAxesFeatureCentralColumnMaskTensor")
+		featureCentralColumnMaskTensor = sequenceObservedColumns.imageAxesFeatureCentralColumnMaskTensor
+		if(featureCentralColumnMaskTensor is None):
+			raise RuntimeError("getImageAxesFeatureCentralColumnMask error: imageAxesFeatureCentralColumnMaskTensor must not be None")
+		if(not pt.is_tensor(featureCentralColumnMaskTensor)):
+			raise RuntimeError("getImageAxesFeatureCentralColumnMask error: imageAxesFeatureCentralColumnMaskTensor must be a tensor")
+		if(featureCentralColumnMaskTensor.dim() != 1):
+			raise RuntimeError("getImageAxesFeatureCentralColumnMask error: imageAxesFeatureCentralColumnMaskTensor must be rank 1")
+		if(int(featureCentralColumnMaskTensor.shape[0]) != int(sequenceObservedColumns.fs)):
+			raise RuntimeError("getImageAxesFeatureCentralColumnMask error: imageAxesFeatureCentralColumnMaskTensor length must equal fs")
+		result = featureCentralColumnMaskTensor.to(device=targetDevice, dtype=pt.bool)
+	else:
+		raise RuntimeError("getImageAxesFeatureCentralColumnMask error: requires trainConnectionsUseSpatialAxes")
+	return result
+
 
 def getImageAxesCentralFieldCoordinates(sequenceObservedColumns):
 	result = None

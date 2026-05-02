@@ -45,6 +45,7 @@ class SequenceObservedColumns(GIAANNcmn_sequenceObservedColumns.SequenceObserved
 		self.imageAxesFeatureFieldXTensor = None
 		self.imageAxesFeatureFieldYTensor = None
 		self.imageAxesFeatureAxisMaskTensor = None
+		self.imageAxesFeatureCentralColumnMaskTensor = None
 		self.imageAxesCentralFieldX = None
 		self.imageAxesCentralFieldY = None
 		self.columnsIndexSequenceWordIndexDict = {}

@@ -39,6 +39,12 @@ debugPrintInsufficientUsableFeaturesWarning = True
 #recent print vars;
 printSequenceNumberColumns = True
 modalityORRFfilterNamesVerbose = False	#default: False	#orig: True
+modalityORsequenceDataTextSnapshotDelimiter = " | "
+modalityORsequenceDataTextSegmentDelimiter = " \ "
+modalityORsequenceDataTextFeatureDelimiter = " "
+modalityORsequenceDataTextSegmentPrefix = "s"
+modalityORsequenceDataTextLabelSuffix = ": "
+modalityORsequenceDataTextIndexDigits = 3
 
 
 #Dataset Type;

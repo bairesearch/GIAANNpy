@@ -109,4 +109,4 @@ MANUAL; - update database save paths to only use specialised inference_prompt.tx
 		- when modalityORimageSequenceEncode=="axes", GIAANNcmn_databaseNetworkTrain effectively only saves connection source feature feature index (not column index) - it does this by setting all trained connection source and target column indices to columnIndex=0.
 [GPT-5.5:] - upgrade the modalityORimageSequenceEncode = "axes" implementation such that it is completely vectorised.
 [GPT-5.5:] - update modalityORimageSequenceEncode = "axes" - retain a for loop for each axis (e.g. X).
-
+[GPT-5.5:] - patch implementation of modalityORimageSequenceEncode = "axes" - training only occurs for the central target column active features.

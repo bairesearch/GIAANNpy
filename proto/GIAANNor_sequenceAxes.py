@@ -39,6 +39,7 @@ def buildImageAxesSequenceTensorData(columnMetadataList, selectedFilterIndices):
 	featureAxisXTensor = None
 	featureAxisYTensor = None
 	featureAxisMaskTensor = None
+	featureCentralColumnMaskTensor = None
 	centralAxisX = None
 	centralAxisY = None
 	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
@@ -55,9 +56,27 @@ def buildImageAxesSequenceTensorData(columnMetadataList, selectedFilterIndices):
 		centralAxisX = int(columnTensorData["axisXTensor"][columnTensorData["centralColumnIndex"]].item())
 		centralAxisY = int(columnTensorData["axisYTensor"][columnTensorData["centralColumnIndex"]].item())
 		featureAxisMaskTensor = calculateImageAxesFeatureAxisMaskTensor(featureAxisXTensor, featureAxisYTensor, centralAxisX, centralAxisY)
-		result = {"centralConceptName": columnTensorData["centralConceptName"], "centralColumnIndex": columnTensorData["centralColumnIndex"], "centralFieldX": int(columnTensorData["fieldXTensor"][columnTensorData["centralColumnIndex"]].item()), "centralFieldY": int(columnTensorData["fieldYTensor"][columnTensorData["centralColumnIndex"]].item()), "centralAxisX": centralAxisX, "centralAxisY": centralAxisY, "featureFieldXTensor": columnTensorData["fieldXTensor"].index_select(0, activeCoordinateTensor[:, 1]).to(dtype=pt.long), "featureFieldYTensor": columnTensorData["fieldYTensor"].index_select(0, activeCoordinateTensor[:, 1]).to(dtype=pt.long), "featureAxisXTensor": featureAxisXTensor, "featureAxisYTensor": featureAxisYTensor, "featureAxisMaskTensor": featureAxisMaskTensor.to(dtype=pt.bool)}
+		featureCentralColumnMaskTensor = calculateImageAxesFeatureCentralColumnMaskTensor(featureAxisXTensor, featureAxisYTensor, centralAxisX, centralAxisY)
+		result = {"centralConceptName": columnTensorData["centralConceptName"], "centralColumnIndex": columnTensorData["centralColumnIndex"], "centralFieldX": int(columnTensorData["fieldXTensor"][columnTensorData["centralColumnIndex"]].item()), "centralFieldY": int(columnTensorData["fieldYTensor"][columnTensorData["centralColumnIndex"]].item()), "centralAxisX": centralAxisX, "centralAxisY": centralAxisY, "featureFieldXTensor": columnTensorData["fieldXTensor"].index_select(0, activeCoordinateTensor[:, 1]).to(dtype=pt.long), "featureFieldYTensor": columnTensorData["fieldYTensor"].index_select(0, activeCoordinateTensor[:, 1]).to(dtype=pt.long), "featureAxisXTensor": featureAxisXTensor, "featureAxisYTensor": featureAxisYTensor, "featureAxisMaskTensor": featureAxisMaskTensor.to(dtype=pt.bool), "featureCentralColumnMaskTensor": featureCentralColumnMaskTensor.to(dtype=pt.bool)}
 	else:
 		raise RuntimeError("buildImageAxesSequenceTensorData error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
+	return result
+
+
+def calculateImageAxesFeatureCentralColumnMaskTensor(featureAxisXTensor, featureAxisYTensor, centralAxisX, centralAxisY):
+	result = None
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		if(not pt.is_tensor(featureAxisXTensor) or not pt.is_tensor(featureAxisYTensor)):
+			raise RuntimeError("calculateImageAxesFeatureCentralColumnMaskTensor error: feature axis coordinates must be tensors")
+		if(featureAxisXTensor.dim() != 1 or featureAxisYTensor.dim() != 1):
+			raise RuntimeError("calculateImageAxesFeatureCentralColumnMaskTensor error: feature axis coordinate tensors must be rank 1")
+		if(int(featureAxisXTensor.shape[0]) != int(featureAxisYTensor.shape[0])):
+			raise RuntimeError("calculateImageAxesFeatureCentralColumnMaskTensor error: feature axis coordinate tensor lengths must match")
+		if(not isinstance(centralAxisX, int) or isinstance(centralAxisX, bool) or not isinstance(centralAxisY, int) or isinstance(centralAxisY, bool)):
+			raise RuntimeError("calculateImageAxesFeatureCentralColumnMaskTensor error: central axis coordinates must be ints")
+		result = (featureAxisXTensor == int(centralAxisX)) & (featureAxisYTensor == int(centralAxisY))
+	else:
+		raise RuntimeError("calculateImageAxesFeatureCentralColumnMaskTensor error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
 	return result
 
 
@@ -158,7 +177,7 @@ def initialiseImageAxesFeatureFieldCoordinates(sequenceObservedColumns, sequence
 	featureFieldXTensor = None
 	featureFieldYTensor = None
 	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
-		if("imageAxesFeatureFieldXTensor" not in sequenceData or "imageAxesFeatureFieldYTensor" not in sequenceData or "imageAxesFeatureAxisMaskTensor" not in sequenceData or "imageAxesCentralFieldX" not in sequenceData or "imageAxesCentralFieldY" not in sequenceData):
+		if("imageAxesFeatureFieldXTensor" not in sequenceData or "imageAxesFeatureFieldYTensor" not in sequenceData or "imageAxesFeatureAxisMaskTensor" not in sequenceData or "imageAxesFeatureCentralColumnMaskTensor" not in sequenceData or "imageAxesCentralFieldX" not in sequenceData or "imageAxesCentralFieldY" not in sequenceData):
 			raise RuntimeError("initialiseImageAxesFeatureFieldCoordinates error: sequenceData missing image axes feature field coordinate tensors")
 		featureFieldXTensor = sequenceData["imageAxesFeatureFieldXTensor"]
 		featureFieldYTensor = sequenceData["imageAxesFeatureFieldYTensor"]
@@ -170,9 +189,12 @@ def initialiseImageAxesFeatureFieldCoordinates(sequenceObservedColumns, sequence
 			raise RuntimeError("initialiseImageAxesFeatureFieldCoordinates error: feature field coordinate tensor lengths must equal fs")
 		if(not pt.is_tensor(sequenceData["imageAxesFeatureAxisMaskTensor"]) or sequenceData["imageAxesFeatureAxisMaskTensor"].dim() != 1 or int(sequenceData["imageAxesFeatureAxisMaskTensor"].shape[0]) != int(sequenceObservedColumns.fs)):
 			raise RuntimeError("initialiseImageAxesFeatureFieldCoordinates error: imageAxesFeatureAxisMaskTensor must be a rank 1 tensor with length fs")
+		if(not pt.is_tensor(sequenceData["imageAxesFeatureCentralColumnMaskTensor"]) or sequenceData["imageAxesFeatureCentralColumnMaskTensor"].dim() != 1 or int(sequenceData["imageAxesFeatureCentralColumnMaskTensor"].shape[0]) != int(sequenceObservedColumns.fs)):
+			raise RuntimeError("initialiseImageAxesFeatureFieldCoordinates error: imageAxesFeatureCentralColumnMaskTensor must be a rank 1 tensor with length fs")
 		sequenceObservedColumns.imageAxesFeatureFieldXTensor = featureFieldXTensor.to(dtype=pt.long)
 		sequenceObservedColumns.imageAxesFeatureFieldYTensor = featureFieldYTensor.to(dtype=pt.long)
 		sequenceObservedColumns.imageAxesFeatureAxisMaskTensor = sequenceData["imageAxesFeatureAxisMaskTensor"].to(dtype=pt.bool)
+		sequenceObservedColumns.imageAxesFeatureCentralColumnMaskTensor = sequenceData["imageAxesFeatureCentralColumnMaskTensor"].to(dtype=pt.bool)
 		sequenceObservedColumns.imageAxesCentralFieldX = int(sequenceData["imageAxesCentralFieldX"])
 		sequenceObservedColumns.imageAxesCentralFieldY = int(sequenceData["imageAxesCentralFieldY"])
 	else:
@@ -220,6 +242,7 @@ def getActiveSegmentsForImageAxesEncoding(sequenceObservedColumns, sequenceConce
 def populateImageAxesTrainTensors(sequenceObservedColumns, featureNeuronsActive, featureNeuronsWordOrder, targetDevice):
 	result = None
 	activeSegmentMask = None
+	featureCentralColumnMaskTensor = None
 	axesColumnIndex = None
 	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
 		if(not pt.is_tensor(featureNeuronsActive) or not pt.is_tensor(featureNeuronsWordOrder)):
@@ -234,10 +257,33 @@ def populateImageAxesTrainTensors(sequenceObservedColumns, featureNeuronsActive,
 		activeSegmentMask = calculateImageAxesFeatureActiveSegmentMask(sequenceObservedColumns, targetDevice)
 		if(int(activeSegmentMask.shape[1]) != int(featureNeuronsActive.shape[3])):
 			raise RuntimeError("populateImageAxesTrainTensors error: active segment mask feature dimension mismatch")
+		featureCentralColumnMaskTensor = getImageAxesFeatureCentralColumnMask(sequenceObservedColumns, targetDevice)
+		activeSegmentMask = activeSegmentMask & featureCentralColumnMaskTensor.view(1, int(featureCentralColumnMaskTensor.shape[0]))
 		featureNeuronsActive[0, :, axesColumnIndex, :] = activeSegmentMask.to(dtype=featureNeuronsActive.dtype)
 		featureNeuronsWordOrder[axesColumnIndex, :] = 0
 	else:
 		raise RuntimeError("populateImageAxesTrainTensors error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
+	return result
+
+
+def getImageAxesFeatureCentralColumnMask(sequenceObservedColumns, targetDevice):
+	result = None
+	featureCentralColumnMaskTensor = None
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		if(not hasattr(sequenceObservedColumns, "imageAxesFeatureCentralColumnMaskTensor")):
+			raise RuntimeError("getImageAxesFeatureCentralColumnMask error: sequenceObservedColumns missing imageAxesFeatureCentralColumnMaskTensor")
+		featureCentralColumnMaskTensor = sequenceObservedColumns.imageAxesFeatureCentralColumnMaskTensor
+		if(featureCentralColumnMaskTensor is None):
+			raise RuntimeError("getImageAxesFeatureCentralColumnMask error: imageAxesFeatureCentralColumnMaskTensor must not be None")
+		if(not pt.is_tensor(featureCentralColumnMaskTensor)):
+			raise RuntimeError("getImageAxesFeatureCentralColumnMask error: imageAxesFeatureCentralColumnMaskTensor must be a tensor")
+		if(featureCentralColumnMaskTensor.dim() != 1):
+			raise RuntimeError("getImageAxesFeatureCentralColumnMask error: imageAxesFeatureCentralColumnMaskTensor must be rank 1")
+		if(int(featureCentralColumnMaskTensor.shape[0]) != int(sequenceObservedColumns.fs)):
+			raise RuntimeError("getImageAxesFeatureCentralColumnMask error: imageAxesFeatureCentralColumnMaskTensor length must equal fs")
+		result = featureCentralColumnMaskTensor.to(device=targetDevice, dtype=pt.bool)
+	else:
+		raise RuntimeError("getImageAxesFeatureCentralColumnMask error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
 	return result
 
 
