@@ -102,3 +102,9 @@ MANUAL; - update database save paths to only use specialised inference_prompt.tx
 		- for every target neuron (i.e. active column feature in the retinotopic map) segment, for every source neuron associated with that segment (i.e. active column feature in its corresponding retinotopic map segment), a target segment input is trained for the particular source neuron feature index coming from every column in the retinotopic snapshot map along axis X (and at source column position y).
 	- Implementation notes:	
 		- the only change from modalityORimageSequenceEncode=="distance" is adding for each axis (X, Y), is adding an effective 1D maxpool operation across all columns of the axis for the feature index of each source neuron (by connecting all features of this type across the axis columns instead of just the source column feature).
+[GPT-5.5:] - add option modalityORimageSequenceEncode=="axes" (GIAANNor_sequenceAxes.py), which modifies modalityORimageSequenceEncode=="axis" such that for each axis (X, Y) it effectively encodes sequence inputs based on contextual feature indices independent of their contextual column indices, but performs the same operation to both axes.
+	- Precise Algorithm:
+		- for each axis (e.g. X), for every central target neuron (i.e. central active column feature in the retinotopic map) segment, for every source neuron associated with that segment along the axis X at position y=centre (i.e. active column feature in its corresponding retinotopic map segment), a target segment input is trained for the particular source neuron feature index. The source and target neuron column index information is discarded during training.
+	- Implementation notes:	
+		- when modalityORimageSequenceEncode=="axes", GIAANNcmn_databaseNetworkTrain effectively only saves connection source feature feature index (not column index) - it does this by setting all trained connection source and target column indices to columnIndex=0.
+

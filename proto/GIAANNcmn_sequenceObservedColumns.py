@@ -43,6 +43,7 @@ class SequenceObservedColumns:
 		self.trainConnectionsIncludeSameTimeIndex = False
 		self.trainConnectionsUseSpatialDistance = False
 		self.trainConnectionsUseSpatialAxis = False
+		self.trainConnectionsUseSpatialAxes = False
 		self.sequenceConceptFieldXTensor = None
 		self.sequenceConceptFieldYTensor = None
 		self.sequenceConceptAxisXTensor = None

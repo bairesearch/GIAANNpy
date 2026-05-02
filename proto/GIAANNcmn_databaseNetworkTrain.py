@@ -73,6 +73,28 @@ def getTrainConnectionsUseSpatialAxis(sequenceObservedColumns):
 	result = sequenceObservedColumns.trainConnectionsUseSpatialAxis
 	return result
 
+def getTrainConnectionsUseSpatialAxes(sequenceObservedColumns):
+	result = None
+	if(not hasattr(sequenceObservedColumns, "trainConnectionsUseSpatialAxes")):
+		raise RuntimeError("getTrainConnectionsUseSpatialAxes error: sequenceObservedColumns missing trainConnectionsUseSpatialAxes")
+	if(not isinstance(sequenceObservedColumns.trainConnectionsUseSpatialAxes, bool)):
+		raise RuntimeError("getTrainConnectionsUseSpatialAxes error: trainConnectionsUseSpatialAxes must be a bool")
+	result = sequenceObservedColumns.trainConnectionsUseSpatialAxes
+	return result
+
+def getImageSequenceEncodeAxesColumnIndex(cs):
+	result = None
+	if(not isinstance(modalityORimageSequenceEncodeAxesColumnIndex, int) or isinstance(modalityORimageSequenceEncodeAxesColumnIndex, bool)):
+		raise RuntimeError("getImageSequenceEncodeAxesColumnIndex error: modalityORimageSequenceEncodeAxesColumnIndex must be an int")
+	if(not isinstance(cs, int) or isinstance(cs, bool)):
+		raise RuntimeError("getImageSequenceEncodeAxesColumnIndex error: cs must be an int")
+	if(cs <= 0):
+		raise RuntimeError("getImageSequenceEncodeAxesColumnIndex error: cs must be > 0")
+	if(modalityORimageSequenceEncodeAxesColumnIndex < 0 or modalityORimageSequenceEncodeAxesColumnIndex >= cs):
+		raise RuntimeError("getImageSequenceEncodeAxesColumnIndex error: modalityORimageSequenceEncodeAxesColumnIndex out of range")
+	result = int(modalityORimageSequenceEncodeAxesColumnIndex)
+	return result
+
 def getSequenceConceptFieldCoordinates(sequenceObservedColumns, targetDevice):
 	result = None
 	fieldXTensor = None
@@ -233,6 +255,9 @@ def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceOb
 			#featureConnectionsSegmentMask = pt.zeros_like(featureConnectionsActive, dtype=pt.bool)
 	else:
 		featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[:, arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+	if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
+		featureConnectionsActive = collapseFeatureConnectionsSpatialAxesTensor(featureConnectionsActive, cs)
+		featureConnectionsSegmentMask = collapseFeatureConnectionsSpatialAxesTensor(featureConnectionsSegmentMask, cs)
 
 	featureConnectionsPos = None
 	if(arrayIndexPropertiesPos or (arrayIndexPropertiesStrength and trainConnectionStrengthPOSdependence)):
@@ -361,6 +386,8 @@ def createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, colu
 			indicesList.append(segmentConnectionIndices)
 	if(len(indicesList) > 0):
 		combinedIndices = pt.cat(indicesList, dim=1)
+		if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
+			combinedIndices = collapseFeatureConnectionsSpatialAxesSparseIndices(combinedIndices, cs)
 		combinedValues = pt.ones((combinedIndices.shape[1],), dtype=arrayType, device=connectionDevice)
 	result = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=connectionTargetSize, dtype=arrayType, device=connectionDevice).coalesce()
 	if(result._nnz() > 0):
@@ -810,6 +837,55 @@ def calculateFeatureConnectionsActiveSegmentIndexTensor(featureConnectionsActive
 		result = segmentIndexTensor.view(arrayNumberOfSegments, 1, 1, 1, 1)
 	else:
 		raise RuntimeError("calculateFeatureConnectionsActiveSegmentIndexTensor error: featureConnectionsActive rank must be 5 or 6")
+	return result
+
+
+def collapseFeatureConnectionsSpatialAxesTensor(featureConnectionsTensor, cs):
+	result = None
+	collapsedFeatureConnectionsTensor = None
+	axesColumnIndex = None
+	if(not pt.is_tensor(featureConnectionsTensor)):
+		raise RuntimeError("collapseFeatureConnectionsSpatialAxesTensor error: featureConnectionsTensor must be a tensor")
+	if(not isinstance(cs, int) or isinstance(cs, bool)):
+		raise RuntimeError("collapseFeatureConnectionsSpatialAxesTensor error: cs must be an int")
+	if(cs <= 0):
+		raise RuntimeError("collapseFeatureConnectionsSpatialAxesTensor error: cs must be > 0")
+	axesColumnIndex = getImageSequenceEncodeAxesColumnIndex(cs)
+	if(featureConnectionsTensor.dim() == 6):
+		if(int(featureConnectionsTensor.shape[2]) != cs or int(featureConnectionsTensor.shape[4]) != cs):
+			raise RuntimeError("collapseFeatureConnectionsSpatialAxesTensor error: featureConnectionsTensor concept dimensions must equal cs")
+		result = pt.zeros_like(featureConnectionsTensor)
+		collapsedFeatureConnectionsTensor = featureConnectionsTensor.amax(dim=(2, 4))
+		result[:, :, axesColumnIndex, :, axesColumnIndex, :] = collapsedFeatureConnectionsTensor
+	elif(featureConnectionsTensor.dim() == 5):
+		if(int(featureConnectionsTensor.shape[1]) != cs or int(featureConnectionsTensor.shape[3]) != cs):
+			raise RuntimeError("collapseFeatureConnectionsSpatialAxesTensor error: featureConnectionsTensor concept dimensions must equal cs")
+		result = pt.zeros_like(featureConnectionsTensor)
+		collapsedFeatureConnectionsTensor = featureConnectionsTensor.amax(dim=(1, 3))
+		result[:, axesColumnIndex, :, axesColumnIndex, :] = collapsedFeatureConnectionsTensor
+	else:
+		raise RuntimeError("collapseFeatureConnectionsSpatialAxesTensor error: featureConnectionsTensor rank must be 5 or 6")
+	return result
+
+
+def collapseFeatureConnectionsSpatialAxesSparseIndices(connectionIndices, cs):
+	result = None
+	axesColumnIndex = None
+	if(not pt.is_tensor(connectionIndices)):
+		raise RuntimeError("collapseFeatureConnectionsSpatialAxesSparseIndices error: connectionIndices must be a tensor")
+	if(not isinstance(cs, int) or isinstance(cs, bool)):
+		raise RuntimeError("collapseFeatureConnectionsSpatialAxesSparseIndices error: cs must be an int")
+	if(cs <= 0):
+		raise RuntimeError("collapseFeatureConnectionsSpatialAxesSparseIndices error: cs must be > 0")
+	if(connectionIndices.dim() != 2):
+		raise RuntimeError("collapseFeatureConnectionsSpatialAxesSparseIndices error: connectionIndices rank must be 2")
+	if(int(connectionIndices.shape[0]) != 6):
+		raise RuntimeError("collapseFeatureConnectionsSpatialAxesSparseIndices error: connectionIndices first dimension must equal 6")
+	axesColumnIndex = getImageSequenceEncodeAxesColumnIndex(cs)
+	result = connectionIndices.clone()
+	if(result.numel() > 0):
+		result[2] = axesColumnIndex
+		result[4] = axesColumnIndex
 	return result
 
 

@@ -25,7 +25,7 @@ from GIAANNcmn_globalDefs import *
 
 def isImageDistanceLikeEncoding():
 	result = False
-	if(submodalityName=="image" and (modalityORimageSequenceEncode=="distance" or modalityORimageSequenceEncode=="axis")):
+	if(submodalityName=="image" and (modalityORimageSequenceEncode=="distance" or modalityORimageSequenceEncode=="axis" or modalityORimageSequenceEncode=="axes")):
 		result = True
 	return result
 
@@ -48,7 +48,7 @@ def buildImageDistanceFieldCoordinatesByConceptName(columnMetadataList):
 			fieldYIndex = calculateImageDistanceFieldCoordinate(yIndex, gridHeight)
 			result[columnMetadata["conceptName"]] = (fieldXIndex, fieldYIndex)
 	else:
-		raise RuntimeError("buildImageDistanceFieldCoordinatesByConceptName error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance' or 'axis'")
+		raise RuntimeError("buildImageDistanceFieldCoordinatesByConceptName error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance', 'axis', or 'axes'")
 	return result
 
 
@@ -75,7 +75,7 @@ def validateImageDistanceFieldCoordinateParameters(columnMetadataList):
 			if(columnMetadata["xIndex"] < 0 or columnMetadata["yIndex"] < 0):
 				raise RuntimeError("validateImageDistanceFieldCoordinateParameters error: xIndex/yIndex must be >= 0")
 	else:
-		raise RuntimeError("validateImageDistanceFieldCoordinateParameters error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance' or 'axis'")
+		raise RuntimeError("validateImageDistanceFieldCoordinateParameters error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance', 'axis', or 'axes'")
 	return result
 
 
@@ -89,7 +89,7 @@ def calculateImageDistanceFieldGridDimensions(columnMetadataList):
 		maxYIndex = max(int(columnMetadata["yIndex"]) for columnMetadata in columnMetadataList)
 		result = (maxXIndex + 1, maxYIndex + 1)
 	else:
-		raise RuntimeError("calculateImageDistanceFieldGridDimensions error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance' or 'axis'")
+		raise RuntimeError("calculateImageDistanceFieldGridDimensions error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance', 'axis', or 'axes'")
 	return result
 
 
@@ -108,7 +108,7 @@ def calculateImageDistanceFieldCoordinate(coordinateIndex, numberOfFieldColumns)
 		if(result < 0 or result >= int(modalityORimageSequenceEncodeDistanceFieldSegments)):
 			raise RuntimeError("calculateImageDistanceFieldCoordinate error: calculated field coordinate out of range")
 	else:
-		raise RuntimeError("calculateImageDistanceFieldCoordinate error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance' or 'axis'")
+		raise RuntimeError("calculateImageDistanceFieldCoordinate error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance', 'axis', or 'axes'")
 	return result
 
 
@@ -136,7 +136,7 @@ def initialiseImageDistanceFieldCoordinates(sequenceObservedColumns, sequenceDat
 		sequenceObservedColumns.sequenceConceptFieldXTensor = pt.tensor(fieldXList, dtype=pt.long)
 		sequenceObservedColumns.sequenceConceptFieldYTensor = pt.tensor(fieldYList, dtype=pt.long)
 	else:
-		raise RuntimeError("initialiseImageDistanceFieldCoordinates error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance' or 'axis'")
+		raise RuntimeError("initialiseImageDistanceFieldCoordinates error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance', 'axis', or 'axes'")
 	return result
 
 
@@ -146,7 +146,7 @@ def configureTrainConnectionsForImageDistanceEncoding(sequenceObservedColumns):
 		sequenceObservedColumns.trainConnectionsIncludeSameTimeIndex = True
 		sequenceObservedColumns.trainConnectionsUseSpatialDistance = True
 	else:
-		raise RuntimeError("configureTrainConnectionsForImageDistanceEncoding error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance' or 'axis'")
+		raise RuntimeError("configureTrainConnectionsForImageDistanceEncoding error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance', 'axis', or 'axes'")
 	return result
 
 
@@ -156,9 +156,9 @@ def validateImageDistanceSnapshotIndex(snapshotIndex):
 		if(not isinstance(snapshotIndex, int) or isinstance(snapshotIndex, bool)):
 			raise RuntimeError("validateImageDistanceSnapshotIndex error: snapshotIndex must be an int")
 		if(snapshotIndex != 0):
-			raise RuntimeError("validateImageDistanceSnapshotIndex error: snapshotIndex must be 0 when modalityORimageSequenceEncode is 'distance' or 'axis'")
+			raise RuntimeError("validateImageDistanceSnapshotIndex error: snapshotIndex must be 0 when modalityORimageSequenceEncode is 'distance', 'axis', or 'axes'")
 	else:
-		raise RuntimeError("validateImageDistanceSnapshotIndex error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance' or 'axis'")
+		raise RuntimeError("validateImageDistanceSnapshotIndex error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance', 'axis', or 'axes'")
 	return result
 
 
@@ -178,7 +178,7 @@ def getActiveSegmentsForImageDistanceEncoding(sequenceObservedColumns, sequenceC
 		maxSegmentIndex = calculateImageDistanceMaxSegmentIndexForTargetFieldCoordinate(fieldXIndex, fieldYIndex)
 		result = pt.arange(0, maxSegmentIndex + 1, device=targetDevice, dtype=pt.long)
 	else:
-		raise RuntimeError("getActiveSegmentsForImageDistanceEncoding error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance' or 'axis'")
+		raise RuntimeError("getActiveSegmentsForImageDistanceEncoding error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance', 'axis', or 'axes'")
 	return result
 
 
@@ -196,7 +196,7 @@ def validateImageDistanceSequenceObservedColumnCoordinates(sequenceObservedColum
 		if(int(sequenceObservedColumns.sequenceConceptFieldXTensor.shape[0]) != int(sequenceObservedColumns.cs) or int(sequenceObservedColumns.sequenceConceptFieldYTensor.shape[0]) != int(sequenceObservedColumns.cs)):
 			raise RuntimeError("validateImageDistanceSequenceObservedColumnCoordinates error: sequence concept field coordinate tensor lengths must equal cs")
 	else:
-		raise RuntimeError("validateImageDistanceSequenceObservedColumnCoordinates error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance' or 'axis'")
+		raise RuntimeError("validateImageDistanceSequenceObservedColumnCoordinates error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance', 'axis', or 'axes'")
 	return result
 
 
@@ -213,7 +213,7 @@ def calculateImageDistanceMaxSegmentIndexForTargetFieldCoordinate(fieldXIndex, f
 		if(result < 0 or result >= int(arrayNumberOfSegments)):
 			raise RuntimeError("calculateImageDistanceMaxSegmentIndexForTargetFieldCoordinate error: calculated segment index out of range")
 	else:
-		raise RuntimeError("calculateImageDistanceMaxSegmentIndexForTargetFieldCoordinate error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance' or 'axis'")
+		raise RuntimeError("calculateImageDistanceMaxSegmentIndexForTargetFieldCoordinate error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance', 'axis', or 'axes'")
 	return result
 
 
@@ -227,5 +227,5 @@ def validateImageDistanceFieldIndex(fieldIndex, fieldName):
 		if(fieldIndex < 0 or fieldIndex >= int(modalityORimageSequenceEncodeDistanceFieldSegments)):
 			raise RuntimeError("validateImageDistanceFieldIndex error: " + fieldName + " out of range")
 	else:
-		raise RuntimeError("validateImageDistanceFieldIndex error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance' or 'axis'")
+		raise RuntimeError("validateImageDistanceFieldIndex error: requires submodalityName=='image' and modalityORimageSequenceEncode=='distance', 'axis', or 'axes'")
 	return result

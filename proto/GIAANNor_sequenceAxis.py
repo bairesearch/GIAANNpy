@@ -23,18 +23,25 @@ from GIAANNcmn_globalDefs import *
 import GIAANNor_sequenceDistance
 
 
+def isImageAxisLikeEncoding():
+	result = False
+	if(submodalityName=="image" and (modalityORimageSequenceEncode=="axis" or modalityORimageSequenceEncode=="axes")):
+		result = True
+	return result
+
+
 def buildImageAxisColumnCoordinatesByConceptName(columnMetadataList):
 	result = {}
 	xIndex = None
 	yIndex = None
-	if(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
+	if(isImageAxisLikeEncoding()):
 		GIAANNor_sequenceDistance.validateImageDistanceFieldCoordinateParameters(columnMetadataList)
 		for columnMetadata in columnMetadataList:
 			xIndex = int(columnMetadata["xIndex"])
 			yIndex = int(columnMetadata["yIndex"])
 			result[columnMetadata["conceptName"]] = (xIndex, yIndex)
 	else:
-		raise RuntimeError("buildImageAxisColumnCoordinatesByConceptName error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axis'")
+		raise RuntimeError("buildImageAxisColumnCoordinatesByConceptName error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axis' or 'axes'")
 	return result
 
 
@@ -48,7 +55,7 @@ def expandImageAxisSequenceConcepts(orderedConceptNameList, requiredSourceFeatur
 	axisConceptName = None
 	axisCoordinates = None
 	expandedOrderedConceptNameList = []
-	if(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
+	if(isImageAxisLikeEncoding()):
 		validateImageAxisSequenceConceptExpansionInputs(orderedConceptNameList, requiredSourceFeatureIndicesByConceptName, activationList, columnMetadataList, axisColumnCoordinatesByConceptName)
 		for activation in activationList:
 			sourceConceptName = activation["conceptName"]
@@ -67,14 +74,14 @@ def expandImageAxisSequenceConcepts(orderedConceptNameList, requiredSourceFeatur
 				expandedOrderedConceptNameList.append(axisConceptName)
 		orderedConceptNameList[:] = expandedOrderedConceptNameList
 	else:
-		raise RuntimeError("expandImageAxisSequenceConcepts error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axis'")
+		raise RuntimeError("expandImageAxisSequenceConcepts error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axis' or 'axes'")
 	return result
 
 
 def validateImageAxisSequenceConceptExpansionInputs(orderedConceptNameList, requiredSourceFeatureIndicesByConceptName, activationList, columnMetadataList, axisColumnCoordinatesByConceptName):
 	result = None
 	conceptName = None
-	if(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
+	if(isImageAxisLikeEncoding()):
 		if(not isinstance(orderedConceptNameList, list)):
 			raise RuntimeError("validateImageAxisSequenceConceptExpansionInputs error: orderedConceptNameList must be a list")
 		if(not isinstance(requiredSourceFeatureIndicesByConceptName, dict)):
@@ -105,18 +112,18 @@ def validateImageAxisSequenceConceptExpansionInputs(orderedConceptNameList, requ
 			if(activation["conceptName"] not in axisColumnCoordinatesByConceptName):
 				raise RuntimeError("validateImageAxisSequenceConceptExpansionInputs error: activation conceptName missing axis coordinates (" + activation["conceptName"] + ")")
 	else:
-		raise RuntimeError("validateImageAxisSequenceConceptExpansionInputs error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axis'")
+		raise RuntimeError("validateImageAxisSequenceConceptExpansionInputs error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axis' or 'axes'")
 	return result
 
 
 def initialiseImageAxisCoordinates(sequenceObservedColumns, sequenceData):
 	result = None
-	if(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
+	if(isImageAxisLikeEncoding()):
 		GIAANNor_sequenceDistance.initialiseImageDistanceFieldCoordinates(sequenceObservedColumns, sequenceData)
 		initialiseImageAxisColumnCoordinates(sequenceObservedColumns, sequenceData)
 		sequenceObservedColumns.trainConnectionsUseSpatialAxis = True
 	else:
-		raise RuntimeError("initialiseImageAxisCoordinates error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axis'")
+		raise RuntimeError("initialiseImageAxisCoordinates error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axis' or 'axes'")
 	return result
 
 
@@ -126,7 +133,7 @@ def initialiseImageAxisColumnCoordinates(sequenceObservedColumns, sequenceData):
 	axisCoordinates = None
 	axisXList = []
 	axisYList = []
-	if(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
+	if(isImageAxisLikeEncoding()):
 		if("imageAxisColumnCoordinatesByConceptName" not in sequenceData):
 			raise RuntimeError("initialiseImageAxisColumnCoordinates error: sequenceData missing imageAxisColumnCoordinatesByConceptName")
 		axisColumnCoordinatesByConceptName = sequenceData["imageAxisColumnCoordinatesByConceptName"]
@@ -143,33 +150,33 @@ def initialiseImageAxisColumnCoordinates(sequenceObservedColumns, sequenceData):
 		sequenceObservedColumns.sequenceConceptAxisXTensor = pt.tensor(axisXList, dtype=pt.long)
 		sequenceObservedColumns.sequenceConceptAxisYTensor = pt.tensor(axisYList, dtype=pt.long)
 	else:
-		raise RuntimeError("initialiseImageAxisColumnCoordinates error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axis'")
+		raise RuntimeError("initialiseImageAxisColumnCoordinates error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axis' or 'axes'")
 	return result
 
 
 def configureTrainConnectionsForImageAxisEncoding(sequenceObservedColumns):
 	result = None
-	if(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
+	if(isImageAxisLikeEncoding()):
 		GIAANNor_sequenceDistance.configureTrainConnectionsForImageDistanceEncoding(sequenceObservedColumns)
 		sequenceObservedColumns.trainConnectionsUseSpatialAxis = True
 	else:
-		raise RuntimeError("configureTrainConnectionsForImageAxisEncoding error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axis'")
+		raise RuntimeError("configureTrainConnectionsForImageAxisEncoding error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axis' or 'axes'")
 	return result
 
 
 def validateImageAxisSnapshotIndex(snapshotIndex):
 	result = None
-	if(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
+	if(isImageAxisLikeEncoding()):
 		GIAANNor_sequenceDistance.validateImageDistanceSnapshotIndex(snapshotIndex)
 	else:
-		raise RuntimeError("validateImageAxisSnapshotIndex error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axis'")
+		raise RuntimeError("validateImageAxisSnapshotIndex error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axis' or 'axes'")
 	return result
 
 
 def getActiveSegmentsForImageAxisEncoding(sequenceObservedColumns, sequenceConceptIndex, targetDevice):
 	result = None
-	if(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
+	if(isImageAxisLikeEncoding()):
 		result = GIAANNor_sequenceDistance.getActiveSegmentsForImageDistanceEncoding(sequenceObservedColumns, sequenceConceptIndex, targetDevice)
 	else:
-		raise RuntimeError("getActiveSegmentsForImageAxisEncoding error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axis'")
+		raise RuntimeError("getActiveSegmentsForImageAxisEncoding error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axis' or 'axes'")
 	return result

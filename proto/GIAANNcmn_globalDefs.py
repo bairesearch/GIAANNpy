@@ -649,12 +649,12 @@ if(useSANI):
 		if(submodalityName=="image"):
 			if(modalityORimageSequenceEncode=="saccades"):
 				arrayNumberOfSegments = modalityORimageSnapshotsPerSequence
-			elif(modalityORimageSequenceEncode=="distance" or modalityORimageSequenceEncode=="axis"):
+			elif(modalityORimageSequenceEncode=="distance" or modalityORimageSequenceEncode=="axis" or modalityORimageSequenceEncode=="axes"):
 				arrayNumberOfSegments = int(math.ceil(math.sqrt(float((modalityORimageSequenceEncodeDistanceFieldSegments - 1)*(modalityORimageSequenceEncodeDistanceFieldSegments - 1)*2)))) + 1
 			elif(modalityORimageSequenceEncode=="none"):
 				arrayNumberOfSegments = 1
 			else:
-				raise RuntimeError("GIAANNcmn_globalDefs error: modalityORimageSequenceEncode must be 'saccades', 'distance', 'axis', or 'none'")
+				raise RuntimeError("GIAANNcmn_globalDefs error: modalityORimageSequenceEncode must be 'saccades', 'distance', 'axis', 'axes', or 'none'")
 		elif(submodalityName=="video"):
 			arrayNumberOfSegments = modalityORvideoMaxEncodedSnapshotsPerSequence
 	else:

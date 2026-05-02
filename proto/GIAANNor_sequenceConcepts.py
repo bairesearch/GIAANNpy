@@ -24,6 +24,7 @@ import GIAANNcmn_databaseNetwork
 import GIAANNcmn_databaseNetworkTrain
 import GIAANNor_RFfilters
 import GIAANNor_sequenceAxis
+import GIAANNor_sequenceAxes
 import GIAANNor_sequenceDistance
 import GIAANNor_sequenceObservedColumns
 import GIAANNor_sequenceSaccades
@@ -80,6 +81,9 @@ def generateSequenceData(databaseNetworkObject, columnMetadataList, selectedFilt
 	elif(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
 		imageDistanceFieldCoordinatesByConceptName = GIAANNor_sequenceDistance.buildImageDistanceFieldCoordinatesByConceptName(columnMetadataList)
 		imageAxisColumnCoordinatesByConceptName = GIAANNor_sequenceAxis.buildImageAxisColumnCoordinatesByConceptName(columnMetadataList)
+	elif(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		imageDistanceFieldCoordinatesByConceptName = GIAANNor_sequenceDistance.buildImageDistanceFieldCoordinatesByConceptName(columnMetadataList)
+		imageAxisColumnCoordinatesByConceptName = GIAANNor_sequenceAxes.buildImageAxesColumnCoordinatesByConceptName(columnMetadataList)
 	ensureConceptColumns(databaseNetworkObject, columnMetadataList, allowNewFeatures)
 	for columnMetadata in columnMetadataList:
 		requiredSourceFeatureIndicesByConceptName[columnMetadata["conceptName"]] = []
@@ -100,6 +104,8 @@ def generateSequenceData(databaseNetworkObject, columnMetadataList, selectedFilt
 				globalFeatureIndices.append(globalFeatureIndex)
 	if(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
 		GIAANNor_sequenceAxis.expandImageAxisSequenceConcepts(orderedConceptNameList, requiredSourceFeatureIndicesByConceptName, activationList, columnMetadataList, imageAxisColumnCoordinatesByConceptName)
+	elif(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		GIAANNor_sequenceAxes.expandImageAxesSequenceConcepts(orderedConceptNameList, requiredSourceFeatureIndicesByConceptName, activationList, columnMetadataList, imageAxisColumnCoordinatesByConceptName)
 	for conceptName in list(requiredSourceFeatureIndicesByConceptName.keys()):
 		requiredSourceFeatureIndicesByConceptName[conceptName] = sorted(set(requiredSourceFeatureIndicesByConceptName[conceptName]))
 	if(len(activationList) > 0):
@@ -113,6 +119,9 @@ def generateSequenceData(databaseNetworkObject, columnMetadataList, selectedFilt
 		if(submodalityName=="image" and modalityORimageSequenceEncode=="distance"):
 			result["imageDistanceFieldCoordinatesByConceptName"] = imageDistanceFieldCoordinatesByConceptName
 		elif(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
+			result["imageDistanceFieldCoordinatesByConceptName"] = imageDistanceFieldCoordinatesByConceptName
+			result["imageAxisColumnCoordinatesByConceptName"] = imageAxisColumnCoordinatesByConceptName
+		elif(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
 			result["imageDistanceFieldCoordinatesByConceptName"] = imageDistanceFieldCoordinatesByConceptName
 			result["imageAxisColumnCoordinatesByConceptName"] = imageAxisColumnCoordinatesByConceptName
 	return result
@@ -222,10 +231,12 @@ def configureTrainConnectionsForImageSequenceEncoding(sequenceObservedColumns):
 			GIAANNor_sequenceDistance.configureTrainConnectionsForImageDistanceEncoding(sequenceObservedColumns)
 		elif(modalityORimageSequenceEncode=="axis"):
 			GIAANNor_sequenceAxis.configureTrainConnectionsForImageAxisEncoding(sequenceObservedColumns)
+		elif(modalityORimageSequenceEncode=="axes"):
+			GIAANNor_sequenceAxes.configureTrainConnectionsForImageAxesEncoding(sequenceObservedColumns)
 		elif(modalityORimageSequenceEncode=="none"):
 			sequenceObservedColumns.trainConnectionsIncludeSameTimeIndex = True
 		else:
-			raise RuntimeError("configureTrainConnectionsForImageSequenceEncoding error: modalityORimageSequenceEncode must be 'saccades', 'distance', 'axis', or 'none'")
+			raise RuntimeError("configureTrainConnectionsForImageSequenceEncoding error: modalityORimageSequenceEncode must be 'saccades', 'distance', 'axis', 'axes', or 'none'")
 	return result
 
 
@@ -251,6 +262,10 @@ def buildTrainTensors(sequenceObservedColumns, sequenceData):
 		elif(submodalityName=="image" and modalityORimageSequenceEncode=="axis"):
 			GIAANNor_sequenceAxis.validateImageAxisSnapshotIndex(snapshotIndex)
 			activeSegments = GIAANNor_sequenceAxis.getActiveSegmentsForImageAxisEncoding(sequenceObservedColumns, sequenceConceptIndex, targetDevice)
+			featureNeuronsWordOrder[sequenceConceptIndex, localFeatureIndex] = 0
+		elif(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+			GIAANNor_sequenceAxes.validateImageAxesSnapshotIndex(snapshotIndex)
+			activeSegments = GIAANNor_sequenceAxes.getActiveSegmentsForImageAxesEncoding(sequenceObservedColumns, sequenceConceptIndex, targetDevice)
 			featureNeuronsWordOrder[sequenceConceptIndex, localFeatureIndex] = 0
 		elif(submodalityName=="image" and modalityORimageSequenceEncode=="none"):
 			if(snapshotIndex != 0):
