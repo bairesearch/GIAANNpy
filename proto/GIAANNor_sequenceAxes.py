@@ -39,6 +39,8 @@ def buildImageAxesSequenceTensorData(columnMetadataList, selectedFilterIndices):
 	featureAxisXTensor = None
 	featureAxisYTensor = None
 	featureAxisMaskTensor = None
+	centralAxisX = None
+	centralAxisY = None
 	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
 		if(not pt.is_tensor(selectedFilterIndices)):
 			raise RuntimeError("buildImageAxesSequenceTensorData error: selectedFilterIndices must be a tensor")
@@ -50,10 +52,38 @@ def buildImageAxesSequenceTensorData(columnMetadataList, selectedFilterIndices):
 		activeCoordinateTensor = pt.nonzero(selectedFilterIndices >= 0, as_tuple=False)
 		featureAxisXTensor = columnTensorData["axisXTensor"].index_select(0, activeCoordinateTensor[:, 1]).to(dtype=pt.long)
 		featureAxisYTensor = columnTensorData["axisYTensor"].index_select(0, activeCoordinateTensor[:, 1]).to(dtype=pt.long)
-		featureAxisMaskTensor = (featureAxisXTensor == int(columnTensorData["axisXTensor"][columnTensorData["centralColumnIndex"]].item())) | (featureAxisYTensor == int(columnTensorData["axisYTensor"][columnTensorData["centralColumnIndex"]].item()))
-		result = {"centralConceptName": columnTensorData["centralConceptName"], "centralColumnIndex": columnTensorData["centralColumnIndex"], "centralFieldX": int(columnTensorData["fieldXTensor"][columnTensorData["centralColumnIndex"]].item()), "centralFieldY": int(columnTensorData["fieldYTensor"][columnTensorData["centralColumnIndex"]].item()), "centralAxisX": int(columnTensorData["axisXTensor"][columnTensorData["centralColumnIndex"]].item()), "centralAxisY": int(columnTensorData["axisYTensor"][columnTensorData["centralColumnIndex"]].item()), "featureFieldXTensor": columnTensorData["fieldXTensor"].index_select(0, activeCoordinateTensor[:, 1]).to(dtype=pt.long), "featureFieldYTensor": columnTensorData["fieldYTensor"].index_select(0, activeCoordinateTensor[:, 1]).to(dtype=pt.long), "featureAxisXTensor": featureAxisXTensor, "featureAxisYTensor": featureAxisYTensor, "featureAxisMaskTensor": featureAxisMaskTensor.to(dtype=pt.bool)}
+		centralAxisX = int(columnTensorData["axisXTensor"][columnTensorData["centralColumnIndex"]].item())
+		centralAxisY = int(columnTensorData["axisYTensor"][columnTensorData["centralColumnIndex"]].item())
+		featureAxisMaskTensor = calculateImageAxesFeatureAxisMaskTensor(featureAxisXTensor, featureAxisYTensor, centralAxisX, centralAxisY)
+		result = {"centralConceptName": columnTensorData["centralConceptName"], "centralColumnIndex": columnTensorData["centralColumnIndex"], "centralFieldX": int(columnTensorData["fieldXTensor"][columnTensorData["centralColumnIndex"]].item()), "centralFieldY": int(columnTensorData["fieldYTensor"][columnTensorData["centralColumnIndex"]].item()), "centralAxisX": centralAxisX, "centralAxisY": centralAxisY, "featureFieldXTensor": columnTensorData["fieldXTensor"].index_select(0, activeCoordinateTensor[:, 1]).to(dtype=pt.long), "featureFieldYTensor": columnTensorData["fieldYTensor"].index_select(0, activeCoordinateTensor[:, 1]).to(dtype=pt.long), "featureAxisXTensor": featureAxisXTensor, "featureAxisYTensor": featureAxisYTensor, "featureAxisMaskTensor": featureAxisMaskTensor.to(dtype=pt.bool)}
 	else:
 		raise RuntimeError("buildImageAxesSequenceTensorData error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
+	return result
+
+
+def calculateImageAxesFeatureAxisMaskTensor(featureAxisXTensor, featureAxisYTensor, centralAxisX, centralAxisY):
+	result = None
+	featureAxisTensorList = None
+	centralAxisList = None
+	axisIndex = None
+	axisMaskTensor = None
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		if(not pt.is_tensor(featureAxisXTensor) or not pt.is_tensor(featureAxisYTensor)):
+			raise RuntimeError("calculateImageAxesFeatureAxisMaskTensor error: feature axis coordinates must be tensors")
+		if(featureAxisXTensor.dim() != 1 or featureAxisYTensor.dim() != 1):
+			raise RuntimeError("calculateImageAxesFeatureAxisMaskTensor error: feature axis coordinate tensors must be rank 1")
+		if(int(featureAxisXTensor.shape[0]) != int(featureAxisYTensor.shape[0])):
+			raise RuntimeError("calculateImageAxesFeatureAxisMaskTensor error: feature axis coordinate tensor lengths must match")
+		if(not isinstance(centralAxisX, int) or isinstance(centralAxisX, bool) or not isinstance(centralAxisY, int) or isinstance(centralAxisY, bool)):
+			raise RuntimeError("calculateImageAxesFeatureAxisMaskTensor error: central axis coordinates must be ints")
+		featureAxisTensorList = [featureAxisXTensor, featureAxisYTensor]
+		centralAxisList = [centralAxisX, centralAxisY]
+		result = pt.zeros_like(featureAxisXTensor, dtype=pt.bool)
+		for axisIndex in range(2):
+			axisMaskTensor = featureAxisTensorList[axisIndex] == int(centralAxisList[axisIndex])
+			result = result | axisMaskTensor
+	else:
+		raise RuntimeError("calculateImageAxesFeatureAxisMaskTensor error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
 	return result
 
 
