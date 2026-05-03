@@ -109,7 +109,7 @@ inferenceConnectionStrengthPOSdependence = False
 
 #modality OR;
 if(tokensiationMethodOneColumnPerSnapshotPixel):
-	modalityORnumberOfColumns = 1000	#default: 1000	#~1000 hypercolumns in V1 
+	modalityORnumberOfColumnsV1 = 1000	#default: 1000	#~1000 hypercolumns in V1
 	modalityORfilterWidth = 5	#default: TODO
 	modalityORfilterChannels = 100	#default: 15000*18	#~18 orientation columns per hypercolumn in V1	#~15000 neuron per orientation column
 	modalityORnumberOfFeaturesPerColumn = modalityORfilterWidth*modalityORfilterWidth*modalityORfilterChannels
@@ -139,10 +139,17 @@ if(submodalityName=="video"):
 	modalityORvideoMaxEncodedSnapshotsPerSequence = 10	#max value:  int((float(modalityORvideoMaxDurationSeconds)*float(modalityORvideoFrameRate))/float(modalityORvideoFramesPerSequenceIteration))
 	modalityORvideoStreamFrames = False	#orig: False
 elif(submodalityName=="image"):
-	modalityORimageSequenceEncode = "axes"	#orig: "saccades"	#options: "saccades", "distance", "axis", "axes", "none"
-	modalityORimageSequenceEncodeAxesColumnIndex = 0	#mandatory: 0	#encoded source/target column index used by modalityORimageSequenceEncode=="axes"
 	#saccade augmentations are calculated by translating the image to a polar coordinates offset from the centre
-	modalityORimageMaxSequencesPerImage = 5		#max independent sequences per image (lists of saccade keypoints) 
+	modalityORimageMaxSequencesPerImage = 5		#max independent sequences per image (lists of saccade keypoints)
+	modalityORimageSequenceEncode = "axes"	#orig: "saccades"	#options: "saccades", "distance", "axis", "axes", "none"
+	if(modalityORimageSequenceEncode=="axes"):
+		modalityORimageSequenceEncodeAxesColumnRandom = True
+		modalityORimageSequenceEncodeAxesSourceColumnIndex = 0	#mandatory: 0	#encoded source column index used by modalityORimageSequenceEncode=="axes"
+		if(modalityORimageSequenceEncodeAxesColumnRandom):
+			modalityORnumberOfColumnsV2 = 1000
+		else:
+			modalityORnumberOfColumnsV2 = 1
+			modalityORimageSequenceEncodeAxesTargetColumnIndex = 0	#mandatory: 0	#fixed encoded target column index used by modalityORimageSequenceEncode=="axes"
 	if(modalityORimageSequenceEncode=="saccades"):
 		modalityORimageSaccadeKeypointsPerEncoding = 3	#default: 3	#orig: 2	# the number of saccade keypoints (transition points) used to encode the context of each selected column feature neuron
 		modalityORimageSnapshotsPerSaccade = 1	#default: 1	#if 1: one snapshot per saccade (plus the start point), if >1 add interpolation between saccade keypoints.

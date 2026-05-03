@@ -82,17 +82,41 @@ def getTrainConnectionsUseSpatialAxes(sequenceObservedColumns):
 	result = sequenceObservedColumns.trainConnectionsUseSpatialAxes
 	return result
 
-def getImageSequenceEncodeAxesColumnIndex(cs):
+def getImageSequenceEncodeAxesSourceColumnIndex(cs):
 	result = None
-	if(not isinstance(modalityORimageSequenceEncodeAxesColumnIndex, int) or isinstance(modalityORimageSequenceEncodeAxesColumnIndex, bool)):
-		raise RuntimeError("getImageSequenceEncodeAxesColumnIndex error: modalityORimageSequenceEncodeAxesColumnIndex must be an int")
+	if(not isinstance(modalityORimageSequenceEncodeAxesSourceColumnIndex, int) or isinstance(modalityORimageSequenceEncodeAxesSourceColumnIndex, bool)):
+		raise RuntimeError("getImageSequenceEncodeAxesSourceColumnIndex error: modalityORimageSequenceEncodeAxesSourceColumnIndex must be an int")
+	if(not isinstance(modalityORimageSequenceEncodeAxesColumnRandom, bool)):
+		raise RuntimeError("getImageSequenceEncodeAxesSourceColumnIndex error: modalityORimageSequenceEncodeAxesColumnRandom must be a bool")
 	if(not isinstance(cs, int) or isinstance(cs, bool)):
-		raise RuntimeError("getImageSequenceEncodeAxesColumnIndex error: cs must be an int")
+		raise RuntimeError("getImageSequenceEncodeAxesSourceColumnIndex error: cs must be an int")
 	if(cs <= 0):
-		raise RuntimeError("getImageSequenceEncodeAxesColumnIndex error: cs must be > 0")
-	if(modalityORimageSequenceEncodeAxesColumnIndex < 0 or modalityORimageSequenceEncodeAxesColumnIndex >= cs):
-		raise RuntimeError("getImageSequenceEncodeAxesColumnIndex error: modalityORimageSequenceEncodeAxesColumnIndex out of range")
-	result = int(modalityORimageSequenceEncodeAxesColumnIndex)
+		raise RuntimeError("getImageSequenceEncodeAxesSourceColumnIndex error: cs must be > 0")
+	if(modalityORimageSequenceEncodeAxesSourceColumnIndex < 0 or modalityORimageSequenceEncodeAxesSourceColumnIndex >= cs):
+		raise RuntimeError("getImageSequenceEncodeAxesSourceColumnIndex error: modalityORimageSequenceEncodeAxesSourceColumnIndex out of range")
+	if(modalityORimageSequenceEncodeAxesColumnRandom):
+		if(not isinstance(modalityORnumberOfColumnsV2, int) or isinstance(modalityORnumberOfColumnsV2, bool)):
+			raise RuntimeError("getImageSequenceEncodeAxesSourceColumnIndex error: modalityORnumberOfColumnsV2 must be an int")
+		if(modalityORnumberOfColumnsV2 <= 0):
+			raise RuntimeError("getImageSequenceEncodeAxesSourceColumnIndex error: modalityORnumberOfColumnsV2 must be > 0")
+		if(cs != int(modalityORnumberOfColumnsV2)):
+			raise RuntimeError("getImageSequenceEncodeAxesSourceColumnIndex error: cs must equal modalityORnumberOfColumnsV2 when modalityORimageSequenceEncodeAxesColumnRandom")
+	result = int(modalityORimageSequenceEncodeAxesSourceColumnIndex)
+	return result
+
+def getImageSequenceEncodeAxesTargetColumnIndex(cs):
+	result = None
+	if(modalityORimageSequenceEncodeAxesColumnRandom):
+		raise RuntimeError("getImageSequenceEncodeAxesTargetColumnIndex error: fixed target column index is not defined when modalityORimageSequenceEncodeAxesColumnRandom")
+	if(not isinstance(modalityORimageSequenceEncodeAxesTargetColumnIndex, int) or isinstance(modalityORimageSequenceEncodeAxesTargetColumnIndex, bool)):
+		raise RuntimeError("getImageSequenceEncodeAxesTargetColumnIndex error: modalityORimageSequenceEncodeAxesTargetColumnIndex must be an int")
+	if(not isinstance(cs, int) or isinstance(cs, bool)):
+		raise RuntimeError("getImageSequenceEncodeAxesTargetColumnIndex error: cs must be an int")
+	if(cs <= 0):
+		raise RuntimeError("getImageSequenceEncodeAxesTargetColumnIndex error: cs must be > 0")
+	if(modalityORimageSequenceEncodeAxesTargetColumnIndex < 0 or modalityORimageSequenceEncodeAxesTargetColumnIndex >= cs):
+		raise RuntimeError("getImageSequenceEncodeAxesTargetColumnIndex error: modalityORimageSequenceEncodeAxesTargetColumnIndex out of range")
+	result = int(modalityORimageSequenceEncodeAxesTargetColumnIndex)
 	return result
 
 def getSequenceConceptFieldCoordinates(sequenceObservedColumns, targetDevice):
@@ -432,7 +456,8 @@ def calculateFeatureConnectionsActiveTrainSpatialAxesSparseIndices(featureNeuron
 	repeatedFeatureMask = None
 	repeatedSourceMask = None
 	connectionsSegmentIndex = None
-	axesColumnIndex = None
+	axesSourceColumnIndex = None
+	axesTargetColumnIndex = None
 	encodedSourceConceptIndices = None
 	encodedTargetConceptIndices = None
 	featureAxisMaskTensor = None
@@ -475,11 +500,16 @@ def calculateFeatureConnectionsActiveTrainSpatialAxesSparseIndices(featureNeuron
 			if(connectionMask.any()):
 				sourceFeatureIndices = sourceFeatureIndices[connectionMask]
 				targetFeatureIndices = targetFeatureIndices[connectionMask]
+				targetConceptIndices = targetConceptIndices[connectionMask]
 				branchIndices = branchIndices[connectionMask]
 				connectionsSegmentIndex = calculateFeatureConnectionsSpatialAxesFeatureSegmentIndexTensor(sequenceObservedColumns, sourceFeatureIndices, targetFeatureIndices, connectionDevice)
-				axesColumnIndex = getImageSequenceEncodeAxesColumnIndex(cs)
-				encodedSourceConceptIndices = pt.full_like(sourceFeatureIndices, axesColumnIndex)
-				encodedTargetConceptIndices = pt.full_like(targetFeatureIndices, axesColumnIndex)
+				axesSourceColumnIndex = getImageSequenceEncodeAxesSourceColumnIndex(cs)
+				encodedSourceConceptIndices = pt.full_like(sourceFeatureIndices, axesSourceColumnIndex)
+				if(modalityORimageSequenceEncodeAxesColumnRandom):
+					encodedTargetConceptIndices = targetConceptIndices
+				else:
+					axesTargetColumnIndex = getImageSequenceEncodeAxesTargetColumnIndex(cs)
+					encodedTargetConceptIndices = pt.full_like(targetFeatureIndices, axesTargetColumnIndex)
 				result = pt.stack((branchIndices, connectionsSegmentIndex, encodedSourceConceptIndices, sourceFeatureIndices, encodedTargetConceptIndices, targetFeatureIndices), dim=0)
 	else:
 		raise RuntimeError("calculateFeatureConnectionsActiveTrainSpatialAxesSparseIndices error: requires trainConnectionsUseSpatialAxes")
@@ -489,11 +519,12 @@ def calculateFeatureConnectionsSpatialAxesSegmentMaskTensor(sequenceObservedColu
 	result = None
 	segmentIndexTensor = None
 	segmentMaskCollapsed = None
-	axesColumnIndex = None
+	axesSourceColumnIndex = None
+	axesTargetColumnIndex = None
 	featureAxisMaskTensor = None
 	featureCentralColumnMaskTensor = None
 	if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
-		axesColumnIndex = getImageSequenceEncodeAxesColumnIndex(cs)
+		axesSourceColumnIndex = getImageSequenceEncodeAxesSourceColumnIndex(cs)
 		segmentIndexTensor = calculateFeatureConnectionsSpatialAxesFeatureSegmentIndexMatrix(sequenceObservedColumns, fs, targetDevice)
 		segmentMaskCollapsed = pt.zeros((arrayNumberOfSegments, fs, fs), dtype=pt.bool, device=targetDevice)
 		segmentMaskCollapsed.scatter_(0, segmentIndexTensor.unsqueeze(0), True)
@@ -502,7 +533,11 @@ def calculateFeatureConnectionsSpatialAxesSegmentMaskTensor(sequenceObservedColu
 		featureCentralColumnMaskTensor = getImageAxesFeatureCentralColumnMask(sequenceObservedColumns, targetDevice)
 		segmentMaskCollapsed = segmentMaskCollapsed & featureCentralColumnMaskTensor.view(1, 1, fs)
 		result = pt.zeros((numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=targetDevice)
-		result[:, :, axesColumnIndex, :, axesColumnIndex, :] = segmentMaskCollapsed
+		if(modalityORimageSequenceEncodeAxesColumnRandom):
+			result[:, :, axesSourceColumnIndex, :, :, :] = segmentMaskCollapsed.view(1, int(arrayNumberOfSegments), int(fs), 1, int(fs)).expand(int(numberOfDendriticBranches), int(arrayNumberOfSegments), int(fs), int(cs), int(fs))
+		else:
+			axesTargetColumnIndex = getImageSequenceEncodeAxesTargetColumnIndex(cs)
+			result[:, :, axesSourceColumnIndex, :, axesTargetColumnIndex, :] = segmentMaskCollapsed
 	else:
 		raise RuntimeError("calculateFeatureConnectionsSpatialAxesSegmentMaskTensor error: requires trainConnectionsUseSpatialAxes")
 	return result
@@ -1103,26 +1138,37 @@ def calculateFeatureConnectionsActiveSegmentIndexTensor(featureConnectionsActive
 def collapseFeatureConnectionsSpatialAxesTensor(featureConnectionsTensor, cs):
 	result = None
 	collapsedFeatureConnectionsTensor = None
-	axesColumnIndex = None
+	axesSourceColumnIndex = None
+	axesTargetColumnIndex = None
 	if(not pt.is_tensor(featureConnectionsTensor)):
 		raise RuntimeError("collapseFeatureConnectionsSpatialAxesTensor error: featureConnectionsTensor must be a tensor")
 	if(not isinstance(cs, int) or isinstance(cs, bool)):
 		raise RuntimeError("collapseFeatureConnectionsSpatialAxesTensor error: cs must be an int")
 	if(cs <= 0):
 		raise RuntimeError("collapseFeatureConnectionsSpatialAxesTensor error: cs must be > 0")
-	axesColumnIndex = getImageSequenceEncodeAxesColumnIndex(cs)
+	axesSourceColumnIndex = getImageSequenceEncodeAxesSourceColumnIndex(cs)
 	if(featureConnectionsTensor.dim() == 6):
 		if(int(featureConnectionsTensor.shape[2]) != cs or int(featureConnectionsTensor.shape[4]) != cs):
 			raise RuntimeError("collapseFeatureConnectionsSpatialAxesTensor error: featureConnectionsTensor concept dimensions must equal cs")
 		result = pt.zeros_like(featureConnectionsTensor)
-		collapsedFeatureConnectionsTensor = featureConnectionsTensor.amax(dim=(2, 4))
-		result[:, :, axesColumnIndex, :, axesColumnIndex, :] = collapsedFeatureConnectionsTensor
+		if(modalityORimageSequenceEncodeAxesColumnRandom):
+			collapsedFeatureConnectionsTensor = featureConnectionsTensor.amax(dim=2)
+			result[:, :, axesSourceColumnIndex, :, :, :] = collapsedFeatureConnectionsTensor
+		else:
+			axesTargetColumnIndex = getImageSequenceEncodeAxesTargetColumnIndex(cs)
+			collapsedFeatureConnectionsTensor = featureConnectionsTensor.amax(dim=(2, 4))
+			result[:, :, axesSourceColumnIndex, :, axesTargetColumnIndex, :] = collapsedFeatureConnectionsTensor
 	elif(featureConnectionsTensor.dim() == 5):
 		if(int(featureConnectionsTensor.shape[1]) != cs or int(featureConnectionsTensor.shape[3]) != cs):
 			raise RuntimeError("collapseFeatureConnectionsSpatialAxesTensor error: featureConnectionsTensor concept dimensions must equal cs")
 		result = pt.zeros_like(featureConnectionsTensor)
-		collapsedFeatureConnectionsTensor = featureConnectionsTensor.amax(dim=(1, 3))
-		result[:, axesColumnIndex, :, axesColumnIndex, :] = collapsedFeatureConnectionsTensor
+		if(modalityORimageSequenceEncodeAxesColumnRandom):
+			collapsedFeatureConnectionsTensor = featureConnectionsTensor.amax(dim=1)
+			result[:, axesSourceColumnIndex, :, :, :] = collapsedFeatureConnectionsTensor
+		else:
+			axesTargetColumnIndex = getImageSequenceEncodeAxesTargetColumnIndex(cs)
+			collapsedFeatureConnectionsTensor = featureConnectionsTensor.amax(dim=(1, 3))
+			result[:, axesSourceColumnIndex, :, axesTargetColumnIndex, :] = collapsedFeatureConnectionsTensor
 	else:
 		raise RuntimeError("collapseFeatureConnectionsSpatialAxesTensor error: featureConnectionsTensor rank must be 5 or 6")
 	return result
@@ -1130,7 +1176,8 @@ def collapseFeatureConnectionsSpatialAxesTensor(featureConnectionsTensor, cs):
 
 def collapseFeatureConnectionsSpatialAxesSparseIndices(connectionIndices, cs):
 	result = None
-	axesColumnIndex = None
+	axesSourceColumnIndex = None
+	axesTargetColumnIndex = None
 	if(not pt.is_tensor(connectionIndices)):
 		raise RuntimeError("collapseFeatureConnectionsSpatialAxesSparseIndices error: connectionIndices must be a tensor")
 	if(not isinstance(cs, int) or isinstance(cs, bool)):
@@ -1141,11 +1188,13 @@ def collapseFeatureConnectionsSpatialAxesSparseIndices(connectionIndices, cs):
 		raise RuntimeError("collapseFeatureConnectionsSpatialAxesSparseIndices error: connectionIndices rank must be 2")
 	if(int(connectionIndices.shape[0]) != 6):
 		raise RuntimeError("collapseFeatureConnectionsSpatialAxesSparseIndices error: connectionIndices first dimension must equal 6")
-	axesColumnIndex = getImageSequenceEncodeAxesColumnIndex(cs)
+	axesSourceColumnIndex = getImageSequenceEncodeAxesSourceColumnIndex(cs)
 	result = connectionIndices.clone()
 	if(result.numel() > 0):
-		result[2] = axesColumnIndex
-		result[4] = axesColumnIndex
+		result[2] = axesSourceColumnIndex
+		if(not modalityORimageSequenceEncodeAxesColumnRandom):
+			axesTargetColumnIndex = getImageSequenceEncodeAxesTargetColumnIndex(cs)
+			result[4] = axesTargetColumnIndex
 	return result
 
 

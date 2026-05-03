@@ -120,7 +120,7 @@ def configureImageAxesSequenceConcepts(orderedConceptNameList, requiredSourceFea
 			raise RuntimeError("configureImageAxesSequenceConcepts error: globalFeatureIndices must be a list")
 		if(not isinstance(imageAxesSequenceTensorData, dict)):
 			raise RuntimeError("configureImageAxesSequenceConcepts error: imageAxesSequenceTensorData must be a dict")
-		validateImageSequenceEncodeAxesColumnIndex()
+			validateImageSequenceEncodeAxesSourceColumnIndex()
 		if(len(globalFeatureIndices) > 0):
 			if("centralConceptName" not in imageAxesSequenceTensorData):
 				raise RuntimeError("configureImageAxesSequenceConcepts error: imageAxesSequenceTensorData missing centralConceptName")
@@ -139,15 +139,144 @@ def configureImageAxesSequenceConcepts(orderedConceptNameList, requiredSourceFea
 	return result
 
 
-def validateImageSequenceEncodeAxesColumnIndex():
+def buildImageAxesSequenceConceptMetadataList(columnMetadataList, imageAxesSequenceTensorData):
+	result = None
+	centralColumnIndex = None
+	orderedColumnMetadataList = None
+	columnIndex = None
+	columnMetadata = None
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		validateImageAxesColumnMetadataList(columnMetadataList)
+		if(not isinstance(imageAxesSequenceTensorData, dict)):
+			raise RuntimeError("buildImageAxesSequenceConceptMetadataList error: imageAxesSequenceTensorData must be a dict")
+		if("centralColumnIndex" not in imageAxesSequenceTensorData):
+			raise RuntimeError("buildImageAxesSequenceConceptMetadataList error: imageAxesSequenceTensorData missing centralColumnIndex")
+		centralColumnIndex = int(imageAxesSequenceTensorData["centralColumnIndex"])
+		if(centralColumnIndex < 0 or centralColumnIndex >= len(columnMetadataList)):
+			raise RuntimeError("buildImageAxesSequenceConceptMetadataList error: centralColumnIndex out of range")
+		if(modalityORimageSequenceEncodeAxesColumnRandom):
+			validateImageSequenceEncodeAxesColumnRandomParameters(len(columnMetadataList))
+			orderedColumnMetadataList = [columnMetadataList[centralColumnIndex]]
+			for columnIndex, columnMetadata in enumerate(columnMetadataList):
+				if(columnIndex != centralColumnIndex and len(orderedColumnMetadataList) < int(modalityORnumberOfColumnsV2)):
+					orderedColumnMetadataList.append(columnMetadata)
+			if(len(orderedColumnMetadataList) != int(modalityORnumberOfColumnsV2)):
+				raise RuntimeError("buildImageAxesSequenceConceptMetadataList error: orderedColumnMetadataList length must equal modalityORnumberOfColumnsV2")
+			result = orderedColumnMetadataList
+		else:
+			validateImageSequenceEncodeAxesTargetColumnIndex()
+			result = [columnMetadataList[centralColumnIndex]]
+	else:
+		raise RuntimeError("buildImageAxesSequenceConceptMetadataList error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
+	return result
+
+
+def buildImageAxesRequiredSourceFeatureIndicesByConceptName(orderedConceptNameList, uniqueGlobalFeatureIndices):
+	result = None
+	uniqueGlobalFeatureIndexTensor = None
+	requiredSourceFeatureIndices = None
+	conceptName = None
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		if(not isinstance(orderedConceptNameList, list)):
+			raise RuntimeError("buildImageAxesRequiredSourceFeatureIndicesByConceptName error: orderedConceptNameList must be a list")
+		if(not isinstance(uniqueGlobalFeatureIndices, list)):
+			raise RuntimeError("buildImageAxesRequiredSourceFeatureIndicesByConceptName error: uniqueGlobalFeatureIndices must be a list")
+		if(len(orderedConceptNameList) == 0):
+			raise RuntimeError("buildImageAxesRequiredSourceFeatureIndicesByConceptName error: orderedConceptNameList must not be empty")
+		if(len(uniqueGlobalFeatureIndices) == 0):
+			raise RuntimeError("buildImageAxesRequiredSourceFeatureIndicesByConceptName error: uniqueGlobalFeatureIndices must not be empty")
+		uniqueGlobalFeatureIndexTensor = pt.tensor(uniqueGlobalFeatureIndices, dtype=pt.long)
+		if(uniqueGlobalFeatureIndexTensor.dim() != 1):
+			raise RuntimeError("buildImageAxesRequiredSourceFeatureIndicesByConceptName error: uniqueGlobalFeatureIndexTensor must be rank 1")
+		requiredSourceFeatureIndices = pt.unique(uniqueGlobalFeatureIndexTensor).tolist()
+		result = {}
+		for conceptName in orderedConceptNameList:
+			if(not isinstance(conceptName, str) or conceptName == ""):
+				raise RuntimeError("buildImageAxesRequiredSourceFeatureIndicesByConceptName error: conceptName must be a non-empty string")
+			result[conceptName] = list(requiredSourceFeatureIndices)
+	else:
+		raise RuntimeError("buildImageAxesRequiredSourceFeatureIndicesByConceptName error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
+	return result
+
+
+def validateImageSequenceEncodeAxesTargetColumnIndex():
 	result = None
 	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
-		if(not isinstance(modalityORimageSequenceEncodeAxesColumnIndex, int) or isinstance(modalityORimageSequenceEncodeAxesColumnIndex, bool)):
-			raise RuntimeError("validateImageSequenceEncodeAxesColumnIndex error: modalityORimageSequenceEncodeAxesColumnIndex must be an int")
-		if(modalityORimageSequenceEncodeAxesColumnIndex != 0):
-			raise RuntimeError("validateImageSequenceEncodeAxesColumnIndex error: modalityORimageSequenceEncodeAxesColumnIndex must equal 0")
+		validateImageSequenceEncodeAxesSourceColumnIndex()
+		if(not isinstance(modalityORimageSequenceEncodeAxesTargetColumnIndex, int) or isinstance(modalityORimageSequenceEncodeAxesTargetColumnIndex, bool)):
+			raise RuntimeError("validateImageSequenceEncodeAxesTargetColumnIndex error: modalityORimageSequenceEncodeAxesTargetColumnIndex must be an int")
+		if(modalityORimageSequenceEncodeAxesTargetColumnIndex != modalityORimageSequenceEncodeAxesSourceColumnIndex):
+			raise RuntimeError("validateImageSequenceEncodeAxesTargetColumnIndex error: modalityORimageSequenceEncodeAxesTargetColumnIndex must equal modalityORimageSequenceEncodeAxesSourceColumnIndex")
 	else:
-		raise RuntimeError("validateImageSequenceEncodeAxesColumnIndex error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
+		raise RuntimeError("validateImageSequenceEncodeAxesTargetColumnIndex error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
+	return result
+
+
+def validateImageSequenceEncodeAxesSourceColumnIndex():
+	result = None
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		if(not isinstance(modalityORimageSequenceEncodeAxesSourceColumnIndex, int) or isinstance(modalityORimageSequenceEncodeAxesSourceColumnIndex, bool)):
+			raise RuntimeError("validateImageSequenceEncodeAxesSourceColumnIndex error: modalityORimageSequenceEncodeAxesSourceColumnIndex must be an int")
+		if(modalityORimageSequenceEncodeAxesSourceColumnIndex != 0):
+			raise RuntimeError("validateImageSequenceEncodeAxesSourceColumnIndex error: modalityORimageSequenceEncodeAxesSourceColumnIndex must equal 0")
+	else:
+		raise RuntimeError("validateImageSequenceEncodeAxesSourceColumnIndex error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
+	return result
+
+
+def validateImageSequenceEncodeAxesColumnRandomParameters(numberOfAvailableColumns):
+	result = None
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		if(not isinstance(modalityORimageSequenceEncodeAxesColumnRandom, bool)):
+			raise RuntimeError("validateImageSequenceEncodeAxesColumnRandomParameters error: modalityORimageSequenceEncodeAxesColumnRandom must be a bool")
+		if(not isinstance(modalityORnumberOfColumnsV2, int) or isinstance(modalityORnumberOfColumnsV2, bool)):
+			raise RuntimeError("validateImageSequenceEncodeAxesColumnRandomParameters error: modalityORnumberOfColumnsV2 must be an int")
+		if(not isinstance(numberOfAvailableColumns, int) or isinstance(numberOfAvailableColumns, bool)):
+			raise RuntimeError("validateImageSequenceEncodeAxesColumnRandomParameters error: numberOfAvailableColumns must be an int")
+		if(modalityORnumberOfColumnsV2 <= 0):
+			raise RuntimeError("validateImageSequenceEncodeAxesColumnRandomParameters error: modalityORnumberOfColumnsV2 must be > 0")
+		if(numberOfAvailableColumns < int(modalityORnumberOfColumnsV2)):
+			raise RuntimeError("validateImageSequenceEncodeAxesColumnRandomParameters error: numberOfAvailableColumns must be >= modalityORnumberOfColumnsV2")
+		validateImageSequenceEncodeAxesSourceColumnIndex()
+	else:
+		raise RuntimeError("validateImageSequenceEncodeAxesColumnRandomParameters error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
+	return result
+
+
+def validateImageSequenceEncodeAxesColumnCount(cs):
+	result = None
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
+		if(not isinstance(cs, int) or isinstance(cs, bool)):
+			raise RuntimeError("validateImageSequenceEncodeAxesColumnCount error: cs must be an int")
+		if(cs <= 0):
+			raise RuntimeError("validateImageSequenceEncodeAxesColumnCount error: cs must be > 0")
+		validateImageSequenceEncodeAxesSourceColumnIndex()
+		if(modalityORimageSequenceEncodeAxesSourceColumnIndex < 0 or modalityORimageSequenceEncodeAxesSourceColumnIndex >= cs):
+			raise RuntimeError("validateImageSequenceEncodeAxesColumnCount error: modalityORimageSequenceEncodeAxesSourceColumnIndex out of range")
+		if(modalityORimageSequenceEncodeAxesColumnRandom):
+			validateImageSequenceEncodeAxesColumnRandomParameters(cs)
+			if(cs != int(modalityORnumberOfColumnsV2)):
+				raise RuntimeError("validateImageSequenceEncodeAxesColumnCount error: cs must equal modalityORnumberOfColumnsV2")
+		else:
+			validateImageSequenceEncodeAxesTargetColumnIndex()
+			if(modalityORimageSequenceEncodeAxesTargetColumnIndex < 0 or modalityORimageSequenceEncodeAxesTargetColumnIndex >= cs):
+				raise RuntimeError("validateImageSequenceEncodeAxesColumnCount error: modalityORimageSequenceEncodeAxesTargetColumnIndex out of range")
+	else:
+		raise RuntimeError("validateImageSequenceEncodeAxesColumnCount error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
+	return result
+
+
+def generateImageAxesRandomTargetColumnIndexTensor(numberOfFeatures, targetDevice):
+	result = None
+	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes" and modalityORimageSequenceEncodeAxesColumnRandom):
+		if(not isinstance(numberOfFeatures, int) or isinstance(numberOfFeatures, bool)):
+			raise RuntimeError("generateImageAxesRandomTargetColumnIndexTensor error: numberOfFeatures must be an int")
+		if(numberOfFeatures <= 0):
+			raise RuntimeError("generateImageAxesRandomTargetColumnIndexTensor error: numberOfFeatures must be > 0")
+		validateImageSequenceEncodeAxesColumnRandomParameters(int(modalityORnumberOfColumnsV2))
+		result = pt.randint(int(modalityORimageSequenceEncodeAxesSourceColumnIndex), int(modalityORnumberOfColumnsV2), (numberOfFeatures,), dtype=pt.long, device=targetDevice)
+	else:
+		raise RuntimeError("generateImageAxesRandomTargetColumnIndexTensor error: requires random modalityORimageSequenceEncode=='axes'")
 	return result
 
 
@@ -230,8 +359,13 @@ def getActiveSegmentsForImageAxesEncoding(sequenceObservedColumns, sequenceConce
 	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
 		if(not isinstance(sequenceConceptIndex, int) or isinstance(sequenceConceptIndex, bool)):
 			raise RuntimeError("getActiveSegmentsForImageAxesEncoding error: sequenceConceptIndex must be an int")
-		if(sequenceConceptIndex != int(modalityORimageSequenceEncodeAxesColumnIndex)):
-			raise RuntimeError("getActiveSegmentsForImageAxesEncoding error: sequenceConceptIndex must equal modalityORimageSequenceEncodeAxesColumnIndex")
+		validateImageSequenceEncodeAxesColumnCount(int(sequenceObservedColumns.cs))
+		if(modalityORimageSequenceEncodeAxesColumnRandom):
+			if(sequenceConceptIndex < int(modalityORimageSequenceEncodeAxesSourceColumnIndex) or sequenceConceptIndex >= int(modalityORnumberOfColumnsV2)):
+				raise RuntimeError("getActiveSegmentsForImageAxesEncoding error: sequenceConceptIndex out of random axes column range")
+		else:
+			if(sequenceConceptIndex != int(modalityORimageSequenceEncodeAxesTargetColumnIndex)):
+				raise RuntimeError("getActiveSegmentsForImageAxesEncoding error: sequenceConceptIndex must equal modalityORimageSequenceEncodeAxesTargetColumnIndex")
 		activeSegmentMask = calculateImageAxesFeatureActiveSegmentMask(sequenceObservedColumns, targetDevice)
 		result = pt.nonzero(pt.any(activeSegmentMask, dim=1), as_tuple=False).flatten()
 	else:
@@ -243,7 +377,10 @@ def populateImageAxesTrainTensors(sequenceObservedColumns, featureNeuronsActive,
 	result = None
 	activeSegmentMask = None
 	featureCentralColumnMaskTensor = None
-	axesColumnIndex = None
+	axesTargetColumnIndex = None
+	targetColumnIndexTensor = None
+	targetColumnMaskTensor = None
+	featureIndexTensor = None
 	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
 		if(not pt.is_tensor(featureNeuronsActive) or not pt.is_tensor(featureNeuronsWordOrder)):
 			raise RuntimeError("populateImageAxesTrainTensors error: featureNeuronsActive and featureNeuronsWordOrder must be tensors")
@@ -251,16 +388,28 @@ def populateImageAxesTrainTensors(sequenceObservedColumns, featureNeuronsActive,
 			raise RuntimeError("populateImageAxesTrainTensors error: featureNeuronsActive rank must be 4")
 		if(featureNeuronsWordOrder.dim() != 2):
 			raise RuntimeError("populateImageAxesTrainTensors error: featureNeuronsWordOrder rank must be 2")
-		axesColumnIndex = int(modalityORimageSequenceEncodeAxesColumnIndex)
-		if(int(featureNeuronsActive.shape[2]) <= axesColumnIndex or int(featureNeuronsWordOrder.shape[0]) <= axesColumnIndex):
-			raise RuntimeError("populateImageAxesTrainTensors error: modalityORimageSequenceEncodeAxesColumnIndex out of range")
+		validateImageSequenceEncodeAxesColumnCount(int(featureNeuronsActive.shape[2]))
 		activeSegmentMask = calculateImageAxesFeatureActiveSegmentMask(sequenceObservedColumns, targetDevice)
 		if(int(activeSegmentMask.shape[1]) != int(featureNeuronsActive.shape[3])):
 			raise RuntimeError("populateImageAxesTrainTensors error: active segment mask feature dimension mismatch")
 		featureCentralColumnMaskTensor = getImageAxesFeatureCentralColumnMask(sequenceObservedColumns, targetDevice)
 		activeSegmentMask = activeSegmentMask & featureCentralColumnMaskTensor.view(1, int(featureCentralColumnMaskTensor.shape[0]))
-		featureNeuronsActive[0, :, axesColumnIndex, :] = activeSegmentMask.to(dtype=featureNeuronsActive.dtype)
-		featureNeuronsWordOrder[axesColumnIndex, :] = 0
+		if(modalityORimageSequenceEncodeAxesColumnRandom):
+			if(int(featureNeuronsActive.shape[2]) != int(modalityORnumberOfColumnsV2) or int(featureNeuronsWordOrder.shape[0]) != int(modalityORnumberOfColumnsV2)):
+				raise RuntimeError("populateImageAxesTrainTensors error: axes random tensor column count must equal modalityORnumberOfColumnsV2")
+			featureIndexTensor = pt.arange(int(featureNeuronsActive.shape[3]), dtype=pt.long, device=targetDevice)
+			targetColumnIndexTensor = generateImageAxesRandomTargetColumnIndexTensor(int(featureNeuronsActive.shape[3]), targetDevice)
+			targetColumnMaskTensor = pt.zeros((int(modalityORnumberOfColumnsV2), int(featureNeuronsActive.shape[3])), dtype=pt.bool, device=targetDevice)
+			targetColumnMaskTensor[targetColumnIndexTensor, featureIndexTensor] = True
+			featureNeuronsActive[0, :, :, :] = activeSegmentMask.view(int(activeSegmentMask.shape[0]), 1, int(activeSegmentMask.shape[1])).to(dtype=featureNeuronsActive.dtype) * targetColumnMaskTensor.view(1, int(targetColumnMaskTensor.shape[0]), int(targetColumnMaskTensor.shape[1])).to(dtype=featureNeuronsActive.dtype)
+			featureNeuronsWordOrder[targetColumnMaskTensor] = 0
+			sequenceObservedColumns.imageAxesTargetColumnIndexTensor = targetColumnIndexTensor
+		else:
+			axesTargetColumnIndex = int(modalityORimageSequenceEncodeAxesTargetColumnIndex)
+			if(int(featureNeuronsActive.shape[2]) <= axesTargetColumnIndex or int(featureNeuronsWordOrder.shape[0]) <= axesTargetColumnIndex):
+				raise RuntimeError("populateImageAxesTrainTensors error: modalityORimageSequenceEncodeAxesTargetColumnIndex out of range")
+			featureNeuronsActive[0, :, axesTargetColumnIndex, :] = activeSegmentMask.to(dtype=featureNeuronsActive.dtype)
+			featureNeuronsWordOrder[axesTargetColumnIndex, :] = 0
 	else:
 		raise RuntimeError("populateImageAxesTrainTensors error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
 	return result

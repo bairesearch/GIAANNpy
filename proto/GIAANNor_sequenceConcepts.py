@@ -144,13 +144,17 @@ def generateSequenceDataImageAxes(databaseNetworkObject, columnMetadataList, sel
 	activationList = None
 	activationTupleIterable = None
 	centralTargetActive = None
+	orderedColumnMetadataList = None
+	orderedConceptNameList = None
 	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
 		imageAxesSequenceTensorData = GIAANNor_sequenceAxes.buildImageAxesSequenceTensorData(columnMetadataList, selectedFilterIndices)
 		activeCoordinateTensor = pt.nonzero(selectedFilterIndices >= 0, as_tuple=False)
 		centralTargetActive = bool(pt.any(imageAxesSequenceTensorData["featureCentralColumnMaskTensor"]).item())
 		if(activeCoordinateTensor.shape[0] > 0 and centralTargetActive):
 			centralConceptName = imageAxesSequenceTensorData["centralConceptName"]
-			ensureConceptColumns(databaseNetworkObject, [columnMetadataList[int(imageAxesSequenceTensorData["centralColumnIndex"])]], allowNewFeatures)
+			orderedColumnMetadataList = GIAANNor_sequenceAxes.buildImageAxesSequenceConceptMetadataList(columnMetadataList, imageAxesSequenceTensorData)
+			orderedConceptNameList = list(map(lambda columnMetadata: columnMetadata["conceptName"], orderedColumnMetadataList))
+			ensureConceptColumns(databaseNetworkObject, orderedColumnMetadataList, allowNewFeatures)
 			activeFilterIndexTensor = selectedFilterIndices[activeCoordinateTensor[:, 0], activeCoordinateTensor[:, 1]].to(dtype=pt.long, device=selectedFilterIndices.device)
 			uniqueFilterIndexTensor, inverseFilterIndexTensor = pt.unique(activeFilterIndexTensor, sorted=True, return_inverse=True)
 			uniqueFilterIndexList = uniqueFilterIndexTensor.detach().cpu().tolist()
@@ -162,10 +166,10 @@ def generateSequenceDataImageAxes(databaseNetworkObject, columnMetadataList, sel
 			featureWords = list(map(uniqueFeatureWords.__getitem__, inverseFilterIndexTensor.detach().cpu().tolist()))
 			featureWordsVerbose = list(map(uniqueFeatureWordsVerbose.__getitem__, inverseFilterIndexTensor.detach().cpu().tolist()))
 			globalFeatureIndices = globalFeatureIndexTensor.detach().cpu().tolist()
-			requiredSourceFeatureIndicesByConceptName = {centralConceptName: sorted(uniqueGlobalFeatureIndices)}
+			requiredSourceFeatureIndicesByConceptName = GIAANNor_sequenceAxes.buildImageAxesRequiredSourceFeatureIndicesByConceptName(orderedConceptNameList, uniqueGlobalFeatureIndices)
 			activationTupleIterable = zip(range(int(activeCoordinateTensor.shape[0])), activeCoordinateTensor[:, 0].detach().cpu().tolist(), activeCoordinateTensor[:, 1].detach().cpu().tolist(), featureWords, featureWordsVerbose, globalFeatureIndices)
 			activationList = list(map(lambda activationTuple: buildImageAxesActivation(activationTuple, centralConceptName), activationTupleIterable))
-			result = {"orderedConceptNameList": [centralConceptName], "activationList": activationList, "featureWords": featureWords, "globalFeatureIndices": globalFeatureIndices, "requiredSourceFeatureIndicesByConceptName": requiredSourceFeatureIndicesByConceptName, "numberOfSnapshots": int(selectedFilterIndices.shape[0]), "numberOfColumns": int(selectedFilterIndices.shape[1]), "imageAxesFeatureFieldXTensor": imageAxesSequenceTensorData["featureFieldXTensor"], "imageAxesFeatureFieldYTensor": imageAxesSequenceTensorData["featureFieldYTensor"], "imageAxesFeatureAxisMaskTensor": imageAxesSequenceTensorData["featureAxisMaskTensor"], "imageAxesFeatureCentralColumnMaskTensor": imageAxesSequenceTensorData["featureCentralColumnMaskTensor"], "imageAxesCentralFieldX": imageAxesSequenceTensorData["centralFieldX"], "imageAxesCentralFieldY": imageAxesSequenceTensorData["centralFieldY"]}
+			result = {"orderedConceptNameList": orderedConceptNameList, "activationList": activationList, "featureWords": featureWords, "globalFeatureIndices": globalFeatureIndices, "requiredSourceFeatureIndicesByConceptName": requiredSourceFeatureIndicesByConceptName, "numberOfSnapshots": int(selectedFilterIndices.shape[0]), "numberOfColumns": int(selectedFilterIndices.shape[1]), "imageAxesFeatureFieldXTensor": imageAxesSequenceTensorData["featureFieldXTensor"], "imageAxesFeatureFieldYTensor": imageAxesSequenceTensorData["featureFieldYTensor"], "imageAxesFeatureAxisMaskTensor": imageAxesSequenceTensorData["featureAxisMaskTensor"], "imageAxesFeatureCentralColumnMaskTensor": imageAxesSequenceTensorData["featureCentralColumnMaskTensor"], "imageAxesCentralFieldX": imageAxesSequenceTensorData["centralFieldX"], "imageAxesCentralFieldY": imageAxesSequenceTensorData["centralFieldY"]}
 	else:
 		raise RuntimeError("generateSequenceDataImageAxes error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
 	return result
@@ -179,13 +183,18 @@ def buildImageAxesActivation(activationTuple, centralConceptName):
 	featureWord = None
 	featureWordVerbose = None
 	globalFeatureIndex = None
+	sequenceConceptIndex = None
 	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
 		if(not isinstance(activationTuple, tuple) or len(activationTuple) != 6):
 			raise RuntimeError("buildImageAxesActivation error: activationTuple must be a tuple of length 6")
 		if(not isinstance(centralConceptName, str) or centralConceptName == ""):
 			raise RuntimeError("buildImageAxesActivation error: centralConceptName must be a non-empty string")
 		localFeatureIndex, snapshotIndex, columnIndex, featureWord, featureWordVerbose, globalFeatureIndex = activationTuple
-		result = {"snapshotIndex": int(snapshotIndex), "columnIndex": int(columnIndex), "conceptName": centralConceptName, "featureWord": featureWord, "featureWordVerbose": featureWordVerbose, "globalFeatureIndex": int(globalFeatureIndex), "localFeatureIndex": int(localFeatureIndex), "sequenceConceptIndex": int(modalityORimageSequenceEncodeAxesColumnIndex)}
+		if(modalityORimageSequenceEncodeAxesColumnRandom):
+			sequenceConceptIndex = int(modalityORimageSequenceEncodeAxesSourceColumnIndex)
+		else:
+			sequenceConceptIndex = int(modalityORimageSequenceEncodeAxesTargetColumnIndex)
+		result = {"snapshotIndex": int(snapshotIndex), "columnIndex": int(columnIndex), "conceptName": centralConceptName, "featureWord": featureWord, "featureWordVerbose": featureWordVerbose, "globalFeatureIndex": int(globalFeatureIndex), "localFeatureIndex": int(localFeatureIndex), "sequenceConceptIndex": sequenceConceptIndex}
 	else:
 		raise RuntimeError("buildImageAxesActivation error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
 	return result

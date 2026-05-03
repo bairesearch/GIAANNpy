@@ -508,8 +508,8 @@ if(tokensiationMethodOneColumnPerSnapshotPixel):
 				raise RuntimeError("applyRFfiltersToPixelColumns error: transformedSnapshotTensor rank must be 4")
 			if(int(transformedSnapshotTensor.shape[1]) != 3):
 				raise RuntimeError("applyRFfiltersToPixelColumns error: transformedSnapshotTensor channel count must be 3")
-			if(int(transformedSnapshotTensor.shape[2])*int(transformedSnapshotTensor.shape[3]) != int(modalityORnumberOfColumns)):
-				raise RuntimeError("applyRFfiltersToPixelColumns error: transformed snapshot pixel count must equal modalityORnumberOfColumns")
+			if(int(transformedSnapshotTensor.shape[2])*int(transformedSnapshotTensor.shape[3]) != int(modalityORnumberOfColumnsV1)):
+				raise RuntimeError("applyRFfiltersToPixelColumns error: transformed snapshot pixel count must equal modalityORnumberOfColumnsV1")
 			if(int(rfFilters.filterTensor.shape[0]) != int(modalityORfilterChannels)):
 				raise RuntimeError("applyRFfiltersToPixelColumns error: rfFilters filter count must equal modalityORfilterChannels")
 			if(int(rfFilters.filterTensor.shape[2]) != int(modalityORfilterWidth) or int(rfFilters.filterTensor.shape[3]) != int(modalityORfilterWidth)):
@@ -550,8 +550,8 @@ if(tokensiationMethodOneColumnPerSnapshotPixel):
 				raise RuntimeError("extractPixelColumnFilterPatches error: transformedSnapshotTensor rank must be 4")
 			if(int(transformedSnapshotTensor.shape[1]) != 3):
 				raise RuntimeError("extractPixelColumnFilterPatches error: transformedSnapshotTensor channel count must be 3")
-			if(int(transformedSnapshotTensor.shape[2])*int(transformedSnapshotTensor.shape[3]) != int(modalityORnumberOfColumns)):
-				raise RuntimeError("extractPixelColumnFilterPatches error: transformed snapshot pixel count must equal modalityORnumberOfColumns")
+			if(int(transformedSnapshotTensor.shape[2])*int(transformedSnapshotTensor.shape[3]) != int(modalityORnumberOfColumnsV1)):
+				raise RuntimeError("extractPixelColumnFilterPatches error: transformed snapshot pixel count must equal modalityORnumberOfColumnsV1")
 			padding = int(modalityORfilterWidth//2)
 			paddedSnapshotTensor = pt.nn.functional.pad(transformedSnapshotTensor, (padding, padding, padding, padding), mode="replicate")
 			patchTensor = paddedSnapshotTensor.unfold(2, int(modalityORfilterWidth), 1).unfold(3, int(modalityORfilterWidth), 1)
