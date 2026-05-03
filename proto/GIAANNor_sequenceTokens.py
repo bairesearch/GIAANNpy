@@ -87,8 +87,8 @@ if(tokensiationMethodOneColumnPerSnapshotPixel):
 		validatePixelColumnTokenisationParameters(snapshotTensor)
 		gridHeight, gridWidth = calculatePixelColumnGridDimensions(int(snapshotTensor.shape[2]), int(snapshotTensor.shape[3]))
 		columnTensor = transformSnapshotsToPixelColumnTensor(snapshotTensor, gridHeight, gridWidth)
-		if(int(columnTensor.shape[2])*int(columnTensor.shape[3]) != int(modalityORnumberOfColumnsV1)):
-			raise RuntimeError("tokeniseSnapshotsToPixelColumns error: transformed snapshot pixel count must equal modalityORnumberOfColumnsV1")
+		if(int(columnTensor.shape[2])*int(columnTensor.shape[3]) != int(modalityORnumberOfColumnsVX)):
+			raise RuntimeError("tokeniseSnapshotsToPixelColumns error: transformed snapshot pixel count must equal modalityORnumberOfColumnsVX")
 		columnMetadataList = buildColumnMetadataList(gridHeight, gridWidth)
 		result = {"columnTensor": columnTensor, "columnMetadataList": columnMetadataList, "gridHeight": gridHeight, "gridWidth": gridWidth}
 		return result
@@ -103,10 +103,10 @@ if(tokensiationMethodOneColumnPerSnapshotPixel):
 				raise RuntimeError("validatePixelColumnTokenisationParameters error: snapshotTensor rank must be 4")
 			if(int(snapshotTensor.shape[1]) != 3):
 				raise RuntimeError("validatePixelColumnTokenisationParameters error: snapshotTensor channel count must be 3")
-			if(not isinstance(modalityORnumberOfColumnsV1, int)):
-				raise RuntimeError("validatePixelColumnTokenisationParameters error: modalityORnumberOfColumnsV1 must be an int")
-			if(modalityORnumberOfColumnsV1 <= 0):
-				raise RuntimeError("validatePixelColumnTokenisationParameters error: modalityORnumberOfColumnsV1 must be > 0")
+			if(not isinstance(modalityORnumberOfColumnsVX, int)):
+				raise RuntimeError("validatePixelColumnTokenisationParameters error: modalityORnumberOfColumnsVX must be an int")
+			if(modalityORnumberOfColumnsVX <= 0):
+				raise RuntimeError("validatePixelColumnTokenisationParameters error: modalityORnumberOfColumnsVX must be > 0")
 			if(modalityORsnapshotRetinotopicFieldBias):
 				validateRetinotopicFieldBiasParameters()
 		else:
@@ -127,15 +127,15 @@ if(tokensiationMethodOneColumnPerSnapshotPixel):
 		if(tokensiationMethodOneColumnPerSnapshotPixel):
 			if(snapshotHeight <= 0 or snapshotWidth <= 0):
 				raise RuntimeError("calculatePixelColumnGridDimensions error: snapshotHeight/snapshotWidth must be > 0")
-			if(not isinstance(modalityORnumberOfColumnsV1, int)):
-				raise RuntimeError("calculatePixelColumnGridDimensions error: modalityORnumberOfColumnsV1 must be an int")
-			if(modalityORnumberOfColumnsV1 <= 0):
-				raise RuntimeError("calculatePixelColumnGridDimensions error: modalityORnumberOfColumnsV1 must be > 0")
+			if(not isinstance(modalityORnumberOfColumnsVX, int)):
+				raise RuntimeError("calculatePixelColumnGridDimensions error: modalityORnumberOfColumnsVX must be an int")
+			if(modalityORnumberOfColumnsVX <= 0):
+				raise RuntimeError("calculatePixelColumnGridDimensions error: modalityORnumberOfColumnsVX must be > 0")
 			targetAspectRatio = float(snapshotWidth)/float(snapshotHeight)
 			candidateHeight = 1
-			while(candidateHeight*candidateHeight <= int(modalityORnumberOfColumnsV1)):
-				if(int(modalityORnumberOfColumnsV1)%candidateHeight == 0):
-					candidateWidth = int(modalityORnumberOfColumnsV1)//candidateHeight
+			while(candidateHeight*candidateHeight <= int(modalityORnumberOfColumnsVX)):
+				if(int(modalityORnumberOfColumnsVX)%candidateHeight == 0):
+					candidateWidth = int(modalityORnumberOfColumnsVX)//candidateHeight
 					candidateAspectRatio = float(candidateWidth)/float(candidateHeight)
 					candidateDifference = abs(candidateAspectRatio - targetAspectRatio)/targetAspectRatio
 					if(bestDifference is None or candidateDifference < bestDifference):
@@ -162,8 +162,8 @@ if(tokensiationMethodOneColumnPerSnapshotPixel):
 		if(tokensiationMethodOneColumnPerSnapshotPixel):
 			if(gridHeight <= 0 or gridWidth <= 0):
 				raise RuntimeError("transformSnapshotsToPixelColumnTensor error: gridHeight/gridWidth must be > 0")
-			if(int(gridHeight)*int(gridWidth) != int(modalityORnumberOfColumnsV1)):
-				raise RuntimeError("transformSnapshotsToPixelColumnTensor error: gridHeight*gridWidth must equal modalityORnumberOfColumnsV1")
+			if(int(gridHeight)*int(gridWidth) != int(modalityORnumberOfColumnsVX)):
+				raise RuntimeError("transformSnapshotsToPixelColumnTensor error: gridHeight*gridWidth must equal modalityORnumberOfColumnsVX")
 			if(modalityORsnapshotRetinotopicFieldBias):
 				result = transformSnapshotsToRetinotopicPixelColumnTensor(snapshotTensor, gridHeight, gridWidth)
 			else:
@@ -221,8 +221,8 @@ if(tokensiationMethodOneColumnPerSnapshotPixel):
 				raise RuntimeError("calculateRetinotopicPixelColumnSourceCoordinateTensor error: requires modalityORsnapshotRetinotopicFieldBias")
 			if(gridHeight <= 0 or gridWidth <= 0):
 				raise RuntimeError("calculateRetinotopicPixelColumnSourceCoordinateTensor error: gridHeight/gridWidth must be > 0")
-			if(int(gridHeight)*int(gridWidth) != int(modalityORnumberOfColumnsV1)):
-				raise RuntimeError("calculateRetinotopicPixelColumnSourceCoordinateTensor error: gridHeight*gridWidth must equal modalityORnumberOfColumnsV1")
+			if(int(gridHeight)*int(gridWidth) != int(modalityORnumberOfColumnsVX)):
+				raise RuntimeError("calculateRetinotopicPixelColumnSourceCoordinateTensor error: gridHeight*gridWidth must equal modalityORnumberOfColumnsVX")
 			validateRetinotopicFieldBiasParameters()
 			numberOfColumns = int(gridHeight)*int(gridWidth)
 			yGrid, xGrid = pt.meshgrid(pt.arange(gridHeight, dtype=arrayType, device=targetDevice), pt.arange(gridWidth, dtype=arrayType, device=targetDevice), indexing="ij")

@@ -158,10 +158,10 @@ def buildImageAxesSequenceConceptMetadataList(columnMetadataList, imageAxesSeque
 			validateImageSequenceEncodeAxesColumnRandomParameters(len(columnMetadataList))
 			orderedColumnMetadataList = [columnMetadataList[centralColumnIndex]]
 			for columnIndex, columnMetadata in enumerate(columnMetadataList):
-				if(columnIndex != centralColumnIndex and len(orderedColumnMetadataList) < int(modalityORnumberOfColumnsV2)):
+				if(columnIndex != centralColumnIndex and len(orderedColumnMetadataList) < int(modalityORnumberOfColumnsVS)):
 					orderedColumnMetadataList.append(columnMetadata)
-			if(len(orderedColumnMetadataList) != int(modalityORnumberOfColumnsV2)):
-				raise RuntimeError("buildImageAxesSequenceConceptMetadataList error: orderedColumnMetadataList length must equal modalityORnumberOfColumnsV2")
+			if(len(orderedColumnMetadataList) != int(modalityORnumberOfColumnsVS)):
+				raise RuntimeError("buildImageAxesSequenceConceptMetadataList error: orderedColumnMetadataList length must equal modalityORnumberOfColumnsVS")
 			result = orderedColumnMetadataList
 		else:
 			validateImageSequenceEncodeAxesTargetColumnIndex()
@@ -229,14 +229,14 @@ def validateImageSequenceEncodeAxesColumnRandomParameters(numberOfAvailableColum
 	if(submodalityName=="image" and modalityORimageSequenceEncode=="axes"):
 		if(not isinstance(modalityORimageSequenceEncodeAxesColumnRandom, bool)):
 			raise RuntimeError("validateImageSequenceEncodeAxesColumnRandomParameters error: modalityORimageSequenceEncodeAxesColumnRandom must be a bool")
-		if(not isinstance(modalityORnumberOfColumnsV2, int) or isinstance(modalityORnumberOfColumnsV2, bool)):
-			raise RuntimeError("validateImageSequenceEncodeAxesColumnRandomParameters error: modalityORnumberOfColumnsV2 must be an int")
+		if(not isinstance(modalityORnumberOfColumnsVS, int) or isinstance(modalityORnumberOfColumnsVS, bool)):
+			raise RuntimeError("validateImageSequenceEncodeAxesColumnRandomParameters error: modalityORnumberOfColumnsVS must be an int")
 		if(not isinstance(numberOfAvailableColumns, int) or isinstance(numberOfAvailableColumns, bool)):
 			raise RuntimeError("validateImageSequenceEncodeAxesColumnRandomParameters error: numberOfAvailableColumns must be an int")
-		if(modalityORnumberOfColumnsV2 <= 0):
-			raise RuntimeError("validateImageSequenceEncodeAxesColumnRandomParameters error: modalityORnumberOfColumnsV2 must be > 0")
-		if(numberOfAvailableColumns < int(modalityORnumberOfColumnsV2)):
-			raise RuntimeError("validateImageSequenceEncodeAxesColumnRandomParameters error: numberOfAvailableColumns must be >= modalityORnumberOfColumnsV2")
+		if(modalityORnumberOfColumnsVS <= 0):
+			raise RuntimeError("validateImageSequenceEncodeAxesColumnRandomParameters error: modalityORnumberOfColumnsVS must be > 0")
+		if(numberOfAvailableColumns < int(modalityORnumberOfColumnsVS)):
+			raise RuntimeError("validateImageSequenceEncodeAxesColumnRandomParameters error: numberOfAvailableColumns must be >= modalityORnumberOfColumnsVS")
 		validateImageSequenceEncodeAxesSourceColumnIndex()
 	else:
 		raise RuntimeError("validateImageSequenceEncodeAxesColumnRandomParameters error: requires submodalityName=='image' and modalityORimageSequenceEncode=='axes'")
@@ -255,8 +255,8 @@ def validateImageSequenceEncodeAxesColumnCount(cs):
 			raise RuntimeError("validateImageSequenceEncodeAxesColumnCount error: modalityORimageSequenceEncodeAxesSourceColumnIndex out of range")
 		if(modalityORimageSequenceEncodeAxesColumnRandom):
 			validateImageSequenceEncodeAxesColumnRandomParameters(cs)
-			if(cs != int(modalityORnumberOfColumnsV2)):
-				raise RuntimeError("validateImageSequenceEncodeAxesColumnCount error: cs must equal modalityORnumberOfColumnsV2")
+			if(cs != int(modalityORnumberOfColumnsVS)):
+				raise RuntimeError("validateImageSequenceEncodeAxesColumnCount error: cs must equal modalityORnumberOfColumnsVS")
 		else:
 			validateImageSequenceEncodeAxesTargetColumnIndex()
 			if(modalityORimageSequenceEncodeAxesTargetColumnIndex < 0 or modalityORimageSequenceEncodeAxesTargetColumnIndex >= cs):
@@ -273,8 +273,8 @@ def generateImageAxesRandomTargetColumnIndexTensor(numberOfFeatures, targetDevic
 			raise RuntimeError("generateImageAxesRandomTargetColumnIndexTensor error: numberOfFeatures must be an int")
 		if(numberOfFeatures <= 0):
 			raise RuntimeError("generateImageAxesRandomTargetColumnIndexTensor error: numberOfFeatures must be > 0")
-		validateImageSequenceEncodeAxesColumnRandomParameters(int(modalityORnumberOfColumnsV2))
-		result = pt.randint(int(modalityORimageSequenceEncodeAxesSourceColumnIndex), int(modalityORnumberOfColumnsV2), (numberOfFeatures,), dtype=pt.long, device=targetDevice)
+		validateImageSequenceEncodeAxesColumnRandomParameters(int(modalityORnumberOfColumnsVS))
+		result = pt.randint(int(modalityORimageSequenceEncodeAxesSourceColumnIndex), int(modalityORnumberOfColumnsVS), (numberOfFeatures,), dtype=pt.long, device=targetDevice)
 	else:
 		raise RuntimeError("generateImageAxesRandomTargetColumnIndexTensor error: requires random modalityORimageSequenceEncode=='axes'")
 	return result
@@ -361,7 +361,7 @@ def getActiveSegmentsForImageAxesEncoding(sequenceObservedColumns, sequenceConce
 			raise RuntimeError("getActiveSegmentsForImageAxesEncoding error: sequenceConceptIndex must be an int")
 		validateImageSequenceEncodeAxesColumnCount(int(sequenceObservedColumns.cs))
 		if(modalityORimageSequenceEncodeAxesColumnRandom):
-			if(sequenceConceptIndex < int(modalityORimageSequenceEncodeAxesSourceColumnIndex) or sequenceConceptIndex >= int(modalityORnumberOfColumnsV2)):
+			if(sequenceConceptIndex < int(modalityORimageSequenceEncodeAxesSourceColumnIndex) or sequenceConceptIndex >= int(modalityORnumberOfColumnsVS)):
 				raise RuntimeError("getActiveSegmentsForImageAxesEncoding error: sequenceConceptIndex out of random axes column range")
 		else:
 			if(sequenceConceptIndex != int(modalityORimageSequenceEncodeAxesTargetColumnIndex)):
@@ -395,11 +395,11 @@ def populateImageAxesTrainTensors(sequenceObservedColumns, featureNeuronsActive,
 		featureCentralColumnMaskTensor = getImageAxesFeatureCentralColumnMask(sequenceObservedColumns, targetDevice)
 		activeSegmentMask = activeSegmentMask & featureCentralColumnMaskTensor.view(1, int(featureCentralColumnMaskTensor.shape[0]))
 		if(modalityORimageSequenceEncodeAxesColumnRandom):
-			if(int(featureNeuronsActive.shape[2]) != int(modalityORnumberOfColumnsV2) or int(featureNeuronsWordOrder.shape[0]) != int(modalityORnumberOfColumnsV2)):
-				raise RuntimeError("populateImageAxesTrainTensors error: axes random tensor column count must equal modalityORnumberOfColumnsV2")
+			if(int(featureNeuronsActive.shape[2]) != int(modalityORnumberOfColumnsVS) or int(featureNeuronsWordOrder.shape[0]) != int(modalityORnumberOfColumnsVS)):
+				raise RuntimeError("populateImageAxesTrainTensors error: axes random tensor column count must equal modalityORnumberOfColumnsVS")
 			featureIndexTensor = pt.arange(int(featureNeuronsActive.shape[3]), dtype=pt.long, device=targetDevice)
 			targetColumnIndexTensor = generateImageAxesRandomTargetColumnIndexTensor(int(featureNeuronsActive.shape[3]), targetDevice)
-			targetColumnMaskTensor = pt.zeros((int(modalityORnumberOfColumnsV2), int(featureNeuronsActive.shape[3])), dtype=pt.bool, device=targetDevice)
+			targetColumnMaskTensor = pt.zeros((int(modalityORnumberOfColumnsVS), int(featureNeuronsActive.shape[3])), dtype=pt.bool, device=targetDevice)
 			targetColumnMaskTensor[targetColumnIndexTensor, featureIndexTensor] = True
 			featureNeuronsActive[0, :, :, :] = activeSegmentMask.view(int(activeSegmentMask.shape[0]), 1, int(activeSegmentMask.shape[1])).to(dtype=featureNeuronsActive.dtype) * targetColumnMaskTensor.view(1, int(targetColumnMaskTensor.shape[0]), int(targetColumnMaskTensor.shape[1])).to(dtype=featureNeuronsActive.dtype)
 			featureNeuronsWordOrder[targetColumnMaskTensor] = 0

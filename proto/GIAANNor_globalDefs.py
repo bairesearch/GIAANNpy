@@ -27,10 +27,6 @@ from GIAANNcmn_globalDefs import useDrawNetworkIndependently
 submodalityName = "image"	#image, video
 
 
-#algorithm selection
-tokensiationMethodOneColumnPerSnapshotPixel = True	#default: True #orig: False
-
-
 #recent debug vars;
 debugPrintNumberFeatures = True
 debugPrintInsufficientUsableFeaturesWarning = True
@@ -40,7 +36,7 @@ debugPrintInsufficientUsableFeaturesWarning = True
 printSequenceNumberColumns = True
 modalityORRFfilterNamesVerbose = False	#default: False	#orig: True
 modalityORsequenceDataTextSnapshotDelimiter = " | "
-modalityORsequenceDataTextSegmentDelimiter = " \ "
+modalityORsequenceDataTextSegmentDelimiter = " \\ "
 modalityORsequenceDataTextFeatureDelimiter = " "
 modalityORsequenceDataTextSegmentPrefix = "s"
 modalityORsequenceDataTextLabelSuffix = ": "
@@ -66,6 +62,8 @@ if(submodalityName=="video"):
 	modalityORdatasetHasBackground = False
 	datasetCameraHorizontalFOV = 50.0	#estimated dataset-level FOV for infactory-ai/soccer-events 1280x720 professional soccer broadcast clips; source footage is variable-zoom and has no published per-clip intrinsics.
 	datasetCameraFOV = datasetCameraHorizontalFOV/2.0	#retinotopic table uses eccentricity/radius from fixation, not full horizontal FOV
+	datasetImageWidth = 1280
+	datasetImageHeight = 720
 elif(submodalityName=="image"):
 	datasetType = "cityscapes"
 	datasetName = "Chris1/cityscapes"
@@ -84,42 +82,126 @@ elif(submodalityName=="image"):
 	modalityORdatasetHasBackground = False
 	datasetCameraHorizontalFOV = 50.0	#48.70231915612077	#derived from Cityscapes K: fx=2262.52, width=2048; 2*atan(width/(2*fx))
 	datasetCameraFOV = datasetCameraHorizontalFOV/2.0	#retinotopic table uses eccentricity/radius from fixation, not full horizontal FOV
-
-#unused nlp settings;
-	#Multisequence settings;
-multisentencePredictions = False
-numSentencesPerSequence = 1
-spacyPipelineOptimisations = False
-useBenchmarkDefaults = False
-	#Concept column delimiters;
-usePOS = False
-useDedicatedFeatureLists = False
-conceptColumnsDelimitByPOS = False
-predictionColumnsMustActivateConceptFeature = False
-pretrainCombineConsecutiveNouns = False
-pretrainCombineHyphenatedNouns = False
-pretrainConceptColumnsDelimitByPOSenforce = False
-useSpacyForConceptNounPOSdetection = False
-detectReferenceSetDelimitersBetweenNouns = False
-trainConnectionStrengthPOSdependence = False
-trainConnectionStrengthLimitTanh = False
-trainConnectionStrengthLimitMax = False
-inferenceConnectionStrengthPOSdependence = False
+	datasetImageWidth = 2048
+	datasetImageHeight = 1024
 
 
-#modality OR;
-if(tokensiationMethodOneColumnPerSnapshotPixel):
-	modalityORnumberOfColumnsV1 = 1000	#default: 1000	#~1000 hypercolumns in V1
-	modalityORfilterWidth = 5	#default: TODO
-	modalityORfilterChannels = 100	#default: 15000*18	#~18 orientation columns per hypercolumn in V1	#~15000 neuron per orientation column
-	modalityORnumberOfFeaturesPerColumn = modalityORfilterWidth*modalityORfilterWidth*modalityORfilterChannels
-else:
-	modalityORpixelsPerColumn = 20
+#"layers" (regions) - could instantiate multiple GIAANN databases for independent/greedy training;
 modalityORnumberOfLayers = 5
 modalityORtrainMaxLayerIndex = 0
-modalityORuseExternalRFfilterLibrary = False
-modalityORexternalRFfilterLibraryModuleName = "ATORpt_RF"
-modalityORRFfilterThreshold = 0.2
+
+
+#RF Filters;
+modalityORfiltersRotations = 18	#default: ~18 orientation columns per hypercolumn in V1
+modalityORfiltersPerRotation = 1024	#debug: 16	#minimum: 1024	#default: ~15000 neuron per orientation column
+modalityORRFfilterRotationallyInvariant = False	#orig: False
+modalityORfilterChannels = modalityORfiltersPerRotation*modalityORfiltersRotations
+if(modalityORRFfilterRotationallyInvariant):
+	modalityORfilterChannelsOutput = modalityORfiltersPerRotation
+else:
+	modalityORfilterChannelsOutput = modalityORfiltersPerRotation*modalityORfiltersRotations
+modalityORfilterUseExternalRFLibrary = False
+modalityORfilterExternalRFLibraryModuleName = "ATORpt_RF"
+modalityORfilterThreshold = 0.2
+modalityORfilterTypeEllipsoidal = "ELL"
+modalityORfilterTypeGabor = "GAB"
+modalityORfilterTypePixel = "PIX"
+modalityORfilterCodeOrientationPrefix = "_O"
+modalityORfilterCodeVariantPrefix = "_V"
+modalityORfilterCodeColourPrefix = "_C"
+modalityORfilterCodePhasePrefix = "_P"
+modalityORfilterCodeOutputPrefix = "OUT"
+modalityORfilterCodeDefaultPrefix = "RF_"
+modalityORfilterWordAlphabet = "abcdefghijklmnopqrstuvwxyz"
+modalityORfilterCodeIndexDigits = 3
+modalityORfilterCodeDefaultIndex = 0
+modalityORfilterWordMinLetters = 2
+modalityORfilterRadiansPerCircle = 6.283185307179586
+modalityORfilterColourChannelCount = 3
+modalityORfilterColourLuminance = (1.0, 1.0, 1.0)
+modalityORfilterColourRedGreen = (1.0, -1.0, 0.0)
+modalityORfilterColourGreenBlue = (0.0, 1.0, -1.0)
+modalityORfilterColourRedBlue = (1.0, 0.0, -1.0)
+modalityORfilterColourWeightsList = [modalityORfilterColourLuminance, modalityORfilterColourRedGreen, modalityORfilterColourGreenBlue, modalityORfilterColourRedBlue]
+modalityORfilterColourIndexLuminance = 0
+modalityORfilterColourIndexRedGreen = 1
+modalityORfilterColourIndexGreenBlue = 2
+modalityORfilterColourIndexRedBlue = 3
+modalityORfilterPolarityPositive = 1.0
+modalityORfilterPolarityNegative = -1.0
+modalityORfilterPhaseCosine = 0.0
+modalityORfilterPhaseSine = 1.5707963267948966
+modalityORfilterFrequencyLow = 0.15
+modalityORfilterFrequencyHigh = 0.25
+modalityORfilterGeneratedTypeList = [modalityORfilterTypeEllipsoidal, modalityORfilterTypeGabor]
+modalityORfilterGeneratedPolarityList = [modalityORfilterPolarityPositive, modalityORfilterPolarityNegative]
+modalityORfilterGeneratedColourIndexList = [modalityORfilterColourIndexLuminance, modalityORfilterColourIndexRedGreen, modalityORfilterColourIndexGreenBlue, modalityORfilterColourIndexRedBlue]
+modalityORfilterGeneratedFractionOffset = 0.5
+modalityORfilterGeneratedMinimumFilterCount = 1
+modalityORfilterGeneratedMinimumCategoryCount = 1
+modalityORfilterGeneratedCoprimeStrideMinimum = 1
+modalityORfilterGeneratedCoprimeSearchStep = 1
+modalityORfilterGeneratedCoprimeGcdRequired = 1
+modalityORfilterGeneratedTypePermutationStrideSeed = 7
+modalityORfilterGeneratedTypePermutationOffsetSeed = 0
+modalityORfilterGeneratedPolarityColourPermutationStrideSeed = 13
+modalityORfilterGeneratedPolarityColourPermutationOffsetSeed = 1
+modalityORfilterGeneratedFrequencyPermutationStrideSeed = 23
+modalityORfilterGeneratedFrequencyPermutationOffsetSeed = 3
+modalityORfilterGeneratedPhasePermutationStrideSeed = 29
+modalityORfilterGeneratedPhasePermutationOffsetSeed = 5
+modalityORfilterGeneratedSigmaXPermutationStrideSeed = 31
+modalityORfilterGeneratedSigmaXPermutationOffsetSeed = 7
+modalityORfilterGeneratedSigmaYPermutationStrideSeed = 37
+modalityORfilterGeneratedSigmaYPermutationOffsetSeed = 11
+modalityORfilterGeneratedLobeOffsetPermutationStrideSeed = 41
+modalityORfilterGeneratedLobeOffsetPermutationOffsetSeed = 13
+modalityORfilterGeneratedSurroundScalePermutationStrideSeed = 43
+modalityORfilterGeneratedSurroundScalePermutationOffsetSeed = 17
+modalityORfilterGeneratedFrequencyMin = 0.05
+modalityORfilterGeneratedFrequencyMax = 0.45
+modalityORfilterGeneratedPhaseMin = 0.0
+modalityORfilterGeneratedPhaseMax = modalityORfilterRadiansPerCircle
+modalityORfilterGeneratedSigmaXMin = 0.2
+modalityORfilterGeneratedSigmaXMax = 0.7
+modalityORfilterGeneratedSigmaYMin = 0.08
+modalityORfilterGeneratedSigmaYMax = 0.35
+modalityORfilterGeneratedLobeOffsetMin = 0.2
+modalityORfilterGeneratedLobeOffsetMax = 0.7
+modalityORfilterGeneratedSurroundScaleMin = 0.25
+modalityORfilterGeneratedSurroundScaleMax = 0.75
+modalityORfilterEllipsoidalSigmaX = 0.45
+modalityORfilterEllipsoidalSigmaY = 0.2
+modalityORfilterEllipsoidalLobeOffset = 0.4
+modalityORfilterEllipsoidalLobeSigmaXScale = 1.2
+modalityORfilterEllipsoidalLobeSigmaYScale = 1.4
+modalityORfilterEllipsoidalSurroundScale = 0.5
+modalityORfilterGaborSigmaX = 0.45
+modalityORfilterGaborSigmaY = 0.25
+modalityORfilterSupplementaryOrientationCount = 8
+modalityORfilterSupplementaryRadiusCount = 2
+modalityORfilterSupplementaryRadius = 0.35
+modalityORfilterSupplementarySigmaBase = 0.2
+modalityORfilterSupplementarySigmaStep = 0.05
+modalityORfilterSupplementarySigmaCount = 3
+modalityORfilterSupplementarySurroundSigmaScale = 2.0
+modalityORfilterSupplementarySurroundScale = 0.5
+modalityORfilterPrototypeTypeIndex = 0
+modalityORfilterPrototypePolarityIndex = 1
+modalityORfilterPrototypeFrequencyIndex = 2
+modalityORfilterPrototypePhaseIndex = 3
+modalityORfilterPrototypeColourIndex = 4
+modalityORfilterPrototypeSigmaXIndex = 5
+modalityORfilterPrototypeSigmaYIndex = 6
+modalityORfilterPrototypeLobeOffsetIndex = 7
+modalityORfilterPrototypeSurroundScaleIndex = 8
+modalityORfilterPrototypeLength = 9
+modalityORfilterNoFrequency = 0.0
+modalityORfilterNoLobeOffset = 0.0
+modalityORfilterNoSurroundScale = 1.0
+
+
+#snapshots (subimage extraction via saccades);
 modalityORsnapshotFractionOfImage = 0.25
 modalityORsnapshotRetinotopicFieldBias = True
 if(modalityORsnapshotRetinotopicFieldBias):
@@ -127,6 +209,25 @@ if(modalityORsnapshotRetinotopicFieldBias):
 else:
 	modalityORsnapshotRetinotopicFieldMaxDegrees = None
 
+
+#VX column/feature assignment;
+tokensiationMethodOneColumnPerSnapshotPixel = True	#default: True #orig: False
+if(tokensiationMethodOneColumnPerSnapshotPixel):
+	modalityORnumberOfColumnsVX = 1000	#default: 1000	#~1000 hypercolumns in V1
+	modalityORfilterWidth = 5	#default: 5
+	modalityORnumberOfFeaturesPerColumn = modalityORfilterWidth*modalityORfilterWidth*modalityORfilterChannelsOutput
+else:
+	modalityORpixelsPerColumn = 20
+	modalityORsnapshotDimension = int(round(float(min(datasetImageWidth, datasetImageHeight))*float(modalityORsnapshotFractionOfImage)))
+	if(modalityORsnapshotDimension < modalityORpixelsPerColumn):
+		raise RuntimeError("GIAANNor_globalDefs error: modalityORsnapshotDimension must be >= modalityORpixelsPerColumn")
+	modalityORnumberOfColumnsVXaxis = int(modalityORsnapshotDimension//modalityORpixelsPerColumn)
+	if(modalityORnumberOfColumnsVXaxis <= 0):
+		raise RuntimeError("GIAANNor_globalDefs error: modalityORnumberOfColumnsVXaxis must be > 0")
+	modalityORnumberOfColumnsVX = modalityORnumberOfColumnsVXaxis*modalityORnumberOfColumnsVXaxis
+
+
+#submodality settings;
 if(submodalityName=="video"):
 	modalityORvideoGenerateMultipleSnapshotsPerFrame = True	#default: True #orig: False	#modality OR video generate multiple snapshots per frame using detected keypoints
 	modalityORvideoGenerateMultipleSnapshotsPerFrameParallel = True
@@ -146,9 +247,9 @@ elif(submodalityName=="image"):
 		modalityORimageSequenceEncodeAxesColumnRandom = True
 		modalityORimageSequenceEncodeAxesSourceColumnIndex = 0	#mandatory: 0	#encoded source column index used by modalityORimageSequenceEncode=="axes"
 		if(modalityORimageSequenceEncodeAxesColumnRandom):
-			modalityORnumberOfColumnsV2 = 1000
+			modalityORnumberOfColumnsVS = 1000	#VS: Visual Spectral area (hypothetical)
 		else:
-			modalityORnumberOfColumnsV2 = 1
+			modalityORnumberOfColumnsVS = 1
 			modalityORimageSequenceEncodeAxesTargetColumnIndex = 0	#mandatory: 0	#fixed encoded target column index used by modalityORimageSequenceEncode=="axes"
 	if(modalityORimageSequenceEncode=="saccades"):
 		modalityORimageSaccadeKeypointsPerEncoding = 3	#default: 3	#orig: 2	# the number of saccade keypoints (transition points) used to encode the context of each selected column feature neuron
@@ -177,7 +278,8 @@ elif(submodalityName=="image"):
 	modalityORdatasetPromptRatio = 0.1
 	modalityORdatasetPromptMaxSequences = 2
 
-#feature detection (for keypoints);
+
+#feature detection (for keypoints) - this preprocessing is implicitly assumed performed in VX via RFs of different shapes and sizes;
 modalityORfeatureDetectionCorners = False	#default: False
 modalityORfeatureDetectionSegmentCentres = True	#default: True
 modalityORfeatureDetectionSegmentPostProcessing = True
@@ -199,3 +301,25 @@ modalityORfeatureDetectionSAM2checkpoint = ""
 modalityORfeatureDetectionSAM3checkpoint = ""
 modalityORfeatureDetectionSAM3textPrompt = "object"
 modalityORfeatureDetectionSAM3confidenceThreshold = 0.5
+
+
+#unused nlp settings;
+	#Multisequence settings;
+multisentencePredictions = False
+numSentencesPerSequence = 1
+spacyPipelineOptimisations = False
+useBenchmarkDefaults = False
+	#Concept column delimiters;
+usePOS = False
+useDedicatedFeatureLists = False
+conceptColumnsDelimitByPOS = False
+predictionColumnsMustActivateConceptFeature = False
+pretrainCombineConsecutiveNouns = False
+pretrainCombineHyphenatedNouns = False
+pretrainConceptColumnsDelimitByPOSenforce = False
+useSpacyForConceptNounPOSdetection = False
+detectReferenceSetDelimitersBetweenNouns = False
+trainConnectionStrengthPOSdependence = False
+trainConnectionStrengthLimitTanh = False
+trainConnectionStrengthLimitMax = False
+inferenceConnectionStrengthPOSdependence = False

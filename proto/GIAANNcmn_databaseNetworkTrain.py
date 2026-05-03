@@ -95,12 +95,12 @@ def getImageSequenceEncodeAxesSourceColumnIndex(cs):
 	if(modalityORimageSequenceEncodeAxesSourceColumnIndex < 0 or modalityORimageSequenceEncodeAxesSourceColumnIndex >= cs):
 		raise RuntimeError("getImageSequenceEncodeAxesSourceColumnIndex error: modalityORimageSequenceEncodeAxesSourceColumnIndex out of range")
 	if(modalityORimageSequenceEncodeAxesColumnRandom):
-		if(not isinstance(modalityORnumberOfColumnsV2, int) or isinstance(modalityORnumberOfColumnsV2, bool)):
-			raise RuntimeError("getImageSequenceEncodeAxesSourceColumnIndex error: modalityORnumberOfColumnsV2 must be an int")
-		if(modalityORnumberOfColumnsV2 <= 0):
-			raise RuntimeError("getImageSequenceEncodeAxesSourceColumnIndex error: modalityORnumberOfColumnsV2 must be > 0")
-		if(cs != int(modalityORnumberOfColumnsV2)):
-			raise RuntimeError("getImageSequenceEncodeAxesSourceColumnIndex error: cs must equal modalityORnumberOfColumnsV2 when modalityORimageSequenceEncodeAxesColumnRandom")
+		if(not isinstance(modalityORnumberOfColumnsVS, int) or isinstance(modalityORnumberOfColumnsVS, bool)):
+			raise RuntimeError("getImageSequenceEncodeAxesSourceColumnIndex error: modalityORnumberOfColumnsVS must be an int")
+		if(modalityORnumberOfColumnsVS <= 0):
+			raise RuntimeError("getImageSequenceEncodeAxesSourceColumnIndex error: modalityORnumberOfColumnsVS must be > 0")
+		if(cs != int(modalityORnumberOfColumnsVS)):
+			raise RuntimeError("getImageSequenceEncodeAxesSourceColumnIndex error: cs must equal modalityORnumberOfColumnsVS when modalityORimageSequenceEncodeAxesColumnRandom")
 	result = int(modalityORimageSequenceEncodeAxesSourceColumnIndex)
 	return result
 
