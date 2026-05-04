@@ -3,3 +3,4 @@ rm -f -- *.pkl *.pt
 rm -f -- *.pkl *.pt
 rm -f -- GIAANNproto*.png
 rm -f -- POS/*
+rm -rf -- ../database-ORimage

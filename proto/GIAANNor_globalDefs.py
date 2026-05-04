@@ -202,7 +202,11 @@ modalityORfilterNoSurroundScale = 1.0
 
 
 #snapshots (subimage extraction via saccades);
-modalityORsnapshotFractionOfImage = 0.25
+modalityORsnapshotCentreFOVonly = True #default: False	#orig: False	#smaller snapshots are more invariant to scale/zoom transformations
+if(modalityORsnapshotCentreFOVonly):
+	modalityORsnapshotFractionOfImage = 0.1		
+else:
+	modalityORsnapshotFractionOfImage = 0.25
 modalityORsnapshotRetinotopicFieldBias = True
 if(modalityORsnapshotRetinotopicFieldBias):
 	modalityORsnapshotRetinotopicFieldMaxDegrees = modalityORsnapshotFractionOfImage*datasetCameraFOV
@@ -213,11 +217,12 @@ else:
 #VX column/feature assignment;
 tokensiationMethodOneColumnPerSnapshotPixel = True	#default: True #orig: False
 if(tokensiationMethodOneColumnPerSnapshotPixel):
-	modalityORnumberOfColumnsVX = 1000	#default: 1000	#~1000 hypercolumns in V1
+	modalityORnumberOfColumnsVXwidth = int(modalityORsnapshotFractionOfImage*100)	#eg 25
+	modalityORnumberOfColumnsVX = modalityORnumberOfColumnsVXwidth*modalityORnumberOfColumnsVXwidth	#default: 10000	#~10000 hypercolumns in V1	
 	modalityORfilterWidth = 5	#default: 5
 	modalityORnumberOfFeaturesPerColumn = modalityORfilterWidth*modalityORfilterWidth*modalityORfilterChannelsOutput
 else:
-	modalityORpixelsPerColumn = 20
+	modalityORpixelsPerColumn = 20	#width only (total pixels = 20*20)
 	modalityORsnapshotDimension = int(round(float(min(datasetImageWidth, datasetImageHeight))*float(modalityORsnapshotFractionOfImage)))
 	if(modalityORsnapshotDimension < modalityORpixelsPerColumn):
 		raise RuntimeError("GIAANNor_globalDefs error: modalityORsnapshotDimension must be >= modalityORpixelsPerColumn")
@@ -241,18 +246,24 @@ if(submodalityName=="video"):
 	modalityORvideoStreamFrames = False	#orig: False
 elif(submodalityName=="image"):
 	#saccade augmentations are calculated by translating the image to a polar coordinates offset from the centre
-	modalityORimageMaxSequencesPerImage = 5		#max independent sequences per image (lists of saccade keypoints)
-	modalityORimageSequenceEncode = "axes"	#orig: "saccades"	#options: "saccades", "distance", "axis", "axes", "none"
+	modalityORimageMaxSequencesPerImage = 50		#default: 50	#debug: 5	#max independent sequences per image (lists of saccade keypoints)
+	if(modalityORsnapshotCentreFOVonly):
+		modalityORimageSequenceEncode = "saccades"
+	else:
+		modalityORimageSequenceEncode = "saccades"	#default: saccades #orig: saccades	#options: "saccades", "distance", "axis", "axes", "none"
 	if(modalityORimageSequenceEncode=="axes"):
 		modalityORimageSequenceEncodeAxesColumnRandom = True
 		modalityORimageSequenceEncodeAxesSourceColumnIndex = 0	#mandatory: 0	#encoded source column index used by modalityORimageSequenceEncode=="axes"
 		if(modalityORimageSequenceEncodeAxesColumnRandom):
-			modalityORnumberOfColumnsVS = 1000	#VS: Visual Spectral area (hypothetical)
+			modalityORnumberOfColumnsVS = modalityORnumberOfColumnsVX	#VS: Visual Spectral area (hypothetical)
 		else:
 			modalityORnumberOfColumnsVS = 1
 			modalityORimageSequenceEncodeAxesTargetColumnIndex = 0	#mandatory: 0	#fixed encoded target column index used by modalityORimageSequenceEncode=="axes"
 	if(modalityORimageSequenceEncode=="saccades"):
-		modalityORimageSaccadeKeypointsPerEncoding = 3	#default: 3	#orig: 2	# the number of saccade keypoints (transition points) used to encode the context of each selected column feature neuron
+		if(modalityORsnapshotCentreFOVonly):
+			modalityORimageSaccadeKeypointsPerEncoding = 3	#default: 3	#use >2 keypoints per encoding for line detection between features
+		else:
+			modalityORimageSaccadeKeypointsPerEncoding = 2	#default: 2	#orig: 2	# the number of saccade keypoints (transition points) used to encode the context of each selected column feature neuron
 		modalityORimageSnapshotsPerSaccade = 1	#default: 1	#if 1: one snapshot per saccade (plus the start point), if >1 add interpolation between saccade keypoints.
 		modalityORimageSnapshotsPerSequence = modalityORimageSaccadeKeypointsPerEncoding*modalityORimageSnapshotsPerSaccade+1
 	elif(modalityORimageSequenceEncode=="distance" or modalityORimageSequenceEncode=="axis" or modalityORimageSequenceEncode=="axes"):
