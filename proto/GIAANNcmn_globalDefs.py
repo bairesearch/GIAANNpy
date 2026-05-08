@@ -50,7 +50,7 @@ elif(useAutoresearch):
 elif(useDrawNetworkIndependently):
 	executionMode = "train"	#default: "train" or "trainAndInference" #set to the execution mode the network was trained on
 else:
-	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
 
 
 #Primary Draw settings:
@@ -114,7 +114,7 @@ elif(useDrawNetworkIndependently):
 	databaseFolderBase = "../database"	#default: "../database"	
 	#databaseFolderBase = "/media/user/ssdpro/GIAANN/databaseOscar1000-numSeedTokensInference8-spacyPipelineOptimisations"
 else:
-	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
+	trainMaxSequences = 10000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"	#"../database"
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
@@ -138,6 +138,13 @@ useSANI = True	#default: True	#orig: False	#sequentially activated neuronal inpu
 
 
 #modality global defs;
+inferenceReportGroundedAccuracy = False
+closedWorldGroundedDatasetGenerated = False
+inferenceReportGroundedRealisticNLPmetric = False
+inferenceReportGroundedStrongerGroundedNLPmetric = False
+inferenceReportGroundedAccuracyMod1_labelBalancedDataset = False
+inferenceReportGroundedAccuracyMod2_majorityClassBaseline = False
+inferenceReportGroundedAccuracyMod3_perLabelMetrics = False
 if(modalityName=="NLP"):
 	from GIAANNnlp_globalDefs import *
 elif(modalityName=="OR"):
@@ -475,6 +482,8 @@ if(not useAutoresearch):
 			elif(datasetType=="cifar10" or datasetType=="cityscapes"):
 				printTrainSequenceDefault = True
 				#printTrainSequenceCount = True
+			else:
+				printTrainSequenceDefault = True
 		
 
 #Debug vars;
@@ -863,6 +872,14 @@ if(printConfiguration):
 	print("inferenceSegmentTiming:", inferenceSegmentTiming)
 	print("inferenceActivationsType:", inferenceActivationsType)
 	print("inferenceReportTokenAccuracyConstrainByColumn:", inferenceReportTokenAccuracyConstrainByColumn)
+	print("inferenceReportGroundedAccuracy:", inferenceReportGroundedAccuracy)
+	if(inferenceReportGroundedAccuracy):
+		print("closedWorldGroundedDatasetGenerated:", closedWorldGroundedDatasetGenerated)
+		print("inferenceReportGroundedRealisticNLPmetric:", inferenceReportGroundedRealisticNLPmetric)
+		print("inferenceReportGroundedStrongerGroundedNLPmetric:", inferenceReportGroundedStrongerGroundedNLPmetric)
+		print("inferenceReportGroundedAccuracyMod1_labelBalancedDataset:", inferenceReportGroundedAccuracyMod1_labelBalancedDataset)
+		print("inferenceReportGroundedAccuracyMod2_majorityClassBaseline:", inferenceReportGroundedAccuracyMod2_majorityClassBaseline)
+		print("inferenceReportGroundedAccuracyMod3_perLabelMetrics:", inferenceReportGroundedAccuracyMod3_perLabelMetrics)
 	print("")
 	print("#Dataset Type;")
 	print("datasetType:", datasetType)

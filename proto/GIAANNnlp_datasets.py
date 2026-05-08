@@ -20,9 +20,12 @@ GIA ANN proto datasets
 
 import os
 import shutil
-from datasets import load_dataset, load_from_disk, DownloadConfig
 
 from GIAANNcmn_globalDefs import *
+if(datasetType not in closedWorldGroundedDatasetTypes):
+	from datasets import load_dataset, load_from_disk, DownloadConfig
+if(datasetType in closedWorldGroundedDatasetTypes):
+	import GIAANNnlp_groundedDataset
 
 def loadDatasetFromHuggingFace(streaming, cacheDirectory):
 	dataset = None
@@ -76,7 +79,9 @@ def buildLocalDatasetCacheDirectories(cacheDirectory):
 
 def loadDataset():
 	dataset = None
-	if(useLocalDataset):
+	if(datasetType in closedWorldGroundedDatasetTypes):
+		dataset = GIAANNnlp_groundedDataset.loadClosedWorldGroundedDataset(False)
+	elif(useLocalDataset):
 		if(datasetFolder == ""):
 			raise RuntimeError("loadDataset error: datasetFolder is empty while useLocalDataset is True")
 		if(not os.path.isdir(datasetFolder)):

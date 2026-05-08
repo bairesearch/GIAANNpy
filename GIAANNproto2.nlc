@@ -1,7 +1,7 @@
 //GIAANNpy Specification (prompts):
 
 ---
-v2a (Codex IDE GPT-5.4) [under development]:
+v2a (Codex IDE GPT-5.4->GPT-5.5) [under development]:
 - add proto GIAANNproto2a1a - start option useModalityOR=True:
 	- GIAANNor_datasets.py: add huggingface datasetType for video (find an appropriate dataset for short approx 1-3 minute lengthed, moderate resolution, video streams).
 	- GIAANNor_RFfilters.py: initialise a set of receptive field (RF) filters:
@@ -61,15 +61,16 @@ v2a (Codex IDE GPT-5.4) [under development]:
 	- create GIAANNor_features.py - copy the ATORpt feature detection code that uses the Segment Anything library and OpenCV (https://github.com/bairesearch/ATORpt ATORpt_PTfeatures.py/ATORpt_RFmainSA.py)
 - patch submodalityName=="image" to use higher resolution image dataset
 - patch numAdjacentFeaturePairsDetected so only adjacent pairs are used for saccades (not all combinations of pairs)
-[GPT-5.5:] - implement modalityORimageSaccadesNumberOfNearbyPairs (for modalityORimageSaccadesUseAdjacentSalientRegions) where this is set to 2 by default - it selects the number of pairs constructed for each feature in the image.
-[GPT-5.5:] - move image keypoint feature-pair detection and selected-pair-to-saccade-offset conversion code from GIAANNor_datasets.py to GIAANNor_keypoints.py.
-[GPT-5.5:] - patch all Hugging Face dataset downloads with useLocalDataset=True to keep dataset caches, download caches, assets caches, and direct hub file downloads under datasetFolder.
+[GPT-5.5:]
+- implement modalityORimageSaccadesNumberOfNearbyPairs (for modalityORimageSaccadesUseAdjacentSalientRegions) where this is set to 2 by default - it selects the number of pairs constructed for each feature in the image.
+- move image keypoint feature-pair detection and selected-pair-to-saccade-offset conversion code from GIAANNor_datasets.py to GIAANNor_keypoints.py.
+- patch all Hugging Face dataset downloads with useLocalDataset=True to keep dataset caches, download caches, assets caches, and direct hub file downloads under datasetFolder.
 MANUAL; - update database save paths to only use specialised inference_prompt.txt when useBenchmark=True
-[GPT-5.5:] - add option modalityORvideoGenerateMultipleSnapshotsPerFrame=True - upgrade submodalityName="video" to use the same modalityORfeatureDetection code as submodalityName="image" to generate multiple snapshots within each video frame for each detected feature (keypoint). The multiple snapshots within each frame should be processed each as a separate subsequence. For each iteration of the video sequence, the nearest keypoints are aligned as pertaining to the same subsequence. Thus the total number of snapshots equals modalityORvideoDuration*modalityORvideoFrameRate/modalityORvideoFramesPerSequenceIteration*numberKeypointsDetectedInFirstSequenceIteration
-[GPT-5.5:] - add option modalityORvideoGenerateMultipleSnapshotsPerFrameParallel=True - each subsequence is processed in parallel efficiently, each as a separate subsequence. Else, use a python for loop to process each subsequence separately.
-[GPT-5.5:] - change snapshot extraction method to use modalityORsnapshotFractionOfImage (rather than a fixed pixel dimensions modalityORsnapshotWidth/modalityORsnapshotHeight).
-[GPT-5.5:] - implement option modalityORsnapshotRetinotopicFieldBias=True - which biases the distribution of cortical column substrate assigned to each snapshot based on a human V1 retinotopic map. Use GIAANNOR-theoreticalReferenceGuide.txt to develop a function for determining the relationship between angular distance from centre of FOV to percentage of columns assigned. Add the table from this guide to the code comments. Note that every snapshot has all columns assigned, but the centre of the FOV has many more columns assigned. It applies to all submodalityName.
-[GPT-5.5:] - implement option tokensiationMethodOneColumnPerSnapshotPixel=True:
+- add option modalityORvideoGenerateMultipleSnapshotsPerFrame=True - upgrade submodalityName="video" to use the same modalityORfeatureDetection code as submodalityName="image" to generate multiple snapshots within each video frame for each detected feature (keypoint). The multiple snapshots within each frame should be processed each as a separate subsequence. For each iteration of the video sequence, the nearest keypoints are aligned as pertaining to the same subsequence. Thus the total number of snapshots equals modalityORvideoDuration*modalityORvideoFrameRate/modalityORvideoFramesPerSequenceIteration*numberKeypointsDetectedInFirstSequenceIteration
+- add option modalityORvideoGenerateMultipleSnapshotsPerFrameParallel=True - each subsequence is processed in parallel efficiently, each as a separate subsequence. Else, use a python for loop to process each subsequence separately.
+- change snapshot extraction method to use modalityORsnapshotFractionOfImage (rather than a fixed pixel dimensions modalityORsnapshotWidth/modalityORsnapshotHeight).
+- implement option modalityORsnapshotRetinotopicFieldBias=True - which biases the distribution of cortical column substrate assigned to each snapshot based on a human V1 retinotopic map. Use GIAANNOR-theoreticalReferenceGuide.txt to develop a function for determining the relationship between angular distance from centre of FOV to percentage of columns assigned. Add the table from this guide to the code comments. Note that every snapshot has all columns assigned, but the centre of the FOV has many more columns assigned. It applies to all submodalityName.
+- implement option tokensiationMethodOneColumnPerSnapshotPixel=True:
 	GIAANNor_sequenceTokens.py: 
 		- transform each snapshot such that the total number of pixels in the snapshot = modalityORnumberOfColumns.
 		- modify the useModalityOR tokenisation method to assign a token (and respective column) for every pixel in the transformed snapshot. 
@@ -78,22 +79,22 @@ MANUAL; - update database save paths to only use specialised inference_prompt.tx
 		- apply the filters on each token (column) pixel and its nearby surrounding pixels.
 		- set modalityORnumberOfFeaturesPerColumn = modalityORfilterWidth*modalityORfilterWidth*modalityORfilterChannels
 	As per AGENTS.md, ensure that all tokensiationMethodOneColumnPerSnapshotPixel=True code and functions are created within context "if(tokensiationMethodOneColumnPerSnapshotPixel):".
-[GPT-5.5:] - add option modalityORimageSaccadesEncode=False - do not encode temporal transitions between saccades (only encode co-occuring features like a standard hebbian network). 
+- add option modalityORimageSaccadesEncode=False - do not encode temporal transitions between saccades (only encode co-occuring features like a standard hebbian network).
 	- update modalityORimageSnapshotsPerSaccade implementation - if modalityORimageSnapshotsPerSaccade=1: no temporal encoding of saccade movements. if modalityORimageSnapshotsPerSaccade=2: encode start and end of saccade only, if modalityORimageSnapshotsPerSaccade>2: encode start and end of saccade and modalityORimageSnapshotsPerSaccade-2 interpolations between these points.
-[GPT-5.5:] - change the modalityORimageSaccadesPerImage interpretation to the max number saccades per image (i.e. do not repeat pairs if there are too few pairs in the list).
-[GPT-5.5:] - modify modalityORsnapshotFractionOfImage implementation so that snapshots taken are always square irrespective of the aspect ratio of the dataset image.
-[GPT-5.5:] - if modalityORimageSaccadesEncode=False, ensure GIAANN training trains connections between column features if their timeIndex is the same as each other.
-[GPT-5.5:] - add option modalityORimageSaccadeKeypointsPerEncoding (where it equalled 2 originally before this upgrade) - determines the number of saccade keypoints (transition points) used to encode the context of each selected column feature neuron. Note the total snaphots per column feature neuron encoding = modalityORimageSaccadeKeypointsPerEncoding*modalityORimageSnapshotsPerSaccade+1. Rename modalityORimageSaccadesPerImage to modalityORimageMaxSequencesPerImage.
-[GPT-5.5:] - change the interpretation of modalityORimageSnapshotsPerSaccade (now expect old value -1):
+- change the modalityORimageSaccadesPerImage interpretation to the max number saccades per image (i.e. do not repeat pairs if there are too few pairs in the list).
+- modify modalityORsnapshotFractionOfImage implementation so that snapshots taken are always square irrespective of the aspect ratio of the dataset image.
+- if modalityORimageSaccadesEncode=False, ensure GIAANN training trains connections between column features if their timeIndex is the same as each other.
+- add option modalityORimageSaccadeKeypointsPerEncoding (where it equalled 2 originally before this upgrade) - determines the number of saccade keypoints (transition points) used to encode the context of each selected column feature neuron. Note the total snaphots per column feature neuron encoding = modalityORimageSaccadeKeypointsPerEncoding*modalityORimageSnapshotsPerSaccade+1. Rename modalityORimageSaccadesPerImage to modalityORimageMaxSequencesPerImage.
+- change the interpretation of modalityORimageSnapshotsPerSaccade (now expect old value -1):
 	if(modalityORimageSaccadesEncode):
 		modalityORimageSnapshotsPerSaccade = 1	#default: 1	#if 1: one snapshot per saccade (plus the start point), if >1 add interpolation between saccade keypoints.
 	else:
 		modalityORimageSnapshotsPerSaccade = 0 #mandatory: 0	#if 0: no temporal encoding of saccade movements
-[GPT-5.5:] - replace bool option modalityORimageSaccadesEncode with enum (string) option modalityORimageSequenceEncode=="saccades"
-[GPT-5.5:] - add option modalityORimageSequenceEncode=="distance" - sequence timing (GIAANN segment input encodings) is determined by spatial distance of contextual column feature (in xy column coordinates) away from target column feature in the (retinotopic) visual snapshot map. Use modalityORimageSequenceEncodeDistanceFieldSegments - total number of segments to divide the snapshot visual field into (x or y). The number of encoded segments each individual feature neuron has will depend on its column position in the field (neurons on the edges of the field will have more encoded segments, as their maximum distance from other neurons in the field is higher). For each source neuron of a target neuron (at a relative distance of x, y), calculate its encoded sequence time (i.e. GIAANN segment index) as ceil(sqrt(x^2+y^2)).
-[GPT-5.5:] - for submodalityName=="video", use option modalityORvideoMaxEncodedSnapshotsPerSequence - which constrains the maximum number of encoded iterations in a sequence of snapshots (i.e. the maximum number of segments of prior context per feature neuron).
-[GPT-5.5:] - move modalityORimageSequenceEncode=="saccades" and modalityORimageSequenceEncode=="distance" code to new files GIAANNor_sequenceSaccades.py and GIAANNor_sequenceDistance.py
-[GPT-5.5:] - add option modalityORimageSequenceEncode=="axis" (GIAANNor_sequenceAxis.py), which is derived from modalityORimageSequenceEncode=="distance", but for each axis (X, Y) it effectively encodes sequence inputs based on contextual feature indices independent of their contextual column indices, while the encoding of the other axis remains the same as modalityORimageSequenceEncode=="distance":
+- replace bool option modalityORimageSaccadesEncode with enum (string) option modalityORimageSequenceEncode=="saccades"
+- add option modalityORimageSequenceEncode=="distance" - sequence timing (GIAANN segment input encodings) is determined by spatial distance of contextual column feature (in xy column coordinates) away from target column feature in the (retinotopic) visual snapshot map. Use modalityORimageSequenceEncodeDistanceFieldSegments - total number of segments to divide the snapshot visual field into (x or y). The number of encoded segments each individual feature neuron has will depend on its column position in the field (neurons on the edges of the field will have more encoded segments, as their maximum distance from other neurons in the field is higher). For each source neuron of a target neuron (at a relative distance of x, y), calculate its encoded sequence time (i.e. GIAANN segment index) as ceil(sqrt(x^2+y^2)).
+- for submodalityName=="video", use option modalityORvideoMaxEncodedSnapshotsPerSequence - which constrains the maximum number of encoded iterations in a sequence of snapshots (i.e. the maximum number of segments of prior context per feature neuron).
+- move modalityORimageSequenceEncode=="saccades" and modalityORimageSequenceEncode=="distance" code to new files GIAANNor_sequenceSaccades.py and GIAANNor_sequenceDistance.py
+- add option modalityORimageSequenceEncode=="axis" (GIAANNor_sequenceAxis.py), which is derived from modalityORimageSequenceEncode=="distance", but for each axis (X, Y) it effectively encodes sequence inputs based on contextual feature indices independent of their contextual column indices, while the encoding of the other axis remains the same as modalityORimageSequenceEncode=="distance":
 	- Conceptual Overview: 
 		- for each axis (e.g. X), the target neuron inputs of a particular SANI segment are trained with source neuron feature type input from every column in the retinotopic snapshot map along this axis X (at position y), for every active source neuron feature (and its respective type i.e. index) of the target neuron.
 		- the target neuron input timings (segments) are still assigned based on their 2D (x,y) position in the retinotopic snapshot map however, using the same algorithm as modalityORimageSequenceEncode=="distance" (i.e. source column position dependent).
@@ -102,15 +103,33 @@ MANUAL; - update database save paths to only use specialised inference_prompt.tx
 		- for every target neuron (i.e. active column feature in the retinotopic map) segment, for every source neuron associated with that segment (i.e. active column feature in its corresponding retinotopic map segment), a target segment input is trained for the particular source neuron feature index coming from every column in the retinotopic snapshot map along axis X (and at source column position y).
 	- Implementation notes:	
 		- the only change from modalityORimageSequenceEncode=="distance" is adding for each axis (X, Y), is adding an effective 1D maxpool operation across all columns of the axis for the feature index of each source neuron (by connecting all features of this type across the axis columns instead of just the source column feature).
-[GPT-5.5:] - add option modalityORimageSequenceEncode=="axes" (GIAANNor_sequenceAxes.py), which modifies modalityORimageSequenceEncode=="axis" such that for each axis (X, Y) it effectively encodes sequence inputs based on contextual feature indices independent of their contextual column indices, but performs the same operation to both axes.
+- add option modalityORimageSequenceEncode=="axes" (GIAANNor_sequenceAxes.py), which modifies modalityORimageSequenceEncode=="axis" such that for each axis (X, Y) it effectively encodes sequence inputs based on contextual feature indices independent of their contextual column indices, but performs the same operation to both axes.
 	- Precise Algorithm:
 		- for each axis (e.g. X), for every central target neuron (i.e. central active column feature in the retinotopic map) segment, for every source neuron associated with that segment along the axis X at position y=centre (i.e. active column feature in its corresponding retinotopic map segment), a target segment input is trained for the particular source neuron feature index. The source and target neuron column index information is discarded during training.
 	- Implementation notes:	
 		- when modalityORimageSequenceEncode=="axes", GIAANNcmn_databaseNetworkTrain effectively only saves connection source feature feature index (not column index) - it does this by setting all trained connection source and target column indices to columnIndex=0.
-[GPT-5.5:] - upgrade the modalityORimageSequenceEncode = "axes" implementation such that it is completely vectorised.
-[GPT-5.5:] - update modalityORimageSequenceEncode = "axes" - retain a for loop for each axis (e.g. X).
-[GPT-5.5:] - patch implementation of modalityORimageSequenceEncode = "axes" - training only occurs for the central target column active features.
-[GPT-5.5:] - add option modalityORimageSequenceEncodeAxesColumnRandom = True, which trains connection target features to random columns within range 0:modalityORnumberOfColumnsV2 (instead of just modalityORimageSequenceEncodeAxesTargetColumnIndex=0).
-[GPT-5.5:] - ensure that modalityORfilterChannels, modalityORfiltersPerRotation, and modalityORfiltersRotations are respected in al useModalityOR modes (submodalityName=="video" and "image"). Ie use these constants to define how many RF filters are created and of which orientation and type. ie explicitly creates filters for multiple rotations.
-[GPT-5.5:] - add option modalityORRFfilterRotationallyInvariant=True, which creates rotationally invariant RF filters. Implementation notes: it does this by linking the output of the equivalent filters at different rotations to modalityORfilterChannelsOutput.
+- upgrade the modalityORimageSequenceEncode = "axes" implementation such that it is completely vectorised.
+- update modalityORimageSequenceEncode = "axes" - retain a for loop for each axis (e.g. X).
+- patch implementation of modalityORimageSequenceEncode = "axes" - training only occurs for the central target column active features.
+- add option modalityORimageSequenceEncodeAxesColumnRandom = True, which trains connection target features to random columns within range 0:modalityORnumberOfColumnsV2 (instead of just modalityORimageSequenceEncodeAxesTargetColumnIndex=0).
+- ensure that modalityORfilterChannels, modalityORfiltersPerRotation, and modalityORfiltersRotations are respected in al useModalityOR modes (submodalityName=="video" and "image"). Ie use these constants to define how many RF filters are created and of which orientation and type. ie explicitly creates filters for multiple rotations.
+- add option modalityORRFfilterRotationallyInvariant=True, which creates rotationally invariant RF filters. Implementation notes: it does this by linking the output of the equivalent filters at different rotations to modalityORfilterChannelsOutput.
 MANUAL; - add option modalityORsnapshotCentreFOVonly
+
+---
+v2b (Codex IDE GPT-5.5) [under development]:
+- add proto GIAANNproto2b1a - start option datasetType=="closedWorldGroundedX" and inferenceReportGroundedAccuracy:
+	- due to the whole-word tokenisation of GIAANN, it limits prediction outside of the training-set. However it is not clear the extent to which this limitation is a) preventing hallucination (either false predictions or correct predictions without sufficient grounding within the training-set), or b) not making predictions that are justifiable within the training set (i.e. undergeneralisation). This is why I am searching for a better test-set eval method.
+	- as recommended in the conclusion of GIAANN-grounded-eval-deep-research-report.md, please implement;
+		- option datasetType="closedWorldGrounded1": find and implement a closed world train+test dataset that can be used to evaluate the performance of GIAANN modalityName=="NLP" at making grounded predictions (not only correct or incorrect predictions).
+		- option inferenceReportGroundedAccuracy=True: new eval code to enable the evaluation of grounded predictions.
+- add options datasetType=="closedWorldGrounded2", datasetType=="closedWorldGrounded3", etc. Set inferenceReportGroundedAccuracy=True and closedWorldGroundedDatasetGenerated=False. Note only datasetType=="closedWorldGrounded1" should use closedWorldGroundedDatasetGenerated=True.
+- add recommended grounded accuracy class-bias controls and diagnostics:
+	- inferenceReportGroundedAccuracyMod1_labelBalancedDataset=True: balance HF-backed closed-world grounded train/eval construction by label and eval pool.
+	- inferenceReportGroundedAccuracyMod2_majorityClassBaseline=True: report the grounded accuracy of a majority-label predictor.
+	- inferenceReportGroundedAccuracyMod3_perLabelMetrics=True: report target-label counts, predicted-label counts, and per-true-label grounded outcomes.
+- keep option inferenceReportGroundedStrongerGroundedNLPmetric=False by default: the claim-derived seed-signature path is retained for comparison but is not the recommended HF-backed grounded eval path.
+- upgrade HF-backed grounded datasets to realistic NLP prompts:
+	- inferenceReportGroundedRealisticNLPmetric=True: use bounded real claim text in the train/eval sequence rather than id-only verdict templates.
+	- grounded eval items store/use a dynamic answer token index, so the answer no longer has to occur at the fixed closedWorldGroundedPromptAnswerTokenIndex position.
+	- realistic NLP prompts must remove claim-internal sentence terminators and insert an explicit verdict delimiter so each generated item remains one inference sequence.

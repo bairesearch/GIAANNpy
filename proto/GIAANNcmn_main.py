@@ -61,6 +61,8 @@ elif(modalityName=="OR"):
 		
 if(executionMode=="inference" or executionMode=="trainAndInference"):
 	import GIAANNcmn_prediction
+if(modalityName=="NLP" and inferenceReportGroundedAccuracy):
+	import GIAANNnlp_groundedEval
 
 
 if(printTimeDatabaseLoadSaveTimes):
@@ -204,6 +206,8 @@ def executeMode(inferenceMode):
 			GIAANNcmn_debug.resetTotalInferenceTokens()
 		if(inferenceMode):
 			GIAANNcmn_prediction.resetInferenceTop1AccuracyCounts()
+			if(modalityName=="NLP" and inferenceReportGroundedAccuracy):
+				GIAANNnlp_groundedEval.resetInferenceGroundedAccuracyCounts()
 		
 		if(modalityName=="NLP"):
 			if(inferenceMode):
@@ -220,6 +224,8 @@ def executeMode(inferenceMode):
 			GIAANNcmn_debug.printTotalInferenceTokens()
 		if(inferenceMode and printInferenceTop1Accuracy and not useAutoresearch):
 			GIAANNcmn_prediction.printInferenceTop1Accuracy(databaseNetworkObject)
+		if(inferenceMode and inferenceReportGroundedAccuracy and not useAutoresearch):
+			GIAANNnlp_groundedEval.printInferenceGroundedAccuracy(databaseNetworkObject)
 
 	if(debugPrintSpacySectionTimes):
 		processArticlePart1averageTime = processArticlePart1totalTime/processArticlePart1count
@@ -267,6 +273,8 @@ def executeMode(inferenceMode):
 			autoresearchExecutionTimeTrain = autoresearchExecutionTime
 		if(inferenceMode and printInferenceTop1Accuracy):
 			GIAANNcmn_prediction.printInferenceTop1Accuracy(databaseNetworkObject, autoresearchExecutionTimeInference, autoresearchExecutionTimeTrain)
+		if(inferenceMode and inferenceReportGroundedAccuracy):
+			GIAANNnlp_groundedEval.printInferenceGroundedAccuracy(databaseNetworkObject, autoresearchExecutionTimeInference, autoresearchExecutionTimeTrain)
 			
 
 if __name__ == "__main__":

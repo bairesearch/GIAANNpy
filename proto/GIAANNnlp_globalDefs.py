@@ -51,7 +51,7 @@ elif(useBenchmark):
 elif(useAutoresearch):
 	datasetType = "oscar"
 else:
-	datasetType = "oscar"	#"oscar" / "wikipedia" / "textfile" [experimental]
+	datasetType = "oscar"	#"oscar" / "wikipedia" / "textfile" / "closedWorldGrounded1" / "closedWorldGrounded2" / "closedWorldGrounded3" [experimental]
 
 
 #Multisentence predictions;
@@ -60,6 +60,30 @@ if(multisentencePredictions):
 	numSentencesPerSequence = 3 #default: 3
 else:
 	numSentencesPerSequence = 1
+
+
+#Closed world grounded dataset constants;
+datasetTypeClosedWorldGrounded1 = "closedWorldGrounded1"
+datasetTypeClosedWorldGrounded2 = "closedWorldGrounded2"
+datasetTypeClosedWorldGrounded3 = "closedWorldGrounded3"
+closedWorldGroundedDatasetTypes = [datasetTypeClosedWorldGrounded1, datasetTypeClosedWorldGrounded2, datasetTypeClosedWorldGrounded3]
+closedWorldGroundedHfDatasetTypes = [datasetTypeClosedWorldGrounded2, datasetTypeClosedWorldGrounded3]
+closedWorldGroundedDatasetTypeToDatasetNameDict = {datasetTypeClosedWorldGrounded1:"closedWorldGrounded1", datasetTypeClosedWorldGrounded2:"EleutherAI/fever", datasetTypeClosedWorldGrounded3:"allenai/scifact"}
+closedWorldGroundedDatasetTypeToDatasetCfgDict = {datasetTypeClosedWorldGrounded1:"", datasetTypeClosedWorldGrounded2:"v1.0", datasetTypeClosedWorldGrounded3:"claims"}
+closedWorldGroundedDatasetTypeToTrainSplitDict = {datasetTypeClosedWorldGrounded1:"train", datasetTypeClosedWorldGrounded2:"train", datasetTypeClosedWorldGrounded3:"train"}
+closedWorldGroundedDatasetTypeToEvalSplitDict = {datasetTypeClosedWorldGrounded1:"test", datasetTypeClosedWorldGrounded2:"dev", datasetTypeClosedWorldGrounded3:"validation"}
+closedWorldGroundedDatasetTypeToDatabaseTypeTextDict = {datasetTypeClosedWorldGrounded1:"ClosedWorldGrounded1", datasetTypeClosedWorldGrounded2:"ClosedWorldGrounded2", datasetTypeClosedWorldGrounded3:"ClosedWorldGrounded3"}
+closedWorldGroundedDatasetTypeToInferencePromptFileNameDict = {datasetTypeClosedWorldGrounded1:"inference_prompt.txt.closedWorldGrounded1", datasetTypeClosedWorldGrounded2:"inference_prompt.txt.closedWorldGrounded2", datasetTypeClosedWorldGrounded3:"inference_prompt.txt.closedWorldGrounded3"}
+closedWorldGroundedRealisticNLPmetricName = ""	#RealisticNLPNoSentenceSplits
+closedWorldGroundedRealisticNLPmetricInferencePromptFileNameSuffix = ""	#.realisticNLPNoSentenceSplits
+closedWorldGroundedStrongerGroundedNLPmetricName = "StrongerGroundedNLP"
+closedWorldGroundedStrongerGroundedNLPmetricInferencePromptFileNameSuffix = ".strongerGroundedNLP"
+closedWorldGroundedDatasetTypeToInferencePromptFileNameRealisticNLPmetricDict = {datasetTypeClosedWorldGrounded1:"inference_prompt.txt.closedWorldGrounded1", datasetTypeClosedWorldGrounded2:closedWorldGroundedDatasetTypeToInferencePromptFileNameDict[datasetTypeClosedWorldGrounded2] + closedWorldGroundedRealisticNLPmetricInferencePromptFileNameSuffix, datasetTypeClosedWorldGrounded3:closedWorldGroundedDatasetTypeToInferencePromptFileNameDict[datasetTypeClosedWorldGrounded3] + closedWorldGroundedRealisticNLPmetricInferencePromptFileNameSuffix}
+closedWorldGroundedDatasetTypeToInferencePromptFileNameStrongerGroundedNLPmetricDict = {datasetTypeClosedWorldGrounded1:"inference_prompt.txt.closedWorldGrounded1", datasetTypeClosedWorldGrounded2:closedWorldGroundedDatasetTypeToInferencePromptFileNameDict[datasetTypeClosedWorldGrounded2] + closedWorldGroundedStrongerGroundedNLPmetricInferencePromptFileNameSuffix, datasetTypeClosedWorldGrounded3:closedWorldGroundedDatasetTypeToInferencePromptFileNameDict[datasetTypeClosedWorldGrounded3] + closedWorldGroundedStrongerGroundedNLPmetricInferencePromptFileNameSuffix}
+inferenceReportGroundedAccuracy = datasetType in closedWorldGroundedDatasetTypes	#report closed-world grounded prediction accuracy
+inferenceReportGroundedRealisticNLPmetric = datasetType in closedWorldGroundedHfDatasetTypes	#use real claim text for HF-backed grounded evals
+inferenceReportGroundedStrongerGroundedNLPmetric = False	#use claim-derived seed tokens for HF-backed grounded evals
+closedWorldGroundedMaxSentencesPerArticle = 1
 
 
 #Dataset;
@@ -90,8 +114,12 @@ elif(datasetType=="wikipedia"):
 		datasetName = "wikipedia"
 		datasetCfg = "20220301.en"
 	useLocalDataset = True	#default: True	#orig: False (stream)	#use local dataset	#automatic huggingface access to dataset is unreliable
+elif(datasetType in closedWorldGroundedDatasetTypes):
+	datasetName = closedWorldGroundedDatasetTypeToDatasetNameDict[datasetType]
+	datasetCfg = closedWorldGroundedDatasetTypeToDatasetCfgDict[datasetType]
+	useLocalDataset = False
 else:
-	printe("Dataset selection error: enable either datasetType==textfile or datasetType==oscar or datasetType==wikipedia")
+	printe("Dataset selection error: enable either datasetType==textfile or datasetType==oscar or datasetType==wikipedia or datasetType in closedWorldGroundedDatasetTypes")
 if(not datasetType=="textfile"):
 	if(useLocalDataset):
 		datasetFolder = "../../dataset/nlp/"
@@ -124,6 +152,8 @@ if(not datasetType=="textfile"):
 			maxSentencesPerArticle = 100	#CHECKTHIS
 		elif(datasetType=="wikipedia"):
 			maxSentencesPerArticle = 1000	#CHECKTHIS
+		elif(datasetType in closedWorldGroundedDatasetTypes):
+			maxSentencesPerArticle = closedWorldGroundedMaxSentencesPerArticle
 else:
 	trainSetStartOffsetSequences = 0
 
@@ -159,9 +189,22 @@ if(useBenchmark):
 		databaseTypeText = ""	#or Wikipedia
 	elif(datasetType=="oscar"):
 		databaseTypeText = "Oscar"
+	elif(datasetType in closedWorldGroundedDatasetTypes):
+		databaseTypeText = closedWorldGroundedDatasetTypeToDatabaseTypeTextDict[datasetType]
+		if(inferenceReportGroundedRealisticNLPmetric):
+			databaseTypeText += closedWorldGroundedRealisticNLPmetricName
+		elif(inferenceReportGroundedStrongerGroundedNLPmetric):
+			databaseTypeText += closedWorldGroundedStrongerGroundedNLPmetricName
 	databaseFolderExtension = databaseTypeText + str(trainMaxSequences) + "-numSeedTokensInference" + str(numSeedTokensInference) + benchmarkAblationText		#useSANIfeaturesAndColumns
 else:
-	databaseFolderExtension = ""
+	if(datasetType in closedWorldGroundedDatasetTypes):
+		databaseFolderExtension = closedWorldGroundedDatasetTypeToDatabaseTypeTextDict[datasetType]
+		if(inferenceReportGroundedRealisticNLPmetric):
+			databaseFolderExtension += closedWorldGroundedRealisticNLPmetricName
+		elif(inferenceReportGroundedStrongerGroundedNLPmetric):
+			databaseFolderExtension += closedWorldGroundedStrongerGroundedNLPmetricName
+	else:
+		databaseFolderExtension = ""
 
 
 #Concept column delimiters:
@@ -260,6 +303,13 @@ if(useInference):
 			#experimental (untested)
 			trainPromptFileName = datasetName	#"train_prompt.txt"
 			inferencePromptFileName = "inference_prompt.txt"
+		elif(datasetType in closedWorldGroundedDatasetTypes):
+			if(inferenceReportGroundedRealisticNLPmetric):
+				inferencePromptFileName = closedWorldGroundedDatasetTypeToInferencePromptFileNameRealisticNLPmetricDict[datasetType]
+			elif(inferenceReportGroundedStrongerGroundedNLPmetric):
+				inferencePromptFileName = closedWorldGroundedDatasetTypeToInferencePromptFileNameStrongerGroundedNLPmetricDict[datasetType]
+			else:
+				inferencePromptFileName = closedWorldGroundedDatasetTypeToInferencePromptFileNameDict[datasetType]
 		else:
 			printe("invalid datasetType")
 
@@ -326,4 +376,102 @@ if useDedicatedFeatureLists:
 	maxNumNonNouns = len(nonNouns)
 
 
-	
+#Closed world grounded dataset constants;
+closedWorldGroundedDatasetGenerated = False
+if(inferenceReportGroundedAccuracy):
+	inferenceReportGroundedAccuracyMod1_labelBalancedDataset = True
+	inferenceReportGroundedAccuracyMod2_majorityClassBaseline = True
+	inferenceReportGroundedAccuracyMod3_perLabelMetrics = True
+	closedWorldGroundedDatasetGenerated = datasetType==datasetTypeClosedWorldGrounded1
+	closedWorldGroundedDatasetTextFieldName = "text"
+	closedWorldGroundedInferencePromptFileEncoding = "utf-8"
+	closedWorldGroundedPromptArticleSeparator = "\n"
+	closedWorldGroundedPromptTokenSeparator = " "
+	closedWorldGroundedPromptAnswerTokenIndex = 8
+	closedWorldGroundedPromptRawAnswerTokenIndex = 9
+	closedWorldGroundedPromptSubjectDeterminer = "the"
+	closedWorldGroundedPromptPredicate = "is"
+	closedWorldGroundedPromptPropertyLabel = "property"
+	closedWorldGroundedPromptConjunction = "and"
+	closedWorldGroundedPromptAnswerLabel = "answer"
+	closedWorldGroundedPromptCopula = "is"
+	closedWorldGroundedPromptAnswerQualifier = "exactly"
+	closedWorldGroundedPromptSentenceTerminator = "."
+	closedWorldGroundedLabelDirectSupport = "direct_support"
+	closedWorldGroundedLabelCompositionalSupport = "compositional_support"
+	closedWorldGroundedLabelUnsupportedWorldTrue = "unsupported_world_true"
+	closedWorldGroundedLabelUnsupportedFalse = "unsupported_false"
+	closedWorldGroundedLabelNoisySupport = "noisy_support"
+	closedWorldGroundedOutcomeJustified = "justified"
+	closedWorldGroundedOutcomeCorrectUngrounded = "correct_ungrounded"
+	closedWorldGroundedOutcomeGroundedFalsehood = "grounded_falsehood"
+	closedWorldGroundedOutcomeUngroundedHallucination = "ungrounded_hallucination"
+	closedWorldGroundedOutcomeAbstained = "abstained"
+	closedWorldGroundedNoPredictionWord = "<no prediction>"
+	closedWorldGroundedFactTupleLength = 3
+	closedWorldGroundedFactTupleEntityIndex = 0
+	closedWorldGroundedFactTuplePropertyIndex = 1
+	closedWorldGroundedFactTupleAnswerIndex = 2
+	closedWorldGroundedEvalItemTupleLength = 6
+	closedWorldGroundedEvalItemTupleCategoryIndex = 0
+	closedWorldGroundedEvalItemTupleEntityIndex = 1
+	closedWorldGroundedEvalItemTuplePropertyIndex = 2
+	closedWorldGroundedEvalItemTupleTargetAnswerIndex = 3
+	closedWorldGroundedEvalItemTupleTrueAnswersIndex = 4
+	closedWorldGroundedEvalItemTupleSupportedAnswersIndex = 5
+	closedWorldGroundedEvalItemFieldSequenceIndex = "sequenceIndex"
+	closedWorldGroundedEvalItemFieldCategory = "category"
+	closedWorldGroundedEvalItemFieldEntity = "entity"
+	closedWorldGroundedEvalItemFieldProperty = "property"
+	closedWorldGroundedEvalItemFieldTargetAnswer = "targetAnswer"
+	closedWorldGroundedEvalItemFieldTrueAnswers = "trueAnswers"
+	closedWorldGroundedEvalItemFieldSupportedAnswers = "supportedAnswers"
+	closedWorldGroundedEvalItemFieldText = "text"
+	closedWorldGroundedEvalItemFieldAnswerTokenIndex = "answerTokenIndex"
+	closedWorldGroundedEvalItemFieldClaimText = "claimText"
+	closedWorldGroundedEvalItemFieldClaimSignatureTokens = "claimSignatureTokens"
+	closedWorldGroundedEvalItemAnswerTokenIndexDynamic = -1
+	closedWorldGroundedHfDatasetItemCountMinimum = 1
+	closedWorldGroundedHfEvalMaxItems = 1000
+	closedWorldGroundedHfInitialPoolItemIndex = 0
+	closedWorldGroundedHfPoolItemIndexIncrement = 1
+	closedWorldGroundedHfInitialAnswerCount = 0
+	closedWorldGroundedHfStreaming = True
+	closedWorldGroundedHfTokenSeparatorReplacement = "_"
+	closedWorldGroundedHfClaimDigestTokenCount = 4
+	closedWorldGroundedHfClaimDigestTokenWidth = 3
+	closedWorldGroundedHfClaimDigestByteOffset = 0
+	closedWorldGroundedRealisticNLPmetricPromptClaimLabel = "claim"
+	closedWorldGroundedRealisticNLPmetricPromptStates = "states"
+	closedWorldGroundedRealisticNLPmetricPromptThat = "that"
+	closedWorldGroundedRealisticNLPmetricMaxClaimWords = 60
+	closedWorldGroundedRealisticNLPmetricClaimTerminalCharacters = (".","?","!")
+	closedWorldGroundedRealisticNLPmetricClaimTerminalCharacterReplacement = closedWorldGroundedPromptTokenSeparator
+	closedWorldGroundedStrongerGroundedNLPmetricPromptClaimLabel = "claim"
+	closedWorldGroundedHfEntityPrefixFever = "feverclaim"
+	closedWorldGroundedHfEntityPrefixSciFact = "scifactclaim"
+	closedWorldGroundedHfPropertyVerdict = "verdict"
+	closedWorldGroundedHfFieldId = "id"
+	closedWorldGroundedHfFieldClaim = "claim"
+	closedWorldGroundedHfFieldLabel = "label"
+	closedWorldGroundedHfFieldEvidenceLabel = "evidence_label"
+	closedWorldGroundedHfSupportedAnswer = "supported"
+	closedWorldGroundedHfRefutedAnswer = "refuted"
+	closedWorldGroundedHfUnknownAnswer = "unknown"
+	closedWorldGroundedHfAlternativeAnswerIndexOffset = 1
+	closedWorldGroundedHfAnswerOptions = []
+	if(datasetType==datasetTypeClosedWorldGrounded2):
+		closedWorldGroundedHfAnswerOptions = [closedWorldGroundedHfSupportedAnswer, closedWorldGroundedHfRefutedAnswer]
+	elif(datasetType==datasetTypeClosedWorldGrounded3):
+		closedWorldGroundedHfAnswerOptions = [closedWorldGroundedHfSupportedAnswer, closedWorldGroundedHfRefutedAnswer, closedWorldGroundedHfUnknownAnswer]
+	closedWorldGroundedFeverLabelRefutesIndex = 0
+	closedWorldGroundedFeverLabelSupportsIndex = 1
+	closedWorldGroundedFeverLabelRefutesName = "REFUTES"
+	closedWorldGroundedFeverLabelSupportsName = "SUPPORTS"
+	closedWorldGroundedSciFactLabelSupport = "SUPPORT"
+	closedWorldGroundedSciFactLabelContradict = "CONTRADICT"
+	closedWorldGroundedSciFactLabelUnknown = ""
+	closedWorldGroundedTrainFactTuples = [("aurorakey","color","blue"),("aurorakey","shape","triangle"),("emberkey","color","red"),("meadowkey","color","green"),("spareitem","shape","circle"),("basaltkey","color","black"),("yellowseed","color","yellow"),("noisedrift","color","purple"),("aerolith","region","northland"),("northland","color","silver"),("solstone","material","copper"),("copper","color","orange")]
+	closedWorldGroundedEvalItemTuples = [(closedWorldGroundedLabelDirectSupport,"aurorakey","color","blue",("blue",),("blue",)),(closedWorldGroundedLabelDirectSupport,"emberkey","color","red",("red",),("red",)),(closedWorldGroundedLabelCompositionalSupport,"aerolith","color","silver",("silver",),("silver",)),(closedWorldGroundedLabelCompositionalSupport,"solstone","color","orange",("orange",),("orange",)),(closedWorldGroundedLabelUnsupportedWorldTrue,"hiddenkey","color","red",("red",),()),(closedWorldGroundedLabelUnsupportedWorldTrue,"meadowkey","shape","circle",("circle",),()),(closedWorldGroundedLabelUnsupportedFalse,"falconkey","color","black",("green",),()),(closedWorldGroundedLabelNoisySupport,"noisedrift","color","purple",("yellow",),("purple",))]
+	if(numSeedTokensInference != closedWorldGroundedPromptAnswerTokenIndex):
+		raise RuntimeError("inferenceReportGroundedAccuracy requires numSeedTokensInference==" + str(closedWorldGroundedPromptAnswerTokenIndex))

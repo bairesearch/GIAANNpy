@@ -40,6 +40,8 @@ if(executionMode=="inference" or executionMode=="trainAndInference"):
 	import GIAANNcmn_prediction
 if(datasetType != "textfile" and executionMode != "inference" and not useDrawNetworkIndependently):
 	import GIAANNnlp_datasets
+if(datasetType in closedWorldGroundedDatasetTypes):
+	import GIAANNnlp_groundedDataset
 
 def loadPOSdatabase():
 	if(usePOS):
@@ -98,8 +100,14 @@ def buildSequenceWithDelimiters(sequence, tokens):
 
 			
 def processPrompt(databaseNetworkObject, inferenceMode, sequenceCount):
-	with open(inferencePromptFile, 'r', encoding='utf-8') as file:
-		text = file.read()
+	text = None
+	if(datasetType in closedWorldGroundedDatasetTypes):
+		GIAANNnlp_groundedDataset.ensureClosedWorldGroundedInferencePromptFile()
+		with open(inferencePromptFile, 'r', encoding=closedWorldGroundedInferencePromptFileEncoding) as file:
+			text = file.read()
+	else:
+		with open(inferencePromptFile, 'r', encoding='utf-8') as file:
+			text = file.read()
 	articleIndex = 0
 	sequenceCount = processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, articleIndex)
 	return sequenceCount

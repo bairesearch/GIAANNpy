@@ -33,6 +33,8 @@ import GIAANNcmn_predictionBeamSearch
 import GIAANNnlp_sequenceConcepts
 import GIAANNcmn_predictionActivate
 import GIAANNcmn_predictionConstraints
+if(inferenceReportGroundedAccuracy):
+	import GIAANNnlp_groundedEval
 
 totalInferenceTop1Matches = 0
 totalInferenceTop1Tokens = 0
@@ -380,6 +382,9 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	tokensSequence = GIAANNnlp_sequenceTokens.getTokens(sequence)
 	addInferenceTop1AccuracyBitsPerByteBytes(sequenceRaw)
 	conceptMask, conceptIndices, numberConcepts = GIAANNnlp_sequenceConcepts.createConceptMask(sequenceObservedColumns, tokensSequence)
+	groundedAnswerTokenIndex = None
+	if(inferenceReportGroundedAccuracy):
+		groundedAnswerTokenIndex = GIAANNnlp_groundedEval.getInferenceGroundedAnswerTokenIndexForSequence(sequenceIndex, tokensSequence, conceptMask, numSeedTokens)
 
 	numPredictionTokens = len(sequencePredict)	#set numPredictionTokens (dynamic)
 				
@@ -410,7 +415,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 		for wordSeedIndex in range(numSeedTokens):
 			sequenceWordIndex = wordSeedIndex
 			wordPredictionIndex = wordSeedIndex
-			featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, seedPhase=True)
+			featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, seedPhase=True, groundedAnswerTokenIndex=groundedAnswerTokenIndex)
 			conceptColumnIndex = int(conceptColumnIndexNext)
 			conceptColumnFeatureIndex = int(conceptColumnFeatureIndexNext)
 			seedTokensProcessed += 1
@@ -419,7 +424,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 		#predict next tokens;
 		for wordPredictionIndex in range(numPredictionTokens):
 			sequenceWordIndex = numSeedTokens + wordPredictionIndex
-			featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime)
+			featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime = processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, groundedAnswerTokenIndex=groundedAnswerTokenIndex)
 			conceptColumnIndex = int(conceptColumnIndexNext)
 			conceptColumnFeatureIndex = int(conceptColumnFeatureIndexNext)
 			predictionTokensProcessed += 1
@@ -437,6 +442,8 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 		raise RuntimeError("processConceptWordsInference error: BPB requires inference to evaluate every token in the sequence")
 	if(inferenceTerminatedPrematurely):
 		addInferenceTop1AccuracyCountPadding(numSeedTokens, numPredictionTokens, seedTokensProcessed, predictionTokensProcessed)
+	if(inferenceReportGroundedAccuracy):
+		recordInferenceGroundedAbstentionIfRequired(sequenceIndex, tokensSequence, conceptMask, groundedAnswerTokenIndex)
 	if(debugPrintTotalInferenceTokens):
 		GIAANNcmn_debug.addTotalInferenceTokens(seedTokensProcessed, predictionTokensProcessed)
 	if(drawNetworkDuringInference):
@@ -444,7 +451,17 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 		if(inferenceUseNeuronFeaturePropertiesTime):
 			databaseNetworkObject.globalFeatureNeurons = GIAANNcmn_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, databaseNetworkObject.arrayIndexPropertiesTimeIndex)
 
-def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, seedPhase=False):
+def recordInferenceGroundedAbstentionIfRequired(sequenceIndex, tokensSequence, conceptMask, groundedAnswerTokenIndex):
+	if(groundedAnswerTokenIndex is None):
+		raise RuntimeError("recordInferenceGroundedAbstentionIfRequired error: groundedAnswerTokenIndex must not be None")
+	if(not GIAANNnlp_groundedEval.hasInferenceGroundedPredictionBeenRecorded(sequenceIndex)):
+		if(groundedAnswerTokenIndex >= len(tokensSequence)):
+			raise RuntimeError("recordInferenceGroundedAbstentionIfRequired error: groundedAnswerTokenIndex out of range")
+		targetWord = getInferenceTargetWord(tokensSequence, conceptMask, groundedAnswerTokenIndex)
+		GIAANNnlp_groundedEval.recordInferenceGroundedPrediction(sequenceIndex, groundedAnswerTokenIndex, targetWord, closedWorldGroundedNoPredictionWord, False, groundedAnswerTokenIndex)
+	return
+
+def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, observedColumnsDict, wordPredictionIndex, sequenceWordIndex, tokensSequence, conceptColumnIndex, conceptColumnFeatureIndex, conceptMask, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, seedPhase=False, groundedAnswerTokenIndex=None):
 	
 	#intialise function variables;
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
@@ -525,6 +542,8 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 
 	#calculate featurePredictionTargetMatch; 
 	featurePredictionTargetMatch, targetWord, predictedWord, targetColumnName, predictedColumnName = calculateInferencePredictionMatch(tokensSequence, sequenceWordIndex, conceptMask, databaseNetworkObject, conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex, predictionCandidatesAvailable)
+	if(inferenceReportGroundedAccuracy):
+		GIAANNnlp_groundedEval.recordInferenceGroundedPrediction(sequenceIndex, sequenceWordIndex, targetWord, predictedWord, predictionCandidatesAvailable, groundedAnswerTokenIndex)
 
 	#print prediction; 
 	if(printPredictionsDuringInferencePredict):
