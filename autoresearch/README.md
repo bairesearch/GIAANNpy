@@ -55,6 +55,6 @@ This code currently requires that you have a single NVIDIA GPU.
 MIT
 
 - Copyright (c) 2026 karpathy (https://github.com/karpathy/autoresearch)
-- Copyright (c) 2026 baxterai
+- Copyright (c) 2026 BAI Research Pty Ltd (bairesearch.com.au)
 
 

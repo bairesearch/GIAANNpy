@@ -279,6 +279,9 @@ The analogy is not perfect---Transformer heads share most of their surrounding n
 
 \citet{bahdanau2015neural} likewise introduced the idea of dividing a context into distinct subspaces of tokens, whereby the processing of each token can proceed somewhat invariant to the absolute position of the token in its context. While these subspaces may primarily form syntactical priors at lower layers (via attention), and semantic priors at intermediate layers (via attention), they form specific concepts at higher layers and interact with other specific concepts (via attention). As such, this segregated information retentic/combinatory property of the transformer architecture also resembles columnar processing of tokens within sequences.
 
+Auxiliary support for functional columnar processing can also be found in human language processing. Recent magnetoencephalography (MEG) analyses by \citet{zou2026constituent} suggest that sequence processing may be divided into chunks (GIA reference sets or GIAANN columns), and next-word statistical predictions do not apply uniformly within and across chunk boundaries (first token of a column).
+
+
 \paragraph{Relevance to GIAANN.}
 GIAANN explicitly implements a form of concept-wise modularity that can be seen as artificial cortical columns.
 Neurons in GIAANN are organised into concept columns, each column devoted to a group of related features or a domain of knowledge (noun).
