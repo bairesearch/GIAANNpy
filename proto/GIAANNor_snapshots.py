@@ -175,7 +175,7 @@ def validateVideoFeatureDetectionProgressInputs(articleIndex, sequenceCount):
 def printVideoFeatureDetectionSequenceIterationProgress(articleIndex, sequenceCount, frameIndex, numberOfFrames):
 	result = None
 	if(submodalityName=="video" and modalityORvideoGenerateMultipleSnapshotsPerFrame):
-		if(printTrainSequenceDefault):
+		if(printSequenceDefault):
 			if(frameIndex < 0 or numberOfFrames <= 0 or frameIndex >= numberOfFrames):
 				raise RuntimeError("printVideoFeatureDetectionSequenceIterationProgress error: frameIndex/numberOfFrames out of range")
 			print(f"Processing sequenceCount: {sequenceCount}, articleIndex={articleIndex}, videoSequenceIteration={frameIndex}/{numberOfFrames}")

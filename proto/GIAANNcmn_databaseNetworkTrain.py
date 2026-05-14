@@ -31,9 +31,9 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 	if(debugPrintTrainSectionTimes):
 		trainConceptWordsStartTime = time.perf_counter()
 	result = GIAANNnlp_sequenceConcepts.processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens)
-	if(printTrainSequenceConceptAssignment):
+	if(printSequenceConceptAssignment):
 		print(f"Processing sequenceCount: {sequenceIndex}, {sequenceObservedColumns.sentenceWithConceptAssignment}")	
-		if(printTrainSequenceConceptAssignmentByLine):
+		if(printSequenceConceptAssignmentByLine):
 			print("")	
 	if(result is None):
 		return False

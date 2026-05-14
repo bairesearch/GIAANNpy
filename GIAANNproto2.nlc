@@ -133,3 +133,10 @@ v2b (Codex IDE GPT-5.5) [under development]:
 	- inferenceReportGroundedRealisticNLPmetric=True: use bounded real claim text in the train/eval sequence rather than id-only verdict templates.
 	- grounded eval items store/use a dynamic answer token index, so the answer no longer has to occur at the fixed closedWorldGroundedPromptAnswerTokenIndex position.
 	- realistic NLP prompts must remove claim-internal sentence terminators and insert an explicit verdict delimiter so each generated item remains one inference sequence.
+MANUAL; - update copyright
+MANUAL; - update paper
+- add option printTrainSequenceBar=True - print each training sequence iteration using standard tqdm bar
+/MANUAL; - add option printEvalSequenceBar=True - print each eval sequence iteration using standard tqdm bar
+MANUAL; - set useBenchmarkEvalDataSet=True by default
+MANUAL; - extract execution mode useDefault
+- update printTrainSequenceText() and buildSequenceWithDelimiters() to use a terminal safe version of token.text - ie certain special characters should not stop the terminal output from being printed. Add a function to convert token.text to a safe text version that will not interfere with terminal printing. 

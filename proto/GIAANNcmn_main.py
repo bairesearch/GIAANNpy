@@ -15,6 +15,7 @@ conda install python=3.12
 python -m pip install --upgrade pip
 pip install networkx
 pip install matplotlib
+pip install tqdm
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 datasetsLibrary4plus=False: pip install "datasets<4" "fsspec==2024.6.1" "gcsfs==2024.6.1"
 
@@ -23,7 +24,7 @@ pip install spacy
 python -m spacy download en_core_web_sm [spacyModelName]
 pip install nltk
 
-## modality OR:
+## modality OR (dev only):
 pip install opencv-python
 pip install git+https://github.com/facebookresearch/segment-anything.git [if modalityORfeatureDetectionSAMversion==1]
 pip install git+https://github.com/facebookresearch/sam2.git [if modalityORfeatureDetectionSAMversion==2]
@@ -53,6 +54,8 @@ import GIAANNcmn_count
 import GIAANNcmn_databaseNetwork
 import GIAANNcmn_databaseNetworkFiles
 import GIAANNcmn_databaseNetworkDrawLarge
+if(printTrainSequenceBar or printEvalSequenceBar):
+	import GIAANNcmn_executionProgress
 
 if(modalityName=="NLP"):
 	import GIAANNnlp_main
@@ -219,6 +222,8 @@ def executeMode(inferenceMode):
 				sequenceCount = GIAANNor_main.processPrompt(databaseNetworkObject, inferenceMode, sequenceCount)
 			else:
 				sequenceCount = GIAANNor_main.processDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset)
+		if(printTrainSequenceBar or printEvalSequenceBar):
+			GIAANNcmn_executionProgress.closeTrainSequenceBar()
 
 		if(inferenceMode and debugPrintTotalInferenceTokens):
 			GIAANNcmn_debug.printTotalInferenceTokens()

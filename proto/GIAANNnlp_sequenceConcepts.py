@@ -349,7 +349,7 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 		printe("conceptColumnsDelimitByPOS is required")
 	
 	sentenceWithConceptAssignment = buildSequenceConceptAssignment(sequenceObservedColumns, sequence, tokens, conceptIndices, startIndices, endIndices)
-	if(printTrainSequenceConceptAssignment):
+	if(printSequenceConceptAssignment):
 		sequenceObservedColumns.sentenceWithConceptAssignment = sentenceWithConceptAssignment
 		#print(f"Processing sequenceCount: {sequenceIndex}, {sequenceObservedColumns.sentenceWithConceptAssignment}")
 
@@ -375,7 +375,7 @@ def buildSequenceConceptAssignment(sequenceObservedColumns, sequence, tokens, co
 	sequenceObservedColumns.tokenConceptColumnIndexList = tokenConceptColumnIndexList
 	conceptColumnsList = sequenceObservedColumns.databaseNetworkObject.conceptColumnsList
 	
-	if(printTrainSequenceConceptAssignmentByLine):
+	if(printSequenceConceptAssignmentByLine):
 		sentenceWithConceptAssignment = ""
 		currentColumnIndex = tokenConceptColumnIndexList[tokenIndex]
 		for tokenIndex, token in enumerate(sequence):

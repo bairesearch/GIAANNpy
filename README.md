@@ -35,7 +35,7 @@ python -m spacy download en_core_web_sm [spacyModelName]
 pip install nltk
 ```
 
-#### modality OR
+#### modality OR (dev only)
 
 ```bash
 pip install opencv-python
@@ -115,7 +115,7 @@ The `database/inference_prompt.txt.trainAndInference` provided is taken from the
 ##### Standard execution
 
 For standard execution (train or inference);
-* set `useQuickExecution = False`
+* set `useDefault = True`
 * set `executionMode="train"` to train the network from a huggingface dataset (e.g. Wikipedia/OSCAR-2201), or;
 * set `executionMode="inference"` to perform inference on a seeded prompt (`prompt_inference.txt.*`)
 

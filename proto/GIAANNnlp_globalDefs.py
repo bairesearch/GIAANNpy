@@ -30,6 +30,7 @@ from GIAANNcmn_globalDefs import useQuickExecution
 from GIAANNcmn_globalDefs import useBenchmark
 from GIAANNcmn_globalDefs import useAutoresearch
 from GIAANNcmn_globalDefs import useDrawNetworkIndependently
+from GIAANNcmn_globalDefs import useDefault
 #from GIAANNcmn_globalDefs import multipleDendriticBranches
 #from GIAANNcmn_globalDefs import numberOfDendriticBranches
 from GIAANNcmn_globalDefs import useSANI
@@ -46,12 +47,19 @@ from GIAANNcmn_globalDefs import numSeedTokensInference
 #Dataset Type;
 if(useQuickExecution):
 	datasetType = "textfile"
+	useBenchmarkEvalDataSet = False	#not used
+elif(useDefault):
+	datasetType = "oscar"	#"oscar" / "wikipedia" / "textfile" [experimental: "closedWorldGrounded1" / "closedWorldGrounded2" / "closedWorldGrounded3"]
+	useBenchmarkEvalDataSet = True	#default: True	#optional
 elif(useBenchmark):
 	datasetType = "oscar"	#"oscar"/"wikipedia"
+	useBenchmarkEvalDataSet = True	#mandatory: True	#use benchmark file naming schemes and evals
 elif(useAutoresearch):
 	datasetType = "oscar"
-else:
-	datasetType = "oscar"	#"oscar" / "wikipedia" / "textfile" / "closedWorldGrounded1" / "closedWorldGrounded2" / "closedWorldGrounded3" [experimental]
+	useBenchmarkEvalDataSet = True	#default: True	#optional
+elif(useDrawNetworkIndependently):
+	datasetType = "oscar"
+	useBenchmarkEvalDataSet = True	#default: True	#optional
 
 
 #Multisentence predictions;
@@ -88,7 +96,7 @@ closedWorldGroundedMaxSentencesPerArticle = 1
 
 #Dataset;
 datasetsLibrary4plus = False	#default: False	#orig: False	#set False during dev to maintain benchmark consistency
-trainTestSet = False	#default: False	#only set True to generate an inference test set (with printTrainSequenceRaw=True)
+trainTestSet = False	#default: False	#only set True to generate an inference test set (with printSequenceRaw=True)
 if(trainTestSet):
 	generateEvalText = True	#mandatory: True
 else:
@@ -254,7 +262,7 @@ if(useInference):
 			printe("useQuickExecution requires datasetType==textfile")
 	else:
 		if(datasetType=="wikipedia"):	
-			if(useBenchmark):
+			if(useBenchmarkEvalDataSet):
 				if(inferenceEvaluateTestSet):
 					inferencePromptFileName = 'inference_prompt.txt.longTestWikipedia'
 				else:
@@ -262,7 +270,7 @@ if(useInference):
 			else:
 				inferencePromptFileName = 'inference_prompt.txt'
 		elif(datasetType=="oscar"):
-			if(useBenchmark):
+			if(useBenchmarkEvalDataSet):
 				if(multisentencePredictions):
 					if(inferenceEvaluateTestSet):
 						if(inferenceEvaluateTestSetTrainMaxSequences10M):

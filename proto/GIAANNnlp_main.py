@@ -32,6 +32,7 @@ import GIAANNcmn_databaseNetwork
 import GIAANNcmn_databaseNetworkFiles
 import GIAANNcmn_databaseNetworkDraw
 import GIAANNcmn_databaseNetworkDrawLarge
+import GIAANNcmn_executionProgress
 import GIAANNnlp_sequenceTokens
 import GIAANNnlp_sequenceConcepts
 import GIAANNcmn_sequenceObservedColumns
@@ -75,30 +76,8 @@ else:
 		else:
 			nlpArticle = spacy.load(spacyModelName)
 			nlpSequence = nlpArticle
-			
-			
-def buildSequenceWithDelimiters(sequence, tokens):
-	if(conceptColumnsDelimitByPOS):
-		delimiterTypes = []
-		for tokenIndex, token in enumerate(tokens):
-			_, isDelimiterDeterministic, isDelimiterProbabilistic = GIAANNnlp_sequenceConcepts.isFeaturePOSreferenceSetDelimiterType(token.word, token, tokens, tokenIndex)
-			if(isDelimiterDeterministic):
-				delimiterTypes.append("Dd")	#deterministic
-			elif(isDelimiterProbabilistic):
-				delimiterTypes.append("Di")	#indeterministic
-			elif(GIAANNnlp_sequenceTokens.isConcept(token)):
-				delimiterTypes.append("C")	#concept
-			else:
-				delimiterTypes.append("")	#non
-	else:
-		printe("conceptColumnsDelimitByPOS is required")
-	sentenceWithDelimiters = " ".join(
-		f"{token.text} ({tokenIndex}:{delimiterTypes[tokenIndex]})"
-		for tokenIndex, token in enumerate(sequence)
-	)
-	return sentenceWithDelimiters
 
-			
+
 def processPrompt(databaseNetworkObject, inferenceMode, sequenceCount):
 	text = None
 	if(datasetType in closedWorldGroundedDatasetTypes):
@@ -128,6 +107,10 @@ def expandSequenceForInference(databaseNetworkObject, sequence):
 	return
 	
 def processDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset):
+	trainMode = not inferenceMode
+	if(printTrainSequenceBar and trainMode):
+		GIAANNcmn_executionProgress.initialiseTrainSequenceBar(sequenceCount)
+
 	for articleIndex, datasetEntry in enumerate(dataset):
 		if(debugPrintSpacySectionTimes):
 			getDatasetEntryTextStartTime = None
@@ -164,6 +147,12 @@ def processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, ar
 			else:
 				skipMode = (sequenceCount < (trainSetStartOffsetSequences-maxSentencesPerArticle))
 	sequences, sequencesRaw = generateSeqencesBatchOrSerial(textParsed, skipMode)
+	if(inferenceMode and inferenceTrainFirstSequences and (printTrainSequenceBar or printEvalSequenceBar)):
+		promptSequenceTotal = calculateProcessArticlePromptSequenceTotal(sequenceCount, sequences)
+		GIAANNcmn_executionProgress.initialisePromptSequenceBar(printPromptSequenceBarInitialSequenceCount, promptSequenceTotal)
+	elif(printEvalSequenceBar and inferenceMode):
+		evalSequenceTotal = calculateProcessArticleEvalSequenceTotal(sequenceCount, sequences)
+		GIAANNcmn_executionProgress.initialiseEvalSequenceBar(printEvalSequenceBarInitialSequenceCount, evalSequenceTotal)
 
 	if(debugPrintSpacySectionTimes):
 		processArticlePart1Duration = time.perf_counter() - processArticlePart1StartTime
@@ -194,7 +183,7 @@ def processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, ar
 			if(sequenceCount >= trainSetStartOffsetSequences):
 				processSequence(databaseNetworkObject, inferenceSequenceInPrompt, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw)
 			else:
-				#if(printTrainSequenceCount):
+				#if(printSequenceCount):
 				print(f"(sequenceCount < trainSetStartOffsetSequences: Processing sequenceCount: {sequenceCount}")	
 			sequenceCount += 1
 		if(sequenceCount == trainMaxSequences and inferenceMode==False):
@@ -213,6 +202,54 @@ def processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, ar
 		processArticlePart2count += 1
 
 	return sequenceCount
+
+def calculateProcessArticlePromptSequenceTotal(sequenceCount, sequences):
+	result = 0
+	sequenceCountTemp = None
+	if(not isinstance(sequenceCount, int)):
+		raise RuntimeError("calculateProcessArticlePromptSequenceTotal error: sequenceCount must be an int")
+	if(sequenceCount < 0):
+		raise RuntimeError("calculateProcessArticlePromptSequenceTotal error: sequenceCount must be >= 0")
+	if(sequences is None or not isinstance(sequences, list)):
+		raise RuntimeError("calculateProcessArticlePromptSequenceTotal error: sequences must be a list")
+	sequenceCountTemp = sequenceCount
+	for sequence in sequences:
+		if(len(sequence) <= maxSequenceLength):
+			if(sequenceCountTemp >= trainSetStartOffsetSequences):
+				result += 1
+			sequenceCountTemp += 1
+	if(result <= 0):
+		raise RuntimeError("calculateProcessArticlePromptSequenceTotal error: promptSequenceTotal must be > 0")
+	return result
+
+def calculateProcessArticleEvalSequenceTotal(sequenceCount, sequences):
+	result = 0
+	numberOfSequences = None
+	sequenceCountTemp = None
+	inferenceSequenceInPrompt = None
+	if(not isinstance(sequenceCount, int)):
+		raise RuntimeError("calculateProcessArticleEvalSequenceTotal error: sequenceCount must be an int")
+	if(sequenceCount < 0):
+		raise RuntimeError("calculateProcessArticleEvalSequenceTotal error: sequenceCount must be >= 0")
+	if(sequences is None or not isinstance(sequences, list)):
+		raise RuntimeError("calculateProcessArticleEvalSequenceTotal error: sequences must be a list")
+	numberOfSequences = len(sequences)
+	sequenceCountTemp = sequenceCount
+	for sequenceIndex, sequence in enumerate(sequences):
+		inferenceSequenceInPrompt = False
+		if(inferenceTrainFirstSequences):
+			if(sequenceIndex == numberOfSequences-1):
+				inferenceSequenceInPrompt = True
+		else:
+			inferenceSequenceInPrompt = True
+		if(len(sequence) <= maxSequenceLength):
+			if(sequenceCountTemp >= trainSetStartOffsetSequences):
+				if(inferenceSequenceInPrompt):
+					result += 1
+			sequenceCountTemp += 1
+	if(result <= 0):
+		raise RuntimeError("calculateProcessArticleEvalSequenceTotal error: evalSequenceTotal must be > 0")
+	return result
 
 def generateSeqencesBatchOrSerial(textParsed, skipMode):
 	sentences = list(textParsed.sents)
@@ -356,18 +393,8 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 			if(debugPrintTrainSectionTimes and trainMode):
 				GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "detectNewFeatures", time.perf_counter() - detectNewFeaturesStartTime)
 
-		if(printTrainSequencePOS):
-			sentenceWithPOS = " ".join(f"{token.text} ({tokenIndex}:{token.pos_})" for tokenIndex, token in enumerate(sequence))
-			print(f"Processing sequenceCount: {sequenceCount}, {sentenceWithPOS}")	#article: {articleIndex}, sequence: {sequenceIndex}
-		if(printTrainSequenceDelimiters):
-			sentenceWithDelimiters = buildSequenceWithDelimiters(sequence, tokens)
-			print(f"Processing sequenceCount: {sequenceCount}, {sentenceWithDelimiters}")	#article: {articleIndex}, sequence: {sequenceIndex}
-		if(printTrainSequenceRaw):
-			print(sequenceRaw)
-		if(printTrainSequenceDefault):
-			print(f"Processing sequenceCount: {sequenceCount}, {sequence.text}")	#"{sequence.text}"	#"Processing sequenceCount: {sequenceCount}, {sequence.text}"	#article: {articleIndex}, sequence: {sequenceIndex}
-		if(printTrainSequenceCount):
-			print(f"Processing sequenceCount: {sequenceCount}")	
+		if((not printTrainSequenceBar and trainMode) or (not printEvalSequenceBar and not trainMode)):
+			GIAANNcmn_executionProgress.printTrainSequenceText(sequenceCount, sequence, tokens, sequenceRaw)
 			
 		# Second pass: Create observed_columns_dict
 		secondPassStartTime = None
@@ -465,8 +492,15 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 	if(debugPrintTrainSectionTimes and trainMode):
 		GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "totalSequenceTrain", time.perf_counter() - sequenceTrainTotalStartTime)
 		GIAANNcmn_debug.debugTrainSectionTimesPrint(databaseNetworkObject)
+	if(inferenceTrainFirstSequences and (printTrainSequenceBar or printEvalSequenceBar)):
+		GIAANNcmn_executionProgress.updatePromptSequenceBar(sequenceCount)
+	elif(printTrainSequenceBar and trainMode):
+		GIAANNcmn_executionProgress.updateTrainSequenceBar(sequenceCount)
+	elif(printEvalSequenceBar and not trainMode):
+		GIAANNcmn_executionProgress.updateEvalSequenceBar(sequenceCount)
 
 	#note sequenceCount can be used as sequenceIndex (independent of index in sequenceList) because sequenceIndex is only used to index sequence time (same for all sequences in sequenceList)
+	return
 
 		
 def releaseRuntimeGpuMemory(sequenceCount):

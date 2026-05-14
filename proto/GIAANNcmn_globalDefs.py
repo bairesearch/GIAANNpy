@@ -21,28 +21,30 @@ import torch as pt
 import math
 import sys
 
-#Recent debug vars;
-
 
 #modality selection;
-useModalityOR = False	#dev: True	#orig: False
-#useModalityNLP = True	#default: True	#orig: True
-if(useModalityOR):
-	modalityName = "OR"	#CV
-else:
+useModalityNLP = True	#default: True	#orig: True
+if(useModalityNLP):
 	modalityName = "NLP"
+	useModalityOR = False
+else:
+	#dev only;
+	modalityName = "OR"
+	useModalityOR = True
 
 
 #Execution mode selection;
-useQuickExecution = True	#default: False	#orig: True
+useQuickExecution = True	#intro: True	#default: False
+useDefault = False	#default: True
 useBenchmark = False		#use benchmark file naming schemes and evals
 useAutoresearch = False
 useDrawNetworkIndependently = False	#default: False	#default: True
-#useDefault = True	#default: True
 inferenceTrainFirstSequences = False	#dependent var
 if(useQuickExecution):
 	executionMode = "inference" 	#mandatory: "inference" (effective trainAndInference but uses a text datafile)
 	inferenceTrainFirstSequences = True	#trains first sequences in inference_prompt.txt, performs inference only on last sequence
+elif(useDefault):
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
 	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
@@ -50,7 +52,7 @@ elif(useAutoresearch):
 elif(useDrawNetworkIndependently):
 	executionMode = "train"	#default: "train" or "trainAndInference" #set to the execution mode the network was trained on
 else:
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
+	raise RuntimeError("execution mode undefined")
 
 
 #Primary Draw settings:
@@ -67,14 +69,18 @@ if(useInference):
 	else:
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True		#True: activate next column features using current prediction
 inferenceAddNewFeatures = True	#default: True	#orig: False	#run a controlled expansion pass during inference to add missing columns/features without training updates
+
 if(useQuickExecution):
 	useBenchmarkDefaultsEvalTestSet = False	#default: False: eval training-set
+elif(useDefault):
+	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
 	useBenchmarkDefaultsEvalTestSet = False	#default: False: eval training-set
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
-else:
-	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
+elif(useDrawNetworkIndependently):
+	useBenchmarkDefaultsEvalTestSet = True	#N/A
+
 if(useBenchmarkDefaultsEvalTestSet):
 	inferenceEvaluateTestSet = True
 	inferenceEvaluateTestSetTrainMaxSequences10M = False	#default: False	#orig: False	#required if performing test-set eval on database trained with > 3M sequences (based on how the original test-set was generated)
@@ -102,20 +108,20 @@ inferenceReportTokenAccuracyConstrainByColumn = False	#default: False	#orig: Fal
 if(useQuickExecution):
 	trainMaxSequences = 10	#N/A: auto generated from inference_prompt.txt.trainAndInference
 	databaseFolderBase = "../database"	#default: "../database/"
+elif(useDefault):
+	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
+	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"	#"../database"
 elif(useBenchmark):
 	trainMaxSequences = 5000	#5000, 200000, 1000000
 	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"
 elif(useAutoresearch):
 	trainMaxSequences = 5000	#5000
-	databaseFolderBase = "../database"
-	#databaseFolderBase = "/media/user/ssdpro/GIAANN/databaseAutoresearch"
+	#databaseFolderBase = "../database"
+	databaseFolderBase = "/media/user/ssdpro/GIAANN/databaseAutoresearch"
 elif(useDrawNetworkIndependently):
 	trainMaxSequences = 0	#not used
 	databaseFolderBase = "../database"	#default: "../database"	
 	#databaseFolderBase = "/media/user/ssdpro/GIAANN/databaseOscar1000-numSeedTokensInference8-spacyPipelineOptimisations"
-else:
-	trainMaxSequences = 10000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
-	databaseFolderBase = "/media/user/ssdpro/GIAANN/database"	#"../database"
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 
@@ -172,7 +178,7 @@ def printe(str):
 if(useModalityOR):
 	useGPUdense = False
 	useGPUsparse = False
-else:
+elif(useModalityNLP):
 	if(useAutoresearch):
 		useGPUdense = False
 		useGPUsparse = False
@@ -429,6 +435,12 @@ randomiseColumnFeatureXposition = True	#shuffle x position of column internal fe
 
 
 #print vars (Information);
+if(useAutoresearch):
+	printEvalSequenceBar = False
+	printTrainSequenceBar = False
+else:
+	printEvalSequenceBar = True	#default: True	#orig: False	#print each eval sequence iteration using standard tqdm bar
+	printTrainSequenceBar = True	#default: True	#orig: False	#print each training sequence iteration using standard tqdm bar
 if(useBenchmark):
 	printTimeDatabaseLoadSaveTimes = True
 	printRamMaxUsage = True
@@ -458,33 +470,54 @@ if(useAutoresearch):
 else:
 	printTotalFeatures = True	#print c+f upon load
 	printConfiguration = True	#print common global defs configuration
-	printHeaderDuringInferencePredict = True
-	printPredictionsDuringInferencePredict = True
-printPredictionsDuringInferencePredictBeamSearch = False
-printTrainSequenceDefault = False	#default: True	#orig: True
-printTrainSequenceRaw = False	#print each training sequence raw text (suitable for inference_prompt.txt generation)
-printTrainSequenceConceptAssignment = False	#print each training sequence split by column assignment
-printTrainSequenceConceptAssignmentByLine = False	#display each column on a new line
-printTrainSequenceDelimiters = False	#print each training sequence with delimiters
-printTrainSequencePOS = False	#print each training sequence with POS tags
-printTrainSequenceCount = False	#print each training sequence count
-if(not useAutoresearch):
-	if(useModalityOR):
-		printTrainSequenceDefault = True
+	if(printEvalSequenceBar):
+		printHeaderDuringInferencePredict = False
+		printPredictionsDuringInferencePredict = False
 	else:
-		if(generateEvalText):
-			printTrainSequenceRaw = True
-		else:
-			if(datasetType=="oscar"):
-				printTrainSequenceCount = True	#non-visible characters affect terminal print consistency
-			elif(datasetType=="wikipedia"):
-				printTrainSequenceDefault = True
-			elif(datasetType=="cifar10" or datasetType=="cityscapes"):
-				printTrainSequenceDefault = True
-				#printTrainSequenceCount = True
-			else:
-				printTrainSequenceDefault = True
-		
+		printHeaderDuringInferencePredict = True
+		printPredictionsDuringInferencePredict = True
+printPredictionsDuringInferencePredictBeamSearch = False
+printSequenceConceptAssignment = False	#print each training sequence split by column assignment
+printSequenceConceptAssignmentByLine = False	#display each column on a new line
+
+printSequenceDefault = False	#default: True	#orig: True
+printSequenceRaw = False	#print each training sequence raw text (suitable for inference_prompt.txt generation)
+printSequenceDelimiters = False	#print each training sequence with delimiters
+printSequencePOS = False	#print each training sequence with POS tags
+printSequenceCount = False	#print each training sequence count
+if(useModalityOR):
+	printSequenceDefault = True
+	printTrainSequenceBar = False
+	printEvalSequenceBar = False
+elif(useModalityNLP):
+	if(generateEvalText):
+		printSequenceRaw = True
+		printTrainSequenceBar = False
+	else:
+		#these settings are ignored if printTrainSequenceBar/printEvalSequenceBar:
+		printSequenceDefault = True
+		#printSequenceCount = True
+
+printTrainSequenceBarDescription = "Training sequences"
+printTrainSequenceBarUnit = "sequence"
+printTrainSequenceBarUpdateStep = 1
+printEvalSequenceBarDescription = "Eval sequences"
+printEvalSequenceBarUnit = "sequence"
+printEvalSequenceBarUpdateStep = 1
+printEvalSequenceBarInitialSequenceCount = 0
+printPromptSequenceBarDescription = "Prompt sequences"
+printPromptSequenceBarUnit = "sequence"
+printPromptSequenceBarUpdateStep = 1
+printPromptSequenceBarInitialSequenceCount = 0
+printSequenceTerminalSafeEscapePrefix16Bit = "\\u"
+printSequenceTerminalSafeEscapePrefix32Bit = "\\U"
+printSequenceTerminalSafeEscapeCodepointWidth16Bit = 4
+printSequenceTerminalSafeEscapeCodepointWidth32Bit = 8
+printSequenceTerminalSafeEscapeCodepointMax16Bit = 0xFFFF
+printSequenceTerminalSafeEscapeFormatPadPrefix = "0"
+printSequenceTerminalSafeEscapeFormatType = "X"
+printSequenceTerminalSafeTextEmpty = ""
+
 
 #Debug vars;
 debugPrintTrainSectionTimes = False	#print per-sequence timing breakdown for key train sections
@@ -498,7 +531,7 @@ if(debugPrintRamMaxUsagePhaseLocal):
 debugPrintTotalInferenceTokens = False	#print total number of inference tokens in seed phase, prediction phase, and both phases (summed across all sequences) 
 debugPrintSpacySectionTimes = False	#print spacy preprocessing times
 
-if(useAutoresearch):
+if(useAutoresearch or printEvalSequenceBar):
 	debugWarningInferenceOnConnectivityError = False
 	debugWarningInferenceOnPredictionTargetMismatch = False
 	debugWarningInferenceNoDelimiterDetectedBetweenConceptTokens = False
@@ -510,7 +543,7 @@ debugTerminateInferenceOnPredictionTargetMismatch = False
 debugTerminateInferenceOnNoPredictionCandidatesAvailable = False
 debugTerminateOnConceptColumnsDelimitByPOSwarning = False
 if(not useAutoresearch):
-	if(not printTrainSequenceRaw):
+	if(not printSequenceRaw):
 		debugTerminateOnConceptColumnsDelimitByPOSwarning = False	#default: True
 if(pretrainConceptColumnsDelimitByPOSenforce):
 	debugTerminateOnConceptColumnsDelimitByPOSerror = False

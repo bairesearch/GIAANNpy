@@ -25,6 +25,8 @@ from GIAANNcmn_globalDefs import *
 import GIAANNcmn_databaseNetwork
 import GIAANNcmn_databaseNetworkFiles
 import GIAANNcmn_databaseNetworkDraw
+if(printTrainSequenceBar or printEvalSequenceBar):
+	import GIAANNcmn_executionProgress
 import GIAANNor_datasets
 import GIAANNor_snapshots
 import GIAANNor_RFfilters
@@ -65,6 +67,10 @@ def printSequenceColumnCounts(sequenceCount, sequenceColumnCounts):
 
 
 def processPrompt(databaseNetworkObject, inferenceMode, sequenceCount):
+	trainMode = not inferenceMode
+	if(printEvalSequenceBar and not trainMode):
+		GIAANNcmn_executionProgress.initialiseEvalSequenceBar(printEvalSequenceBarInitialSequenceCount, modalityORdatasetPromptMaxSequences)
+
 	# GIAANNor_main.processPrompt() for modalityName=="OR" should use a testset part of the OR dataset as a prompt (rather than an independent prompt file).
 	result = sequenceCount
 	promptDataset = GIAANNor_datasets.loadPromptDataset()
@@ -78,6 +84,10 @@ def processPrompt(databaseNetworkObject, inferenceMode, sequenceCount):
 
 
 def processDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset):
+	trainMode = not inferenceMode
+	if(printTrainSequenceBar and trainMode):
+		GIAANNcmn_executionProgress.initialiseTrainSequenceBar(sequenceCount)
+
 	result = sequenceCount
 	if(submodalityName=="video"):
 		result = processVideoDataset(databaseNetworkObject, inferenceMode, result, dataset)
@@ -265,11 +275,13 @@ def processTokenisedSequence(databaseNetworkObject, inferenceMode, sequenceCount
 	
 	if(sequenceData is not None):
 
-		if(printTrainSequenceDefault):
-			sequenceText = GIAANNor_sequenceConcepts.generateSequenceDataText(sequenceData)
-			print(f"Processing sequenceCount: {sequenceCount}, {sequenceText}")
-		if(printTrainSequenceCount):
-			print(f"Processing sequenceCount: {sequenceCount}")	
+		#printTrainSequenceText() equivalent;
+		if(not printTrainSequenceBar):
+			if(printSequenceDefault):
+				sequenceText = GIAANNor_sequenceConcepts.generateSequenceDataText(sequenceData)
+				print(f"Processing sequenceCount: {sequenceCount}, {sequenceText}")
+			if(printSequenceCount):
+				print(f"Processing sequenceCount: {sequenceCount}")
 
 
 		if(storeDatabaseGlobalFeatureNeuronsInRam):
@@ -290,5 +302,7 @@ def processTokenisedSequence(databaseNetworkObject, inferenceMode, sequenceCount
 			GIAANNcmn_databaseNetwork.moveObservedColumnsDictConnectionsToDatabaseAfterTrain(observedColumnsDict, inferenceMode)
 	else:
 		printe("sequenceData is None")
+	if(printTrainSequenceBar):
+		GIAANNcmn_executionProgress.updateTrainSequenceBar(sequenceCount)
 
 	return
