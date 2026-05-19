@@ -151,6 +151,10 @@ inferenceReportGroundedStrongerGroundedNLPmetric = False
 inferenceReportGroundedAccuracyMod1_labelBalancedDataset = False
 inferenceReportGroundedAccuracyMod2_majorityClassBaseline = False
 inferenceReportGroundedAccuracyMod3_perLabelMetrics = False
+tokenisationSubwordAuxiliary = False
+tokenisationSubwordAuxiliaryLemma = False
+tokenisationSubwordAuxiliaryMorph = False
+tokenisationSubwordAuxiliarySuffix = False
 if(modalityName=="NLP"):
 	from GIAANNnlp_globalDefs import *
 elif(modalityName=="OR"):
@@ -608,6 +612,9 @@ if(useInference):
 #Database save paths;
 conceptColumnsDictFile = databaseFolder + 'conceptColumnsDict.pkl'
 conceptFeaturesDictFile = databaseFolder + 'conceptFeaturesDict.pkl'
+if(tokenisationSubwordAuxiliary):
+	tokenisationSubwordAuxiliaryFeaturesDictFile = databaseFolder + tokenisationSubwordAuxiliaryFeaturesDictFileName
+	tokenisationSubwordAuxiliaryFeatureWordsByParentWordFile = databaseFolder + tokenisationSubwordAuxiliaryFeatureWordsByParentWordFileName
 observedColumnsFolderName = 'observedColumns'
 observedColumnsDir = databaseFolder + observedColumnsFolderName
 observedColumnFolderNamePrefix = 'cIndex'

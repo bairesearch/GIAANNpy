@@ -24,6 +24,8 @@ import GIAANNcmn_debug
 import GIAANNcmn_databaseNetworkFiles
 from GIAANNcmn_databaseNetworkObservedColumn import ObservedColumn, ObservedColumnConnectionBase, ObservedColumnProxy, ObservedColumnStub
 import GIAANNcmn_sparseTensors
+if(tokenisationSubwordAuxiliary):
+	import GIAANNnlp_subwordAuxiliary
 
 def calculateArrayNumberOfProperties(inferenceMode):
 	if(inferenceMode):
@@ -33,7 +35,7 @@ def calculateArrayNumberOfProperties(inferenceMode):
 	return arrayNumberOfProperties
 
 class DatabaseNetworkClass():
-	def __init__(self, inferenceMode, c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList, conceptFeaturesReferenceSetDelimiterDeterministicList, conceptFeaturesReferenceSetDelimiterProbabilisticList):
+	def __init__(self, inferenceMode, c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList, conceptFeaturesReferenceSetDelimiterDeterministicList, conceptFeaturesReferenceSetDelimiterProbabilisticList, auxiliaryFeaturesDict=None, auxiliaryFeaturesList=None, auxiliaryFeatureWordsByParentWord=None, auxiliaryLoadExistingDatabase=None):
 		self.c = c
 		self.f = f
 		self.s = s
@@ -55,6 +57,8 @@ class DatabaseNetworkClass():
 				self.conceptFeaturesReferenceSetDelimiterProbabilisticList = conceptFeaturesReferenceSetDelimiterProbabilisticList
 			else:
 				self.conceptFeaturesReferenceSetDelimiterList = conceptFeaturesReferenceSetDelimiterList
+		if(tokenisationSubwordAuxiliary):
+			GIAANNnlp_subwordAuxiliary.initialiseDatabaseNetworkAuxiliary(self, auxiliaryFeaturesDict, auxiliaryFeaturesList, auxiliaryFeatureWordsByParentWord, auxiliaryLoadExistingDatabase)
 		self.setArrayIndexProperties(inferenceMode)
 		self.inferenceMode = inferenceMode
 
@@ -165,10 +169,14 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 	conceptFeaturesReferenceSetDelimiterList = []
 	conceptFeaturesReferenceSetDelimiterDeterministicList = []
 	conceptFeaturesReferenceSetDelimiterProbabilisticList = []
+	auxiliaryFeaturesDict = None
+	auxiliaryFeaturesList = None
+	auxiliaryFeatureWordsByParentWord = None
 	loadExistingDatabase = inferenceMode or loadExistingDatabaseOverride or (trainLoadExistingDatabase and GIAANNcmn_databaseNetworkFiles.pathExists(conceptColumnsDictFile))
+	databaseLoadedFromDisk = loadExistingDatabase and GIAANNcmn_databaseNetworkFiles.pathExists(conceptColumnsDictFile)
 
 	# Initialize the concept columns dictionary
-	if(loadExistingDatabase and GIAANNcmn_databaseNetworkFiles.pathExists(conceptColumnsDictFile)):
+	if(databaseLoadedFromDisk):
 		conceptColumnsDict = GIAANNcmn_databaseNetworkFiles.loadDictFile(conceptColumnsDictFile)
 		c = len(conceptColumnsDict)
 		conceptColumnsList = list(conceptColumnsDict.keys())
@@ -197,6 +205,8 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 					conceptFeaturesReferenceSetDelimiterProbabilisticList = GIAANNcmn_debug.applyDebugLimitList(conceptFeaturesReferenceSetDelimiterProbabilisticList, f, "conceptFeaturesReferenceSetDelimiterProbabilisticList")
 				else:
 					conceptFeaturesReferenceSetDelimiterList = GIAANNcmn_debug.applyDebugLimitList(conceptFeaturesReferenceSetDelimiterList, f, "conceptFeaturesReferenceSetDelimiterList")
+		if(tokenisationSubwordAuxiliary):
+			auxiliaryFeaturesDict, auxiliaryFeaturesList, auxiliaryFeatureWordsByParentWord = GIAANNnlp_subwordAuxiliary.loadOrCreateDatabaseAuxiliaryFeatureMaps(loadExistingDatabase)
 	else:
 		if(useDedicatedConceptNames):
 			# Add dummy feature for prime concept neuron (different per concept column)
@@ -216,6 +226,8 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 				conceptFeaturesReferenceSetDelimiterProbabilisticList.append(False)
 			else:
 				conceptFeaturesReferenceSetDelimiterList.append(False)
+		if(tokenisationSubwordAuxiliary):
+			auxiliaryFeaturesDict, auxiliaryFeaturesList, auxiliaryFeatureWordsByParentWord = GIAANNnlp_subwordAuxiliary.loadOrCreateDatabaseAuxiliaryFeatureMaps(False)
 	if storeDatabaseGlobalFeatureNeuronsInRam:
 		if(loadExistingDatabase):
 			globalFeatureNeurons = loadFeatureNeuronsGlobal(inferenceMode, c, f)
@@ -227,10 +239,12 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 	s = arrayNumberOfSegments
 	p = calculateArrayNumberOfProperties(inferenceMode)
 		
-	databaseNetworkObject = DatabaseNetworkClass(inferenceMode, c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList, conceptFeaturesReferenceSetDelimiterDeterministicList, conceptFeaturesReferenceSetDelimiterProbabilisticList)
+	databaseNetworkObject = DatabaseNetworkClass(inferenceMode, c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList, conceptFeaturesReferenceSetDelimiterDeterministicList, conceptFeaturesReferenceSetDelimiterProbabilisticList, auxiliaryFeaturesDict, auxiliaryFeaturesList, auxiliaryFeatureWordsByParentWord, databaseLoadedFromDisk)
 	
 	if(printTotalFeatures):
 		print("initialiseDatabaseNetwork: c = ", databaseNetworkObject.c, ", f = ", databaseNetworkObject.f)
+		if(tokenisationSubwordAuxiliary):
+			print("initialiseDatabaseNetwork: fa = ", databaseNetworkObject.fa)
 	
 	return databaseNetworkObject
 	
@@ -362,6 +376,8 @@ def moveObservedColumnsDictConnectionsToDatabaseAfterTrain(observedColumnsDict, 
 					sourceTensor = observedColumn.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, deviceDatabase, createMissing=False)
 					observedColumn.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, sourceTensor)
 				observedColumn.clearTrainPreparedSourceFeatureIndices()
+				if(tokenisationSubwordAuxiliary):
+					GIAANNnlp_subwordAuxiliary.moveObservedColumnAuxiliaryConnectionsToDatabaseAfterTrain(observedColumn)
 	return
 
 def prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFeatureIndicesByObservedColumn):

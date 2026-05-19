@@ -24,6 +24,8 @@ from GIAANNcmn_globalDefs import *
 import GIAANNcmn_debug
 import GIAANNcmn_sparseTensors
 import GIAANNnlp_sequenceConcepts
+if(tokenisationSubwordAuxiliary):
+	import GIAANNnlp_subwordAuxiliary
 
 	
 def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
@@ -41,6 +43,8 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 	featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask = GIAANNnlp_sequenceConcepts.processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices)
 
 	featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex)
+	if(tokenisationSubwordAuxiliary):
+		GIAANNnlp_subwordAuxiliary.trainAuxiliaryFeatureConnections(sequenceObservedColumns, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, conceptIndices, startIndices, endIndices)
 	if(debugPrintTrainSectionTimes):
 		GIAANNcmn_debug.debugTrainSectionTimesAdd(sequenceObservedColumns.databaseNetworkObject, "trainConceptWords", time.perf_counter() - trainConceptWordsStartTime)
 

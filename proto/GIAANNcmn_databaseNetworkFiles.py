@@ -422,6 +422,9 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 
 		saveDictFile(conceptColumnsDictFile, databaseNetworkObject.conceptColumnsDict)
 		saveDictFile(conceptFeaturesDictFile, databaseNetworkObject.conceptFeaturesDict)
+		if(tokenisationSubwordAuxiliary):
+			import GIAANNnlp_subwordAuxiliary
+			GIAANNnlp_subwordAuxiliary.saveDatabaseAuxiliaryFeatureMaps(databaseNetworkObject)
 
 		if(conceptColumnsDelimitByPOS):
 			if(detectReferenceSetDelimitersBetweenNouns):
@@ -572,6 +575,9 @@ def observedColumnSaveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsTo
 		else:
 			raise RuntimeError("observedColumnSaveToDisk(saveAllSourceFeatures) requires !storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam")
 	self.saveLoadedSourceFeatureConnectionsToDisk(sourceFeatureIndicesToSave)
+	if(tokenisationSubwordAuxiliary):
+		import GIAANNnlp_subwordAuxiliary
+		GIAANNnlp_subwordAuxiliary.saveObservedColumnAuxiliaryFeatureConnectionsToDisk(self, saveAllSourceFeatures)
 	
 	if not storeDatabaseGlobalFeatureNeuronsInRam:
 		saveTensor(self.featureNeurons, getObservedColumnFolder(self.conceptIndex), getObservedColumnFeatureNeuronsFileBaseName())
@@ -654,6 +660,9 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 		sourceFeatureIndices = listObservedColumnSourceFeatureIndices(conceptIndex)
 		loadTargetDevice = targetDevice if targetDevice is not None else deviceDatabase
 		instance.loadRequiredSourceFeatureConnections(sourceFeatureIndices, loadTargetDevice, createMissing=False, ensureCurrentSizeOnLoad=resizeFeatureTensorsToCurrentSize)
+	if(tokenisationSubwordAuxiliary):
+		import GIAANNnlp_subwordAuxiliary
+		GIAANNnlp_subwordAuxiliary.loadObservedColumnAuxiliaryConnectionsFromDisk(instance, targetDevice=targetDevice, loadAllSourceFeatures=loadAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize)
 	return instance
 
 def saveTensor(tensor, folderName, fileName):

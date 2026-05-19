@@ -23,6 +23,8 @@ from GIAANNcmn_globalDefs import *
 
 if(usePOS):
 	import GIAANNnlp_sequencePOS
+if(tokenisationSubwordAuxiliary):
+	import GIAANNnlp_subwordAuxiliary
 
 def loadPOSdatabase():
 	GIAANNnlp_sequencePOS.loadPOSdatabase()
@@ -49,27 +51,36 @@ def isTokenReferenceSetDelimiterProbabilistic(token):
 	
 
 class SequenceToken:
-	def __init__(self, word, lemma, pos, tag):
+	def __init__(self, word, lemma, pos, tag, morph=None):
 		self.word = word
 		self.lemma = lemma
 		self.pos = pos
 		self.tag = tag
+		if(tokenisationSubwordAuxiliary):
+			self.morph = morph
+			self.auxiliaryFeatureWords = []
 
 # Preprocessing helpers
 class PreprocessedToken:
-	__slots__ = ("text", "lemma_", "pos_", "tag_")
-	def __init__(self, text, lemma, pos, tag):
+	__slots__ = ("text", "lemma_", "pos_", "tag_", "morph")
+	def __init__(self, text, lemma, pos, tag, morph=None):
 		self.text = text
 		self.lemma_ = lemma
 		self.pos_ = pos
 		self.tag_ = tag
+		self.morph = morph
 
 def convertPreprocessedTokenToSequenceToken(preprocessedToken):
 	word = preprocessedToken.text.lower()
 	lemma = preprocessedToken.lemma_.lower()
 	pos = preprocessedToken.pos_  #coarse Part-of-speech (e.g. PRON) 
 	tag = preprocessedToken.tag_	#fine-grained POS (e.g., PRP, PRP$, WP, WP$, etc.)
-	token = SequenceToken(word, lemma, pos, tag)
+	morph = None
+	if(tokenisationSubwordAuxiliary):
+		morph = GIAANNnlp_subwordAuxiliary.getPreprocessedTokenMorphString(preprocessedToken)
+	token = SequenceToken(word, lemma, pos, tag, morph)
+	if(tokenisationSubwordAuxiliary):
+		token.auxiliaryFeatureWords = GIAANNnlp_subwordAuxiliary.createTokenAuxiliaryFeatureWords(token)
 	return token
 
 def getTokens(sequence):
@@ -104,6 +115,16 @@ class PreprocessedSequence:
 def preprocessSequence(sequence):
 	return pretrain(sequence)
 
+def createSinglePreprocessedToken(token):
+	text = token.text
+	lemma = token.lemma_
+	pos = token.pos_
+	tag = token.tag_
+	morph = None
+	if(tokenisationSubwordAuxiliary):
+		morph = GIAANNnlp_subwordAuxiliary.getPreprocessedTokenMorphString(token)
+	return PreprocessedToken(text, lemma, pos, tag, morph)
+
 def pretrain(sequence):
 	if(pretrainCombineHyphenatedNouns):
 		sequence = pretrainCombineConsecutiveNounHyphenated(sequence)
@@ -117,7 +138,7 @@ if(pretrainConceptColumnsDelimitByPOSenforce):
 	
 	def pretrainConceptColumnsDelimitByPOSenforce(sequence):
 		result = None
-		sequenceLocal = sequence if isinstance(sequence, PreprocessedSequence) else PreprocessedSequence([PreprocessedToken(token.text, token.lemma_, token.pos_, token.tag_) for token in sequence])
+		sequenceLocal = sequence if isinstance(sequence, PreprocessedSequence) else PreprocessedSequence([createSinglePreprocessedToken(token) for token in sequence])
 		if(not usePOS):
 			printe("pretrainConceptColumnsDelimitByPOSenforce requires usePOS")
 		if(not useSpacyForConceptNounPOSdetection):
@@ -181,7 +202,10 @@ if(pretrainCombineConsecutiveNouns):
 		lemma = token.lemma_
 		pos = token.pos_
 		tag = token.tag_
-		return PreprocessedToken(text, lemma, pos, tag)
+		morph = None
+		if(tokenisationSubwordAuxiliary):
+			morph = GIAANNnlp_subwordAuxiliary.getPreprocessedTokenMorphString(token)
+		return PreprocessedToken(text, lemma, pos, tag, morph)
 
 	def createCombinedToken(tokens):
 		if(len(tokens) == 1):
@@ -190,7 +214,10 @@ if(pretrainCombineConsecutiveNouns):
 		combinedLemma = "_".join(token.lemma_ for token in tokens)
 		combinedPos = tokens[0].pos_
 		combinedTag = tokens[0].tag_
-		return PreprocessedToken(combinedText, combinedLemma, combinedPos, combinedTag)
+		combinedMorph = None
+		if(tokenisationSubwordAuxiliary):
+			combinedMorph = GIAANNnlp_subwordAuxiliary.getPreprocessedTokenMorphString(tokens[0])
+		return PreprocessedToken(combinedText, combinedLemma, combinedPos, combinedTag, combinedMorph)
 
 if(pretrainCombineHyphenatedNouns):
 
@@ -239,7 +266,10 @@ if(pretrainCombineHyphenatedNouns):
 			combinedLemma = buildCombinedTokenString(tokens, joinersLocal, True)
 			combinedPos = tokens[0].pos_
 			combinedTag = tokens[0].tag_
-			result = PreprocessedToken(combinedText, combinedLemma, combinedPos, combinedTag)
+			combinedMorph = None
+			if(tokenisationSubwordAuxiliary):
+				combinedMorph = GIAANNnlp_subwordAuxiliary.getPreprocessedTokenMorphString(tokens[0])
+			result = PreprocessedToken(combinedText, combinedLemma, combinedPos, combinedTag, combinedMorph)
 		return result
 
 	def buildCombinedTokenString(tokens, joiners, useLemma):

@@ -213,8 +213,6 @@ else:
 			databaseFolderExtension += closedWorldGroundedStrongerGroundedNLPmetricName
 	else:
 		databaseFolderExtension = ""
-
-
 #Concept column delimiters:
 conceptColumnsDelimitByPOS = True	#mandatory: True	#orig: False	#closer to original GIA specification	#FUTURE: still requires working for edge cases
 if(conceptColumnsDelimitByPOS):
@@ -483,3 +481,30 @@ if(inferenceReportGroundedAccuracy):
 	closedWorldGroundedEvalItemTuples = [(closedWorldGroundedLabelDirectSupport,"aurorakey","color","blue",("blue",),("blue",)),(closedWorldGroundedLabelDirectSupport,"emberkey","color","red",("red",),("red",)),(closedWorldGroundedLabelCompositionalSupport,"aerolith","color","silver",("silver",),("silver",)),(closedWorldGroundedLabelCompositionalSupport,"solstone","color","orange",("orange",),("orange",)),(closedWorldGroundedLabelUnsupportedWorldTrue,"hiddenkey","color","red",("red",),()),(closedWorldGroundedLabelUnsupportedWorldTrue,"meadowkey","shape","circle",("circle",),()),(closedWorldGroundedLabelUnsupportedFalse,"falconkey","color","black",("green",),()),(closedWorldGroundedLabelNoisySupport,"noisedrift","color","purple",("yellow",),("purple",))]
 	if(numSeedTokensInference != closedWorldGroundedPromptAnswerTokenIndex):
 		raise RuntimeError("inferenceReportGroundedAccuracy requires numSeedTokensInference==" + str(closedWorldGroundedPromptAnswerTokenIndex))
+
+
+#Subword auxiliary tokenisation;
+tokenisationSubwordAuxiliary = False
+if(tokenisationSubwordAuxiliary):
+	tokenisationSubwordAuxiliaryLemma = True
+	tokenisationSubwordAuxiliaryMorph = True
+	tokenisationSubwordAuxiliarySuffix = False
+	tokenisationSubwordAuxiliaryFeatureNamePrefix = "AUX"
+	tokenisationSubwordAuxiliaryFeatureNameDelimiter = ":"
+	tokenisationSubwordAuxiliaryFeatureTypeLemma = "LEMMA"
+	tokenisationSubwordAuxiliaryFeatureTypeMorph = "MORPH"
+	tokenisationSubwordAuxiliaryFeatureTypeSuffix = "SUFFIX"
+	tokenisationSubwordAuxiliaryFeatureValueEmpty = ""
+	tokenisationSubwordAuxiliaryMorphSeparator = "|"
+	tokenisationSubwordAuxiliaryMorphEmpty = tokenisationSubwordAuxiliaryFeatureValueEmpty
+	tokenisationSubwordAuxiliarySuffixList = ["ing", "ed"]
+	tokenisationSubwordAuxiliarySuffixMinimumStemLength = 2
+	tokenisationSubwordAuxiliaryConnectionProximityMultiplier = 10
+	tokenisationSubwordAuxiliaryFeaturesDictFileName = "auxiliaryFeaturesDict.pkl"
+	tokenisationSubwordAuxiliaryFeatureWordsByParentWordFileName = "auxiliaryFeatureWordsByParentWord.pkl"
+	tokenisationSubwordAuxiliaryConnectionsFolderName = "auxiliaryFeatureConnections"
+	tokenisationSubwordAuxiliarySourceFeatureConnectionsFileNamePrefix = "auxIndex"
+else:
+	tokenisationSubwordAuxiliaryLemma = False
+	tokenisationSubwordAuxiliaryMorph = False
+	tokenisationSubwordAuxiliarySuffix = False

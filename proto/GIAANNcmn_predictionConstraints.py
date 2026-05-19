@@ -23,6 +23,8 @@ from GIAANNcmn_globalDefs import *
 import GIAANNcmn_databaseNetwork
 import GIAANNcmn_sparseTensors
 import GIAANNcmn_predictionActivate
+if(tokenisationSubwordAuxiliary):
+	import GIAANNnlp_subwordAuxiliary
 
 def buildAllowedColumnsSet(allowedColumnsTensor):
 	allowedSet = None
@@ -268,29 +270,39 @@ def getConnectedColumnsForFeature(observedColumn, featureIndex, includeFeatureDe
 	if(not hasattr(observedColumn, "databaseNetworkObject") or observedColumn.databaseNetworkObject is None):
 		raise RuntimeError("getConnectedColumnsForFeature error: observedColumn.databaseNetworkObject is required")
 	databaseNetworkObject = observedColumn.databaseNetworkObject
-	if(featureIndex is None or featureIndex < 0):
-		return [], {} if includeFeatureDetails else None
-	featureConnectionsSource = observedColumn.prepareFeatureConnectionsForSourceFeature(featureIndex, targetDevice=deviceSparse, createMissing=False)
-	featureConnectionsStrength = featureConnectionsSource[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
-	featureConnectionsStrength = featureConnectionsStrength.coalesce()
-	if(featureConnectionsStrength._nnz() == 0):
-		return [], {} if includeFeatureDetails else None
-	targetColumnIndices = featureConnectionsStrength.indices()
-	if(targetColumnIndices.shape[1] == 0):
-		return [], {} if includeFeatureDetails else None
-	if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments" and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"): #OLD: elif(enforceDirectConnections and enforceDirectConnectionsSANI):
-		lastSegmentMask = targetColumnIndices[1] == arrayIndexSegmentLast
-		targetColumnIndices = targetColumnIndices[:, lastSegmentMask]
-	targetColumns = targetColumnIndices[2].unique()
-	targetColumnsList = targetColumns.cpu().tolist()
+	targetColumnsList = []
+	columnFeatureMap = {}
+	if(featureIndex is not None and featureIndex >= 0):
+		featureConnectionsSource = observedColumn.prepareFeatureConnectionsForSourceFeature(featureIndex, targetDevice=deviceSparse, createMissing=False)
+		featureConnectionsStrength = featureConnectionsSource[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
+		featureConnectionsStrength = featureConnectionsStrength.coalesce()
+		if(featureConnectionsStrength._nnz() > 0):
+			targetColumnIndices = featureConnectionsStrength.indices()
+			if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments" and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"): #OLD: elif(enforceDirectConnections and enforceDirectConnectionsSANI):
+				lastSegmentMask = targetColumnIndices[1] == arrayIndexSegmentLast
+				targetColumnIndices = targetColumnIndices[:, lastSegmentMask]
+			if(targetColumnIndices.shape[1] > 0):
+				targetColumns = targetColumnIndices[2].unique()
+				targetColumnsList = targetColumns.cpu().tolist()
+				if(includeFeatureDetails):
+					targetFeatures = targetColumnIndices[3].cpu().tolist()
+					for columnValue, featureValue in zip(targetColumnIndices[2].tolist(), targetFeatures):
+						columnFeatureMap.setdefault(columnValue, set()).add(featureValue)
+		if(tokenisationSubwordAuxiliary):
+			if(includeFeatureDetails):
+				auxiliaryTargetColumnsList, auxiliaryColumnFeatureMap = GIAANNnlp_subwordAuxiliary.getConnectedColumnsForAuxiliaryFeatures(observedColumn, featureIndex, includeFeatureDetails=True)
+				targetColumnsList.extend(auxiliaryTargetColumnsList)
+				for columnValue, featureSet in auxiliaryColumnFeatureMap.items():
+					columnFeatureMap.setdefault(columnValue, set()).update(featureSet)
+			else:
+				auxiliaryTargetColumnsList, _ = GIAANNnlp_subwordAuxiliary.getConnectedColumnsForAuxiliaryFeatures(observedColumn, featureIndex, includeFeatureDetails=False)
+				targetColumnsList.extend(auxiliaryTargetColumnsList)
+			targetColumnsList = sorted(set(targetColumnsList))
 	if(includeFeatureDetails):
-		targetFeatures = targetColumnIndices[3].cpu().tolist()
-		columnFeatureMap = {}
-		for columnValue, featureValue in zip(targetColumnIndices[2].tolist(), targetFeatures):
-			columnFeatureMap.setdefault(columnValue, set()).add(featureValue)
-		return targetColumnsList, columnFeatureMap
+		result = targetColumnsList, columnFeatureMap
 	else:
-		return targetColumnsList, None
+		result = targetColumnsList, None
+	return result
 
 
 def buildConnectedColumnsLookup(databaseNetworkObject, observedColumnsDict, columnFeaturePairs, device, dtype):
