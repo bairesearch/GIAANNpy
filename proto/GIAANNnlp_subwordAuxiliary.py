@@ -40,46 +40,64 @@ if(tokenisationSubwordAuxiliary):
 
 	def createTokenAuxiliaryFeatureWords(token):
 		result = []
-		if(tokenisationSubwordAuxiliaryLemma):
-			appendTokenLemmaAuxiliaryFeatureWord(result, token)
-		if(tokenisationSubwordAuxiliaryMorph):
-			appendTokenMorphAuxiliaryFeatureWords(result, token)
-		if(tokenisationSubwordAuxiliarySuffix):
-			appendTokenSuffixAuxiliaryFeatureWords(result, token)
-		result = list(dict.fromkeys(result))
+		if(shouldCreateTokenBaseAuxiliaryFeature(token)):
+			result.append(buildAuxiliaryFeatureName(getTokenAuxiliaryBaseForm(token)))
 		return result
 
-	def appendTokenLemmaAuxiliaryFeatureWord(auxiliaryFeatureWords, token):
-		if(token.lemma is None):
-			raise RuntimeError("appendTokenLemmaAuxiliaryFeatureWord error: token lemma is None")
-		if(token.word is None):
-			raise RuntimeError("appendTokenLemmaAuxiliaryFeatureWord error: token word is None")
-		if(token.lemma != tokenisationSubwordAuxiliaryFeatureValueEmpty):
-			auxiliaryFeatureWords.append(buildAuxiliaryFeatureName(tokenisationSubwordAuxiliaryFeatureTypeLemma, token.lemma))
-		return
+	def shouldCreateTokenBaseAuxiliaryFeature(token):
+		baseForm = getTokenAuxiliaryBaseForm(token)
+		distinctForm = isTokenAuxiliaryDistinctForm(token, baseForm)
+		result = False
+		if(baseForm != tokenisationSubwordAuxiliaryFeatureValueEmpty):
+			if(tokenisationSubwordAuxiliaryDistinctEnforce and not distinctForm):
+				result = False
+			else:
+				if(tokenisationSubwordAuxiliaryMorph and tokenMorphIndicatesAuxiliaryVariation(token)):
+					result = True
+				if((not result) and tokenisationSubwordAuxiliarySuffix and tokenSuffixIndicatesAuxiliaryVariation(token)):
+					result = True
+				if((not result) and tokenisationSubwordAuxiliaryLemma and distinctForm):
+					result = True
+		return result
 
-	def appendTokenMorphAuxiliaryFeatureWords(auxiliaryFeatureWords, token):
+	def getTokenAuxiliaryBaseForm(token):
+		if(token.lemma is None):
+			raise RuntimeError("getTokenAuxiliaryBaseForm error: token lemma is None")
+		if(token.word is None):
+			raise RuntimeError("getTokenAuxiliaryBaseForm error: token word is None")
+		result = token.lemma
+		return result
+
+	def isTokenAuxiliaryDistinctForm(token, baseForm):
+		if(token.word is None):
+			raise RuntimeError("isTokenAuxiliaryDistinctForm error: token word is None")
+		result = baseForm != token.word
+		return result
+
+	def tokenMorphIndicatesAuxiliaryVariation(token):
 		morphString = token.morph
 		if(morphString is None):
 			morphString = tokenisationSubwordAuxiliaryMorphEmpty
+		result = False
 		if(morphString != tokenisationSubwordAuxiliaryMorphEmpty):
 			morphParts = morphString.split(tokenisationSubwordAuxiliaryMorphSeparator)
 			for morphPart in morphParts:
 				if(morphPart != tokenisationSubwordAuxiliaryMorphEmpty):
-					auxiliaryFeatureWords.append(buildAuxiliaryFeatureName(tokenisationSubwordAuxiliaryFeatureTypeMorph, morphPart))
-		return
+					result = True
+		return result
 
-	def appendTokenSuffixAuxiliaryFeatureWords(auxiliaryFeatureWords, token):
+	def tokenSuffixIndicatesAuxiliaryVariation(token):
 		if(token.word is None):
-			raise RuntimeError("appendTokenSuffixAuxiliaryFeatureWords error: token word is None")
+			raise RuntimeError("tokenSuffixIndicatesAuxiliaryVariation error: token word is None")
+		result = False
 		for suffix in tokenisationSubwordAuxiliarySuffixList:
 			if(token.word.endswith(suffix)):
 				if(len(token.word) > len(suffix) + tokenisationSubwordAuxiliarySuffixMinimumStemLength):
-					auxiliaryFeatureWords.append(buildAuxiliaryFeatureName(tokenisationSubwordAuxiliaryFeatureTypeSuffix, suffix))
-		return
+					result = True
+		return result
 
-	def buildAuxiliaryFeatureName(auxiliaryFeatureType, auxiliaryFeatureValue):
-		result = tokenisationSubwordAuxiliaryFeatureNamePrefix + tokenisationSubwordAuxiliaryFeatureNameDelimiter + auxiliaryFeatureType + tokenisationSubwordAuxiliaryFeatureNameDelimiter + auxiliaryFeatureValue
+	def buildAuxiliaryFeatureName(auxiliaryFeatureValue):
+		result = tokenisationSubwordAuxiliaryFeatureNamePrefix + tokenisationSubwordAuxiliaryFeatureNameDelimiter + auxiliaryFeatureValue
 		return result
 
 	def buildConceptColumnAuxiliaryFeatureName(databaseNetworkObject, conceptIndex, auxiliaryFeatureWord):

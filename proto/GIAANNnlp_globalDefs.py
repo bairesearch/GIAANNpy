@@ -204,15 +204,18 @@ if(useBenchmark):
 		elif(inferenceReportGroundedStrongerGroundedNLPmetric):
 			databaseTypeText += closedWorldGroundedStrongerGroundedNLPmetricName
 	databaseFolderExtension = databaseTypeText + str(trainMaxSequences) + "-numSeedTokensInference" + str(numSeedTokensInference) + benchmarkAblationText		#useSANIfeaturesAndColumns
+elif(useAutoresearch):
+	databaseFolderExtension = "Autoresearch"
+elif(datasetType in closedWorldGroundedDatasetTypes):
+	databaseFolderExtension = closedWorldGroundedDatasetTypeToDatabaseTypeTextDict[datasetType]
+	if(inferenceReportGroundedRealisticNLPmetric):
+		databaseFolderExtension += closedWorldGroundedRealisticNLPmetricName
+	elif(inferenceReportGroundedStrongerGroundedNLPmetric):
+		databaseFolderExtension += closedWorldGroundedStrongerGroundedNLPmetricName
 else:
-	if(datasetType in closedWorldGroundedDatasetTypes):
-		databaseFolderExtension = closedWorldGroundedDatasetTypeToDatabaseTypeTextDict[datasetType]
-		if(inferenceReportGroundedRealisticNLPmetric):
-			databaseFolderExtension += closedWorldGroundedRealisticNLPmetricName
-		elif(inferenceReportGroundedStrongerGroundedNLPmetric):
-			databaseFolderExtension += closedWorldGroundedStrongerGroundedNLPmetricName
-	else:
-		databaseFolderExtension = ""
+	databaseFolderExtension = ""
+
+
 #Concept column delimiters:
 conceptColumnsDelimitByPOS = True	#mandatory: True	#orig: False	#closer to original GIA specification	#FUTURE: still requires working for edge cases
 if(conceptColumnsDelimitByPOS):
@@ -486,14 +489,12 @@ if(inferenceReportGroundedAccuracy):
 #Subword auxiliary tokenisation;
 tokenisationSubwordAuxiliary = False
 if(tokenisationSubwordAuxiliary):
-	tokenisationSubwordAuxiliaryLemma = True
+	tokenisationSubwordAuxiliaryLemma = True	#fallback condition: assign base-form auxiliary when morph/suffix gates do not detect a distinct form
 	tokenisationSubwordAuxiliaryMorph = True
-	tokenisationSubwordAuxiliarySuffix = False
+	tokenisationSubwordAuxiliarySuffix = True
+	tokenisationSubwordAuxiliaryDistinctEnforce = True	#only create base-form auxiliaries when token.lemma differs from token.word
 	tokenisationSubwordAuxiliaryFeatureNamePrefix = "AUX"
 	tokenisationSubwordAuxiliaryFeatureNameDelimiter = ":"
-	tokenisationSubwordAuxiliaryFeatureTypeLemma = "LEMMA"
-	tokenisationSubwordAuxiliaryFeatureTypeMorph = "MORPH"
-	tokenisationSubwordAuxiliaryFeatureTypeSuffix = "SUFFIX"
 	tokenisationSubwordAuxiliaryFeatureValueEmpty = ""
 	tokenisationSubwordAuxiliaryMorphSeparator = "|"
 	tokenisationSubwordAuxiliaryMorphEmpty = tokenisationSubwordAuxiliaryFeatureValueEmpty
@@ -508,3 +509,4 @@ else:
 	tokenisationSubwordAuxiliaryLemma = False
 	tokenisationSubwordAuxiliaryMorph = False
 	tokenisationSubwordAuxiliarySuffix = False
+	tokenisationSubwordAuxiliaryDistinctEnforce = False

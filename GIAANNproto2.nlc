@@ -119,7 +119,7 @@ MANUAL; - add option modalityORsnapshotCentreFOVonly
 ---
 v2b (Codex IDE GPT-5.5) [under development]:
 - add proto GIAANNproto2b1a - start option datasetType=="closedWorldGroundedX" and inferenceReportGroundedAccuracy:
-	- due to the whole-word tokenisation of GIAANN, it limits prediction outside of the training-set. However it is not clear the extent to which this limitation is a) preventing hallucination (either false predictions or correct predictions without sufficient grounding within the training-set), or b) not making predictions that are justifiable within the training set (i.e. undergeneralisation). This is why I am searching for a better test-set eval method.
+	- due to the whole-word tokenisation of GIAANN, it limits prediction outside of the training-set. However it is not clear the extent to which this limitation is a) preventing hallucination (either false predictions or correct predictions without sufficient grounding within the training-set), or b) not making predictions that are justifiable within the training set (i.e. undergeneralisation).
 	- as recommended in the conclusion of GIAANN-grounded-eval-deep-research-report.md, please implement;
 		- option datasetType="closedWorldGrounded1": find and implement a closed world train+test dataset that can be used to evaluate the performance of GIAANN modalityName=="NLP" at making grounded predictions (not only correct or incorrect predictions).
 		- option inferenceReportGroundedAccuracy=True: new eval code to enable the evaluation of grounded predictions.
@@ -158,3 +158,10 @@ v2c (Codex IDE GPT-5.5) [under development]:
 		- tokenisationSubwordAuxiliary feature names must not include a POS qualifier/property for lemma, morph, or suffix auxiliary types. Use source concept column scoping rather than POS scoping to separate auxiliary target connections.
 		- if(tokenisationSubwordAuxiliary) then assume any accessed database was created using this mode; do not add database compatibility checks.
 		- implement tokenisationSubwordAuxiliary-specific functions in GIAANNnlp_subwordAuxiliary.py.
+- change the tokenisationSubwordAuxiliary implementation so that only a single auxiliary neuron is assigned for all variations (LEMMA/MORPH/SUFFIX), which takes the base form of the word (eg verb).
+	Algorithm notes:
+		- use unscoped form AUX:<baseForm> and stored source-column-scoped form AUX:<sourceConceptIndex>:<baseForm>; eg running and ran can both map to AUX:run, stored for source concept column 42 as AUX:42:run.
+		- tokenisationSubwordAuxiliaryMorph, tokenisationSubwordAuxiliarySuffix, and tokenisationSubwordAuxiliaryLemma are eligibility gates only; they decide whether a parent whole-word feature receives the single base-form auxiliary, and they must not create separate MORPH, SUFFIX, or LEMMA auxiliary neurons.
+		- tokenisationSubwordAuxiliaryLemma is retained only as a fallback eligibility condition when morph/suffix gates do not identify a distinct variation.
+		- tokenisationSubwordAuxiliaryDistinctEnforce=True requires the parent whole-word feature form to differ from its base form before assigning the base-form auxiliary.
+- add option inferenceCopyTemplateDatasets=True which copies *.* files from databaseFolderTemplate to databaseFolder upon startup of mode inference.

@@ -22,6 +22,8 @@ import pickle
 import os
 import time
 import subprocess
+import glob
+import shutil
 
 from GIAANNcmn_globalDefs import *
 import GIAANNcmn_debug
@@ -38,6 +40,24 @@ def prepareDatabaseFilesStartup():
 			clearDatabaseFiles()
 	else:
 		os.makedirs(observedColumnsDir, exist_ok=True)
+	if(inferenceCopyTemplateDatasets):
+		if(executionMode=="inference"):
+			copyTemplateDatasetFilesToDatabaseFolder()
+	return
+
+def copyTemplateDatasetFilesToDatabaseFolder():
+	if(inferenceCopyTemplateDatasets):
+		if(not os.path.isdir(databaseFolderTemplate)):
+			raise RuntimeError("copyTemplateDatasetFilesToDatabaseFolder error: missing databaseFolderTemplate = " + databaseFolderTemplate)
+		templateDatasetFilePaths = sorted(glob.glob(os.path.join(databaseFolderTemplate, databaseFolderTemplateDatasetFileNamePattern)))
+		if(len(templateDatasetFilePaths) == 0):
+			raise RuntimeError("copyTemplateDatasetFilesToDatabaseFolder error: no template dataset files found in databaseFolderTemplate = " + databaseFolderTemplate)
+		os.makedirs(databaseFolder, exist_ok=True)
+		for templateDatasetFilePath in templateDatasetFilePaths:
+			if(not os.path.isfile(templateDatasetFilePath)):
+				raise RuntimeError("copyTemplateDatasetFilesToDatabaseFolder error: template dataset path is not a file = " + templateDatasetFilePath)
+			databaseDatasetFilePath = os.path.join(databaseFolder, os.path.basename(templateDatasetFilePath))
+			shutil.copy2(templateDatasetFilePath, databaseDatasetFilePath)
 	return
 
 def clearDatabaseFiles():
