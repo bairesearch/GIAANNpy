@@ -439,8 +439,7 @@ def processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuro
 	result = processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
 	return result
 
-def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None):
-		
+def calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex):
 	featureNeuronsActive = GIAANNcmn_sparseTensors.neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANImethod)
 	
 	sourceColumnIndex = int(sourceColumnIndex)
@@ -481,6 +480,53 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 	if(multipleDendriticBranches and featureNeuronsActive.dim() == 1):
 		# Collapse branch-local source activations so each target branch receives the same drive.
 		featureNeuronsActive = featureNeuronsActive.sum()
+	result = featureNeuronsActive
+	return result
+
+def transformFeatureNeuronsTargetActivationPredict(featureNeuronsTargetActivation):
+	if(inferenceActivationFunction):
+		result = activationFunction(featureNeuronsTargetActivation)
+		#print("featureNeuronsTargetActivation = ", featureNeuronsTargetActivation)
+	else:
+		result = featureNeuronsTargetActivation*j1
+	return result
+
+def applyFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureNeuronsTargetActivation, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None, applySegmentActivations=True):
+	if(inferenceUseNeuronFeaturePropertiesTimeExact):
+		# spec step (a): only allow segment activation when the time difference to the previous segment is exactly 1.
+		featureNeuronsTargetActivation = applyExactTimeActivationConstraint(featureNeuronsTargetActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
+
+	featureNeuronsTargetActivationApplied = featureNeuronsTargetActivation
+
+	#update the activations of the target nodes;
+	if(useSANI):
+		if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
+			if(enforceSequentialActivation):
+				if(inferenceApplySequentialActivationSparse):
+					globalFeatureNeuronsActivation, featureNeuronsTargetActivationApplied = applySequentialActivationSparse(globalFeatureNeuronsActivation, featureNeuronsTargetActivation)
+				else:
+					globalFeatureNeuronsActivation, featureNeuronsTargetActivationApplied = applySequentialActivationDense(globalFeatureNeuronsActivation, featureNeuronsTargetActivation)
+			else:
+				globalFeatureNeuronsActivation += featureNeuronsTargetActivation
+		elif(algorithmMatrixSANImethod=="doNotEnforceActivationAcrossSegments"):
+			globalFeatureNeuronsActivation += featureNeuronsTargetActivation
+	else:
+		globalFeatureNeuronsActivation += featureNeuronsTargetActivation
+	if(inferenceSegmentActivationsBoolean and applySegmentActivations):
+		globalFeatureNeuronsActivation = applySegmentActivationsBoolean(globalFeatureNeuronsActivation)
+	if(inferenceUseNeuronFeaturePropertiesTime):
+		# spec step (a): store last timeValue for activated segments during each prediction step
+		globalFeatureNeuronsTime = updateTimeValuesFromActivation(globalFeatureNeuronsTime, featureNeuronsTargetActivationApplied, sequenceWordIndex, sequenceColumnIndex)
+	result = globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime
+	return result
+
+def processFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureNeuronsTargetActivation, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None):
+	featureNeuronsTargetActivation = transformFeatureNeuronsTargetActivationPredict(featureNeuronsTargetActivation)
+	result = applyFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureNeuronsTargetActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
+	return result
+
+def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None, sourceActivationMultiplier=None):
+	featureNeuronsActive = calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex)
 
 	#target neuron activation dependence on connection strength;
 	featureConnectionsStrength = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
@@ -506,38 +552,13 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 		else:
 			featureNeuronsTargetActivation = featureConnectionsStrength * featureNeuronsActive.view(-1, 1, 1, 1)
 
-	if(inferenceActivationFunction):
-		featureNeuronsTargetActivation = activationFunction(featureNeuronsTargetActivation)
-		#print("featureNeuronsTargetActivation = ", featureNeuronsTargetActivation)
-	else:
-		featureNeuronsTargetActivation = featureNeuronsTargetActivation*j1
-	if(inferenceUseNeuronFeaturePropertiesTimeExact):
-		# spec step (a): only allow segment activation when the time difference to the previous segment is exactly 1.
-		featureNeuronsTargetActivation = applyExactTimeActivationConstraint(featureNeuronsTargetActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
-
-	featureNeuronsTargetActivationApplied = featureNeuronsTargetActivation
-
-	#update the activations of the target nodes;
-	if(useSANI):
-		if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
-			if(enforceSequentialActivation):
-				if(inferenceApplySequentialActivationSparse):
-					globalFeatureNeuronsActivation, featureNeuronsTargetActivationApplied = applySequentialActivationSparse(globalFeatureNeuronsActivation, featureNeuronsTargetActivation)
-				else:
-					globalFeatureNeuronsActivation, featureNeuronsTargetActivationApplied = applySequentialActivationDense(globalFeatureNeuronsActivation, featureNeuronsTargetActivation)
-			else:
-				globalFeatureNeuronsActivation += featureNeuronsTargetActivation
-		elif(algorithmMatrixSANImethod=="doNotEnforceActivationAcrossSegments"):
-			globalFeatureNeuronsActivation += featureNeuronsTargetActivation
-	else:
-		globalFeatureNeuronsActivation += featureNeuronsTargetActivation
-	if(inferenceSegmentActivationsBoolean):
-		globalFeatureNeuronsActivation = applySegmentActivationsBoolean(globalFeatureNeuronsActivation)
-	if(inferenceUseNeuronFeaturePropertiesTime):
-		# spec step (a): store last timeValue for activated segments during each prediction step
-		globalFeatureNeuronsTime = updateTimeValuesFromActivation(globalFeatureNeuronsTime, featureNeuronsTargetActivationApplied, sequenceWordIndex, sequenceColumnIndex)
-		
-	return globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime
+	if(sourceActivationMultiplier is not None):
+		sourceActivationMultiplier = float(sourceActivationMultiplier)
+		if(sourceActivationMultiplier < auxiliaryNeuronsSimilarWordsMinimumSimilarity or sourceActivationMultiplier > auxiliaryNeuronsSimilarWordsMaximumSimilarity):
+			raise RuntimeError("processFeaturesActivePredict error: sourceActivationMultiplier out of range")
+		featureNeuronsTargetActivation = featureNeuronsTargetActivation * sourceActivationMultiplier
+	result = processFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureNeuronsTargetActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
+	return result
 
 def selectActivatedBranchIndex(globalFeatureNeuronsActivation, columnIndex, featureIndex):
 	if(not multipleDendriticBranches):

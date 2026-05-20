@@ -143,8 +143,8 @@ MANUAL; - extract execution mode useDefault
 
 ---
 v2c (Codex IDE GPT-5.5) [under development]:
-- add proto GIAANNproto2c1a - start option tokenisationSubwordAuxiliary=True
-	- tokenisationSubwordAuxiliary=True adds source-column-scoped lemma/morph/suffix auxiliary source features for NLP whole-word parent features, improving morphological generalisation without creating subword output prediction candidates.
+- add proto GIAANNproto2c1a - start option auxiliaryNeuronsTokenisationSubword=True
+	- auxiliaryNeuronsTokenisationSubword=True adds source-column-scoped lemma/morph/suffix auxiliary source features for NLP whole-word parent features, improving morphological generalisation without creating subword output prediction candidates.
 	Algorithm notes:
 		- auxiliary feature names use the unscoped form AUX:<auxiliaryType>:<auxiliaryValue> and the stored source-column-scoped form AUX:<sourceConceptIndex>:<auxiliaryType>:<auxiliaryValue>; eg AUX:LEMMA:run becomes AUX:42:LEMMA:run for source concept column 42.
 		- during training, the parent whole-word feature is trained normally, and each registered auxiliary source feature is trained with the same eligible downstream target column/feature neurons using the same temporal/segment constraints, but with its own auxiliary source-feature connection tensor.
@@ -152,16 +152,47 @@ v2c (Codex IDE GPT-5.5) [under development]:
 		- during prediction, activate auxiliary source connections only when the current predicted whole-word feature has registered auxiliary features. Auxiliary activations add evidence to ordinary target column/feature neurons; they do not create auxiliary output neurons.
 		- during prediction, activate all auxiliary features registered for the current parent whole-word feature in the current source concept column; do not activate auxiliary features globally across source columns.
 	Implementation notes:
-		- add auxiliary features for lemma, morph, and suffix, but implement each auxiliary feature type specfic code within its own context if(tokenisationSubwordAuxiliaryLemma), if(tokenisationSubwordAuxiliaryMorph), if(tokenisationSubwordAuxiliarySuffix). All common auxiliary code should be contained within only context if(tokenisationSubwordAuxiliary).
+		- add auxiliary features for lemma, morph, and suffix, but implement each auxiliary feature type specfic code within its own context if(auxiliaryNeuronsTokenisationSubwordLemma), if(auxiliaryNeuronsTokenisationSubwordMorph), if(auxiliaryNeuronsTokenisationSubwordSuffix). All common auxiliary code should be contained within only context if(auxiliaryNeuronsTokenisationSubword).
 		- auxiliary features are sidecar source features anchored to the parent whole-word feature. They must not be registered in conceptFeaturesDict/conceptFeaturesList, and they must not participate as next-word candidate feature indices.
-		- store auxiliary feature dictionaries and parent-word mappings in dedicated tokenisationSubwordAuxiliary storage structures. Store auxiliary source-feature connection tensors separately from ordinary whole-word source-feature connection tensors.
-		- tokenisationSubwordAuxiliary feature names must not include a POS qualifier/property for lemma, morph, or suffix auxiliary types. Use source concept column scoping rather than POS scoping to separate auxiliary target connections.
-		- if(tokenisationSubwordAuxiliary) then assume any accessed database was created using this mode; do not add database compatibility checks.
-		- implement tokenisationSubwordAuxiliary-specific functions in GIAANNnlp_subwordAuxiliary.py.
-- change the tokenisationSubwordAuxiliary implementation so that only a single auxiliary neuron is assigned for all variations (LEMMA/MORPH/SUFFIX), which takes the base form of the word (eg verb).
+		- store auxiliary feature dictionaries and parent-word mappings in dedicated auxiliaryNeuronsTokenisationSubword storage structures. Store auxiliary source-feature connection tensors separately from ordinary whole-word source-feature connection tensors.
+		- auxiliaryNeuronsTokenisationSubword feature names must not include a POS qualifier/property for lemma, morph, or suffix auxiliary types. Use source concept column scoping rather than POS scoping to separate auxiliary target connections.
+		- if(auxiliaryNeuronsTokenisationSubword) then assume any accessed database was created using this mode; do not add database compatibility checks.
+		- implement auxiliaryNeuronsTokenisationSubword-specific functions in GIAANNnlp_auxiliaryNeuronsSubword.py.
+- change the auxiliaryNeuronsTokenisationSubword implementation so that only a single auxiliary neuron is assigned for all variations (LEMMA/MORPH/SUFFIX), which takes the base form of the word (eg verb).
 	Algorithm notes:
 		- use unscoped form AUX:<baseForm> and stored source-column-scoped form AUX:<sourceConceptIndex>:<baseForm>; eg running and ran can both map to AUX:run, stored for source concept column 42 as AUX:42:run.
-		- tokenisationSubwordAuxiliaryMorph, tokenisationSubwordAuxiliarySuffix, and tokenisationSubwordAuxiliaryLemma are eligibility gates only; they decide whether a parent whole-word feature receives the single base-form auxiliary, and they must not create separate MORPH, SUFFIX, or LEMMA auxiliary neurons.
-		- tokenisationSubwordAuxiliaryLemma is retained only as a fallback eligibility condition when morph/suffix gates do not identify a distinct variation.
-		- tokenisationSubwordAuxiliaryDistinctEnforce=True requires the parent whole-word feature form to differ from its base form before assigning the base-form auxiliary.
+		- auxiliaryNeuronsTokenisationSubwordMorph, auxiliaryNeuronsTokenisationSubwordSuffix, and auxiliaryNeuronsTokenisationSubwordLemma are eligibility gates only; they decide whether a parent whole-word feature receives the single base-form auxiliary, and they must not create separate MORPH, SUFFIX, or LEMMA auxiliary neurons.
+		- auxiliaryNeuronsTokenisationSubwordLemma is retained only as a fallback eligibility condition when morph/suffix gates do not identify a distinct variation.
+		- auxiliaryNeuronsTokenisationSubwordDistinctEnforce=True requires the parent whole-word feature form to differ from its base form before assigning the base-form auxiliary.
 - add option inferenceCopyTemplateDatasets=True which copies *.* files from databaseFolderTemplate to databaseFolder upon startup of mode inference.
+- upgrade option auxiliaryNeurons=True to support option auxiliaryNeuronsSimilarWords=True
+	Algorithm notes:
+		- similarity auxiliary neurons (auxiliaryNeuronsSimilarWords) behave the same as subword auxiliary neurons (auxiliaryNeuronsTokenisationSubword), except that a) their input connections are connected and activated differently, and b) they must fire a numeric activation value depending on their current input connection strengths/activations.
+		- support suboptions auxiliaryNeuronsSimilarWordsPrimeConceptFeatures=True (similar noun words) and auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures=True (similar non-noun words).
+		- for each prime concept feature (auxiliaryNeuronsSimilarWordsPrimeConceptFeatures) and secondary feature neuron (auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures) within each column in the database network, assign a similarity auxiliary neuron. Whenever a new sequence is trained, create a similarity auxiliary neuron for each new feature neuron (i.e. parent) added to a column in the network.
+		- for suboption auxiliaryNeuronsSimilarWordsPrimeConceptFeatures=True: use form SIMC:<wordName> and stored source-column-scoped form SIMC:<sourceConceptIndex>:<wordName>. eg1 "rock" similarity auxiliary neuron in column X is activated by either the "rock" prime concept feature neuron in column X or "stone" prime concept feature in column Y.
+		- for suboption auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures=True: use form SIMF:<wordName> and stored source-column-scoped form SIMF:<sourceConceptIndex>:<wordName>. eg1 "happy" similarity auxiliary neuron in column X is activated by either the "happy" secondary concept feature neuron in column X or the "ecstatic" secondary concept feature neuron in column X.
+		- the strength of a similarity auxiliary neuron activation is determined by the weights of the auxiliary neuron input connections (from its parent feature neurons e.g. "rock"/"stone" or "happy"/"ecstatic").
+		- the strength of the similarity auxiliary neuron input connections is determined by the similar word dataset values for the connection between the parent feature neurons (e.g. "rock"/"stone" or "happy"/"ecstatic") and the auxiliary feature neuron (e.g. "rock" or "happy").
+		- in the examples provided, the other parent features mentioned ("stone" and "ecstatic") will also have similarity auxiliary neurons assigned, but these have been omitted for brevity.
+	Implementation notes:
+		- obtain at least two word similarity datasets (auxiliaryNeuronsSimilarWordsDataset1, auxiliaryNeuronsSimilarWordsDataset2 etc), for example word2vec. Preferably use textual databases (that may have been generated using machine learning models) rather than machine learning models.
+		- set auxiliaryNeuronsSimilarWordsDatasetName="" depending on which word similarity datasets is enabled (eg auxiliaryNeuronsSimilarWordsDataset1=True)
+		- implement auxiliaryNeuronsSimilarWords-specific functions in GIAANNnlp_auxiliaryNeuronsSimilarity.py.
+	Maybe your implementation is not properly vectorised (or is using python objects instead of pytorch vectors where these would be much faster)? For example, the input connections into the similarity auxiliary feature nodes should be defined using sparse pytorch arrays; definately not python dictionaries. Please review this auxiliaryNeuronsSimilarWords=True inference algorithm update/clarification:
+- update option auxiliaryNeuronsSimilarWords
+	1. only assign input connetions to similarity auxiliary nodes with their similarity score is above  auxiliaryNeuronsSimilarWordsThreshold (default=0.5)
+	2. For option auxiliaryNeuronsSimilarWordsPrimeConceptFeatures=True, only a concept index is required to define an input connection into a similarity auxiliary node.
+		- For option  auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures=True, only a feature index of the current column is required to define an input connection into a similarity auxiliary node.
+	3. For the currently activated parent concept feature node in the sequence;
+		a) if(auxiliaryNeuronsSimilarWordsPrimeConceptFeatures): the activation value of all auxiliary prime concept feature nodes in the network are calculated [using a single pytorch matrix operation];
+		b) if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures): the activation value of all secondary feature nodes in the current column are calculated [using a single pytroch matrix operation].
+		Every similiarity auxiliary node with an activation value above 0 then fires to calculate its auxiliary contribution to the network activation state.
+- a dense word2vec similarity matrix of size dictionarySize*dictionarySize is too large and is an unacceptable implementation for auxiliaryNeuronsSimilarWordsDataset3. What is required is a compact similarity dataset for each dataset type (1, 2, 3). 
+	- For case auxiliaryNeuronsSimilarWordsDataset3 where the similarity matrix is generated, use this implementation. For each word in the dictionary assign a similarity score to the auxiliaryNeuronsSimilarWordsDataset3maxNumberSimilarWords most similar words, where auxiliaryNeuronsSimilarWordsDataset3maxNumberSimilarWords=50 by default.
+	- upgrade auxiliaryNeuronsSimilarWordsDataset3 to use this method to generate its compact matrix (shape dictionary size * auxiliaryNeuronsSimilarWordsDataset3maxNumberSimilarWords):
+		- WordNet includes similar-word groupings for: Nouns, Verbs, Adjectives, Adverbs
+		- Use these wordnet similar word lists to calculate the word2vec similarity scores for each word in the dictionary. So the similarWordsDataset3Word2Vec.txt dataset should be of format:
+			num rows = size of wordnet dictionary, 
+			number columns = dynamic (for every similar word to the row word, store the name of the similar word and its word2vec calculated similarity score). 
+

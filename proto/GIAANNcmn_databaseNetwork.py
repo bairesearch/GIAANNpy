@@ -24,8 +24,10 @@ import GIAANNcmn_debug
 import GIAANNcmn_databaseNetworkFiles
 from GIAANNcmn_databaseNetworkObservedColumn import ObservedColumn, ObservedColumnConnectionBase, ObservedColumnProxy, ObservedColumnStub
 import GIAANNcmn_sparseTensors
-if(tokenisationSubwordAuxiliary):
-	import GIAANNnlp_subwordAuxiliary
+if(auxiliaryNeuronsTokenisationSubword):
+	import GIAANNnlp_auxiliaryNeuronsSubword
+if(auxiliaryNeuronsSimilarWords):
+	import GIAANNnlp_auxiliaryNeuronsSimilarity
 
 def calculateArrayNumberOfProperties(inferenceMode):
 	if(inferenceMode):
@@ -35,7 +37,7 @@ def calculateArrayNumberOfProperties(inferenceMode):
 	return arrayNumberOfProperties
 
 class DatabaseNetworkClass():
-	def __init__(self, inferenceMode, c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList, conceptFeaturesReferenceSetDelimiterDeterministicList, conceptFeaturesReferenceSetDelimiterProbabilisticList, auxiliaryFeaturesDict=None, auxiliaryFeaturesList=None, auxiliaryFeatureWordsByParentWord=None, auxiliaryLoadExistingDatabase=None):
+	def __init__(self, inferenceMode, c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList, conceptFeaturesReferenceSetDelimiterDeterministicList, conceptFeaturesReferenceSetDelimiterProbabilisticList, auxiliaryFeaturesDict=None, auxiliaryFeaturesList=None, auxiliaryFeatureWordsByParentWord=None, auxiliaryLoadExistingDatabase=None, auxiliarySimilarFeaturesDict=None, auxiliarySimilarFeaturesList=None, auxiliarySimilarFeatureWordWeightsByParentWord=None, auxiliarySimilarLoadExistingDatabase=None):
 		self.c = c
 		self.f = f
 		self.s = s
@@ -57,8 +59,10 @@ class DatabaseNetworkClass():
 				self.conceptFeaturesReferenceSetDelimiterProbabilisticList = conceptFeaturesReferenceSetDelimiterProbabilisticList
 			else:
 				self.conceptFeaturesReferenceSetDelimiterList = conceptFeaturesReferenceSetDelimiterList
-		if(tokenisationSubwordAuxiliary):
-			GIAANNnlp_subwordAuxiliary.initialiseDatabaseNetworkAuxiliary(self, auxiliaryFeaturesDict, auxiliaryFeaturesList, auxiliaryFeatureWordsByParentWord, auxiliaryLoadExistingDatabase)
+		if(auxiliaryNeuronsTokenisationSubword):
+			GIAANNnlp_auxiliaryNeuronsSubword.initialiseDatabaseNetworkAuxiliary(self, auxiliaryFeaturesDict, auxiliaryFeaturesList, auxiliaryFeatureWordsByParentWord, auxiliaryLoadExistingDatabase)
+		if(auxiliaryNeuronsSimilarWords):
+			GIAANNnlp_auxiliaryNeuronsSimilarity.initialiseDatabaseNetworkAuxiliary(self, auxiliarySimilarFeaturesDict, auxiliarySimilarFeaturesList, auxiliarySimilarFeatureWordWeightsByParentWord, auxiliarySimilarLoadExistingDatabase)
 		self.setArrayIndexProperties(inferenceMode)
 		self.inferenceMode = inferenceMode
 
@@ -172,6 +176,9 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 	auxiliaryFeaturesDict = None
 	auxiliaryFeaturesList = None
 	auxiliaryFeatureWordsByParentWord = None
+	auxiliarySimilarFeaturesDict = None
+	auxiliarySimilarFeaturesList = None
+	auxiliarySimilarFeatureWordWeightsByParentWord = None
 	loadExistingDatabase = inferenceMode or loadExistingDatabaseOverride or (trainLoadExistingDatabase and GIAANNcmn_databaseNetworkFiles.pathExists(conceptColumnsDictFile))
 	databaseLoadedFromDisk = loadExistingDatabase and GIAANNcmn_databaseNetworkFiles.pathExists(conceptColumnsDictFile)
 
@@ -205,8 +212,10 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 					conceptFeaturesReferenceSetDelimiterProbabilisticList = GIAANNcmn_debug.applyDebugLimitList(conceptFeaturesReferenceSetDelimiterProbabilisticList, f, "conceptFeaturesReferenceSetDelimiterProbabilisticList")
 				else:
 					conceptFeaturesReferenceSetDelimiterList = GIAANNcmn_debug.applyDebugLimitList(conceptFeaturesReferenceSetDelimiterList, f, "conceptFeaturesReferenceSetDelimiterList")
-		if(tokenisationSubwordAuxiliary):
-			auxiliaryFeaturesDict, auxiliaryFeaturesList, auxiliaryFeatureWordsByParentWord = GIAANNnlp_subwordAuxiliary.loadOrCreateDatabaseAuxiliaryFeatureMaps(loadExistingDatabase)
+		if(auxiliaryNeuronsTokenisationSubword):
+			auxiliaryFeaturesDict, auxiliaryFeaturesList, auxiliaryFeatureWordsByParentWord = GIAANNnlp_auxiliaryNeuronsSubword.loadOrCreateDatabaseAuxiliaryFeatureMaps(loadExistingDatabase)
+		if(auxiliaryNeuronsSimilarWords):
+			auxiliarySimilarFeaturesDict, auxiliarySimilarFeaturesList, auxiliarySimilarFeatureWordWeightsByParentWord = GIAANNnlp_auxiliaryNeuronsSimilarity.loadOrCreateDatabaseAuxiliaryFeatureMaps(loadExistingDatabase)
 	else:
 		if(useDedicatedConceptNames):
 			# Add dummy feature for prime concept neuron (different per concept column)
@@ -226,8 +235,10 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 				conceptFeaturesReferenceSetDelimiterProbabilisticList.append(False)
 			else:
 				conceptFeaturesReferenceSetDelimiterList.append(False)
-		if(tokenisationSubwordAuxiliary):
-			auxiliaryFeaturesDict, auxiliaryFeaturesList, auxiliaryFeatureWordsByParentWord = GIAANNnlp_subwordAuxiliary.loadOrCreateDatabaseAuxiliaryFeatureMaps(False)
+		if(auxiliaryNeuronsTokenisationSubword):
+			auxiliaryFeaturesDict, auxiliaryFeaturesList, auxiliaryFeatureWordsByParentWord = GIAANNnlp_auxiliaryNeuronsSubword.loadOrCreateDatabaseAuxiliaryFeatureMaps(False)
+		if(auxiliaryNeuronsSimilarWords):
+			auxiliarySimilarFeaturesDict, auxiliarySimilarFeaturesList, auxiliarySimilarFeatureWordWeightsByParentWord = GIAANNnlp_auxiliaryNeuronsSimilarity.loadOrCreateDatabaseAuxiliaryFeatureMaps(False)
 	if storeDatabaseGlobalFeatureNeuronsInRam:
 		if(loadExistingDatabase):
 			globalFeatureNeurons = loadFeatureNeuronsGlobal(inferenceMode, c, f)
@@ -239,12 +250,14 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 	s = arrayNumberOfSegments
 	p = calculateArrayNumberOfProperties(inferenceMode)
 		
-	databaseNetworkObject = DatabaseNetworkClass(inferenceMode, c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList, conceptFeaturesReferenceSetDelimiterDeterministicList, conceptFeaturesReferenceSetDelimiterProbabilisticList, auxiliaryFeaturesDict, auxiliaryFeaturesList, auxiliaryFeatureWordsByParentWord, databaseLoadedFromDisk)
+	databaseNetworkObject = DatabaseNetworkClass(inferenceMode, c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList, conceptFeaturesReferenceSetDelimiterDeterministicList, conceptFeaturesReferenceSetDelimiterProbabilisticList, auxiliaryFeaturesDict, auxiliaryFeaturesList, auxiliaryFeatureWordsByParentWord, databaseLoadedFromDisk, auxiliarySimilarFeaturesDict, auxiliarySimilarFeaturesList, auxiliarySimilarFeatureWordWeightsByParentWord, databaseLoadedFromDisk)
 	
 	if(printTotalFeatures):
 		print("initialiseDatabaseNetwork: c = ", databaseNetworkObject.c, ", f = ", databaseNetworkObject.f)
-		if(tokenisationSubwordAuxiliary):
+		if(auxiliaryNeuronsTokenisationSubword):
 			print("initialiseDatabaseNetwork: fa = ", databaseNetworkObject.fa)
+		if(auxiliaryNeuronsSimilarWords):
+			print("initialiseDatabaseNetwork: fas = ", databaseNetworkObject.fas)
 	
 	return databaseNetworkObject
 	
@@ -376,8 +389,10 @@ def moveObservedColumnsDictConnectionsToDatabaseAfterTrain(observedColumnsDict, 
 					sourceTensor = observedColumn.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, deviceDatabase, createMissing=False)
 					observedColumn.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, sourceTensor)
 				observedColumn.clearTrainPreparedSourceFeatureIndices()
-				if(tokenisationSubwordAuxiliary):
-					GIAANNnlp_subwordAuxiliary.moveObservedColumnAuxiliaryConnectionsToDatabaseAfterTrain(observedColumn)
+				if(auxiliaryNeuronsTokenisationSubword):
+					GIAANNnlp_auxiliaryNeuronsSubword.moveObservedColumnAuxiliaryConnectionsToDatabaseAfterTrain(observedColumn)
+				if(auxiliaryNeuronsSimilarWords):
+					GIAANNnlp_auxiliaryNeuronsSimilarity.moveObservedColumnAuxiliaryConnectionsToDatabaseAfterTrain(observedColumn)
 	return
 
 def prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFeatureIndicesByObservedColumn):

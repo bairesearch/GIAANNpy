@@ -22,8 +22,6 @@ import pickle
 import os
 import time
 import subprocess
-import glob
-import shutil
 
 from GIAANNcmn_globalDefs import *
 import GIAANNcmn_debug
@@ -40,13 +38,12 @@ def prepareDatabaseFilesStartup():
 			clearDatabaseFiles()
 	else:
 		os.makedirs(observedColumnsDir, exist_ok=True)
-	if(inferenceCopyTemplateDatasets):
-		if(executionMode=="inference"):
-			copyTemplateDatasetFilesToDatabaseFolder()
 	return
 
 def copyTemplateDatasetFilesToDatabaseFolder():
 	if(inferenceCopyTemplateDatasets):
+		import glob
+		import shutil
 		if(not os.path.isdir(databaseFolderTemplate)):
 			raise RuntimeError("copyTemplateDatasetFilesToDatabaseFolder error: missing databaseFolderTemplate = " + databaseFolderTemplate)
 		templateDatasetFilePaths = sorted(glob.glob(os.path.join(databaseFolderTemplate, databaseFolderTemplateDatasetFileNamePattern)))
@@ -442,9 +439,12 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 
 		saveDictFile(conceptColumnsDictFile, databaseNetworkObject.conceptColumnsDict)
 		saveDictFile(conceptFeaturesDictFile, databaseNetworkObject.conceptFeaturesDict)
-		if(tokenisationSubwordAuxiliary):
-			import GIAANNnlp_subwordAuxiliary
-			GIAANNnlp_subwordAuxiliary.saveDatabaseAuxiliaryFeatureMaps(databaseNetworkObject)
+		if(auxiliaryNeuronsTokenisationSubword):
+			import GIAANNnlp_auxiliaryNeuronsSubword
+			GIAANNnlp_auxiliaryNeuronsSubword.saveDatabaseAuxiliaryFeatureMaps(databaseNetworkObject)
+		if(auxiliaryNeuronsSimilarWords):
+			import GIAANNnlp_auxiliaryNeuronsSimilarity
+			GIAANNnlp_auxiliaryNeuronsSimilarity.saveDatabaseAuxiliaryFeatureMaps(databaseNetworkObject)
 
 		if(conceptColumnsDelimitByPOS):
 			if(detectReferenceSetDelimitersBetweenNouns):
@@ -595,9 +595,12 @@ def observedColumnSaveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsTo
 		else:
 			raise RuntimeError("observedColumnSaveToDisk(saveAllSourceFeatures) requires !storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam")
 	self.saveLoadedSourceFeatureConnectionsToDisk(sourceFeatureIndicesToSave)
-	if(tokenisationSubwordAuxiliary):
-		import GIAANNnlp_subwordAuxiliary
-		GIAANNnlp_subwordAuxiliary.saveObservedColumnAuxiliaryFeatureConnectionsToDisk(self, saveAllSourceFeatures)
+	if(auxiliaryNeuronsTokenisationSubword):
+		import GIAANNnlp_auxiliaryNeuronsSubword
+		GIAANNnlp_auxiliaryNeuronsSubword.saveObservedColumnAuxiliaryFeatureConnectionsToDisk(self, saveAllSourceFeatures)
+	if(auxiliaryNeuronsSimilarWords):
+		import GIAANNnlp_auxiliaryNeuronsSimilarity
+		GIAANNnlp_auxiliaryNeuronsSimilarity.saveObservedColumnAuxiliaryFeatureConnectionsToDisk(self, saveAllSourceFeatures)
 	
 	if not storeDatabaseGlobalFeatureNeuronsInRam:
 		saveTensor(self.featureNeurons, getObservedColumnFolder(self.conceptIndex), getObservedColumnFeatureNeuronsFileBaseName())
@@ -680,9 +683,12 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 		sourceFeatureIndices = listObservedColumnSourceFeatureIndices(conceptIndex)
 		loadTargetDevice = targetDevice if targetDevice is not None else deviceDatabase
 		instance.loadRequiredSourceFeatureConnections(sourceFeatureIndices, loadTargetDevice, createMissing=False, ensureCurrentSizeOnLoad=resizeFeatureTensorsToCurrentSize)
-	if(tokenisationSubwordAuxiliary):
-		import GIAANNnlp_subwordAuxiliary
-		GIAANNnlp_subwordAuxiliary.loadObservedColumnAuxiliaryConnectionsFromDisk(instance, targetDevice=targetDevice, loadAllSourceFeatures=loadAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize)
+	if(auxiliaryNeuronsTokenisationSubword):
+		import GIAANNnlp_auxiliaryNeuronsSubword
+		GIAANNnlp_auxiliaryNeuronsSubword.loadObservedColumnAuxiliaryConnectionsFromDisk(instance, targetDevice=targetDevice, loadAllSourceFeatures=loadAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize)
+	if(auxiliaryNeuronsSimilarWords):
+		import GIAANNnlp_auxiliaryNeuronsSimilarity
+		GIAANNnlp_auxiliaryNeuronsSimilarity.loadObservedColumnAuxiliaryConnectionsFromDisk(instance, targetDevice=targetDevice, loadAllSourceFeatures=loadAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize)
 	return instance
 
 def saveTensor(tensor, folderName, fileName):

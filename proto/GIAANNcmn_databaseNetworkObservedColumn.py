@@ -23,8 +23,10 @@ import time
 from GIAANNcmn_globalDefs import *
 import GIAANNcmn_debug
 import GIAANNcmn_databaseNetworkFiles
-if(tokenisationSubwordAuxiliary):
-	import GIAANNnlp_subwordAuxiliary
+if(auxiliaryNeuronsTokenisationSubword):
+	import GIAANNnlp_auxiliaryNeuronsSubword
+if(auxiliaryNeuronsSimilarWords):
+	import GIAANNnlp_auxiliaryNeuronsSimilarity
 
 
 class ObservedColumnConnectionBase:
@@ -123,8 +125,10 @@ class ObservedColumnConnectionBase:
 		self.expandFeatureNeuronArraysFeatures(self.databaseNetworkObject.f)
 		self.expandFeatureConnectionsArraysConcepts(self.databaseNetworkObject.c, loadedSourceFeatureIndices)
 		self.expandFeatureConnectionsArraysFeatures(self.databaseNetworkObject.f, loadedSourceFeatureIndices)
-		if(tokenisationSubwordAuxiliary):
-			GIAANNnlp_subwordAuxiliary.ensureRAMdatabaseAuxiliaryFeatureTensorSizes(self)
+		if(auxiliaryNeuronsTokenisationSubword):
+			GIAANNnlp_auxiliaryNeuronsSubword.ensureRAMdatabaseAuxiliaryFeatureTensorSizes(self)
+		if(auxiliaryNeuronsSimilarWords):
+			GIAANNnlp_auxiliaryNeuronsSimilarity.ensureRAMdatabaseAuxiliaryFeatureTensorSizes(self)
 		return
 
 	def setTrainPreparedSourceFeatureIndices(self, sourceFeatureIndices):
@@ -342,8 +346,10 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		self.featureConnectionsBySourceFeature = {}
 		self.loadedSourceFeatureIndices = set()
 		self.trainPreparedSourceFeatureIndices = set()
-		if(tokenisationSubwordAuxiliary):
-			GIAANNnlp_subwordAuxiliary.initialiseObservedColumnAuxiliaryStorage(self)
+		if(auxiliaryNeuronsTokenisationSubword):
+			GIAANNnlp_auxiliaryNeuronsSubword.initialiseObservedColumnAuxiliaryStorage(self)
+		if(auxiliaryNeuronsSimilarWords):
+			GIAANNnlp_auxiliaryNeuronsSimilarity.initialiseObservedColumnAuxiliaryStorage(self)
 		if(optimisationGetFeatureConnectionsForSourceFeatureCache):
 			self.storedSourceFeatureIndicesCache = None
 		if(not trainStoreFeatureMapsGlobally):
@@ -478,8 +484,10 @@ class ObservedColumnProxy(ObservedColumnConnectionBase):
 		self.featureConnectionsBySourceFeature = {}
 		self.loadedSourceFeatureIndices = set()
 		self.trainPreparedSourceFeatureIndices = set()
-		if(tokenisationSubwordAuxiliary):
-			GIAANNnlp_subwordAuxiliary.initialiseObservedColumnProxyAuxiliaryStorage(self)
+		if(auxiliaryNeuronsTokenisationSubword):
+			GIAANNnlp_auxiliaryNeuronsSubword.initialiseObservedColumnProxyAuxiliaryStorage(self)
+		if(auxiliaryNeuronsSimilarWords):
+			GIAANNnlp_auxiliaryNeuronsSimilarity.initialiseObservedColumnProxyAuxiliaryStorage(self)
 		if((not storeDatabaseGlobalFeatureNeuronsInRam) and hasattr(observedColumn, "featureNeurons")):
 			self.featureNeurons = observedColumn.featureNeurons.to(targetDevice)
 

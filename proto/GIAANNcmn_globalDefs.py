@@ -21,6 +21,9 @@ import torch as pt
 import math
 import sys
 
+if(__name__ == "__main__"):
+	sys.modules["GIAANNcmn_globalDefs"] = sys.modules[__name__]
+
 
 #modality selection;
 useModalityNLP = True	#default: True	#orig: True
@@ -125,10 +128,10 @@ elif(useDrawNetworkIndependently):
 	databaseFolderBase = databaseFolderBaseLocal
 	#databaseFolderBase = "/media/user/ssdpro/GIAANN/databaseOscar1000-numSeedTokensInference8-spacyPipelineOptimisations"
 databaseFolderTemplate = databaseFolderBase + "Template/"
-if(databaseFolderBaseLocal):
-	inferenceCopyTemplateDatasets = False
-else:
+if(databaseFolderBase==databaseFolderBaseSSD):
 	inferenceCopyTemplateDatasets = True	#default: True	#copy template dataset files into databaseFolder at inference startup
+else:
+	inferenceCopyTemplateDatasets = False
 databaseFolderTemplateDatasetFileNamePattern = "*.*"
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
@@ -152,18 +155,6 @@ useSANI = True	#default: True	#orig: False	#sequentially activated neuronal inpu
 
 
 #modality global defs;
-inferenceReportGroundedAccuracy = False
-closedWorldGroundedDatasetGenerated = False
-inferenceReportGroundedRealisticNLPmetric = False
-inferenceReportGroundedStrongerGroundedNLPmetric = False
-inferenceReportGroundedAccuracyMod1_labelBalancedDataset = False
-inferenceReportGroundedAccuracyMod2_majorityClassBaseline = False
-inferenceReportGroundedAccuracyMod3_perLabelMetrics = False
-tokenisationSubwordAuxiliary = False
-tokenisationSubwordAuxiliaryLemma = False
-tokenisationSubwordAuxiliaryMorph = False
-tokenisationSubwordAuxiliarySuffix = False
-tokenisationSubwordAuxiliaryDistinctEnforce = False
 if(modalityName=="NLP"):
 	from GIAANNnlp_globalDefs import *
 elif(modalityName=="OR"):
@@ -621,9 +612,17 @@ if(useInference):
 #Database save paths;
 conceptColumnsDictFile = databaseFolder + 'conceptColumnsDict.pkl'
 conceptFeaturesDictFile = databaseFolder + 'conceptFeaturesDict.pkl'
-if(tokenisationSubwordAuxiliary):
-	tokenisationSubwordAuxiliaryFeaturesDictFile = databaseFolder + tokenisationSubwordAuxiliaryFeaturesDictFileName
-	tokenisationSubwordAuxiliaryFeatureWordsByParentWordFile = databaseFolder + tokenisationSubwordAuxiliaryFeatureWordsByParentWordFileName
+if(auxiliaryNeuronsTokenisationSubword):
+	auxiliaryNeuronsTokenisationSubwordFeaturesDictFile = databaseFolder + auxiliaryNeuronsTokenisationSubwordFeaturesDictFileName
+	auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWordFile = databaseFolder + auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWordFileName
+if(auxiliaryNeuronsSimilarWords):
+	auxiliaryNeuronsSimilarWordsFeaturesDictFile = databaseFolder + auxiliaryNeuronsSimilarWordsFeaturesDictFileName
+	auxiliaryNeuronsSimilarWordsFeatureWordWeightsByParentWordFile = databaseFolder + auxiliaryNeuronsSimilarWordsFeatureWordWeightsByParentWordFileName
+	auxiliaryNeuronsSimilarWordsDatasetFolder = databaseFolder + auxiliaryNeuronsSimilarWordsDatasetFolderName + "/"
+	auxiliaryNeuronsSimilarWordsDataset2File = auxiliaryNeuronsSimilarWordsDatasetFolder + auxiliaryNeuronsSimilarWordsDataset2FileName
+	auxiliaryNeuronsSimilarWordsDataset3File = auxiliaryNeuronsSimilarWordsDatasetFolder + auxiliaryNeuronsSimilarWordsDataset3FileName
+	auxiliaryNeuronsSimilarWordsDataset3SourceFile = auxiliaryNeuronsSimilarWordsDatasetFolder + auxiliaryNeuronsSimilarWordsDataset3SourceFileName
+	auxiliaryNeuronsSimilarWordsDataset3SourceDownloadArchiveFile = auxiliaryNeuronsSimilarWordsDatasetFolder + auxiliaryNeuronsSimilarWordsDataset3SourceDownloadArchiveFileName
 observedColumnsFolderName = 'observedColumns'
 observedColumnsDir = databaseFolder + observedColumnsFolderName
 observedColumnFolderNamePrefix = 'cIndex'

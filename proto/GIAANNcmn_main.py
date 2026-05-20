@@ -175,6 +175,9 @@ def executeMode(inferenceMode):
 		debugPrintTimeDatabaseLoadSaveTimesExecuteModeStartTime = time.perf_counter()
 	if(useAutoresearch):
 		autoresearchExecutionTimeStart = time.perf_counter()
+	if(inferenceCopyTemplateDatasets):
+		if(inferenceMode):
+			GIAANNcmn_databaseNetworkFiles.copyTemplateDatasetFilesToDatabaseFolder()
 
 	databaseNetworkObject = GIAANNcmn_databaseNetwork.initialiseDatabaseNetwork(inferenceMode)
 	if(modalityName=="NLP"):

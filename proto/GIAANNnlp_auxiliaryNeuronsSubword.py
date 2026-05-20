@@ -1,4 +1,4 @@
-"""GIAANNnlp_subwordAuxiliary.py
+"""GIAANNnlp_auxiliaryNeuronsSubword.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch.com.au)
@@ -13,7 +13,7 @@ see GIAANNcmn_main.py
 see GIAANNcmn_main.py
 
 # Description:
-GIA ANN NLP subword auxiliary feature support
+GIA ANN NLP auxiliary neurons subword
 
 """
 
@@ -24,18 +24,18 @@ from GIAANNcmn_globalDefs import *
 import GIAANNcmn_databaseNetworkFiles
 
 
-if(tokenisationSubwordAuxiliary):
+if(auxiliaryNeuronsTokenisationSubword):
 
-	tokenisationSubwordAuxiliarySavedSourceTensorPaths = set()
+	auxiliaryNeuronsTokenisationSubwordSavedSourceTensorPaths = set()
 
 	def getPreprocessedTokenMorphString(preprocessedToken):
-		result = tokenisationSubwordAuxiliaryMorphEmpty
+		result = auxiliaryNeuronsTokenisationSubwordMorphEmpty
 		if(hasattr(preprocessedToken, "morph")):
 			result = str(preprocessedToken.morph)
 		elif(hasattr(preprocessedToken, "morph_")):
 			result = str(preprocessedToken.morph_)
 		if(result is None):
-			result = tokenisationSubwordAuxiliaryMorphEmpty
+			result = auxiliaryNeuronsTokenisationSubwordMorphEmpty
 		return result
 
 	def createTokenAuxiliaryFeatureWords(token):
@@ -48,15 +48,15 @@ if(tokenisationSubwordAuxiliary):
 		baseForm = getTokenAuxiliaryBaseForm(token)
 		distinctForm = isTokenAuxiliaryDistinctForm(token, baseForm)
 		result = False
-		if(baseForm != tokenisationSubwordAuxiliaryFeatureValueEmpty):
-			if(tokenisationSubwordAuxiliaryDistinctEnforce and not distinctForm):
+		if(baseForm != auxiliaryNeuronsTokenisationSubwordFeatureValueEmpty):
+			if(auxiliaryNeuronsTokenisationSubwordDistinctEnforce and not distinctForm):
 				result = False
 			else:
-				if(tokenisationSubwordAuxiliaryMorph and tokenMorphIndicatesAuxiliaryVariation(token)):
+				if(auxiliaryNeuronsTokenisationSubwordMorph and tokenMorphIndicatesAuxiliaryVariation(token)):
 					result = True
-				if((not result) and tokenisationSubwordAuxiliarySuffix and tokenSuffixIndicatesAuxiliaryVariation(token)):
+				if((not result) and auxiliaryNeuronsTokenisationSubwordSuffix and tokenSuffixIndicatesAuxiliaryVariation(token)):
 					result = True
-				if((not result) and tokenisationSubwordAuxiliaryLemma and distinctForm):
+				if((not result) and auxiliaryNeuronsTokenisationSubwordLemma and distinctForm):
 					result = True
 		return result
 
@@ -77,12 +77,12 @@ if(tokenisationSubwordAuxiliary):
 	def tokenMorphIndicatesAuxiliaryVariation(token):
 		morphString = token.morph
 		if(morphString is None):
-			morphString = tokenisationSubwordAuxiliaryMorphEmpty
+			morphString = auxiliaryNeuronsTokenisationSubwordMorphEmpty
 		result = False
-		if(morphString != tokenisationSubwordAuxiliaryMorphEmpty):
-			morphParts = morphString.split(tokenisationSubwordAuxiliaryMorphSeparator)
+		if(morphString != auxiliaryNeuronsTokenisationSubwordMorphEmpty):
+			morphParts = morphString.split(auxiliaryNeuronsTokenisationSubwordMorphSeparator)
 			for morphPart in morphParts:
-				if(morphPart != tokenisationSubwordAuxiliaryMorphEmpty):
+				if(morphPart != auxiliaryNeuronsTokenisationSubwordMorphEmpty):
 					result = True
 		return result
 
@@ -90,22 +90,22 @@ if(tokenisationSubwordAuxiliary):
 		if(token.word is None):
 			raise RuntimeError("tokenSuffixIndicatesAuxiliaryVariation error: token word is None")
 		result = False
-		for suffix in tokenisationSubwordAuxiliarySuffixList:
+		for suffix in auxiliaryNeuronsTokenisationSubwordSuffixList:
 			if(token.word.endswith(suffix)):
-				if(len(token.word) > len(suffix) + tokenisationSubwordAuxiliarySuffixMinimumStemLength):
+				if(len(token.word) > len(suffix) + auxiliaryNeuronsTokenisationSubwordSuffixMinimumStemLength):
 					result = True
 		return result
 
 	def buildAuxiliaryFeatureName(auxiliaryFeatureValue):
-		result = tokenisationSubwordAuxiliaryFeatureNamePrefix + tokenisationSubwordAuxiliaryFeatureNameDelimiter + auxiliaryFeatureValue
+		result = auxiliaryNeuronsTokenisationSubwordFeatureNamePrefix + auxiliaryNeuronsTokenisationSubwordFeatureNameDelimiter + auxiliaryFeatureValue
 		return result
 
 	def buildConceptColumnAuxiliaryFeatureName(databaseNetworkObject, conceptIndex, auxiliaryFeatureWord):
 		normalisedConceptIndex = normaliseAuxiliaryParentMapConceptIndex(databaseNetworkObject, conceptIndex)
-		auxiliaryFeatureNamePrefix = tokenisationSubwordAuxiliaryFeatureNamePrefix + tokenisationSubwordAuxiliaryFeatureNameDelimiter
+		auxiliaryFeatureNamePrefix = auxiliaryNeuronsTokenisationSubwordFeatureNamePrefix + auxiliaryNeuronsTokenisationSubwordFeatureNameDelimiter
 		if(not auxiliaryFeatureWord.startswith(auxiliaryFeatureNamePrefix)):
 			raise RuntimeError("buildConceptColumnAuxiliaryFeatureName error: auxiliaryFeatureWord missing prefix")
-		result = auxiliaryFeatureNamePrefix + str(normalisedConceptIndex) + tokenisationSubwordAuxiliaryFeatureNameDelimiter + auxiliaryFeatureWord[len(auxiliaryFeatureNamePrefix):]
+		result = auxiliaryFeatureNamePrefix + str(normalisedConceptIndex) + auxiliaryNeuronsTokenisationSubwordFeatureNameDelimiter + auxiliaryFeatureWord[len(auxiliaryFeatureNamePrefix):]
 		return result
 
 	def buildIndexListFromIndexDict(indexDict, mapName):
@@ -127,9 +127,9 @@ if(tokenisationSubwordAuxiliary):
 		auxiliaryFeaturesDict = {}
 		auxiliaryFeatureWordsByParentWord = {}
 		if(loadExistingDatabase):
-			auxiliaryFeaturesDict = GIAANNcmn_databaseNetworkFiles.loadDictFile(tokenisationSubwordAuxiliaryFeaturesDictFile)
-			auxiliaryFeatureWordsByParentWord = GIAANNcmn_databaseNetworkFiles.loadDictFile(tokenisationSubwordAuxiliaryFeatureWordsByParentWordFile)
-		auxiliaryFeaturesList = buildIndexListFromIndexDict(auxiliaryFeaturesDict, tokenisationSubwordAuxiliaryFeaturesDictFileName)
+			auxiliaryFeaturesDict = GIAANNcmn_databaseNetworkFiles.loadDictFile(auxiliaryNeuronsTokenisationSubwordFeaturesDictFile)
+			auxiliaryFeatureWordsByParentWord = GIAANNcmn_databaseNetworkFiles.loadDictFile(auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWordFile)
+		auxiliaryFeaturesList = buildIndexListFromIndexDict(auxiliaryFeaturesDict, auxiliaryNeuronsTokenisationSubwordFeaturesDictFileName)
 		result = auxiliaryFeaturesDict, auxiliaryFeaturesList, auxiliaryFeatureWordsByParentWord
 		return result
 
@@ -139,15 +139,15 @@ if(tokenisationSubwordAuxiliary):
 		databaseNetworkObject.auxiliaryFeaturesDict = auxiliaryFeaturesDict
 		databaseNetworkObject.auxiliaryFeaturesList = auxiliaryFeaturesList
 		databaseNetworkObject.auxiliaryFeaturesIndexToWordDict = dict(enumerate(auxiliaryFeaturesList))
-		databaseNetworkObject.tokenisationSubwordAuxiliaryFeatureWordsByParentWord = auxiliaryFeatureWordsByParentWord
-		databaseNetworkObject.tokenisationSubwordAuxiliaryFeatureIndicesByParentWord = buildAuxiliaryFeatureIndicesByParentWord(databaseNetworkObject)
-		databaseNetworkObject.tokenisationSubwordAuxiliaryLoadExistingDatabase = auxiliaryLoadExistingDatabase
+		databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWord = auxiliaryFeatureWordsByParentWord
+		databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordFeatureIndicesByParentWord = buildAuxiliaryFeatureIndicesByParentWord(databaseNetworkObject)
+		databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordLoadExistingDatabase = auxiliaryLoadExistingDatabase
 		databaseNetworkObject.fa = len(auxiliaryFeaturesList)
 		return
 
 	def buildAuxiliaryFeatureIndicesByParentWord(databaseNetworkObject):
 		result = {}
-		for conceptIndex, auxiliaryFeatureWordsByParentWord in databaseNetworkObject.tokenisationSubwordAuxiliaryFeatureWordsByParentWord.items():
+		for conceptIndex, auxiliaryFeatureWordsByParentWord in databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWord.items():
 			normalisedConceptIndex = normaliseAuxiliaryParentMapConceptIndex(databaseNetworkObject, conceptIndex)
 			if(not isinstance(auxiliaryFeatureWordsByParentWord, dict)):
 				raise RuntimeError("buildAuxiliaryFeatureIndicesByParentWord error: concept parent map must be dict")
@@ -173,8 +173,8 @@ if(tokenisationSubwordAuxiliary):
 		return result
 
 	def saveDatabaseAuxiliaryFeatureMaps(databaseNetworkObject):
-		GIAANNcmn_databaseNetworkFiles.saveDictFile(tokenisationSubwordAuxiliaryFeaturesDictFile, databaseNetworkObject.auxiliaryFeaturesDict)
-		GIAANNcmn_databaseNetworkFiles.saveDictFile(tokenisationSubwordAuxiliaryFeatureWordsByParentWordFile, databaseNetworkObject.tokenisationSubwordAuxiliaryFeatureWordsByParentWord)
+		GIAANNcmn_databaseNetworkFiles.saveDictFile(auxiliaryNeuronsTokenisationSubwordFeaturesDictFile, databaseNetworkObject.auxiliaryFeaturesDict)
+		GIAANNcmn_databaseNetworkFiles.saveDictFile(auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWordFile, databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWord)
 		return
 
 	def processAuxiliaryFeatureDetection(databaseNetworkObject, token, isConcept, allowNewFeatures):
@@ -203,15 +203,15 @@ if(tokenisationSubwordAuxiliary):
 			raise RuntimeError("registerParentAuxiliaryFeatureWord error: parentWord is None")
 		if(auxiliaryFeatureWord not in databaseNetworkObject.auxiliaryFeaturesDict):
 			raise RuntimeError("registerParentAuxiliaryFeatureWord error: missing auxiliary feature word " + auxiliaryFeatureWord)
-		if(normalisedConceptIndex not in databaseNetworkObject.tokenisationSubwordAuxiliaryFeatureWordsByParentWord):
-			databaseNetworkObject.tokenisationSubwordAuxiliaryFeatureWordsByParentWord[normalisedConceptIndex] = {}
-			databaseNetworkObject.tokenisationSubwordAuxiliaryFeatureIndicesByParentWord[normalisedConceptIndex] = {}
-		if(parentWord not in databaseNetworkObject.tokenisationSubwordAuxiliaryFeatureWordsByParentWord[normalisedConceptIndex]):
-			databaseNetworkObject.tokenisationSubwordAuxiliaryFeatureWordsByParentWord[normalisedConceptIndex][parentWord] = []
-			databaseNetworkObject.tokenisationSubwordAuxiliaryFeatureIndicesByParentWord[normalisedConceptIndex][parentWord] = []
-		if(auxiliaryFeatureWord not in databaseNetworkObject.tokenisationSubwordAuxiliaryFeatureWordsByParentWord[normalisedConceptIndex][parentWord]):
-			databaseNetworkObject.tokenisationSubwordAuxiliaryFeatureWordsByParentWord[normalisedConceptIndex][parentWord].append(auxiliaryFeatureWord)
-			databaseNetworkObject.tokenisationSubwordAuxiliaryFeatureIndicesByParentWord[normalisedConceptIndex][parentWord].append(databaseNetworkObject.auxiliaryFeaturesDict[auxiliaryFeatureWord])
+		if(normalisedConceptIndex not in databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWord):
+			databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWord[normalisedConceptIndex] = {}
+			databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordFeatureIndicesByParentWord[normalisedConceptIndex] = {}
+		if(parentWord not in databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWord[normalisedConceptIndex]):
+			databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWord[normalisedConceptIndex][parentWord] = []
+			databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordFeatureIndicesByParentWord[normalisedConceptIndex][parentWord] = []
+		if(auxiliaryFeatureWord not in databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWord[normalisedConceptIndex][parentWord]):
+			databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWord[normalisedConceptIndex][parentWord].append(auxiliaryFeatureWord)
+			databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordFeatureIndicesByParentWord[normalisedConceptIndex][parentWord].append(databaseNetworkObject.auxiliaryFeaturesDict[auxiliaryFeatureWord])
 		return
 
 	def getTokenAuxiliaryFeatureIndices(databaseNetworkObject, token, isConcept, conceptIndex, allowNewFeatures=False, registerParent=False):
@@ -268,11 +268,11 @@ if(tokenisationSubwordAuxiliary):
 		return result
 
 	def getObservedColumnAuxiliaryFeatureConnectionsFolder(conceptIndex):
-		result = os.path.join(GIAANNcmn_databaseNetworkFiles.getObservedColumnFolder(conceptIndex), tokenisationSubwordAuxiliaryConnectionsFolderName)
+		result = os.path.join(GIAANNcmn_databaseNetworkFiles.getObservedColumnFolder(conceptIndex), auxiliaryNeuronsTokenisationSubwordConnectionsFolderName)
 		return result
 
 	def getObservedColumnAuxiliarySourceFeatureConnectionsFileBaseName(sourceFeatureIndex):
-		result = tokenisationSubwordAuxiliarySourceFeatureConnectionsFileNamePrefix + str(int(sourceFeatureIndex))
+		result = auxiliaryNeuronsTokenisationSubwordSourceFeatureConnectionsFileNamePrefix + str(int(sourceFeatureIndex))
 		return result
 
 	def listObservedColumnAuxiliarySourceFeatureIndices(databaseNetworkObject, conceptIndex):
@@ -280,10 +280,10 @@ if(tokenisationSubwordAuxiliary):
 		connectionsFolder = getObservedColumnAuxiliaryFeatureConnectionsFolder(conceptIndex)
 		if(os.path.isdir(connectionsFolder)):
 			for fileName in os.listdir(connectionsFolder):
-				if(fileName.startswith(tokenisationSubwordAuxiliarySourceFeatureConnectionsFileNamePrefix) and fileName.endswith(pytorchTensorFileExtension)):
+				if(fileName.startswith(auxiliaryNeuronsTokenisationSubwordSourceFeatureConnectionsFileNamePrefix) and fileName.endswith(pytorchTensorFileExtension)):
 					filePath = os.path.join(connectionsFolder, fileName)
-					if(databaseNetworkObject.tokenisationSubwordAuxiliaryLoadExistingDatabase or filePath in tokenisationSubwordAuxiliarySavedSourceTensorPaths):
-						sourceFeatureIndexString = fileName[len(tokenisationSubwordAuxiliarySourceFeatureConnectionsFileNamePrefix):-len(pytorchTensorFileExtension)]
+					if(databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordLoadExistingDatabase or filePath in auxiliaryNeuronsTokenisationSubwordSavedSourceTensorPaths):
+						sourceFeatureIndexString = fileName[len(auxiliaryNeuronsTokenisationSubwordSourceFeatureConnectionsFileNamePrefix):-len(pytorchTensorFileExtension)]
 						result.append(int(sourceFeatureIndexString))
 		result.sort()
 		return result
@@ -312,11 +312,11 @@ if(tokenisationSubwordAuxiliary):
 			tensorNNZ = int(pt.count_nonzero(tensor).item())
 		if(tensorNNZ > 0):
 			GIAANNcmn_databaseNetworkFiles.saveTensor(tensor, connectionsFolder, fileBaseName)
-			tokenisationSubwordAuxiliarySavedSourceTensorPaths.add(filePath)
+			auxiliaryNeuronsTokenisationSubwordSavedSourceTensorPaths.add(filePath)
 		else:
 			if(GIAANNcmn_databaseNetworkFiles.pathExists(filePath)):
 				os.remove(filePath)
-			tokenisationSubwordAuxiliarySavedSourceTensorPaths.discard(filePath)
+			auxiliaryNeuronsTokenisationSubwordSavedSourceTensorPaths.discard(filePath)
 		return
 
 	def getObservedColumnAuxiliaryFeatureConnectionsTargetSize(observedColumn):
@@ -547,7 +547,7 @@ if(tokenisationSubwordAuxiliary):
 					baseValues = pt.ones((branchIndices.shape[0],), dtype=arrayType, device=connectionDevice)
 					if(trainConnectionStrengthNormaliseWrtContextLength):
 						connectionDistances = pt.abs(targetWordOrder - sourceWordOrderPair).to(baseValues.dtype)
-						baseValues = baseValues * (tokenisationSubwordAuxiliaryConnectionProximityMultiplier/(connectionDistances + 1))
+						baseValues = baseValues * (auxiliaryNeuronsTokenisationSubwordConnectionProximityMultiplier/(connectionDistances + 1))
 					appendAuxiliaryConnectionSegmentIndices(indicesList, valuesList, branchIndices, sourceConceptIndicesPair, sourceAuxiliaryFeatureIndicesPair, targetConceptIndices, targetFeatureIndices, sourceWordOrderPair, targetWordOrder, baseValues)
 		if(len(indicesList) > 0):
 			combinedIndices = pt.cat(indicesList, dim=1)
@@ -701,9 +701,9 @@ if(tokenisationSubwordAuxiliary):
 				raise RuntimeError("getAuxiliaryFeatureIndicesForParentFeature error: sourceFeatureIndex out of range")
 			conceptIndex = normaliseAuxiliaryParentMapConceptIndex(databaseNetworkObject, observedColumn.conceptIndex)
 			parentWord = databaseNetworkObject.conceptFeaturesList[sourceFeatureIndex]
-			if(conceptIndex in databaseNetworkObject.tokenisationSubwordAuxiliaryFeatureIndicesByParentWord):
-				if(parentWord in databaseNetworkObject.tokenisationSubwordAuxiliaryFeatureIndicesByParentWord[conceptIndex]):
-					result = databaseNetworkObject.tokenisationSubwordAuxiliaryFeatureIndicesByParentWord[conceptIndex][parentWord]
+			if(conceptIndex in databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordFeatureIndicesByParentWord):
+				if(parentWord in databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordFeatureIndicesByParentWord[conceptIndex]):
+					result = databaseNetworkObject.auxiliaryNeuronsTokenisationSubwordFeatureIndicesByParentWord[conceptIndex][parentWord]
 		return result
 
 	def processAuxiliaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None):
