@@ -24,7 +24,7 @@ from GIAANNcmn_globalDefs import *
 import GIAANNcmn_databaseNetworkFiles
 
 
-if(auxiliaryNeuronsTokenisationSubword):
+if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubword):
 
 	auxiliaryNeuronsTokenisationSubwordSavedSourceTensorPaths = set()
 

@@ -26,6 +26,8 @@ import GIAANNcmn_sparseTensors
 import GIAANNnlp_sequenceConcepts
 if(optimisationUseCUDAObservedColumnUpdateKernel):
 	import GIAANNcmn_cudaObservedColumnUpdate
+if(auxiliaryNeurons and auxiliaryNeuronsAuto):
+	import GIAANNnlp_auxiliaryNeuronsAuto
 
 # Define the SequenceObservedColumns class
 class SequenceObservedColumns:
@@ -743,9 +745,12 @@ class SequenceObservedColumns:
 		self.inferenceConceptUpdateCounts = {} if inference else None
 		if(trainSequenceObservedColumnsMatchSequenceWords):
 			#for multiple instances of concept in sequence, need to take the sum of the changes between the existing and modified arrays for each instance of a same concept in the sequence
-			self.updateObservedColumns(self.sequenceObservedColumnsDict, inference, mode="default")
+			sequenceObservedColumnsDict = self.sequenceObservedColumnsDict
 		else:
-			self.updateObservedColumns(self.observedColumnsDict2, inference, mode="default")
+			sequenceObservedColumnsDict = self.observedColumnsDict2
+		self.updateObservedColumns(sequenceObservedColumnsDict, inference, mode="default")
+		if(auxiliaryNeurons and auxiliaryNeuronsAuto and not inference):
+			GIAANNnlp_auxiliaryNeuronsAuto.updateReverseFeatureConnectionsFromSequence(self, sequenceObservedColumnsDict)
 
 	def updateObservedColumns(self, sequenceObservedColumnsDict, inference, mode):
 		if(arrayIndexPropertiesEfficient and not inference):

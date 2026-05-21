@@ -240,6 +240,10 @@ def executeMode(inferenceMode):
 		processArticlePart2averageTime = processArticlePart2totalTime/processArticlePart2count
 		print(f"debugPrintSpacySectionTimes: processArticlePart1averageTime={processArticlePart1averageTime:.6f} processArticlePart2averageTime={processArticlePart2averageTime:.6f}")
 
+	if(not inferenceMode):
+		if(modalityName=="NLP" and auxiliaryNeurons and auxiliaryNeuronsAuto):
+			GIAANNnlp_main.trainAutoAuxiliaryNeuronsEnd(databaseNetworkObject)
+
 	if(not inferenceMode or inferenceTrainFirstSequences):
 		if(useSaveData):
 			if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):

@@ -35,10 +35,14 @@ import GIAANNcmn_databaseNetworkDrawLarge
 import GIAANNcmn_executionProgress
 import GIAANNnlp_sequenceTokens
 import GIAANNnlp_sequenceConcepts
-if(auxiliaryNeuronsTokenisationSubword):
+if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubword):
 	import GIAANNnlp_auxiliaryNeuronsSubword
-if(auxiliaryNeuronsSimilarWords):
+if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	import GIAANNnlp_auxiliaryNeuronsSimilarity
+if(auxiliaryNeurons and auxiliaryNeuronsSimilarWordsAuto):
+	import GIAANNnlp_auxiliaryNeuronsSimilarityAuto
+if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubwordAuto):
+	import GIAANNnlp_auxiliaryNeuronsSubwordAuto
 import GIAANNcmn_sequenceObservedColumns
 import GIAANNcmn_databaseNetworkTrain
 if(executionMode=="inference" or executionMode=="trainAndInference"):
@@ -51,6 +55,15 @@ if(datasetType in closedWorldGroundedDatasetTypes):
 def loadPOSdatabase():
 	if(usePOS):
 		GIAANNnlp_sequenceTokens.loadPOSdatabase()
+	return
+
+def trainAutoAuxiliaryNeuronsEnd(databaseNetworkObject):
+	if(auxiliaryNeurons and auxiliaryNeuronsAuto):
+		if(auxiliaryNeuronsSimilarWordsAuto):
+			GIAANNnlp_auxiliaryNeuronsSimilarityAuto.updateAutoAuxiliaryConnections(databaseNetworkObject)
+		if(auxiliaryNeuronsTokenisationSubwordAuto):
+			GIAANNnlp_auxiliaryNeuronsSubwordAuto.updateAutoAuxiliaryConnections(databaseNetworkObject)
+	return
 
 # Initialize spaCy model
 if(useDrawNetworkIndependently):
@@ -443,9 +456,9 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 				GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("prepareObservedColumnsForTrainSequence")
 				
 			GIAANNcmn_databaseNetwork.prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFeatureIndicesByObservedColumn)
-			if(auxiliaryNeuronsTokenisationSubword):
+			if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubword):
 				GIAANNnlp_auxiliaryNeuronsSubword.prepareObservedColumnsForTrainSequenceAuxiliary(sequenceObservedColumns, observedColumnsDict, allowNewFeatures)
-			if(auxiliaryNeuronsSimilarWords):
+			if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 				GIAANNnlp_auxiliaryNeuronsSimilarity.prepareObservedColumnsForTrainSequenceAuxiliary(sequenceObservedColumns, observedColumnsDict, allowNewFeatures)
 			
 			if(debugPrintRamMaxUsagePhaseLocal):
@@ -482,7 +495,6 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 						GIAANNcmn_databaseNetworkFiles.saveData(databaseNetworkObject, observedColumnsDict, sequenceCount)
 						if(debugPrintRamMaxUsagePhaseLocal):
 							GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("saveData(sequence)")
-
 				if(drawNetworkDuringTrain):
 					# Visualize the complete graph every time a new sequence is parsed by the application.
 					GIAANNcmn_databaseNetworkDraw.visualizeGraph(sequenceObservedColumns, False, save=drawNetworkDuringTrainSave, fileName=drawNetworkDuringTrainSaveFilenamePrepend+generateDrawSequenceIndex(sequenceIndex))

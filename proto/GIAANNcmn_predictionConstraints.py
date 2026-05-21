@@ -23,9 +23,9 @@ from GIAANNcmn_globalDefs import *
 import GIAANNcmn_databaseNetwork
 import GIAANNcmn_sparseTensors
 import GIAANNcmn_predictionActivate
-if(auxiliaryNeuronsTokenisationSubword):
+if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubword):
 	import GIAANNnlp_auxiliaryNeuronsSubword
-if(auxiliaryNeuronsSimilarWords):
+if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	import GIAANNnlp_auxiliaryNeuronsSimilarity
 
 def buildAllowedColumnsSet(allowedColumnsTensor):
@@ -290,7 +290,7 @@ def getConnectedColumnsForFeature(observedColumn, featureIndex, includeFeatureDe
 					targetFeatures = targetColumnIndices[3].cpu().tolist()
 					for columnValue, featureValue in zip(targetColumnIndices[2].tolist(), targetFeatures):
 						columnFeatureMap.setdefault(columnValue, set()).add(featureValue)
-		if(auxiliaryNeuronsTokenisationSubword):
+		if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubword):
 			if(includeFeatureDetails):
 				auxiliaryTargetColumnsList, auxiliaryColumnFeatureMap = GIAANNnlp_auxiliaryNeuronsSubword.getConnectedColumnsForAuxiliaryFeatures(observedColumn, featureIndex, includeFeatureDetails=True)
 				targetColumnsList.extend(auxiliaryTargetColumnsList)
@@ -300,7 +300,7 @@ def getConnectedColumnsForFeature(observedColumn, featureIndex, includeFeatureDe
 				auxiliaryTargetColumnsList, _ = GIAANNnlp_auxiliaryNeuronsSubword.getConnectedColumnsForAuxiliaryFeatures(observedColumn, featureIndex, includeFeatureDetails=False)
 				targetColumnsList.extend(auxiliaryTargetColumnsList)
 			targetColumnsList = sorted(set(targetColumnsList))
-		if(auxiliaryNeuronsSimilarWords):
+		if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			if(includeFeatureDetails):
 				auxiliaryTargetColumnsList, auxiliaryColumnFeatureMap = GIAANNnlp_auxiliaryNeuronsSimilarity.getConnectedColumnsForAuxiliaryFeatures(observedColumn, featureIndex, includeFeatureDetails=True)
 				targetColumnsList.extend(auxiliaryTargetColumnsList)
