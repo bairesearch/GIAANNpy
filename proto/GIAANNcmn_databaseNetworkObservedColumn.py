@@ -23,7 +23,7 @@ import time
 from GIAANNcmn_globalDefs import *
 import GIAANNcmn_debug
 import GIAANNcmn_databaseNetworkFiles
-if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubword):
+if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
 	import GIAANNnlp_auxiliaryNeuronsSubword
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	import GIAANNnlp_auxiliaryNeuronsSimilarity
@@ -127,7 +127,7 @@ class ObservedColumnConnectionBase:
 		self.expandFeatureNeuronArraysFeatures(self.databaseNetworkObject.f)
 		self.expandFeatureConnectionsArraysConcepts(self.databaseNetworkObject.c, loadedSourceFeatureIndices)
 		self.expandFeatureConnectionsArraysFeatures(self.databaseNetworkObject.f, loadedSourceFeatureIndices)
-		if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubword):
+		if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
 			GIAANNnlp_auxiliaryNeuronsSubword.ensureRAMdatabaseAuxiliaryFeatureTensorSizes(self)
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			GIAANNnlp_auxiliaryNeuronsSimilarity.ensureRAMdatabaseAuxiliaryFeatureTensorSizes(self)
@@ -350,7 +350,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		self.featureConnectionsBySourceFeature = {}
 		self.loadedSourceFeatureIndices = set()
 		self.trainPreparedSourceFeatureIndices = set()
-		if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubword):
+		if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
 			GIAANNnlp_auxiliaryNeuronsSubword.initialiseObservedColumnAuxiliaryStorage(self)
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			GIAANNnlp_auxiliaryNeuronsSimilarity.initialiseObservedColumnAuxiliaryStorage(self)
@@ -490,7 +490,7 @@ class ObservedColumnProxy(ObservedColumnConnectionBase):
 		self.featureConnectionsBySourceFeature = {}
 		self.loadedSourceFeatureIndices = set()
 		self.trainPreparedSourceFeatureIndices = set()
-		if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubword):
+		if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
 			GIAANNnlp_auxiliaryNeuronsSubword.initialiseObservedColumnProxyAuxiliaryStorage(self)
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			GIAANNnlp_auxiliaryNeuronsSimilarity.initialiseObservedColumnProxyAuxiliaryStorage(self)

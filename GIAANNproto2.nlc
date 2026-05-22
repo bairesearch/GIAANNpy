@@ -262,4 +262,37 @@ v2c (Codex IDE GPT-5.5) [under development]:
 	b) calculate similar feature neurons by firing the reverse and forward connections respectively of the sibling feature neurons.
 	- take any neuron that is sufficiently activated after step b (above a threshold auxiliaryNeuronsSimilarWordsAutoThreshold) as a similar feature neuron, and assign its similarity score based on its activation level.
 	- train the similarity auxiliary neuron of the current feature neuron based on all similar feature neurons discovered.
-
+- optimise auxiliaryNeuronsSimilarWordsAuto auxiliary identification algorithm;
+	Algorithm notes;
+		auxiliaryNeuronsSimilarWordsPrimeConceptFeatures: For every column index in the trained network c (apply the same method);
+			a) calculate sibling feature neurons by firing the current prime feature neurons forward and reverse connections, and then;
+			b) calculate similar prime feature neurons (for the current column index) by firing the reverse and forward connections respectively of the sibling feature neurons.
+		auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures: For every secondary feature index in the trained network f (ie fIndex > featureIndexPrimeConceptNeuron);
+			a) calculate sibling feature neurons by firing the feature index neurons (of every concept column) forward and reverse connections, and then;
+			b) calculate similar feature neurons (for the feature index) by firing the reverse and forward connections respectively of the sibling feature neurons.
+	Implementation Notes;
+		a)
+			- if(auxiliaryNeuronsSimilarWordsPrimeConceptFeatures): no change required.
+			- if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures): for the current feature index, the source feature of every concept column (corresponding to that feature index) is fired.
+		b)
+			- if(auxiliaryNeuronsSimilarWordsPrimeConceptFeatures): (ie fIndex==featureIndexPrimeConceptNeuron): the activated features (candidate similar features) are not summed across all concept columns (each concept column gets a different set of similar prime)
+			- if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures): (ie fIndex>featureIndexPrimeConceptNeuron): the activated features (candidate similar features) are summed across all concept columns
+			- normalised (0.0->1.0) across all featureIndices.
+			- then the auxiliaryNeuronsSimilarWordsAutoThreshold is applied to obtain the final set of similar feature neurons used to train the similarity auxiliary neuron input connections.
+		- the similarity auxiliary neuron input/output connections training code should not require upgrading. 
+- optimise auxiliaryNeuronsTokenisationSubwordAuto auxiliary identification algorithm;
+	Implementation Notes;
+		- ensure that the code is only perform subword auxiliary identification for;
+		i) auxiliaryNeuronsTokenisationSubwordPrimeConceptFeatures - every prime concept feature in the network: no change required.
+		ii) auxiliaryNeuronsTokenisationSubwordSecondaryConceptFeatures - every feature index in f (its corresponding word). 
+			- i.e. the same secondary subword auxiliary neuron input connections information should be assigned for each concept column.
+			- the only difference is that not every concept column will use the same secondary subword auxiliary neurons.
+		- the subword auxiliary neuron input/output connections training code should not require upgrading. 
+- verify that similiarity and subword auxiliary neurons are created for every feature neuron added during training of the network. Many auxiliary neurons will have zero input/ouput connections, but the auxiliary neurons should still exist.
+- update auxiliaryNeuronsSimilarWordsAuto:auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures similar feature neuron identification to use this algorithm implementation for each feature index;
+	a) load the source feature neuron forward/reverse connections for each concept column at that feature index. Activate every source feature neuron (simultaneously) and propagate its signal through its forward/reverse connections (simultaneously). Calculate the new global activation map of sibling feature neurons.
+	b) load the sibling feature neuron reverse/forward connections for every sibling neuron. Activate every sibling feature neuron (simultaneously) and propagate its signal through its reverse/forward connections (simultaneously). Calculate the new global activation map of similar feature neurons.
+- upgrade auxiliaryNeuronsSimilarWordsAuto algorithn to only track direct connections (when detecting both sibling feature neurons and similar feature neurons). ie only propagate the forward/reverse connections signal through to segmentIndex[last] segments.
+- in auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures step b), only the reverse/forward connections of the sibling feature neurons are loaded (not the connections of every feature neuron in the network).
+- upgrade to ensure no dense similiarity matrices, only sparse matrices are allowed.
+- auxiliaryNeuronsSimilarWordsAuto should be unloading the observed column connections from ram once used to identify the similar neuron features. auxiliaryNeuronsSimilarWordsPrimeConceptFeatures: for every concept index, auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures: for every feature index.

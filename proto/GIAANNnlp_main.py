@@ -35,7 +35,7 @@ import GIAANNcmn_databaseNetworkDrawLarge
 import GIAANNcmn_executionProgress
 import GIAANNnlp_sequenceTokens
 import GIAANNnlp_sequenceConcepts
-if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubword):
+if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
 	import GIAANNnlp_auxiliaryNeuronsSubword
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	import GIAANNnlp_auxiliaryNeuronsSimilarity
@@ -456,7 +456,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 				GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("prepareObservedColumnsForTrainSequence")
 				
 			GIAANNcmn_databaseNetwork.prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFeatureIndicesByObservedColumn)
-			if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubword):
+			if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
 				GIAANNnlp_auxiliaryNeuronsSubword.prepareObservedColumnsForTrainSequenceAuxiliary(sequenceObservedColumns, observedColumnsDict, allowNewFeatures)
 			if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 				GIAANNnlp_auxiliaryNeuronsSimilarity.prepareObservedColumnsForTrainSequenceAuxiliary(sequenceObservedColumns, observedColumnsDict, allowNewFeatures)

@@ -23,7 +23,7 @@ from GIAANNcmn_globalDefs import *
 import GIAANNcmn_databaseNetwork
 import GIAANNcmn_sparseTensors
 import GIAANNcmn_predictionActivate
-if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubword):
+if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
 	import GIAANNnlp_auxiliaryNeuronsSubword
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	import GIAANNnlp_auxiliaryNeuronsSimilarity
@@ -290,7 +290,7 @@ def getConnectedColumnsForFeature(observedColumn, featureIndex, includeFeatureDe
 					targetFeatures = targetColumnIndices[3].cpu().tolist()
 					for columnValue, featureValue in zip(targetColumnIndices[2].tolist(), targetFeatures):
 						columnFeatureMap.setdefault(columnValue, set()).add(featureValue)
-		if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubword):
+		if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
 			if(includeFeatureDetails):
 				auxiliaryTargetColumnsList, auxiliaryColumnFeatureMap = GIAANNnlp_auxiliaryNeuronsSubword.getConnectedColumnsForAuxiliaryFeatures(observedColumn, featureIndex, includeFeatureDetails=True)
 				targetColumnsList.extend(auxiliaryTargetColumnsList)

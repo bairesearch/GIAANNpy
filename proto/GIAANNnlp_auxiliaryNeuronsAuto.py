@@ -295,6 +295,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 
 	def updateAutoAuxiliaryFeatureConnectionWeights(databaseNetworkObject, subwordSimilarity):
 		import GIAANNnlp_auxiliaryNeuronsSimilarity
+		ensureAutoAuxiliaryFeatureRecords(databaseNetworkObject, subwordSimilarity)
 		removeAutoParentKeysForMode(databaseNetworkObject, subwordSimilarity)
 		if(getAutoPrimeFeatureEnabled(subwordSimilarity)):
 			updateAutoAuxiliaryFeatureConnectionWeightsForFeatureType(databaseNetworkObject, subwordSimilarity, True)
@@ -303,6 +304,39 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 		databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeatureIndexWeightsByParentWord = GIAANNnlp_auxiliaryNeuronsSimilarity.buildAuxiliaryFeatureIndexWeightsByParentWord(databaseNetworkObject)
 		GIAANNnlp_auxiliaryNeuronsSimilarity.invalidateDatabaseAuxiliaryInputConnectionCaches(databaseNetworkObject)
 		return
+
+	def ensureAutoAuxiliaryFeatureRecords(databaseNetworkObject, subwordSimilarity):
+		import GIAANNnlp_auxiliaryNeuronsSimilarity
+		if(getAutoPrimeFeatureEnabled(subwordSimilarity)):
+			for conceptIndex, conceptName in enumerate(databaseNetworkObject.conceptColumnsList):
+				registerAutoAuxiliaryFeatureRecord(databaseNetworkObject, getAutoPrimePrefix(subwordSimilarity), conceptIndex, GIAANNnlp_auxiliaryNeuronsSimilarity.normaliseSimilarityWord(conceptName))
+		if(getAutoSecondaryFeatureEnabled(subwordSimilarity)):
+			for featureKey in sorted(buildAutoObservedSecondaryFeatureKeys(databaseNetworkObject)):
+				conceptIndex, featureIndex = getAutoFeatureNeuronIndicesFromKey(databaseNetworkObject, featureKey)
+				if(featureIndex >= len(databaseNetworkObject.conceptFeaturesList)):
+					raise RuntimeError("ensureAutoAuxiliaryFeatureRecords error: featureIndex out of range")
+				registerAutoAuxiliaryFeatureRecord(databaseNetworkObject, getAutoSecondaryPrefix(subwordSimilarity), conceptIndex, GIAANNnlp_auxiliaryNeuronsSimilarity.normaliseSimilarityWord(databaseNetworkObject.conceptFeaturesList[featureIndex]))
+		return
+
+	def registerAutoAuxiliaryFeatureRecord(databaseNetworkObject, auxiliaryFeaturePrefix, conceptIndex, auxiliaryBaseWord):
+		import GIAANNnlp_auxiliaryNeuronsSimilarity
+		auxiliaryFeatureWord = GIAANNnlp_auxiliaryNeuronsSimilarity.buildConceptColumnAuxiliaryFeatureName(databaseNetworkObject, auxiliaryFeaturePrefix, conceptIndex, auxiliaryBaseWord)
+		GIAANNnlp_auxiliaryNeuronsSimilarity.registerAuxiliaryFeatureWord(databaseNetworkObject, auxiliaryFeatureWord, True)
+		return
+
+	def buildAutoObservedSecondaryFeatureKeys(databaseNetworkObject):
+		result = set()
+		for conceptIndex in range(databaseNetworkObject.c):
+			for featureIndex in GIAANNcmn_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(conceptIndex):
+				if(featureIndex != featureIndexPrimeConceptNeuron and autoSecondaryFeatureIndexHasSimilarityWord(databaseNetworkObject, featureIndex)):
+					result.add(getAutoFeatureNeuronKey(databaseNetworkObject, conceptIndex, featureIndex))
+		return result
+
+	def autoSecondaryFeatureIndexHasSimilarityWord(databaseNetworkObject, featureIndex):
+		if(featureIndex < 0 or featureIndex >= len(databaseNetworkObject.conceptFeaturesList)):
+			raise RuntimeError("autoSecondaryFeatureIndexHasSimilarityWord error: featureIndex out of range")
+		result = str(databaseNetworkObject.conceptFeaturesList[featureIndex]).strip() != auxiliaryNeuronsSimilarWordsFeatureValueEmpty
+		return result
 
 	def getAutoPrimeFeatureEnabled(subwordSimilarity):
 		if(subwordSimilarity):
@@ -358,10 +392,11 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 		records = buildAutoAuxiliaryFeatureRecords(databaseNetworkObject, subwordSimilarity, primeConceptFeatures)
 		if(records["rowCount"] > 0):
 			if(subwordSimilarity):
-				similarityMatrix = calculateSubwordSimilarityMatrix(records["words"], deviceSparse)
-				if(not primeConceptFeatures):
-					similarityMatrix = applySecondaryColumnIdentificationMask(similarityMatrix, records, subwordSimilarity)
-				registerAutoSimilarityMatrixWeights(databaseNetworkObject, records, similarityMatrix)
+				if(primeConceptFeatures):
+					similarityMatrix = calculateSubwordSimilaritySparseMatrix(records["words"], deviceSparse)
+					registerAutoSimilaritySparseMatrixWeights(databaseNetworkObject, records, similarityMatrix)
+				else:
+					registerAutoSubwordSecondaryFeatureWeights(databaseNetworkObject, records, deviceSparse)
 			else:
 				registerAutoConnectionPropagationWeights(databaseNetworkObject, records, deviceDense)
 		return
@@ -390,10 +425,31 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 				auxiliaryFeatureWordList.append(auxiliaryFeatureWord)
 		rowCount = len(auxiliaryFeatureIndexList)
 		result = {"rowCount": rowCount, "prefix": prefix, "primeConceptFeatures": primeConceptFeatures, "conceptIndices": pt.tensor(conceptIndexList, dtype=pt.long, device=deviceSparse), "featureIndices": pt.tensor(featureIndexList, dtype=pt.long, device=deviceSparse), "auxiliaryFeatureIndices": pt.tensor(auxiliaryFeatureIndexList, dtype=pt.long, device=deviceSparse), "words": wordList, "auxiliaryFeatureWords": auxiliaryFeatureWordList}
+		validateAutoAuxiliaryFeatureRecords(databaseNetworkObject, result, primeConceptFeatures)
 		return result
 
+	def validateAutoAuxiliaryFeatureRecords(databaseNetworkObject, records, primeConceptFeatures):
+		if(primeConceptFeatures):
+			recordConceptIndices = set(records["conceptIndices"].detach().cpu().tolist())
+			for conceptIndex in range(databaseNetworkObject.c):
+				if(conceptIndex not in recordConceptIndices):
+					raise RuntimeError("validateAutoAuxiliaryFeatureRecords error: missing prime auxiliary feature conceptIndex=" + str(conceptIndex))
+		else:
+			recordFeatureKeys = set((records["conceptIndices"]*databaseNetworkObject.f + records["featureIndices"]).detach().cpu().tolist())
+			for featureKey in sorted(buildAutoObservedSecondaryFeatureKeys(databaseNetworkObject)):
+				if(featureKey not in recordFeatureKeys):
+					conceptIndex, featureIndex = getAutoFeatureNeuronIndicesFromKey(databaseNetworkObject, featureKey)
+					raise RuntimeError("validateAutoAuxiliaryFeatureRecords error: missing secondary auxiliary feature conceptIndex=" + str(conceptIndex) + ", featureIndex=" + str(featureIndex))
+		return
+
 	def registerAutoConnectionPropagationWeights(databaseNetworkObject, records, targetDevice):
-		import GIAANNnlp_auxiliaryNeuronsSimilarity
+		if(records["primeConceptFeatures"]):
+			registerAutoPrimeConnectionPropagationWeights(databaseNetworkObject, records, targetDevice)
+		else:
+			registerAutoSecondaryConnectionPropagationWeights(databaseNetworkObject, records, targetDevice)
+		return
+
+	def registerAutoPrimeConnectionPropagationWeights(databaseNetworkObject, records, targetDevice):
 		recordRowsByFeatureKey = buildAutoRecordRowsByFeatureKey(databaseNetworkObject, records)
 		for sourceRowIndex in range(records["rowCount"]):
 			print("auxiliaryNeuronsSimilarWordsAuto: columnIndex=", int(records["conceptIndices"][sourceRowIndex].item()), ", featureIndex=", int(records["featureIndices"][sourceRowIndex].item()))
@@ -415,6 +471,34 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 							registerAutoSimilarityRecordWeight(databaseNetworkObject, records, sourceRowIndex, targetRowIndex, activationWeight)
 		return
 
+	def registerAutoSecondaryConnectionPropagationWeights(databaseNetworkObject, records, targetDevice):
+		featureRecords = buildAutoSecondaryFeatureIndexRecords(databaseNetworkObject, targetDevice)
+		recordRowsByFeatureIndex = buildAutoRecordRowsByFeatureIndex(records)
+		for sourceRowIndex in range(records["rowCount"]):
+			registerAutoSimilarityRecordWeight(databaseNetworkObject, records, sourceRowIndex, sourceRowIndex, auxiliaryNeuronsSimilarWordsIdentitySimilarity)
+		for sourceFeatureRowIndex in range(featureRecords["rowCount"]):
+			sourceFeatureIndex = int(featureRecords["featureIndices"][sourceFeatureRowIndex].item())
+			print("auxiliaryNeuronsSimilarWordsAuto: columnIndex=all, featureIndex=", sourceFeatureIndex)
+			if(sourceFeatureIndex in recordRowsByFeatureIndex):
+				similarFeatureActivations = calculateTwoHopSimilarSecondaryFeatureIndexActivations(databaseNetworkObject, records, sourceFeatureIndex, recordRowsByFeatureIndex[sourceFeatureIndex], targetDevice)
+			else:
+				similarFeatureActivations = createEmptyFeatureIndexActivationSparseVector(databaseNetworkObject, targetDevice)
+			similarFeatureActivations = similarFeatureActivations.coalesce()
+			if(similarFeatureActivations._nnz() > 0):
+				similarFeatureIndices = similarFeatureActivations.indices()[0]
+				similarFeatureValues = similarFeatureActivations.values()
+				activeMask = similarFeatureValues >= auxiliaryNeuronsSimilarWordsAutoThreshold
+				activeFeatureIndices = similarFeatureIndices[activeMask]
+				activeFeatureValues = similarFeatureValues[activeMask]
+				for activeIndex in range(activeFeatureIndices.shape[0]):
+					targetFeatureIndex = int(activeFeatureIndices[activeIndex].item())
+					if(targetFeatureIndex in recordRowsByFeatureIndex):
+						activationWeight = float(activeFeatureValues[activeIndex].item())
+						for targetRowIndex in recordRowsByFeatureIndex[targetFeatureIndex]:
+							registerAutoSimilarityFeatureIndexWeight(databaseNetworkObject, records, sourceFeatureIndex, targetRowIndex, activationWeight)
+		return
+
+
 	def buildAutoRecordRowsByFeatureKey(databaseNetworkObject, records):
 		result = {}
 		for rowIndex in range(records["rowCount"]):
@@ -422,6 +506,15 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 			if(featureKey in result):
 				raise RuntimeError("buildAutoRecordRowsByFeatureKey error: duplicate feature key")
 			result[featureKey] = rowIndex
+		return result
+
+	def buildAutoRecordRowsByFeatureIndex(records):
+		result = {}
+		for rowIndex in range(records["rowCount"]):
+			featureIndex = int(records["featureIndices"][rowIndex].item())
+			if(featureIndex not in result):
+				result[featureIndex] = []
+			result[featureIndex].append(rowIndex)
 		return result
 
 	def getAutoFeatureNeuronKey(databaseNetworkObject, conceptIndex, featureIndex):
@@ -455,16 +548,31 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 		featureIndex = int(records["featureIndices"][sourceRowIndex].item())
 		observedColumn = loadObservedColumnForAutoConnectionPropagation(databaseNetworkObject, conceptIndex, targetDevice)
 		forwardConnectionTensor = observedColumn.getFeatureConnectionsForSourceFeature(featureIndex, targetDevice=targetDevice, createMissing=False, ensureCurrentSizeOnLoad=True)
-		forwardSiblingActivations = buildFeatureActivationVectorFromConnectionTensor(databaseNetworkObject, forwardConnectionTensor, targetDevice)
+		forwardSiblingActivations = buildFeatureActivationVectorFromConnectionTensor(databaseNetworkObject, forwardConnectionTensor, targetDevice, "calculateTwoHopSimilarFeatureActivations")
 		reverseConnectionTensor = getObservedColumnReverseFeatureConnectionsForTargetFeature(observedColumn, featureIndex, targetDevice=targetDevice, createMissing=False, ensureCurrentSizeOnLoad=True)
-		reverseSiblingActivations = buildFeatureActivationVectorFromConnectionTensor(databaseNetworkObject, reverseConnectionTensor, targetDevice)
-		similarFeatureActivationsForward = propagateSiblingFeatureActivations(databaseNetworkObject, forwardSiblingActivations, True, targetDevice)
-		similarFeatureActivationsReverse = propagateSiblingFeatureActivations(databaseNetworkObject, reverseSiblingActivations, False, targetDevice)
+		reverseSiblingActivations = buildFeatureActivationVectorFromConnectionTensor(databaseNetworkObject, reverseConnectionTensor, targetDevice, "calculateTwoHopSimilarFeatureActivations")
+		unloadObservedColumnConnectionsForAutoConnectionPropagation(observedColumn, [featureIndex], [featureIndex])
+		similarFeatureActivationsForward = propagateLocalSiblingFeatureActivations(databaseNetworkObject, forwardSiblingActivations, True, targetDevice)
+		similarFeatureActivationsReverse = propagateLocalSiblingFeatureActivations(databaseNetworkObject, reverseSiblingActivations, False, targetDevice)
 		result = addFeatureActivationSparseVectors(databaseNetworkObject, similarFeatureActivationsForward, similarFeatureActivationsReverse, targetDevice)
 		result = normaliseFeatureActivationSparseVector(databaseNetworkObject, result, targetDevice)
 		return result
 
-	def propagateSiblingFeatureActivations(databaseNetworkObject, siblingActivations, fireReverseConnections, targetDevice):
+	def buildFeatureActivationVectorFromConnectionTensor(databaseNetworkObject, connectionTensor, targetDevice, functionName):
+		connectionStrength = getAutoDirectConnectionStrength(databaseNetworkObject, connectionTensor, functionName)
+		if(connectionStrength._nnz() > 0):
+			indices = connectionStrength.indices()
+			values = connectionStrength.values().to(targetDevice)
+			if((values < auxiliaryNeuronsSimilarWordsMinimumSimilarity).any()):
+				raise RuntimeError(functionName + " error: connection strength values must be non-negative")
+			featureKeys = indices[2].to(targetDevice)*databaseNetworkObject.f + indices[3].to(targetDevice)
+			result = pt.sparse_coo_tensor(featureKeys.view(1, -1), values, size=(databaseNetworkObject.c * databaseNetworkObject.f,), dtype=arrayType, device=targetDevice).coalesce()
+			result = normaliseFeatureActivationSparseVector(databaseNetworkObject, result, targetDevice)
+		else:
+			result = createEmptyFeatureActivationSparseVector(databaseNetworkObject, targetDevice)
+		return result
+
+	def propagateLocalSiblingFeatureActivations(databaseNetworkObject, siblingActivations, fireReverseConnections, targetDevice):
 		result = createEmptyFeatureActivationSparseVector(databaseNetworkObject, targetDevice)
 		siblingActivations = siblingActivations.coalesce()
 		if(siblingActivations._nnz() > 0):
@@ -482,10 +590,85 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 					connectionTensor = getObservedColumnReverseFeatureConnectionsForTargetFeature(siblingObservedColumn, siblingFeatureIndex, targetDevice=targetDevice, createMissing=False, ensureCurrentSizeOnLoad=True)
 				else:
 					connectionTensor = siblingObservedColumn.getFeatureConnectionsForSourceFeature(siblingFeatureIndex, targetDevice=targetDevice, createMissing=False, ensureCurrentSizeOnLoad=True)
-				connectionActivations = buildFeatureActivationVectorFromConnectionTensor(databaseNetworkObject, connectionTensor, targetDevice)
+				connectionActivations = buildFeatureActivationVectorFromConnectionTensor(databaseNetworkObject, connectionTensor, targetDevice, "propagateLocalSiblingFeatureActivations")
+				if(fireReverseConnections):
+					unloadObservedColumnConnectionsForAutoConnectionPropagation(siblingObservedColumn, None, [siblingFeatureIndex])
+				else:
+					unloadObservedColumnConnectionsForAutoConnectionPropagation(siblingObservedColumn, [siblingFeatureIndex], None)
 				connectionActivations = multiplyFeatureActivationSparseVector(connectionActivations, siblingActivationValue, targetDevice)
 				result = addFeatureActivationSparseVectors(databaseNetworkObject, result, connectionActivations, targetDevice)
 		result = normaliseFeatureActivationSparseVector(databaseNetworkObject, result, targetDevice)
+		return result
+
+
+	def calculateTwoHopSimilarSecondaryFeatureIndexActivations(databaseNetworkObject, records, sourceFeatureIndex, sourceRowIndices, targetDevice):
+		sourceRowIndicesTensor = pt.tensor(sourceRowIndices, dtype=pt.long, device=records["conceptIndices"].device)
+		if(sourceRowIndicesTensor.numel() > 0):
+			sourceConceptIndices = records["conceptIndices"].index_select(0, sourceRowIndicesTensor).to(targetDevice)
+			forwardSiblingActivations = buildSecondarySourceFeatureSiblingActivations(databaseNetworkObject, sourceConceptIndices, sourceFeatureIndex, True, targetDevice)
+			reverseSiblingActivations = buildSecondarySourceFeatureSiblingActivations(databaseNetworkObject, sourceConceptIndices, sourceFeatureIndex, False, targetDevice)
+			similarFeatureActivationsForward = propagateLocalSiblingFeatureActivations(databaseNetworkObject, forwardSiblingActivations, True, targetDevice)
+			similarFeatureActivationsReverse = propagateLocalSiblingFeatureActivations(databaseNetworkObject, reverseSiblingActivations, False, targetDevice)
+			similarFeatureActivations = addFeatureActivationSparseVectors(databaseNetworkObject, similarFeatureActivationsForward, similarFeatureActivationsReverse, targetDevice)
+			similarFeatureActivations = normaliseFeatureActivationSparseVector(databaseNetworkObject, similarFeatureActivations, targetDevice)
+			result = collapseFeatureActivationSparseVectorByFeatureIndex(databaseNetworkObject, similarFeatureActivations, targetDevice)
+		else:
+			result = createEmptyFeatureIndexActivationSparseVector(databaseNetworkObject, targetDevice)
+		return result
+
+	def buildSecondarySourceFeatureSiblingActivations(databaseNetworkObject, sourceConceptIndices, sourceFeatureIndex, fireForwardConnections, targetDevice):
+		result = createEmptyFeatureActivationSparseVector(databaseNetworkObject, targetDevice)
+		for sourceConceptIndexTensor in sourceConceptIndices:
+			sourceConceptIndex = int(sourceConceptIndexTensor.item())
+			observedColumn = loadObservedColumnForAutoConnectionPropagation(databaseNetworkObject, sourceConceptIndex, targetDevice)
+			if(fireForwardConnections):
+				connectionTensor = observedColumn.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=targetDevice, createMissing=False, ensureCurrentSizeOnLoad=True)
+			else:
+				connectionTensor = getObservedColumnReverseFeatureConnectionsForTargetFeature(observedColumn, sourceFeatureIndex, targetDevice=targetDevice, createMissing=False, ensureCurrentSizeOnLoad=True)
+			connectionActivations = buildFeatureActivationVectorFromConnectionTensor(databaseNetworkObject, connectionTensor, targetDevice, "buildSecondarySourceFeatureSiblingActivations")
+			if(fireForwardConnections):
+				unloadObservedColumnConnectionsForAutoConnectionPropagation(observedColumn, [sourceFeatureIndex], None)
+			else:
+				unloadObservedColumnConnectionsForAutoConnectionPropagation(observedColumn, None, [sourceFeatureIndex])
+			result = addFeatureActivationSparseVectors(databaseNetworkObject, result, connectionActivations, targetDevice)
+		result = normaliseFeatureActivationSparseVector(databaseNetworkObject, result, targetDevice)
+		return result
+
+	def collapseFeatureActivationSparseVectorByFeatureIndex(databaseNetworkObject, featureActivations, targetDevice):
+		featureActivations = featureActivations.coalesce()
+		if(tuple(featureActivations.size()) != (databaseNetworkObject.c * databaseNetworkObject.f,)):
+			raise RuntimeError("collapseFeatureActivationSparseVectorByFeatureIndex error: feature activation vector size mismatch")
+		if(featureActivations._nnz() > 0):
+			featureIndices = featureActivations.indices()[0].remainder(databaseNetworkObject.f)
+			secondaryMask = featureIndices != featureIndexPrimeConceptNeuron
+			featureIndices = featureIndices[secondaryMask]
+			values = featureActivations.values()[secondaryMask]
+			if(featureIndices.numel() > 0):
+				result = pt.sparse_coo_tensor(featureIndices.view(1, -1), values, size=(databaseNetworkObject.f,), dtype=arrayType, device=targetDevice).coalesce()
+				result = normaliseFeatureIndexActivationSparseVector(databaseNetworkObject, result, targetDevice)
+			else:
+				result = createEmptyFeatureIndexActivationSparseVector(databaseNetworkObject, targetDevice)
+		else:
+			result = createEmptyFeatureIndexActivationSparseVector(databaseNetworkObject, targetDevice)
+		return result
+
+
+	def getAutoDirectConnectionStrength(databaseNetworkObject, connectionTensor, functionName):
+		connectionStrength = connectionTensor[databaseNetworkObject.arrayIndexPropertiesStrengthIndex].coalesce()
+		if(connectionStrength.dim() != 4):
+			raise RuntimeError(functionName + " error: connection strength tensor rank mismatch")
+		if(connectionStrength.size(1) <= arrayIndexSegmentLast):
+			raise RuntimeError(functionName + " error: direct segment index out of range")
+		if(connectionStrength._nnz() > 0):
+			indices = connectionStrength.indices()
+			values = connectionStrength.values()
+			directConnectionMask = indices[1] == arrayIndexSegmentLast
+			if(bool(directConnectionMask.any().item())):
+				result = pt.sparse_coo_tensor(indices[:, directConnectionMask], values[directConnectionMask], size=connectionStrength.size(), dtype=arrayType, device=connectionStrength.device).coalesce()
+			else:
+				result = pt.sparse_coo_tensor(pt.empty((4, 0), dtype=pt.long, device=connectionStrength.device), pt.empty((0,), dtype=arrayType, device=connectionStrength.device), size=connectionStrength.size(), dtype=arrayType, device=connectionStrength.device)
+		else:
+			result = connectionStrength
 		return result
 
 	def loadObservedColumnForAutoConnectionPropagation(databaseNetworkObject, conceptIndex, targetDevice):
@@ -494,7 +677,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 		conceptName = databaseNetworkObject.conceptColumnsList[conceptIndex]
 		if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 			import GIAANNcmn_databaseNetwork
-			result = GIAANNcmn_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, conceptName, conceptIndex, targetDevice=targetDevice, createDeviceCopy=False, loadAllSourceFeatures=False)
+			result = GIAANNcmn_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, conceptName, conceptIndex, targetDevice=targetDevice, createDeviceCopy=True, loadAllSourceFeatures=False)
 		else:
 			from GIAANNcmn_databaseNetworkObservedColumn import ObservedColumn
 			if(GIAANNcmn_databaseNetworkFiles.observedColumnMetadataExists(conceptIndex)):
@@ -503,20 +686,19 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 				result = ObservedColumn(databaseNetworkObject, conceptIndex, conceptName, conceptIndex)
 		return result
 
-	def buildFeatureActivationVectorFromConnectionTensor(databaseNetworkObject, connectionTensor, targetDevice):
-		connectionStrength = connectionTensor[databaseNetworkObject.arrayIndexPropertiesStrengthIndex].coalesce()
-		if(connectionStrength._nnz() > 0):
-			indices = connectionStrength.indices()
-			values = connectionStrength.values().to(targetDevice)
-			if((values < auxiliaryNeuronsSimilarWordsMinimumSimilarity).any()):
-				raise RuntimeError("buildFeatureActivationVectorFromConnectionTensor error: connection strength values must be non-negative")
-			featureKeys = indices[2].to(targetDevice) * databaseNetworkObject.f + indices[3].to(targetDevice)
-			featureActivationIndices = featureKeys.view(1, -1)
-			result = pt.sparse_coo_tensor(featureActivationIndices, values, size=(databaseNetworkObject.c * databaseNetworkObject.f,), dtype=arrayType, device=targetDevice).coalesce()
-			result = normaliseFeatureActivationSparseVector(databaseNetworkObject, result, targetDevice)
-		else:
-			result = createEmptyFeatureActivationSparseVector(databaseNetworkObject, targetDevice)
-		return result
+	def unloadObservedColumnConnectionsForAutoConnectionPropagation(observedColumn, sourceFeatureIndices, targetFeatureIndices):
+		if(observedColumn is None):
+			raise RuntimeError("unloadObservedColumnConnectionsForAutoConnectionPropagation error: observedColumn is None")
+		if(sourceFeatureIndices is not None):
+			observedColumn.unloadLoadedSourceFeatureConnections(sourceFeatureIndices)
+		if(targetFeatureIndices is not None):
+			ensureObservedColumnReverseConnectionStorage(observedColumn)
+			for targetFeatureIndex in targetFeatureIndices:
+				normalisedTargetFeatureIndex = normaliseReverseTargetFeatureIndex(observedColumn.databaseNetworkObject, targetFeatureIndex)
+				if(normalisedTargetFeatureIndex in observedColumn.reverseFeatureConnectionsByTargetFeature):
+					del observedColumn.reverseFeatureConnectionsByTargetFeature[normalisedTargetFeatureIndex]
+				observedColumn.reverseLoadedTargetFeatureIndices.discard(normalisedTargetFeatureIndex)
+		return
 
 	def createEmptyFeatureActivationSparseVector(databaseNetworkObject, targetDevice):
 		indices = pt.empty((1, 0), dtype=pt.long, device=targetDevice)
@@ -528,9 +710,9 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 		featureActivations = featureActivations.coalesce()
 		if(featureActivations._nnz() > 0):
 			values = featureActivations.values()
+			if((values < auxiliaryNeuronsSimilarWordsMinimumSimilarity).any()):
+				raise RuntimeError("normaliseFeatureActivationSparseVector error: activation values must be non-negative")
 			maxActivation = values.max()
-			if(float(maxActivation.item()) < auxiliaryNeuronsSimilarWordsMinimumSimilarity):
-				raise RuntimeError("normaliseFeatureActivationSparseVector error: max activation must be non-negative")
 			if(float(maxActivation.item()) > auxiliaryNeuronsSimilarWordsMinimumSimilarity):
 				normalisedValues = values/maxActivation
 				result = pt.sparse_coo_tensor(featureActivations.indices(), normalisedValues, size=featureActivations.size(), dtype=arrayType, device=targetDevice).coalesce()
@@ -559,58 +741,157 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 				raise RuntimeError("addFeatureActivationSparseVectors error: result activation values must be non-negative")
 		return result
 
+	def createEmptyFeatureIndexActivationSparseVector(databaseNetworkObject, targetDevice):
+		indices = pt.empty((1, 0), dtype=pt.long, device=targetDevice)
+		values = pt.empty((0,), dtype=arrayType, device=targetDevice)
+		result = pt.sparse_coo_tensor(indices, values, size=(databaseNetworkObject.f,), dtype=arrayType, device=targetDevice)
+		return result
+
+	def normaliseFeatureIndexActivationSparseVector(databaseNetworkObject, featureActivations, targetDevice):
+		featureActivations = featureActivations.coalesce()
+		if(featureActivations._nnz() > 0):
+			values = featureActivations.values()
+			maxActivation = values.max()
+			if(float(maxActivation.item()) < auxiliaryNeuronsSimilarWordsMinimumSimilarity):
+				raise RuntimeError("normaliseFeatureIndexActivationSparseVector error: max activation must be non-negative")
+			if(float(maxActivation.item()) > auxiliaryNeuronsSimilarWordsMinimumSimilarity):
+				normalisedValues = values/maxActivation
+				result = pt.sparse_coo_tensor(featureActivations.indices(), normalisedValues, size=featureActivations.size(), dtype=arrayType, device=targetDevice).coalesce()
+			else:
+				result = createEmptyFeatureIndexActivationSparseVector(databaseNetworkObject, targetDevice)
+		else:
+			result = featureActivations
+		return result
+
 	def registerAutoSimilarityRecordWeight(databaseNetworkObject, records, parentRowIndex, auxiliaryRowIndex, activationWeight):
 		import GIAANNnlp_auxiliaryNeuronsSimilarity
 		parentKey = GIAANNnlp_auxiliaryNeuronsSimilarity.buildSimilarityParentKey(records["prefix"], records["words"][parentRowIndex])
 		GIAANNnlp_auxiliaryNeuronsSimilarity.registerSimilarityParentFeatureWordWeight(databaseNetworkObject, parentKey, records["auxiliaryFeatureWords"][auxiliaryRowIndex], activationWeight)
 		return
 
-	def calculateSubwordSimilarityMatrix(words, targetDevice):
+	def registerAutoSimilarityFeatureIndexWeight(databaseNetworkObject, records, parentFeatureIndex, auxiliaryRowIndex, activationWeight):
+		import GIAANNnlp_auxiliaryNeuronsSimilarity
+		if(parentFeatureIndex < 0 or parentFeatureIndex >= len(databaseNetworkObject.conceptFeaturesList)):
+			raise RuntimeError("registerAutoSimilarityFeatureIndexWeight error: parentFeatureIndex out of range")
+		parentKey = GIAANNnlp_auxiliaryNeuronsSimilarity.buildSimilarityParentKey(records["prefix"], databaseNetworkObject.conceptFeaturesList[parentFeatureIndex])
+		GIAANNnlp_auxiliaryNeuronsSimilarity.registerSimilarityParentFeatureWordWeight(databaseNetworkObject, parentKey, records["auxiliaryFeatureWords"][auxiliaryRowIndex], activationWeight)
+		return
+
+	def registerAutoSubwordSecondaryFeatureWeights(databaseNetworkObject, records, targetDevice):
+		featureRecords = buildAutoSecondaryFeatureIndexRecords(databaseNetworkObject, targetDevice)
+		recordRowsByFeatureIndex = buildAutoRecordRowsByFeatureIndex(records)
+		if(featureRecords["rowCount"] > 0):
+			similarityMatrix = calculateSubwordSimilaritySparseMatrix(featureRecords["words"], targetDevice)
+			activePairs = similarityMatrix.indices().transpose(0, 1)
+			activeValues = similarityMatrix.values()
+			for pairIndex in range(activePairs.shape[0]):
+				parentRowIndex = int(activePairs[pairIndex, 0].item())
+				parentFeatureIndex = int(featureRecords["featureIndices"][parentRowIndex].item())
+				if(pairIndex == 0 or int(activePairs[pairIndex - 1, 0].item()) != parentRowIndex): print("auxiliaryNeuronsTokenisationSubwordAuto: columnIndex=all, featureIndex=", parentFeatureIndex)
+				targetRowIndex = int(activePairs[pairIndex, 1].item())
+				targetFeatureIndex = int(featureRecords["featureIndices"][targetRowIndex].item())
+				if(targetFeatureIndex in recordRowsByFeatureIndex):
+					activationWeight = float(activeValues[pairIndex].item())
+					for auxiliaryRowIndex in recordRowsByFeatureIndex[targetFeatureIndex]:
+						registerAutoSimilarityFeatureIndexWeight(databaseNetworkObject, records, parentFeatureIndex, auxiliaryRowIndex, activationWeight)
+		return
+
+	def buildAutoSecondaryFeatureIndexRecords(databaseNetworkObject, targetDevice):
+		featureIndexList = []
+		wordList = []
+		if(databaseNetworkObject.f != len(databaseNetworkObject.conceptFeaturesList)):
+			raise RuntimeError("buildAutoSecondaryFeatureIndexRecords error: feature count mismatch")
+		for featureIndex in range(featureIndexPrimeConceptNeuron+1, databaseNetworkObject.f):
+			featureWord = databaseNetworkObject.conceptFeaturesList[featureIndex]
+			if(featureWord not in databaseNetworkObject.conceptFeaturesDict or databaseNetworkObject.conceptFeaturesDict[featureWord] != featureIndex):
+				raise RuntimeError("buildAutoSecondaryFeatureIndexRecords error: feature index map mismatch")
+			featureIndexList.append(featureIndex)
+			wordList.append(featureWord)
+		result = {"rowCount": len(featureIndexList), "featureIndices": pt.tensor(featureIndexList, dtype=pt.long, device=targetDevice), "words": wordList}
+		return result
+
+	def calculateSubwordSimilaritySparseMatrix(words, targetDevice):
+		wordCount = len(words)
 		wordLengths = pt.tensor([len(word) for word in words], dtype=pt.long, device=targetDevice)
-		maxWordLength = int(wordLengths.max().item()) if len(words) > 0 else 0
-		wordCodes = pt.zeros((len(words), maxWordLength), dtype=pt.long, device=targetDevice)
+		maxWordLength = int(wordLengths.max().item()) if wordCount > 0 else 0
+		wordCodes = pt.zeros((wordCount, maxWordLength), dtype=pt.long, device=targetDevice)
 		for wordIndex, word in enumerate(words):
 			for characterIndex, character in enumerate(word):
 				wordCodes[wordIndex, characterIndex] = ord(character)
-		if(len(words) > 0 and maxWordLength > 0):
+		if(wordCount > 0):
+			batchSize = int(auxiliaryNeuronsTokenisationSubwordAutoSimilarityBatchSize)
+			if(batchSize <= 0):
+				raise RuntimeError("calculateSubwordSimilaritySparseMatrix error: auxiliaryNeuronsTokenisationSubwordAutoSimilarityBatchSize must be positive")
+			indicesList = []
+			valuesList = []
+			for rowStart in range(0, wordCount, batchSize):
+				rowEnd = min(rowStart + batchSize, wordCount)
+				batchIndices, batchValues = calculateSubwordSimilaritySparseMatrixRows(wordCodes, wordLengths, rowStart, rowEnd, targetDevice)
+				if(batchValues.numel() > 0):
+					indicesList.append(batchIndices)
+					valuesList.append(batchValues)
+			if(len(valuesList) > 0):
+				indices = pt.cat(indicesList, dim=1)
+				values = pt.cat(valuesList, dim=0)
+			else:
+				indices = pt.empty((2, 0), dtype=pt.long, device=targetDevice)
+				values = pt.empty((0,), dtype=arrayType, device=targetDevice)
+		else:
+			indices = pt.empty((2, 0), dtype=pt.long, device=targetDevice)
+			values = pt.empty((0,), dtype=arrayType, device=targetDevice)
+		result = pt.sparse_coo_tensor(indices, values, size=(wordCount, wordCount), dtype=arrayType, device=targetDevice).coalesce()
+		return result
+
+	def calculateSubwordSimilaritySparseMatrixRows(wordCodes, wordLengths, rowStart, rowEnd, targetDevice):
+		wordCount = wordCodes.shape[0]
+		maxWordLength = wordCodes.shape[1]
+		rowWordCount = rowEnd - rowStart
+		if(rowWordCount <= 0):
+			raise RuntimeError("calculateSubwordSimilaritySparseMatrixRows error: row range is empty")
+		if(maxWordLength > 0):
 			positionIndices = pt.arange(maxWordLength, dtype=pt.long, device=targetDevice)
-			validMask = (positionIndices.view(1, 1, maxWordLength) < wordLengths.view(-1, 1, 1)) & (positionIndices.view(1, 1, maxWordLength) < wordLengths.view(1, -1, 1))
-			characterEqualMask = (wordCodes.view(len(words), 1, maxWordLength) == wordCodes.view(1, len(words), maxWordLength)) & validMask
+			rowWordCodes = wordCodes[rowStart:rowEnd]
+			rowWordLengths = wordLengths[rowStart:rowEnd]
+			validMask = (positionIndices.view(1, 1, maxWordLength) < rowWordLengths.view(-1, 1, 1)) & (positionIndices.view(1, 1, maxWordLength) < wordLengths.view(1, -1, 1))
+			characterEqualMask = (rowWordCodes.view(rowWordCount, 1, maxWordLength) == wordCodes.view(1, wordCount, maxWordLength)) & validMask
 			prefixMask = characterEqualMask.to(pt.long).cumprod(dim=2).to(pt.bool)
-			sharedPrefixLengths = prefixMask.sum(dim=2).to(arrayType)
-			denominator = pt.maximum(wordLengths.view(-1, 1), wordLengths.view(1, -1)).clamp(min=1).to(arrayType)
-			result = sharedPrefixLengths/denominator
-			thresholdMask = sharedPrefixLengths >= float(auxiliaryNeuronsTokenisationSubwordPrefixThreshold)
-			result = pt.where(thresholdMask, pt.maximum(result, pt.full_like(result, auxiliaryNeuronsSimilarWordsThreshold)), pt.zeros_like(result))
-			diagonalIndices = pt.arange(len(words), dtype=pt.long, device=targetDevice)
-			result[diagonalIndices, diagonalIndices] = auxiliaryNeuronsSimilarWordsIdentitySimilarity
+			sharedPrefixLengths = prefixMask.sum(dim=2)
+			activeMask = sharedPrefixLengths >= int(auxiliaryNeuronsTokenisationSubwordPrefixThreshold)
+			rowLocalIndices = pt.arange(rowWordCount, dtype=pt.long, device=targetDevice)
+			diagonalColumnIndices = rowStart + rowLocalIndices
+			activeMask[rowLocalIndices, diagonalColumnIndices] = True
+			activeRowIndices, activeColumnIndices = pt.nonzero(activeMask, as_tuple=True)
+			if(activeRowIndices.numel() > 0):
+				activeSharedPrefixLengths = sharedPrefixLengths[activeRowIndices, activeColumnIndices].to(arrayType)
+				activeDenominator = pt.maximum(wordLengths[rowStart + activeRowIndices], wordLengths[activeColumnIndices]).clamp(min=1).to(arrayType)
+				values = activeSharedPrefixLengths/activeDenominator
+				values = pt.maximum(values, pt.full_like(values, auxiliaryNeuronsSimilarWordsThreshold))
+				diagonalMask = activeColumnIndices == rowStart + activeRowIndices
+				values = pt.where(diagonalMask, pt.full_like(values, auxiliaryNeuronsSimilarWordsIdentitySimilarity), values)
+				indices = pt.stack((rowStart + activeRowIndices, activeColumnIndices), dim=0)
+			else:
+				indices = pt.empty((2, 0), dtype=pt.long, device=targetDevice)
+				values = pt.empty((0,), dtype=arrayType, device=targetDevice)
 		else:
-			result = pt.zeros((len(words), len(words)), dtype=arrayType, device=targetDevice)
-		return result
+			rowGlobalIndices = pt.arange(rowStart, rowEnd, dtype=pt.long, device=targetDevice)
+			indices = pt.stack((rowGlobalIndices, rowGlobalIndices), dim=0)
+			values = pt.full((rowWordCount,), auxiliaryNeuronsSimilarWordsIdentitySimilarity, dtype=arrayType, device=targetDevice)
+		return indices, values
 
-	def applySecondaryColumnIdentificationMask(similarityMatrix, records, subwordSimilarity):
-		if(subwordSimilarity):
-			identifySameColumn = auxiliaryNeuronsTokenisationSubwordSecondaryConceptFeaturesIdentifySameColumn
-		else:
-			identifySameColumn = auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesIdentifySameColumn
-		if(identifySameColumn):
-			conceptIndices = records["conceptIndices"]
-			columnMask = conceptIndices.view(-1, 1) == conceptIndices.view(1, -1)
-			result = pt.where(columnMask, similarityMatrix, pt.zeros_like(similarityMatrix))
-		else:
-			result = similarityMatrix
-		return result
-
-	def registerAutoSimilarityMatrixWeights(databaseNetworkObject, records, similarityMatrix):
+	def registerAutoSimilaritySparseMatrixWeights(databaseNetworkObject, records, similarityMatrix):
 		import GIAANNnlp_auxiliaryNeuronsSimilarity
+		if(not similarityMatrix.is_sparse):
+			raise RuntimeError("registerAutoSimilaritySparseMatrixWeights error: similarity matrix must be sparse")
 		if(similarityMatrix.dim() != 2 or similarityMatrix.shape[0] != records["rowCount"] or similarityMatrix.shape[1] != records["rowCount"]):
-			raise RuntimeError("registerAutoSimilarityMatrixWeights error: similarity matrix dimensions mismatch")
-		activePairs = pt.nonzero(similarityMatrix >= auxiliaryNeuronsSimilarWordsThreshold, as_tuple=False)
+			raise RuntimeError("registerAutoSimilaritySparseMatrixWeights error: similarity matrix dimensions mismatch")
+		similarityMatrix = similarityMatrix.coalesce()
+		activePairs = similarityMatrix.indices().transpose(0, 1)
+		activeValues = similarityMatrix.values()
 		for pairIndex in range(activePairs.shape[0]):
 			parentRowIndex = int(activePairs[pairIndex, 0].item())
 			if(pairIndex == 0 or int(activePairs[pairIndex - 1, 0].item()) != parentRowIndex): print("auxiliaryNeuronsTokenisationSubwordAuto: columnIndex=", int(records["conceptIndices"][parentRowIndex].item()), ", featureIndex=", int(records["featureIndices"][parentRowIndex].item()))
 			auxiliaryRowIndex = int(activePairs[pairIndex, 1].item())
-			activationWeight = float(similarityMatrix[parentRowIndex, auxiliaryRowIndex].item())
+			activationWeight = float(activeValues[pairIndex].item())
 			parentKey = GIAANNnlp_auxiliaryNeuronsSimilarity.buildSimilarityParentKey(records["prefix"], records["words"][parentRowIndex])
 			GIAANNnlp_auxiliaryNeuronsSimilarity.registerSimilarityParentFeatureWordWeight(databaseNetworkObject, parentKey, records["auxiliaryFeatureWords"][auxiliaryRowIndex], activationWeight)
 		return

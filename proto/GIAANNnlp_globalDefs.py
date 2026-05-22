@@ -490,14 +490,6 @@ if(inferenceReportGroundedAccuracy):
 auxiliaryNeurons=False	#default: False	#orig: False
 if(auxiliaryNeurons):
 	auxiliaryNeuronsAuto = True	#default: True	#orig: False
-	auxiliaryNeuronsSimilarWordsStatic = False
-	auxiliaryNeuronsTokenisationSubwordStatic = False
-	auxiliaryNeuronsSimilarWordsAuto = False
-	auxiliaryNeuronsTokenisationSubwordAuto = False
-	auxiliaryNeuronsSimilarWordsPrimeConceptFeatures = False
-	auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures = False
-	auxiliaryNeuronsTokenisationSubwordPrimeConceptFeatures = False
-	auxiliaryNeuronsTokenisationSubwordSecondaryConceptFeatures = False
 	if(auxiliaryNeuronsAuto):
 		auxiliaryNeuronsSimilarWordsAuto = True	#default: True
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilarWordsAuto):
@@ -511,7 +503,11 @@ if(auxiliaryNeurons):
 			auxiliaryNeuronsTokenisationSubwordPrimeConceptFeatures = True	#find similar noun subwords
 			auxiliaryNeuronsTokenisationSubwordSecondaryConceptFeatures = True	#find similar non-noun subwords
 			auxiliaryNeuronsTokenisationSubwordPrefixThreshold = 3	#in number of prefix characters that must be shared
+			auxiliaryNeuronsTokenisationSubwordAutoSimilarityBatchSize = 256
 			auxiliaryNeuronsTokenisationSubwordSecondaryConceptFeaturesIdentifySameColumn = True
+		auxiliaryNeuronsSimilar = auxiliaryNeuronsSimilarWordsAuto or auxiliaryNeuronsTokenisationSubwordAuto
+		auxiliaryNeuronsTokenisation = False
+		auxiliaryNeuronsSimilarWordsStatic = False
 	else:
 		auxiliaryNeuronsSimilarWordsStatic = True
 		if(auxiliaryNeuronsSimilarWordsStatic):
@@ -603,8 +599,8 @@ if(auxiliaryNeurons):
 			auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWordFileName = "auxiliaryFeatureWordsByParentWord.pkl"
 			auxiliaryNeuronsTokenisationSubwordConnectionsFolderName = "auxiliaryFeatureConnections"
 			auxiliaryNeuronsTokenisationSubwordSourceFeatureConnectionsFileNamePrefix = "auxIndex"
-	auxiliaryNeuronsSimilar = auxiliaryNeuronsSimilarWordsStatic or auxiliaryNeuronsSimilarWordsAuto or auxiliaryNeuronsTokenisationSubwordAuto
-	auxiliaryNeuronsTokenisationSubword = auxiliaryNeuronsTokenisationSubwordStatic
+		auxiliaryNeuronsSimilar = auxiliaryNeuronsSimilarWordsStatic
+		auxiliaryNeuronsTokenisation = auxiliaryNeuronsTokenisationSubwordStatic
 	if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		auxiliaryNeuronsSimilarWordsFeatureNamePrefixPrimeConcept = "SIMC"
 		auxiliaryNeuronsSimilarWordsFeatureNamePrefixSecondary = "SIMF"

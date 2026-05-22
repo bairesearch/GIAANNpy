@@ -612,7 +612,7 @@ if(useInference):
 #Database save paths;
 conceptColumnsDictFile = databaseFolder + 'conceptColumnsDict.pkl'
 conceptFeaturesDictFile = databaseFolder + 'conceptFeaturesDict.pkl'
-if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubword):
+if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
 	auxiliaryNeuronsTokenisationSubwordFeaturesDictFile = databaseFolder + auxiliaryNeuronsTokenisationSubwordFeaturesDictFileName
 	auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWordFile = databaseFolder + auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWordFileName
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):

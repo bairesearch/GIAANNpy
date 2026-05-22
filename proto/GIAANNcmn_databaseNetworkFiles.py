@@ -439,7 +439,7 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 
 		saveDictFile(conceptColumnsDictFile, databaseNetworkObject.conceptColumnsDict)
 		saveDictFile(conceptFeaturesDictFile, databaseNetworkObject.conceptFeaturesDict)
-		if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubword):
+		if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
 			import GIAANNnlp_auxiliaryNeuronsSubword
 			GIAANNnlp_auxiliaryNeuronsSubword.saveDatabaseAuxiliaryFeatureMaps(databaseNetworkObject)
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
@@ -595,7 +595,7 @@ def observedColumnSaveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsTo
 		else:
 			raise RuntimeError("observedColumnSaveToDisk(saveAllSourceFeatures) requires !storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam")
 	self.saveLoadedSourceFeatureConnectionsToDisk(sourceFeatureIndicesToSave)
-	if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubword):
+	if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
 		import GIAANNnlp_auxiliaryNeuronsSubword
 		GIAANNnlp_auxiliaryNeuronsSubword.saveObservedColumnAuxiliaryFeatureConnectionsToDisk(self, saveAllSourceFeatures)
 	if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
@@ -686,7 +686,7 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 		sourceFeatureIndices = listObservedColumnSourceFeatureIndices(conceptIndex)
 		loadTargetDevice = targetDevice if targetDevice is not None else deviceDatabase
 		instance.loadRequiredSourceFeatureConnections(sourceFeatureIndices, loadTargetDevice, createMissing=False, ensureCurrentSizeOnLoad=resizeFeatureTensorsToCurrentSize)
-	if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubword):
+	if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
 		import GIAANNnlp_auxiliaryNeuronsSubword
 		GIAANNnlp_auxiliaryNeuronsSubword.loadObservedColumnAuxiliaryConnectionsFromDisk(instance, targetDevice=targetDevice, loadAllSourceFeatures=loadAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize)
 	if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
