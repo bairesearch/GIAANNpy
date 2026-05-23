@@ -440,11 +440,11 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 		saveDictFile(conceptColumnsDictFile, databaseNetworkObject.conceptColumnsDict)
 		saveDictFile(conceptFeaturesDictFile, databaseNetworkObject.conceptFeaturesDict)
 		if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-			import GIAANNnlp_auxiliaryNeuronsSubword
-			GIAANNnlp_auxiliaryNeuronsSubword.saveDatabaseAuxiliaryFeatureMaps(databaseNetworkObject)
+			import GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic
+			GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.saveDatabaseAuxiliaryFeatureMaps(databaseNetworkObject)
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-			import GIAANNnlp_auxiliaryNeuronsSimilarity
-			GIAANNnlp_auxiliaryNeuronsSimilarity.saveDatabaseAuxiliaryFeatureMaps(databaseNetworkObject)
+			import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
+			GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.saveDatabaseAuxiliaryFeatureMaps(databaseNetworkObject)
 
 		if(conceptColumnsDelimitByPOS):
 			if(detectReferenceSetDelimitersBetweenNouns):
@@ -596,11 +596,11 @@ def observedColumnSaveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsTo
 			raise RuntimeError("observedColumnSaveToDisk(saveAllSourceFeatures) requires !storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam")
 	self.saveLoadedSourceFeatureConnectionsToDisk(sourceFeatureIndicesToSave)
 	if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-		import GIAANNnlp_auxiliaryNeuronsSubword
-		GIAANNnlp_auxiliaryNeuronsSubword.saveObservedColumnAuxiliaryFeatureConnectionsToDisk(self, saveAllSourceFeatures)
+		import GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic
+		GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.saveObservedColumnAuxiliaryFeatureConnectionsToDisk(self, saveAllSourceFeatures)
 	if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-		import GIAANNnlp_auxiliaryNeuronsSimilarity
-		GIAANNnlp_auxiliaryNeuronsSimilarity.saveObservedColumnAuxiliaryFeatureConnectionsToDisk(self, saveAllSourceFeatures)
+		import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
+		GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.saveObservedColumnAuxiliaryFeatureConnectionsToDisk(self, saveAllSourceFeatures)
 	if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 		import GIAANNnlp_auxiliaryNeuronsAuto
 		GIAANNnlp_auxiliaryNeuronsAuto.saveObservedColumnReverseFeatureConnectionsToDisk(self, saveAllSourceFeatures)
@@ -687,11 +687,11 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 		loadTargetDevice = targetDevice if targetDevice is not None else deviceDatabase
 		instance.loadRequiredSourceFeatureConnections(sourceFeatureIndices, loadTargetDevice, createMissing=False, ensureCurrentSizeOnLoad=resizeFeatureTensorsToCurrentSize)
 	if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-		import GIAANNnlp_auxiliaryNeuronsSubword
-		GIAANNnlp_auxiliaryNeuronsSubword.loadObservedColumnAuxiliaryConnectionsFromDisk(instance, targetDevice=targetDevice, loadAllSourceFeatures=loadAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize)
+		import GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic
+		GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.loadObservedColumnAuxiliaryConnectionsFromDisk(instance, targetDevice=targetDevice, loadAllSourceFeatures=loadAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize)
 	if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-		import GIAANNnlp_auxiliaryNeuronsSimilarity
-		GIAANNnlp_auxiliaryNeuronsSimilarity.loadObservedColumnAuxiliaryConnectionsFromDisk(instance, targetDevice=targetDevice, loadAllSourceFeatures=loadAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize)
+		import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
+		GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.loadObservedColumnAuxiliaryConnectionsFromDisk(instance, targetDevice=targetDevice, loadAllSourceFeatures=loadAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize)
 	if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 		import GIAANNnlp_auxiliaryNeuronsAuto
 		GIAANNnlp_auxiliaryNeuronsAuto.loadObservedColumnReverseConnectionsFromDisk(instance, targetDevice=targetDevice, loadAllTargetFeatures=loadAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize)

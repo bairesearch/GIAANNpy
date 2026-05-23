@@ -498,14 +498,29 @@ if(auxiliaryNeurons):
 			auxiliaryNeuronsSimilarWordsAutoThreshold = 0.5
 			auxiliaryNeuronsSimilarWordsAutoSecondaryConceptFeaturesTrainIdentifyColumn = True
 			auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesIdentifySameColumn = auxiliaryNeuronsSimilarWordsAutoSecondaryConceptFeaturesTrainIdentifyColumn
-		auxiliaryNeuronsTokenisationSubwordAuto = True	#default: True
-		if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubwordAuto):
-			auxiliaryNeuronsTokenisationSubwordPrimeConceptFeatures = True	#find similar noun subwords
-			auxiliaryNeuronsTokenisationSubwordSecondaryConceptFeatures = True	#find similar non-noun subwords
-			auxiliaryNeuronsTokenisationSubwordPrefixThreshold = 3	#in number of prefix characters that must be shared
-			auxiliaryNeuronsTokenisationSubwordAutoSimilarityBatchSize = 256
-			auxiliaryNeuronsTokenisationSubwordSecondaryConceptFeaturesIdentifySameColumn = True
-		auxiliaryNeuronsSimilar = auxiliaryNeuronsSimilarWordsAuto or auxiliaryNeuronsTokenisationSubwordAuto
+			if(auxiliaryNeuronsSimilarWordsPrimeConceptFeatures):
+				auxiliaryNeuronsSimilarWordsPrimeConceptFeaturesDatasetFileName = "auxiliaryNeuronsSimilarWordsPrimeConceptFeaturesDataset.txt"
+			if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures):
+				auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesDatasetFileName = "auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesDataset.txt"
+			auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesLimit = True
+			if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesLimit):
+				auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMaximumSharedSourceFeatureIndex = 0.2	#maximum fraction of concept columns that can have the secondary feature index for it to have similar word detection applied
+		auxiliaryNeuronsSimilarSubwordAuto = True	#default: True
+		if(auxiliaryNeurons and auxiliaryNeuronsSimilarSubwordAuto):
+			auxiliaryNeuronsSimilarSubwordPrimeConceptFeatures = True	#find similar noun subwords
+			auxiliaryNeuronsSimilarSubwordSecondaryConceptFeatures = True	#find similar non-noun subwords
+			auxiliaryNeuronsSimilarSubwordAutoThreshold = 0.7
+			auxiliaryNeuronsSimilarSubwordPrefixThreshold = 3	#in number of prefix characters that must be shared
+			auxiliaryNeuronsSimilarSubwordSimilarityBatchSize = 256
+			auxiliaryNeuronsSimilarSubwordSecondaryConceptFeaturesIdentifySameColumn = True
+			if(auxiliaryNeuronsSimilarSubwordPrimeConceptFeatures):
+				auxiliaryNeuronsSimilarSubwordPrimeConceptFeaturesDatasetFileName = "auxiliaryNeuronsSimilarSubwordPrimeConceptFeaturesDataset.txt"
+			if(auxiliaryNeuronsSimilarSubwordSecondaryConceptFeatures):
+				auxiliaryNeuronsSimilarSubwordSecondaryConceptFeaturesDatasetFileName = "auxiliaryNeuronsSimilarSubwordSecondaryConceptFeaturesDataset.txt"
+		auxiliaryNeuronsAutoFeatureDatasetFileWriteMode = "w"
+		auxiliaryNeuronsAutoFeatureDatasetFileEncoding = "utf-8"
+		auxiliaryNeuronsAutoFeatureDatasetLineTerminator = "\n"
+		auxiliaryNeuronsSimilar = auxiliaryNeuronsSimilarWordsAuto or auxiliaryNeuronsSimilarSubwordAuto
 		auxiliaryNeuronsTokenisation = False
 		auxiliaryNeuronsSimilarWordsStatic = False
 	else:
@@ -542,20 +557,14 @@ if(auxiliaryNeurons):
 			auxiliaryNeuronsSimilarWordsDatasetMinimumErrorActualPrefix = ": actual = "
 			auxiliaryNeuronsSimilarWordsDatasetMinimumErrorMinimumPrefix = ", minimum = "
 			auxiliaryNeuronsSimilarWordsDataset1MinimumSynsets = 10000
-			auxiliaryNeuronsSimilarWordsDataset1InsufficientSynsetsError = "getSimilarWordWeightsDatasetWordNet error: WordNet dataset is below production minimum synsets"
 			auxiliaryNeuronsSimilarWordsDataset2MinimumRows = 10000
 			auxiliaryNeuronsSimilarWordsDataset2MinimumUniqueWords = 10000
-			auxiliaryNeuronsSimilarWordsDataset2InsufficientRowsError = "loadSimilarWordsDatasetTextPairs error: dataset2 is below production minimum rows"
-			auxiliaryNeuronsSimilarWordsDataset2InsufficientUniqueWordsError = "loadSimilarWordsDatasetTextPairs error: dataset2 is below production minimum unique words"
 			auxiliaryNeuronsSimilarWordsDataset3FileName = "similarWordsDataset3Word2Vec.txt"
 			auxiliaryNeuronsSimilarWordsDataset3SourceFileName = "similarWordsDataset3Word2VecSource.txt"
 			auxiliaryNeuronsSimilarWordsDataset3SourceDownload = True
 			auxiliaryNeuronsSimilarWordsDataset3SourceDownloadURL = "https://dl.fbaipublicfiles.com/fasttext/vectors-english/wiki-news-300d-1M.vec.zip"
 			auxiliaryNeuronsSimilarWordsDataset3SourceDownloadArchiveFileName = "wiki-news-300d-1M.vec.zip"
 			auxiliaryNeuronsSimilarWordsDataset3SourceDownloadArchiveMemberName = "wiki-news-300d-1M.vec"
-			auxiliaryNeuronsSimilarWordsDataset3SourceMissingFileError = "loadSimilarWordsDatasetWord2VecText error: missing auxiliaryNeuronsSimilarWordsDataset3SourceFile = "
-			auxiliaryNeuronsSimilarWordsDataset3SourceDownloadError = "downloadSimilarWordsDataset3SourceFile error: failed to download source embeddings"
-			auxiliaryNeuronsSimilarWordsDataset3SourceArchiveMemberError = "extractSimilarWordsDataset3SourceFile error: missing archive member = "
 			auxiliaryNeuronsSimilarWordsDataset3GenerateStartMessage = "generateSimilarWordsDataset3CompactFile: creating compact similarity dataset at "
 			auxiliaryNeuronsSimilarWordsDataset3GenerateFinishMessage = "generateSimilarWordsDataset3CompactFile: wrote compact similarity dataset rows = "
 			auxiliaryNeuronsSimilarWordsDataset3CommentPrefix = "#"
@@ -566,7 +575,6 @@ if(auxiliaryNeurons):
 			auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordPairFields = 2
 			auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordOffset = 0
 			auxiliaryNeuronsSimilarWordsDataset3CompactSimilarityOffset = 1
-			auxiliaryNeuronsSimilarWordsDataset3CompactInvalidPairFieldsError = "loadSimilarWordsDatasetWord2VecText error: compact row has incomplete similar-word/score pair"
 			auxiliaryNeuronsSimilarWordsDataset3SourceHeaderFieldCount = 2
 			auxiliaryNeuronsSimilarWordsDataset3SourceMinimumFields = 2
 			auxiliaryNeuronsSimilarWordsDataset3SourceWordFieldIndex = 0
@@ -575,8 +583,6 @@ if(auxiliaryNeurons):
 			auxiliaryNeuronsSimilarWordsDataset3maxNumberSimilarWords = 50
 			auxiliaryNeuronsSimilarWordsDataset3MinimumWords = 10000
 			auxiliaryNeuronsSimilarWordsDataset3MinimumVectorLength = 50
-			auxiliaryNeuronsSimilarWordsDataset3InsufficientWordsError = "loadSimilarWordsDatasetWord2VecText error: dataset3 is below production minimum words"
-			auxiliaryNeuronsSimilarWordsDataset3InsufficientVectorLengthError = "loadSimilarWordsDatasetWord2VecText error: dataset3 source vectors are below production minimum vector length"
 			auxiliaryNeuronsSimilarWordsDataset3TempFileSuffix = ".tmp"
 			auxiliaryNeuronsSimilarWordsDataset3SimilarityFormat = "{:.6f}"
 			auxiliaryNeuronsSimilarWordsDataset3WordNetPOSList = ["n", "v", "a", "r"]
@@ -613,6 +619,15 @@ if(auxiliaryNeurons):
 		auxiliaryNeuronsSimilarWordsMinimumSimilarity = 0.0
 		auxiliaryNeuronsSimilarWordsMaximumSimilarity = 1.0
 		auxiliaryNeuronsSimilarWordsIdentitySimilarity = 1.0
+		auxiliaryNeuronsSimilarWordsDataset3Delimiter = "\t"
+		auxiliaryNeuronsSimilarWordsDataset3CompactMinimumFields = 1
+		auxiliaryNeuronsSimilarWordsDataset3CompactSourceWordFieldIndex = 0
+		auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordStartFieldIndex = 1
+		auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordPairFields = 2
+		auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordOffset = 0
+		auxiliaryNeuronsSimilarWordsDataset3CompactSimilarityOffset = 1
+		auxiliaryNeuronsSimilarWordsDataset3TempFileSuffix = ".tmp"
+		auxiliaryNeuronsSimilarWordsDataset3SimilarityFormat = "{:.6f}"
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilarWordsAuto):
 			auxiliaryNeuronsSimilarWordsThreshold = auxiliaryNeuronsSimilarWordsAutoThreshold
 		auxiliaryNeuronsSimilarWordsFeaturesDictFileName = "auxiliarySimilarFeaturesDict.pkl"

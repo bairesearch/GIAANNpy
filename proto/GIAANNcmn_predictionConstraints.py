@@ -24,9 +24,9 @@ import GIAANNcmn_databaseNetwork
 import GIAANNcmn_sparseTensors
 import GIAANNcmn_predictionActivate
 if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-	import GIAANNnlp_auxiliaryNeuronsSubword
+	import GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-	import GIAANNnlp_auxiliaryNeuronsSimilarity
+	import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
 
 def buildAllowedColumnsSet(allowedColumnsTensor):
 	allowedSet = None
@@ -292,22 +292,22 @@ def getConnectedColumnsForFeature(observedColumn, featureIndex, includeFeatureDe
 						columnFeatureMap.setdefault(columnValue, set()).add(featureValue)
 		if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
 			if(includeFeatureDetails):
-				auxiliaryTargetColumnsList, auxiliaryColumnFeatureMap = GIAANNnlp_auxiliaryNeuronsSubword.getConnectedColumnsForAuxiliaryFeatures(observedColumn, featureIndex, includeFeatureDetails=True)
+				auxiliaryTargetColumnsList, auxiliaryColumnFeatureMap = GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.getConnectedColumnsForAuxiliaryFeatures(observedColumn, featureIndex, includeFeatureDetails=True)
 				targetColumnsList.extend(auxiliaryTargetColumnsList)
 				for columnValue, featureSet in auxiliaryColumnFeatureMap.items():
 					columnFeatureMap.setdefault(columnValue, set()).update(featureSet)
 			else:
-				auxiliaryTargetColumnsList, _ = GIAANNnlp_auxiliaryNeuronsSubword.getConnectedColumnsForAuxiliaryFeatures(observedColumn, featureIndex, includeFeatureDetails=False)
+				auxiliaryTargetColumnsList, _ = GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.getConnectedColumnsForAuxiliaryFeatures(observedColumn, featureIndex, includeFeatureDetails=False)
 				targetColumnsList.extend(auxiliaryTargetColumnsList)
 			targetColumnsList = sorted(set(targetColumnsList))
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			if(includeFeatureDetails):
-				auxiliaryTargetColumnsList, auxiliaryColumnFeatureMap = GIAANNnlp_auxiliaryNeuronsSimilarity.getConnectedColumnsForAuxiliaryFeatures(observedColumn, featureIndex, includeFeatureDetails=True)
+				auxiliaryTargetColumnsList, auxiliaryColumnFeatureMap = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.getConnectedColumnsForAuxiliaryFeatures(observedColumn, featureIndex, includeFeatureDetails=True)
 				targetColumnsList.extend(auxiliaryTargetColumnsList)
 				for columnValue, featureSet in auxiliaryColumnFeatureMap.items():
 					columnFeatureMap.setdefault(columnValue, set()).update(featureSet)
 			else:
-				auxiliaryTargetColumnsList, _ = GIAANNnlp_auxiliaryNeuronsSimilarity.getConnectedColumnsForAuxiliaryFeatures(observedColumn, featureIndex, includeFeatureDetails=False)
+				auxiliaryTargetColumnsList, _ = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.getConnectedColumnsForAuxiliaryFeatures(observedColumn, featureIndex, includeFeatureDetails=False)
 				targetColumnsList.extend(auxiliaryTargetColumnsList)
 			targetColumnsList = sorted(set(targetColumnsList))
 	if(includeFeatureDetails):

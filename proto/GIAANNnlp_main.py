@@ -36,13 +36,13 @@ import GIAANNcmn_executionProgress
 import GIAANNnlp_sequenceTokens
 import GIAANNnlp_sequenceConcepts
 if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-	import GIAANNnlp_auxiliaryNeuronsSubword
+	import GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-	import GIAANNnlp_auxiliaryNeuronsSimilarity
+	import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
 if(auxiliaryNeurons and auxiliaryNeuronsSimilarWordsAuto):
-	import GIAANNnlp_auxiliaryNeuronsSimilarityAuto
-if(auxiliaryNeurons and auxiliaryNeuronsTokenisationSubwordAuto):
-	import GIAANNnlp_auxiliaryNeuronsSubwordAuto
+	import GIAANNnlp_auxiliaryNeuronsSimilarWordsAuto
+if(auxiliaryNeurons and auxiliaryNeuronsSimilarSubwordAuto):
+	import GIAANNnlp_auxiliaryNeuronsSimilarSubwordAuto
 import GIAANNcmn_sequenceObservedColumns
 import GIAANNcmn_databaseNetworkTrain
 if(executionMode=="inference" or executionMode=="trainAndInference"):
@@ -60,9 +60,9 @@ def loadPOSdatabase():
 def trainAutoAuxiliaryNeuronsEnd(databaseNetworkObject):
 	if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 		if(auxiliaryNeuronsSimilarWordsAuto):
-			GIAANNnlp_auxiliaryNeuronsSimilarityAuto.updateAutoAuxiliaryConnections(databaseNetworkObject)
-		if(auxiliaryNeuronsTokenisationSubwordAuto):
-			GIAANNnlp_auxiliaryNeuronsSubwordAuto.updateAutoAuxiliaryConnections(databaseNetworkObject)
+			GIAANNnlp_auxiliaryNeuronsSimilarWordsAuto.updateAutoAuxiliaryConnections(databaseNetworkObject)
+		if(auxiliaryNeuronsSimilarSubwordAuto):
+			GIAANNnlp_auxiliaryNeuronsSimilarSubwordAuto.updateAutoAuxiliaryConnections(databaseNetworkObject)
 	return
 
 # Initialize spaCy model
@@ -457,9 +457,9 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 				
 			GIAANNcmn_databaseNetwork.prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFeatureIndicesByObservedColumn)
 			if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-				GIAANNnlp_auxiliaryNeuronsSubword.prepareObservedColumnsForTrainSequenceAuxiliary(sequenceObservedColumns, observedColumnsDict, allowNewFeatures)
+				GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.prepareObservedColumnsForTrainSequenceAuxiliary(sequenceObservedColumns, observedColumnsDict, allowNewFeatures)
 			if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-				GIAANNnlp_auxiliaryNeuronsSimilarity.prepareObservedColumnsForTrainSequenceAuxiliary(sequenceObservedColumns, observedColumnsDict, allowNewFeatures)
+				GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.prepareObservedColumnsForTrainSequenceAuxiliary(sequenceObservedColumns, observedColumnsDict, allowNewFeatures)
 			
 			if(debugPrintRamMaxUsagePhaseLocal):
 				GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("prepareObservedColumnsForTrainSequence")

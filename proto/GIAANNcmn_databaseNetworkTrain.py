@@ -25,9 +25,9 @@ import GIAANNcmn_debug
 import GIAANNcmn_sparseTensors
 import GIAANNnlp_sequenceConcepts
 if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-	import GIAANNnlp_auxiliaryNeuronsSubword
+	import GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-	import GIAANNnlp_auxiliaryNeuronsSimilarity
+	import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
 
 	
 def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
@@ -46,9 +46,9 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 
 	featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex)
 	if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-		GIAANNnlp_auxiliaryNeuronsSubword.trainAuxiliaryFeatureConnections(sequenceObservedColumns, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, conceptIndices, startIndices, endIndices)
+		GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.trainAuxiliaryFeatureConnections(sequenceObservedColumns, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, conceptIndices, startIndices, endIndices)
 	if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-		GIAANNnlp_auxiliaryNeuronsSimilarity.trainAuxiliaryFeatureConnections(sequenceObservedColumns, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, conceptIndices, startIndices, endIndices)
+		GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.trainAuxiliaryFeatureConnections(sequenceObservedColumns, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, conceptIndices, startIndices, endIndices)
 	if(debugPrintTrainSectionTimes):
 		GIAANNcmn_debug.debugTrainSectionTimesAdd(sequenceObservedColumns.databaseNetworkObject, "trainConceptWords", time.perf_counter() - trainConceptWordsStartTime)
 

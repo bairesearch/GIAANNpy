@@ -143,8 +143,8 @@ MANUAL; - extract execution mode useDefault
 
 ---
 v2c (Codex IDE GPT-5.5) [under development]:
-- add proto GIAANNproto2c1a - start option auxiliaryNeuronsTokenisationSubword=True
-	- auxiliaryNeuronsTokenisationSubword=True adds source-column-scoped lemma/morph/suffix auxiliary source features for NLP whole-word parent features, improving morphological generalisation without creating subword output prediction candidates.
+- add proto GIAANNproto2c1a - start option auxiliaryNeuronsTokenisationSubwordStatic=True
+	- auxiliaryNeuronsTokenisationSubwordStatic=True adds source-column-scoped lemma/morph/suffix auxiliary source features for NLP whole-word parent features, improving morphological generalisation without creating subword output prediction candidates.
 	Algorithm notes:
 		- auxiliary feature names use the unscoped form SUB:<auxiliaryType>:<auxiliaryValue> and the stored source-column-scoped form SUB:<sourceConceptIndex>:<auxiliaryType>:<auxiliaryValue>; eg SUB:LEMMA:run becomes SUB:42:LEMMA:run for source concept column 42.
 		- during training, the parent whole-word feature is trained normally, and each registered auxiliary source feature is trained with the same eligible downstream target column/feature neurons using the same temporal/segment constraints, but with its own auxiliary source-feature connection tensor.
@@ -152,22 +152,22 @@ v2c (Codex IDE GPT-5.5) [under development]:
 		- during prediction, activate auxiliary source connections only when the current predicted whole-word feature has registered auxiliary features. Auxiliary activations add evidence to ordinary target column/feature neurons; they do not create auxiliary output neurons.
 		- during prediction, activate all auxiliary features registered for the current parent whole-word feature in the current source concept column; do not activate auxiliary features globally across source columns.
 	Implementation notes:
-		- add auxiliary features for lemma, morph, and suffix, but implement each auxiliary feature type specfic code within its own context if(auxiliaryNeuronsTokenisationSubwordLemma), if(auxiliaryNeuronsTokenisationSubwordMorph), if(auxiliaryNeuronsTokenisationSubwordSuffix). All common auxiliary code should be contained within only context if(auxiliaryNeuronsTokenisationSubword).
+		- add auxiliary features for lemma, morph, and suffix, but implement each auxiliary feature type specfic code within its own context if(auxiliaryNeuronsTokenisationSubwordLemma), if(auxiliaryNeuronsTokenisationSubwordMorph), if(auxiliaryNeuronsTokenisationSubwordSuffix). All common auxiliary code should be contained within only context if(auxiliaryNeuronsTokenisationSubwordStatic).
 		- auxiliary features are sidecar source features anchored to the parent whole-word feature. They must not be registered in conceptFeaturesDict/conceptFeaturesList, and they must not participate as next-word candidate feature indices.
-		- store auxiliary feature dictionaries and parent-word mappings in dedicated auxiliaryNeuronsTokenisationSubword storage structures. Store auxiliary source-feature connection tensors separately from ordinary whole-word source-feature connection tensors.
-		- auxiliaryNeuronsTokenisationSubword feature names must not include a POS qualifier/property for lemma, morph, or suffix auxiliary types. Use source concept column scoping rather than POS scoping to separate auxiliary target connections.
-		- if(auxiliaryNeuronsTokenisationSubword) then assume any accessed database was created using this mode; do not add database compatibility checks.
-		- implement auxiliaryNeuronsTokenisationSubword-specific functions in GIAANNnlp_auxiliaryNeuronsSubword.py.
-- change the auxiliaryNeuronsTokenisationSubword implementation so that only a single auxiliary neuron is assigned for all variations (LEMMA/MORPH/SUFFIX), which takes the base form of the word (eg verb).
+		- store auxiliary feature dictionaries and parent-word mappings in dedicated auxiliaryNeuronsTokenisationSubwordStatic storage structures. Store auxiliary source-feature connection tensors separately from ordinary whole-word source-feature connection tensors.
+		- auxiliaryNeuronsTokenisationSubwordStatic feature names must not include a POS qualifier/property for lemma, morph, or suffix auxiliary types. Use source concept column scoping rather than POS scoping to separate auxiliary target connections.
+		- if(auxiliaryNeuronsTokenisationSubwordStatic) then assume any accessed database was created using this mode; do not add database compatibility checks.
+		- implement auxiliaryNeuronsTokenisationSubwordStatic-specific functions in GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.py.
+- change the auxiliaryNeuronsTokenisationSubwordStatic implementation so that only a single auxiliary neuron is assigned for all variations (LEMMA/MORPH/SUFFIX), which takes the base form of the word (eg verb).
 	Algorithm notes:
 		- use unscoped form SUB:<baseForm> and stored source-column-scoped form SUB:<sourceConceptIndex>:<baseForm>; eg running and ran can both map to SUB:run, stored for source concept column 42 as SUB:42:run.
 		- auxiliaryNeuronsTokenisationSubwordMorph, auxiliaryNeuronsTokenisationSubwordSuffix, and auxiliaryNeuronsTokenisationSubwordLemma are eligibility gates only; they decide whether a parent whole-word feature receives the single base-form auxiliary, and they must not create separate MORPH, SUFFIX, or LEMMA auxiliary neurons.
 		- auxiliaryNeuronsTokenisationSubwordLemma is retained only as a fallback eligibility condition when morph/suffix gates do not identify a distinct variation.
 		- auxiliaryNeuronsTokenisationSubwordDistinctEnforce=True requires the parent whole-word feature form to differ from its base form before assigning the base-form auxiliary.
 - add option inferenceCopyTemplateDatasets=True which copies *.* files from databaseFolderTemplate to databaseFolder upon startup of mode inference.
-- upgrade option auxiliaryNeurons=True to support option auxiliaryNeuronsSimilarWords=True
+- upgrade option auxiliaryNeurons=True to support option auxiliaryNeuronsSimilarWordsStatic=True
 	Algorithm notes:
-		- similarity auxiliary neurons (auxiliaryNeuronsSimilarWords) behave the same as subword auxiliary neurons (auxiliaryNeuronsTokenisationSubword), except that a) their input connections are connected and activated differently, and b) they must fire a numeric activation value depending on their current input connection strengths/activations.
+		- similarity auxiliary neurons (auxiliaryNeuronsSimilarWordsStatic) behave the same as subword auxiliary neurons (auxiliaryNeuronsTokenisationSubwordStatic), except that a) their input connections are connected and activated differently, and b) they must fire a numeric activation value depending on their current input connection strengths/activations.
 		- support suboptions auxiliaryNeuronsSimilarWordsPrimeConceptFeatures=True (similar noun words) and auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures=True (similar non-noun words).
 		- for each prime concept feature (auxiliaryNeuronsSimilarWordsPrimeConceptFeatures) and secondary feature neuron (auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures) within each column in the database network, assign a similarity auxiliary neuron. Whenever a new sequence is trained, create a similarity auxiliary neuron for each new feature neuron (i.e. parent) added to a column in the network.
 		- for suboption auxiliaryNeuronsSimilarWordsPrimeConceptFeatures=True: use form SIMC:<wordName> and stored source-column-scoped form SIMC:<sourceConceptIndex>:<wordName>. eg1 "rock" similarity auxiliary neuron in column X is activated by either the "rock" prime concept feature neuron in column X or "stone" prime concept feature in column Y.
@@ -178,9 +178,9 @@ v2c (Codex IDE GPT-5.5) [under development]:
 	Implementation notes:
 		- obtain at least two word similarity datasets (auxiliaryNeuronsSimilarWordsDataset1, auxiliaryNeuronsSimilarWordsDataset2 etc), for example word2vec. Preferably use textual databases (that may have been generated using machine learning models) rather than machine learning models.
 		- set auxiliaryNeuronsSimilarWordsDatasetName="" depending on which word similarity datasets is enabled (eg auxiliaryNeuronsSimilarWordsDataset1=True)
-		- implement auxiliaryNeuronsSimilarWords-specific functions in GIAANNnlp_auxiliaryNeuronsSimilarity.py.
-	Maybe your implementation is not properly vectorised (or is using python objects instead of pytorch vectors where these would be much faster)? For example, the input connections into the similarity auxiliary feature nodes should be defined using sparse pytorch arrays; definately not python dictionaries. Please review this auxiliaryNeuronsSimilarWords=True inference algorithm update/clarification:
-- update option auxiliaryNeuronsSimilarWords
+		- implement auxiliaryNeuronsSimilarWordsStatic-specific functions in GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.py.
+	Maybe your implementation is not properly vectorised (or is using python objects instead of pytorch vectors where these would be much faster)? For example, the input connections into the similarity auxiliary feature nodes should be defined using sparse pytorch arrays; definately not python dictionaries. Please review this auxiliaryNeuronsSimilarWordsStatic=True inference algorithm update/clarification:
+- update option auxiliaryNeuronsSimilarWordsStatic
 	1. only assign input connetions to similarity auxiliary nodes with their similarity score is above  auxiliaryNeuronsSimilarWordsThreshold (default=0.5)
 	2. For option auxiliaryNeuronsSimilarWordsPrimeConceptFeatures=True, only a concept index is required to define an input connection into a similarity auxiliary node.
 		- For option  auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures=True, only a feature index of the current column is required to define an input connection into a similarity auxiliary node.
@@ -197,7 +197,7 @@ v2c (Codex IDE GPT-5.5) [under development]:
 			number columns = dynamic (for every similar word to the row word, store the name of the similar word and its word2vec calculated similarity score). 
 - upgrade feature auxiliaryNeurons=True with option auxiliaryNeuronsAuto=True to automatically learn; 
 	a) if(auxiliaryNeuronsSimilarWordsAuto): word similarity associations to create similarity auxiliary neurons (rather than relying on an external word similarity dataset/model).
-	b) if(auxiliaryNeuronsTokenisationSubwordAuto): subword form associations to create subword auxiliary neurons (rather than relying on an external NLP package).
+	b) if(auxiliaryNeuronsSimilarSubwordAuto): subword form associations to create subword auxiliary neurons (rather than relying on an external NLP package).
 	Algorithm notes:
 		a) if(auxiliaryNeuronsSimilarWordsAuto): 
 			- learn similiarity auxiliary neurons (i.e. assign their connections/strengths) by identifying;
@@ -223,10 +223,10 @@ v2c (Codex IDE GPT-5.5) [under development]:
 			- the strength of a similarity auxiliary neuron activation is determined by the weights of the auxiliary neuron input connections (from its parent feature neurons e.g. "rock"/"stone" or "happy"/"ecstatic").
 			- the strength of the similarity auxiliary neuron input connections is determined by the similar word dataset values for the connection between the parent feature neurons (e.g. "rock"/"stone" or "happy"/"ecstatic") and the auxiliary feature neuron (e.g. "rock" or "happy").
 			- in the examples provided, the other parent features mentioned ("stone" and "ecstatic") will also have similarity auxiliary neurons assigned, but these have been omitted for brevity.
-		b) if(auxiliaryNeuronsTokenisationSubwordAuto):
+		b) if(auxiliaryNeuronsSimilarSubwordAuto):
 			- learn tokenisation subword auxiliary neurons (and assign their connections) by identifying;
-				i) auxiliaryNeuronsTokenisationSubwordPrimeConceptFeatures: prime concept neurons in the network that share prefix characters.
-				ii) auxiliaryNeuronsTokenisationSubwordSecondaryConceptFeatures: secondary concept features that share prefix characters.
+				i) auxiliaryNeuronsSimilarSubwordPrimeConceptFeatures: prime concept neurons in the network that share prefix characters.
+				ii) auxiliaryNeuronsSimilarSubwordSecondaryConceptFeatures: secondary concept features that share prefix characters.
 				- i.e. their feature words share prefix characters.
 				- if the parent is a primary concept feature (ie featureIndex=0), then it must compare the prefix of the actual name of the concept column.
 				- if(auxiliaryNeuronsTokenisationSubwordSecondaryConceptFeaturesIdentifySameColumn): 
@@ -238,16 +238,16 @@ v2c (Codex IDE GPT-5.5) [under development]:
 					- if(auxiliaryNeuronsTokenisationSubwordSecondaryConceptFeaturesIdentifySameColumn): their connection strengths are however determined by a sum of all similar nodes across all columns	
 			- apply a certain subword min shared character threshold for prefix comparisons (auxiliaryNeuronsTokenisationSubwordPrefixThreshold=3).
 			- subword auxiliary neurons are only used (have their connections trained) if their prefix similarity is above the threshold.
-			- unlike auxiliaryNeuronsTokenisationSubwordAuto=False, auxiliaryNeuronsTokenisationSubwordAuto=True uses the same auxiliary neuron connectivty and activation code as auxiliaryNeuronsSimilarWords=True; i.e. input connections/strengths are used to adjust the activation values of the subword auxliary neurons (they are not boolean as used in the original implementation auxiliaryNeuronsTokenisationSubwordAuto=False).
-			- for suboption auxiliaryNeuronsTokenisationSubwordPrimeConceptFeatures=True: use form SUBC:<wordName> and stored source-column-scoped form SUBC:<sourceConceptIndex>:<wordName>. eg1 "bat" similarity auxiliary neuron in column X is activated by either the "bat" prime concept feature neuron in column X or "batty" prime concept feature in column Y.
-			- for suboption auxiliaryNeuronsTokenisationSubwordSecondaryConceptFeatures=True: use form SUBF:<wordName> and stored source-column-scoped form SUBF:<sourceConceptIndex>:<wordName>. eg1 "run" subword auxiliary neuron in column X is activated by either the "run" secondary concept feature neuron in column X or the "runs" secondary concept feature neuron in column X.	
+			- unlike auxiliaryNeuronsSimilarSubwordStatic, auxiliaryNeuronsSimilarSubwordAuto uses the same auxiliary neuron connectivity and activation code as auxiliaryNeuronsSimilarWordsStatic=True; i.e. input connections/strengths are used to adjust the activation values of the subword auxliary neurons (they are not boolean as used in the original implementation auxiliaryNeuronsSimilarSubwordAuto=False).
+			- for suboption auxiliaryNeuronsSimilarSubwordPrimeConceptFeatures=True: use form SUBC:<wordName> and stored source-column-scoped form SUBC:<sourceConceptIndex>:<wordName>. eg1 "bat" similarity auxiliary neuron in column X is activated by either the "bat" prime concept feature neuron in column X or "batty" prime concept feature in column Y.
+			- for suboption auxiliaryNeuronsSimilarSubwordSecondaryConceptFeatures=True: use form SUBF:<wordName> and stored source-column-scoped form SUBF:<sourceConceptIndex>:<wordName>. eg1 "run" subword auxiliary neuron in column X is activated by either the "run" secondary concept feature neuron in column X or the "runs" secondary concept feature neuron in column X.	
 			- the strength of a subword auxiliary neuron activation is determined by the weights of the auxiliary neuron input connections (from its parent feature neurons e.g. "bat"/"batty" or "run"/"runs").
 			- the strength of the subword auxiliary neuron input connections is determined by the similar word dataset values for the connection between the parent feature neurons (e.g. "bat"/"batty or "run"/"runs) and the auxiliary feature neuron (e.g. "bat" or "run").
 			- in the examples provided, the other parent features mentioned ("batty" and "runs") will also have subword auxiliary neurons assigned, but these have been omitted for brevity.
 	Implementation notes:
-		- options a) if(auxiliaryNeuronsSimilarWordsAuto) and b) if(auxiliaryNeuronsTokenisationSubwordAuto) should be implemented using the same basic execution flow functions but with parameter subwordSimilarity=True/False (as their functionality is mostly shared).
+		- options a) if(auxiliaryNeuronsSimilarWordsAuto) and b) if(auxiliaryNeuronsSimilarSubwordAuto) should be implemented using the same basic execution flow functions but with parameter subwordSimilarity=True/False (as their functionality is mostly shared).
 		- all similarity/subword comparisons must be implemented using pytorch tensor vectorisation (no python for loops or dictionaries).
-		- assign a similiarity/subword (auxiliaryNeuronsSimilarWordsAuto/auxiliaryNeuronsTokenisationSubwordAuto) auxiliary neuron to every new parent feature neuron in the network (even if they have zero connections). 
+		- assign a similiarity/subword (auxiliaryNeuronsSimilarWordsAuto/auxiliaryNeuronsSimilarSubwordAuto) auxiliary neuron to every new parent feature neuron in the network (even if they have zero connections). 
 		- the similarity/subword comparisons should be peformed every auxiliaryNeuronsSimilarWordsAutoIteration/auxiliaryNeuronsTokenisationSubwordAutoIteration sequences (eg both initialised =1000).
 		- every time the comparisons are made and the similar prime/secondary concept features have been (re)identified, then assign/update the similarity auxiliary neuron connection strengths.
 		- I removed all GIAANNnlp_globalDefs.py auxiliaryNeurons derived vars - the codebase needs to be updated to only execute if each respective auxiliaryNeurons feature is enabled (they will only be defined if their parent feature is enabled).
@@ -255,7 +255,7 @@ v2c (Codex IDE GPT-5.5) [under development]:
 		- note that the auxiliaryNeurons:auxiliaryNeuronsAuto=True execution flow largely replaces (does not reuse) the auxiliaryNeurons:auxiliaryNeuronsAuto=False execution flow, except that it;
 			i) reuses the same auxiliaryNeuronsAuto=False code to train and store the auxiliary neuron output connections.
 			ii) reuses the same auxiliaryNeuronsAuto:auxiliaryNeuronsSimilarWordsAuto=False code during inference to activate the auxiliary neurons and propagate their auxiliary signal.
-		- implement all auxiliaryNeuronsAuto specific functions in GIAANNnlp_auxiliaryNeuronsAuto.py (shared auto similarity identification code), GIAANNnlp_auxiliaryNeuronsSimilarityAuto.py (auxiliaryNeuronsSimilarWordsAuto), GIAANNnlp_auxiliaryNeuronsSubwordAuto.py (auxiliaryNeuronsTokenisationSubwordAuto).
+		- implement all auxiliaryNeuronsAuto specific functions in GIAANNnlp_auxiliaryNeuronsAuto.py (shared auto similarity identification code), GIAANNnlp_auxiliaryNeuronsSimilarSubwordAuto.py (auxiliaryNeuronsSimilarWordsAuto), GIAANNnlp_auxiliaryNeuronsSimilarSubwordAuto.py (auxiliaryNeuronsSimilarSubwordAuto).
 - remove auxiliaryNeuronsSimilarWordsAutoIteration and auxiliaryNeuronsTokenisationSubwordAutoIteration and perform the auxiliary neuron training at the end of training.
 - if(auxiliaryNeuronsSimilarWordsAuto): for every feature neuron in the trained network, calculate its similarity to every other neuron using this algorithm;
 	a) calculate sibling feature neurons by firing the current feature neurons forward and reverse connections, and then;
@@ -279,12 +279,12 @@ v2c (Codex IDE GPT-5.5) [under development]:
 			- if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures): (ie fIndex>featureIndexPrimeConceptNeuron): the activated features (candidate similar features) are summed across all concept columns
 			- normalised (0.0->1.0) across all featureIndices.
 			- then the auxiliaryNeuronsSimilarWordsAutoThreshold is applied to obtain the final set of similar feature neurons used to train the similarity auxiliary neuron input connections.
-		- the similarity auxiliary neuron input/output connections training code should not require upgrading. 
-- optimise auxiliaryNeuronsTokenisationSubwordAuto auxiliary identification algorithm;
+		- the similarity auxiliary neuron input/output ions training code should not require upgrading. 
+- optimise auxiliaryNeuronsSimilarSubwordAuto auxiliary identification algorithm;
 	Implementation Notes;
 		- ensure that the code is only perform subword auxiliary identification for;
-		i) auxiliaryNeuronsTokenisationSubwordPrimeConceptFeatures - every prime concept feature in the network: no change required.
-		ii) auxiliaryNeuronsTokenisationSubwordSecondaryConceptFeatures - every feature index in f (its corresponding word). 
+		i) auxiliaryNeuronsSimilarSubwordPrimeConceptFeatures - every prime concept feature in the network: no change required.
+		ii) auxiliaryNeuronsSimilarSubwordSecondaryConceptFeatures - every feature index in f (its corresponding word). 
 			- i.e. the same secondary subword auxiliary neuron input connections information should be assigned for each concept column.
 			- the only difference is that not every concept column will use the same secondary subword auxiliary neurons.
 		- the subword auxiliary neuron input/output connections training code should not require upgrading. 
@@ -296,3 +296,12 @@ v2c (Codex IDE GPT-5.5) [under development]:
 - in auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures step b), only the reverse/forward connections of the sibling feature neurons are loaded (not the connections of every feature neuron in the network).
 - upgrade to ensure no dense similiarity matrices, only sparse matrices are allowed.
 - auxiliaryNeuronsSimilarWordsAuto should be unloading the observed column connections from ram once used to identify the similar neuron features. auxiliaryNeuronsSimilarWordsPrimeConceptFeatures: for every concept index, auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures: for every feature index.
+- upgrade auxiliaryNeurons (both auxiliaryNeuronsSimilarWordsAuto and auxiliaryNeuronsSimilarSubwordAuto)
+- implement option auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMaximumSharedSourceFeatureIndex - maximum fraction of concept columns that can utilise the secondary feature index for it to have similar word detection applied. This updates auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures to only perform sibling feature neuron detection (part a) when the fraction of features at feature index across columns is less than auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMaximumSharedSourceFeatureIndex (e.g. 0.2).
+- upgrade auxiliaryNeuronsSimilarWordsAuto to generate a dataset file for the similar words detected for each column index (auxiliaryNeuronsSimilarWordsPrimeConceptFeaturesDatasetFileName) and feature index (auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesDatasetFileName), both in the same format as auxiliaryNeuronsSimilarWordsDataset3FileName.
+- upgrade auxiliaryNeuronsSimilarSubwordAuto to generate a dataset file for the similar subwords detected for each column index (auxiliaryNeuronsSimilarSubwordPrimeConceptFeaturesDatasetFileName) and feature index (auxiliaryNeuronsSimilarSubwordSecondaryConceptFeaturesDatasetFileName), both in the same format as auxiliaryNeuronsSimilarWordsDataset3FileName.
+- apply auxiliaryNeuronsAuto (both auxiliaryNeuronsSimilarWordsAuto and auxiliaryNeuronsSimilarSubwordAuto) inference algorithm during beam search. For every current feature neuron activated in the inference sequence: calculate which auxiliary feature neurons are activated by the current feature neuron, and then propagate their auxiliary activations.
+- update auxiliaryNeuronsAuto (auxiliaryNeuronsSimilarWordsAuto and auxiliaryNeuronsSimilarSubwordAuto) - auxiliary feature neurons are only ever trained for parent features that exist  in the current column.
+- update auxiliaryNeuronsSimilarSubwordAuto to use auxiliaryNeuronsSimilarSubwordAutoThreshold as a similiarity value threshold before selecting the set of similar subwords.
+- move all error constants ("*Error") from if(auxiliaryNeurons) in GIAANNnlp_globalDefs.py to inline in their respective code.
+- patch auxiliaryNeuronsSimilarSubwordAuto implementation - a subword similarity score below auxiliaryNeuronsSimilarSubwordAutoThreshold should be discarded, even if it satisfied the auxiliaryNeuronsSimilarSubwordPrefixThreshold condition.
