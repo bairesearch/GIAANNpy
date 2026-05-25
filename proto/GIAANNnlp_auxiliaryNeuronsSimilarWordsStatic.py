@@ -1506,8 +1506,10 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 				raise RuntimeError("validateSimilarWordsConfiguration error: auxiliaryNeuronsSimilarSubwordAutoThreshold out of range")
 		if(auxiliaryNeuronsAuto and auxiliaryNeuronsSimilarWordsAuto and auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures):
 			if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesLimit):
-				if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMaximumSharedSourceFeatureIndex < 0.0 or auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMaximumSharedSourceFeatureIndex > 1.0):
-					raise RuntimeError("validateSimilarWordsConfiguration error: auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMaximumSharedSourceFeatureIndex out of range")
+				if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMaximumSharedSourceFeatureIndexFraction < 0.0 or auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMaximumSharedSourceFeatureIndexFraction > 1.0):
+					raise RuntimeError("validateSimilarWordsConfiguration error: auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMaximumSharedSourceFeatureIndexFraction out of range")
+				if(not isinstance(auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMinimumSharedSourceFeatureIndex, int) or isinstance(auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMinimumSharedSourceFeatureIndex, bool) or auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMinimumSharedSourceFeatureIndex <= 0):
+					raise RuntimeError("validateSimilarWordsConfiguration error: auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMinimumSharedSourceFeatureIndex must be a positive int")
 		if(auxiliaryNeuronsSimilarWordsStatic):
 			if(auxiliaryNeuronsSimilarWordsDatasetName not in (auxiliaryNeuronsSimilarWordsDataset1Name, auxiliaryNeuronsSimilarWordsDataset2Name, auxiliaryNeuronsSimilarWordsDataset3Name)):
 				raise RuntimeError("validateSimilarWordsConfiguration error: unsupported auxiliaryNeuronsSimilarWordsDatasetName")

@@ -305,3 +305,6 @@ v2c (Codex IDE GPT-5.5) [under development]:
 - update auxiliaryNeuronsSimilarSubwordAuto to use auxiliaryNeuronsSimilarSubwordAutoThreshold as a similiarity value threshold before selecting the set of similar subwords.
 - move all error constants ("*Error") from if(auxiliaryNeurons) in GIAANNnlp_globalDefs.py to inline in their respective code.
 - patch auxiliaryNeuronsSimilarSubwordAuto implementation - a subword similarity score below auxiliaryNeuronsSimilarSubwordAutoThreshold should be discarded, even if it satisfied the auxiliaryNeuronsSimilarSubwordPrefixThreshold condition.
+- upgrade option auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesLimit to enforce additional option auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMinimumSharedSourceFeatureIndex - the minimum number (not fraction) of concept columns that can have the secondary feature index for it to have similar word detection applied.
+- add note regarding biological feasiblity of current auxiliaryNeuronsSimilarWords algorithm (and alternate auxiliaryNeuronsSimilarWordsCofire algorithm).
+- upgrade option auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesLimit to apply the same limit filters to the similar feature neurons also (not just the source/parent feature neurons).

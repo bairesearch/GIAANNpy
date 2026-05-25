@@ -491,6 +491,14 @@ auxiliaryNeurons=False	#default: False	#orig: False
 if(auxiliaryNeurons):
 	auxiliaryNeuronsAuto = True	#default: True	#orig: False
 	if(auxiliaryNeuronsAuto):
+		'''
+		note current auxiliaryNeuronsSimilarWords implementation is computationally efficient but not biologically feasible as it relies on the existence of reverse connections
+			CONSIDER adding option auxiliaryNeuronsSimilarWordsCofire:
+				for each pair of feature neurons in the network:
+					fire both their forward and reverse connections:
+						measure the co-occurance of activations across the global feature activation matrix.
+						if high co-occurance, then the two neurons are related.
+		'''
 		auxiliaryNeuronsSimilarWordsAuto = True	#default: True
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilarWordsAuto):
 			auxiliaryNeuronsSimilarWordsPrimeConceptFeatures = True	#find similar noun words
@@ -504,7 +512,8 @@ if(auxiliaryNeurons):
 				auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesDatasetFileName = "auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesDataset.txt"
 			auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesLimit = True
 			if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesLimit):
-				auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMaximumSharedSourceFeatureIndex = 0.2	#maximum fraction of concept columns that can have the secondary feature index for it to have similar word detection applied
+				auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMaximumSharedSourceFeatureIndexFraction = 0.05	#maximum fraction of concept columns that can have the secondary feature index for it to have similar word detection applied
+				auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMinimumSharedSourceFeatureIndex = 3	#minimum number of concept columns that can have the secondary feature index for it to have similar word detection applied
 		auxiliaryNeuronsSimilarSubwordAuto = True	#default: True
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilarSubwordAuto):
 			auxiliaryNeuronsSimilarSubwordPrimeConceptFeatures = True	#find similar noun subwords

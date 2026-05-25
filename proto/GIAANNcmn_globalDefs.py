@@ -47,7 +47,7 @@ if(useQuickExecution):
 	executionMode = "inference" 	#mandatory: "inference" (effective trainAndInference but uses a text datafile)
 	inferenceTrainFirstSequences = True	#trains first sequences in inference_prompt.txt, performs inference only on last sequence
 elif(useDefault):
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference"
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
 	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):

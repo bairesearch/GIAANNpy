@@ -567,7 +567,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 			if(sourceFeatureIndex in recordRowsByFeatureIndex):
 				sourceRowIndices = recordRowsByFeatureIndex[sourceFeatureIndex]
 				if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesLimit):
-					if(autoSecondaryFeatureIndexSharedSourceFractionAllowed(databaseNetworkObject, sourceFeatureIndex, sourceRowIndices)):
+					if(autoSecondaryFeatureIndexSharedSourceAllowed(databaseNetworkObject, sourceFeatureIndex, sourceRowIndices)):
 						similarFeatureActivations = calculateTwoHopSimilarSecondaryFeatureIndexActivations(databaseNetworkObject, records, sourceFeatureIndex, sourceRowIndices, targetDevice)
 					else:
 						similarFeatureActivations = createEmptyFeatureIndexActivationSparseVector(databaseNetworkObject, targetDevice)
@@ -585,15 +585,18 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 				for activeIndex in range(activeFeatureIndices.shape[0]):
 					targetFeatureIndex = int(activeFeatureIndices[activeIndex].item())
 					if(targetFeatureIndex in recordRowsByFeatureIndex):
-						activationWeight = float(activeFeatureValues[activeIndex].item())
-						for targetRowIndex in recordRowsByFeatureIndex[targetFeatureIndex]:
-							registerAutoSimilarityFeatureIndexWeight(databaseNetworkObject, records, sourceFeatureIndex, targetRowIndex, recordRowsByFeatureKey, activationWeight)
+						targetRowIndices = recordRowsByFeatureIndex[targetFeatureIndex]
+						if(not auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesLimit or autoSecondaryFeatureIndexSharedSourceAllowed(databaseNetworkObject, targetFeatureIndex, targetRowIndices)):
+							activationWeight = float(activeFeatureValues[activeIndex].item())
+							for targetRowIndex in targetRowIndices:
+								registerAutoSimilarityFeatureIndexWeight(databaseNetworkObject, records, sourceFeatureIndex, targetRowIndex, recordRowsByFeatureKey, activationWeight)
 		return
 
 	if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesLimit):
-		def autoSecondaryFeatureIndexSharedSourceFractionAllowed(databaseNetworkObject, sourceFeatureIndex, sourceRowIndices):
+		def autoSecondaryFeatureIndexSharedSourceAllowed(databaseNetworkObject, sourceFeatureIndex, sourceRowIndices):
 			sharedSourceFeatureIndexFraction = autoSecondaryFeatureIndexSharedSourceFraction(databaseNetworkObject, sourceFeatureIndex, sourceRowIndices)
-			result = sharedSourceFeatureIndexFraction < auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMaximumSharedSourceFeatureIndex
+			sourceFeatureColumnCount = len(sourceRowIndices)
+			result = sourceFeatureColumnCount >= auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMinimumSharedSourceFeatureIndex and sharedSourceFeatureIndexFraction < auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMaximumSharedSourceFeatureIndexFraction
 			return result
 
 		def autoSecondaryFeatureIndexSharedSourceFraction(databaseNetworkObject, sourceFeatureIndex, sourceRowIndices):
