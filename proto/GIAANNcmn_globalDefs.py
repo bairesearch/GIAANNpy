@@ -78,7 +78,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = False	#default: False: eval training-set
+	useBenchmarkDefaultsEvalTestSet = False	#default: True/False
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
@@ -87,8 +87,8 @@ elif(useDrawNetworkIndependently):
 if(useBenchmarkDefaultsEvalTestSet):
 	inferenceEvaluateTestSet = True
 	inferenceEvaluateTestSetTrainMaxSequences10M = False	#default: False	#orig: False	#required if performing test-set eval on database trained with > 3M sequences (based on how the original test-set was generated)
-	inferenceSegmentTiming = "none"	#~optimum
-	#inferenceSegmentTiming = "biased"	#default
+	#inferenceSegmentTiming = "none"	#~optimum
+	inferenceSegmentTiming = "biased"	#default
 	#inferenceSegmentTiming = "exact"
 	#inferenceSegmentTiming = "seq"
 	inferenceActivationsType = "boolf"	#default
@@ -440,11 +440,14 @@ randomiseColumnFeatureXposition = True	#shuffle x position of column internal fe
 
 #print vars (Information);
 if(useAutoresearch):
-	printEvalSequenceBar = False
 	printTrainSequenceBar = False
+	printEvalSequenceBar = False
 else:
-	printEvalSequenceBar = True	#default: True	#orig: False	#print each eval sequence iteration using standard tqdm bar
 	printTrainSequenceBar = True	#default: True	#orig: False	#print each training sequence iteration using standard tqdm bar
+	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures or useQuickExecution):
+		printEvalSequenceBar = False	#default: False	#False: print actual predicted sequences not conditioned on target tokens (only prompt targets tokens)
+	else:
+		printEvalSequenceBar = True	#default: True	#orig: False	#True: print each eval sequence iteration using standard tqdm bar
 if(useBenchmark):
 	printTimeDatabaseLoadSaveTimes = True
 	printRamMaxUsage = True

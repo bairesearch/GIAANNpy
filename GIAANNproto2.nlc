@@ -308,3 +308,5 @@ v2c (Codex IDE GPT-5.5) [under development]:
 - upgrade option auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesLimit to enforce additional option auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMinimumSharedSourceFeatureIndex - the minimum number (not fraction) of concept columns that can have the secondary feature index for it to have similar word detection applied.
 - add note regarding biological feasiblity of current auxiliaryNeuronsSimilarWords algorithm (and alternate auxiliaryNeuronsSimilarWordsCofire algorithm).
 - upgrade option auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesLimit to apply the same limit filters to the similar feature neurons also (not just the source/parent feature neurons).
+MANUAL; - restore default inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures:printEvalSequenceBar=False - print actual predicted sequences not conditioned on target tokens (only prompt targets tokens)
+

@@ -42,6 +42,7 @@ from GIAANNcmn_globalDefs import numberOfDendriticBranches
 from GIAANNcmn_globalDefs import randomlyAssignBranches
 from GIAANNcmn_globalDefs import trainMaxSequences
 from GIAANNcmn_globalDefs import numSeedTokensInference
+from GIAANNcmn_globalDefs import inferenceEvaluateTestSetTrainMaxSequences10M
 
 
 #Dataset Type;
@@ -50,7 +51,7 @@ if(useQuickExecution):
 	useBenchmarkEvalDataSet = False	#not used
 elif(useDefault):
 	datasetType = "oscar"	#"oscar" / "wikipedia" / "textfile" [experimental: "closedWorldGrounded1" / "closedWorldGrounded2" / "closedWorldGrounded3"]
-	useBenchmarkEvalDataSet = True	#default: True	#optional
+	useBenchmarkEvalDataSet = True	#default: True	#optional	#use an official eval dataset (prompt) - else user must provide a custom inference_prompt.txt
 elif(useBenchmark):
 	datasetType = "oscar"	#"oscar"/"wikipedia"
 	useBenchmarkEvalDataSet = True	#mandatory: True	#use benchmark file naming schemes and evals
