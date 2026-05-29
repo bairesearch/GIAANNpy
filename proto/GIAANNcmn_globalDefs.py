@@ -78,7 +78,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = False	#default: True/False
+	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
@@ -243,7 +243,10 @@ if(useInference):
 		inferenceUseNeuronFeaturePropertiesTime = True
 		inferenceUseNeuronFeaturePropertiesTimeExact = True
 	elif(inferenceSegmentTiming=="seq"):
-		inferenceUseNeuronFeaturePropertiesTime = True	#default: True	#orig: True
+		if(useBenchmark):
+			inferenceUseNeuronFeaturePropertiesTime = True	#benchmark uses temporal biasing in conjunction with sequentiality checks
+		else:
+			inferenceUseNeuronFeaturePropertiesTime = False
 		inferenceUseNeuronFeaturePropertiesTimeExact = False
 	else:
 		printe("inferenceSegmentTiming error")
