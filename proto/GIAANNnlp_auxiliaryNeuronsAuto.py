@@ -27,6 +27,7 @@ import GIAANNcmn_databaseNetworkFiles
 if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 
 	auxiliaryNeuronsAutoReverseSavedTargetTensorPaths = set()
+	auxiliaryNeuronsAutoFeatureDatasetCacheByFile = {}
 
 	def getTokenAutoAuxiliaryFeatureIndices(databaseNetworkObject, token, isConcept, conceptIndex, allowNewFeatures=False, registerParent=False):
 		import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
@@ -301,9 +302,195 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 			updateAutoAuxiliaryFeatureConnectionWeightsForFeatureType(databaseNetworkObject, subwordSimilarity, True)
 		if(getAutoSecondaryFeatureEnabled(subwordSimilarity)):
 			updateAutoAuxiliaryFeatureConnectionWeightsForFeatureType(databaseNetworkObject, subwordSimilarity, False)
+		if(auxiliaryNeuronsAutoInference):
+			removeAutoParentKeysForMode(databaseNetworkObject, subwordSimilarity)
 		databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeatureIndexWeightsByParentWord = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.buildAuxiliaryFeatureIndexWeightsByParentWord(databaseNetworkObject)
 		GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.invalidateDatabaseAuxiliaryInputConnectionCaches(databaseNetworkObject)
 		return
+
+	def calculateDynamicAutoPrimeAuxiliaryConceptActivations(databaseNetworkObject, sourceConceptIndex, sourceFeatureIndex, sourceActivationValue, targetDevice):
+		import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
+		validateDynamicAutoPrimeInferenceSourceFeature(sourceFeatureIndex)
+		validateDynamicAutoInferenceSourceActivation(sourceActivationValue, "calculateDynamicAutoPrimeAuxiliaryConceptActivations")
+		normalisedSourceConceptIndex = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.normaliseAuxiliaryParentMapConceptIndex(databaseNetworkObject, sourceConceptIndex)
+		sourceWord = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.normaliseSimilarityWord(databaseNetworkObject.conceptColumnsList[normalisedSourceConceptIndex])
+		connectionWeights = {}
+		if(getAutoPrimeFeatureEnabled(False)):
+			addDynamicAutoPrimeAuxiliaryFeatureActivationsForDataset(databaseNetworkObject, connectionWeights, sourceWord, getAutoPrimePrefix(False), getAutoAuxiliaryFeatureDatasetFile(False, True))
+		if(getAutoPrimeFeatureEnabled(True)):
+			addDynamicAutoPrimeSubwordAuxiliaryFeatureActivations(databaseNetworkObject, connectionWeights, sourceWord)
+		result = buildDynamicAutoAuxiliaryActivationVector(databaseNetworkObject, connectionWeights, sourceActivationValue, targetDevice)
+		return result
+
+	def calculateDynamicAutoSecondaryAuxiliaryFeatureActivations(observedColumn, sourceFeatureIndex, sourceActivationValue, targetDevice):
+		import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
+		databaseNetworkObject = observedColumn.databaseNetworkObject
+		normalisedConceptIndex = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.normaliseAuxiliaryParentMapConceptIndex(databaseNetworkObject, observedColumn.conceptIndex)
+		normalisedSourceFeatureIndex = int(sourceFeatureIndex)
+		validateDynamicAutoSecondaryInferenceSourceFeature(databaseNetworkObject, normalisedSourceFeatureIndex)
+		validateDynamicAutoInferenceSourceActivation(sourceActivationValue, "calculateDynamicAutoSecondaryAuxiliaryFeatureActivations")
+		sourceWord = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.normaliseSimilarityWord(databaseNetworkObject.conceptFeaturesList[normalisedSourceFeatureIndex])
+		connectionWeights = {}
+		if(getAutoSecondaryFeatureEnabled(False)):
+			addDynamicAutoSecondaryAuxiliaryFeatureActivationsForDataset(databaseNetworkObject, connectionWeights, sourceWord, normalisedConceptIndex, getAutoSecondaryPrefix(False), getAutoAuxiliaryFeatureDatasetFile(False, False))
+		if(getAutoSecondaryFeatureEnabled(True)):
+			addDynamicAutoSecondarySubwordAuxiliaryFeatureActivations(databaseNetworkObject, connectionWeights, sourceWord, normalisedConceptIndex)
+		result = buildDynamicAutoAuxiliaryActivationVector(databaseNetworkObject, connectionWeights, sourceActivationValue, targetDevice)
+		return result
+
+	def validateDynamicAutoPrimeInferenceSourceFeature(sourceFeatureIndex):
+		if(int(sourceFeatureIndex) != featureIndexPrimeConceptNeuron):
+			raise RuntimeError("validateDynamicAutoPrimeInferenceSourceFeature error: sourceFeatureIndex must be the active prime concept feature")
+		return
+
+	def validateDynamicAutoSecondaryInferenceSourceFeature(databaseNetworkObject, sourceFeatureIndex):
+		normalisedSourceFeatureIndex = int(sourceFeatureIndex)
+		if(normalisedSourceFeatureIndex <= featureIndexPrimeConceptNeuron or normalisedSourceFeatureIndex >= len(databaseNetworkObject.conceptFeaturesList)):
+			raise RuntimeError("validateDynamicAutoSecondaryInferenceSourceFeature error: sourceFeatureIndex must be an active secondary feature")
+		return
+
+	def validateDynamicAutoInferenceSourceActivation(sourceActivationValue, functionName):
+		if(float(sourceActivationValue.item()) <= auxiliaryNeuronsSimilarWordsMinimumSimilarity):
+			raise RuntimeError(functionName + " error: dynamic auto inference source activation must be active")
+		return
+
+	def addDynamicAutoPrimeAuxiliaryFeatureActivationsForDataset(databaseNetworkObject, connectionWeights, sourceWord, auxiliaryFeaturePrefix, datasetFile):
+		import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
+		targetRecords = getAutoAuxiliaryFeatureDatasetTargetRecordsForSourceWord(datasetFile, sourceWord)
+		similarityThreshold = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.getSimilarityThresholdForAuxiliaryFeaturePrefix(auxiliaryFeaturePrefix)
+		for targetWord, activationWeight in targetRecords:
+			if(activationWeight >= similarityThreshold):
+				if(targetWord not in databaseNetworkObject.conceptColumnsDict):
+					raise RuntimeError("addDynamicAutoPrimeAuxiliaryFeatureActivationsForDataset error: targetWord missing from conceptColumnsDict")
+				targetConceptIndex = databaseNetworkObject.conceptColumnsDict[targetWord]
+				auxiliaryFeatureWord = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.buildConceptColumnAuxiliaryFeatureName(databaseNetworkObject, auxiliaryFeaturePrefix, targetConceptIndex, targetWord)
+				if(auxiliaryFeatureWord not in databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeaturesDict):
+					raise RuntimeError("addDynamicAutoPrimeAuxiliaryFeatureActivationsForDataset error: target auxiliary feature word missing")
+				auxiliaryFeatureIndex = databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeaturesDict[auxiliaryFeatureWord]
+				mergeDynamicAutoAuxiliaryFeatureActivation(connectionWeights, auxiliaryFeatureIndex, activationWeight)
+		return
+
+	def addDynamicAutoSecondaryAuxiliaryFeatureActivationsForDataset(databaseNetworkObject, connectionWeights, sourceWord, conceptIndex, auxiliaryFeaturePrefix, datasetFile):
+		import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
+		targetRecords = getAutoAuxiliaryFeatureDatasetTargetRecordsForSourceWord(datasetFile, sourceWord)
+		similarityThreshold = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.getSimilarityThresholdForAuxiliaryFeaturePrefix(auxiliaryFeaturePrefix)
+		for targetWord, activationWeight in targetRecords:
+			if(activationWeight >= similarityThreshold):
+				if(targetWord not in databaseNetworkObject.conceptFeaturesDict):
+					raise RuntimeError("addDynamicAutoSecondaryAuxiliaryFeatureActivationsForDataset error: targetWord missing from conceptFeaturesDict")
+				auxiliaryFeatureWord = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.buildConceptColumnAuxiliaryFeatureName(databaseNetworkObject, auxiliaryFeaturePrefix, conceptIndex, targetWord)
+				if(auxiliaryFeatureWord in databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeaturesDict):
+					auxiliaryFeatureIndex = databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeaturesDict[auxiliaryFeatureWord]
+					mergeDynamicAutoAuxiliaryFeatureActivation(connectionWeights, auxiliaryFeatureIndex, activationWeight)
+		return
+
+	def addDynamicAutoPrimeSubwordAuxiliaryFeatureActivations(databaseNetworkObject, connectionWeights, sourceWord):
+		import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
+		auxiliaryFeaturePrefix = getAutoPrimePrefix(True)
+		similarityThreshold = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.getSimilarityThresholdForAuxiliaryFeaturePrefix(auxiliaryFeaturePrefix)
+		for auxiliaryFeatureWord, auxiliaryFeatureIndex in databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeaturesDict.items():
+			if(GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.auxiliaryFeatureWordHasPrefix(auxiliaryFeatureWord, auxiliaryFeaturePrefix)):
+				auxiliaryConceptIndex, targetWord = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.parseConceptColumnAuxiliaryFeatureName(databaseNetworkObject, auxiliaryFeatureWord)
+				activationWeight = calculateDynamicAutoSubwordSimilarityWeight(sourceWord, targetWord)
+				if(activationWeight >= similarityThreshold):
+					mergeDynamicAutoAuxiliaryFeatureActivation(connectionWeights, auxiliaryFeatureIndex, activationWeight)
+		return
+
+	def addDynamicAutoSecondarySubwordAuxiliaryFeatureActivations(databaseNetworkObject, connectionWeights, sourceWord, conceptIndex):
+		import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
+		auxiliaryFeaturePrefix = getAutoSecondaryPrefix(True)
+		similarityThreshold = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.getSimilarityThresholdForAuxiliaryFeaturePrefix(auxiliaryFeaturePrefix)
+		for auxiliaryFeatureWord, auxiliaryFeatureIndex in databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeaturesDict.items():
+			if(GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.auxiliaryFeatureWordHasPrefix(auxiliaryFeatureWord, auxiliaryFeaturePrefix)):
+				auxiliaryConceptIndex, targetWord = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.parseConceptColumnAuxiliaryFeatureName(databaseNetworkObject, auxiliaryFeatureWord)
+				if(auxiliaryConceptIndex == conceptIndex):
+					activationWeight = calculateDynamicAutoSubwordSimilarityWeight(sourceWord, targetWord)
+					if(activationWeight >= similarityThreshold):
+						mergeDynamicAutoAuxiliaryFeatureActivation(connectionWeights, auxiliaryFeatureIndex, activationWeight)
+		return
+
+	def calculateDynamicAutoSubwordSimilarityWeight(sourceWord, targetWord):
+		import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
+		normalisedSourceWord = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.normaliseSimilarityWord(sourceWord)
+		normalisedTargetWord = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.normaliseSimilarityWord(targetWord)
+		maxSharedPrefixLength = min(len(normalisedSourceWord), len(normalisedTargetWord))
+		sharedPrefixLength = 0
+		for characterIndex in range(maxSharedPrefixLength):
+			if(normalisedSourceWord[characterIndex] == normalisedTargetWord[characterIndex]):
+				sharedPrefixLength += 1
+			else:
+				break
+		if(normalisedSourceWord == normalisedTargetWord):
+			result = auxiliaryNeuronsSimilarWordsIdentitySimilarity
+		elif(sharedPrefixLength >= int(auxiliaryNeuronsSimilarSubwordPrefixThreshold)):
+			result = sharedPrefixLength/max(len(normalisedSourceWord), len(normalisedTargetWord))
+		else:
+			result = auxiliaryNeuronsSimilarWordsMinimumSimilarity
+		return result
+
+	def mergeDynamicAutoAuxiliaryFeatureActivation(connectionWeights, auxiliaryFeatureIndex, activationWeight):
+		normalisedAuxiliaryFeatureIndex = int(auxiliaryFeatureIndex)
+		normalisedActivationWeight = float(activationWeight)
+		currentActivationWeight = connectionWeights.get(normalisedAuxiliaryFeatureIndex)
+		if(currentActivationWeight is None or normalisedActivationWeight > currentActivationWeight):
+			connectionWeights[normalisedAuxiliaryFeatureIndex] = normalisedActivationWeight
+		return
+
+	def buildDynamicAutoAuxiliaryActivationVector(databaseNetworkObject, connectionWeights, sourceActivationValue, targetDevice):
+		result = pt.zeros((databaseNetworkObject.fas,), dtype=arrayType, device=targetDevice)
+		if(len(connectionWeights) > 0):
+			auxiliaryFeatureIndices = []
+			activationWeights = []
+			for auxiliaryFeatureIndex in sorted(connectionWeights.keys()):
+				auxiliaryFeatureIndices.append(auxiliaryFeatureIndex)
+				activationWeights.append(connectionWeights[auxiliaryFeatureIndex])
+			auxiliaryFeatureIndexTensor = pt.tensor(auxiliaryFeatureIndices, dtype=pt.long, device=targetDevice)
+			activationWeightTensor = pt.tensor(activationWeights, dtype=arrayType, device=targetDevice)
+			result[auxiliaryFeatureIndexTensor] = activationWeightTensor * sourceActivationValue.to(targetDevice)
+		return result
+
+	def getAutoAuxiliaryFeatureDatasetTargetRecordsForSourceWord(datasetFile, sourceWord):
+		import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
+		normalisedSourceWord = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.normaliseSimilarityWord(sourceWord)
+		datasetRecordsBySourceWord = loadAutoAuxiliaryFeatureDataset(datasetFile)
+		if(normalisedSourceWord in datasetRecordsBySourceWord):
+			result = datasetRecordsBySourceWord[normalisedSourceWord]
+		else:
+			result = []
+		return result
+
+	def loadAutoAuxiliaryFeatureDataset(datasetFile):
+		global auxiliaryNeuronsAutoFeatureDatasetCacheByFile
+		if(datasetFile not in auxiliaryNeuronsAutoFeatureDatasetCacheByFile):
+			if(not GIAANNcmn_databaseNetworkFiles.pathExists(datasetFile)):
+				raise RuntimeError("loadAutoAuxiliaryFeatureDataset error: missing datasetFile")
+			datasetRecordsBySourceWord = {}
+			with open(datasetFile, auxiliaryNeuronsAutoFeatureDatasetFileReadMode, encoding=auxiliaryNeuronsAutoFeatureDatasetFileEncoding) as fileObject:
+				for lineIndex, line in enumerate(fileObject):
+					sourceWord, targetRecords = parseAutoAuxiliaryFeatureDatasetLine(line)
+					if(sourceWord in datasetRecordsBySourceWord):
+						raise RuntimeError("loadAutoAuxiliaryFeatureDataset error: duplicate sourceWord")
+					datasetRecordsBySourceWord[sourceWord] = targetRecords
+			auxiliaryNeuronsAutoFeatureDatasetCacheByFile[datasetFile] = datasetRecordsBySourceWord
+		result = auxiliaryNeuronsAutoFeatureDatasetCacheByFile[datasetFile]
+		return result
+
+	def parseAutoAuxiliaryFeatureDatasetLine(line):
+		import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
+		strippedLine = line.strip()
+		fields = strippedLine.split(auxiliaryNeuronsSimilarWordsDataset3Delimiter)
+		if(len(fields) < auxiliaryNeuronsSimilarWordsDataset3CompactMinimumFields):
+			raise RuntimeError("parseAutoAuxiliaryFeatureDatasetLine error: row has insufficient fields")
+		if((len(fields) - auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordStartFieldIndex)%auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordPairFields != 0):
+			raise RuntimeError("parseAutoAuxiliaryFeatureDatasetLine error: row has incomplete similar-word/score pair")
+		sourceWord = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.normaliseSimilarityWord(fields[auxiliaryNeuronsSimilarWordsDataset3CompactSourceWordFieldIndex])
+		targetRecords = []
+		for fieldIndex in range(auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordStartFieldIndex, len(fields), auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordPairFields):
+			targetWord = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.normaliseSimilarityWord(fields[fieldIndex + auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordOffset])
+			activationWeight = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.normaliseSimilarityWeight(float(fields[fieldIndex + auxiliaryNeuronsSimilarWordsDataset3CompactSimilarityOffset]))
+			targetRecords.append((targetWord, activationWeight))
+		result = sourceWord, targetRecords
+		return result
 
 	def ensureAutoAuxiliaryFeatureRecords(databaseNetworkObject, subwordSimilarity):
 		import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
@@ -510,6 +697,8 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 					fields.append(auxiliaryNeuronsSimilarWordsDataset3SimilarityFormat.format(activationWeight))
 				fileObject.write(auxiliaryNeuronsSimilarWordsDataset3Delimiter.join(fields) + auxiliaryNeuronsAutoFeatureDatasetLineTerminator)
 		os.replace(temporaryFile, datasetFile)
+		if(datasetFile in auxiliaryNeuronsAutoFeatureDatasetCacheByFile):
+			del auxiliaryNeuronsAutoFeatureDatasetCacheByFile[datasetFile]
 		return
 
 	def validateAutoAuxiliaryFeatureRecords(databaseNetworkObject, records, primeConceptFeatures):

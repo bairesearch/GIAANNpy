@@ -111,18 +111,18 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		sourceActivationValue = collapseSourceActivationForAuxiliaryInput(sourceActivation)
 		if(float(sourceActivationValue.item()) > auxiliaryNeuronsSimilarWordsMinimumSimilarity):
 			if(auxiliaryNeuronsSimilarWordsPrimeConceptFeatures and int(sourceFeatureIndex) == featureIndexPrimeConceptNeuron):
-				globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = processAuxiliaryPrimeFeaturePredictionActivations(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, int(sourceColumnIndex), sourceActivationValue, globalFeatureNeuronsTimeResult, sequenceWordIndex, sequenceColumnIndex, connectionDevice)
+				globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = processAuxiliaryPrimeFeaturePredictionActivations(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, int(sourceColumnIndex), int(sourceFeatureIndex), sourceActivationValue, globalFeatureNeuronsTimeResult, sequenceWordIndex, sequenceColumnIndex, connectionDevice)
 			if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures and int(sourceFeatureIndex) != featureIndexPrimeConceptNeuron):
 				globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = processAuxiliarySecondaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, int(sourceFeatureIndex), sourceActivationValue, globalFeatureNeuronsTimeResult, sequenceWordIndex, sequenceColumnIndex, connectionDevice)
 		result = globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult
 		return result
 
-	def processAuxiliaryPrimeFeaturePredictionActivations(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sourceColumnIndex, sourceActivationValue, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex, connectionDevice):
+	def processAuxiliaryPrimeFeaturePredictionActivations(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sourceColumnIndex, sourceFeatureIndex, sourceActivationValue, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex, connectionDevice):
 		import GIAANNcmn_predictionActivate
 		globalFeatureNeuronsActivationResult = globalFeatureNeuronsActivation
 		globalFeatureConnectionsActivationResult = globalFeatureConnectionsActivation
 		globalFeatureNeuronsTimeResult = globalFeatureNeuronsTime
-		auxiliaryActivations = calculatePrimeAuxiliaryConceptActivations(databaseNetworkObject, sourceColumnIndex, sourceActivationValue, connectionDevice)
+		auxiliaryActivations = calculatePrimeAuxiliaryConceptActivations(databaseNetworkObject, sourceColumnIndex, sourceFeatureIndex, sourceActivationValue, connectionDevice)
 		if(auxiliaryActivationVectorHasActiveValues(auxiliaryActivations)):
 			materialisedConnections = getPrimeOutputConnectionsMaterialised(databaseNetworkObject, connectionDevice, auxiliaryActivations)
 			featureNeuronsTargetActivation = calculateAuxiliaryFeatureTargetActivation(databaseNetworkObject, materialisedConnections, auxiliaryActivations)
@@ -151,7 +151,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		columnFeatureMap = {}
 		activationValue = pt.tensor(auxiliaryNeuronsSimilarWordsIdentitySimilarity, dtype=arrayType, device=deviceSparse)
 		if(auxiliaryNeuronsSimilarWordsPrimeConceptFeatures and int(parentFeatureIndex) == featureIndexPrimeConceptNeuron):
-			auxiliaryActivations = calculatePrimeAuxiliaryConceptActivations(databaseNetworkObject, int(observedColumn.conceptIndex), activationValue, deviceSparse)
+			auxiliaryActivations = calculatePrimeAuxiliaryConceptActivations(databaseNetworkObject, int(observedColumn.conceptIndex), int(parentFeatureIndex), activationValue, deviceSparse)
 			if(auxiliaryActivationVectorHasActiveValues(auxiliaryActivations)):
 				materialisedConnections = getPrimeOutputConnectionsMaterialised(databaseNetworkObject, deviceSparse, auxiliaryActivations)
 				auxiliaryTargetColumnsList, auxiliaryColumnFeatureMap = getConnectedColumnsForMaterialisedAuxiliaryConnections(databaseNetworkObject, materialisedConnections, auxiliaryActivations, includeFeatureDetails)
@@ -179,19 +179,27 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			result = sourceActivation
 		return result
 
-	def calculatePrimeAuxiliaryConceptActivations(databaseNetworkObject, sourceConceptIndex, sourceActivationValue, targetDevice):
-		inputConnections = getPrimeInputConnections(databaseNetworkObject, targetDevice)
-		sourceVector = pt.zeros((databaseNetworkObject.c, 1), dtype=arrayType, device=targetDevice)
-		sourceVector[int(sourceConceptIndex), 0] = sourceActivationValue.to(targetDevice)
-		result = pt.sparse.mm(inputConnections.transpose(0, 1).coalesce(), sourceVector).view(-1)
+	def calculatePrimeAuxiliaryConceptActivations(databaseNetworkObject, sourceConceptIndex, sourceFeatureIndex, sourceActivationValue, targetDevice):
+		if(auxiliaryNeuronsAuto and auxiliaryNeuronsAutoInference):
+			import GIAANNnlp_auxiliaryNeuronsAuto
+			result = GIAANNnlp_auxiliaryNeuronsAuto.calculateDynamicAutoPrimeAuxiliaryConceptActivations(databaseNetworkObject, sourceConceptIndex, sourceFeatureIndex, sourceActivationValue, targetDevice)
+		else:
+			inputConnections = getPrimeInputConnections(databaseNetworkObject, targetDevice)
+			sourceVector = pt.zeros((databaseNetworkObject.c, 1), dtype=arrayType, device=targetDevice)
+			sourceVector[int(sourceConceptIndex), 0] = sourceActivationValue.to(targetDevice)
+			result = pt.sparse.mm(inputConnections.transpose(0, 1).coalesce(), sourceVector).view(-1)
 		return result
 
 	def calculateSecondaryAuxiliaryFeatureActivations(observedColumn, sourceFeatureIndex, sourceActivationValue, targetDevice):
 		databaseNetworkObject = observedColumn.databaseNetworkObject
-		inputConnections = getSecondaryInputConnections(observedColumn, targetDevice)
-		sourceVector = pt.zeros((databaseNetworkObject.f, 1), dtype=arrayType, device=targetDevice)
-		sourceVector[int(sourceFeatureIndex), 0] = sourceActivationValue.to(targetDevice)
-		result = pt.sparse.mm(inputConnections.transpose(0, 1).coalesce(), sourceVector).view(-1)
+		if(auxiliaryNeuronsAuto and auxiliaryNeuronsAutoInference):
+			import GIAANNnlp_auxiliaryNeuronsAuto
+			result = GIAANNnlp_auxiliaryNeuronsAuto.calculateDynamicAutoSecondaryAuxiliaryFeatureActivations(observedColumn, sourceFeatureIndex, sourceActivationValue, targetDevice)
+		else:
+			inputConnections = getSecondaryInputConnections(observedColumn, targetDevice)
+			sourceVector = pt.zeros((databaseNetworkObject.f, 1), dtype=arrayType, device=targetDevice)
+			sourceVector[int(sourceFeatureIndex), 0] = sourceActivationValue.to(targetDevice)
+			result = pt.sparse.mm(inputConnections.transpose(0, 1).coalesce(), sourceVector).view(-1)
 		return result
 
 	def getPrimeInputConnections(databaseNetworkObject, targetDevice):

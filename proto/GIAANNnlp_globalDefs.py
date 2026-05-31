@@ -36,6 +36,7 @@ from GIAANNcmn_globalDefs import useDefault
 from GIAANNcmn_globalDefs import useSANI
 from GIAANNcmn_globalDefs import useInference
 from GIAANNcmn_globalDefs import inferenceEvaluateTestSet
+from GIAANNcmn_globalDefs import inferenceAddNewFeatures
 #useBenchmark dependencies:
 from GIAANNcmn_globalDefs import multipleDendriticBranches
 from GIAANNcmn_globalDefs import numberOfDendriticBranches
@@ -43,6 +44,8 @@ from GIAANNcmn_globalDefs import randomlyAssignBranches
 from GIAANNcmn_globalDefs import trainMaxSequences
 from GIAANNcmn_globalDefs import numSeedTokensInference
 from GIAANNcmn_globalDefs import inferenceEvaluateTestSetTrainMaxSequences10M
+
+
 
 
 #Dataset Type;
@@ -528,11 +531,16 @@ if(auxiliaryNeurons):
 			if(auxiliaryNeuronsSimilarSubwordSecondaryConceptFeatures):
 				auxiliaryNeuronsSimilarSubwordSecondaryConceptFeaturesDatasetFileName = "auxiliaryNeuronsSimilarSubwordSecondaryConceptFeaturesDataset.txt"
 		auxiliaryNeuronsAutoFeatureDatasetFileWriteMode = "w"
+		auxiliaryNeuronsAutoFeatureDatasetFileReadMode = "r"
 		auxiliaryNeuronsAutoFeatureDatasetFileEncoding = "utf-8"
 		auxiliaryNeuronsAutoFeatureDatasetLineTerminator = "\n"
 		auxiliaryNeuronsSimilar = auxiliaryNeuronsSimilarWordsAuto or auxiliaryNeuronsSimilarSubwordAuto
 		auxiliaryNeuronsTokenisation = False
 		auxiliaryNeuronsSimilarWordsStatic = False
+		if(inferenceAddNewFeatures):
+			auxiliaryNeuronsAutoInference = True	#default: True	#orig: False
+		else:
+			auxiliaryNeuronsAutoInference = False
 	else:
 		auxiliaryNeuronsSimilarWordsStatic = True
 		if(auxiliaryNeuronsSimilarWordsStatic):
