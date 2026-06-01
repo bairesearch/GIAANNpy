@@ -23,8 +23,6 @@ from GIAANNcmn_globalDefs import *
 
 if(usePOS):
 	import GIAANNnlp_sequencePOS
-if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-	import GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic
 
 def loadPOSdatabase():
 	GIAANNnlp_sequencePOS.loadPOSdatabase()
@@ -51,36 +49,27 @@ def isTokenReferenceSetDelimiterProbabilistic(token):
 	
 
 class SequenceToken:
-	def __init__(self, word, lemma, pos, tag, morph=None):
+	def __init__(self, word, lemma, pos, tag):
 		self.word = word
 		self.lemma = lemma
 		self.pos = pos
 		self.tag = tag
-		if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-			self.morph = morph
-			self.auxiliaryFeatureWords = []
 
 # Preprocessing helpers
 class PreprocessedToken:
-	__slots__ = ("text", "lemma_", "pos_", "tag_", "morph")
-	def __init__(self, text, lemma, pos, tag, morph=None):
+	__slots__ = ("text", "lemma_", "pos_", "tag_")
+	def __init__(self, text, lemma, pos, tag):
 		self.text = text
 		self.lemma_ = lemma
 		self.pos_ = pos
 		self.tag_ = tag
-		self.morph = morph
 
 def convertPreprocessedTokenToSequenceToken(preprocessedToken):
 	word = preprocessedToken.text.lower()
 	lemma = preprocessedToken.lemma_.lower()
 	pos = preprocessedToken.pos_  #coarse Part-of-speech (e.g. PRON) 
 	tag = preprocessedToken.tag_	#fine-grained POS (e.g., PRP, PRP$, WP, WP$, etc.)
-	morph = None
-	if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-		morph = GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.getPreprocessedTokenMorphString(preprocessedToken)
-	token = SequenceToken(word, lemma, pos, tag, morph)
-	if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-		token.auxiliaryFeatureWords = GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.createTokenAuxiliaryFeatureWords(token)
+	token = SequenceToken(word, lemma, pos, tag)
 	return token
 
 def getTokens(sequence):
@@ -120,10 +109,7 @@ def createSinglePreprocessedToken(token):
 	lemma = token.lemma_
 	pos = token.pos_
 	tag = token.tag_
-	morph = None
-	if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-		morph = GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.getPreprocessedTokenMorphString(token)
-	return PreprocessedToken(text, lemma, pos, tag, morph)
+	return PreprocessedToken(text, lemma, pos, tag)
 
 def pretrain(sequence):
 	if(pretrainCombineHyphenatedNouns):
@@ -202,10 +188,7 @@ if(pretrainCombineConsecutiveNouns):
 		lemma = token.lemma_
 		pos = token.pos_
 		tag = token.tag_
-		morph = None
-		if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-			morph = GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.getPreprocessedTokenMorphString(token)
-		return PreprocessedToken(text, lemma, pos, tag, morph)
+		return PreprocessedToken(text, lemma, pos, tag)
 
 	def createCombinedToken(tokens):
 		if(len(tokens) == 1):
@@ -214,10 +197,7 @@ if(pretrainCombineConsecutiveNouns):
 		combinedLemma = "_".join(token.lemma_ for token in tokens)
 		combinedPos = tokens[0].pos_
 		combinedTag = tokens[0].tag_
-		combinedMorph = None
-		if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-			combinedMorph = GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.getPreprocessedTokenMorphString(tokens[0])
-		return PreprocessedToken(combinedText, combinedLemma, combinedPos, combinedTag, combinedMorph)
+		return PreprocessedToken(combinedText, combinedLemma, combinedPos, combinedTag)
 
 if(pretrainCombineHyphenatedNouns):
 
@@ -266,10 +246,7 @@ if(pretrainCombineHyphenatedNouns):
 			combinedLemma = buildCombinedTokenString(tokens, joinersLocal, True)
 			combinedPos = tokens[0].pos_
 			combinedTag = tokens[0].tag_
-			combinedMorph = None
-			if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-				combinedMorph = GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.getPreprocessedTokenMorphString(tokens[0])
-			result = PreprocessedToken(combinedText, combinedLemma, combinedPos, combinedTag, combinedMorph)
+			result = PreprocessedToken(combinedText, combinedLemma, combinedPos, combinedTag)
 		return result
 
 	def buildCombinedTokenString(tokens, joiners, useLemma):

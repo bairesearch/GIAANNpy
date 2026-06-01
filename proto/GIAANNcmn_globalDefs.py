@@ -618,9 +618,6 @@ if(useInference):
 #Database save paths;
 conceptColumnsDictFile = databaseFolder + 'conceptColumnsDict.pkl'
 conceptFeaturesDictFile = databaseFolder + 'conceptFeaturesDict.pkl'
-if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-	auxiliaryNeuronsTokenisationSubwordFeaturesDictFile = databaseFolder + auxiliaryNeuronsTokenisationSubwordFeaturesDictFileName
-	auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWordFile = databaseFolder + auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWordFileName
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	auxiliaryNeuronsSimilarWordsFeaturesDictFile = databaseFolder + auxiliaryNeuronsSimilarWordsFeaturesDictFileName
 	auxiliaryNeuronsSimilarWordsFeatureWordWeightsByParentWordFile = databaseFolder + auxiliaryNeuronsSimilarWordsFeatureWordWeightsByParentWordFileName
@@ -635,12 +632,6 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 				auxiliaryNeuronsSimilarSubwordPrimeConceptFeaturesDatasetFile = databaseFolder + auxiliaryNeuronsSimilarSubwordPrimeConceptFeaturesDatasetFileName
 			if(auxiliaryNeuronsSimilarSubwordSecondaryConceptFeatures):
 				auxiliaryNeuronsSimilarSubwordSecondaryConceptFeaturesDatasetFile = databaseFolder + auxiliaryNeuronsSimilarSubwordSecondaryConceptFeaturesDatasetFileName
-	if(auxiliaryNeuronsSimilarWordsStatic):
-		auxiliaryNeuronsSimilarWordsDatasetFolder = databaseFolder + auxiliaryNeuronsSimilarWordsDatasetFolderName + "/"
-		auxiliaryNeuronsSimilarWordsDataset2File = auxiliaryNeuronsSimilarWordsDatasetFolder + auxiliaryNeuronsSimilarWordsDataset2FileName
-		auxiliaryNeuronsSimilarWordsDataset3File = auxiliaryNeuronsSimilarWordsDatasetFolder + auxiliaryNeuronsSimilarWordsDataset3FileName
-		auxiliaryNeuronsSimilarWordsDataset3SourceFile = auxiliaryNeuronsSimilarWordsDatasetFolder + auxiliaryNeuronsSimilarWordsDataset3SourceFileName
-		auxiliaryNeuronsSimilarWordsDataset3SourceDownloadArchiveFile = auxiliaryNeuronsSimilarWordsDatasetFolder + auxiliaryNeuronsSimilarWordsDataset3SourceDownloadArchiveFileName
 observedColumnsFolderName = 'observedColumns'
 observedColumnsDir = databaseFolder + observedColumnsFolderName
 observedColumnFolderNamePrefix = 'cIndex'

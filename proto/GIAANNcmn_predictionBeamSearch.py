@@ -26,10 +26,8 @@ import GIAANNcmn_databaseNetwork
 import GIAANNcmn_sparseTensors
 import GIAANNcmn_predictionActivate
 import GIAANNcmn_predictionConstraints
-if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-	import GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-	import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
+	import GIAANNnlp_auxiliaryNeuronsSimilarWords
 
 
 def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, conceptActivationState=None, connectedColumnsConstraint=None, connectedColumnsFeatures=None):
@@ -196,10 +194,8 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 	observedColumnsDict[lemma] = observedColumn
 	featureConnections = observedColumn.prepareFeatureConnectionsForSourceFeature(featureIndex, targetDevice=state["features"].device, createMissing=False)
 	state["features"], state["connections"], state["time"] = GIAANNcmn_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, state["features"], state["connections"], featureConnections, columnIndex, featureIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex)
-	if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-		state["features"], state["connections"], state["time"] = GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.processAuxiliaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, state["features"], state["connections"], columnIndex, featureIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex)
 	if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-		state["features"], state["connections"], state["time"] = GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.processAuxiliaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, state["features"], state["connections"], columnIndex, featureIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex)
+		state["features"], state["connections"], state["time"] = GIAANNnlp_auxiliaryNeuronsSimilarWords.processAuxiliaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, state["features"], state["connections"], columnIndex, featureIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex)
 	applyBeamNodePredictionEffects(state, columnIndex, featureIndex, sequenceWordIndex)
 	if(predictionColumnsMustActivateConceptFeature):
 		conceptState = state.get("conceptActivations")

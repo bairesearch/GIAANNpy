@@ -24,10 +24,8 @@ from GIAANNcmn_globalDefs import *
 import GIAANNcmn_debug
 import GIAANNcmn_sparseTensors
 import GIAANNnlp_sequenceConcepts
-if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-	import GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-	import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
+	import GIAANNnlp_auxiliaryNeuronsSimilarWords
 
 	
 def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
@@ -45,10 +43,8 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 	featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask = GIAANNnlp_sequenceConcepts.processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices)
 
 	featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex)
-	if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-		GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.trainAuxiliaryFeatureConnections(sequenceObservedColumns, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, conceptIndices, startIndices, endIndices)
 	if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-		GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.trainAuxiliaryFeatureConnections(sequenceObservedColumns, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, conceptIndices, startIndices, endIndices)
+		GIAANNnlp_auxiliaryNeuronsSimilarWords.trainAuxiliaryFeatureConnections(sequenceObservedColumns, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, conceptIndices, startIndices, endIndices)
 	if(debugPrintTrainSectionTimes):
 		GIAANNcmn_debug.debugTrainSectionTimesAdd(sequenceObservedColumns.databaseNetworkObject, "trainConceptWords", time.perf_counter() - trainConceptWordsStartTime)
 

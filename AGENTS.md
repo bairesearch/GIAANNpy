@@ -15,3 +15,4 @@
 - When arranging functions in a file, position parent functions above child functions (not below them).
 - When responding to prompt requests in point form, always enumerate your responses so the programmer can reference them systematically.
 - Never use any magic numbers or text (all constants must be defined in the associated global defs file).
+- Never update the requirement specification (the ".nlc" Natural Language Code file).

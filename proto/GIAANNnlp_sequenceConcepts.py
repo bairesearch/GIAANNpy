@@ -23,8 +23,6 @@ import torch as pt
 from GIAANNcmn_globalDefs import *
 import GIAANNcmn_databaseNetwork
 import GIAANNnlp_sequenceTokens
-if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-	import GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic
 
 
 def firstPass(databaseNetworkObject, sequence, allowNewFeatures):
@@ -121,8 +119,6 @@ def detectNewFeatures(databaseNetworkObject, tokens, allowNewFeatures):
 	for tokenIndex, token in enumerate(tokens):
 		if(processFeatureDetection(databaseNetworkObject, tokenIndex, token, tokens, allowNewFeatures)):
 			numNewFeatures += 1
-		if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-			GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.processAuxiliaryFeatureDetection(databaseNetworkObject, token, GIAANNnlp_sequenceTokens.isConcept(token), allowNewFeatures)
 	
 	# After processing all features, update f
 	if(allowNewFeatures):

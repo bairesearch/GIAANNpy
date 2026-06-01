@@ -35,10 +35,8 @@ import GIAANNcmn_databaseNetworkDrawLarge
 import GIAANNcmn_executionProgress
 import GIAANNnlp_sequenceTokens
 import GIAANNnlp_sequenceConcepts
-if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-	import GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-	import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
+	import GIAANNnlp_auxiliaryNeuronsSimilarWords
 if(auxiliaryNeurons and auxiliaryNeuronsSimilarWordsAuto):
 	import GIAANNnlp_auxiliaryNeuronsSimilarWordsAuto
 if(auxiliaryNeurons and auxiliaryNeuronsSimilarSubwordAuto):
@@ -456,10 +454,8 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 				GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("prepareObservedColumnsForTrainSequence")
 				
 			GIAANNcmn_databaseNetwork.prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFeatureIndicesByObservedColumn)
-			if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-				GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.prepareObservedColumnsForTrainSequenceAuxiliary(sequenceObservedColumns, observedColumnsDict, allowNewFeatures)
 			if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-				GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.prepareObservedColumnsForTrainSequenceAuxiliary(sequenceObservedColumns, observedColumnsDict, allowNewFeatures)
+				GIAANNnlp_auxiliaryNeuronsSimilarWords.prepareObservedColumnsForTrainSequenceAuxiliary(sequenceObservedColumns, observedColumnsDict, allowNewFeatures)
 			
 			if(debugPrintRamMaxUsagePhaseLocal):
 				GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("prepareObservedColumnsForTrainSequence")

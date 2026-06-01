@@ -1,4 +1,4 @@
-"""GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.py
+"""GIAANNnlp_auxiliaryNeuronsSimilarWords.py
 
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch.com.au)
@@ -13,7 +13,7 @@ see GIAANNcmn_main.py
 see GIAANNcmn_main.py
 
 # Description:
-GIA ANN NLP auxiliary neurons similar words static
+GIA ANN NLP auxiliary neurons similar words
 
 """
 
@@ -27,9 +27,6 @@ import GIAANNcmn_databaseNetworkFiles
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 
 	auxiliaryNeuronsSimilarWordsSavedSourceTensorPaths = set()
-	auxiliaryNeuronsSimilarWordsDatasetCache = None
-	auxiliaryNeuronsSimilarWordsDatasetWordNetValidated = False
-	auxiliaryNeuronsSimilarWordsParentWordWeightsCache = {}
 
 	def loadOrCreateDatabaseAuxiliaryFeatureMaps(loadExistingDatabase):
 		auxiliarySimilarFeaturesDict = {}
@@ -45,8 +42,6 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		if(not isinstance(auxiliarySimilarLoadExistingDatabase, bool)):
 			raise RuntimeError("initialiseDatabaseNetworkAuxiliarySimilarity error: auxiliarySimilarLoadExistingDatabase must be bool")
 		validateSimilarWordsConfiguration()
-		if(auxiliaryNeuronsSimilarWordsStatic and auxiliaryNeuronsSimilarWordsDataset3):
-			ensureSimilarWordsDataset3CompactFile()
 		databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeaturesDict = auxiliarySimilarFeaturesDict
 		databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeaturesList = auxiliarySimilarFeaturesList
 		databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeaturesIndexToWordDict = dict(enumerate(auxiliarySimilarFeaturesList))
@@ -582,23 +577,6 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		if(auxiliaryNeuronsAuto):
 			import GIAANNnlp_auxiliaryNeuronsAuto
 			result = GIAANNnlp_auxiliaryNeuronsAuto.getTokenAutoAuxiliaryFeatureIndices(databaseNetworkObject, token, isConcept, conceptIndex, allowNewFeatures, registerParent)
-		else:
-			if(isConcept):
-				if(auxiliaryNeuronsSimilarWordsPrimeConceptFeatures and tokenHasPrimeConceptSimilarityWord(token)):
-					similarityWord = getTokenPrimeConceptSimilarityWord(token)
-					auxiliaryFeatureWord = buildConceptColumnAuxiliaryFeatureName(databaseNetworkObject, auxiliaryNeuronsSimilarWordsFeatureNamePrefixPrimeConcept, conceptIndex, similarityWord)
-					auxiliaryFeatureIndex = registerAuxiliaryFeatureWord(databaseNetworkObject, auxiliaryFeatureWord, allowNewFeatures)
-					if(registerParent):
-						registerSimilarityParentFeatureWordWeights(databaseNetworkObject, auxiliaryNeuronsSimilarWordsFeatureNamePrefixPrimeConcept, similarityWord, auxiliaryFeatureWord)
-					result.append(auxiliaryFeatureIndex)
-			else:
-				if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures and tokenHasSecondarySimilarityWord(token)):
-					similarityWord = getTokenSecondarySimilarityWord(token)
-					auxiliaryFeatureWord = buildConceptColumnAuxiliaryFeatureName(databaseNetworkObject, auxiliaryNeuronsSimilarWordsFeatureNamePrefixSecondary, conceptIndex, similarityWord)
-					auxiliaryFeatureIndex = registerAuxiliaryFeatureWord(databaseNetworkObject, auxiliaryFeatureWord, allowNewFeatures)
-					if(registerParent):
-						registerSimilarityParentFeatureWordWeights(databaseNetworkObject, auxiliaryNeuronsSimilarWordsFeatureNamePrefixSecondary, similarityWord, auxiliaryFeatureWord)
-					result.append(auxiliaryFeatureIndex)
 		return result
 
 	def buildAuxiliarySourceOccurrenceTensors(sequenceObservedColumns, conceptIndices, startIndices, endIndices, targetDevice):
@@ -768,15 +746,6 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			result = databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeaturesDict[auxiliaryFeatureWord]
 		return result
 
-	def registerSimilarityParentFeatureWordWeights(databaseNetworkObject, auxiliaryFeaturePrefix, auxiliaryBaseWord, auxiliaryFeatureWord):
-		if(auxiliaryFeatureWord not in databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeaturesDict):
-			raise RuntimeError("registerSimilarityParentFeatureWordWeights error: missing auxiliary feature word " + auxiliaryFeatureWord)
-		parentWordWeights = getSimilarityAuxiliaryParentWordWeights(auxiliaryBaseWord)
-		for parentWord, activationWeight in parentWordWeights.items():
-			parentKey = buildSimilarityParentKey(auxiliaryFeaturePrefix, parentWord)
-			registerSimilarityParentFeatureWordWeight(databaseNetworkObject, parentKey, auxiliaryFeatureWord, activationWeight)
-		return
-
 	def registerSimilarityParentFeatureWordWeight(databaseNetworkObject, parentKey, auxiliaryFeatureWord, activationWeight):
 		parentPrefix, parentWord = parseSimilarityParentKey(parentKey)
 		similarityThreshold = getSimilarityThresholdForAuxiliaryFeaturePrefix(parentPrefix)
@@ -817,317 +786,6 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			auxiliaryFeatureIndex = databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeaturesDict[auxiliaryFeatureWord]
 			result.append((auxiliaryConceptIndex, auxiliaryFeatureIndex, normaliseSimilarityWeight(activationWeight)))
 		result.sort(key=lambda item: (item[0], item[1]))
-		return result
-
-	def getSimilarityAuxiliaryParentWordWeights(auxiliaryBaseWord):
-		normalisedAuxiliaryBaseWord = normaliseSimilarityWord(auxiliaryBaseWord)
-		if(normalisedAuxiliaryBaseWord in auxiliaryNeuronsSimilarWordsParentWordWeightsCache):
-			result = auxiliaryNeuronsSimilarWordsParentWordWeightsCache[normalisedAuxiliaryBaseWord]
-		else:
-			result = {normalisedAuxiliaryBaseWord: auxiliaryNeuronsSimilarWordsIdentitySimilarity}
-			similarWordWeights = getSimilarWordWeights(normalisedAuxiliaryBaseWord)
-			for parentWord, activationWeight in similarWordWeights.items():
-				normalisedParentWord = normaliseSimilarityWord(parentWord)
-				normalisedActivationWeight = normaliseSimilarityWeight(activationWeight)
-				if(normalisedActivationWeight >= auxiliaryNeuronsSimilarWordsThreshold):
-					currentActivationWeight = result.get(normalisedParentWord)
-					if(currentActivationWeight is None or normalisedActivationWeight > currentActivationWeight):
-						result[normalisedParentWord] = normalisedActivationWeight
-			auxiliaryNeuronsSimilarWordsParentWordWeightsCache[normalisedAuxiliaryBaseWord] = result
-		return result
-
-	def getSimilarWordWeights(word):
-		result = {}
-		if(auxiliaryNeuronsSimilarWordsDatasetName == auxiliaryNeuronsSimilarWordsDataset1Name):
-			result = getSimilarWordWeightsDatasetWordNet(word)
-		elif(auxiliaryNeuronsSimilarWordsDatasetName == auxiliaryNeuronsSimilarWordsDataset2Name):
-			result = getSimilarWordWeightsDatasetTextPairs(word)
-		elif(auxiliaryNeuronsSimilarWordsDatasetName == auxiliaryNeuronsSimilarWordsDataset3Name):
-			result = getSimilarWordWeightsDatasetWord2VecText(word)
-		else:
-			raise RuntimeError("getSimilarWordWeights error: unsupported auxiliaryNeuronsSimilarWordsDatasetName")
-		return result
-
-	def getSimilarWordWeightsDatasetWordNet(word):
-		result = {}
-		try:
-			from nltk.corpus import wordnet as wn
-			validateSimilarWordsDatasetWordNet(wn)
-			synsets = wn.synsets(word)
-		except LookupError as error:
-			raise RuntimeError("getSimilarWordWeightsDatasetWordNet error: missing NLTK WordNet dataset") from error
-		for synset in synsets:
-			for lemma in synset.lemma_names():
-				similarWord = normaliseSimilarityDatasetWordNetLemma(lemma)
-				if(similarWord != word):
-					result[similarWord] = auxiliaryNeuronsSimilarWordsIdentitySimilarity
-		return result
-
-	def validateSimilarWordsDatasetWordNet(wn):
-		global auxiliaryNeuronsSimilarWordsDatasetWordNetValidated
-		if(not auxiliaryNeuronsSimilarWordsDatasetWordNetValidated):
-			synsetCount = 0
-			for synset in wn.all_synsets():
-				synsetCount += 1
-				if(synsetCount >= auxiliaryNeuronsSimilarWordsDataset1MinimumSynsets):
-					auxiliaryNeuronsSimilarWordsDatasetWordNetValidated = True
-					break
-			if(not auxiliaryNeuronsSimilarWordsDatasetWordNetValidated):
-				raise RuntimeError("getSimilarWordWeightsDatasetWordNet error: WordNet dataset is below production minimum synsets" + auxiliaryNeuronsSimilarWordsDatasetMinimumErrorActualPrefix + str(synsetCount) + auxiliaryNeuronsSimilarWordsDatasetMinimumErrorMinimumPrefix + str(auxiliaryNeuronsSimilarWordsDataset1MinimumSynsets))
-		return
-
-	def getSimilarWordWeightsDatasetTextPairs(word):
-		global auxiliaryNeuronsSimilarWordsDatasetCache
-		if(auxiliaryNeuronsSimilarWordsDatasetCache is None):
-			auxiliaryNeuronsSimilarWordsDatasetCache = loadSimilarWordsDatasetTextPairs()
-		result = auxiliaryNeuronsSimilarWordsDatasetCache.get(word, {})
-		return result
-
-	def loadSimilarWordsDatasetTextPairs():
-		result = {}
-		rowCount = 0
-		uniqueWords = set()
-		if(not GIAANNcmn_databaseNetworkFiles.pathExists(auxiliaryNeuronsSimilarWordsDataset2File)):
-			raise RuntimeError("loadSimilarWordsDatasetTextPairs error: missing auxiliaryNeuronsSimilarWordsDataset2File = " + auxiliaryNeuronsSimilarWordsDataset2File)
-		with open(auxiliaryNeuronsSimilarWordsDataset2File, "r", encoding="utf-8") as fileObject:
-			for lineIndex, line in enumerate(fileObject):
-				strippedLine = line.strip()
-				if(strippedLine != auxiliaryNeuronsSimilarWordsFeatureValueEmpty and not strippedLine.startswith(auxiliaryNeuronsSimilarWordsDataset2CommentPrefix)):
-					fields = strippedLine.split(auxiliaryNeuronsSimilarWordsDataset2Delimiter)
-					if(len(fields) < auxiliaryNeuronsSimilarWordsDataset2MinimumFields):
-						raise RuntimeError("loadSimilarWordsDatasetTextPairs error: line has insufficient fields")
-					sourceWord = normaliseSimilarityWord(fields[auxiliaryNeuronsSimilarWordsDataset2SourceWordFieldIndex])
-					targetWord = normaliseSimilarityWord(fields[auxiliaryNeuronsSimilarWordsDataset2TargetWordFieldIndex])
-					activationWeight = normaliseSimilarityWeight(float(fields[auxiliaryNeuronsSimilarWordsDataset2SimilarityFieldIndex]))
-					rowCount += 1
-					uniqueWords.add(sourceWord)
-					uniqueWords.add(targetWord)
-					addSimilarWordsDatasetTextPair(result, sourceWord, targetWord, activationWeight)
-					addSimilarWordsDatasetTextPair(result, targetWord, sourceWord, activationWeight)
-		validateSimilarWordsDatasetTextPairs(rowCount, uniqueWords)
-		return result
-
-	def validateSimilarWordsDatasetTextPairs(rowCount, uniqueWords):
-		uniqueWordCount = len(uniqueWords)
-		if(rowCount < auxiliaryNeuronsSimilarWordsDataset2MinimumRows):
-			raise RuntimeError("loadSimilarWordsDatasetTextPairs error: dataset2 is below production minimum rows" + auxiliaryNeuronsSimilarWordsDatasetMinimumErrorActualPrefix + str(rowCount) + auxiliaryNeuronsSimilarWordsDatasetMinimumErrorMinimumPrefix + str(auxiliaryNeuronsSimilarWordsDataset2MinimumRows))
-		if(uniqueWordCount < auxiliaryNeuronsSimilarWordsDataset2MinimumUniqueWords):
-			raise RuntimeError("loadSimilarWordsDatasetTextPairs error: dataset2 is below production minimum unique words" + auxiliaryNeuronsSimilarWordsDatasetMinimumErrorActualPrefix + str(uniqueWordCount) + auxiliaryNeuronsSimilarWordsDatasetMinimumErrorMinimumPrefix + str(auxiliaryNeuronsSimilarWordsDataset2MinimumUniqueWords))
-		return
-
-	def addSimilarWordsDatasetTextPair(datasetDict, sourceWord, targetWord, activationWeight):
-		if(sourceWord not in datasetDict):
-			datasetDict[sourceWord] = {}
-		currentActivationWeight = datasetDict[sourceWord].get(targetWord)
-		if(currentActivationWeight is None or activationWeight > currentActivationWeight):
-			datasetDict[sourceWord][targetWord] = activationWeight
-		return
-
-	def addSimilarWordsDatasetDirectedPair(datasetDict, sourceWord, targetWord, activationWeight):
-		currentActivationWeight = datasetDict[sourceWord].get(targetWord)
-		if(currentActivationWeight is None or activationWeight > currentActivationWeight):
-			datasetDict[sourceWord][targetWord] = activationWeight
-		return
-
-	def getSimilarWordWeightsDatasetWord2VecText(word):
-		global auxiliaryNeuronsSimilarWordsDatasetCache
-		if(auxiliaryNeuronsSimilarWordsDatasetCache is None):
-			auxiliaryNeuronsSimilarWordsDatasetCache = loadSimilarWordsDatasetWord2VecText()
-		result = auxiliaryNeuronsSimilarWordsDatasetCache.get(word, {})
-		return result
-
-	def loadSimilarWordsDatasetWord2VecText():
-		ensureSimilarWordsDataset3CompactFile()
-		result = {}
-		rowCount = 0
-		with open(auxiliaryNeuronsSimilarWordsDataset3File, "r", encoding="utf-8") as fileObject:
-			for lineIndex, line in enumerate(fileObject):
-				strippedLine = line.strip()
-				if(strippedLine != auxiliaryNeuronsSimilarWordsFeatureValueEmpty and not strippedLine.startswith(auxiliaryNeuronsSimilarWordsDataset3CommentPrefix)):
-					fields = strippedLine.split(auxiliaryNeuronsSimilarWordsDataset3Delimiter)
-					if(len(fields) < auxiliaryNeuronsSimilarWordsDataset3CompactMinimumFields):
-						raise RuntimeError("loadSimilarWordsDatasetWord2VecText error: compact row has insufficient fields")
-					if((len(fields) - auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordStartFieldIndex)%auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordPairFields != 0):
-						raise RuntimeError("loadSimilarWordsDatasetWord2VecText error: compact row has incomplete similar-word/score pair")
-					sourceWord = normaliseSimilarityWord(fields[auxiliaryNeuronsSimilarWordsDataset3CompactSourceWordFieldIndex])
-					if(sourceWord in result):
-						raise RuntimeError("loadSimilarWordsDatasetWord2VecText error: duplicate compact source word")
-					result[sourceWord] = {}
-					rowCount += 1
-					for fieldIndex in range(auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordStartFieldIndex, len(fields), auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordPairFields):
-						targetWord = normaliseSimilarityWord(fields[fieldIndex + auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordOffset])
-						activationWeight = normaliseSimilarityWeight(float(fields[fieldIndex + auxiliaryNeuronsSimilarWordsDataset3CompactSimilarityOffset]))
-						addSimilarWordsDatasetDirectedPair(result, sourceWord, targetWord, activationWeight)
-		validateSimilarWordsDataset3CompactRows(rowCount)
-		return result
-
-	def ensureSimilarWordsDataset3CompactFile():
-		if(not GIAANNcmn_databaseNetworkFiles.pathExists(auxiliaryNeuronsSimilarWordsDataset3File)):
-			generateSimilarWordsDataset3CompactFile()
-		return
-
-	def generateSimilarWordsDataset3CompactFile():
-		try:
-			from nltk.corpus import wordnet as wn
-		except LookupError as error:
-			raise RuntimeError("generateSimilarWordsDataset3CompactFile error: missing NLTK WordNet dataset") from error
-		print(auxiliaryNeuronsSimilarWordsDataset3GenerateStartMessage + auxiliaryNeuronsSimilarWordsDataset3File)
-		candidateMap = buildSimilarWordsDataset3WordNetCandidateMap(wn)
-		wordVectors = loadSimilarWordsDataset3SourceVectors(set(candidateMap.keys()))
-		os.makedirs(auxiliaryNeuronsSimilarWordsDatasetFolder, exist_ok=True)
-		temporaryFile = auxiliaryNeuronsSimilarWordsDataset3File + auxiliaryNeuronsSimilarWordsDataset3TempFileSuffix
-		rowCount = 0
-		with open(temporaryFile, "w", encoding="utf-8") as fileObject:
-			for sourceWord in sorted(candidateMap.keys()):
-				records = calculateSimilarWordsDataset3CompactRecords(sourceWord, candidateMap[sourceWord], wordVectors)
-				fields = [sourceWord]
-				for targetWord, activationWeight in records:
-					fields.append(targetWord)
-					fields.append(auxiliaryNeuronsSimilarWordsDataset3SimilarityFormat.format(activationWeight))
-				fileObject.write(auxiliaryNeuronsSimilarWordsDataset3Delimiter.join(fields) + "\n")
-				rowCount += 1
-		validateSimilarWordsDataset3CompactRows(rowCount)
-		os.replace(temporaryFile, auxiliaryNeuronsSimilarWordsDataset3File)
-		print(auxiliaryNeuronsSimilarWordsDataset3GenerateFinishMessage + str(rowCount))
-		return
-
-	def buildSimilarWordsDataset3WordNetCandidateMap(wn):
-		result = {}
-		validateSimilarWordsDatasetWordNet(wn)
-		for partOfSpeech in auxiliaryNeuronsSimilarWordsDataset3WordNetPOSList:
-			for synset in wn.all_synsets(pos=partOfSpeech):
-				wordList = buildSimilarWordsDataset3WordNetSynsetWordList(synset)
-				addSimilarWordsDataset3WordNetCandidateWords(result, wordList)
-		validateSimilarWordsDataset3CompactRows(len(result))
-		return result
-
-	def buildSimilarWordsDataset3WordNetSynsetWordList(synset):
-		result = []
-		wordSet = set()
-		for lemmaName in synset.lemma_names():
-			word = normaliseSimilarityDatasetWordNetLemma(lemmaName)
-			if(word not in wordSet):
-				wordSet.add(word)
-				result.append(word)
-		return result
-
-	def addSimilarWordsDataset3WordNetCandidateWords(candidateMap, wordList):
-		for sourceWord in wordList:
-			if(sourceWord not in candidateMap):
-				candidateMap[sourceWord] = set()
-			for targetWord in wordList:
-				if(targetWord != sourceWord):
-					candidateMap[sourceWord].add(targetWord)
-		return
-
-	def loadSimilarWordsDataset3SourceVectors(requiredWords):
-		ensureSimilarWordsDataset3SourceFile()
-		result = {}
-		sourceWordsByNormalisedWord = {}
-		expectedVectorLength = None
-		with open(auxiliaryNeuronsSimilarWordsDataset3SourceFile, "r", encoding="utf-8") as fileObject:
-			for lineIndex, line in enumerate(fileObject):
-				strippedLine = line.strip()
-				if(strippedLine != auxiliaryNeuronsSimilarWordsFeatureValueEmpty and not strippedLine.startswith(auxiliaryNeuronsSimilarWordsDataset3CommentPrefix)):
-					fields = strippedLine.split()
-					if(len(fields) < auxiliaryNeuronsSimilarWordsDataset3SourceMinimumFields):
-						raise RuntimeError("loadSimilarWordsDataset3SourceVectors error: source row has insufficient fields")
-					if(expectedVectorLength is None and len(fields) == auxiliaryNeuronsSimilarWordsDataset3SourceHeaderFieldCount and fields[0].isdigit() and fields[1].isdigit()):
-						expectedVectorLength = int(fields[1])
-					else:
-						sourceWord = fields[auxiliaryNeuronsSimilarWordsDataset3SourceWordFieldIndex]
-						word = normaliseSimilarityDatasetWordNetLemma(sourceWord)
-						vectorFields = fields[auxiliaryNeuronsSimilarWordsDataset3SourceVectorStartFieldIndex:]
-						if(expectedVectorLength is None):
-							expectedVectorLength = len(vectorFields)
-						if(len(vectorFields) != expectedVectorLength):
-							raise RuntimeError("loadSimilarWordsDataset3SourceVectors error: source vector length mismatch")
-						if(word in requiredWords):
-							storeSimilarWordsDataset3SourceVector(result, sourceWordsByNormalisedWord, word, sourceWord, vectorFields)
-		validateSimilarWordsDataset3SourceVectors(result, expectedVectorLength)
-		return result
-
-	def storeSimilarWordsDataset3SourceVector(wordVectors, sourceWordsByNormalisedWord, normalisedWord, sourceWord, vectorFields):
-		if(normalisedWord not in wordVectors or isSimilarWordsDataset3SourceWordPreferred(sourceWord, sourceWordsByNormalisedWord[normalisedWord], normalisedWord)):
-			wordVectors[normalisedWord] = normaliseSimilarWordsDataset3SourceVector([float(field) for field in vectorFields])
-			sourceWordsByNormalisedWord[normalisedWord] = str(sourceWord)
-		return
-
-	def isSimilarWordsDataset3SourceWordPreferred(sourceWord, currentSourceWord, normalisedWord):
-		result = False
-		if(auxiliaryNeuronsSimilarWordsDataset3PreferExactSourceWord):
-			sourceWordExact = str(sourceWord) == normalisedWord
-			currentSourceWordExact = str(currentSourceWord) == normalisedWord
-			if(sourceWordExact and not currentSourceWordExact):
-				result = True
-		return result
-
-	def ensureSimilarWordsDataset3SourceFile():
-		if(not GIAANNcmn_databaseNetworkFiles.pathExists(auxiliaryNeuronsSimilarWordsDataset3SourceFile)):
-			if(auxiliaryNeuronsSimilarWordsDataset3SourceDownload):
-				downloadSimilarWordsDataset3SourceFile()
-			if(not GIAANNcmn_databaseNetworkFiles.pathExists(auxiliaryNeuronsSimilarWordsDataset3SourceFile)):
-				raise RuntimeError("loadSimilarWordsDatasetWord2VecText error: missing auxiliaryNeuronsSimilarWordsDataset3SourceFile = " + auxiliaryNeuronsSimilarWordsDataset3SourceFile)
-		return
-
-	def downloadSimilarWordsDataset3SourceFile():
-		import urllib.request
-		os.makedirs(auxiliaryNeuronsSimilarWordsDatasetFolder, exist_ok=True)
-		try:
-			if(not GIAANNcmn_databaseNetworkFiles.pathExists(auxiliaryNeuronsSimilarWordsDataset3SourceDownloadArchiveFile)):
-				urllib.request.urlretrieve(auxiliaryNeuronsSimilarWordsDataset3SourceDownloadURL, auxiliaryNeuronsSimilarWordsDataset3SourceDownloadArchiveFile)
-			extractSimilarWordsDataset3SourceFile()
-		except Exception as exception:
-			raise RuntimeError("downloadSimilarWordsDataset3SourceFile error: failed to download source embeddings") from exception
-		return
-
-	def extractSimilarWordsDataset3SourceFile():
-		import zipfile
-		with zipfile.ZipFile(auxiliaryNeuronsSimilarWordsDataset3SourceDownloadArchiveFile, "r") as archiveObject:
-			if(auxiliaryNeuronsSimilarWordsDataset3SourceDownloadArchiveMemberName not in archiveObject.namelist()):
-				raise RuntimeError("extractSimilarWordsDataset3SourceFile error: missing archive member = " + auxiliaryNeuronsSimilarWordsDataset3SourceDownloadArchiveMemberName)
-			archiveObject.extract(auxiliaryNeuronsSimilarWordsDataset3SourceDownloadArchiveMemberName, auxiliaryNeuronsSimilarWordsDatasetFolder)
-		extractedFile = os.path.join(auxiliaryNeuronsSimilarWordsDatasetFolder, auxiliaryNeuronsSimilarWordsDataset3SourceDownloadArchiveMemberName)
-		os.replace(extractedFile, auxiliaryNeuronsSimilarWordsDataset3SourceFile)
-		return
-
-	def normaliseSimilarWordsDataset3SourceVector(vectorValues):
-		vector = pt.tensor(vectorValues, dtype=arrayType, device=pt.device("cpu"))
-		vectorNorm = pt.linalg.vector_norm(vector)
-		if(float(vectorNorm.item()) <= auxiliaryNeuronsSimilarWordsDataset3Epsilon):
-			raise RuntimeError("normaliseSimilarWordsDataset3SourceVector error: zero source vector detected")
-		result = vector/vectorNorm
-		return result
-
-	def calculateSimilarWordsDataset3CompactRecords(sourceWord, candidateWords, wordVectors):
-		result = []
-		sourceVector = wordVectors.get(sourceWord)
-		if(sourceVector is not None):
-			for targetWord in candidateWords:
-				targetVector = wordVectors.get(targetWord)
-				if(targetVector is not None):
-					activationWeight = float(pt.dot(sourceVector, targetVector).item())
-					if(activationWeight >= auxiliaryNeuronsSimilarWordsThreshold):
-						result.append((targetWord, normaliseSimilarityWeight(activationWeight)))
-		result.sort(key=lambda item: (-item[1], item[0]))
-		if(len(result) > auxiliaryNeuronsSimilarWordsDataset3maxNumberSimilarWords):
-			result = result[:auxiliaryNeuronsSimilarWordsDataset3maxNumberSimilarWords]
-		return result
-
-	def validateSimilarWordsDataset3CompactRows(rowCount):
-		if(rowCount < auxiliaryNeuronsSimilarWordsDataset3MinimumWords):
-			raise RuntimeError("loadSimilarWordsDatasetWord2VecText error: dataset3 is below production minimum words" + auxiliaryNeuronsSimilarWordsDatasetMinimumErrorActualPrefix + str(rowCount) + auxiliaryNeuronsSimilarWordsDatasetMinimumErrorMinimumPrefix + str(auxiliaryNeuronsSimilarWordsDataset3MinimumWords))
-		return
-
-	def validateSimilarWordsDataset3SourceVectors(wordVectors, vectorLength):
-		if(len(wordVectors) < auxiliaryNeuronsSimilarWordsDataset3MinimumWords):
-			raise RuntimeError("loadSimilarWordsDatasetWord2VecText error: dataset3 is below production minimum words" + auxiliaryNeuronsSimilarWordsDatasetMinimumErrorActualPrefix + str(len(wordVectors)) + auxiliaryNeuronsSimilarWordsDatasetMinimumErrorMinimumPrefix + str(auxiliaryNeuronsSimilarWordsDataset3MinimumWords))
-		if(vectorLength < auxiliaryNeuronsSimilarWordsDataset3MinimumVectorLength):
-			raise RuntimeError("loadSimilarWordsDatasetWord2VecText error: dataset3 source vectors are below production minimum vector length" + auxiliaryNeuronsSimilarWordsDatasetMinimumErrorActualPrefix + str(vectorLength) + auxiliaryNeuronsSimilarWordsDatasetMinimumErrorMinimumPrefix + str(auxiliaryNeuronsSimilarWordsDataset3MinimumVectorLength))
-		return
-
-	def normaliseSimilarityDatasetWordNetLemma(lemmaName):
-		result = normaliseSimilarityWord(str(lemmaName).replace("_", " "))
 		return result
 
 	def buildTokenSequenceConceptIndexList(tokens, conceptIndices, startIndices, endIndices):
@@ -1518,9 +1176,4 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 					raise RuntimeError("validateSimilarWordsConfiguration error: auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMaximumSharedSourceFeatureIndexFraction out of range")
 				if(not isinstance(auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMinimumSharedSourceFeatureIndex, int) or isinstance(auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMinimumSharedSourceFeatureIndex, bool) or auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMinimumSharedSourceFeatureIndex <= 0):
 					raise RuntimeError("validateSimilarWordsConfiguration error: auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMinimumSharedSourceFeatureIndex must be a positive int")
-		if(auxiliaryNeuronsSimilarWordsStatic):
-			if(auxiliaryNeuronsSimilarWordsDatasetName not in (auxiliaryNeuronsSimilarWordsDataset1Name, auxiliaryNeuronsSimilarWordsDataset2Name, auxiliaryNeuronsSimilarWordsDataset3Name)):
-				raise RuntimeError("validateSimilarWordsConfiguration error: unsupported auxiliaryNeuronsSimilarWordsDatasetName")
-			if(auxiliaryNeuronsSimilarWordsDataset3 and auxiliaryNeuronsSimilarWordsDataset3maxNumberSimilarWords <= 0):
-				raise RuntimeError("validateSimilarWordsConfiguration error: auxiliaryNeuronsSimilarWordsDataset3maxNumberSimilarWords must be positive")
 		return

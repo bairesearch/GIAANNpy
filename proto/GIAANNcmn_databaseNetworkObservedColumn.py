@@ -23,10 +23,8 @@ import time
 from GIAANNcmn_globalDefs import *
 import GIAANNcmn_debug
 import GIAANNcmn_databaseNetworkFiles
-if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-	import GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-	import GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic
+	import GIAANNnlp_auxiliaryNeuronsSimilarWords
 if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 	import GIAANNnlp_auxiliaryNeuronsAuto
 
@@ -127,10 +125,8 @@ class ObservedColumnConnectionBase:
 		self.expandFeatureNeuronArraysFeatures(self.databaseNetworkObject.f)
 		self.expandFeatureConnectionsArraysConcepts(self.databaseNetworkObject.c, loadedSourceFeatureIndices)
 		self.expandFeatureConnectionsArraysFeatures(self.databaseNetworkObject.f, loadedSourceFeatureIndices)
-		if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-			GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.ensureRAMdatabaseAuxiliaryFeatureTensorSizes(self)
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-			GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.ensureRAMdatabaseAuxiliaryFeatureTensorSizes(self)
+			GIAANNnlp_auxiliaryNeuronsSimilarWords.ensureRAMdatabaseAuxiliaryFeatureTensorSizes(self)
 		if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 			GIAANNnlp_auxiliaryNeuronsAuto.ensureRAMdatabaseReverseFeatureTensorSizes(self)
 		return
@@ -350,10 +346,8 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		self.featureConnectionsBySourceFeature = {}
 		self.loadedSourceFeatureIndices = set()
 		self.trainPreparedSourceFeatureIndices = set()
-		if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-			GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.initialiseObservedColumnAuxiliaryStorage(self)
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-			GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.initialiseObservedColumnAuxiliaryStorage(self)
+			GIAANNnlp_auxiliaryNeuronsSimilarWords.initialiseObservedColumnAuxiliaryStorage(self)
 		if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 			GIAANNnlp_auxiliaryNeuronsAuto.initialiseObservedColumnReverseConnectionStorage(self)
 		if(optimisationGetFeatureConnectionsForSourceFeatureCache):
@@ -490,10 +484,8 @@ class ObservedColumnProxy(ObservedColumnConnectionBase):
 		self.featureConnectionsBySourceFeature = {}
 		self.loadedSourceFeatureIndices = set()
 		self.trainPreparedSourceFeatureIndices = set()
-		if(auxiliaryNeurons and auxiliaryNeuronsTokenisation):
-			GIAANNnlp_auxiliaryNeuronsSimilarSubwordStatic.initialiseObservedColumnProxyAuxiliaryStorage(self)
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-			GIAANNnlp_auxiliaryNeuronsSimilarWordsStatic.initialiseObservedColumnProxyAuxiliaryStorage(self)
+			GIAANNnlp_auxiliaryNeuronsSimilarWords.initialiseObservedColumnProxyAuxiliaryStorage(self)
 		if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 			GIAANNnlp_auxiliaryNeuronsAuto.initialiseObservedColumnReverseConnectionStorage(self)
 		if((not storeDatabaseGlobalFeatureNeuronsInRam) and hasattr(observedColumn, "featureNeurons")):

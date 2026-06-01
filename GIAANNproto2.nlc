@@ -321,3 +321,8 @@ MANUAL; - restore default inferenceUseNextTokenPredictionsOrTargetsToActivateNex
 			- similar words (auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures)
 			- similar subwords (auxiliaryNeuronsSimilarSubwordPrimeConceptFeatures)
 	- ensure that the only auxiliary neuron input connections dynamically learnt come from the currently predicted inference feature.
+- compact the codebase by removing legacy option auxiliaryNeuronsAuto==False and all of its subfeatures;
+	- remove option auxiliaryNeuronsSimilarWordsStatic
+	- remove option auxiliaryNeuronsTokenisationSubwordStatic
+	- remove option auxiliaryNeuronsTokenisation
+	- keep all cases of if(auxiliaryNeuronsAuto) within in the code but remove all cases of if(auxiliaryNeuronsAuto==False). Do not delete the variable "auxiliaryNeuronsAuto".

@@ -535,96 +535,10 @@ if(auxiliaryNeurons):
 		auxiliaryNeuronsAutoFeatureDatasetFileEncoding = "utf-8"
 		auxiliaryNeuronsAutoFeatureDatasetLineTerminator = "\n"
 		auxiliaryNeuronsSimilar = auxiliaryNeuronsSimilarWordsAuto or auxiliaryNeuronsSimilarSubwordAuto
-		auxiliaryNeuronsTokenisation = False
-		auxiliaryNeuronsSimilarWordsStatic = False
 		if(inferenceAddNewFeatures):
 			auxiliaryNeuronsAutoInference = True	#default: True	#orig: False
 		else:
 			auxiliaryNeuronsAutoInference = False
-	else:
-		auxiliaryNeuronsSimilarWordsStatic = True
-		if(auxiliaryNeuronsSimilarWordsStatic):
-			auxiliaryNeuronsSimilarWordsPrimeConceptFeatures = True	#find similar noun words
-			auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures = True	#find similar non-noun words
-			auxiliaryNeuronsSimilarWordsThreshold = 0.5
-			auxiliaryNeuronsSimilarWordsDataset1 = False
-			auxiliaryNeuronsSimilarWordsDataset2 = False
-			auxiliaryNeuronsSimilarWordsDataset3 = True
-			auxiliaryNeuronsSimilarWordsDataset1Name = "wordnet"
-			auxiliaryNeuronsSimilarWordsDataset2Name = "textPairs"
-			auxiliaryNeuronsSimilarWordsDataset3Name = "word2vecText"
-			auxiliaryNeuronsSimilarWordsDatasetEnabledCount = int(auxiliaryNeuronsSimilarWordsDataset1) + int(auxiliaryNeuronsSimilarWordsDataset2) + int(auxiliaryNeuronsSimilarWordsDataset3)
-			if(auxiliaryNeuronsSimilarWordsDatasetEnabledCount != 1):
-				raise RuntimeError("auxiliaryNeuronsSimilar requires exactly one similar word dataset enabled")
-			if(auxiliaryNeuronsSimilarWordsDataset1):
-				auxiliaryNeuronsSimilarWordsDatasetName = auxiliaryNeuronsSimilarWordsDataset1Name
-			elif(auxiliaryNeuronsSimilarWordsDataset2):
-				auxiliaryNeuronsSimilarWordsDatasetName = auxiliaryNeuronsSimilarWordsDataset2Name
-			elif(auxiliaryNeuronsSimilarWordsDataset3):
-				auxiliaryNeuronsSimilarWordsDatasetName = auxiliaryNeuronsSimilarWordsDataset3Name
-			else:
-				raise RuntimeError("auxiliaryNeuronsSimilar requires exactly one similar word dataset enabled")
-			auxiliaryNeuronsSimilarWordsDatasetFolderName = "similarWords"
-			auxiliaryNeuronsSimilarWordsDataset2FileName = "similarWordsDataset2.tsv"
-			auxiliaryNeuronsSimilarWordsDataset2Delimiter = "\t"
-			auxiliaryNeuronsSimilarWordsDataset2CommentPrefix = "#"
-			auxiliaryNeuronsSimilarWordsDataset2MinimumFields = 3
-			auxiliaryNeuronsSimilarWordsDataset2SourceWordFieldIndex = 0
-			auxiliaryNeuronsSimilarWordsDataset2TargetWordFieldIndex = 1
-			auxiliaryNeuronsSimilarWordsDataset2SimilarityFieldIndex = 2
-			auxiliaryNeuronsSimilarWordsDatasetMinimumErrorActualPrefix = ": actual = "
-			auxiliaryNeuronsSimilarWordsDatasetMinimumErrorMinimumPrefix = ", minimum = "
-			auxiliaryNeuronsSimilarWordsDataset1MinimumSynsets = 10000
-			auxiliaryNeuronsSimilarWordsDataset2MinimumRows = 10000
-			auxiliaryNeuronsSimilarWordsDataset2MinimumUniqueWords = 10000
-			auxiliaryNeuronsSimilarWordsDataset3FileName = "similarWordsDataset3Word2Vec.txt"
-			auxiliaryNeuronsSimilarWordsDataset3SourceFileName = "similarWordsDataset3Word2VecSource.txt"
-			auxiliaryNeuronsSimilarWordsDataset3SourceDownload = True
-			auxiliaryNeuronsSimilarWordsDataset3SourceDownloadURL = "https://dl.fbaipublicfiles.com/fasttext/vectors-english/wiki-news-300d-1M.vec.zip"
-			auxiliaryNeuronsSimilarWordsDataset3SourceDownloadArchiveFileName = "wiki-news-300d-1M.vec.zip"
-			auxiliaryNeuronsSimilarWordsDataset3SourceDownloadArchiveMemberName = "wiki-news-300d-1M.vec"
-			auxiliaryNeuronsSimilarWordsDataset3GenerateStartMessage = "generateSimilarWordsDataset3CompactFile: creating compact similarity dataset at "
-			auxiliaryNeuronsSimilarWordsDataset3GenerateFinishMessage = "generateSimilarWordsDataset3CompactFile: wrote compact similarity dataset rows = "
-			auxiliaryNeuronsSimilarWordsDataset3CommentPrefix = "#"
-			auxiliaryNeuronsSimilarWordsDataset3Delimiter = "\t"
-			auxiliaryNeuronsSimilarWordsDataset3CompactMinimumFields = 1
-			auxiliaryNeuronsSimilarWordsDataset3CompactSourceWordFieldIndex = 0
-			auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordStartFieldIndex = 1
-			auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordPairFields = 2
-			auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordOffset = 0
-			auxiliaryNeuronsSimilarWordsDataset3CompactSimilarityOffset = 1
-			auxiliaryNeuronsSimilarWordsDataset3SourceHeaderFieldCount = 2
-			auxiliaryNeuronsSimilarWordsDataset3SourceMinimumFields = 2
-			auxiliaryNeuronsSimilarWordsDataset3SourceWordFieldIndex = 0
-			auxiliaryNeuronsSimilarWordsDataset3SourceVectorStartFieldIndex = 1
-			auxiliaryNeuronsSimilarWordsDataset3PreferExactSourceWord = True
-			auxiliaryNeuronsSimilarWordsDataset3maxNumberSimilarWords = 50
-			auxiliaryNeuronsSimilarWordsDataset3MinimumWords = 10000
-			auxiliaryNeuronsSimilarWordsDataset3MinimumVectorLength = 50
-			auxiliaryNeuronsSimilarWordsDataset3TempFileSuffix = ".tmp"
-			auxiliaryNeuronsSimilarWordsDataset3SimilarityFormat = "{:.6f}"
-			auxiliaryNeuronsSimilarWordsDataset3WordNetPOSList = ["n", "v", "a", "r"]
-			auxiliaryNeuronsSimilarWordsDataset3Epsilon = 1.0e-12
-		auxiliaryNeuronsTokenisationSubwordStatic = False
-		if(auxiliaryNeuronsTokenisationSubwordStatic):
-			auxiliaryNeuronsTokenisationSubwordLemma = True	#fallback condition: assign base-form auxiliary when morph/suffix gates do not detect a distinct form
-			auxiliaryNeuronsTokenisationSubwordMorph = True
-			auxiliaryNeuronsTokenisationSubwordSuffix = True
-			auxiliaryNeuronsTokenisationSubwordDistinctEnforce = True	#only create base-form auxiliaries when token.lemma differs from token.word
-			auxiliaryNeuronsTokenisationSubwordFeatureNamePrefix = "SUB"
-			auxiliaryNeuronsTokenisationSubwordFeatureNameDelimiter = ":"
-			auxiliaryNeuronsTokenisationSubwordFeatureValueEmpty = ""
-			auxiliaryNeuronsTokenisationSubwordMorphSeparator = "|"
-			auxiliaryNeuronsTokenisationSubwordMorphEmpty = auxiliaryNeuronsTokenisationSubwordFeatureValueEmpty
-			auxiliaryNeuronsTokenisationSubwordSuffixList = ["ing", "ed"]
-			auxiliaryNeuronsTokenisationSubwordSuffixMinimumStemLength = 2
-			auxiliaryNeuronsTokenisationSubwordConnectionProximityMultiplier = 10
-			auxiliaryNeuronsTokenisationSubwordFeaturesDictFileName = "auxiliaryFeaturesDict.pkl"
-			auxiliaryNeuronsTokenisationSubwordFeatureWordsByParentWordFileName = "auxiliaryFeatureWordsByParentWord.pkl"
-			auxiliaryNeuronsTokenisationSubwordConnectionsFolderName = "auxiliaryFeatureConnections"
-			auxiliaryNeuronsTokenisationSubwordSourceFeatureConnectionsFileNamePrefix = "auxIndex"
-		auxiliaryNeuronsSimilar = auxiliaryNeuronsSimilarWordsStatic
-		auxiliaryNeuronsTokenisation = auxiliaryNeuronsTokenisationSubwordStatic
 	if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		auxiliaryNeuronsSimilarWordsFeatureNamePrefixPrimeConcept = "SIMC"
 		auxiliaryNeuronsSimilarWordsFeatureNamePrefixSecondary = "SIMF"
@@ -637,15 +551,15 @@ if(auxiliaryNeurons):
 		auxiliaryNeuronsSimilarWordsMinimumSimilarity = 0.0
 		auxiliaryNeuronsSimilarWordsMaximumSimilarity = 1.0
 		auxiliaryNeuronsSimilarWordsIdentitySimilarity = 1.0
-		auxiliaryNeuronsSimilarWordsDataset3Delimiter = "\t"
-		auxiliaryNeuronsSimilarWordsDataset3CompactMinimumFields = 1
-		auxiliaryNeuronsSimilarWordsDataset3CompactSourceWordFieldIndex = 0
-		auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordStartFieldIndex = 1
-		auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordPairFields = 2
-		auxiliaryNeuronsSimilarWordsDataset3CompactSimilarWordOffset = 0
-		auxiliaryNeuronsSimilarWordsDataset3CompactSimilarityOffset = 1
-		auxiliaryNeuronsSimilarWordsDataset3TempFileSuffix = ".tmp"
-		auxiliaryNeuronsSimilarWordsDataset3SimilarityFormat = "{:.6f}"
+		auxiliaryNeuronsAutoFeatureDatasetDelimiter = "\t"
+		auxiliaryNeuronsAutoFeatureDatasetMinimumFields = 1
+		auxiliaryNeuronsAutoFeatureDatasetSourceWordFieldIndex = 0
+		auxiliaryNeuronsAutoFeatureDatasetSimilarWordStartFieldIndex = 1
+		auxiliaryNeuronsAutoFeatureDatasetSimilarWordPairFields = 2
+		auxiliaryNeuronsAutoFeatureDatasetSimilarWordOffset = 0
+		auxiliaryNeuronsAutoFeatureDatasetSimilarityOffset = 1
+		auxiliaryNeuronsAutoFeatureDatasetTempFileSuffix = ".tmp"
+		auxiliaryNeuronsAutoFeatureDatasetSimilarityFormat = "{:.6f}"
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilarWordsAuto):
 			auxiliaryNeuronsSimilarWordsThreshold = auxiliaryNeuronsSimilarWordsAutoThreshold
 		auxiliaryNeuronsSimilarWordsFeaturesDictFileName = "auxiliarySimilarFeaturesDict.pkl"
