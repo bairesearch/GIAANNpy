@@ -326,3 +326,5 @@ MANUAL; - restore default inferenceUseNextTokenPredictionsOrTargetsToActivateNex
 	- remove option auxiliaryNeuronsTokenisationSubwordStatic
 	- remove option auxiliaryNeuronsTokenisation
 	- keep all cases of if(auxiliaryNeuronsAuto) within in the code but remove all cases of if(auxiliaryNeuronsAuto==False). Do not delete the variable "auxiliaryNeuronsAuto".
+- update trainReverseConnections - when optimisationArrayIndexPropertiesEfficientSerialConnections=False reverse updates use a batched gather/update/scatter flow analogous to forward connection training instead of per-target-feature sparse add/coalesce loops.
+- update calculateSubwordSimilaritySparseMatrix to avoid dense tensors.

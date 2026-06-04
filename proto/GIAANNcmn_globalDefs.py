@@ -107,9 +107,10 @@ else:
 inferenceReportTokenAccuracyConstrainByColumn = False	#default: False	#orig: False
 
 
-#Database;
-databaseFolderBaseLocal = "../database"	#default: "../database"
-databaseFolderBaseSSD = "/media/user/ssdpro/GIAANN/database"	#default: "/media/user/ssdpro/GIAANN/database"
+#Database folder;
+databaseFolderBaseLocal = "../"	#default: "../"
+databaseFolderBaseSSD = "/media/user/ssdpro/GIAANN/"	#default: "/media/user/ssdpro/GIAANN/"
+databaseNameBase = "database"	#default: "database"
 if(useQuickExecution):
 	trainMaxSequences = 10	#N/A: auto generated from inference_prompt.txt.trainAndInference
 	databaseFolderBase = databaseFolderBaseLocal
@@ -126,13 +127,15 @@ elif(useAutoresearch):
 elif(useDrawNetworkIndependently):
 	trainMaxSequences = 0	#not used
 	databaseFolderBase = databaseFolderBaseLocal
-	#databaseFolderBase = "/media/user/ssdpro/GIAANN/databaseOscar1000-numSeedTokensInference8-spacyPipelineOptimisations"
-databaseFolderTemplate = databaseFolderBase + "Template/"
 if(databaseFolderBase==databaseFolderBaseSSD):
 	inferenceCopyTemplateDatasets = True	#default: True	#copy template dataset files into databaseFolder at inference startup
 else:
 	inferenceCopyTemplateDatasets = False
+databaseFolderTemplate = databaseFolderBase + "databaseTemplate/"
 databaseFolderTemplateDatasetFileNamePattern = "*.*"
+
+
+#Train settings:
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 
@@ -162,7 +165,7 @@ elif(modalityName=="OR"):
 		
 
 #database folder finalise;
-databaseFolder = databaseFolderBase + databaseFolderExtension + "/"
+databaseFolder = databaseFolderBase + databaseNameBase + databaseFolderExtension + "/"
 databaseClearScriptName = "clear.sh"
 inferencePromptFile = databaseFolder + inferencePromptFileName
 if(modalityName=="NLP"):

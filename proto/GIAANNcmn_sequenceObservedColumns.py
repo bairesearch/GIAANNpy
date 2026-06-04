@@ -749,7 +749,7 @@ class SequenceObservedColumns:
 		else:
 			sequenceObservedColumnsDict = self.observedColumnsDict2
 		self.updateObservedColumns(sequenceObservedColumnsDict, inference, mode="default")
-		if(auxiliaryNeurons and auxiliaryNeuronsAuto and not inference):
+		if(auxiliaryNeurons and auxiliaryNeuronsAuto and trainReverseConnections and not inference):
 			GIAANNnlp_auxiliaryNeuronsAuto.updateReverseFeatureConnectionsFromSequence(self, sequenceObservedColumnsDict)
 
 	def updateObservedColumns(self, sequenceObservedColumnsDict, inference, mode):

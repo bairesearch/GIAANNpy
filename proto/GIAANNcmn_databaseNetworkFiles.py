@@ -595,7 +595,7 @@ def observedColumnSaveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsTo
 	if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		import GIAANNnlp_auxiliaryNeuronsSimilarWords
 		GIAANNnlp_auxiliaryNeuronsSimilarWords.saveObservedColumnAuxiliaryFeatureConnectionsToDisk(self, saveAllSourceFeatures)
-	if(auxiliaryNeurons and auxiliaryNeuronsAuto):
+	if(auxiliaryNeurons and auxiliaryNeuronsAuto and trainReverseConnections):
 		import GIAANNnlp_auxiliaryNeuronsAuto
 		GIAANNnlp_auxiliaryNeuronsAuto.saveObservedColumnReverseFeatureConnectionsToDisk(self, saveAllSourceFeatures)
 	

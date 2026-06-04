@@ -380,7 +380,7 @@ def moveObservedColumnsDictConnectionsToDatabaseAfterTrain(observedColumnsDict, 
 				observedColumn.clearTrainPreparedSourceFeatureIndices()
 				if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 					GIAANNnlp_auxiliaryNeuronsSimilarWords.moveObservedColumnAuxiliaryConnectionsToDatabaseAfterTrain(observedColumn)
-				if(auxiliaryNeurons and auxiliaryNeuronsAuto):
+				if(auxiliaryNeurons and auxiliaryNeuronsAuto and trainReverseConnections):
 					GIAANNnlp_auxiliaryNeuronsAuto.moveObservedColumnReverseConnectionsToDatabaseAfterTrain(observedColumn)
 	return
 

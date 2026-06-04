@@ -494,6 +494,7 @@ if(inferenceReportGroundedAccuracy):
 auxiliaryNeurons=False	#default: False	#orig: False
 if(auxiliaryNeurons):
 	auxiliaryNeuronsAuto = True	#default: True	#orig: False
+	trainReverseConnections = True
 	if(auxiliaryNeuronsAuto):
 		'''
 		note current auxiliaryNeuronsSimilarWords implementation is computationally efficient but not biologically feasible as it relies on the existence of reverse connections
@@ -516,15 +517,15 @@ if(auxiliaryNeurons):
 				auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesDatasetFileName = "auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesDataset.txt"
 			auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesLimit = True
 			if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesLimit):
-				auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMaximumSharedSourceFeatureIndexFraction = 0.05	#maximum fraction of concept columns that can have the secondary feature index for it to have similar word detection applied
-				auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMinimumSharedSourceFeatureIndex = 3	#minimum number of concept columns that can have the secondary feature index for it to have similar word detection applied
+				auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMaximumSharedSourceFeatureIndexFraction = 0.1	#sparse: 0.05	#maximum fraction of concept columns that can have the secondary feature index for it to have similar word detection applied
+				auxiliaryNeuronsSimilarWordsSecondaryConceptFeaturesMinimumSharedSourceFeatureIndex = 1	#sparse: 3	#minimum number of concept columns that can have the secondary feature index for it to have similar word detection applied
 		auxiliaryNeuronsSimilarSubwordAuto = True	#default: True
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilarSubwordAuto):
 			auxiliaryNeuronsSimilarSubwordPrimeConceptFeatures = True	#find similar noun subwords
 			auxiliaryNeuronsSimilarSubwordSecondaryConceptFeatures = True	#find similar non-noun subwords
 			auxiliaryNeuronsSimilarSubwordAutoThreshold = 0.7
 			auxiliaryNeuronsSimilarSubwordPrefixThreshold = 3	#in number of prefix characters that must be shared
-			auxiliaryNeuronsSimilarSubwordSimilarityBatchSize = 256
+			auxiliaryNeuronsSimilarSubwordSimilarityBatchSize = 256	#orig: 256
 			auxiliaryNeuronsSimilarSubwordSecondaryConceptFeaturesIdentifySameColumn = True
 			if(auxiliaryNeuronsSimilarSubwordPrimeConceptFeatures):
 				auxiliaryNeuronsSimilarSubwordPrimeConceptFeaturesDatasetFileName = "auxiliaryNeuronsSimilarSubwordPrimeConceptFeaturesDataset.txt"
@@ -569,4 +570,7 @@ if(auxiliaryNeurons):
 	if(auxiliaryNeuronsAuto):
 		auxiliaryNeuronsAutoReverseConnectionsFolderName = "reverseFeatureConnections"
 		auxiliaryNeuronsAutoReverseTargetFeatureConnectionsFileNamePrefix = "revIndex"
-		
+else:
+	trainReverseConnections = False
+
+	

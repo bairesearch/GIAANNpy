@@ -107,7 +107,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		if(float(sourceActivationValue.item()) > auxiliaryNeuronsSimilarWordsMinimumSimilarity):
 			if(auxiliaryNeuronsSimilarWordsPrimeConceptFeatures and int(sourceFeatureIndex) == featureIndexPrimeConceptNeuron):
 				globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = processAuxiliaryPrimeFeaturePredictionActivations(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, int(sourceColumnIndex), int(sourceFeatureIndex), sourceActivationValue, globalFeatureNeuronsTimeResult, sequenceWordIndex, sequenceColumnIndex, connectionDevice)
-			if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures and int(sourceFeatureIndex) != featureIndexPrimeConceptNeuron):
+			if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures and int(sourceFeatureIndex) != featureIndexPrimeConceptNeuron and secondaryAuxiliaryFeatureHasSimilarityWord(databaseNetworkObject, int(sourceFeatureIndex))):
 				globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = processAuxiliarySecondaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, int(sourceFeatureIndex), sourceActivationValue, globalFeatureNeuronsTimeResult, sequenceWordIndex, sequenceColumnIndex, connectionDevice)
 		result = globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult
 		return result
@@ -154,7 +154,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 				if(includeFeatureDetails):
 					for columnValue, featureSet in auxiliaryColumnFeatureMap.items():
 						columnFeatureMap.setdefault(columnValue, set()).update(featureSet)
-		if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures and int(parentFeatureIndex) != featureIndexPrimeConceptNeuron):
+		if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures and int(parentFeatureIndex) != featureIndexPrimeConceptNeuron and secondaryAuxiliaryFeatureHasSimilarityWord(databaseNetworkObject, int(parentFeatureIndex))):
 			auxiliaryActivations = calculateSecondaryAuxiliaryFeatureActivations(observedColumn, int(parentFeatureIndex), activationValue, deviceSparse)
 			if(auxiliaryActivationVectorHasActiveValues(auxiliaryActivations)):
 				materialisedConnections = getSecondaryOutputConnectionsMaterialised(observedColumn, deviceSparse)
@@ -165,6 +165,13 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 						columnFeatureMap.setdefault(columnValue, set()).update(featureSet)
 		targetColumnsList = sorted(set(targetColumnsList))
 		result = targetColumnsList, columnFeatureMap
+		return result
+
+	def secondaryAuxiliaryFeatureHasSimilarityWord(databaseNetworkObject, sourceFeatureIndex):
+		normalisedSourceFeatureIndex = int(sourceFeatureIndex)
+		if(normalisedSourceFeatureIndex <= featureIndexPrimeConceptNeuron or normalisedSourceFeatureIndex >= len(databaseNetworkObject.conceptFeaturesList)):
+			raise RuntimeError("secondaryAuxiliaryFeatureHasSimilarityWord error: sourceFeatureIndex out of range")
+		result = str(databaseNetworkObject.conceptFeaturesList[normalisedSourceFeatureIndex]).strip() != auxiliaryNeuronsSimilarWordsFeatureValueEmpty
 		return result
 
 	def collapseSourceActivationForAuxiliaryInput(sourceActivation):

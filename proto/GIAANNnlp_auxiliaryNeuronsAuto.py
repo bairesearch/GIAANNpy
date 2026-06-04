@@ -17,6 +17,7 @@ GIA ANN NLP auxiliary neurons auto
 
 """
 
+import math
 import os
 import torch as pt
 
@@ -224,71 +225,171 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 			ensureObservedColumnReverseFeatureConnectionSize(observedColumn, targetFeatureIndex)
 		return
 
-	def moveObservedColumnReverseConnectionsToDatabaseAfterTrain(observedColumn):
-		ensureObservedColumnReverseConnectionStorage(observedColumn)
-		for targetFeatureIndex in sorted(observedColumn.reverseTrainPreparedTargetFeatureIndices):
-			targetTensor = getObservedColumnReverseFeatureConnectionsForTargetFeature(observedColumn, targetFeatureIndex, targetDevice=deviceDatabase, createMissing=False)
-			setObservedColumnReverseFeatureConnectionsForTargetFeature(observedColumn, targetFeatureIndex, targetTensor)
-		observedColumn.reverseTrainPreparedTargetFeatureIndices.clear()
-		return
+	if(trainReverseConnections):
+		def moveObservedColumnReverseConnectionsToDatabaseAfterTrain(observedColumn):
+			ensureObservedColumnReverseConnectionStorage(observedColumn)
+			for targetFeatureIndex in sorted(observedColumn.reverseTrainPreparedTargetFeatureIndices):
+				targetTensor = getObservedColumnReverseFeatureConnectionsForTargetFeature(observedColumn, targetFeatureIndex, targetDevice=deviceDatabase, createMissing=False)
+				setObservedColumnReverseFeatureConnectionsForTargetFeature(observedColumn, targetFeatureIndex, targetTensor)
+			observedColumn.reverseTrainPreparedTargetFeatureIndices.clear()
+			return
 
-	def updateReverseFeatureConnectionsFromSequence(sequenceObservedColumns, sequenceObservedColumnsDict):
-		if(not arrayIndexPropertiesStrength):
-			raise RuntimeError("updateReverseFeatureConnectionsFromSequence error: arrayIndexPropertiesStrength must be enabled")
-		if(sequenceObservedColumns.useTrainSparseConnectionsTensor()):
-			connectionDeltaSparse = sequenceObservedColumns.extractSequenceConnectionPropertySparse(sequenceObservedColumns.databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
-		else:
-			connectionDeltaSparse = sequenceObservedColumns.featureConnections[sequenceObservedColumns.databaseNetworkObject.arrayIndexPropertiesStrengthIndex].to_sparse().coalesce()
-		if(connectionDeltaSparse._nnz() > 0):
-			applyReverseConnectionUpdates(sequenceObservedColumns, sequenceObservedColumnsDict, connectionDeltaSparse.indices(), connectionDeltaSparse.values())
-		return
+		def updateReverseFeatureConnectionsFromSequence(sequenceObservedColumns, sequenceObservedColumnsDict):
+			if(not arrayIndexPropertiesStrength):
+				raise RuntimeError("updateReverseFeatureConnectionsFromSequence error: arrayIndexPropertiesStrength must be enabled")
+			if(sequenceObservedColumns.useTrainSparseConnectionsTensor()):
+				connectionDeltaSparse = sequenceObservedColumns.extractSequenceConnectionPropertySparse(sequenceObservedColumns.databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
+			else:
+				connectionDeltaSparse = sequenceObservedColumns.featureConnections[sequenceObservedColumns.databaseNetworkObject.arrayIndexPropertiesStrengthIndex].to_sparse().coalesce()
+			if(connectionDeltaSparse._nnz() > 0):
+				applyReverseConnectionUpdates(sequenceObservedColumns, sequenceObservedColumnsDict, connectionDeltaSparse.indices(), connectionDeltaSparse.values())
+			return
 
-	def applyReverseConnectionUpdates(sequenceObservedColumns, sequenceObservedColumnsDict, connectionIndices, connectionValues):
-		databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
-		connectionDevice = connectionIndices.device
-		conceptIndicesTensor = sequenceObservedColumns.conceptIndicesInSequenceObservedTensor.to(connectionDevice)
-		featureIndicesInObserved = sequenceObservedColumns.featureIndicesInObservedTensor.to(connectionDevice)
-		sourceConceptIndex = conceptIndicesTensor[connectionIndices[2]]
-		sourceFeatureIndex = connectionIndices[3]
-		targetConceptIndex = conceptIndicesTensor[connectionIndices[4]]
-		targetFeatureIndex = connectionIndices[5]
-		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-			sourceFeatureIndex = featureIndicesInObserved[sourceFeatureIndex]
-			targetFeatureIndex = featureIndicesInObserved[targetFeatureIndex]
-		targetCombinedKeys = targetConceptIndex * databaseNetworkObject.f + targetFeatureIndex
-		sortedTargetCombinedKeys, sortOrder = pt.sort(targetCombinedKeys)
-		sortedBranch = connectionIndices[0].index_select(0, sortOrder)
-		sortedSegment = connectionIndices[1].index_select(0, sortOrder)
-		sortedSourceConceptIndex = sourceConceptIndex.index_select(0, sortOrder)
-		sortedSourceFeatureIndex = sourceFeatureIndex.index_select(0, sortOrder)
-		sortedValues = connectionValues.index_select(0, sortOrder)
-		uniqueTargetCombinedKeys, counts = pt.unique_consecutive(sortedTargetCombinedKeys, return_counts=True)
-		starts = pt.cumsum(counts, 0) - counts
-		observedColumnsByConceptIndex = sequenceObservedColumns.getObservedColumnsByConceptIndex(sequenceObservedColumnsDict)
-		targetSize = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
-		for targetCombinedKey, start, count in zip(uniqueTargetCombinedKeys.tolist(), starts.tolist(), counts.tolist()):
-			end = start + count
-			targetConceptIndexValue = int(targetCombinedKey // databaseNetworkObject.f)
-			targetFeatureIndexValue = int(targetCombinedKey % databaseNetworkObject.f)
-			if(targetConceptIndexValue not in observedColumnsByConceptIndex):
-				raise RuntimeError("applyReverseConnectionUpdates error: missing observed column")
-			observedColumn = observedColumnsByConceptIndex[targetConceptIndexValue]
-			propertyRow = pt.full((count,), databaseNetworkObject.arrayIndexPropertiesStrengthIndex, dtype=pt.long, device=connectionDevice)
-			updateIndices = pt.stack((propertyRow, sortedBranch[start:end], sortedSegment[start:end], sortedSourceConceptIndex[start:end], sortedSourceFeatureIndex[start:end]), dim=0)
-			updateSparse = pt.sparse_coo_tensor(updateIndices, sortedValues[start:end], size=targetSize, dtype=arrayType, device=connectionDevice)
-			targetSparse = getObservedColumnReverseFeatureConnectionsForTargetFeature(observedColumn, targetFeatureIndexValue, targetDevice=connectionDevice, createMissing=False, ensureCurrentSizeOnLoad=True)
+		def applyReverseConnectionUpdates(sequenceObservedColumns, sequenceObservedColumnsDict, connectionIndices, connectionValues):
+			if(optimisationArrayIndexPropertiesEfficientSerialConnections):
+				applyReverseConnectionUpdatesSerial(sequenceObservedColumns, sequenceObservedColumnsDict, connectionIndices, connectionValues)
+			else:
+				applyReverseConnectionUpdatesBatched(sequenceObservedColumns, sequenceObservedColumnsDict, connectionIndices, connectionValues)
+			return
+
+		def applyReverseConnectionUpdatesSerial(sequenceObservedColumns, sequenceObservedColumnsDict, connectionIndices, connectionValues):
+			databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
+			connectionDevice, sourceConceptIndex, sourceFeatureIndex, targetConceptIndex, targetFeatureIndex = buildReverseConnectionMappedTensors(sequenceObservedColumns, connectionIndices)
+			targetCombinedKeys = targetConceptIndex * databaseNetworkObject.f + targetFeatureIndex
+			sortedTargetCombinedKeys, sortOrder = pt.sort(targetCombinedKeys)
+			sortedBranch = connectionIndices[0].index_select(0, sortOrder)
+			sortedSegment = connectionIndices[1].index_select(0, sortOrder)
+			sortedSourceConceptIndex = sourceConceptIndex.index_select(0, sortOrder)
+			sortedSourceFeatureIndex = sourceFeatureIndex.index_select(0, sortOrder)
+			sortedValues = connectionValues.index_select(0, sortOrder)
+			uniqueTargetCombinedKeys, counts = pt.unique_consecutive(sortedTargetCombinedKeys, return_counts=True)
+			starts = pt.cumsum(counts, 0) - counts
+			observedColumnsByConceptIndex = sequenceObservedColumns.getObservedColumnsByConceptIndex(sequenceObservedColumnsDict)
+			targetSize = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
+			for targetCombinedKey, start, count in zip(uniqueTargetCombinedKeys.tolist(), starts.tolist(), counts.tolist()):
+				end = start + count
+				targetConceptIndexValue = int(targetCombinedKey // databaseNetworkObject.f)
+				targetFeatureIndexValue = int(targetCombinedKey % databaseNetworkObject.f)
+				if(targetConceptIndexValue not in observedColumnsByConceptIndex):
+					raise RuntimeError("applyReverseConnectionUpdatesSerial error: missing observed column")
+				observedColumn = observedColumnsByConceptIndex[targetConceptIndexValue]
+				propertyRow = pt.full((count,), databaseNetworkObject.arrayIndexPropertiesStrengthIndex, dtype=pt.long, device=connectionDevice)
+				updateIndices = pt.stack((propertyRow, sortedBranch[start:end], sortedSegment[start:end], sortedSourceConceptIndex[start:end], sortedSourceFeatureIndex[start:end]), dim=0)
+				updateSparse = pt.sparse_coo_tensor(updateIndices, sortedValues[start:end], size=targetSize, dtype=arrayType, device=connectionDevice)
+				targetSparse = getObservedColumnReverseFeatureConnectionsForTargetFeature(observedColumn, targetFeatureIndexValue, targetDevice=connectionDevice, createMissing=False, ensureCurrentSizeOnLoad=True)
+				targetSparse = addSparseUpdateNonNegative(targetSparse, updateSparse)
+				setObservedColumnReverseFeatureConnectionsForTargetFeature(observedColumn, targetFeatureIndexValue, targetSparse)
+				observedColumn.reverseTrainPreparedTargetFeatureIndices.add(targetFeatureIndexValue)
+			return
+
+		def applyReverseConnectionUpdatesBatched(sequenceObservedColumns, sequenceObservedColumnsDict, connectionIndices, connectionValues):
+			databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
+			connectionDevice, sourceConceptIndex, sourceFeatureIndex, targetConceptIndex, targetFeatureIndex = buildReverseConnectionMappedTensors(sequenceObservedColumns, connectionIndices)
+			targetCombinedKeys = targetConceptIndex * databaseNetworkObject.f + targetFeatureIndex
+			targetCombinedKeysUnique = pt.unique(targetCombinedKeys, sorted=True)
+			targetSize = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, targetCombinedKeysUnique.shape[0], databaseNetworkObject.c, databaseNetworkObject.f)
+			observedColumnsByConceptIndex = sequenceObservedColumns.getObservedColumnsByConceptIndex(sequenceObservedColumnsDict)
+			targetSparse = gatherReverseConnectionTargetBucketTensor(observedColumnsByConceptIndex, targetCombinedKeysUnique, databaseNetworkObject, connectionDevice)
+			updateSparse = buildReverseConnectionTargetBucketUpdateSparse(databaseNetworkObject, connectionIndices, connectionValues, sourceConceptIndex, sourceFeatureIndex, targetConceptIndex, targetFeatureIndex, targetCombinedKeysUnique, targetSize)
 			targetSparse = addSparseUpdateNonNegative(targetSparse, updateSparse)
-			setObservedColumnReverseFeatureConnectionsForTargetFeature(observedColumn, targetFeatureIndexValue, targetSparse)
-			observedColumn.reverseTrainPreparedTargetFeatureIndices.add(targetFeatureIndexValue)
-		return
+			scatterReverseConnectionTargetBucketTensor(observedColumnsByConceptIndex, targetCombinedKeysUnique, targetSparse)
+			return
 
-	def addSparseUpdateNonNegative(targetSparse, updateSparse):
-		if(tuple(targetSparse.size()) != tuple(updateSparse.size())):
-			raise RuntimeError("addSparseUpdateNonNegative error: sparse tensor size mismatch")
-		result = (targetSparse.coalesce() + updateSparse.coalesce()).coalesce()
-		if(result._nnz() > 0):
-			result.values().clamp_(min=0)
-		return result
+		def buildReverseConnectionMappedTensors(sequenceObservedColumns, connectionIndices):
+			connectionDevice = connectionIndices.device
+			conceptIndicesTensor = sequenceObservedColumns.conceptIndicesInSequenceObservedTensor.to(connectionDevice)
+			featureIndicesInObserved = sequenceObservedColumns.featureIndicesInObservedTensor.to(connectionDevice)
+			sourceConceptIndex = conceptIndicesTensor[connectionIndices[2]]
+			sourceFeatureIndex = connectionIndices[3]
+			targetConceptIndex = conceptIndicesTensor[connectionIndices[4]]
+			targetFeatureIndex = connectionIndices[5]
+			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
+				sourceFeatureIndex = featureIndicesInObserved[sourceFeatureIndex]
+				targetFeatureIndex = featureIndicesInObserved[targetFeatureIndex]
+			result = connectionDevice, sourceConceptIndex, sourceFeatureIndex, targetConceptIndex, targetFeatureIndex
+			return result
+
+		def buildReverseConnectionTargetBucketUpdateSparse(databaseNetworkObject, connectionIndices, connectionValues, sourceConceptIndex, sourceFeatureIndex, targetConceptIndex, targetFeatureIndex, targetCombinedKeysUnique, targetSize):
+			targetCombinedKeys = targetConceptIndex * databaseNetworkObject.f + targetFeatureIndex
+			targetBucketIndex = pt.searchsorted(targetCombinedKeysUnique, targetCombinedKeys)
+			propertyRow = pt.full_like(connectionIndices[1], databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
+			updateIndices = pt.stack((propertyRow, connectionIndices[0], connectionIndices[1], targetBucketIndex, sourceConceptIndex, sourceFeatureIndex), dim=0)
+			result = pt.sparse_coo_tensor(updateIndices, connectionValues, size=targetSize, dtype=arrayType, device=connectionIndices.device)
+			return result
+
+		def gatherReverseConnectionTargetBucketTensor(observedColumnsByConceptIndex, targetCombinedKeysUnique, databaseNetworkObject, targetDevice):
+			targetSize = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, targetCombinedKeysUnique.shape[0], databaseNetworkObject.c, databaseNetworkObject.f)
+			combinedIndicesList = []
+			combinedValuesList = []
+			targetConceptIndexList = pt.div(targetCombinedKeysUnique, databaseNetworkObject.f, rounding_mode='floor').detach().cpu().tolist()
+			targetFeatureIndexList = pt.remainder(targetCombinedKeysUnique, databaseNetworkObject.f).detach().cpu().tolist()
+			for targetBucketIndex, (targetConceptIndexValue, targetFeatureIndexValue) in enumerate(zip(targetConceptIndexList, targetFeatureIndexList)):
+				if(int(targetConceptIndexValue) not in observedColumnsByConceptIndex):
+					raise RuntimeError("gatherReverseConnectionTargetBucketTensor error: missing observed column")
+				observedColumn = observedColumnsByConceptIndex[int(targetConceptIndexValue)]
+				targetTensor = getObservedColumnReverseFeatureConnectionsForTargetFeature(observedColumn, int(targetFeatureIndexValue), targetDevice=targetDevice, createMissing=False, ensureCurrentSizeOnLoad=True)
+				targetTensor = targetTensor.coalesce()
+				if(targetTensor._nnz() > 0):
+					targetIndices = targetTensor.indices()
+					targetValues = targetTensor.values()
+					targetBucketRow = pt.full((1, targetIndices.shape[1]), targetBucketIndex, dtype=pt.long, device=targetIndices.device)
+					batchedIndices = pt.cat([targetIndices[0:3], targetBucketRow, targetIndices[3:]], dim=0)
+					combinedIndicesList.append(batchedIndices)
+					combinedValuesList.append(targetValues)
+			if(len(combinedIndicesList) > 0):
+				combinedIndices = pt.cat(combinedIndicesList, dim=1)
+				combinedValues = pt.cat(combinedValuesList, dim=0)
+				result = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSize, dtype=arrayType, device=targetDevice)
+			else:
+				result = initialiseReverseConnectionBucketTensor(targetSize, targetDevice)
+			return result
+
+		def scatterReverseConnectionTargetBucketTensor(observedColumnsByConceptIndex, targetCombinedKeysUnique, targetSparse):
+			targetSparse = targetSparse.coalesce()
+			targetIndices = targetSparse.indices()
+			targetValues = targetSparse.values()
+			targetSortedIndices = targetIndices
+			targetSortedValues = targetValues
+			targetBucketRanges = {}
+			if(targetIndices.numel() > 0):
+				sortedBucketIndices, sortOrder = pt.sort(targetIndices[3])
+				targetSortedIndices = targetIndices[:, sortOrder]
+				targetSortedValues = targetValues.index_select(0, sortOrder)
+				uniqueBuckets, counts = pt.unique_consecutive(sortedBucketIndices, return_counts=True)
+				starts = pt.cumsum(counts, 0) - counts
+				for targetBucketIndexValue, start, count in zip(uniqueBuckets.tolist(), starts.tolist(), counts.tolist()):
+					targetBucketRanges[int(targetBucketIndexValue)] = (int(start), int(start + count))
+			targetConceptIndexList = pt.div(targetCombinedKeysUnique, targetSparse.size(5), rounding_mode='floor').detach().cpu().tolist()
+			targetFeatureIndexList = pt.remainder(targetCombinedKeysUnique, targetSparse.size(5)).detach().cpu().tolist()
+			targetTensorSize = (targetSparse.size(0), targetSparse.size(1), targetSparse.size(2), targetSparse.size(4), targetSparse.size(5))
+			for targetBucketIndex, (targetConceptIndexValue, targetFeatureIndexValue) in enumerate(zip(targetConceptIndexList, targetFeatureIndexList)):
+				if(int(targetConceptIndexValue) not in observedColumnsByConceptIndex):
+					raise RuntimeError("scatterReverseConnectionTargetBucketTensor error: missing observed column")
+				if(targetBucketIndex in targetBucketRanges):
+					start, end = targetBucketRanges[targetBucketIndex]
+					targetTensorIndices = pt.stack((targetSortedIndices[0, start:end], targetSortedIndices[1, start:end], targetSortedIndices[2, start:end], targetSortedIndices[4, start:end], targetSortedIndices[5, start:end]), dim=0)
+					targetTensorValues = targetSortedValues[start:end]
+					targetTensor = pt.sparse_coo_tensor(targetTensorIndices, targetTensorValues, size=targetTensorSize, dtype=arrayType, device=targetSparse.device)
+				else:
+					targetTensor = initialiseReverseConnectionBucketTensor(targetTensorSize, targetSparse.device)
+				observedColumn = observedColumnsByConceptIndex[int(targetConceptIndexValue)]
+				setObservedColumnReverseFeatureConnectionsForTargetFeature(observedColumn, int(targetFeatureIndexValue), targetTensor)
+				observedColumn.reverseTrainPreparedTargetFeatureIndices.add(int(targetFeatureIndexValue))
+			return
+
+		def initialiseReverseConnectionBucketTensor(targetSize, targetDevice):
+			indices = pt.empty((len(targetSize), 0), dtype=pt.long, device=targetDevice)
+			values = pt.empty((0,), dtype=arrayType, device=targetDevice)
+			result = pt.sparse_coo_tensor(indices, values, size=targetSize, dtype=arrayType, device=targetDevice)
+			return result
+
+		def addSparseUpdateNonNegative(targetSparse, updateSparse):
+			if(tuple(targetSparse.size()) != tuple(updateSparse.size())):
+				raise RuntimeError("addSparseUpdateNonNegative error: sparse tensor size mismatch")
+			result = (targetSparse.coalesce() + updateSparse.coalesce()).coalesce()
+			if(result._nnz() > 0):
+				result.values().clamp_(min=0)
+			return result
 
 	def updateAutoAuxiliaryConnections(databaseNetworkObject, subwordSimilarity=False):
 		updateAutoAuxiliaryFeatureConnectionWeights(databaseNetworkObject, subwordSimilarity)
@@ -1117,75 +1218,158 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 
 	def calculateSubwordSimilaritySparseMatrix(words, targetDevice):
 		wordCount = len(words)
-		wordLengths = pt.tensor([len(word) for word in words], dtype=pt.long, device=targetDevice)
-		maxWordLength = int(wordLengths.max().item()) if wordCount > 0 else 0
-		wordCodes = pt.zeros((wordCount, maxWordLength), dtype=pt.long, device=targetDevice)
-		for wordIndex, word in enumerate(words):
-			for characterIndex, character in enumerate(word):
-				wordCodes[wordIndex, characterIndex] = ord(character)
 		if(wordCount > 0):
-			batchSize = int(auxiliaryNeuronsSimilarSubwordSimilarityBatchSize)
-			if(batchSize <= 0):
-				raise RuntimeError("calculateSubwordSimilaritySparseMatrix error: auxiliaryNeuronsSimilarSubwordSimilarityBatchSize must be positive")
-			indicesList = []
-			valuesList = []
-			for rowStart in range(0, wordCount, batchSize):
-				rowEnd = min(rowStart + batchSize, wordCount)
-				batchIndices, batchValues = calculateSubwordSimilaritySparseMatrixRows(wordCodes, wordLengths, rowStart, rowEnd, targetDevice)
-				if(batchValues.numel() > 0):
-					indicesList.append(batchIndices)
-					valuesList.append(batchValues)
-			if(len(valuesList) > 0):
-				indices = pt.cat(indicesList, dim=1)
-				values = pt.cat(valuesList, dim=0)
-			else:
-				indices = pt.empty((2, 0), dtype=pt.long, device=targetDevice)
-				values = pt.empty((0,), dtype=arrayType, device=targetDevice)
+			prefixThreshold = int(auxiliaryNeuronsSimilarSubwordPrefixThreshold)
+			similarityThreshold = float(auxiliaryNeuronsSimilarSubwordAutoThreshold)
+			validateSubwordSimilaritySparseMatrixParameters(prefixThreshold, similarityThreshold)
+			wordLengths = [len(word) for word in words]
+			requiredPrefixLengths = calculateSubwordRequiredPrefixLengths(wordLengths, prefixThreshold, similarityThreshold)
+			prefixRowsByRequiredLength = buildSubwordPrefixRowsByRequiredLength(words, wordLengths, requiredPrefixLengths)
+			prefixRowsByLengthCache = {}
+			requiredPrefixLengthValues = sorted(prefixRowsByRequiredLength.keys())
+			rowIndices = []
+			columnIndices = []
+			similarityValues = []
+			appendSubwordIdentitySimilarityPairs(wordCount, rowIndices, columnIndices, similarityValues)
+			for sourceRowIndex in range(wordCount):
+				appendSubwordSimilarityPairsForSource(words, wordLengths, requiredPrefixLengths, prefixRowsByRequiredLength, prefixRowsByLengthCache, requiredPrefixLengthValues, sourceRowIndex, prefixThreshold, similarityThreshold, rowIndices, columnIndices, similarityValues)
+			indices, values = buildSubwordSimilaritySparseTensors(rowIndices, columnIndices, similarityValues, targetDevice)
 		else:
 			indices = pt.empty((2, 0), dtype=pt.long, device=targetDevice)
 			values = pt.empty((0,), dtype=arrayType, device=targetDevice)
 		result = pt.sparse_coo_tensor(indices, values, size=(wordCount, wordCount), dtype=arrayType, device=targetDevice).coalesce()
 		return result
 
-	def calculateSubwordSimilaritySparseMatrixRows(wordCodes, wordLengths, rowStart, rowEnd, targetDevice):
-		wordCount = wordCodes.shape[0]
-		maxWordLength = wordCodes.shape[1]
-		rowWordCount = rowEnd - rowStart
-		if(rowWordCount <= 0):
-			raise RuntimeError("calculateSubwordSimilaritySparseMatrixRows error: row range is empty")
-		if(maxWordLength > 0):
-			positionIndices = pt.arange(maxWordLength, dtype=pt.long, device=targetDevice)
-			rowWordCodes = wordCodes[rowStart:rowEnd]
-			rowWordLengths = wordLengths[rowStart:rowEnd]
-			validMask = (positionIndices.view(1, 1, maxWordLength) < rowWordLengths.view(-1, 1, 1)) & (positionIndices.view(1, 1, maxWordLength) < wordLengths.view(1, -1, 1))
-			characterEqualMask = (rowWordCodes.view(rowWordCount, 1, maxWordLength) == wordCodes.view(1, wordCount, maxWordLength)) & validMask
-			prefixMask = characterEqualMask.to(pt.long).cumprod(dim=2).to(pt.bool)
-			sharedPrefixLengths = prefixMask.sum(dim=2)
-			candidateMask = sharedPrefixLengths >= int(auxiliaryNeuronsSimilarSubwordPrefixThreshold)
-			rowLocalIndices = pt.arange(rowWordCount, dtype=pt.long, device=targetDevice)
-			diagonalColumnIndices = rowStart + rowLocalIndices
-			candidateMask[rowLocalIndices, diagonalColumnIndices] = True
-			candidateRowIndices, candidateColumnIndices = pt.nonzero(candidateMask, as_tuple=True)
-			if(candidateRowIndices.numel() > 0):
-				candidateSharedPrefixLengths = sharedPrefixLengths[candidateRowIndices, candidateColumnIndices].to(arrayType)
-				candidateDenominator = pt.maximum(wordLengths[rowStart + candidateRowIndices], wordLengths[candidateColumnIndices]).clamp(min=1).to(arrayType)
-				candidateValues = candidateSharedPrefixLengths/candidateDenominator
-				candidateDiagonalMask = candidateColumnIndices == rowStart + candidateRowIndices
-				activeMask = (candidateValues >= auxiliaryNeuronsSimilarSubwordAutoThreshold) | candidateDiagonalMask
-				activeRowIndices = candidateRowIndices[activeMask]
-				activeColumnIndices = candidateColumnIndices[activeMask]
-				values = candidateValues[activeMask]
-				diagonalMask = activeColumnIndices == rowStart + activeRowIndices
-				values = pt.where(diagonalMask, pt.full_like(values, auxiliaryNeuronsSimilarWordsIdentitySimilarity), values)
-				indices = pt.stack((rowStart + activeRowIndices, activeColumnIndices), dim=0)
+	def validateSubwordSimilaritySparseMatrixParameters(prefixThreshold, similarityThreshold):
+		if(prefixThreshold <= 0):
+			raise RuntimeError("validateSubwordSimilaritySparseMatrixParameters error: auxiliaryNeuronsSimilarSubwordPrefixThreshold must be positive")
+		if(similarityThreshold < auxiliaryNeuronsSimilarWordsMinimumSimilarity or similarityThreshold > auxiliaryNeuronsSimilarWordsMaximumSimilarity):
+			raise RuntimeError("validateSubwordSimilaritySparseMatrixParameters error: auxiliaryNeuronsSimilarSubwordAutoThreshold out of range")
+		return
+
+	def calculateSubwordRequiredPrefixLengths(wordLengths, prefixThreshold, similarityThreshold):
+		result = []
+		for wordLength in wordLengths:
+			requiredPrefixLength = calculateSubwordRequiredPrefixLength(wordLength, prefixThreshold, similarityThreshold)
+			result.append(requiredPrefixLength)
+		return result
+
+	def calculateSubwordRequiredPrefixLength(wordLength, prefixThreshold, similarityThreshold):
+		if(wordLength < 0):
+			raise RuntimeError("calculateSubwordRequiredPrefixLength error: wordLength out of range")
+		requiredPrefixLength = max(prefixThreshold, math.ceil(similarityThreshold*wordLength))
+		if(wordLength > 0):
+			while(requiredPrefixLength > prefixThreshold and (requiredPrefixLength - 1)/wordLength >= similarityThreshold):
+				requiredPrefixLength -= 1
+			while(requiredPrefixLength < wordLength and requiredPrefixLength/wordLength < similarityThreshold):
+				requiredPrefixLength += 1
+		result = requiredPrefixLength
+		return result
+
+	def buildSubwordPrefixRowsByRequiredLength(words, wordLengths, requiredPrefixLengths):
+		result = {}
+		for wordIndex, word in enumerate(words):
+			requiredPrefixLength = requiredPrefixLengths[wordIndex]
+			if(wordLengths[wordIndex] >= requiredPrefixLength):
+				if(requiredPrefixLength not in result):
+					result[requiredPrefixLength] = {}
+				prefix = word[:requiredPrefixLength]
+				if(prefix not in result[requiredPrefixLength]):
+					result[requiredPrefixLength][prefix] = []
+				result[requiredPrefixLength][prefix].append(wordIndex)
+		return result
+
+	def appendSubwordIdentitySimilarityPairs(wordCount, rowIndices, columnIndices, similarityValues):
+		for wordIndex in range(wordCount):
+			rowIndices.append(wordIndex)
+			columnIndices.append(wordIndex)
+			similarityValues.append(auxiliaryNeuronsSimilarWordsIdentitySimilarity)
+		return
+
+	def appendSubwordSimilarityPairsForSource(words, wordLengths, requiredPrefixLengths, prefixRowsByRequiredLength, prefixRowsByLengthCache, requiredPrefixLengthValues, sourceRowIndex, prefixThreshold, similarityThreshold, rowIndices, columnIndices, similarityValues):
+		sourceWord = words[sourceRowIndex]
+		sourceLength = wordLengths[sourceRowIndex]
+		sourceRequiredPrefixLength = requiredPrefixLengths[sourceRowIndex]
+		if(sourceLength >= prefixThreshold):
+			appendSubwordSimilarityPairsForSourceRequiredLength(words, wordLengths, requiredPrefixLengths, prefixRowsByLengthCache, sourceRowIndex, sourceRequiredPrefixLength, prefixThreshold, similarityThreshold, rowIndices, columnIndices, similarityValues)
+			for targetRequiredPrefixLength in requiredPrefixLengthValues:
+				if(targetRequiredPrefixLength > sourceRequiredPrefixLength and targetRequiredPrefixLength <= sourceLength):
+					sourcePrefix = sourceWord[:targetRequiredPrefixLength]
+					if(sourcePrefix in prefixRowsByRequiredLength[targetRequiredPrefixLength]):
+						candidateRows = prefixRowsByRequiredLength[targetRequiredPrefixLength][sourcePrefix]
+						appendSubwordSimilarityPairsForCandidateRows(words, wordLengths, sourceRowIndex, candidateRows, prefixThreshold, similarityThreshold, rowIndices, columnIndices, similarityValues)
+				elif(targetRequiredPrefixLength > sourceLength):
+					break
+		return
+
+	def appendSubwordSimilarityPairsForSourceRequiredLength(words, wordLengths, requiredPrefixLengths, prefixRowsByLengthCache, sourceRowIndex, sourceRequiredPrefixLength, prefixThreshold, similarityThreshold, rowIndices, columnIndices, similarityValues):
+		sourceWord = words[sourceRowIndex]
+		sourcePrefix = sourceWord[:sourceRequiredPrefixLength]
+		prefixRowsByLength = getSubwordPrefixRowsByLength(words, wordLengths, prefixRowsByLengthCache, sourceRequiredPrefixLength)
+		if(sourcePrefix in prefixRowsByLength):
+			appendSubwordSimilarityPairsForCandidateRowsWithRequiredPrefixLimit(words, wordLengths, requiredPrefixLengths, sourceRowIndex, prefixRowsByLength[sourcePrefix], sourceRequiredPrefixLength, prefixThreshold, similarityThreshold, rowIndices, columnIndices, similarityValues)
+		return
+
+	def appendSubwordSimilarityPairsForCandidateRowsWithRequiredPrefixLimit(words, wordLengths, requiredPrefixLengths, sourceRowIndex, candidateRows, requiredPrefixLengthLimit, prefixThreshold, similarityThreshold, rowIndices, columnIndices, similarityValues):
+		for targetRowIndex in candidateRows:
+			if(requiredPrefixLengths[targetRowIndex] <= requiredPrefixLengthLimit):
+				appendSubwordSimilarityPairForCandidateRow(words, wordLengths, sourceRowIndex, targetRowIndex, prefixThreshold, similarityThreshold, rowIndices, columnIndices, similarityValues)
+		return
+
+	def getSubwordPrefixRowsByLength(words, wordLengths, prefixRowsByLengthCache, prefixLength):
+		if(prefixLength not in prefixRowsByLengthCache):
+			rowsByPrefix = {}
+			for wordIndex, word in enumerate(words):
+				if(wordLengths[wordIndex] >= prefixLength):
+					prefix = word[:prefixLength]
+					if(prefix not in rowsByPrefix):
+						rowsByPrefix[prefix] = []
+					rowsByPrefix[prefix].append(wordIndex)
+			prefixRowsByLengthCache[prefixLength] = rowsByPrefix
+		result = prefixRowsByLengthCache[prefixLength]
+		return result
+
+	def appendSubwordSimilarityPairsForCandidateRows(words, wordLengths, sourceRowIndex, candidateRows, prefixThreshold, similarityThreshold, rowIndices, columnIndices, similarityValues):
+		for targetRowIndex in candidateRows:
+			appendSubwordSimilarityPairForCandidateRow(words, wordLengths, sourceRowIndex, targetRowIndex, prefixThreshold, similarityThreshold, rowIndices, columnIndices, similarityValues)
+		return
+
+	def appendSubwordSimilarityPairForCandidateRow(words, wordLengths, sourceRowIndex, targetRowIndex, prefixThreshold, similarityThreshold, rowIndices, columnIndices, similarityValues):
+		if(targetRowIndex != sourceRowIndex):
+			sourceWord = words[sourceRowIndex]
+			targetWord = words[targetRowIndex]
+			sourceLength = wordLengths[sourceRowIndex]
+			targetLength = wordLengths[targetRowIndex]
+			sharedPrefixLength = calculateSubwordSharedPrefixLength(sourceWord, targetWord)
+			if(sharedPrefixLength >= prefixThreshold):
+				similarityDenominator = max(sourceLength, targetLength)
+				similarityValue = sharedPrefixLength/similarityDenominator
+				if(similarityValue >= similarityThreshold):
+					rowIndices.append(sourceRowIndex)
+					columnIndices.append(targetRowIndex)
+					similarityValues.append(similarityValue)
+		return
+
+	def calculateSubwordSharedPrefixLength(sourceWord, targetWord):
+		sharedPrefixLength = 0
+		maxSharedPrefixLength = min(len(sourceWord), len(targetWord))
+		for characterIndex in range(maxSharedPrefixLength):
+			if(sourceWord[characterIndex] == targetWord[characterIndex]):
+				sharedPrefixLength += 1
 			else:
-				indices = pt.empty((2, 0), dtype=pt.long, device=targetDevice)
-				values = pt.empty((0,), dtype=arrayType, device=targetDevice)
+				break
+		result = sharedPrefixLength
+		return result
+
+	def buildSubwordSimilaritySparseTensors(rowIndices, columnIndices, similarityValues, targetDevice):
+		if(len(similarityValues) > 0):
+			indices = pt.tensor([rowIndices, columnIndices], dtype=pt.long, device=targetDevice)
+			values = pt.tensor(similarityValues, dtype=arrayType, device=targetDevice)
 		else:
-			rowGlobalIndices = pt.arange(rowStart, rowEnd, dtype=pt.long, device=targetDevice)
-			indices = pt.stack((rowGlobalIndices, rowGlobalIndices), dim=0)
-			values = pt.full((rowWordCount,), auxiliaryNeuronsSimilarWordsIdentitySimilarity, dtype=arrayType, device=targetDevice)
-		return indices, values
+			indices = pt.empty((2, 0), dtype=pt.long, device=targetDevice)
+			values = pt.empty((0,), dtype=arrayType, device=targetDevice)
+		result = indices, values
+		return result
 
 	def registerAutoSimilaritySparseMatrixWeights(databaseNetworkObject, records, similarityMatrix):
 		import GIAANNnlp_auxiliaryNeuronsSimilarWords
