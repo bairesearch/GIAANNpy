@@ -328,3 +328,17 @@ MANUAL; - restore default inferenceUseNextTokenPredictionsOrTargetsToActivateNex
 	- keep all cases of if(auxiliaryNeuronsAuto) within in the code but remove all cases of if(auxiliaryNeuronsAuto==False). Do not delete the variable "auxiliaryNeuronsAuto".
 - update trainReverseConnections - when optimisationArrayIndexPropertiesEfficientSerialConnections=False reverse updates use a batched gather/update/scatter flow analogous to forward connection training instead of per-target-feature sparse add/coalesce loops.
 - update calculateSubwordSimilaritySparseMatrix to avoid dense tensors.
+
+---
+v2d (Codex IDE GPT-5.5) [under development]:
+- add proto GIAANNproto2d1a - start option useTrainDuringInference (executionMode=="trainDuringInference"):
+	MANUAL; - in processArticle() it executes processSequence in inferenceMode==True then in inferenceMode==False
+	MANUAL; - mandate inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False
+	- during inferenceMode==True phase, it builds a bool mask called inferenceSuccessfulPredictionMask (of sequence size) using each token that was successfully predicted in the sequence. All prompt tokens are automatically set to False.
+	- during inferenceMode==False phase, uses inferenceSuccessfulPredictionMask as a bool mask for each token that needs to be trained in the sequence. All other tokens in the sequence are not trained. The masking process should be a single line of code within GIAANNcmn_databaseNetworkTrain.py; e.g. if(useTrainDuringInference): activeTokens + inferenceSuccessfulPredictionMask.
+	- mask is applied to target feature neurons receiving input during training only (and their incoming connections); masked token feature neurons can still have output connections trained.
+	- the mask is applied such that unsuccessful prediction targets (False) are trained, and successful prediction targets (True) and not trained. Set trainTargetFeaturesMask = not inferenceSuccessfulPredictionMask.
+	Implementation Notes:
+		- do not change any existing code in the codebase unrelated to specific useTrainDuringInference behaviour.
+		- ensure to encapsulate all useTrainDuringInference specific behaviour within context if(useTrainDuringInference) as per AGENTS.md.
+- upgrade useTrainDuringInference to print the final printInferenceTop1Accuracy exactly the same way inferenceMode prints the eval accuracies.

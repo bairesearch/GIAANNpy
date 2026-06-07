@@ -41,7 +41,9 @@ useQuickExecution = True	#intro: True	#default: False
 useDefault = False	#default: True
 useBenchmark = False		#use benchmark file naming schemes and evals
 useAutoresearch = False
-useDrawNetworkIndependently = False	#default: False	#default: True
+useDrawNetworkIndependently = False
+useTrainDuringInference = False
+
 inferenceTrainFirstSequences = False	#dependent var
 if(useQuickExecution):
 	executionMode = "inference" 	#mandatory: "inference" (effective trainAndInference but uses a text datafile)
@@ -54,8 +56,11 @@ elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
 	executionMode = "train"	#default: "train" or "trainAndInference" #set to the execution mode the network was trained on
+elif(useTrainDuringInference):
+	executionMode = "trainDuringInference"	#optional: "trainDuringInference/"inference"
 else:
 	raise RuntimeError("execution mode undefined")
+
 
 
 #Primary Draw settings:
@@ -67,7 +72,9 @@ drawNetworkDuringInference = False	#default: False
 numSeedTokensInference = 8	#default: 5, 8, 12, 16	#this is also set during train phase only so that the derived numberOfSegments always matches inference phase
 useInference = True  #mandatory: True	#enable options that support inference mode
 if(useInference):
-	if(useBenchmark or useAutoresearch):
+	if(useTrainDuringInference):
+		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#mandatory: False
+	elif(useBenchmark or useAutoresearch):
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: False	#False: use current target (default top-1 accuracy measurement)
 	else:
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True		#True: activate next column features using current prediction
@@ -83,6 +90,8 @@ elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
 	useBenchmarkDefaultsEvalTestSet = True	#N/A
+elif(useTrainDuringInference):
+	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 
 if(useBenchmarkDefaultsEvalTestSet):
 	inferenceEvaluateTestSet = True
@@ -127,6 +136,9 @@ elif(useAutoresearch):
 elif(useDrawNetworkIndependently):
 	trainMaxSequences = 0	#not used
 	databaseFolderBase = databaseFolderBaseLocal
+elif(useTrainDuringInference):
+	trainMaxSequences = 1000	#slow execution
+	databaseFolderBase = databaseFolderBaseSSD
 if(databaseFolderBase==databaseFolderBaseSSD):
 	inferenceCopyTemplateDatasets = True	#default: True	#copy template dataset files into databaseFolder at inference startup
 else:
@@ -143,7 +155,10 @@ numberEpochs = 1	#default: 1
 #Dendritic branches;
 multipleDendriticBranches = True	#default: True	#orig: False
 if(multipleDendriticBranches):
-	randomlyAssignBranches = False	#optional	#orig: False
+	if(useTrainDuringInference):
+		randomlyAssignBranches = True	#default: True	#useTrainDuringInference algorithm has automatic protection against replication of same patterns across multiple branches, so it can better capitalise on randomised branch assignment
+	else:
+		randomlyAssignBranches = False	#optional	#default: False #orig: False
 	if(randomlyAssignBranches):
 		numberOfDendriticBranches = 5
 	else:
@@ -190,11 +205,14 @@ elif(useModalityNLP):
 		useGPUdense = False
 		useGPUsparse = False
 	else:
-		useGPUdense = True	#default: True
-		if(executionMode=="inference" or executionMode=="trainAndInference"):
-			useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors	#inference can be slightly faster CPU sparse tensor operations
-		elif(executionMode=="train"):
+		if(useTrainDuringInference):
+			useGPUdense = False
+		else:
+			useGPUdense = True	#default: True
+		if(executionMode=="train"):
 			useGPUsparse = True	#default: True		#slight performance increase during train (does not use significant additional GPU ram during train)
+		else:
+			useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors	#inference can be slightly faster CPU sparse tensor operations
 useGPUsparseStrict = True	#default: True	#orig: False	#optional	#enforce strict sparse device during transfer to/from dense tensors (make conversion process always use sparse device)	 #no significant difference in speed; can theoretically affect peak CPU or GPU RAM
 useGPUfileio = False	#default: False	#orig: useGPUsparse
 
@@ -363,10 +381,7 @@ drawDelimiters = False	#optional
 drawDefault = True	#optional
 drawNetworkDuringTrainSave = False	#default: False	#save drawn network during train
 drawNetworkDuringInferenceSave = False	#True is only for debug
-if(executionMode=="inference" or executionMode=="trainAndInference"):
-	drawSequenceObservedColumns = False	#mandatory
-	drawAllColumns = False	#mandatory
-else:
+if(executionMode=="train"):
 	drawSequenceObservedColumns = False	#default: False	#optional	#draw sequence observed columns (instead of complete observed columns)	#note if !drawSequenceObservedColumns and !trainSequenceObservedColumnsUseSequenceFeaturesOnly, then will still draw complete columns	#optional (will affect which network changes can be visualised)
 	if(useDrawNetworkIndependently):
 		drawAllColumns = True	#mandatory
@@ -374,6 +389,9 @@ else:
 		drawAllColumns = False	#default: False	#optional	#draw all columns in network (only used for automated visualisation; drawNetworkDuringTrainSave)	#requires !drawSequenceObservedColumns
 		if(drawAllColumns):
 			assert not trainSequenceObservedColumnsUseSequenceFeaturesOnly
+else:
+	drawSequenceObservedColumns = False	#mandatory
+	drawAllColumns = False	#mandatory
 
 drawNetworkSaveFormatVector = True	#default: False	#orig: False	#True: save matplotlib network images as svg instead of png
 drawSegmentsTrain = False	#derived
@@ -613,7 +631,7 @@ if(useInference):
 	kcMax = 1 	#topk next concept column prediction
 	kf = 1
 	assert kcNetwork==1 and kf==1 and kcMax==1, "multiple prediction column/feature pairs not supported"
-	if(executionMode == "inference"):
+	if(not executionMode == "train"):
 		assert storeDatabaseGlobalFeatureNeuronsInRam, "useInference: global feature neuron lists are required" 
 	assert useSaveData,  "useInference: useSaveData is required" 
 		
@@ -973,7 +991,7 @@ if(printConfiguration):
 	print("useGPUdense:", useGPUdense)
 	print("useGPUsparse:", useGPUsparse)
 	print("useGPUfileio:", useGPUfileio)
-	if(executionMode=="train" or executionMode=="trainAndInference"):
+	if(executionMode=="train" or executionMode=="trainAndInference" or executionMode=="trainDuringInference"):
 		print("\ttrainSparseConnectionsTensor:", trainSparseConnectionsTensor)
 		print("\ttrainSparseNeuronsTensor:", trainSparseNeuronsTensor)
 	print("storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam:", storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam)

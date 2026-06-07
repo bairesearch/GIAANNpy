@@ -62,7 +62,7 @@ if(modalityName=="NLP"):
 elif(modalityName=="OR"):
 	import GIAANNor_main
 		
-if(executionMode=="inference" or executionMode=="trainAndInference"):
+if(executionMode=="inference" or executionMode=="trainAndInference" or executionMode=="trainDuringInference"):
 	import GIAANNcmn_prediction
 if(modalityName=="NLP" and inferenceReportGroundedAccuracy):
 	import GIAANNnlp_groundedEval
@@ -125,7 +125,9 @@ def main():
 			executeMode(True)
 		elif(executionMode=="train"):
 			executeMode(False)
-	
+		elif(executionMode=="trainDuringInference"):
+			executeMode(False)
+
 	if(printRamMaxUsage):
 		GIAANNcmn_count.countPrintGpuRamMaxUsageSummary()
 	if(debugPrintRamAverageUsage and not debugPrintRamCurrentUsage):
@@ -142,6 +144,8 @@ def getDrawModeDatabaseInferenceMode():
 		inferenceMode = True
 	elif(executionMode == "inference"):
 		inferenceMode = True
+	elif(executionMode == "trainDuringInference"):
+		inferenceMode = False
 	else:
 		raise RuntimeError(f"getDrawModeDatabaseInferenceMode error: unsupported executionMode {executionMode}")
 	return inferenceMode
@@ -214,6 +218,9 @@ def executeMode(inferenceMode):
 			GIAANNcmn_prediction.resetInferenceTop1AccuracyCounts()
 			if(modalityName=="NLP" and inferenceReportGroundedAccuracy):
 				GIAANNnlp_groundedEval.resetInferenceGroundedAccuracyCounts()
+		if(useTrainDuringInference):
+			if(not inferenceMode):
+				GIAANNcmn_prediction.resetInferenceTop1AccuracyCounts()
 		
 		if(modalityName=="NLP"):
 			if(inferenceMode):
@@ -232,6 +239,9 @@ def executeMode(inferenceMode):
 			GIAANNcmn_debug.printTotalInferenceTokens()
 		if(inferenceMode and printInferenceTop1Accuracy and not useAutoresearch):
 			GIAANNcmn_prediction.printInferenceTop1Accuracy(databaseNetworkObject)
+		if(useTrainDuringInference):
+			if(not inferenceMode and printInferenceTop1Accuracy and not useAutoresearch):
+				GIAANNcmn_prediction.printInferenceTop1Accuracy(databaseNetworkObject)
 		if(inferenceMode and inferenceReportGroundedAccuracy and not useAutoresearch):
 			GIAANNnlp_groundedEval.printInferenceGroundedAccuracy(databaseNetworkObject)
 

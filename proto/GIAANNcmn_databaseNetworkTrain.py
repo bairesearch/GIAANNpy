@@ -28,7 +28,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	import GIAANNnlp_auxiliaryNeuronsSimilarWords
 
 	
-def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
+def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens, inferenceSuccessfulPredictionMask=None):
 	trainConceptWordsStartTime = None
 	if(debugPrintTrainSectionTimes):
 		trainConceptWordsStartTime = time.perf_counter()
@@ -37,18 +37,61 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 		print(f"Processing sequenceCount: {sequenceIndex}, {sequenceObservedColumns.sentenceWithConceptAssignment}")	
 		if(printSequenceConceptAssignmentByLine):
 			print("")	
-	if(result is None):
-		return False
-	conceptIndices, startIndices, endIndices = result
-	featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask = GIAANNnlp_sequenceConcepts.processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices)
-
-	featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex)
-	if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-		GIAANNnlp_auxiliaryNeuronsSimilarWords.trainAuxiliaryFeatureConnections(sequenceObservedColumns, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, conceptIndices, startIndices, endIndices)
+	trainActive = False
+	if(result is not None):
+		conceptIndices, startIndices, endIndices = result
+		featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask = GIAANNnlp_sequenceConcepts.processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices)
+		trainActive = True
+		featureNeuronsTargetMask = None
+		if(useTrainDuringInference):
+			featureNeuronsTargetMask = createTrainDuringInferenceFeatureNeuronsTargetMask(tokens, inferenceSuccessfulPredictionMask, featureNeuronsWordOrder, featureNeuronsActive)
+			trainActive = bool(pt.any(featureNeuronsActive*featureNeuronsTargetMask).item())
+		if(trainActive):
+			featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex, featureNeuronsTargetMask)
+			if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
+				if(useTrainDuringInference):
+					featureNeuronsActive = featureNeuronsActive*featureNeuronsTargetMask
+				GIAANNnlp_auxiliaryNeuronsSimilarWords.trainAuxiliaryFeatureConnections(sequenceObservedColumns, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, conceptIndices, startIndices, endIndices)
 	if(debugPrintTrainSectionTimes):
 		GIAANNcmn_debug.debugTrainSectionTimesAdd(sequenceObservedColumns.databaseNetworkObject, "trainConceptWords", time.perf_counter() - trainConceptWordsStartTime)
 
-	return True
+	return trainActive
+
+def createTrainDuringInferenceFeatureNeuronsTargetMask(tokens, inferenceSuccessfulPredictionMask, featureNeuronsWordOrder, featureNeuronsActive):
+	result = None
+	trainTargetFeaturesMask = None
+	if(inferenceSuccessfulPredictionMask is None):
+		raise RuntimeError("createTrainDuringInferenceFeatureNeuronsTargetMask error: inferenceSuccessfulPredictionMask is None")
+	if(not pt.is_tensor(inferenceSuccessfulPredictionMask)):
+		raise RuntimeError("createTrainDuringInferenceFeatureNeuronsTargetMask error: inferenceSuccessfulPredictionMask must be a tensor")
+	if(inferenceSuccessfulPredictionMask.dtype != pt.bool):
+		raise RuntimeError("createTrainDuringInferenceFeatureNeuronsTargetMask error: inferenceSuccessfulPredictionMask must be bool")
+	if(inferenceSuccessfulPredictionMask.dim() != 1):
+		raise RuntimeError("createTrainDuringInferenceFeatureNeuronsTargetMask error: inferenceSuccessfulPredictionMask rank must be 1")
+	if(int(inferenceSuccessfulPredictionMask.shape[0]) != len(tokens)):
+		raise RuntimeError("createTrainDuringInferenceFeatureNeuronsTargetMask error: inferenceSuccessfulPredictionMask length must match tokens length")
+	if(numSeedTokens > 0 and bool(pt.any(inferenceSuccessfulPredictionMask[:numSeedTokens]).item())):
+		raise RuntimeError("createTrainDuringInferenceFeatureNeuronsTargetMask error: prompt tokens must be False")
+	if(featureNeuronsWordOrder is None):
+		raise RuntimeError("createTrainDuringInferenceFeatureNeuronsTargetMask error: featureNeuronsWordOrder is None")
+	if(not pt.is_tensor(featureNeuronsWordOrder)):
+		raise RuntimeError("createTrainDuringInferenceFeatureNeuronsTargetMask error: featureNeuronsWordOrder must be a tensor")
+	if(not pt.is_tensor(featureNeuronsActive)):
+		raise RuntimeError("createTrainDuringInferenceFeatureNeuronsTargetMask error: featureNeuronsActive must be a tensor")
+	if(featureNeuronsWordOrder.dim() != 2):
+		raise RuntimeError("createTrainDuringInferenceFeatureNeuronsTargetMask error: featureNeuronsWordOrder rank must be 2")
+	if(featureNeuronsActive.dim() != 4):
+		raise RuntimeError("createTrainDuringInferenceFeatureNeuronsTargetMask error: featureNeuronsActive rank must be 4")
+	if(int(featureNeuronsWordOrder.shape[0]) != int(featureNeuronsActive.shape[2]) or int(featureNeuronsWordOrder.shape[1]) != int(featureNeuronsActive.shape[3])):
+		raise RuntimeError("createTrainDuringInferenceFeatureNeuronsTargetMask error: featureNeuronsWordOrder shape must match featureNeuronsActive concept and feature dimensions")
+	if(featureNeuronsWordOrder.numel() > 0):
+		if(bool(pt.any(featureNeuronsWordOrder < 0).item()) or bool(pt.any(featureNeuronsWordOrder >= inferenceSuccessfulPredictionMask.shape[0]).item())):
+			raise RuntimeError("createTrainDuringInferenceFeatureNeuronsTargetMask error: featureNeuronsWordOrder contains out of range token indices")
+	trainTargetFeaturesMask = pt.logical_not(inferenceSuccessfulPredictionMask)
+	if(numSeedTokens > 0):
+		trainTargetFeaturesMask[:numSeedTokens] = False
+	result = trainTargetFeaturesMask.to(device=featureNeuronsWordOrder.device)[featureNeuronsWordOrder].to(device=featureNeuronsActive.device, dtype=featureNeuronsActive.dtype).unsqueeze(0).unsqueeze(0)
+	return result
 
 def getTrainConnectionsIncludeSameTimeIndex(sequenceObservedColumns):
 	result = None
@@ -185,11 +228,16 @@ def createFeatureWordOrderConnectionMask(sourceWordOrder, targetWordOrder, train
 	return result
 
 #first dim cs1 pertains to every concept node in sequence
-def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex):
+def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex, featureNeuronsTargetMask=None):
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 	processFeaturesActiveTrainStartTime = None
 	if(debugPrintTrainSectionTimes):
 		processFeaturesActiveTrainStartTime = time.perf_counter()
+	featureNeuronsActiveTarget = featureNeuronsActive
+	if(useTrainDuringInference):
+		if(featureNeuronsTargetMask is None):
+			raise RuntimeError("processFeaturesActiveTrain error: featureNeuronsTargetMask is None")
+		featureNeuronsActiveTarget = featureNeuronsActive*featureNeuronsTargetMask
 	useSparseSequenceNeurons = trainSparseNeuronsTensor
 	useSparseSequenceConnections = trainSparseConnectionsTensor
 	if(useSparseSequenceNeurons):
@@ -201,30 +249,34 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 		if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections and arrayIndexPropertiesPermanence):
 			raise RuntimeError("processFeaturesActiveTrain error: trainSparseConnectionsTensor does not support trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections")
 	if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections and arrayIndexPropertiesPermanence):
-		featureNeuronsActiveUnion = featureNeuronsActive.amax(dim=(0, 1))
+		featureNeuronsActiveUnion = featureNeuronsActiveTarget.amax(dim=(0, 1))
 		featureNeuronsInactiveUnion = 1 - featureNeuronsActiveUnion
+		if(useTrainDuringInference):
+			featureNeuronsInactiveUnion = featureNeuronsInactiveUnion*featureNeuronsTargetMask.squeeze(0).squeeze(0)
 	if(useSparseSequenceNeurons):
-		processFeaturesActiveTrainSparseNeurons(sequenceObservedColumns, featureNeuronsActive, cs, fs, featureNeuronsPos)
+		processFeaturesActiveTrainSparseNeurons(sequenceObservedColumns, featureNeuronsActiveTarget, cs, fs, featureNeuronsPos)
 	else:
-		featureNeuronsInactive = 1 - featureNeuronsActive
+		featureNeuronsInactive = 1 - featureNeuronsActiveTarget
+		if(useTrainDuringInference):
+			featureNeuronsInactive = featureNeuronsInactive*featureNeuronsTargetMask
 		if(arrayIndexPropertiesStrength):
-			sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, :, :, :, :] += featureNeuronsActive
+			sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesStrengthIndex, :, :, :, :] += featureNeuronsActiveTarget
 		if(arrayIndexPropertiesPermanence):
-			sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesPermanenceIndex, :, :, :, :] += featureNeuronsActive*z1
+			sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesPermanenceIndex, :, :, :, :] += featureNeuronsActiveTarget*z1
 		if(arrayIndexPropertiesActivation):
 			sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesActivationIndex, :, :, :, :] = 0
 		if(arrayIndexPropertiesTime):
 			sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesTimeIndex, :, :, :, :] = 0
 			#OLD inferenceUseNeuronFeaturePropertiesTime=False: sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesTimeIndex, :, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesTimeIndex] + featureNeuronsActive*sequenceIndex
 		if(arrayIndexPropertiesPos):
-			sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesPosIndex, :, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesPosIndex] + featureNeuronsActive*featureNeuronsPos
+			sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesPosIndex, :, :, :, :] = featureNeuronsInactive*sequenceObservedColumns.featureNeurons[databaseNetworkObject.arrayIndexPropertiesPosIndex] + featureNeuronsActiveTarget*featureNeuronsPos
 
 	if(useSparseSequenceConnections):
 		featureConnectionsActive = None
 		featureConnectionsSegmentMask = None
-		processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos)
+		processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsTargetMask)
 	else:
-		featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, useSparseSequenceConnections)
+		featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, useSparseSequenceConnections, featureNeuronsTargetMask)
 
 	if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections and arrayIndexPropertiesPermanence):
 		decreasePermanenceActive(sequenceObservedColumns, featureNeuronsActiveUnion, featureNeuronsInactiveUnion, sequenceConceptIndexMask, featureNeuronsSegmentMask, featureConnectionsSegmentMask)
@@ -260,7 +312,7 @@ def processFeaturesActiveTrainSparseNeurons(sequenceObservedColumns, featureNeur
 		setSequenceFeatureNeuronsProperty(sequenceObservedColumns, databaseNetworkObject.arrayIndexPropertiesPosIndex, posSparse)
 	return
 
-def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, useSparseSequenceConnections):
+def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, useSparseSequenceConnections, featureNeuronsTargetMask=None):
 
 	trainConnectionsIncludeSameTimeIndex = getTrainConnectionsIncludeSameTimeIndex(sequenceObservedColumns)
 	if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
@@ -285,6 +337,9 @@ def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceOb
 			#featureConnectionsSegmentMask = pt.zeros_like(featureConnectionsActive, dtype=pt.bool)
 	else:
 		featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[:, arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+
+	if(useTrainDuringInference):
+		featureConnectionsActive, featureConnectionsSegmentMask = applyTrainDuringInferenceFeatureConnectionsTargetMask(featureConnectionsActive, featureConnectionsSegmentMask, featureNeuronsTargetMask)
 
 	featureConnectionsPos = None
 	if(arrayIndexPropertiesPos or (arrayIndexPropertiesStrength and trainConnectionStrengthPOSdependence)):
@@ -336,13 +391,82 @@ def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceOb
 
 	return featureConnectionsActive, featureConnectionsSegmentMask
 
-def processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos):
+def applyTrainDuringInferenceFeatureConnectionsTargetMask(featureConnectionsActive, featureConnectionsSegmentMask, featureNeuronsTargetMask):
+	featureConnectionsActiveResult = None
+	featureConnectionsSegmentMaskResult = None
+	connectionTargetMask = None
+	if(featureConnectionsActive is None):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsTargetMask error: featureConnectionsActive is None")
+	if(featureConnectionsSegmentMask is None):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsTargetMask error: featureConnectionsSegmentMask is None")
+	if(featureNeuronsTargetMask is None):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsTargetMask error: featureNeuronsTargetMask is None")
+	if(not pt.is_tensor(featureConnectionsActive)):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsTargetMask error: featureConnectionsActive must be a tensor")
+	if(not pt.is_tensor(featureConnectionsSegmentMask)):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsTargetMask error: featureConnectionsSegmentMask must be a tensor")
+	if(not pt.is_tensor(featureNeuronsTargetMask)):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsTargetMask error: featureNeuronsTargetMask must be a tensor")
+	if(featureConnectionsActive.dim() != 6):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsTargetMask error: featureConnectionsActive rank must be 6")
+	if(featureConnectionsSegmentMask.shape != featureConnectionsActive.shape):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsTargetMask error: featureConnectionsSegmentMask shape mismatch")
+	if(featureNeuronsTargetMask.dim() != 4):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsTargetMask error: featureNeuronsTargetMask rank must be 4")
+	if(int(featureNeuronsTargetMask.shape[2]) != int(featureConnectionsActive.shape[4]) or int(featureNeuronsTargetMask.shape[3]) != int(featureConnectionsActive.shape[5])):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsTargetMask error: featureNeuronsTargetMask target shape mismatch")
+	connectionTargetMask = featureNeuronsTargetMask.to(device=featureConnectionsActive.device, dtype=featureConnectionsActive.dtype).view(1, 1, 1, 1, int(featureConnectionsActive.shape[4]), int(featureConnectionsActive.shape[5]))
+	featureConnectionsActiveResult = featureConnectionsActive*connectionTargetMask
+	featureConnectionsSegmentMaskResult = pt.logical_and(featureConnectionsSegmentMask, connectionTargetMask.to(dtype=pt.bool))
+	return featureConnectionsActiveResult, featureConnectionsSegmentMaskResult
+
+def applyTrainDuringInferenceFeatureConnectionsSparseTargetMask(connectionActiveSparse, featureNeuronsTargetMask):
+	result = None
+	connectionActiveSparseCoalesced = None
+	connectionActiveIndices = None
+	connectionActiveValues = None
+	filteredConnectionActiveIndices = None
+	filteredConnectionActiveValues = None
+	targetMask = None
+	targetKeepMask = None
+	if(connectionActiveSparse is None):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsSparseTargetMask error: connectionActiveSparse is None")
+	if(featureNeuronsTargetMask is None):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsSparseTargetMask error: featureNeuronsTargetMask is None")
+	if(not pt.is_tensor(connectionActiveSparse)):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsSparseTargetMask error: connectionActiveSparse must be a tensor")
+	if(not pt.is_tensor(featureNeuronsTargetMask)):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsSparseTargetMask error: featureNeuronsTargetMask must be a tensor")
+	if(connectionActiveSparse.layout != pt.sparse_coo):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsSparseTargetMask error: connectionActiveSparse must be sparse COO")
+	if(featureNeuronsTargetMask.dim() != 4):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsSparseTargetMask error: featureNeuronsTargetMask rank must be 4")
+	connectionActiveSparseCoalesced = connectionActiveSparse.coalesce()
+	if(connectionActiveSparseCoalesced.dim() != 6):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsSparseTargetMask error: connectionActiveSparse rank must be 6")
+	if(int(featureNeuronsTargetMask.shape[2]) != int(connectionActiveSparseCoalesced.shape[4]) or int(featureNeuronsTargetMask.shape[3]) != int(connectionActiveSparseCoalesced.shape[5])):
+		raise RuntimeError("applyTrainDuringInferenceFeatureConnectionsSparseTargetMask error: featureNeuronsTargetMask target shape mismatch")
+	connectionActiveIndices = connectionActiveSparseCoalesced.indices()
+	connectionActiveValues = connectionActiveSparseCoalesced.values()
+	filteredConnectionActiveIndices = connectionActiveIndices
+	filteredConnectionActiveValues = connectionActiveValues
+	if(connectionActiveIndices.numel() > 0):
+		targetMask = featureNeuronsTargetMask.squeeze(0).squeeze(0).to(device=connectionActiveIndices.device, dtype=pt.bool)
+		targetKeepMask = targetMask[connectionActiveIndices[4], connectionActiveIndices[5]]
+		filteredConnectionActiveIndices = connectionActiveIndices[:, targetKeepMask]
+		filteredConnectionActiveValues = connectionActiveValues[targetKeepMask]
+	result = pt.sparse_coo_tensor(filteredConnectionActiveIndices, filteredConnectionActiveValues, size=connectionActiveSparseCoalesced.size(), dtype=connectionActiveSparseCoalesced.dtype, device=connectionActiveSparseCoalesced.device).coalesce()
+	return result
+
+def processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsTargetMask=None):
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 	trainConnectionsIncludeSameTimeIndex = getTrainConnectionsIncludeSameTimeIndex(sequenceObservedColumns)
 	if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
 		connectionActiveSparse = createFeatureConnectionsActiveTrainSpatialAxesSparse(featureNeuronsActive, cs, fs, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
 	else:
 		connectionActiveSparse = createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+	if(useTrainDuringInference):
+		connectionActiveSparse = applyTrainDuringInferenceFeatureConnectionsSparseTargetMask(connectionActiveSparse, featureNeuronsTargetMask)
 	connectionActiveIndices = connectionActiveSparse.indices()
 	connectionActiveValues = connectionActiveSparse.values()
 	if(featureNeuronsWordOrder.device != connectionActiveIndices.device):

@@ -31,6 +31,7 @@ from GIAANNcmn_globalDefs import useBenchmark
 from GIAANNcmn_globalDefs import useAutoresearch
 from GIAANNcmn_globalDefs import useDrawNetworkIndependently
 from GIAANNcmn_globalDefs import useDefault
+from GIAANNcmn_globalDefs import useTrainDuringInference
 #from GIAANNcmn_globalDefs import multipleDendriticBranches
 #from GIAANNcmn_globalDefs import numberOfDendriticBranches
 from GIAANNcmn_globalDefs import useSANI
@@ -64,7 +65,9 @@ elif(useAutoresearch):
 elif(useDrawNetworkIndependently):
 	datasetType = "oscar"
 	useBenchmarkEvalDataSet = True	#default: True	#optional
-
+elif(useTrainDuringInference):
+	datasetType = "oscar"	#"oscar" / "wikipedia" / "textfile" [experimental: "closedWorldGrounded1" / "closedWorldGrounded2" / "closedWorldGrounded3"]
+	useBenchmarkEvalDataSet = True	#default: True	#optional	#use an official eval dataset (prompt) - else user must provide a custom inference_prompt.txt
 
 #Multisentence predictions;
 multisentencePredictions = False	#default: False	#each sequence comprises multiple sentences	#requires higher GPU RAM for train

@@ -378,10 +378,15 @@ if not drawSequenceObservedColumns:
 def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequence, sequenceSeed, sequencePredict, numSeedTokens, sequenceRaw):
 	if(printHeaderDuringInferencePredict):
 		print("processConceptWordsInference:")
+	if(useTrainDuringInference and drawNetworkDuringInference):
+		raise RuntimeError("processConceptWordsInference error: drawNetworkDuringInference is not supported with useTrainDuringInference transient inference activations")
 
 	sequenceWordIndex = 0
 
 	tokensSequence = GIAANNnlp_sequenceTokens.getTokens(sequence)
+	inferenceSuccessfulPredictionMask = None
+	if(useTrainDuringInference):
+		inferenceSuccessfulPredictionMask = createInferenceSuccessfulPredictionMask(tokensSequence)
 	addInferenceTop1AccuracyBitsPerByteBytes(sequenceRaw)
 	conceptMask, conceptIndices, numberConcepts = GIAANNnlp_sequenceConcepts.createConceptMask(sequenceObservedColumns, tokensSequence)
 	groundedAnswerTokenIndex = None
@@ -399,10 +404,16 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	conceptColumnFeatureIndex = int(targetFeatureIndex)
 	conceptActivationState = None
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
-	globalFeatureNeuronsActivation = databaseNetworkObject.globalFeatureNeurons[databaseNetworkObject.arrayIndexPropertiesActivationIndex]
+	if(useTrainDuringInference):
+		globalFeatureNeuronsActivation = createInferenceTransientGlobalFeatureNeuronsProperty(databaseNetworkObject)
+	else:
+		globalFeatureNeuronsActivation = databaseNetworkObject.globalFeatureNeurons[databaseNetworkObject.arrayIndexPropertiesActivationIndex]
 	globalFeatureNeuronsTime = None
 	if(inferenceUseNeuronFeaturePropertiesTime):
-		globalFeatureNeuronsTime = databaseNetworkObject.globalFeatureNeurons[databaseNetworkObject.arrayIndexPropertiesTimeIndex]
+		if(useTrainDuringInference):
+			globalFeatureNeuronsTime = createInferenceTransientGlobalFeatureNeuronsProperty(databaseNetworkObject)
+		else:
+			globalFeatureNeuronsTime = databaseNetworkObject.globalFeatureNeurons[databaseNetworkObject.arrayIndexPropertiesTimeIndex]
 	if(predictionColumnsMustActivateConceptFeature):
 		conceptActivationState = initialiseConceptActivationState(conceptColumnIndex, conceptColumnFeatureIndex)
 	observedColumnsDict = sequenceObservedColumns.observedColumnsDict  # key: lemma, value: ObservedColumn	#every observed column in inference (seed and prediction phases)
@@ -431,6 +442,8 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 			conceptColumnFeatureIndex = int(conceptColumnFeatureIndexNext)
 			predictionTokensProcessed += 1
 			addInferenceTop1AccuracyCount(featurePredictionTargetMatch, False)
+			if(useTrainDuringInference):
+				inferenceSuccessfulPredictionMask[sequenceWordIndex] = featurePredictionTargetMatch
 			if(not featurePredictionTargetMatch):
 				if(debugWarningInferenceOnPredictionTargetMismatch):
 					print("warning: featurePredictionTargetMatch=False")
@@ -452,6 +465,23 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 		databaseNetworkObject.globalFeatureNeurons = GIAANNcmn_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, databaseNetworkObject.arrayIndexPropertiesActivationIndex)
 		if(inferenceUseNeuronFeaturePropertiesTime):
 			databaseNetworkObject.globalFeatureNeurons = GIAANNcmn_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, databaseNetworkObject.arrayIndexPropertiesTimeIndex)
+	return inferenceSuccessfulPredictionMask
+
+def createInferenceTransientGlobalFeatureNeuronsProperty(databaseNetworkObject):
+	result = None
+	if(databaseNetworkObject is None):
+		raise RuntimeError("createInferenceTransientGlobalFeatureNeuronsProperty error: databaseNetworkObject is None")
+	if(databaseNetworkObject.c < 0 or databaseNetworkObject.f < 0):
+		raise RuntimeError("createInferenceTransientGlobalFeatureNeuronsProperty error: database dimensions must be non-negative")
+	result = GIAANNcmn_sparseTensors.createEmptySparseTensor((numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f))
+	return result
+
+def createInferenceSuccessfulPredictionMask(tokensSequence):
+	result = None
+	if(tokensSequence is None):
+		raise RuntimeError("createInferenceSuccessfulPredictionMask error: tokensSequence is None")
+	result = pt.zeros((len(tokensSequence),), dtype=pt.bool)
+	return result
 
 def recordInferenceGroundedAbstentionIfRequired(sequenceIndex, tokensSequence, conceptMask, groundedAnswerTokenIndex):
 	if(groundedAnswerTokenIndex is None):

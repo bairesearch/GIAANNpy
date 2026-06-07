@@ -43,7 +43,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilarSubwordAuto):
 	import GIAANNnlp_auxiliaryNeuronsSimilarSubwordAuto
 import GIAANNcmn_sequenceObservedColumns
 import GIAANNcmn_databaseNetworkTrain
-if(executionMode=="inference" or executionMode=="trainAndInference"):
+if(executionMode=="inference" or executionMode=="trainAndInference" or executionMode=="trainDuringInference"):
 	import GIAANNcmn_prediction
 if(datasetType != "textfile" and executionMode != "inference" and not useDrawNetworkIndependently):
 	import GIAANNnlp_datasets
@@ -136,7 +136,7 @@ def processDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset)
 			getDatasetEntryTextDuration = time.perf_counter() - getDatasetEntryTextStartTime
 			print(f"debugPrintSpacySectionTimes: articleIndex={articleIndex} sequenceCount={sequenceCount} sequenceCount={sequenceCount} datasetEntryTextSeconds={getDatasetEntryTextDuration:.6f}")
 		sequenceCount = processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, articleIndex)
-		if(sequenceCount == trainMaxSequences and inferenceMode==False):
+		if(sequenceCount >= trainMaxSequences and inferenceMode==False):
 			break
 	return sequenceCount
 
@@ -175,8 +175,14 @@ def processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, ar
 		processArticlePart2Duration = 0.0
 		processArticlePart2StartTime = time.perf_counter()
 
+	if(inferenceMode and not inferenceTrainFirstSequences):
+		if(printHeaderDuringInferencePredict):
+			print("executing inference:")
+
 	numberOfSequences = len(sequences)
 	for sequenceIndex, sequence in enumerate(sequences):
+		if(useTrainDuringInference and inferenceMode==False and sequenceCount >= trainMaxSequences):
+			break
 		sequenceRaw = sequencesRaw[sequenceIndex]
 		inferenceSequenceInPrompt = False
 		if(inferenceMode):
@@ -191,17 +197,18 @@ def processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, ar
 							print("\ninferenceTrainFirstSequences: executing train:")
 			else:
 				inferenceSequenceInPrompt = True
-				if(sequenceIndex==0):
-					if(printHeaderDuringInferencePredict):
-						print("\n!inferenceTrainFirstSequences: executing inference:")
 		if(len(sequence) <= maxSequenceLength):
 			if(sequenceCount >= trainSetStartOffsetSequences):
-				processSequence(databaseNetworkObject, inferenceSequenceInPrompt, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw)
+				if(executionMode=="trainDuringInference"):
+					inferenceSuccessfulPredictionMask = processSequence(databaseNetworkObject, True, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw)
+					processSequence(databaseNetworkObject, False, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw, inferenceSuccessfulPredictionMask)
+				else:
+					processSequence(databaseNetworkObject, inferenceSequenceInPrompt, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw)
 			else:
 				#if(printSequenceCount):
 				print(f"(sequenceCount < trainSetStartOffsetSequences: Processing sequenceCount: {sequenceCount}")	
 			sequenceCount += 1
-		if(sequenceCount == trainMaxSequences and inferenceMode==False):
+		if(sequenceCount >= trainMaxSequences and inferenceMode==False):
 			break
 
 	if(debugPrintSpacySectionTimes):
@@ -324,7 +331,7 @@ def generateSeqencesBatchOrSerial(textParsed, skipMode):
 	return sequences, sequencesRaw
 
 
-def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw):
+def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw, inferenceSuccessfulPredictionMask=None):
 	trainMode = not inferenceMode
 	
 	sequenceTrainTotalStartTime = None
@@ -346,7 +353,8 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 	
 	if(inferenceMode):
 		if(not inferenceTrainFirstSequences):
-			GIAANNcmn_databaseNetwork.restoreGlobalArrays(databaseNetworkObject)	#reset activations so each prompt sequence is independent
+			if(not useTrainDuringInference):
+				GIAANNcmn_databaseNetwork.restoreGlobalArrays(databaseNetworkObject)	#reset activations so each prompt sequence is independent
 	
 	databaseNetworkObject.articleIndexDebug = articleIndex
 	databaseNetworkObject.sequenceIndexDebug = sequenceIndex
@@ -357,6 +365,10 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 	
 	if(inferenceMode):
 		if(numSeedTokens >= len(sequence)):
+			if(useTrainDuringInference):
+				tokens = GIAANNnlp_sequenceTokens.getTokens(sequence)
+				inferenceSuccessfulPredictionMask = GIAANNcmn_prediction.createInferenceSuccessfulPredictionMask(tokens)
+				return inferenceSuccessfulPredictionMask
 			return
 		sequenceSeed = sequence[0:numSeedTokens]	#prompt
 		sequencePredict = sequence[numSeedTokens:]
@@ -389,6 +401,8 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 			getTokensStartTime = time.perf_counter()
 		
 		tokens = GIAANNnlp_sequenceTokens.getTokens(sequence)
+		if(inferenceMode and useTrainDuringInference and inferenceSuccessfulPredictionMask is None):
+			inferenceSuccessfulPredictionMask = GIAANNcmn_prediction.createInferenceSuccessfulPredictionMask(tokens)
 		
 		if(debugPrintTrainSectionTimes and trainMode):
 			GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "getTokens", time.perf_counter() - getTokensStartTime)
@@ -445,7 +459,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 					print("warning: inference skipped due to missing concept column delimiter detection in sequence")
 			else:
 				# Process each concept word in the sequence (predict)
-				GIAANNcmn_prediction.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens, sequenceRaw)
+				inferenceSuccessfulPredictionMask = GIAANNcmn_prediction.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens, sequenceRaw)
 		else:
 			# Process each concept word in the sequence (train)
 			requiredSourceFeatureIndicesByObservedColumn = sequenceObservedColumns.getTrainRequiredSourceFeatureIndicesByObservedColumn()
@@ -462,7 +476,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 			if(debugPrintRamMaxUsagePhaseLocal):
 				GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("trainConceptWords")
 			
-			trained = GIAANNcmn_databaseNetworkTrain.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens)
+			trained = GIAANNcmn_databaseNetworkTrain.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens, inferenceSuccessfulPredictionMask)
 			
 			if(debugPrintRamMaxUsagePhaseLocal):
 				GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("trainConceptWords")
@@ -516,7 +530,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		GIAANNcmn_executionProgress.updateEvalSequenceBar(sequenceCount)
 
 	#note sequenceCount can be used as sequenceIndex (independent of index in sequenceList) because sequenceIndex is only used to index sequence time (same for all sequences in sequenceList)
-	return
+	return inferenceSuccessfulPredictionMask
 
 		
 def releaseRuntimeGpuMemory(sequenceCount):
