@@ -526,7 +526,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		GIAANNcmn_executionProgress.updatePromptSequenceBar(sequenceCount)
 	elif(printTrainSequenceBar and trainMode):
 		GIAANNcmn_executionProgress.updateTrainSequenceBar(sequenceCount)
-	elif(printEvalSequenceBar and not trainMode):
+	elif(printEvalSequenceBar and not trainMode and executionMode!="trainDuringInference"):
 		GIAANNcmn_executionProgress.updateEvalSequenceBar(sequenceCount)
 
 	#note sequenceCount can be used as sequenceIndex (independent of index in sequenceList) because sequenceIndex is only used to index sequence time (same for all sequences in sequenceList)

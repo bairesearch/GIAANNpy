@@ -174,12 +174,8 @@ def updateSequenceBar(sequenceCount, sequenceBarEnabled, sequenceBarUpdateStep):
 		if(trainSequenceBar is None):
 			raise RuntimeError("trainSequenceBar is None; requires initialisation")
 		if(trainSequenceBar.n + sequenceBarUpdateStep > trainSequenceBar.total):
-			if(useTrainDuringInference):
-				sequenceBarUpdateStep = trainSequenceBar.total - trainSequenceBar.n
-			else:
-				raise RuntimeError("updateSequenceBar error: sequence bar update exceeds total")
-		if(sequenceBarUpdateStep > 0):
-			trainSequenceBar.update(sequenceBarUpdateStep)
+			raise RuntimeError("updateSequenceBar error: sequence bar update exceeds total")
+		trainSequenceBar.update(sequenceBarUpdateStep)
 	return result
 
 

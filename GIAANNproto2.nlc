@@ -342,3 +342,4 @@ v2d (Codex IDE GPT-5.5) [under development]:
 		- do not change any existing code in the codebase unrelated to specific useTrainDuringInference behaviour.
 		- ensure to encapsulate all useTrainDuringInference specific behaviour within context if(useTrainDuringInference) as per AGENTS.md.
 - upgrade useTrainDuringInference to print the final printInferenceTop1Accuracy exactly the same way inferenceMode prints the eval accuracies.
+- patch useTrainDuringInference:updateSequenceBar - with trainDuringInference the tqdm execution progress bar only uses the total number of trained sequences (trainMaxSequences) for its progress monitoring. 

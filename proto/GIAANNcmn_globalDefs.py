@@ -91,7 +91,10 @@ elif(useAutoresearch):
 elif(useDrawNetworkIndependently):
 	useBenchmarkDefaultsEvalTestSet = True	#N/A
 elif(useTrainDuringInference):
-	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
+	if(executionMode == "trainDuringInference"):
+		useBenchmarkDefaultsEvalTestSet = False	#default: False	#execute executionMode="trainDuringInference" must use inferenceSegmentTiming = "exact" to approximate executionMode = "train"
+	elif(executionMode == "inference"):
+		useBenchmarkDefaultsEvalTestSet = False	#default: True: eval test-set
 
 if(useBenchmarkDefaultsEvalTestSet):
 	inferenceEvaluateTestSet = True
@@ -137,7 +140,7 @@ elif(useDrawNetworkIndependently):
 	trainMaxSequences = 0	#not used
 	databaseFolderBase = databaseFolderBaseLocal
 elif(useTrainDuringInference):
-	trainMaxSequences = 1000	#slow execution
+	trainMaxSequences = 5000	#slow execution
 	databaseFolderBase = databaseFolderBaseSSD
 if(databaseFolderBase==databaseFolderBaseSSD):
 	inferenceCopyTemplateDatasets = True	#default: True	#copy template dataset files into databaseFolder at inference startup
