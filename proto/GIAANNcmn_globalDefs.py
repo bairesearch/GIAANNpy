@@ -51,7 +51,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -82,7 +82,7 @@ inferenceAddNewFeatures = True	#default: True	#orig: False	#run a controlled exp
 if(useQuickExecution):
 	useBenchmarkDefaultsEvalTestSet = False	#default: False: eval training-set
 elif(useDefault):
-	useBenchmarkDefaultsEvalTestSet = False	#default: True: eval test-set
+	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
 	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
 elif(useAutoresearch):
@@ -123,16 +123,16 @@ inferenceReportTokenAccuracyConstrainByColumn = False	#default: False	#orig: Fal
 databaseFolderBaseLocal = "../"	#default: "../"
 databaseFolderBaseSSD = "/media/user/ssdpro/GIAANN/"	#default: "/media/user/ssdpro/GIAANN/"
 databaseNameBase = "database"	 #"database"	#default: "database"
-#databaseNameBase = "databaseOscar1000-multipleDendriticBranchesBinaryTree"
+
 
 if(useQuickExecution):
 	trainMaxSequences = 10	#N/A: auto generated from inference_prompt.txt.trainAndInference
 	databaseFolderBase = databaseFolderBaseLocal
 elif(useDefault):
-	trainMaxSequences = 1000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
+	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 1000	#5000, 200000, 1000000
+	trainMaxSequences = 5000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 5000	#5000
@@ -155,6 +155,21 @@ databaseFolderTemplateDatasetFileNamePattern = "*.*"
 #Train settings:
 maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
+trainVerifyConnectionNonexistentAcrossBranches = False	#default: True	#orig: False
+if(trainVerifyConnectionNonexistentAcrossBranches):
+	trainVerifyConnectionNonexistentAcrossBranchesConnectionExistsStrengthThreshold = 0	#mandatory	#minimum preexisting connection strength that prevents training the connection on another branch
+	trainVerifyConnectionNonexistentAcrossBranchesMinimumContiguouslyConnectedFinalSegments = 1	#mandatory
+	trainVerifyConnectionNonexistentAcrossBranchesNoCandidateScore = -1	#mandatory
+	trainVerifyConnectionNonexistentAcrossBranchesSourceConnectionTensorRank = 5	#mandatory	#properties, branch, segment, target concept, target feature
+	trainVerifyConnectionNonexistentAcrossBranchesBucketConnectionTensorRank = 6	#mandatory	#properties, branch, segment, source bucket, target concept, target feature
+	trainVerifyConnectionNonexistentAcrossBranchesConnectionPropertyDimension = 0	#mandatory
+	trainVerifyConnectionNonexistentAcrossBranchesConnectionBranchDimension = 1	#mandatory
+	trainVerifyConnectionNonexistentAcrossBranchesConnectionSegmentDimension = 2	#mandatory
+	trainVerifyConnectionNonexistentAcrossBranchesSourceTargetConceptDimension = 3	#mandatory
+	trainVerifyConnectionNonexistentAcrossBranchesSourceTargetFeatureDimension = 4	#mandatory
+	trainVerifyConnectionNonexistentAcrossBranchesBucketSourceDimension = 3	#mandatory
+	trainVerifyConnectionNonexistentAcrossBranchesBucketTargetConceptDimension = 4	#mandatory
+	trainVerifyConnectionNonexistentAcrossBranchesBucketTargetFeatureDimension = 5	#mandatory
 
 
 #Dendritic branches;
@@ -163,10 +178,13 @@ if(multipleDendriticBranches):
 	multipleDendriticBranchesBinaryTree = False	#default: False	#True: binary tree of dendritic branches, False: independent dendritic branches
 	if(multipleDendriticBranchesBinaryTree):
 		multipleDendriticBranchesBinaryTreeBranchingFactor = 2	#mandatory
+		multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches = False	#derived var
 		multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches = False	#derived var
 		multipleDendriticBranchesBinaryTreeDepth = numSeedTokensInference	#== arrayNumberOfSegments	#depth of the dendritic binary tree
 		if(multipleDendriticBranchesBinaryTreeDepth < 1):
 			raise RuntimeError("GIAANNcmn_globalDefs error: multipleDendriticBranchesBinaryTreeDepth must be >= 1")
+		if(trainVerifyConnectionNonexistentAcrossBranches):
+			multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches = True
 		if(useTrainDuringInference):
 			multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches = True
 			if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
@@ -187,6 +205,9 @@ else:
 	#multipleDendriticBranchesBinaryTree = False
 	multipleDendriticBranchesNumber = 1
 	multipleDendriticBranchesRandom = False
+if(trainVerifyConnectionNonexistentAcrossBranches):
+	if(not multipleDendriticBranches or not multipleDendriticBranchesRandom):
+		raise RuntimeError("GIAANNcmn_globalDefs error: trainVerifyConnectionNonexistentAcrossBranches requires multipleDendriticBranches and multipleDendriticBranchesRandom")
 
 
 #SANI;

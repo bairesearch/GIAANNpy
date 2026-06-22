@@ -472,6 +472,10 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 				GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("prepareObservedColumnsForTrainSequence")
 				
 			GIAANNcmn_databaseNetwork.prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFeatureIndicesByObservedColumn)
+			if(trainVerifyConnectionNonexistentAcrossBranches):
+				if(multipleDendriticBranchesBinaryTree):
+					if(multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches):
+						sequenceObservedColumns.prepareTrainVerifyConnectionNonexistentAcrossBranches()
 			if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 				GIAANNnlp_auxiliaryNeuronsSimilarWords.prepareObservedColumnsForTrainSequenceAuxiliary(sequenceObservedColumns, observedColumnsDict, allowNewFeatures)
 			

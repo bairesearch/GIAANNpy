@@ -379,5 +379,28 @@ v2e (Codex IDE GPT-5.5) [under development]:
 		- do not change any existing code in the codebase unrelated to specific multipleDendriticBranchesBinaryTree==True behaviour.
 		- ensure to encapsulate all multipleDendriticBranchesBinaryTree==True specific behaviour within context if(multipleDendriticBranchesBinaryTree) as per AGENTS.md.
 
-
+---
+v2f (Codex IDE GPT-5.5) [under development]:
+- add proto GIAANNproto2f1a - start option trainVerifyConnectionNonexistentAcrossBranches:
+	- upgrade train with option trainVerifyConnectionNonexistentAcrossBranches:
+		- do not create a segment connection (ie connection to target segment) between two sequence neurons if the segment connection already exists in a branch.
+		- if multipleDendriticBranchesBinaryTreeDepth:
+			- ensure to only compare branches for preexisting segment connections that exist in the current branch tuple of the binary tree (multipleDendriticBranchesBinaryTreeBranchingFactor).
+		- note option trainVerifyConnectionNonexistentAcrossBranches achieves a similar outcome to useTrainDuringInference, but it is designed to be more efficient (does not require a preliminary inference phase before train).
+		- note the currently planned implementation [please confirm if this is the most efficient method before proceeding]:
+			- GIAANNcmn_sequenceObservedColumns:populateArrays() should not be required to preload the sequence connections into RAM to perform this comparison.
+			- GIAANNcmn_sequenceObservedColumns:updateObservedColumns/updateObservedColumnsEfficient() should be upgraded to perform this comparison using its preloaded sequence connections.
+				- the comparison should be executed as a final filter before updating the connections arrays. 
+	- if trainVerifyConnectionNonexistentAcrossBranches:multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches:
+		- multipleDendriticBranchesBinaryTree selects the trained the branch index for each target neuron based on the most completely already connected set of root branches.
+			- uses the preloaded sequence connections from trainVerifyConnectionNonexistentAcrossBranches to detect the most completely already connected set of root branches.
+			- randomly selects a branch index that corresponds to the portion of already connected root branches between:
+				- multipleDendriticBranchesNumber/(2^numberOfContiguouslyActiveFinalSegments-1)*branchIndex and multipleDendriticBranchesNumber/(2^numberOfContiguouslyActiveFinalSegments-1)*(branchIndex+1); assuming neurons last numberOfContiguouslyActiveFinalSegments are already connected, and assuming the last contiguous segment connected is on branchIndex.
+				- eg if neurons last 3 segments are already connected, and the third last segment (ie numberOfContiguouslyActiveFinalSegments==3) connected is on branchIndex==3 [of possible values 0->3] then assuming multipleDendriticBranchesBinaryTreeDepth==arrayNumberOfSegments==7:
+					 - the randomly assigned branch index to be trained for the neuron must be between multipleDendriticBranchesNumber/(2^(3-1))*3 and multipleDendriticBranchesNumber/(2^(3-1)*(3+1)
+			- note this is a very similar algorithm to multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches, except that it uses aleady connected branch segments rather than already active branch segments (recently activated during inference phase).
+	Implementation Notes:
+		- implementation must use vectorised pytorch code only (no python for loops).
+		- do not change any existing code in the codebase unrelated to specific trainVerifyConnectionNonexistentAcrossBranches==True or multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches==True behaviour.
+		- ensure to encapsulate all trainVerifyConnectionNonexistentAcrossBranches==True or multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches==True specific behaviour within context if(trainVerifyConnectionNonexistentAcrossBranches) or if(multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches) as per AGENTS.md.
 

@@ -45,7 +45,12 @@ from GIAANNcmn_globalDefs import multipleDendriticBranchesRandom
 from GIAANNcmn_globalDefs import trainMaxSequences
 from GIAANNcmn_globalDefs import numSeedTokensInference
 from GIAANNcmn_globalDefs import inferenceEvaluateTestSetTrainMaxSequences10M
-
+#useBenchmark dependencies [v2]:
+#inferenceReportGroundedAccuracy
+#auxiliaryNeurons
+from GIAANNcmn_globalDefs import useTrainDuringInference
+from GIAANNcmn_globalDefs import multipleDendriticBranchesBinaryTree
+from GIAANNcmn_globalDefs import trainVerifyConnectionNonexistentAcrossBranches
 
 
 
@@ -173,7 +178,7 @@ else:
 	trainSetStartOffsetSequences = 0
 
 
-#Benchmarking;
+#Benchmarking defaults;
 if(useBenchmark):
 	useBenchmarkDefaults = True	#default: True
 else:
@@ -182,45 +187,6 @@ if(useBenchmarkDefaults):
 	spacyPipelineOptimisations = True	#default: True	#orig: False	#spacyPipelineOptimisations do not significantly affect test-set accuracies (~-0.002)
 else:
 	spacyPipelineOptimisations = True	#default: True
-if(useBenchmark):
-	#generate benchmark filename:
-	if(multipleDendriticBranches and multipleDendriticBranchesRandom):
-		if(spacyPipelineOptimisations):
-			benchmarkAblationText = "-multipleDendriticBranchesRandom" + str(multipleDendriticBranchesNumber)
-		else:
-			printe("multipleDendriticBranchesRandom currently assumes spacyPipelineOptimisations")
-	elif(multisentencePredictions):
-		if(not useBenchmarkDefaults):
-			benchmarkAblationText = "-multisentencePredictions"
-		else:
-			printe("multisentencePredictions currently assumes not useBenchmarkDefaults")
-	elif(not useBenchmarkDefaults):
-		benchmarkAblationText = "-useBenchmarkDefaultsFalse"
-	elif(spacyPipelineOptimisations):
-		benchmarkAblationText = "-spacyPipelineOptimisations"
-	else:
-		benchmarkAblationText = ""
-	if(datasetType=="wikipedia"):
-		databaseTypeText = ""	#or Wikipedia
-	elif(datasetType=="oscar"):
-		databaseTypeText = "Oscar"
-	elif(datasetType in closedWorldGroundedDatasetTypes):
-		databaseTypeText = closedWorldGroundedDatasetTypeToDatabaseTypeTextDict[datasetType]
-		if(inferenceReportGroundedRealisticNLPmetric):
-			databaseTypeText += closedWorldGroundedRealisticNLPmetricName
-		elif(inferenceReportGroundedStrongerGroundedNLPmetric):
-			databaseTypeText += closedWorldGroundedStrongerGroundedNLPmetricName
-	databaseFolderExtension = databaseTypeText + str(trainMaxSequences) + "-numSeedTokensInference" + str(numSeedTokensInference) + benchmarkAblationText		#useSANIfeaturesAndColumns
-elif(useAutoresearch):
-	databaseFolderExtension = "Autoresearch"
-elif(datasetType in closedWorldGroundedDatasetTypes):
-	databaseFolderExtension = closedWorldGroundedDatasetTypeToDatabaseTypeTextDict[datasetType]
-	if(inferenceReportGroundedRealisticNLPmetric):
-		databaseFolderExtension += closedWorldGroundedRealisticNLPmetricName
-	elif(inferenceReportGroundedStrongerGroundedNLPmetric):
-		databaseFolderExtension += closedWorldGroundedStrongerGroundedNLPmetricName
-else:
-	databaseFolderExtension = ""
 
 
 #Concept column delimiters:
@@ -575,5 +541,63 @@ if(auxiliaryNeurons):
 		auxiliaryNeuronsAutoReverseTargetFeatureConnectionsFileNamePrefix = "revIndex"
 else:
 	trainReverseConnections = False
+
+
+#Benchmarking filenames;
+if(useBenchmark):
+	#generate benchmark filename:
+	#v2 benchmarks;
+	if(inferenceReportGroundedAccuracy):
+		benchmarkAblationText = "-inferenceReportGroundedAccuracy"
+	elif(auxiliaryNeurons):
+		benchmarkAblationText = "-auxiliaryNeurons"
+	elif(useTrainDuringInference):
+		benchmarkAblationText = "-useTrainDuringInference"
+	elif(trainVerifyConnectionNonexistentAcrossBranches):
+		if(multipleDendriticBranchesBinaryTree):
+			benchmarkAblationText = "-trainVerifyConnectionNonexistentAcrossBranches-multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches"
+		else:
+			benchmarkAblationText = "-trainVerifyConnectionNonexistentAcrossBranches"
+	elif(multipleDendriticBranchesBinaryTree):
+		benchmarkAblationText = "-multipleDendriticBranchesBinaryTree"	
+	#v1 benchmarks;
+	elif(multipleDendriticBranches and multipleDendriticBranchesRandom):
+		if(spacyPipelineOptimisations):
+			benchmarkAblationText = "-multipleDendriticBranchesRandom" + str(multipleDendriticBranchesNumber)
+		else:
+			printe("multipleDendriticBranchesRandom currently assumes spacyPipelineOptimisations")
+	elif(multisentencePredictions):
+		if(not useBenchmarkDefaults):
+			benchmarkAblationText = "-multisentencePredictions"
+		else:
+			printe("multisentencePredictions currently assumes not useBenchmarkDefaults")
+	elif(not useBenchmarkDefaults):
+		benchmarkAblationText = "-useBenchmarkDefaultsFalse"
+	elif(spacyPipelineOptimisations):
+		benchmarkAblationText = "-spacyPipelineOptimisations"
+	else:
+		benchmarkAblationText = ""
+	if(datasetType=="wikipedia"):
+		databaseTypeText = ""	#or Wikipedia
+	elif(datasetType=="oscar"):
+		databaseTypeText = "Oscar"
+	elif(datasetType in closedWorldGroundedDatasetTypes):
+		databaseTypeText = closedWorldGroundedDatasetTypeToDatabaseTypeTextDict[datasetType]
+		if(inferenceReportGroundedRealisticNLPmetric):
+			databaseTypeText += closedWorldGroundedRealisticNLPmetricName
+		elif(inferenceReportGroundedStrongerGroundedNLPmetric):
+			databaseTypeText += closedWorldGroundedStrongerGroundedNLPmetricName
+	databaseFolderExtension = databaseTypeText + str(trainMaxSequences) + "-numSeedTokensInference" + str(numSeedTokensInference) + benchmarkAblationText		#useSANIfeaturesAndColumns
+elif(useAutoresearch):
+	databaseFolderExtension = "Autoresearch"
+elif(datasetType in closedWorldGroundedDatasetTypes):
+	databaseFolderExtension = closedWorldGroundedDatasetTypeToDatabaseTypeTextDict[datasetType]
+	if(inferenceReportGroundedRealisticNLPmetric):
+		databaseFolderExtension += closedWorldGroundedRealisticNLPmetricName
+	elif(inferenceReportGroundedStrongerGroundedNLPmetric):
+		databaseFolderExtension += closedWorldGroundedStrongerGroundedNLPmetricName
+else:
+	databaseFolderExtension = ""
+	
 
 	

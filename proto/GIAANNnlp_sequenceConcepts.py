@@ -529,6 +529,9 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 						if(useTrainDuringInference):
 							if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
 								branchIndex = selectFeatureBinaryTreeBranchIndexFromInference(sequenceObservedColumns.databaseNetworkObject, conceptIndexKey, globalFeatureIndex, branchIndex)
+						if(trainVerifyConnectionNonexistentAcrossBranches):
+							if(multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches):
+								branchIndex = selectFeatureBinaryTreeBranchIndexFromConnections(sequenceObservedColumns, conceptIndexKey, globalFeatureIndex, branchIndex)
 					if(useSANI):
 						if(multipleDendriticBranchesBinaryTree):
 							binaryTreeBranchIndices = calculateFeatureBinaryTreeBranchIndices(branchIndex, activeSequentialSegments)
@@ -580,6 +583,9 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 							if(useTrainDuringInference):
 								if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
 									branchIndex = selectFeatureBinaryTreeBranchIndexFromInference(sequenceObservedColumns.databaseNetworkObject, conceptIndexKey, sequenceFeatureIndex, branchIndex)
+							if(trainVerifyConnectionNonexistentAcrossBranches):
+								if(multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches):
+									branchIndex = selectFeatureBinaryTreeBranchIndexFromConnections(sequenceObservedColumns, conceptIndexKey, sequenceFeatureIndex, branchIndex)
 					if(useSANI):
 						if(multipleDendriticBranchesBinaryTree):
 							binaryTreeBranchIndices = calculateFeatureBinaryTreeBranchIndices(branchIndex, activeSequentialSegments)
@@ -605,6 +611,9 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 							if(useTrainDuringInference):
 								if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
 									branchIndex = selectFeatureBinaryTreeBranchIndexFromInference(sequenceObservedColumns.databaseNetworkObject, conceptIndexKey, sequenceFeatureIndex, branchIndex)
+							if(trainVerifyConnectionNonexistentAcrossBranches):
+								if(multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches):
+									branchIndex = selectFeatureBinaryTreeBranchIndexFromConnections(sequenceObservedColumns, conceptIndexKey, sequenceFeatureIndex, branchIndex)
 					if(useSANI):
 						if(multipleDendriticBranchesBinaryTree):
 							binaryTreeBranchIndices = calculateFeatureBinaryTreeBranchIndices(branchIndex, activeSequentialSegments)
@@ -715,4 +724,35 @@ def selectFeatureBinaryTreeBranchIndexFromInference(databaseNetworkObject, conce
 			result = int(pt.randint(selectedRootBranchStart, selectedRootBranchEnd, (1,), device=branchActivation.device).item())
 	else:
 		raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromInference error: requires multipleDendriticBranchesBinaryTree")
+	return result
+
+def selectFeatureBinaryTreeBranchIndexFromConnections(sequenceObservedColumns, conceptIndexKey, featureIndex, defaultBranchIndex):
+	result = defaultBranchIndex
+	if(trainVerifyConnectionNonexistentAcrossBranches):
+		if(not multipleDendriticBranchesBinaryTree or not multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches):
+			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromConnections error: requires binary-tree most-connected-root-branch selection")
+		if(sequenceObservedColumns is None):
+			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromConnections error: sequenceObservedColumns is None")
+		if(not isinstance(conceptIndexKey, int) or isinstance(conceptIndexKey, bool) or not isinstance(featureIndex, int) or isinstance(featureIndex, bool)):
+			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromConnections error: conceptIndexKey and featureIndex must be ints")
+		if(not isinstance(defaultBranchIndex, int) or isinstance(defaultBranchIndex, bool) or defaultBranchIndex < arrayIndexSegmentFirst or defaultBranchIndex >= multipleDendriticBranchesNumber):
+			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromConnections error: defaultBranchIndex out of range")
+		if(conceptIndexKey < arrayIndexSegmentFirst or conceptIndexKey >= sequenceObservedColumns.databaseNetworkObject.c or featureIndex < arrayIndexSegmentFirst or featureIndex >= sequenceObservedColumns.databaseNetworkObject.f):
+			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromConnections error: target neuron index out of range")
+		targetCombinedKeys = getattr(sequenceObservedColumns, "trainVerifyConnectionNonexistentAcrossBranchesTargetCombinedKeys", None)
+		selectedRootBranches = getattr(sequenceObservedColumns, "trainVerifyConnectionNonexistentAcrossBranchesSelectedRootBranches", None)
+		connectedTargetMask = getattr(sequenceObservedColumns, "trainVerifyConnectionNonexistentAcrossBranchesConnectedTargetMask", None)
+		if(targetCombinedKeys is None or selectedRootBranches is None or connectedTargetMask is None):
+			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromConnections error: preloaded sequence connection selection is unavailable")
+		if(not pt.is_tensor(targetCombinedKeys) or not pt.is_tensor(selectedRootBranches) or not pt.is_tensor(connectedTargetMask)):
+			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromConnections error: preloaded sequence connection selection tensors are invalid")
+		if(targetCombinedKeys.dim() != 1 or selectedRootBranches.dim() != 1 or connectedTargetMask.dim() != 1 or targetCombinedKeys.shape[0] != selectedRootBranches.shape[0] or targetCombinedKeys.shape[0] != connectedTargetMask.shape[0]):
+			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromConnections error: preloaded sequence connection selection tensor dimensions are invalid")
+		targetCombinedKey = conceptIndexKey*sequenceObservedColumns.databaseNetworkObject.f + featureIndex
+		targetCombinedKeyTensor = pt.tensor([targetCombinedKey], dtype=targetCombinedKeys.dtype, device=targetCombinedKeys.device)
+		targetPosition = pt.searchsorted(targetCombinedKeys, targetCombinedKeyTensor)
+		if(targetPosition.item() < targetCombinedKeys.numel() and targetCombinedKeys[targetPosition.item()].item() == targetCombinedKey and connectedTargetMask[targetPosition.item()].item()):
+			result = int(selectedRootBranches[targetPosition.item()].item())
+			if(result < arrayIndexSegmentFirst or result >= multipleDendriticBranchesNumber):
+				raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromConnections error: selected root branch index out of range")
 	return result

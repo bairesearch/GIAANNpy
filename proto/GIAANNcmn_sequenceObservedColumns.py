@@ -29,6 +29,145 @@ if(optimisationUseCUDAObservedColumnUpdateKernel):
 if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 	import GIAANNnlp_auxiliaryNeuronsAuto
 
+def filterTrainVerifyConnectionNonexistentAcrossBranchesUpdates(existingConnectionSparse, connectionUpdatesSparse, strengthPropertyIndex):
+	result = connectionUpdatesSparse
+	if(trainVerifyConnectionNonexistentAcrossBranches):
+		if(not isinstance(strengthPropertyIndex, int) or isinstance(strengthPropertyIndex, bool) or strengthPropertyIndex < 0):
+			raise RuntimeError("filterTrainVerifyConnectionNonexistentAcrossBranchesUpdates error: strengthPropertyIndex is invalid")
+		if(not pt.is_tensor(existingConnectionSparse) or not pt.is_tensor(connectionUpdatesSparse)):
+			raise RuntimeError("filterTrainVerifyConnectionNonexistentAcrossBranchesUpdates error: connection tensors must be tensors")
+		if(existingConnectionSparse.layout != pt.sparse_coo or connectionUpdatesSparse.layout != pt.sparse_coo):
+			raise RuntimeError("filterTrainVerifyConnectionNonexistentAcrossBranchesUpdates error: connection tensors must be sparse COO")
+		existingConnectionSparse = existingConnectionSparse.coalesce()
+		connectionUpdatesSparse = connectionUpdatesSparse.coalesce()
+		if(existingConnectionSparse.dim() != connectionUpdatesSparse.dim() or tuple(existingConnectionSparse.size()) != tuple(connectionUpdatesSparse.size())):
+			raise RuntimeError("filterTrainVerifyConnectionNonexistentAcrossBranchesUpdates error: connection tensor dimensions must match")
+		if(existingConnectionSparse.dim() != trainVerifyConnectionNonexistentAcrossBranchesSourceConnectionTensorRank and existingConnectionSparse.dim() != trainVerifyConnectionNonexistentAcrossBranchesBucketConnectionTensorRank):
+			raise RuntimeError("filterTrainVerifyConnectionNonexistentAcrossBranchesUpdates error: connection tensor rank is invalid")
+		if(strengthPropertyIndex >= existingConnectionSparse.size(trainVerifyConnectionNonexistentAcrossBranchesConnectionPropertyDimension)):
+			raise RuntimeError("filterTrainVerifyConnectionNonexistentAcrossBranchesUpdates error: strengthPropertyIndex out of range")
+		existingConnectionIndices = existingConnectionSparse.indices()
+		existingConnectionValues = existingConnectionSparse.values()
+		connectionUpdateIndices = connectionUpdatesSparse.indices()
+		connectionUpdateValues = connectionUpdatesSparse.values()
+		preexistingConnectionMask = (existingConnectionIndices[trainVerifyConnectionNonexistentAcrossBranchesConnectionPropertyDimension] == strengthPropertyIndex) & (existingConnectionValues > trainVerifyConnectionNonexistentAcrossBranchesConnectionExistsStrengthThreshold)
+		if(preexistingConnectionMask.any() and connectionUpdateIndices.numel() > 0):
+			preexistingConnectionKeys = calculateTrainVerifyConnectionNonexistentAcrossBranchesConnectionKeys(existingConnectionIndices[:, preexistingConnectionMask], existingConnectionSparse.size())
+			connectionUpdateKeys = calculateTrainVerifyConnectionNonexistentAcrossBranchesConnectionKeys(connectionUpdateIndices, connectionUpdatesSparse.size())
+			sortedPreexistingConnectionKeys = pt.unique(preexistingConnectionKeys, sorted=True)
+			preexistingConnectionPositions = pt.searchsorted(sortedPreexistingConnectionKeys, connectionUpdateKeys)
+			preexistingConnectionPositionMask = preexistingConnectionPositions < sortedPreexistingConnectionKeys.numel()
+			connectionExistsMask = pt.zeros((connectionUpdateKeys.numel(),), dtype=pt.bool, device=connectionUpdateKeys.device)
+			if(preexistingConnectionPositionMask.any()):
+				connectionExistsMask[preexistingConnectionPositionMask] = sortedPreexistingConnectionKeys[preexistingConnectionPositions[preexistingConnectionPositionMask]] == connectionUpdateKeys[preexistingConnectionPositionMask]
+			connectionKeepMask = pt.logical_not(connectionExistsMask)
+			result = pt.sparse_coo_tensor(connectionUpdateIndices[:, connectionKeepMask], connectionUpdateValues[connectionKeepMask], size=connectionUpdatesSparse.size(), dtype=connectionUpdatesSparse.dtype, device=connectionUpdatesSparse.device).coalesce()
+	return result
+
+def calculateTrainVerifyConnectionNonexistentAcrossBranchesConnectionKeys(connectionIndices, connectionTargetSize):
+	result = None
+	if(trainVerifyConnectionNonexistentAcrossBranches):
+		if(not pt.is_tensor(connectionIndices)):
+			raise RuntimeError("calculateTrainVerifyConnectionNonexistentAcrossBranchesConnectionKeys error: connectionIndices must be a tensor")
+		if(len(connectionTargetSize) != connectionIndices.shape[0]):
+			raise RuntimeError("calculateTrainVerifyConnectionNonexistentAcrossBranchesConnectionKeys error: connection index rank does not match connection target size")
+		connectionTensorRank = len(connectionTargetSize)
+		if(connectionTensorRank != trainVerifyConnectionNonexistentAcrossBranchesSourceConnectionTensorRank and connectionTensorRank != trainVerifyConnectionNonexistentAcrossBranchesBucketConnectionTensorRank):
+			raise RuntimeError("calculateTrainVerifyConnectionNonexistentAcrossBranchesConnectionKeys error: connection tensor rank is invalid")
+		branchIndices = connectionIndices[trainVerifyConnectionNonexistentAcrossBranchesConnectionBranchDimension]
+		segmentIndices = connectionIndices[trainVerifyConnectionNonexistentAcrossBranchesConnectionSegmentDimension]
+		if(connectionTensorRank == trainVerifyConnectionNonexistentAcrossBranchesSourceConnectionTensorRank):
+			targetConceptIndices = connectionIndices[trainVerifyConnectionNonexistentAcrossBranchesSourceTargetConceptDimension]
+			targetFeatureIndices = connectionIndices[trainVerifyConnectionNonexistentAcrossBranchesSourceTargetFeatureDimension]
+			if(multipleDendriticBranchesBinaryTree):
+				# The stored binary-tree branch index is the current branch tuple at this segment.
+				result = ((branchIndices*connectionTargetSize[trainVerifyConnectionNonexistentAcrossBranchesConnectionSegmentDimension] + segmentIndices)*connectionTargetSize[trainVerifyConnectionNonexistentAcrossBranchesSourceTargetConceptDimension] + targetConceptIndices)*connectionTargetSize[trainVerifyConnectionNonexistentAcrossBranchesSourceTargetFeatureDimension] + targetFeatureIndices
+			else:
+				result = (segmentIndices*connectionTargetSize[trainVerifyConnectionNonexistentAcrossBranchesSourceTargetConceptDimension] + targetConceptIndices)*connectionTargetSize[trainVerifyConnectionNonexistentAcrossBranchesSourceTargetFeatureDimension] + targetFeatureIndices
+		else:
+			sourceBucketIndices = connectionIndices[trainVerifyConnectionNonexistentAcrossBranchesBucketSourceDimension]
+			targetConceptIndices = connectionIndices[trainVerifyConnectionNonexistentAcrossBranchesBucketTargetConceptDimension]
+			targetFeatureIndices = connectionIndices[trainVerifyConnectionNonexistentAcrossBranchesBucketTargetFeatureDimension]
+			if(multipleDendriticBranchesBinaryTree):
+				# The stored binary-tree branch index is the current branch tuple at this segment.
+				result = (((branchIndices*connectionTargetSize[trainVerifyConnectionNonexistentAcrossBranchesConnectionSegmentDimension] + segmentIndices)*connectionTargetSize[trainVerifyConnectionNonexistentAcrossBranchesBucketSourceDimension] + sourceBucketIndices)*connectionTargetSize[trainVerifyConnectionNonexistentAcrossBranchesBucketTargetConceptDimension] + targetConceptIndices)*connectionTargetSize[trainVerifyConnectionNonexistentAcrossBranchesBucketTargetFeatureDimension] + targetFeatureIndices
+			else:
+				result = ((segmentIndices*connectionTargetSize[trainVerifyConnectionNonexistentAcrossBranchesBucketSourceDimension] + sourceBucketIndices)*connectionTargetSize[trainVerifyConnectionNonexistentAcrossBranchesBucketTargetConceptDimension] + targetConceptIndices)*connectionTargetSize[trainVerifyConnectionNonexistentAcrossBranchesBucketTargetFeatureDimension] + targetFeatureIndices
+	return result
+
+def selectTrainVerifyConnectionNonexistentAcrossBranchesMostConnectedRootBranches(existingConnectionSparse, targetCombinedKeys, strengthPropertyIndex):
+	selectedRootBranches = None
+	connectedTargetMask = None
+	if(trainVerifyConnectionNonexistentAcrossBranches):
+		if(not multipleDendriticBranchesBinaryTree or not multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches):
+			raise RuntimeError("selectTrainVerifyConnectionNonexistentAcrossBranchesMostConnectedRootBranches error: requires binary-tree most-connected-root-branch selection")
+		if(not isinstance(strengthPropertyIndex, int) or isinstance(strengthPropertyIndex, bool) or strengthPropertyIndex < 0):
+			raise RuntimeError("selectTrainVerifyConnectionNonexistentAcrossBranchesMostConnectedRootBranches error: strengthPropertyIndex is invalid")
+		if(not pt.is_tensor(existingConnectionSparse) or existingConnectionSparse.layout != pt.sparse_coo):
+			raise RuntimeError("selectTrainVerifyConnectionNonexistentAcrossBranchesMostConnectedRootBranches error: existingConnectionSparse must be sparse COO")
+		if(existingConnectionSparse.dim() != trainVerifyConnectionNonexistentAcrossBranchesBucketConnectionTensorRank):
+			raise RuntimeError("selectTrainVerifyConnectionNonexistentAcrossBranchesMostConnectedRootBranches error: existing connection tensor rank is invalid")
+		if(existingConnectionSparse.size(trainVerifyConnectionNonexistentAcrossBranchesConnectionBranchDimension) != multipleDendriticBranchesNumber or existingConnectionSparse.size(trainVerifyConnectionNonexistentAcrossBranchesConnectionSegmentDimension) != arrayNumberOfSegments):
+			raise RuntimeError("selectTrainVerifyConnectionNonexistentAcrossBranchesMostConnectedRootBranches error: existing connection binary-tree dimensions are invalid")
+		if(strengthPropertyIndex >= existingConnectionSparse.size(trainVerifyConnectionNonexistentAcrossBranchesConnectionPropertyDimension)):
+			raise RuntimeError("selectTrainVerifyConnectionNonexistentAcrossBranchesMostConnectedRootBranches error: strengthPropertyIndex out of range")
+		if(not pt.is_tensor(targetCombinedKeys) or targetCombinedKeys.dim() != 1):
+			raise RuntimeError("selectTrainVerifyConnectionNonexistentAcrossBranchesMostConnectedRootBranches error: targetCombinedKeys must be a rank 1 tensor")
+		if(targetCombinedKeys.numel() == 0):
+			raise RuntimeError("selectTrainVerifyConnectionNonexistentAcrossBranchesMostConnectedRootBranches error: targetCombinedKeys must not be empty")
+		if(not bool(pt.all(targetCombinedKeys[1:] > targetCombinedKeys[:-1]).item())):
+			raise RuntimeError("selectTrainVerifyConnectionNonexistentAcrossBranchesMostConnectedRootBranches error: targetCombinedKeys must be sorted and unique")
+		existingConnectionSparse = existingConnectionSparse.coalesce()
+		existingConnectionIndices = existingConnectionSparse.indices()
+		existingConnectionValues = existingConnectionSparse.values()
+		targetCount = targetCombinedKeys.numel()
+		selectedRootBranches = pt.zeros((targetCount,), dtype=pt.long, device=targetCombinedKeys.device)
+		connectedTargetMask = pt.zeros((targetCount,), dtype=pt.bool, device=targetCombinedKeys.device)
+		preexistingConnectionMask = (existingConnectionIndices[trainVerifyConnectionNonexistentAcrossBranchesConnectionPropertyDimension] == strengthPropertyIndex) & (existingConnectionValues > trainVerifyConnectionNonexistentAcrossBranchesConnectionExistsStrengthThreshold)
+		connectionByBranchSegmentTarget = pt.zeros((multipleDendriticBranchesNumber, arrayNumberOfSegments, targetCount), dtype=pt.bool, device=targetCombinedKeys.device)
+		if(preexistingConnectionMask.any()):
+			preexistingConnectionIndices = existingConnectionIndices[:, preexistingConnectionMask]
+			preexistingTargetCombinedKeys = preexistingConnectionIndices[trainVerifyConnectionNonexistentAcrossBranchesBucketTargetConceptDimension]*existingConnectionSparse.size(trainVerifyConnectionNonexistentAcrossBranchesBucketTargetFeatureDimension) + preexistingConnectionIndices[trainVerifyConnectionNonexistentAcrossBranchesBucketTargetFeatureDimension]
+			preexistingTargetPositions = pt.searchsorted(targetCombinedKeys, preexistingTargetCombinedKeys)
+			preexistingTargetPositionInRangeMask = preexistingTargetPositions < targetCount
+			preexistingTargetPositionMask = pt.zeros((preexistingTargetPositions.numel(),), dtype=pt.bool, device=preexistingTargetPositions.device)
+			if(preexistingTargetPositionInRangeMask.any()):
+				preexistingTargetPositionIndices = preexistingTargetPositions[preexistingTargetPositionInRangeMask]
+				preexistingTargetPositionMask[preexistingTargetPositionInRangeMask] = targetCombinedKeys[preexistingTargetPositionIndices] == preexistingTargetCombinedKeys[preexistingTargetPositionInRangeMask]
+			if(preexistingTargetPositionMask.any()):
+				preexistingConnectionBranchIndices = preexistingConnectionIndices[trainVerifyConnectionNonexistentAcrossBranchesConnectionBranchDimension, preexistingTargetPositionMask]
+				preexistingConnectionSegmentIndices = preexistingConnectionIndices[trainVerifyConnectionNonexistentAcrossBranchesConnectionSegmentDimension, preexistingTargetPositionMask]
+				preexistingConnectionTargetPositions = preexistingTargetPositions[preexistingTargetPositionMask]
+				connectionByBranchSegmentTarget[preexistingConnectionBranchIndices, preexistingConnectionSegmentIndices, preexistingConnectionTargetPositions] = True
+		rootBranchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=targetCombinedKeys.device).unsqueeze(1)
+		segmentIndices = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=targetCombinedKeys.device).unsqueeze(0)
+		branchingFactors = pt.full_like(segmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor)
+		branchDivisors = pt.pow(branchingFactors, segmentIndices)
+		pathBranchIndices = pt.div(rootBranchIndices, branchDivisors, rounding_mode="floor")
+		pathConnectionMask = connectionByBranchSegmentTarget[pathBranchIndices, segmentIndices, :]
+		contiguouslyConnectedFinalPath = pt.flip(pt.cumprod(pt.flip(pathConnectionMask.to(pt.long), dims=(1,)), dim=1), dims=(1,))
+		numberOfContiguouslyConnectedFinalSegments = contiguouslyConnectedFinalPath.sum(dim=1)
+		maximumNumberOfContiguouslyConnectedFinalSegments = numberOfContiguouslyConnectedFinalSegments.max(dim=0).values
+		connectedTargetMask = maximumNumberOfContiguouslyConnectedFinalSegments > 0
+		maximumNumberOfContiguouslyConnectedFinalSegmentsForSelection = maximumNumberOfContiguouslyConnectedFinalSegments.clamp(min=trainVerifyConnectionNonexistentAcrossBranchesMinimumContiguouslyConnectedFinalSegments)
+		firstContiguouslyConnectedFinalSegmentIndices = arrayNumberOfSegments - maximumNumberOfContiguouslyConnectedFinalSegmentsForSelection
+		firstContiguouslyConnectedFinalSegmentBranchDivisors = pt.pow(pt.full_like(firstContiguouslyConnectedFinalSegmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor), firstContiguouslyConnectedFinalSegmentIndices)
+		mostCompleteRootBranchIndices = pt.div(rootBranchIndices, firstContiguouslyConnectedFinalSegmentBranchDivisors.unsqueeze(0), rounding_mode="floor")
+		mostCompleteRootBranchMask = (numberOfContiguouslyConnectedFinalSegments == maximumNumberOfContiguouslyConnectedFinalSegments.unsqueeze(0)) & connectedTargetMask.unsqueeze(0)
+		mostCompleteRootBranchOneHot = pt.nn.functional.one_hot(mostCompleteRootBranchIndices, num_classes=multipleDendriticBranchesNumber).to(pt.long)
+		mostCompleteBranchCounts = (mostCompleteRootBranchOneHot*mostCompleteRootBranchMask.unsqueeze(-1)).sum(dim=0)
+		maximumMostCompleteBranchCounts = mostCompleteBranchCounts.max(dim=1).values
+		mostCompleteBranchCandidateMask = (mostCompleteBranchCounts == maximumMostCompleteBranchCounts.unsqueeze(1)) & (maximumMostCompleteBranchCounts > 0).unsqueeze(1)
+		mostCompleteBranchCandidateScores = pt.rand((targetCount, multipleDendriticBranchesNumber), device=targetCombinedKeys.device)
+		mostCompleteBranchCandidateScores = mostCompleteBranchCandidateScores.masked_fill(pt.logical_not(mostCompleteBranchCandidateMask), trainVerifyConnectionNonexistentAcrossBranchesNoCandidateScore)
+		selectedMostCompleteBranchIndices = pt.argmax(mostCompleteBranchCandidateScores, dim=1)
+		rootBranchesPerSelectedBranch = pt.div(pt.full_like(maximumNumberOfContiguouslyConnectedFinalSegmentsForSelection, multipleDendriticBranchesNumber), pt.pow(pt.full_like(maximumNumberOfContiguouslyConnectedFinalSegmentsForSelection, multipleDendriticBranchesBinaryTreeBranchingFactor), maximumNumberOfContiguouslyConnectedFinalSegmentsForSelection - 1), rounding_mode="floor")
+		selectedRootBranchStarts = rootBranchesPerSelectedBranch*selectedMostCompleteBranchIndices
+		selectedRootBranchOffsets = (pt.rand((targetCount,), device=targetCombinedKeys.device)*rootBranchesPerSelectedBranch.to(pt.float32)).to(pt.long)
+		selectedRootBranches = selectedRootBranchStarts + selectedRootBranchOffsets
+		selectedRootBranches = pt.where(connectedTargetMask, selectedRootBranches, pt.zeros_like(selectedRootBranches))
+	return selectedRootBranches, connectedTargetMask
+
 # Define the SequenceObservedColumns class
 class SequenceObservedColumns:
 	"""
@@ -56,6 +195,10 @@ class SequenceObservedColumns:
 		self.imageAxesFeatureCentralColumnMaskTensor = None
 		self.imageAxesCentralFieldX = None
 		self.imageAxesCentralFieldY = None
+		if(trainVerifyConnectionNonexistentAcrossBranches):
+			self.trainVerifyConnectionNonexistentAcrossBranchesTargetCombinedKeys = None
+			self.trainVerifyConnectionNonexistentAcrossBranchesSelectedRootBranches = None
+			self.trainVerifyConnectionNonexistentAcrossBranchesConnectedTargetMask = None
 
 		if(trainSequenceObservedColumnsMatchSequenceWords):
 			self.cs = len(observedColumnsSequenceWordIndexDict)
@@ -252,6 +395,30 @@ class SequenceObservedColumns:
 			result = self.getTrainRequiredSourceFeatureIndicesByObservedColumnGeneric(observedColumnsByConceptIndex)
 		self.requiredSourceFeatureIndicesByObservedColumn = result
 		return result
+
+	def prepareTrainVerifyConnectionNonexistentAcrossBranches(self):
+		if(trainVerifyConnectionNonexistentAcrossBranches):
+			if(multipleDendriticBranchesBinaryTree):
+				if(multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches):
+					self.ensureTokenConceptColumnIndexList()
+					if(self.tokenConceptColumnIndexList is None):
+						raise RuntimeError("prepareTrainVerifyConnectionNonexistentAcrossBranches error: tokenConceptColumnIndexList is None")
+					conceptIndicesTensor = pt.tensor(self.tokenConceptColumnIndexList, dtype=pt.long, device=deviceSparse)
+					featureIndicesTensor = self.featureIndicesInObservedTensor.to(device=deviceSparse, dtype=pt.long)
+					if(conceptIndicesTensor.dim() != 1 or featureIndicesTensor.dim() != 1 or conceptIndicesTensor.shape[0] != featureIndicesTensor.shape[0]):
+						raise RuntimeError("prepareTrainVerifyConnectionNonexistentAcrossBranches error: sequence concept and feature index tensors must be matching rank 1 tensors")
+					if(conceptIndicesTensor.numel() == 0):
+						raise RuntimeError("prepareTrainVerifyConnectionNonexistentAcrossBranches error: sequence concept and feature index tensors must not be empty")
+					if(bool(pt.any(conceptIndicesTensor < 0).item()) or bool(pt.any(conceptIndicesTensor >= self.databaseNetworkObject.c).item()) or bool(pt.any(featureIndicesTensor < 0).item()) or bool(pt.any(featureIndicesTensor >= self.databaseNetworkObject.f).item())):
+						raise RuntimeError("prepareTrainVerifyConnectionNonexistentAcrossBranches error: sequence concept or feature index out of range")
+					targetCombinedKeys = pt.unique(conceptIndicesTensor*self.databaseNetworkObject.f + featureIndicesTensor, sorted=True)
+					observedColumnsByConceptIndex = self.getObservedColumnsByConceptIndex(self.sequenceObservedColumnsDict if trainSequenceObservedColumnsMatchSequenceWords else self.observedColumnsDict2)
+					existingConnectionSparse = self.gatherConnectionSourceBucketTensor(observedColumnsByConceptIndex, targetCombinedKeys, deviceSparse)
+					selectedRootBranches, connectedTargetMask = selectTrainVerifyConnectionNonexistentAcrossBranchesMostConnectedRootBranches(existingConnectionSparse, targetCombinedKeys, self.databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
+					self.trainVerifyConnectionNonexistentAcrossBranchesTargetCombinedKeys = targetCombinedKeys
+					self.trainVerifyConnectionNonexistentAcrossBranchesSelectedRootBranches = selectedRootBranches
+					self.trainVerifyConnectionNonexistentAcrossBranchesConnectedTargetMask = connectedTargetMask
+		return
 	
 	def removeDuplicates(self, lst):
 		#python requires ordered sets
@@ -964,6 +1131,9 @@ class SequenceObservedColumns:
 					connectionUpdatesReplaceSource = connectionUpdatesReplaceBySourceFeature.get(sourceFeatureIndex, emptyConnectionUpdates)
 				if(arrayIndexPropertiesPos):
 					connectionUpdatesPosSource = connectionUpdatesPosBySourceFeature.get(sourceFeatureIndex, emptyConnectionUpdates)
+				if(trainVerifyConnectionNonexistentAcrossBranches):
+					if(addPropertiesEnabled):
+						connectionUpdatesAddSource = filterTrainVerifyConnectionNonexistentAcrossBranchesUpdates(connectionTargetSparse, connectionUpdatesAddSource, databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
 				if(replacePropertiesEnabled):
 					connectionIndices = connectionTargetSparse.indices()
 					connectionValues = connectionTargetSparse.values()
@@ -1168,6 +1338,8 @@ class SequenceObservedColumns:
 				connectionTargetSparse = self.gatherConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionDevice)
 				if(connectionIndices.numel() > 0):
 					connectionUpdates = self.buildConnectionSourceBucketUpdateSparse(connectionIndices, connectionValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor, connectionSourceCombinedKeysUnique, connectionTargetSize)
+					if(trainVerifyConnectionNonexistentAcrossBranches):
+						connectionUpdates = filterTrainVerifyConnectionNonexistentAcrossBranchesUpdates(connectionTargetSparse, connectionUpdates, databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
 					connectionTargetSparse = self.addSparseUpdateNonNegative(connectionTargetSparse, connectionUpdates)
 				self.scatterConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionTargetSparse)
 		if(updateObservedColumnsEfficientFeatureConnectionsPhaseLabel is not None):
@@ -1620,6 +1792,8 @@ class SequenceObservedColumns:
 						connectionTargetSparse = connectionTargetSparse.to(connectionDevice)
 				else:
 					connectionTargetSparse = observedColumn.prepareFeatureConnectionsForSourceFeature(normalisedSourceFeatureIndex, targetDevice=connectionDevice, createMissing=False)
+				if(trainVerifyConnectionNonexistentAcrossBranches):
+					updateSparse = filterTrainVerifyConnectionNonexistentAcrossBranchesUpdates(connectionTargetSparse, updateSparse, observedColumn.databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
 				connectionTargetSparse = self.addSparseUpdateNonNegative(connectionTargetSparse, updateSparse)
 				if(connectionStorageDevice is not None):
 					if(connectionTargetSparse.device != connectionStorageDevice):
