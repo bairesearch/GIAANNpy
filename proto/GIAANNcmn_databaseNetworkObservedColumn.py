@@ -38,19 +38,19 @@ class ObservedColumnConnectionBase:
 		deviceTarget = targetDevice if targetDevice is not None else self.getDefaultConnectionTargetDevice()
 		indices = pt.empty((5, 0), dtype=pt.long, device=deviceTarget)
 		values = pt.empty((0,), dtype=arrayType, device=deviceTarget)
-		featureConnections = pt.sparse_coo_tensor(indices, values, size=(self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, c, f), dtype=arrayType, device=deviceTarget)
+		featureConnections = pt.sparse_coo_tensor(indices, values, size=(self.databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, c, f), dtype=arrayType, device=deviceTarget)
 		return featureConnections
 
 	def getFeatureConnectionsTargetSize(self, c=None, f=None):
 		targetC = c if c is not None else self.databaseNetworkObject.c
 		targetF = f if f is not None else self.databaseNetworkObject.f
-		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, targetC, targetF)
+		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, targetC, targetF)
 		return targetSize
 
 	def getMaterialisedFeatureConnectionsTargetSize(self, c=None, f=None):
 		targetC = c if c is not None else self.databaseNetworkObject.c
 		targetF = f if f is not None else self.databaseNetworkObject.f
-		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, targetF, targetC, targetF)
+		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, targetF, targetC, targetF)
 		return targetSize
 
 	def normaliseSourceFeatureIndex(self, sourceFeatureIndex):
@@ -364,7 +364,7 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		deviceTarget = targetDevice if targetDevice is not None else (deviceDatabase if storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam else deviceSparse)
 		indices = pt.empty((4, 0), dtype=pt.long, device=deviceTarget)
 		values = pt.empty((0,), dtype=arrayType, device=deviceTarget)
-		featureNeurons = pt.sparse_coo_tensor(indices, values, size=(self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, f), dtype=arrayType, device=deviceTarget)
+		featureNeurons = pt.sparse_coo_tensor(indices, values, size=(self.databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, f), dtype=arrayType, device=deviceTarget)
 		return featureNeurons
 
 	def getDefaultConnectionTargetDevice(self):

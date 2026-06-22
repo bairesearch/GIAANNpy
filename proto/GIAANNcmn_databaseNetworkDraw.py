@@ -46,11 +46,11 @@ if(drawSegments):
 elif(drawBranches):
 	branchColoursBase = ['red', 'green', 'blue', 'yellow', 'magenta', 'cyan']
 	branchColours = branchColoursBase
-	if(numberOfDendriticBranches > len(branchColoursBase)):
-		repeats = (numberOfDendriticBranches + len(branchColoursBase) - 1) // len(branchColoursBase)
-		branchColours = (branchColoursBase * repeats)[:numberOfDendriticBranches]
+	if(multipleDendriticBranchesNumber > len(branchColoursBase)):
+		repeats = (multipleDendriticBranchesNumber + len(branchColoursBase) - 1) // len(branchColoursBase)
+		branchColours = (branchColoursBase * repeats)[:multipleDendriticBranchesNumber]
 	else:
-		branchColours = branchColoursBase[:numberOfDendriticBranches]
+		branchColours = branchColoursBase[:multipleDendriticBranchesNumber]
 elif(drawRelationTypes):
 	relationTypeConceptPos1 = 'NOUN'
 	relationTypeConceptPos2 = 'PROPN'
@@ -133,7 +133,7 @@ elif(drawDelimiters):
 def selectDrawBranch(tensor, drawBranches):
 	if(tensor is None):
 		return tensor
-	if(tensor.dim() > 1 and tensor.size(1) == numberOfDendriticBranches):
+	if(tensor.dim() > 1 and tensor.size(1) == multipleDendriticBranchesNumber):
 		if(drawBranches):
 			return tensor
 		if(tensor.is_sparse):
@@ -148,7 +148,7 @@ def collapseBranchDimensionForNodes(tensor, drawBranches):
 			raise RuntimeError("collapseBranchDimensionForNodes error: tensor is None while drawBranches enabled")
 		if(tensor.dim() <= 1):
 			raise RuntimeError("collapseBranchDimensionForNodes error: tensor rank missing branch dimension")
-		if(tensor.size(1) != numberOfDendriticBranches):
+		if(tensor.size(1) != multipleDendriticBranchesNumber):
 			raise RuntimeError("collapseBranchDimensionForNodes error: branch dimension mismatch")
 		if(tensor.is_sparse):
 			tensorCoalesced = tensor.coalesce()

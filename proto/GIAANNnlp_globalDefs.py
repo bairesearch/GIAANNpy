@@ -33,15 +33,15 @@ from GIAANNcmn_globalDefs import useDrawNetworkIndependently
 from GIAANNcmn_globalDefs import useDefault
 from GIAANNcmn_globalDefs import useTrainDuringInference
 #from GIAANNcmn_globalDefs import multipleDendriticBranches
-#from GIAANNcmn_globalDefs import numberOfDendriticBranches
+#from GIAANNcmn_globalDefs import multipleDendriticBranchesNumber
 from GIAANNcmn_globalDefs import useSANI
 from GIAANNcmn_globalDefs import useInference
 from GIAANNcmn_globalDefs import inferenceEvaluateTestSet
 from GIAANNcmn_globalDefs import inferenceAddNewFeatures
 #useBenchmark dependencies:
 from GIAANNcmn_globalDefs import multipleDendriticBranches
-from GIAANNcmn_globalDefs import numberOfDendriticBranches
-from GIAANNcmn_globalDefs import randomlyAssignBranches
+from GIAANNcmn_globalDefs import multipleDendriticBranchesNumber
+from GIAANNcmn_globalDefs import multipleDendriticBranchesRandom
 from GIAANNcmn_globalDefs import trainMaxSequences
 from GIAANNcmn_globalDefs import numSeedTokensInference
 from GIAANNcmn_globalDefs import inferenceEvaluateTestSetTrainMaxSequences10M
@@ -184,11 +184,11 @@ else:
 	spacyPipelineOptimisations = True	#default: True
 if(useBenchmark):
 	#generate benchmark filename:
-	if(multipleDendriticBranches and randomlyAssignBranches):
+	if(multipleDendriticBranches and multipleDendriticBranchesRandom):
 		if(spacyPipelineOptimisations):
-			benchmarkAblationText = "-randomlyAssignBranches" + str(numberOfDendriticBranches)
+			benchmarkAblationText = "-multipleDendriticBranchesRandom" + str(multipleDendriticBranchesNumber)
 		else:
-			printe("randomlyAssignBranches currently assumes spacyPipelineOptimisations")
+			printe("multipleDendriticBranchesRandom currently assumes spacyPipelineOptimisations")
 	elif(multisentencePredictions):
 		if(not useBenchmarkDefaults):
 			benchmarkAblationText = "-multisentencePredictions"

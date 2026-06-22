@@ -389,7 +389,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		return result
 
 	def getMaterialisedAuxiliaryFeatureConnectionsTargetSize(databaseNetworkObject, sourceDimensionSize):
-		result = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, int(sourceDimensionSize), databaseNetworkObject.c, databaseNetworkObject.f)
+		result = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, int(sourceDimensionSize), databaseNetworkObject.c, databaseNetworkObject.f)
 		return result
 
 	def buildMaterialisedAuxiliaryFeatureConnections(databaseNetworkObject, indicesList, valuesList, sourceDimensionSize, targetDevice):
@@ -439,7 +439,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			indices = sourceTargetActivation.indices()
 			values = sourceTargetActivation.values()
 			targetIndices = pt.stack((indices[0], indices[1], indices[3], indices[4]), dim=0)
-			result = pt.sparse_coo_tensor(targetIndices, values, size=(numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f), dtype=arrayType, device=values.device).coalesce()
+			result = pt.sparse_coo_tensor(targetIndices, values, size=(multipleDendriticBranchesNumber, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f), dtype=arrayType, device=values.device).coalesce()
 		else:
 			result = createEmptyFeatureNeuronsTargetActivation(databaseNetworkObject, sourceTargetActivation.device)
 		return result
@@ -447,7 +447,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	def createEmptyFeatureNeuronsTargetActivation(databaseNetworkObject, targetDevice):
 		indices = pt.empty((4, 0), dtype=pt.long, device=targetDevice)
 		values = pt.empty((0,), dtype=arrayType, device=targetDevice)
-		result = pt.sparse_coo_tensor(indices, values, size=(numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f), dtype=arrayType, device=targetDevice)
+		result = pt.sparse_coo_tensor(indices, values, size=(multipleDendriticBranchesNumber, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f), dtype=arrayType, device=targetDevice)
 		return result
 
 	def getConnectedColumnsForMaterialisedAuxiliaryConnections(databaseNetworkObject, materialisedConnections, auxiliaryActivations, includeFeatureDetails):
@@ -649,7 +649,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		if(len(indicesList) > 0):
 			combinedIndices = pt.cat(indicesList, dim=1)
 			combinedValues = pt.cat(valuesList, dim=0)
-			sparseSize = (numberOfDendriticBranches, arrayNumberOfSegments, sequenceObservedColumns.cs, sequenceObservedColumns.databaseNetworkObject.fas, sequenceObservedColumns.cs, sequenceObservedColumns.fs)
+			sparseSize = (multipleDendriticBranchesNumber, arrayNumberOfSegments, sequenceObservedColumns.cs, sequenceObservedColumns.databaseNetworkObject.fas, sequenceObservedColumns.cs, sequenceObservedColumns.fs)
 			connectionSparse = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=sparseSize, dtype=arrayType, device=connectionDevice).coalesce()
 			combinedIndices = connectionSparse.indices()
 			combinedValues = connectionSparse.values()
@@ -683,7 +683,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			else:
 				sequenceObservedColumnsDict = sequenceObservedColumns.observedColumnsDict2
 			observedColumnsByConceptIndex = sequenceObservedColumns.getObservedColumnsByConceptIndex(sequenceObservedColumnsDict)
-			targetSize = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
+			targetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
 			for sourceCombinedKey, start, count in zip(uniqueSourceCombinedKeys.tolist(), starts.tolist(), counts.tolist()):
 				end = start + count
 				sourceConceptIndexValue = int(sourceCombinedKey // databaseNetworkObject.fas)
@@ -810,7 +810,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	def initialiseAuxiliaryFeatureConnections(databaseNetworkObject, targetDevice):
 		indices = pt.empty((5, 0), dtype=pt.long, device=targetDevice)
 		values = pt.empty((0,), dtype=arrayType, device=targetDevice)
-		result = pt.sparse_coo_tensor(indices, values, size=(databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f), dtype=arrayType, device=targetDevice)
+		result = pt.sparse_coo_tensor(indices, values, size=(databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f), dtype=arrayType, device=targetDevice)
 		return result
 
 	def getObservedColumnAuxiliaryFeatureConnectionsForSourceFeature(observedColumn, sourceFeatureIndex, targetDevice=None, createMissing=False, ensureCurrentSizeOnLoad=False):
@@ -883,7 +883,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		return
 
 	def getObservedColumnAuxiliaryFeatureConnectionsTargetSize(observedColumn):
-		result = (observedColumn.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, observedColumn.databaseNetworkObject.c, observedColumn.databaseNetworkObject.f)
+		result = (observedColumn.databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, observedColumn.databaseNetworkObject.c, observedColumn.databaseNetworkObject.f)
 		return result
 
 	def getObservedColumnAuxiliaryFeatureConnectionsFolder(conceptIndex):

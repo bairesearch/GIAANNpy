@@ -405,6 +405,11 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	conceptActivationState = None
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 	if(useTrainDuringInference):
+		if(multipleDendriticBranchesBinaryTree):
+			if(not multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
+				raise RuntimeError("processConceptWordsInference error: multipleDendriticBranchesBinaryTree requires root-branch selection during useTrainDuringInference")
+			databaseNetworkObject.multipleDendriticBranchesBinaryTreeInferenceActivation = None
+	if(useTrainDuringInference):
 		globalFeatureNeuronsActivation = createInferenceTransientGlobalFeatureNeuronsProperty(databaseNetworkObject)
 	else:
 		globalFeatureNeuronsActivation = databaseNetworkObject.globalFeatureNeurons[databaseNetworkObject.arrayIndexPropertiesActivationIndex]
@@ -465,6 +470,9 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 		databaseNetworkObject.globalFeatureNeurons = GIAANNcmn_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsActivation, databaseNetworkObject.arrayIndexPropertiesActivationIndex)
 		if(inferenceUseNeuronFeaturePropertiesTime):
 			databaseNetworkObject.globalFeatureNeurons = GIAANNcmn_sparseTensors.replaceAllSparseTensorElementsAtFirstDimIndex(databaseNetworkObject.globalFeatureNeurons, globalFeatureNeuronsTime, databaseNetworkObject.arrayIndexPropertiesTimeIndex)
+	if(useTrainDuringInference):
+		if(multipleDendriticBranchesBinaryTree):
+			databaseNetworkObject.multipleDendriticBranchesBinaryTreeInferenceActivation = globalFeatureNeuronsActivation.coalesce()
 	return inferenceSuccessfulPredictionMask
 
 def createInferenceTransientGlobalFeatureNeuronsProperty(databaseNetworkObject):
@@ -473,7 +481,7 @@ def createInferenceTransientGlobalFeatureNeuronsProperty(databaseNetworkObject):
 		raise RuntimeError("createInferenceTransientGlobalFeatureNeuronsProperty error: databaseNetworkObject is None")
 	if(databaseNetworkObject.c < 0 or databaseNetworkObject.f < 0):
 		raise RuntimeError("createInferenceTransientGlobalFeatureNeuronsProperty error: database dimensions must be non-negative")
-	result = GIAANNcmn_sparseTensors.createEmptySparseTensor((numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f))
+	result = GIAANNcmn_sparseTensors.createEmptySparseTensor((multipleDendriticBranchesNumber, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f))
 	return result
 
 def createInferenceSuccessfulPredictionMask(tokensSequence):
@@ -731,11 +739,18 @@ def deactivatePredictedNeuronActivations(globalFeatureNeuronsActivation, concept
 			branchIndex = GIAANNcmn_predictionActivate.selectActivatedBranchIndex(globalFeatureNeuronsActivationResult, int(conceptColumnIndex), int(conceptColumnFeatureIndex))
 		branchTensor = pt.tensor(branchIndex, device=conceptColumnIndexTensor.device)
 		if(useSANI):
-			indicesToUpdateList = []
-			for segmentIndex in range(arrayNumberOfSegments):
-				indexToUpdate = pt.stack([branchTensor, pt.tensor(segmentIndex, device=conceptColumnIndexTensor.device), conceptColumnIndexTensor.squeeze(), conceptColumnFeatureIndexTensorActivation.squeeze()], dim=0)
-				indicesToUpdateList.append(indexToUpdate)
-			indicesToUpdate = pt.stack(indicesToUpdateList, dim=0)
+			if(multipleDendriticBranchesBinaryTree):
+				segmentIndices = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=conceptColumnIndexTensor.device)
+				branchIndices = pt.full_like(segmentIndices, branchIndex)
+				branchDivisors = pt.pow(pt.full_like(segmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor), segmentIndices)
+				binaryTreeBranchIndices = pt.div(branchIndices, branchDivisors, rounding_mode="floor")
+				indicesToUpdate = pt.stack([binaryTreeBranchIndices, segmentIndices, conceptColumnIndexTensor.squeeze().expand(arrayNumberOfSegments), conceptColumnFeatureIndexTensorActivation.squeeze().expand(arrayNumberOfSegments)], dim=1)
+			else:
+				indicesToUpdateList = []
+				for segmentIndex in range(arrayNumberOfSegments):
+					indexToUpdate = pt.stack([branchTensor, pt.tensor(segmentIndex, device=conceptColumnIndexTensor.device), conceptColumnIndexTensor.squeeze(), conceptColumnFeatureIndexTensorActivation.squeeze()], dim=0)
+					indicesToUpdateList.append(indexToUpdate)
+				indicesToUpdate = pt.stack(indicesToUpdateList, dim=0)
 		else:
 			indicesToUpdate = pt.stack([branchTensor, pt.tensor(arrayIndexSegmentFirst, device=conceptColumnIndexTensor.device), conceptColumnIndexTensor.squeeze(), conceptColumnFeatureIndexTensorActivation.squeeze()], dim=0)
 		modifier = 0

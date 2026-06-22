@@ -590,43 +590,126 @@ def selectAindicesContainedInB(A, B):
 def neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANImethod):
 	hasBranchDim = globalFeatureNeuronsActivation.dim() == 4
 	isSparse = globalFeatureNeuronsActivation.is_sparse
-	# Sparse tensors cannot be sliced with native indexing on CPU; use sliceSparseTensor.
-	def sliceSegment(tensor, segmentIndex):
-		if(hasBranchDim):
-			if(isSparse):
-				return sliceSparseTensor(tensor, 1, segmentIndex)
-			return tensor[:, segmentIndex]
-		if(isSparse):
-			return sliceSparseTensor(tensor, 0, segmentIndex)
-		return tensor[segmentIndex]
-	if(useSANI):
-		if(algorithmMatrixSANImethod=="doNotEnforceActivationAcrossSegments"):
-			if(hasBranchDim):
-				featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=1) 	#sum activations across all segments
-			else:
-				featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=0) 	#sum activations across all segments
-		elif(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
-			if(hasBranchDim):
-				featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=1) 	#sum activations across all segments
-			else:
-				featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=0) 	#sum activations across all segments
-			if(enforceActivationAcrossSegmentsIgnoreInternalColumn):
-				lastSegmentConstraint = arrayIndexSegmentAdjacentColumn	#ignore internal column activation requirement
-			else:
-				lastSegmentConstraint = arrayIndexSegmentLast
-			if(algorithmMatrixSANIenforceRequirement=="enforceAnySegmentMustBeActive"):
-				pass
-			elif(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
-				# Only require that the last constraint segment (ie adjacent column or adjacent feature) is active; the internal column segment is ignored
-				lastConstraintSegmentActive = sliceSegment(globalFeatureNeuronsActivation, lastSegmentConstraint)
-				featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, lastConstraintSegmentActive)
-			elif(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):
-				for s in range(lastSegmentConstraint+1):	#ignore internal column activation requirement
-					featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, sliceSegment(globalFeatureNeuronsActivation, s))
+	if(multipleDendriticBranchesBinaryTree):
+		featureNeuronsActive = neuronActivationSparseBinaryTree(globalFeatureNeuronsActivation, algorithmMatrixSANImethod)
 	else:
-		#select last (most proximal) segment activation
-		featureNeuronsActive = sliceSegment(globalFeatureNeuronsActivation, arrayIndexSegmentLast)
+		# Sparse tensors cannot be sliced with native indexing on CPU; use sliceSparseTensor.
+		def sliceSegment(tensor, segmentIndex):
+			if(hasBranchDim):
+				if(isSparse):
+					return sliceSparseTensor(tensor, 1, segmentIndex)
+				return tensor[:, segmentIndex]
+			if(isSparse):
+				return sliceSparseTensor(tensor, 0, segmentIndex)
+			return tensor[segmentIndex]
+		if(useSANI):
+			if(algorithmMatrixSANImethod=="doNotEnforceActivationAcrossSegments"):
+				if(hasBranchDim):
+					featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=1) 	#sum activations across all segments
+				else:
+					featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=0) 	#sum activations across all segments
+			elif(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
+				if(hasBranchDim):
+					featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=1) 	#sum activations across all segments
+				else:
+					featureNeuronsActive = globalFeatureNeuronsActivation.sum(dim=0) 	#sum activations across all segments
+				if(enforceActivationAcrossSegmentsIgnoreInternalColumn):
+					lastSegmentConstraint = arrayIndexSegmentAdjacentColumn	#ignore internal column activation requirement
+				else:
+					lastSegmentConstraint = arrayIndexSegmentLast
+				if(algorithmMatrixSANIenforceRequirement=="enforceAnySegmentMustBeActive"):
+					pass
+				elif(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+					# Only require that the last constraint segment (ie adjacent column or adjacent feature) is active; the internal column segment is ignored
+					lastConstraintSegmentActive = sliceSegment(globalFeatureNeuronsActivation, lastSegmentConstraint)
+					featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, lastConstraintSegmentActive)
+				elif(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):
+					for s in range(lastSegmentConstraint+1):	#ignore internal column activation requirement
+						featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, sliceSegment(globalFeatureNeuronsActivation, s))
+		else:
+			#select last (most proximal) segment activation
+			featureNeuronsActive = sliceSegment(globalFeatureNeuronsActivation, arrayIndexSegmentLast)
 	return featureNeuronsActive	
+
+def neuronActivationSparseBinaryTree(globalFeatureNeuronsActivation, algorithmMatrixSANImethod):
+	result = None
+	if(multipleDendriticBranchesBinaryTree):
+		if(not multipleDendriticBranches):
+			raise RuntimeError("neuronActivationSparseBinaryTree error: multipleDendriticBranches is required")
+		if(globalFeatureNeuronsActivation.dim() < 3):
+			raise RuntimeError("neuronActivationSparseBinaryTree error: activation tensor must include branch and segment dimensions")
+		if(globalFeatureNeuronsActivation.shape[0] != multipleDendriticBranchesNumber or globalFeatureNeuronsActivation.shape[1] != arrayNumberOfSegments):
+			raise RuntimeError("neuronActivationSparseBinaryTree error: activation tensor tree dimensions are invalid")
+		if(multipleDendriticBranchesBinaryTreeDepth != arrayNumberOfSegments):
+			raise RuntimeError("neuronActivationSparseBinaryTree error: binary tree depth must equal arrayNumberOfSegments")
+		wasSparse = globalFeatureNeuronsActivation.is_sparse
+		activationSparse = globalFeatureNeuronsActivation.coalesce() if wasSparse else globalFeatureNeuronsActivation.to_sparse_coo().coalesce()
+		segmentActivations = []
+		for segmentIndex in range(arrayNumberOfSegments):
+			segmentActivations.append(projectBinaryTreeSegmentActivation(activationSparse, segmentIndex))
+		combinedIndices = pt.empty((activationSparse.dim()-1, 0), dtype=pt.long, device=activationSparse.device)
+		combinedValues = pt.empty((0,), dtype=activationSparse.dtype, device=activationSparse.device)
+		if(len(segmentActivations) > 0):
+			combinedIndices = pt.cat([segmentActivation.indices() for segmentActivation in segmentActivations], dim=1)
+			combinedValues = pt.cat([segmentActivation.values() for segmentActivation in segmentActivations], dim=0)
+		featureNeuronsActive = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=(multipleDendriticBranchesNumber, *activationSparse.size()[2:]), dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
+		if(useSANI):
+			if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
+				if(enforceActivationAcrossSegmentsIgnoreInternalColumn):
+					lastSegmentConstraint = arrayIndexSegmentAdjacentColumn
+				else:
+					lastSegmentConstraint = arrayIndexSegmentLast
+				if(lastSegmentConstraint < arrayIndexSegmentFirst or lastSegmentConstraint >= arrayNumberOfSegments):
+					raise RuntimeError("neuronActivationSparseBinaryTree error: lastSegmentConstraint out of range")
+				if(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+					featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, segmentActivations[lastSegmentConstraint])
+				elif(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):
+					for segmentIndex in range(lastSegmentConstraint+1):
+						featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, segmentActivations[segmentIndex])
+				elif(algorithmMatrixSANIenforceRequirement!="enforceAnySegmentMustBeActive"):
+					raise RuntimeError("neuronActivationSparseBinaryTree error: algorithmMatrixSANIenforceRequirement is invalid")
+			elif(algorithmMatrixSANImethod!="doNotEnforceActivationAcrossSegments"):
+				raise RuntimeError("neuronActivationSparseBinaryTree error: algorithmMatrixSANImethod is invalid")
+		else:
+			featureNeuronsActive = segmentActivations[arrayIndexSegmentLast]
+		result = featureNeuronsActive if wasSparse else featureNeuronsActive.to_dense()
+	else:
+		raise RuntimeError("neuronActivationSparseBinaryTree error: requires multipleDendriticBranchesBinaryTree")
+	return result
+
+def projectBinaryTreeSegmentActivation(activationSparse, segmentIndex):
+	result = None
+	if(multipleDendriticBranchesBinaryTree):
+		if(not activationSparse.is_sparse or not activationSparse.is_coalesced()):
+			raise RuntimeError("projectBinaryTreeSegmentActivation error: activationSparse must be a coalesced sparse tensor")
+		if(segmentIndex < arrayIndexSegmentFirst or segmentIndex >= arrayNumberOfSegments):
+			raise RuntimeError("projectBinaryTreeSegmentActivation error: segmentIndex out of range")
+		rootBranchesPerSegmentBranch = multipleDendriticBranchesBinaryTreeBranchingFactor**segmentIndex
+		segmentBranchCount = multipleDendriticBranchesNumber//rootBranchesPerSegmentBranch
+		if(segmentBranchCount < 1 or multipleDendriticBranchesNumber % rootBranchesPerSegmentBranch != arrayIndexSegmentFirst):
+			raise RuntimeError("projectBinaryTreeSegmentActivation error: binary tree branch dimensions are invalid")
+		activationIndices = activationSparse.indices()
+		activationValues = activationSparse.values()
+		segmentMask = activationIndices[1] == segmentIndex
+		segmentIndices = activationIndices[:, segmentMask]
+		segmentValues = activationValues[segmentMask]
+		resultSize = (multipleDendriticBranchesNumber, *activationSparse.size()[2:])
+		if(segmentIndices.shape[1] == arrayIndexSegmentFirst):
+			emptyIndices = pt.empty((len(resultSize), 0), dtype=pt.long, device=activationSparse.device)
+			emptyValues = pt.empty((0,), dtype=activationSparse.dtype, device=activationSparse.device)
+			result = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=resultSize, dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
+		else:
+			if(bool(pt.any(segmentIndices[0] >= segmentBranchCount).item())):
+				raise RuntimeError("projectBinaryTreeSegmentActivation error: active branch index is invalid for segmentIndex")
+			rootBranchOffsets = pt.arange(rootBranchesPerSegmentBranch, dtype=pt.long, device=activationSparse.device)
+			rootBranchIndices = (segmentIndices[0].unsqueeze(1)*rootBranchesPerSegmentBranch + rootBranchOffsets.unsqueeze(0)).reshape(-1)
+			repeatedTailIndices = segmentIndices[2:].repeat_interleave(rootBranchesPerSegmentBranch, dim=1)
+			expandedIndices = pt.cat((rootBranchIndices.unsqueeze(0), repeatedTailIndices), dim=0)
+			expandedValues = segmentValues.repeat_interleave(rootBranchesPerSegmentBranch)
+			result = pt.sparse_coo_tensor(expandedIndices, expandedValues, size=resultSize, dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
+	else:
+		raise RuntimeError("projectBinaryTreeSegmentActivation error: requires multipleDendriticBranchesBinaryTree")
+	return result
 			
 def insertSequenceObservedColumnIntoObservedColumnFeatures(self, cIdx, fIdxTensor, featureIndicesInObserved, featureNeuronsSparse, observedColumn, storeDatabaseGlobalFeatureNeuronsInRam=False):
 	# feature neurons

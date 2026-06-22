@@ -318,7 +318,7 @@ def insertPropertyDimension(tensor, insertIndex, targetPropertyCount):
 	zerosTensor = pt.zeros(zerosShape, dtype=tensor.dtype, device=tensor.device)
 	return pt.cat([tensor[:insertIndex], zerosTensor, tensor[insertIndex:]], dim=0)
 
-def adjustBranchDimensions(tensor, tensorName, expectedRank, branchCount=numberOfDendriticBranches):
+def adjustBranchDimensions(tensor, tensorName, expectedRank, branchCount=multipleDendriticBranchesNumber):
 	if tensor.dim() == expectedRank:
 		return expandBranchDimensions(tensor, tensorName, branchCount)
 	if tensor.dim() == expectedRank - 1:
@@ -470,7 +470,7 @@ def generateGlobalFeatureNeuronsTensor(databaseNetworkObject, useRAMcolumnFeatur
 	for expectedConceptIndex, conceptIndex in enumerate(conceptIndices):
 		if(conceptIndex != expectedConceptIndex):
 			raise RuntimeError(f"generateGlobalFeatureNeuronsTensor error: concept indices must be contiguous from 0; found {conceptIndex} at position {expectedConceptIndex}")
-	targetSize = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
+	targetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
 	combinedIndicesList = []
 	combinedValuesList = []
 	observedColumnsByConceptIndex = None
@@ -505,7 +505,7 @@ def generateGlobalFeatureNeuronsTensor(databaseNetworkObject, useRAMcolumnFeatur
 			else:
 				emptyIndices = pt.empty((4, 0), dtype=pt.long, device=deviceFileIO)
 				emptyValues = pt.empty((0,), dtype=arrayType, device=deviceFileIO)
-				featureNeurons = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=(databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.f), dtype=arrayType, device=deviceFileIO)
+				featureNeurons = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=(databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, databaseNetworkObject.f), dtype=arrayType, device=deviceFileIO)
 		featureNeurons = ensureFeatureNeuronsTensorCurrentSize(featureNeurons, databaseNetworkObject.f, featureNeuronsTensorName)
 		if(featureNeurons.device != deviceFileIO):
 			featureNeurons = featureNeurons.to(deviceFileIO)

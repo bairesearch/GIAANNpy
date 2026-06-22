@@ -74,96 +74,215 @@ if(inferenceSegmentActivationsBoolean):
 			return globalFeatureNeuronsActivation.bool().float()
 
 def applySequentialActivationDense(globalFeatureNeuronsActivation, featureNeuronsTargetActivation):
-	globalFeatureNeuronsActivationDense = globalFeatureNeuronsActivation.to_dense()
-	featureNeuronsTargetActivationDense = featureNeuronsTargetActivation
-	if(featureNeuronsTargetActivationDense.is_sparse):
-		featureNeuronsTargetActivationDense = featureNeuronsTargetActivationDense.to_dense()
-	featureNeuronsTargetActivationAppliedDense = pt.zeros_like(featureNeuronsTargetActivationDense)
-	for branchIndex in range(globalFeatureNeuronsActivationDense.shape[0]):
-		branchActivation = globalFeatureNeuronsActivationDense[branchIndex]
-		branchTargetActivation = featureNeuronsTargetActivationDense[branchIndex]
-		branchTargetActivationApplied = featureNeuronsTargetActivationAppliedDense[branchIndex]
-		if(useSANIfeaturesAndColumns):
-			# For useSANIfeaturesAndColumns, enforce sequential activation independently for:
-			# a) concept/column segments and b) feature segments.
-			featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
-			assert featureSegmentsOffset >= 0 and featureSegmentsOffset < arrayNumberOfSegments
-			previousConceptChannelActivation = branchActivation[:featureSegmentsOffset-1] > 0 if featureSegmentsOffset > 1 else None
-			previousFeatureChannelActivation = branchActivation[featureSegmentsOffset:arrayNumberOfSegments-1] > 0 if featureSegmentsOffset+1 < arrayNumberOfSegments else None
-			if(previousConceptChannelActivation is not None):
-				branchActivation[1:featureSegmentsOffset] += branchTargetActivation[1:featureSegmentsOffset] * previousConceptChannelActivation
-				branchTargetActivationApplied[1:featureSegmentsOffset] = branchTargetActivation[1:featureSegmentsOffset] * previousConceptChannelActivation
-			if(previousFeatureChannelActivation is not None):
-				branchActivation[featureSegmentsOffset+1:] += branchTargetActivation[featureSegmentsOffset+1:] * previousFeatureChannelActivation
-				branchTargetActivationApplied[featureSegmentsOffset+1:] = branchTargetActivation[featureSegmentsOffset+1:] * previousFeatureChannelActivation
-			branchActivation[0] += branchTargetActivation[0]
-			branchActivation[featureSegmentsOffset] += branchTargetActivation[featureSegmentsOffset]
-			branchTargetActivationApplied[0] = branchTargetActivation[0]
-			branchTargetActivationApplied[featureSegmentsOffset] = branchTargetActivation[featureSegmentsOffset]
-		else:
-			previousChannelActivation = branchActivation[:-1] > 0
-			branchActivation[1:] += branchTargetActivation[1:] * previousChannelActivation
-			branchActivation[0] += branchTargetActivation[0]
-			branchTargetActivationApplied[1:] = branchTargetActivation[1:] * previousChannelActivation
-			branchTargetActivationApplied[0] = branchTargetActivation[0]
-		globalFeatureNeuronsActivationDense[branchIndex] = branchActivation
-		featureNeuronsTargetActivationAppliedDense[branchIndex] = branchTargetActivationApplied
-	resultActivation = globalFeatureNeuronsActivationDense.to_sparse_coo()
-	if(featureNeuronsTargetActivation.is_sparse):
-		featureNeuronsTargetActivationApplied = featureNeuronsTargetActivationAppliedDense.to_sparse_coo()
+	if(multipleDendriticBranchesBinaryTree):
+		resultActivation, featureNeuronsTargetActivationApplied = applySequentialActivationDenseBinaryTree(globalFeatureNeuronsActivation, featureNeuronsTargetActivation)
 	else:
-		featureNeuronsTargetActivationApplied = featureNeuronsTargetActivationAppliedDense
+		globalFeatureNeuronsActivationDense = globalFeatureNeuronsActivation.to_dense()
+		featureNeuronsTargetActivationDense = featureNeuronsTargetActivation
+		if(featureNeuronsTargetActivationDense.is_sparse):
+			featureNeuronsTargetActivationDense = featureNeuronsTargetActivationDense.to_dense()
+		featureNeuronsTargetActivationAppliedDense = pt.zeros_like(featureNeuronsTargetActivationDense)
+		for branchIndex in range(globalFeatureNeuronsActivationDense.shape[0]):
+			branchActivation = globalFeatureNeuronsActivationDense[branchIndex]
+			branchTargetActivation = featureNeuronsTargetActivationDense[branchIndex]
+			branchTargetActivationApplied = featureNeuronsTargetActivationAppliedDense[branchIndex]
+			if(useSANIfeaturesAndColumns):
+				# For useSANIfeaturesAndColumns, enforce sequential activation independently for:
+				# a) concept/column segments and b) feature segments.
+				featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
+				assert featureSegmentsOffset >= 0 and featureSegmentsOffset < arrayNumberOfSegments
+				previousConceptChannelActivation = branchActivation[:featureSegmentsOffset-1] > 0 if featureSegmentsOffset > 1 else None
+				previousFeatureChannelActivation = branchActivation[featureSegmentsOffset:arrayNumberOfSegments-1] > 0 if featureSegmentsOffset+1 < arrayNumberOfSegments else None
+				if(previousConceptChannelActivation is not None):
+					branchActivation[1:featureSegmentsOffset] += branchTargetActivation[1:featureSegmentsOffset] * previousConceptChannelActivation
+					branchTargetActivationApplied[1:featureSegmentsOffset] = branchTargetActivation[1:featureSegmentsOffset] * previousConceptChannelActivation
+				if(previousFeatureChannelActivation is not None):
+					branchActivation[featureSegmentsOffset+1:] += branchTargetActivation[featureSegmentsOffset+1:] * previousFeatureChannelActivation
+					branchTargetActivationApplied[featureSegmentsOffset+1:] = branchTargetActivation[featureSegmentsOffset+1:] * previousFeatureChannelActivation
+				branchActivation[0] += branchTargetActivation[0]
+				branchActivation[featureSegmentsOffset] += branchTargetActivation[featureSegmentsOffset]
+				branchTargetActivationApplied[0] = branchTargetActivation[0]
+				branchTargetActivationApplied[featureSegmentsOffset] = branchTargetActivation[featureSegmentsOffset]
+			else:
+				previousChannelActivation = branchActivation[:-1] > 0
+				branchActivation[1:] += branchTargetActivation[1:] * previousChannelActivation
+				branchActivation[0] += branchTargetActivation[0]
+				branchTargetActivationApplied[1:] = branchTargetActivation[1:] * previousChannelActivation
+				branchTargetActivationApplied[0] = branchTargetActivation[0]
+			globalFeatureNeuronsActivationDense[branchIndex] = branchActivation
+			featureNeuronsTargetActivationAppliedDense[branchIndex] = branchTargetActivationApplied
+		resultActivation = globalFeatureNeuronsActivationDense.to_sparse_coo()
+		if(featureNeuronsTargetActivation.is_sparse):
+			featureNeuronsTargetActivationApplied = featureNeuronsTargetActivationAppliedDense.to_sparse_coo()
+		else:
+			featureNeuronsTargetActivationApplied = featureNeuronsTargetActivationAppliedDense
 	return resultActivation, featureNeuronsTargetActivationApplied
 
 def applySequentialActivationSparse(globalFeatureNeuronsActivation, featureNeuronsTargetActivation):
 	resultActivation = globalFeatureNeuronsActivation
 	featureNeuronsTargetActivationApplied = featureNeuronsTargetActivation
-	if(featureNeuronsTargetActivation is None):
-		raise RuntimeError("applySequentialActivationSparse: featureNeuronsTargetActivation is None")
-	if(not globalFeatureNeuronsActivation.is_sparse):
-		raise RuntimeError("applySequentialActivationSparse: globalFeatureNeuronsActivation must be sparse")
-	activationSparse = globalFeatureNeuronsActivation.coalesce()
-	targetSparse = featureNeuronsTargetActivation
-	if(not targetSparse.is_sparse):
-		targetSparse = targetSparse.to_sparse_coo()
-	targetSparse = targetSparse.coalesce()
-	if(targetSparse._nnz() == 0):
-		featureNeuronsTargetActivationApplied = targetSparse
+	if(multipleDendriticBranchesBinaryTree):
+		resultActivation, featureNeuronsTargetActivationApplied = applySequentialActivationSparseBinaryTree(globalFeatureNeuronsActivation, featureNeuronsTargetActivation)
 	else:
-		indices = targetSparse.indices()
-		values = targetSparse.values()
-		segmentIndices = indices[1]
-		allowedMask = pt.ones((segmentIndices.shape[0],), dtype=pt.bool, device=segmentIndices.device)
+		if(featureNeuronsTargetActivation is None):
+			raise RuntimeError("applySequentialActivationSparse: featureNeuronsTargetActivation is None")
+		if(not globalFeatureNeuronsActivation.is_sparse):
+			raise RuntimeError("applySequentialActivationSparse: globalFeatureNeuronsActivation must be sparse")
+		activationSparse = globalFeatureNeuronsActivation.coalesce()
+		targetSparse = featureNeuronsTargetActivation
+		if(not targetSparse.is_sparse):
+			targetSparse = targetSparse.to_sparse_coo()
+		targetSparse = targetSparse.coalesce()
+		if(targetSparse._nnz() == 0):
+			featureNeuronsTargetActivationApplied = targetSparse
+		else:
+			indices = targetSparse.indices()
+			values = targetSparse.values()
+			segmentIndices = indices[1]
+			allowedMask = pt.ones((segmentIndices.shape[0],), dtype=pt.bool, device=segmentIndices.device)
+			if(useSANIfeaturesAndColumns):
+				featureSegmentStart = arrayNumberOfSegmentsColumnDistance
+				if(featureSegmentStart < 0 or featureSegmentStart >= arrayNumberOfSegments):
+					raise RuntimeError("applySequentialActivationSparse: featureSegmentStart out of range")
+				requireCheck = (segmentIndices != 0) & (segmentIndices != featureSegmentStart)
+				if(requireCheck.any()):
+					checkIndices = pt.nonzero(requireCheck, as_tuple=False).view(-1)
+					prevIndices = indices.index_select(1, checkIndices).clone()
+					prevIndices[1] = prevIndices[1] - 1
+					prevValues = gatherSparseTensorValuesAtIndices(activationSparse, prevIndices, values.dtype)
+					allowedMask[checkIndices] = prevValues > 0
+			else:
+				requireCheck = segmentIndices > 0
+				if(requireCheck.any()):
+					checkIndices = pt.nonzero(requireCheck, as_tuple=False).view(-1)
+					prevIndices = indices.index_select(1, checkIndices).clone()
+					prevIndices[1] = prevIndices[1] - 1
+					prevValues = gatherSparseTensorValuesAtIndices(activationSparse, prevIndices, values.dtype)
+					allowedMask[checkIndices] = prevValues > 0
+			if(allowedMask.any()):
+				allowedIndices = indices[:, allowedMask]
+				allowedValues = values[allowedMask]
+				featureNeuronsTargetActivationApplied = pt.sparse_coo_tensor(allowedIndices, allowedValues, size=targetSparse.size(), device=targetSparse.device).coalesce()
+			else:
+				emptyIndices = pt.empty((indices.shape[0], 0), dtype=indices.dtype, device=indices.device)
+				emptyValues = pt.empty((0,), dtype=values.dtype, device=values.device)
+				featureNeuronsTargetActivationApplied = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=targetSparse.size(), device=targetSparse.device).coalesce()
+		resultActivation = activationSparse + featureNeuronsTargetActivationApplied
+		resultActivation = resultActivation.coalesce()
+	return resultActivation, featureNeuronsTargetActivationApplied
+
+def applySequentialActivationDenseBinaryTree(globalFeatureNeuronsActivation, featureNeuronsTargetActivation):
+	resultActivation = None
+	featureNeuronsTargetActivationApplied = None
+	if(multipleDendriticBranchesBinaryTree):
+		if(globalFeatureNeuronsActivation.dim() != 4 or featureNeuronsTargetActivation.dim() != 4):
+			raise RuntimeError("applySequentialActivationDenseBinaryTree error: activation tensors must be rank 4")
+		if(globalFeatureNeuronsActivation.shape[0] != multipleDendriticBranchesNumber or globalFeatureNeuronsActivation.shape[1] != arrayNumberOfSegments or featureNeuronsTargetActivation.shape != globalFeatureNeuronsActivation.shape):
+			raise RuntimeError("applySequentialActivationDenseBinaryTree error: activation tensor shapes are invalid")
+		if(multipleDendriticBranchesNumber % multipleDendriticBranchesBinaryTreeBranchingFactor != arrayIndexSegmentFirst):
+			raise RuntimeError("applySequentialActivationDenseBinaryTree error: branch count is invalid")
+		globalFeatureNeuronsActivationDense = globalFeatureNeuronsActivation.to_dense()
+		featureNeuronsTargetActivationSparse = featureNeuronsTargetActivation.is_sparse
+		featureNeuronsTargetActivationDense = featureNeuronsTargetActivation.to_dense() if featureNeuronsTargetActivationSparse else featureNeuronsTargetActivation
+		featureNeuronsTargetActivationAppliedDense = pt.zeros_like(featureNeuronsTargetActivationDense)
+		featureNeuronsTargetActivationAppliedDense[:, arrayIndexSegmentFirst] = featureNeuronsTargetActivationDense[:, arrayIndexSegmentFirst]
+		if(arrayNumberOfSegments > 1):
+			parentBranchCount = multipleDendriticBranchesNumber//multipleDendriticBranchesBinaryTreeBranchingFactor
+			previousSegmentActivation = pt.zeros_like(featureNeuronsTargetActivationDense[:, 1:])
+			previousSegmentActivation[:parentBranchCount] = (globalFeatureNeuronsActivationDense.reshape(parentBranchCount, multipleDendriticBranchesBinaryTreeBranchingFactor, arrayNumberOfSegments, *globalFeatureNeuronsActivationDense.shape[2:])[:, :, :-1] > 0).any(dim=1)
+			branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=globalFeatureNeuronsActivationDense.device).unsqueeze(1)
+			segmentIndices = pt.arange(1, arrayNumberOfSegments, dtype=pt.long, device=globalFeatureNeuronsActivationDense.device).unsqueeze(0)
+			validBranchCounts = multipleDendriticBranchesNumber//pt.pow(pt.full_like(segmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor), segmentIndices)
+			validBranchMask = branchIndices < validBranchCounts
+			featureNeuronsTargetActivationAppliedDense[:, 1:] = featureNeuronsTargetActivationDense[:, 1:]*previousSegmentActivation*validBranchMask.view(multipleDendriticBranchesNumber, arrayNumberOfSegments-1, *([1]*(featureNeuronsTargetActivationDense.dim()-2)))
+			if(useSANIfeaturesAndColumns):
+				featureSegmentStart = arrayNumberOfSegmentsColumnDistance
+				if(featureSegmentStart <= arrayIndexSegmentFirst or featureSegmentStart >= arrayNumberOfSegments):
+					raise RuntimeError("applySequentialActivationDenseBinaryTree error: featureSegmentStart out of range")
+				featureNeuronsTargetActivationAppliedDense[:, featureSegmentStart] = featureNeuronsTargetActivationDense[:, featureSegmentStart]*validBranchMask[:, featureSegmentStart-1].view(multipleDendriticBranchesNumber, *([1]*(featureNeuronsTargetActivationDense.dim()-2)))
+		resultActivation = (globalFeatureNeuronsActivationDense + featureNeuronsTargetActivationAppliedDense).to_sparse_coo()
+		featureNeuronsTargetActivationApplied = featureNeuronsTargetActivationAppliedDense.to_sparse_coo() if featureNeuronsTargetActivationSparse else featureNeuronsTargetActivationAppliedDense
+	else:
+		raise RuntimeError("applySequentialActivationDenseBinaryTree error: requires multipleDendriticBranchesBinaryTree")
+	return resultActivation, featureNeuronsTargetActivationApplied
+
+def applySequentialActivationSparseBinaryTree(globalFeatureNeuronsActivation, featureNeuronsTargetActivation):
+	resultActivation = None
+	featureNeuronsTargetActivationApplied = None
+	if(multipleDendriticBranchesBinaryTree):
+		if(featureNeuronsTargetActivation is None):
+			raise RuntimeError("applySequentialActivationSparseBinaryTree error: featureNeuronsTargetActivation is None")
+		if(not globalFeatureNeuronsActivation.is_sparse):
+			raise RuntimeError("applySequentialActivationSparseBinaryTree error: globalFeatureNeuronsActivation must be sparse")
+		if(globalFeatureNeuronsActivation.dim() != 4 or globalFeatureNeuronsActivation.shape[0] != multipleDendriticBranchesNumber or globalFeatureNeuronsActivation.shape[1] != arrayNumberOfSegments):
+			raise RuntimeError("applySequentialActivationSparseBinaryTree error: globalFeatureNeuronsActivation shape is invalid")
+		activationSparse = globalFeatureNeuronsActivation.coalesce()
+		targetSparse = featureNeuronsTargetActivation.coalesce() if featureNeuronsTargetActivation.is_sparse else featureNeuronsTargetActivation.to_sparse_coo().coalesce()
+		if(targetSparse.size() != activationSparse.size()):
+			raise RuntimeError("applySequentialActivationSparseBinaryTree error: activation tensor shapes are invalid")
+		if(targetSparse._nnz() == arrayIndexSegmentFirst):
+			featureNeuronsTargetActivationApplied = targetSparse
+		else:
+			indices = targetSparse.indices()
+			values = targetSparse.values()
+			segmentIndices = indices[1]
+			if(bool(pt.any(segmentIndices < arrayIndexSegmentFirst).item()) or bool(pt.any(segmentIndices >= arrayNumberOfSegments).item())):
+				raise RuntimeError("applySequentialActivationSparseBinaryTree error: target segment index out of range")
+			allowedMask = pt.ones((segmentIndices.shape[0],), dtype=pt.bool, device=segmentIndices.device)
+			requireCheck = calculateBinaryTreeSequentialActivationRequiredMask(segmentIndices)
+			if(requireCheck.any()):
+				checkIndices = pt.nonzero(requireCheck, as_tuple=False).view(-1)
+				previousIndices = buildBinaryTreePreviousSegmentIndices(indices.index_select(1, checkIndices), targetSparse.size())
+				previousValues = gatherSparseTensorValuesAtIndices(activationSparse, previousIndices, values.dtype).view(checkIndices.shape[0], multipleDendriticBranchesBinaryTreeBranchingFactor)
+				allowedMask[checkIndices] = pt.any(previousValues > 0, dim=1)
+			if(allowedMask.any()):
+				featureNeuronsTargetActivationApplied = pt.sparse_coo_tensor(indices[:, allowedMask], values[allowedMask], size=targetSparse.size(), device=targetSparse.device).coalesce()
+			else:
+				emptyIndices = pt.empty((indices.shape[0], 0), dtype=indices.dtype, device=indices.device)
+				emptyValues = pt.empty((0,), dtype=values.dtype, device=values.device)
+				featureNeuronsTargetActivationApplied = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=targetSparse.size(), device=targetSparse.device).coalesce()
+		resultActivation = (activationSparse + featureNeuronsTargetActivationApplied).coalesce()
+	else:
+		raise RuntimeError("applySequentialActivationSparseBinaryTree error: requires multipleDendriticBranchesBinaryTree")
+	return resultActivation, featureNeuronsTargetActivationApplied
+
+def buildBinaryTreePreviousSegmentIndices(indices, activationSize):
+	result = None
+	if(multipleDendriticBranchesBinaryTree):
+		if(indices.dim() != 2 or indices.shape[0] != len(activationSize) or len(activationSize) != 4):
+			raise RuntimeError("buildBinaryTreePreviousSegmentIndices error: indices or activationSize is invalid")
+		if(indices.shape[1] == arrayIndexSegmentFirst):
+			raise RuntimeError("buildBinaryTreePreviousSegmentIndices error: indices must not be empty")
+		if(bool(pt.any(indices[1] <= arrayIndexSegmentFirst).item()) or bool(pt.any(indices[1] >= arrayNumberOfSegments).item())):
+			raise RuntimeError("buildBinaryTreePreviousSegmentIndices error: segment indices must be in the non-root range")
+		validBranchCounts = multipleDendriticBranchesNumber//pt.pow(pt.full_like(indices[1], multipleDendriticBranchesBinaryTreeBranchingFactor), indices[1])
+		if(bool(pt.any(indices[0] < arrayIndexSegmentFirst).item()) or bool(pt.any(indices[0] >= validBranchCounts).item())):
+			raise RuntimeError("buildBinaryTreePreviousSegmentIndices error: branch index is invalid for a non-root segment")
+		childOffsets = pt.arange(multipleDendriticBranchesBinaryTreeBranchingFactor, dtype=indices.dtype, device=indices.device)
+		result = indices.repeat_interleave(multipleDendriticBranchesBinaryTreeBranchingFactor, dim=1)
+		result[0] = (indices[0].unsqueeze(1)*multipleDendriticBranchesBinaryTreeBranchingFactor + childOffsets.unsqueeze(0)).reshape(-1)
+		result[1] = result[1] - 1
+	else:
+		raise RuntimeError("buildBinaryTreePreviousSegmentIndices error: requires multipleDendriticBranchesBinaryTree")
+	return result
+
+def calculateBinaryTreeSequentialActivationRequiredMask(segmentIndices):
+	result = None
+	featureSegmentStart = None
+	if(multipleDendriticBranchesBinaryTree):
+		if(not pt.is_tensor(segmentIndices) or segmentIndices.dim() != 1):
+			raise RuntimeError("calculateBinaryTreeSequentialActivationRequiredMask error: segmentIndices must be a rank 1 tensor")
+		if(bool(pt.any(segmentIndices < arrayIndexSegmentFirst).item()) or bool(pt.any(segmentIndices >= arrayNumberOfSegments).item())):
+			raise RuntimeError("calculateBinaryTreeSequentialActivationRequiredMask error: segment index out of range")
+		result = segmentIndices > arrayIndexSegmentFirst
 		if(useSANIfeaturesAndColumns):
 			featureSegmentStart = arrayNumberOfSegmentsColumnDistance
-			if(featureSegmentStart < 0 or featureSegmentStart >= arrayNumberOfSegments):
-				raise RuntimeError("applySequentialActivationSparse: featureSegmentStart out of range")
-			requireCheck = (segmentIndices != 0) & (segmentIndices != featureSegmentStart)
-			if(requireCheck.any()):
-				checkIndices = pt.nonzero(requireCheck, as_tuple=False).view(-1)
-				prevIndices = indices.index_select(1, checkIndices).clone()
-				prevIndices[1] = prevIndices[1] - 1
-				prevValues = gatherSparseTensorValuesAtIndices(activationSparse, prevIndices, values.dtype)
-				allowedMask[checkIndices] = prevValues > 0
-		else:
-			requireCheck = segmentIndices > 0
-			if(requireCheck.any()):
-				checkIndices = pt.nonzero(requireCheck, as_tuple=False).view(-1)
-				prevIndices = indices.index_select(1, checkIndices).clone()
-				prevIndices[1] = prevIndices[1] - 1
-				prevValues = gatherSparseTensorValuesAtIndices(activationSparse, prevIndices, values.dtype)
-				allowedMask[checkIndices] = prevValues > 0
-		if(allowedMask.any()):
-			allowedIndices = indices[:, allowedMask]
-			allowedValues = values[allowedMask]
-			featureNeuronsTargetActivationApplied = pt.sparse_coo_tensor(allowedIndices, allowedValues, size=targetSparse.size(), device=targetSparse.device).coalesce()
-		else:
-			emptyIndices = pt.empty((indices.shape[0], 0), dtype=indices.dtype, device=indices.device)
-			emptyValues = pt.empty((0,), dtype=values.dtype, device=values.device)
-			featureNeuronsTargetActivationApplied = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=targetSparse.size(), device=targetSparse.device).coalesce()
-	resultActivation = activationSparse + featureNeuronsTargetActivationApplied
-	resultActivation = resultActivation.coalesce()
-	return resultActivation, featureNeuronsTargetActivationApplied
+			if(featureSegmentStart <= arrayIndexSegmentFirst or featureSegmentStart >= arrayNumberOfSegments):
+				raise RuntimeError("calculateBinaryTreeSequentialActivationRequiredMask error: featureSegmentStart out of range")
+			result = result & (segmentIndices != featureSegmentStart)
+	else:
+		raise RuntimeError("calculateBinaryTreeSequentialActivationRequiredMask error: requires multipleDendriticBranchesBinaryTree")
+	return result
 
 def calculateSequenceColumnIndex(conceptMask, sequenceWordIndex):
 	result = None
@@ -329,42 +448,67 @@ def applyExactTimeActivationConstraint(featureNeuronsTargetActivation, globalFea
 			indices = activationSparse.indices()
 			values = activationSparse.values()
 			segmentIndices = indices[1]
-			requiresCheck = pt.zeros((segmentIndices.shape[0],), dtype=pt.bool, device=segmentIndices.device)
-			if(useSANIfeaturesAndColumns):
-				featureMask = segmentIndices >= arrayNumberOfSegmentsColumnDistance
-				columnMask = ~featureMask
-				if(columnMask.any()):
-					requiresCheck = requiresCheck | (columnMask & (segmentIndices > 0))
-				if(featureMask.any()):
-					requiresCheck = requiresCheck | (featureMask & (segmentIndices > arrayNumberOfSegmentsColumnDistance))
+			if(multipleDendriticBranchesBinaryTree):
+				requiresCheck = calculateBinaryTreeSequentialActivationRequiredMask(segmentIndices)
 			else:
-				requiresCheck = segmentIndices > 0
+				requiresCheck = pt.zeros((segmentIndices.shape[0],), dtype=pt.bool, device=segmentIndices.device)
+				if(useSANIfeaturesAndColumns):
+					featureMask = segmentIndices >= arrayNumberOfSegmentsColumnDistance
+					columnMask = ~featureMask
+					if(columnMask.any()):
+						requiresCheck = requiresCheck | (columnMask & (segmentIndices > 0))
+					if(featureMask.any()):
+						requiresCheck = requiresCheck | (featureMask & (segmentIndices > arrayNumberOfSegmentsColumnDistance))
+				else:
+					requiresCheck = segmentIndices > 0
 			allowedMask = pt.ones((segmentIndices.shape[0],), dtype=pt.bool, device=segmentIndices.device)
 			if(requiresCheck.any()):
 				checkIndices = pt.nonzero(requiresCheck, as_tuple=False).view(-1)
 				localSegmentIndices = segmentIndices.index_select(0, checkIndices)
-				prevIndices = indices.index_select(1, checkIndices).clone()
-				prevSegmentIndices = localSegmentIndices - 1
-				prevIndices[1] = prevSegmentIndices
-				prevStoredTimes = gatherSparseTensorValuesAtIndices(globalFeatureNeuronsTime, prevIndices, values.dtype)
-				currentTimeValues = pt.zeros_like(prevStoredTimes)
-				if(useSANIfeaturesAndColumns):
-					featureMaskCheck = localSegmentIndices >= arrayNumberOfSegmentsColumnDistance
-					if(featureMaskCheck.any()):
-						currentTimeValues[featureMaskCheck] = float(sequenceWordIndex)
-					if((~featureMaskCheck).any()):
+				if(multipleDendriticBranchesBinaryTree):
+					previousIndices = buildBinaryTreePreviousSegmentIndices(indices.index_select(1, checkIndices), activationSparse.size())
+					previousStoredTimes = gatherSparseTensorValuesAtIndices(globalFeatureNeuronsTime, previousIndices, values.dtype).view(checkIndices.shape[0], multipleDendriticBranchesBinaryTreeBranchingFactor)
+					currentTimeValues = pt.zeros((checkIndices.shape[0],), dtype=values.dtype, device=values.device)
+					if(useSANIfeaturesAndColumns):
+						featureMaskCheck = localSegmentIndices >= arrayNumberOfSegmentsColumnDistance
+						if(featureMaskCheck.any()):
+							currentTimeValues[featureMaskCheck] = float(sequenceWordIndex)
+						if((~featureMaskCheck).any()):
+							if(sequenceColumnIndex is None):
+								raise RuntimeError("applyExactTimeActivationConstraint: sequenceColumnIndex is required for column segments")
+							currentTimeValues[~featureMaskCheck] = float(sequenceColumnIndex)
+					elif(useSANIfeatures):
+						currentTimeValues = pt.full_like(currentTimeValues, float(sequenceWordIndex))
+					elif(useSANIcolumns):
 						if(sequenceColumnIndex is None):
 							raise RuntimeError("applyExactTimeActivationConstraint: sequenceColumnIndex is required for column segments")
-						currentTimeValues[~featureMaskCheck] = float(sequenceColumnIndex)
-				elif(useSANIfeatures):
-					currentTimeValues = pt.full_like(prevStoredTimes, float(sequenceWordIndex))
-				elif(useSANIcolumns):
-					if(sequenceColumnIndex is None):
-						raise RuntimeError("applyExactTimeActivationConstraint: sequenceColumnIndex is required for column segments")
-					currentTimeValues = pt.full_like(prevStoredTimes, float(sequenceColumnIndex))
+						currentTimeValues = pt.full_like(currentTimeValues, float(sequenceColumnIndex))
+					else:
+						raise RuntimeError("applyExactTimeActivationConstraint: useSANI feature mode not configured")
+					allowedMask[checkIndices] = pt.any((currentTimeValues.unsqueeze(1) - previousStoredTimes) == 1, dim=1)
 				else:
-					raise RuntimeError("applyExactTimeActivationConstraint: useSANI feature mode not configured")
-				allowedMask[checkIndices] = (currentTimeValues - prevStoredTimes) == 1
+					prevIndices = indices.index_select(1, checkIndices).clone()
+					prevSegmentIndices = localSegmentIndices - 1
+					prevIndices[1] = prevSegmentIndices
+					prevStoredTimes = gatherSparseTensorValuesAtIndices(globalFeatureNeuronsTime, prevIndices, values.dtype)
+					currentTimeValues = pt.zeros_like(prevStoredTimes)
+					if(useSANIfeaturesAndColumns):
+						featureMaskCheck = localSegmentIndices >= arrayNumberOfSegmentsColumnDistance
+						if(featureMaskCheck.any()):
+							currentTimeValues[featureMaskCheck] = float(sequenceWordIndex)
+						if((~featureMaskCheck).any()):
+							if(sequenceColumnIndex is None):
+								raise RuntimeError("applyExactTimeActivationConstraint: sequenceColumnIndex is required for column segments")
+							currentTimeValues[~featureMaskCheck] = float(sequenceColumnIndex)
+					elif(useSANIfeatures):
+						currentTimeValues = pt.full_like(prevStoredTimes, float(sequenceWordIndex))
+					elif(useSANIcolumns):
+						if(sequenceColumnIndex is None):
+							raise RuntimeError("applyExactTimeActivationConstraint: sequenceColumnIndex is required for column segments")
+						currentTimeValues = pt.full_like(prevStoredTimes, float(sequenceColumnIndex))
+					else:
+						raise RuntimeError("applyExactTimeActivationConstraint: useSANI feature mode not configured")
+					allowedMask[checkIndices] = (currentTimeValues - prevStoredTimes) == 1
 			keepIndices = pt.nonzero(allowedMask, as_tuple=False).view(-1)
 			if(keepIndices.numel() == 0):
 				emptyIndices = pt.empty((indices.shape[0], 0), dtype=indices.dtype, device=indices.device)
@@ -478,8 +622,12 @@ def calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalF
 	if(inferenceSourceActivationsBoolean):
 		featureNeuronsActive = (featureNeuronsActive > 0).to(featureNeuronsActive.dtype)	#ensure the source activation signal is binary (even with useSANI)
 	if(multipleDendriticBranches and featureNeuronsActive.dim() == 1):
-		# Collapse branch-local source activations so each target branch receives the same drive.
-		featureNeuronsActive = featureNeuronsActive.sum()
+		if(multipleDendriticBranchesBinaryTree):
+			# A tree path already sums each compatible segment; retain its strongest complete path without counting shared segments across descendant roots.
+			featureNeuronsActive = featureNeuronsActive.max()
+		else:
+			# Collapse branch-local source activations so each target branch receives the same drive.
+			featureNeuronsActive = featureNeuronsActive.sum()
 	result = featureNeuronsActive
 	return result
 
@@ -561,32 +709,59 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 	return result
 
 def selectActivatedBranchIndex(globalFeatureNeuronsActivation, columnIndex, featureIndex):
-	if(not multipleDendriticBranches):
-		return 0
-	if(globalFeatureNeuronsActivation is None):
-		return 0
-	if(globalFeatureNeuronsActivation.is_sparse):
+	result = arrayIndexSegmentFirst
+	if(multipleDendriticBranchesBinaryTree):
+		result = selectActivatedBinaryTreeRootBranchIndex(globalFeatureNeuronsActivation, columnIndex, featureIndex)
+	elif(not multipleDendriticBranches):
+		result = arrayIndexSegmentFirst
+	elif(globalFeatureNeuronsActivation is None):
+		result = arrayIndexSegmentFirst
+	elif(globalFeatureNeuronsActivation.is_sparse):
 		sparseActivation = globalFeatureNeuronsActivation.coalesce()
-		if(sparseActivation._nnz() == 0):
-			return 0
-		indices = sparseActivation.indices()
-		values = sparseActivation.values()
-		mask = (indices[2] == columnIndex) & (indices[3] == featureIndex)
-		if(not pt.any(mask)):
-			return 0
-		branchIndices = indices[0, mask].tolist()
-		branchValues = values[mask].tolist()
-		branchScores = {}
-		for branchIndex, value in zip(branchIndices, branchValues):
-			branchScores[branchIndex] = branchScores.get(branchIndex, 0.0) + float(value)
-		bestBranch = max(branchScores, key=branchScores.get)
-		return int(bestBranch)
-	activationSlice = globalFeatureNeuronsActivation[:, :, columnIndex, featureIndex]
-	if(activationSlice.numel() == 0):
-		return 0
-	branchScores = activationSlice.sum(dim=1)
-	bestBranch = int(pt.argmax(branchScores).item())
-	return bestBranch
+		if(sparseActivation._nnz() != arrayIndexSegmentFirst):
+			indices = sparseActivation.indices()
+			values = sparseActivation.values()
+			mask = (indices[2] == columnIndex) & (indices[3] == featureIndex)
+			if(pt.any(mask)):
+				branchIndices = indices[0, mask].tolist()
+				branchValues = values[mask].tolist()
+				branchScores = {}
+				for branchIndex, value in zip(branchIndices, branchValues):
+					branchScores[branchIndex] = branchScores.get(branchIndex, 0.0) + float(value)
+				bestBranch = max(branchScores, key=branchScores.get)
+				result = int(bestBranch)
+	else:
+		activationSlice = globalFeatureNeuronsActivation[:, :, columnIndex, featureIndex]
+		if(activationSlice.numel() != arrayIndexSegmentFirst):
+			branchScores = activationSlice.sum(dim=1)
+			result = int(pt.argmax(branchScores).item())
+	return result
+
+def selectActivatedBinaryTreeRootBranchIndex(globalFeatureNeuronsActivation, columnIndex, featureIndex):
+	result = arrayIndexSegmentFirst
+	if(multipleDendriticBranchesBinaryTree):
+		if(globalFeatureNeuronsActivation is None):
+			result = arrayIndexSegmentFirst
+		else:
+			featureNeuronsActive = GIAANNcmn_sparseTensors.neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANImethod)
+			if(featureNeuronsActive.is_sparse):
+				featureNeuronsActive = featureNeuronsActive.coalesce()
+				featureIndices = featureNeuronsActive.indices()
+				featureValues = featureNeuronsActive.values()
+				featureMask = (featureIndices[1] == columnIndex) & (featureIndices[2] == featureIndex)
+				branchScores = pt.zeros((multipleDendriticBranchesNumber,), dtype=featureValues.dtype, device=featureValues.device)
+				if(featureMask.any()):
+					branchScores.index_add_(arrayIndexSegmentFirst, featureIndices[0, featureMask], featureValues[featureMask])
+					result = int(pt.argmax(branchScores).item())
+			else:
+				if(featureNeuronsActive.dim() != 3):
+					raise RuntimeError("selectActivatedBinaryTreeRootBranchIndex error: feature activation rank is invalid")
+				if(columnIndex < arrayIndexSegmentFirst or columnIndex >= featureNeuronsActive.shape[1] or featureIndex < arrayIndexSegmentFirst or featureIndex >= featureNeuronsActive.shape[2]):
+					raise RuntimeError("selectActivatedBinaryTreeRootBranchIndex error: target neuron index out of range")
+				result = int(pt.argmax(featureNeuronsActive[:, columnIndex, featureIndex]).item())
+	else:
+		raise RuntimeError("selectActivatedBinaryTreeRootBranchIndex error: requires multipleDendriticBranchesBinaryTree")
+	return result
 
 def applyConnectionStrengthPOSdependenceInference(databaseNetworkObject, featureConnectionsStrength, featureConnectionsPos, sourceConceptIndex):
 	posLookup = getConnectionStrengthPOSdependenceLookup(databaseNetworkObject)

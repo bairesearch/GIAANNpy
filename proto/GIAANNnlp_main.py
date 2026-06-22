@@ -333,6 +333,10 @@ def generateSeqencesBatchOrSerial(textParsed, skipMode):
 
 def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw, inferenceSuccessfulPredictionMask=None):
 	trainMode = not inferenceMode
+	if(inferenceMode):
+		if(useTrainDuringInference):
+			if(multipleDendriticBranchesBinaryTree):
+				databaseNetworkObject.multipleDendriticBranchesBinaryTreeInferenceActivation = None
 	
 	sequenceTrainTotalStartTime = None
 	if(debugPrintTrainSectionTimes and trainMode):

@@ -405,16 +405,16 @@ def buildDeterministicBranchOrder(conceptIndexKey, featureIndex):
 	seedValue = ((conceptIndexKey + 1) * 2654435761) ^ ((featureIndex + 1) * 1013904223)
 	seedValue = seedValue & 0xFFFFFFFF
 	rng = random.Random(seedValue)
-	branchOrder = list(range(numberOfDendriticBranches))
+	branchOrder = list(range(multipleDendriticBranchesNumber))
 	rng.shuffle(branchOrder)
 	return branchOrder
 
 def selectFeatureBranchIndex(featureBranchCounts, branchAssignments, conceptIndexKey, featureIndex):
 	branchIndex = featureBranchCounts.get(featureIndex, 0)
 	featureBranchCounts[featureIndex] = branchIndex + 1
-	if(randomlyAssignBranches):
+	if(multipleDendriticBranchesRandom):
 		if(branchAssignments is None):
-			raise RuntimeError("selectFeatureBranchIndex error: branchAssignments is None while randomlyAssignBranches enabled")
+			raise RuntimeError("selectFeatureBranchIndex error: branchAssignments is None while multipleDendriticBranchesRandom enabled")
 		featureBranchOrders = branchAssignments.get(conceptIndexKey)
 		if(featureBranchOrders is None):
 			featureBranchOrders = {}
@@ -423,12 +423,12 @@ def selectFeatureBranchIndex(featureBranchCounts, branchAssignments, conceptInde
 		if(branchOrder is None):
 			branchOrder = buildDeterministicBranchOrder(conceptIndexKey, featureIndex)
 			featureBranchOrders[featureIndex] = branchOrder
-		if(branchIndex < numberOfDendriticBranches):
+		if(branchIndex < multipleDendriticBranchesNumber):
 			branchIndex = branchOrder[branchIndex]
 		else:
-			branchIndex = numberOfDendriticBranches - 1
-	if(branchIndex >= numberOfDendriticBranches):
-		branchIndex = numberOfDendriticBranches - 1
+			branchIndex = multipleDendriticBranchesNumber - 1
+	if(branchIndex >= multipleDendriticBranchesNumber):
+		branchIndex = multipleDendriticBranchesNumber - 1
 	return branchIndex
 	
 def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices):
@@ -436,7 +436,7 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 	
 	cs = sequenceObservedColumns.cs
 	fs = sequenceObservedColumns.fs
-	featureNeuronsActive = pt.zeros((numberOfDendriticBranches, arrayNumberOfSegments, cs, fs), dtype=arrayType)
+	featureNeuronsActive = pt.zeros((multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs), dtype=arrayType)
 	featureNeuronsWordOrder = pt.arange(fs).unsqueeze(0).repeat(cs, 1)
 	pt.zeros((cs, fs), dtype=pt.long)
 	columnsWordOrder = pt.zeros((cs), dtype=pt.long)
@@ -453,7 +453,7 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 	branchAssignments = None
 	if(multipleDendriticBranches):
 		branchCounters = {}
-		if(randomlyAssignBranches):
+		if(multipleDendriticBranchesRandom):
 			branchAssignments = {}
 	
 	conceptIndicesList = conceptIndices.tolist()
@@ -525,8 +525,16 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 						continue
 					globalFeatureIndex = int(featureIndicesInObservedTensor[j].item())
 					branchIndex = selectFeatureBranchIndex(featureBranchCounts, branchAssignments, conceptIndexKey, globalFeatureIndex)
+					if(multipleDendriticBranchesBinaryTree):
+						if(useTrainDuringInference):
+							if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
+								branchIndex = selectFeatureBinaryTreeBranchIndexFromInference(sequenceObservedColumns.databaseNetworkObject, conceptIndexKey, globalFeatureIndex, branchIndex)
 					if(useSANI):
-						featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, j] = 1
+						if(multipleDendriticBranchesBinaryTree):
+							binaryTreeBranchIndices = calculateFeatureBinaryTreeBranchIndices(branchIndex, activeSequentialSegments)
+							featureNeuronsActive[binaryTreeBranchIndices, activeSequentialSegments, sequenceConceptIndex, j] = 1
+						else:
+							featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, j] = 1
 					else:
 						featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, j] = 1
 					featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, tokens[j].pos)
@@ -568,8 +576,16 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 							featureBranchCounts = {}
 							branchCounters[conceptIndexKey] = featureBranchCounts
 						branchIndex = selectFeatureBranchIndex(featureBranchCounts, branchAssignments, conceptIndexKey, sequenceFeatureIndex)
+						if(multipleDendriticBranchesBinaryTree):
+							if(useTrainDuringInference):
+								if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
+									branchIndex = selectFeatureBinaryTreeBranchIndexFromInference(sequenceObservedColumns.databaseNetworkObject, conceptIndexKey, sequenceFeatureIndex, branchIndex)
 					if(useSANI):
-						featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
+						if(multipleDendriticBranchesBinaryTree):
+							binaryTreeBranchIndices = calculateFeatureBinaryTreeBranchIndices(branchIndex, activeSequentialSegments)
+							featureNeuronsActive[binaryTreeBranchIndices, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
+						else:
+							featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
 					else:
 						featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, sequenceFeatureIndex] = 1
 				elif(featureWord in sequenceObservedColumns.featureWordToIndex):
@@ -585,8 +601,16 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 							featureBranchCounts = {}
 							branchCounters[conceptIndexKey] = featureBranchCounts
 						branchIndex = selectFeatureBranchIndex(featureBranchCounts, branchAssignments, conceptIndexKey, sequenceFeatureIndex)
+						if(multipleDendriticBranchesBinaryTree):
+							if(useTrainDuringInference):
+								if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
+									branchIndex = selectFeatureBinaryTreeBranchIndexFromInference(sequenceObservedColumns.databaseNetworkObject, conceptIndexKey, sequenceFeatureIndex, branchIndex)
 					if(useSANI):
-						featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
+						if(multipleDendriticBranchesBinaryTree):
+							binaryTreeBranchIndices = calculateFeatureBinaryTreeBranchIndices(branchIndex, activeSequentialSegments)
+							featureNeuronsActive[binaryTreeBranchIndices, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
+						else:
+							featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
 					else:
 						featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, sequenceFeatureIndex] = 1
 				featureNeuronsWordOrder[sequenceConceptIndex, sequenceFeatureIndex] = j
@@ -611,3 +635,84 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 				tokenSpan = " ".join(tokenSlice)
 			
 	return featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask
+
+def calculateFeatureBinaryTreeBranchIndices(branchIndex, segmentIndices):
+	result = None
+	if(multipleDendriticBranchesBinaryTree):
+		if(not multipleDendriticBranchesRandom):
+			raise RuntimeError("calculateFeatureBinaryTreeBranchIndices error: multipleDendriticBranchesRandom is required")
+		if(not isinstance(branchIndex, int) or isinstance(branchIndex, bool)):
+			raise RuntimeError("calculateFeatureBinaryTreeBranchIndices error: branchIndex must be an int")
+		if(branchIndex < arrayIndexSegmentFirst or branchIndex >= multipleDendriticBranchesNumber):
+			raise RuntimeError("calculateFeatureBinaryTreeBranchIndices error: branchIndex out of range")
+		if(not pt.is_tensor(segmentIndices) or segmentIndices.dim() != 1):
+			raise RuntimeError("calculateFeatureBinaryTreeBranchIndices error: segmentIndices must be a rank 1 tensor")
+		if(segmentIndices.numel() > 0 and (bool(pt.any(segmentIndices < arrayIndexSegmentFirst).item()) or bool(pt.any(segmentIndices >= arrayNumberOfSegments).item()))):
+			raise RuntimeError("calculateFeatureBinaryTreeBranchIndices error: segmentIndices out of range")
+		if(multipleDendriticBranchesBinaryTreeDepth != arrayNumberOfSegments):
+			raise RuntimeError("calculateFeatureBinaryTreeBranchIndices error: binary tree depth must equal arrayNumberOfSegments")
+		branchIndices = pt.full_like(segmentIndices, branchIndex)
+		branchingFactors = pt.full_like(segmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor)
+		branchDivisors = pt.pow(branchingFactors, segmentIndices)
+		result = pt.div(branchIndices, branchDivisors, rounding_mode="floor")
+	else:
+		raise RuntimeError("calculateFeatureBinaryTreeBranchIndices error: requires multipleDendriticBranchesBinaryTree")
+	return result
+
+def selectFeatureBinaryTreeBranchIndexFromInference(databaseNetworkObject, conceptIndexKey, featureIndex, defaultBranchIndex):
+	result = defaultBranchIndex
+	if(multipleDendriticBranchesBinaryTree):
+		if(not useTrainDuringInference or not multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
+			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromInference error: requires useTrainDuringInference root-branch selection")
+		if(databaseNetworkObject is None):
+			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromInference error: databaseNetworkObject is None")
+		if(not isinstance(conceptIndexKey, int) or isinstance(conceptIndexKey, bool) or not isinstance(featureIndex, int) or isinstance(featureIndex, bool)):
+			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromInference error: conceptIndexKey and featureIndex must be ints")
+		if(not isinstance(defaultBranchIndex, int) or isinstance(defaultBranchIndex, bool) or defaultBranchIndex < arrayIndexSegmentFirst or defaultBranchIndex >= multipleDendriticBranchesNumber):
+			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromInference error: defaultBranchIndex out of range")
+		if(multipleDendriticBranchesBinaryTreeDepth != arrayNumberOfSegments):
+			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromInference error: binary tree depth must equal arrayNumberOfSegments")
+		inferenceActivation = getattr(databaseNetworkObject, "multipleDendriticBranchesBinaryTreeInferenceActivation", None)
+		if(inferenceActivation is None):
+			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromInference error: inference activation is unavailable")
+		if(inferenceActivation.dim() != 4 or inferenceActivation.shape[0] != multipleDendriticBranchesNumber or inferenceActivation.shape[1] != arrayNumberOfSegments):
+			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromInference error: inference activation shape is invalid")
+		if(conceptIndexKey < arrayIndexSegmentFirst or conceptIndexKey >= inferenceActivation.shape[2] or featureIndex < arrayIndexSegmentFirst or featureIndex >= inferenceActivation.shape[3]):
+			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromInference error: target neuron index out of range")
+		if(inferenceActivation.is_sparse):
+			inferenceActivationSparse = inferenceActivation.coalesce()
+			inferenceActivationIndices = inferenceActivationSparse.indices()
+			inferenceActivationValues = inferenceActivationSparse.values()
+			inferenceActivationMask = (inferenceActivationIndices[2] == conceptIndexKey) & (inferenceActivationIndices[3] == featureIndex)
+			branchActivation = pt.zeros((multipleDendriticBranchesNumber, arrayNumberOfSegments), dtype=inferenceActivationValues.dtype, device=inferenceActivationValues.device)
+			if(inferenceActivationMask.any()):
+				branchActivation.index_put_((inferenceActivationIndices[0, inferenceActivationMask], inferenceActivationIndices[1, inferenceActivationMask]), inferenceActivationValues[inferenceActivationMask], accumulate=True)
+		else:
+			branchActivation = inferenceActivation[:, :, conceptIndexKey, featureIndex]
+		rootBranchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=branchActivation.device).unsqueeze(1)
+		segmentIndices = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=branchActivation.device).unsqueeze(0)
+		branchingFactors = pt.full_like(segmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor)
+		branchDivisors = pt.pow(branchingFactors, segmentIndices)
+		pathBranchIndices = pt.div(rootBranchIndices, branchDivisors, rounding_mode="floor")
+		pathActivations = branchActivation[pathBranchIndices, segmentIndices]
+		pathActivationMask = (pathActivations > 0).to(pt.long)
+		contiguouslyActiveFinalPath = pt.flip(pt.cumprod(pt.flip(pathActivationMask, dims=(1,)), dim=1), dims=(1,))
+		numberOfContiguouslyActiveFinalSegments = contiguouslyActiveFinalPath.sum(dim=1)
+		maximumNumberOfContiguouslyActiveFinalSegments = int(numberOfContiguouslyActiveFinalSegments.max().item())
+		if(maximumNumberOfContiguouslyActiveFinalSegments > arrayIndexSegmentFirst):
+			firstContiguouslyActiveFinalSegmentIndex = arrayNumberOfSegments - maximumNumberOfContiguouslyActiveFinalSegments
+			mostCompleteRootBranches = pt.nonzero(numberOfContiguouslyActiveFinalSegments == maximumNumberOfContiguouslyActiveFinalSegments, as_tuple=False).view(-1)
+			firstContiguouslyActiveFinalSegmentBranchDivisor = multipleDendriticBranchesBinaryTreeBranchingFactor**firstContiguouslyActiveFinalSegmentIndex
+			mostCompleteBranchIndices = pt.div(mostCompleteRootBranches, firstContiguouslyActiveFinalSegmentBranchDivisor, rounding_mode="floor")
+			mostCompleteBranchCounts = pt.bincount(mostCompleteBranchIndices, minlength=multipleDendriticBranchesNumber)
+			maximumBranchCount = mostCompleteBranchCounts.max()
+			mostCompleteBranchCandidates = pt.nonzero(mostCompleteBranchCounts == maximumBranchCount, as_tuple=False).view(-1)
+			selectedCandidateIndex = pt.randint(mostCompleteBranchCandidates.numel(), (1,), device=branchActivation.device)
+			selectedBranchIndex = int(mostCompleteBranchCandidates[selectedCandidateIndex].item())
+			rootBranchesPerSelectedBranch = multipleDendriticBranchesNumber//(multipleDendriticBranchesBinaryTreeBranchingFactor**(maximumNumberOfContiguouslyActiveFinalSegments-1))
+			selectedRootBranchStart = rootBranchesPerSelectedBranch*selectedBranchIndex
+			selectedRootBranchEnd = selectedRootBranchStart + rootBranchesPerSelectedBranch
+			result = int(pt.randint(selectedRootBranchStart, selectedRootBranchEnd, (1,), device=branchActivation.device).item())
+	else:
+		raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromInference error: requires multipleDendriticBranchesBinaryTree")
+	return result

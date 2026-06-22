@@ -260,12 +260,12 @@ class SequenceObservedColumns:
 		
 	#@staticmethod
 	def initialiseFeatureNeuronsSequence(self, cs, fs):
-		featureNeurons = pt.zeros(self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, dtype=arrayType)
+		featureNeurons = pt.zeros(self.databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs, dtype=arrayType)
 		return featureNeurons
 
 	#@staticmethod
 	def initialiseFeatureNeuronsSequenceSparse(self, cs, fs):
-		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, cs, fs)
+		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs)
 		emptyIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=deviceSparse)
 		emptyValues = pt.empty((0,), dtype=arrayType, device=deviceSparse)
 		featureNeurons = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=targetSize, dtype=arrayType, device=deviceSparse)
@@ -273,12 +273,12 @@ class SequenceObservedColumns:
 
 	#@staticmethod
 	def initialiseFeatureConnectionsSequence(self, cs, fs):
-		featureConnections = pt.zeros(self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs, dtype=arrayType)
+		featureConnections = pt.zeros(self.databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs, cs, fs, dtype=arrayType)
 		return featureConnections
 
 	#@staticmethod
 	def initialiseFeatureConnectionsSequenceSparse(self, cs, fs):
-		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs)
+		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs, cs, fs)
 		emptyIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=deviceSparse)
 		emptyValues = pt.empty((0,), dtype=arrayType, device=deviceSparse)
 		featureConnections = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=targetSize, dtype=arrayType, device=deviceSparse)
@@ -527,7 +527,7 @@ class SequenceObservedColumns:
 			newList = []
 			branchMappedCount = 0
 			branchMappedNonZero = 0
-			if(randomlyAssignBranches and branchList is not None):
+			if(multipleDendriticBranchesRandom and branchList is not None):
 				observedColumn = self.sequenceObservedColumnsDict.get(columnIndex) if trainSequenceObservedColumnsMatchSequenceWords else self.observedColumnsDict2.get(columnIndex)
 				conceptIndexKey = observedColumn.conceptIndex if observedColumn is not None else None
 			for idx, (defaultValue, globalValue) in enumerate(zip(defaultList, globalList)):
@@ -537,7 +537,7 @@ class SequenceObservedColumns:
 						branchMappedCount = branchMappedCount + 1
 						branchIndex = int(branchList[idx])
 						candidateIndex = branchIndex if branchIndex < len(candidates) else len(candidates) - 1
-						if(randomlyAssignBranches and conceptIndexKey is not None):
+						if(multipleDendriticBranchesRandom and conceptIndexKey is not None):
 							branchOrder = GIAANNnlp_sequenceConcepts.buildDeterministicBranchOrder(conceptIndexKey, int(globalValue))
 							if(branchIndex in branchOrder):
 								candidateIndex = branchOrder.index(branchIndex)
@@ -909,7 +909,7 @@ class SequenceObservedColumns:
 					removeMask = removeMask & (targetIndices[0] != databaseNetworkObject.arrayIndexPropertiesActivationIndex)
 				elif(self.debugInferenceActive and multipleDendriticBranches and databaseNetworkObject.arrayIndexPropertiesActivationIndex is not None):
 					if(activationUpdateBranches is not None and activationUpdateBranches.numel() > 0):
-						activationBranchLookup = self.buildMaskLookup(numberOfDendriticBranches, activationUpdateBranches.to(targetIndices.device), targetIndices.device)
+						activationBranchLookup = self.buildMaskLookup(multipleDendriticBranchesNumber, activationUpdateBranches.to(targetIndices.device), targetIndices.device)
 						activationMask = (targetIndices[0] == databaseNetworkObject.arrayIndexPropertiesActivationIndex)
 						if(not storeDatabaseGlobalFeatureNeuronsInRam):
 							activationMask = activationMask & observedFeatureMaskLookup[targetIndices[3]]
@@ -1124,7 +1124,7 @@ class SequenceObservedColumns:
 			if(featureIndices.numel() > 0):
 				if(not storeDatabaseGlobalFeatureNeuronsInRam):
 					featureConceptIndicesUnique = pt.unique(conceptIndicesFeatureTensor[featureIndices[2]], sorted=True)
-					featureTargetSize = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, featureConceptIndicesUnique.shape[0], databaseNetworkObject.f)
+					featureTargetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, featureConceptIndicesUnique.shape[0], databaseNetworkObject.f)
 					featureTargetSparse = self.gatherFeatureNeuronConceptBucketTensor(observedColumnsByConceptIndex, featureConceptIndicesUnique, featureDevice)
 					featureUpdates = self.buildFeaturePropertyUpdateSparseBatched(featureIndices, featureValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, conceptIndicesFeatureTensor, featureTargetSize, featureConceptIndicesUnique)
 					featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
@@ -1164,7 +1164,7 @@ class SequenceObservedColumns:
 				connectionSourceCombinedKeys = self.buildConnectionSourceCombinedKeys(connectionIndices, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor)
 			if(connectionSourceCombinedKeys is not None and connectionSourceCombinedKeys.numel() > 0):
 				connectionSourceCombinedKeysUnique = pt.unique(connectionSourceCombinedKeys, sorted=True)
-				connectionTargetSize = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, connectionSourceCombinedKeysUnique.shape[0], databaseNetworkObject.c, databaseNetworkObject.f)
+				connectionTargetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, connectionSourceCombinedKeysUnique.shape[0], databaseNetworkObject.c, databaseNetworkObject.f)
 				connectionTargetSparse = self.gatherConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionDevice)
 				if(connectionIndices.numel() > 0):
 					connectionUpdates = self.buildConnectionSourceBucketUpdateSparse(connectionIndices, connectionValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor, connectionSourceCombinedKeysUnique, connectionTargetSize)
@@ -1211,7 +1211,7 @@ class SequenceObservedColumns:
 		return result
 
 	def gatherFeatureNeuronConceptBucketTensor(self, observedColumnsByConceptIndex, compactConceptIndices, targetDevice):
-		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, compactConceptIndices.shape[0], self.databaseNetworkObject.f)
+		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, compactConceptIndices.shape[0], self.databaseNetworkObject.f)
 		combinedIndicesList = []
 		combinedValuesList = []
 		conceptIndexList = compactConceptIndices.detach().cpu().tolist()
@@ -1253,7 +1253,7 @@ class SequenceObservedColumns:
 			for conceptBucketIndexValue, start, count in zip(uniqueBuckets.tolist(), starts.tolist(), counts.tolist()):
 				featureTargetBucketRanges[int(conceptBucketIndexValue)] = (int(start), int(start + count))
 		conceptIndexList = compactConceptIndices.detach().cpu().tolist()
-		sourceTensorSize = (self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, self.databaseNetworkObject.f)
+		sourceTensorSize = (self.databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, self.databaseNetworkObject.f)
 		for conceptBucketIndex, conceptIndexValue in enumerate(conceptIndexList):
 			if(int(conceptIndexValue) not in observedColumnsByConceptIndex):
 				raise RuntimeError(f"scatterFeatureNeuronConceptBucketTensor error: missing observed column for conceptIndex {int(conceptIndexValue)}")
@@ -1297,7 +1297,7 @@ class SequenceObservedColumns:
 		return result
 
 	def gatherConnectionSourceBucketTensor(self, observedColumnsByConceptIndex, sourceCombinedKeysUnique, targetDevice):
-		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, sourceCombinedKeysUnique.shape[0], self.databaseNetworkObject.c, self.databaseNetworkObject.f)
+		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, sourceCombinedKeysUnique.shape[0], self.databaseNetworkObject.c, self.databaseNetworkObject.f)
 		result = None
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
 			gatherConnectionSourceBucketTensorStartTime = None
@@ -1354,7 +1354,7 @@ class SequenceObservedColumns:
 				connectionTargetBucketRanges[int(sourceBucketIndexValue)] = (int(start), int(start + count))
 		sourceConceptIndexList = pt.div(sourceCombinedKeysUnique, self.databaseNetworkObject.f, rounding_mode='floor').detach().cpu().tolist()
 		sourceFeatureIndexList = pt.remainder(sourceCombinedKeysUnique, self.databaseNetworkObject.f).detach().cpu().tolist()
-		sourceTensorSize = (self.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, self.databaseNetworkObject.c, self.databaseNetworkObject.f)
+		sourceTensorSize = (self.databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, self.databaseNetworkObject.c, self.databaseNetworkObject.f)
 		for sourceBucketIndex, (conceptIndexValue, sourceFeatureIndexValue) in enumerate(zip(sourceConceptIndexList, sourceFeatureIndexList)):
 			if(int(conceptIndexValue) not in observedColumnsByConceptIndex):
 				raise RuntimeError(f"scatterConnectionSourceBucketTensor error: missing observed column for conceptIndex {int(conceptIndexValue)}")

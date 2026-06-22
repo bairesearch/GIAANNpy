@@ -107,12 +107,12 @@ def ensureGlobalFeatureNeuronsSize(databaseNetworkObject, updateBackup):
 	if(databaseNetworkObject.globalFeatureNeurons is None):
 		raise RuntimeError("ensureGlobalFeatureNeuronsSize error: globalFeatureNeurons is None")
 	if(databaseNetworkObject.globalFeatureNeurons.shape[3] < databaseNetworkObject.c or databaseNetworkObject.globalFeatureNeurons.shape[4] < databaseNetworkObject.f):
-		newShape = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
+		newShape = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
 		databaseNetworkObject.globalFeatureNeurons = GIAANNcmn_databaseNetworkFiles.expandSparseTensorSize(databaseNetworkObject.globalFeatureNeurons, newShape, "ensureGlobalFeatureNeuronsSize.globalFeatureNeurons")
 		expanded = True
 	if(updateBackup and databaseNetworkObject.globalFeatureNeuronsBackup is not None):
 		if(databaseNetworkObject.globalFeatureNeuronsBackup.shape[3] < databaseNetworkObject.c or databaseNetworkObject.globalFeatureNeuronsBackup.shape[4] < databaseNetworkObject.f):
-			newBackupShape = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
+			newBackupShape = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
 			databaseNetworkObject.globalFeatureNeuronsBackup = GIAANNcmn_databaseNetworkFiles.expandSparseTensorSize(databaseNetworkObject.globalFeatureNeuronsBackup, newBackupShape, "ensureGlobalFeatureNeuronsSize.globalFeatureNeuronsBackup")
 			expanded = True
 	return expanded
@@ -121,7 +121,7 @@ def ensureGlobalFeatureNeuronsSize(databaseNetworkObject, updateBackup):
 if storeDatabaseGlobalFeatureNeuronsInRam:
 	def initialiseFeatureNeuronsGlobal(inferenceMode, c, f):
 		arrayNumberOfProperties = calculateArrayNumberOfProperties(inferenceMode)
-		globalFeatureNeurons = GIAANNcmn_sparseTensors.createEmptySparseTensor((arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, c, f))
+		globalFeatureNeurons = GIAANNcmn_sparseTensors.createEmptySparseTensor((arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, c, f))
 		return globalFeatureNeurons
 		
 	def loadFeatureNeuronsGlobal(inferenceMode, c, f):

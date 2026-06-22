@@ -219,18 +219,28 @@ def applyBeamNodePredictionEffects(state, columnIndex, featureIndex, sequenceWor
 		state["features"] = GIAANNcmn_sparseTensors.modifySparseTensor(state["features"], indicesToUpdate, modifier, multiply=False)
 
 def buildBeamNodeIndices(device, columnIndex, featureIndex, branchIndex=0):
-	indicesToUpdateList = []
 	columnTensor = pt.tensor(columnIndex, dtype=pt.long, device=device)
 	featureTensor = pt.tensor(featureIndex, dtype=pt.long, device=device)
 	branchTensor = pt.tensor(branchIndex, dtype=pt.long, device=device)
 	if(useSANI):
-		for segmentIndex in range(arrayNumberOfSegments):
-			segmentTensor = pt.tensor(segmentIndex, dtype=pt.long, device=device)
-			indicesToUpdateList.append(pt.stack([branchTensor, segmentTensor, columnTensor, featureTensor], dim=0))
+		if(multipleDendriticBranchesBinaryTree):
+			segmentIndices = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=device)
+			branchIndices = pt.full_like(segmentIndices, branchIndex)
+			branchDivisors = pt.pow(pt.full_like(segmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor), segmentIndices)
+			binaryTreeBranchIndices = pt.div(branchIndices, branchDivisors, rounding_mode="floor")
+			indicesToUpdate = pt.stack([binaryTreeBranchIndices, segmentIndices, columnTensor.expand(arrayNumberOfSegments), featureTensor.expand(arrayNumberOfSegments)], dim=1)
+		else:
+			indicesToUpdateList = []
+			for segmentIndex in range(arrayNumberOfSegments):
+				segmentTensor = pt.tensor(segmentIndex, dtype=pt.long, device=device)
+				indicesToUpdateList.append(pt.stack([branchTensor, segmentTensor, columnTensor, featureTensor], dim=0))
+			indicesToUpdate = pt.stack(indicesToUpdateList, dim=0)
 	else:
+		indicesToUpdateList = []
 		segmentTensor = pt.tensor(arrayIndexSegmentFirst, dtype=pt.long, device=device)
 		indicesToUpdateList.append(pt.stack([branchTensor, segmentTensor, columnTensor, featureTensor], dim=0))
-	return pt.stack(indicesToUpdateList, dim=0)
+		indicesToUpdate = pt.stack(indicesToUpdateList, dim=0)
+	return indicesToUpdate
 
 def describeBeamCandidate(databaseNetworkObject, candidate):
 	return describeBeamNodes(databaseNetworkObject, candidate["nodes"])

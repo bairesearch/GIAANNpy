@@ -51,7 +51,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -60,7 +60,6 @@ elif(useTrainDuringInference):
 	executionMode = "trainDuringInference"	#optional: "trainDuringInference/"inference"
 else:
 	raise RuntimeError("execution mode undefined")
-
 
 
 #Primary Draw settings:
@@ -83,7 +82,7 @@ inferenceAddNewFeatures = True	#default: True	#orig: False	#run a controlled exp
 if(useQuickExecution):
 	useBenchmarkDefaultsEvalTestSet = False	#default: False: eval training-set
 elif(useDefault):
-	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
+	useBenchmarkDefaultsEvalTestSet = False	#default: True: eval test-set
 elif(useBenchmark):
 	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
 elif(useAutoresearch):
@@ -92,10 +91,11 @@ elif(useDrawNetworkIndependently):
 	useBenchmarkDefaultsEvalTestSet = True	#N/A
 elif(useTrainDuringInference):
 	if(executionMode == "trainDuringInference"):
-		useBenchmarkDefaultsEvalTestSet = False	#default: False	#execute executionMode="trainDuringInference" must use inferenceSegmentTiming = "exact" to approximate executionMode = "train"
+		useBenchmarkDefaultsEvalTrainSet = False	#default: False	#execute executionMode="trainDuringInference" must use inferenceSegmentTiming = "exact" to approximate executionMode = "train"
+		useBenchmarkDefaultsEvalTestSet = useBenchmarkDefaultsEvalTrainSet	#alias only
 	elif(executionMode == "inference"):
 		useBenchmarkDefaultsEvalTestSet = False	#default: True: eval test-set
-
+	
 if(useBenchmarkDefaultsEvalTestSet):
 	inferenceEvaluateTestSet = True
 	inferenceEvaluateTestSetTrainMaxSequences10M = False	#default: False	#orig: False	#required if performing test-set eval on database trained with > 3M sequences (based on how the original test-set was generated)
@@ -122,15 +122,17 @@ inferenceReportTokenAccuracyConstrainByColumn = False	#default: False	#orig: Fal
 #Database folder;
 databaseFolderBaseLocal = "../"	#default: "../"
 databaseFolderBaseSSD = "/media/user/ssdpro/GIAANN/"	#default: "/media/user/ssdpro/GIAANN/"
-databaseNameBase = "database"	#default: "database"
+databaseNameBase = "database"	 #"database"	#default: "database"
+#databaseNameBase = "databaseOscar1000-multipleDendriticBranchesBinaryTree"
+
 if(useQuickExecution):
 	trainMaxSequences = 10	#N/A: auto generated from inference_prompt.txt.trainAndInference
 	databaseFolderBase = databaseFolderBaseLocal
 elif(useDefault):
-	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
+	trainMaxSequences = 1000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 5000	#5000, 200000, 1000000
+	trainMaxSequences = 1000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 5000	#5000
@@ -140,7 +142,7 @@ elif(useDrawNetworkIndependently):
 	trainMaxSequences = 0	#not used
 	databaseFolderBase = databaseFolderBaseLocal
 elif(useTrainDuringInference):
-	trainMaxSequences = 5000	#slow execution
+	trainMaxSequences = 5000	#slow execution	#5000, 200000
 	databaseFolderBase = databaseFolderBaseSSD
 if(databaseFolderBase==databaseFolderBaseSSD):
 	inferenceCopyTemplateDatasets = True	#default: True	#copy template dataset files into databaseFolder at inference startup
@@ -158,17 +160,33 @@ numberEpochs = 1	#default: 1
 #Dendritic branches;
 multipleDendriticBranches = True	#default: True	#orig: False
 if(multipleDendriticBranches):
-	if(useTrainDuringInference):
-		randomlyAssignBranches = True	#default: True	#useTrainDuringInference algorithm has automatic protection against replication of same patterns across multiple branches, so it can better capitalise on randomised branch assignment
+	multipleDendriticBranchesBinaryTree = False	#default: False	#True: binary tree of dendritic branches, False: independent dendritic branches
+	if(multipleDendriticBranchesBinaryTree):
+		multipleDendriticBranchesBinaryTreeBranchingFactor = 2	#mandatory
+		multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches = False	#derived var
+		multipleDendriticBranchesBinaryTreeDepth = numSeedTokensInference	#== arrayNumberOfSegments	#depth of the dendritic binary tree
+		if(multipleDendriticBranchesBinaryTreeDepth < 1):
+			raise RuntimeError("GIAANNcmn_globalDefs error: multipleDendriticBranchesBinaryTreeDepth must be >= 1")
+		if(useTrainDuringInference):
+			multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches = True
+			if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
+				if(executionMode=="trainDuringInference"):
+					assert inferenceSegmentTiming=="biased" or inferenceSegmentTiming=="none"	#requires enforceSequentialActivation==False during the inference phase of training
+	if(useTrainDuringInference or multipleDendriticBranchesBinaryTree):
+		multipleDendriticBranchesRandom = True	#mandatory: True	#useTrainDuringInference algorithm has automatic protection against replication of same patterns across multiple branches, so it can better capitalise on randomised branch assignment
 	else:
-		randomlyAssignBranches = False	#optional	#default: False #orig: False
-	if(randomlyAssignBranches):
-		numberOfDendriticBranches = 5
+		multipleDendriticBranchesRandom = False	#optional	#default: False #orig: False
+	if(multipleDendriticBranchesRandom):
+		if(multipleDendriticBranchesBinaryTree):
+			multipleDendriticBranchesNumber = multipleDendriticBranchesBinaryTreeBranchingFactor**(multipleDendriticBranchesBinaryTreeDepth-1)	#note segmentIndex==0 (ie depthIndex==multipleDendriticBranchesBinaryTreeDepth-1) has the most branches, while segmentIndex==numberOfSegments-1 (ie depthIndex==0) has one branch.
+		else:
+			multipleDendriticBranchesNumber = 5
 	else:
-		numberOfDendriticBranches = 2	#default: 5, 2	#affects train+inference RAM
+		multipleDendriticBranchesNumber = 2	#default: 5, 2	#affects train+inference RAM
 else:
-	numberOfDendriticBranches = 1
-	randomlyAssignBranches = False
+	#multipleDendriticBranchesBinaryTree = False
+	multipleDendriticBranchesNumber = 1
+	multipleDendriticBranchesRandom = False
 
 
 #SANI;
@@ -209,11 +227,11 @@ elif(useModalityNLP):
 		useGPUsparse = False
 	else:
 		if(useTrainDuringInference):
-			useGPUdense = False
+			useGPUdense = False	#this is a temporary fail-safe mode that allows for seamless transition between per sequence inference and train phase
 		else:
 			useGPUdense = True	#default: True
 		if(executionMode=="train"):
-			useGPUsparse = True	#default: True		#slight performance increase during train (does not use significant additional GPU ram during train)
+			useGPUsparse = False	#default: True		#slight performance increase during train (does not use significant additional GPU ram during train)
 		else:
 			useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors	#inference can be slightly faster CPU sparse tensor operations
 useGPUsparseStrict = True	#default: True	#orig: False	#optional	#enforce strict sparse device during transfer to/from dense tensors (make conversion process always use sparse device)	 #no significant difference in speed; can theoretically affect peak CPU or GPU RAM
@@ -228,14 +246,14 @@ else:
 if(trainSparseNeuronsTensor):
 	assert trainSparseConnectionsTensor, "trainSparseNeuronsTensor requires trainSparseConnectionsTensor=True"
 
-storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = False	#default: False	#orig2: True	#orig1: False	#optional	#store database feature connections and column separated feature neuron data in RAM, else dynamically load these from filesystem per sequence
+storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = True	#default: False	#orig2: True	#orig1: False	#optional	#store database feature connections and column separated feature neuron data in RAM, else dynamically load these from filesystem per sequence
 if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 	useGPUdatabase = False	#default: False	#default: False
 	resizeTensorsOnRAMdatabaseSave = False	#default: False #orig: True	#resize all feature neuron and connections tensors during final RAM database save
 	resizeTensorsOnRAMdatabaseLoad = False	#default: False #orig: True	#resize all feature neuron and connections tensors during initial RAM database load
 
 if(executionMode=="train"):
-	storeDatabaseGlobalFeatureNeuronsInRam = False		 #default: False	#orig: True	 #not required to be True for inference compatibility	#optional
+	storeDatabaseGlobalFeatureNeuronsInRam = True		 #default: False	#orig: True	 #not required to be True for inference compatibility	#optional
 else:
 	storeDatabaseGlobalFeatureNeuronsInRam = True		#mandatory: True	#if storeDatabaseGlobalFeatureNeuronsInRam=True use global feature neuron tensors, else use feature neuron tensors in observed columns (note feature connection tensors are always in observed columns)
 trainEndGenerateGlobalFeatureNeuronsTensor = False	#derived var
@@ -828,6 +846,14 @@ else:
 	algorithmMatrixSANImethod = "NA"
 	arrayIndexSegmentLast = 0
 
+if(multipleDendriticBranchesBinaryTree):
+	if(not multipleDendriticBranchesRandom):
+		raise RuntimeError("GIAANNcmn_globalDefs error: multipleDendriticBranchesBinaryTree requires multipleDendriticBranchesRandom")
+	if(not useSANI):
+		raise RuntimeError("GIAANNcmn_globalDefs error: multipleDendriticBranchesBinaryTree requires useSANI")
+	if(arrayNumberOfSegments != multipleDendriticBranchesBinaryTreeDepth):
+		raise RuntimeError("GIAANNcmn_globalDefs error: multipleDendriticBranchesBinaryTreeDepth must equal arrayNumberOfSegments")
+
 arrayType = pt.float32	#pt.long	#pt.float32
 
 
@@ -978,8 +1004,8 @@ if(printConfiguration):
 	print("")
 	print("#Dendritic branches;")
 	print("multipleDendriticBranches:", multipleDendriticBranches)
-	print("numberOfDendriticBranches:", numberOfDendriticBranches)
-	print("randomlyAssignBranches:", randomlyAssignBranches)
+	print("multipleDendriticBranchesNumber:", multipleDendriticBranchesNumber)
+	print("multipleDendriticBranchesRandom:", multipleDendriticBranchesRandom)
 	print("")
 	print("#Dataset;")
 	print("datasetName:", datasetName)

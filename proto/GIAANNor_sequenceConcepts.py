@@ -405,7 +405,7 @@ def configureTrainConnectionsForImageSequenceEncoding(sequenceObservedColumns):
 def buildTrainTensors(sequenceObservedColumns, sequenceData):
 	result = None
 	targetDevice = deviceDense
-	featureNeuronsActive = pt.zeros((numberOfDendriticBranches, arrayNumberOfSegments, sequenceObservedColumns.cs, sequenceObservedColumns.fs), dtype=arrayType, device=targetDevice)
+	featureNeuronsActive = pt.zeros((multipleDendriticBranchesNumber, arrayNumberOfSegments, sequenceObservedColumns.cs, sequenceObservedColumns.fs), dtype=arrayType, device=targetDevice)
 	sequenceConceptIndexMask = pt.ones((sequenceObservedColumns.cs, sequenceObservedColumns.fs), dtype=arrayType, device=targetDevice)
 	columnsWordOrder = None
 	featureNeuronsWordOrder = pt.zeros((sequenceObservedColumns.cs, sequenceObservedColumns.fs), dtype=pt.long, device=targetDevice)

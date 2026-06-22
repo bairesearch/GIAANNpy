@@ -318,23 +318,29 @@ def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceOb
 	if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
 		featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrainSpatialAxes(featureNeuronsActive, cs, fs, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
 	elif(useSANI):
-		featureConnectionsActive = None
-		featureConnectionsSegmentMask = None
-		for segmentIndex in range(arrayNumberOfSegments):
-			segmentActive = featureNeuronsActive[:, segmentIndex]
-			if not pt.any(segmentActive):
-				continue
-			segmentConnectionsActive, segmentMask = createFeatureConnectionsActiveTrain(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+		if(multipleDendriticBranchesBinaryTree):
+			segmentActive = featureNeuronsActive[:, arrayIndexSegmentFirst]
+			if(not pt.any(segmentActive)):
+				raise RuntimeError("processFeaturesActiveTrainDenseConnections error: binary tree root segment has no active features")
+			featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+		else:
+			featureConnectionsActive = None
+			featureConnectionsSegmentMask = None
+			for segmentIndex in range(arrayNumberOfSegments):
+				segmentActive = featureNeuronsActive[:, segmentIndex]
+				if not pt.any(segmentActive):
+					continue
+				segmentConnectionsActive, segmentMask = createFeatureConnectionsActiveTrain(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+				if featureConnectionsActive is None:
+					featureConnectionsActive = segmentConnectionsActive
+					featureConnectionsSegmentMask = segmentMask
+				else:
+					featureConnectionsActive = pt.maximum(featureConnectionsActive, segmentConnectionsActive)
+					featureConnectionsSegmentMask = pt.logical_or(featureConnectionsSegmentMask, segmentMask)
 			if featureConnectionsActive is None:
-				featureConnectionsActive = segmentConnectionsActive
-				featureConnectionsSegmentMask = segmentMask
-			else:
-				featureConnectionsActive = pt.maximum(featureConnectionsActive, segmentConnectionsActive)
-				featureConnectionsSegmentMask = pt.logical_or(featureConnectionsSegmentMask, segmentMask)
-		if featureConnectionsActive is None:
-			printe("processFeaturesActiveTrain() error: featureConnectionsActive is None")
-			#featureConnectionsActive = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=arrayType)
-			#featureConnectionsSegmentMask = pt.zeros_like(featureConnectionsActive, dtype=pt.bool)
+				printe("processFeaturesActiveTrain() error: featureConnectionsActive is None")
+				#featureConnectionsActive = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=arrayType)
+				#featureConnectionsSegmentMask = pt.zeros_like(featureConnectionsActive, dtype=pt.bool)
 	else:
 		featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[:, arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
 
@@ -343,7 +349,7 @@ def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceOb
 
 	featureConnectionsPos = None
 	if(arrayIndexPropertiesPos or (arrayIndexPropertiesStrength and trainConnectionStrengthPOSdependence)):
-		featureConnectionsPos = featureNeuronsPos.view(1, 1, cs, fs, 1, 1).expand(numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs)
+		featureConnectionsPos = featureNeuronsPos.view(1, 1, cs, fs, 1, 1).expand(multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs, cs, fs)
 
 	featureConnectionsInactive = None
 	if((arrayIndexPropertiesTime or arrayIndexPropertiesPos) and not useSparseSequenceConnections):
@@ -367,8 +373,8 @@ def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceOb
 		csIndices1 = None
 		csIndices2 = None
 		if(trainConnectionStrengthIncreaseColumnInternal or trainConnectionStrengthPOSdependence):
-			csIndices1 = pt.arange(cs).view(1, 1, cs, 1, 1, 1).expand(numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs)
-			csIndices2 = pt.arange(cs).view(1, 1, 1, 1, cs, 1).expand(numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs)
+			csIndices1 = pt.arange(cs).view(1, 1, cs, 1, 1, 1).expand(multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs, cs, fs)
+			csIndices2 = pt.arange(cs).view(1, 1, 1, 1, cs, 1).expand(multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs, cs, fs)
 
 		if(trainConnectionStrengthIncreaseColumnInternal):
 			columnInternalConnectionsMask = (csIndices1 == csIndices2)
@@ -530,16 +536,25 @@ def createFeatureConnectionsActiveTrainSpatialAxes(featureNeuronsActive, cs, fs,
 	featureConnectionsActive = None
 	featureConnectionsSegmentMask = None
 	connectionDevice = None
+	binaryTreeRootFeatureNeuronsActive = None
 	if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
-		connectionTargetSize = (numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs)
+		connectionTargetSize = (multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs, cs, fs)
 		connectionDevice = featureNeuronsActive.device
-		connectionIndices = calculateFeatureConnectionsActiveTrainSpatialAxesSparseIndices(featureNeuronsActive, cs, fs, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+		if(multipleDendriticBranchesBinaryTree):
+			binaryTreeRootFeatureNeuronsActive = selectFeatureNeuronsBinaryTreeRootSegment(featureNeuronsActive)
+			connectionIndices = calculateFeatureConnectionsActiveTrainSpatialAxesSparseIndices(binaryTreeRootFeatureNeuronsActive, cs, fs, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+		else:
+			connectionIndices = calculateFeatureConnectionsActiveTrainSpatialAxesSparseIndices(featureNeuronsActive, cs, fs, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+		if(multipleDendriticBranchesBinaryTree):
+			connectionIndices = calculateFeatureConnectionsBinaryTreeBranchIndicesFromRootBranches(connectionIndices, connectionTargetSize)
 		connectionValues = pt.ones((connectionIndices.shape[1],), dtype=arrayType, device=connectionDevice)
 		connectionSparse = pt.sparse_coo_tensor(connectionIndices, connectionValues, size=connectionTargetSize, dtype=arrayType, device=connectionDevice).coalesce()
 		if(connectionSparse._nnz() > 0):
 			connectionSparse.values().clamp_(max=1.0)
 		featureConnectionsActive = connectionSparse.to_dense()
 		featureConnectionsSegmentMask = calculateFeatureConnectionsSpatialAxesSegmentMaskTensor(sequenceObservedColumns, cs, fs, connectionDevice)
+		if(multipleDendriticBranchesBinaryTree):
+			featureConnectionsSegmentMask = pt.logical_and(featureConnectionsSegmentMask, calculateFeatureConnectionsBinaryTreeValidSegmentBranchMask(featureConnectionsSegmentMask))
 		result = (featureConnectionsActive, featureConnectionsSegmentMask)
 	else:
 		raise RuntimeError("createFeatureConnectionsActiveTrainSpatialAxes error: requires trainConnectionsUseSpatialAxes")
@@ -551,10 +566,17 @@ def createFeatureConnectionsActiveTrainSpatialAxesSparse(featureNeuronsActive, c
 	connectionIndices = None
 	connectionValues = None
 	connectionDevice = None
+	binaryTreeRootFeatureNeuronsActive = None
 	if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
-		connectionTargetSize = (numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs)
+		connectionTargetSize = (multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs, cs, fs)
 		connectionDevice = featureNeuronsActive.device
-		connectionIndices = calculateFeatureConnectionsActiveTrainSpatialAxesSparseIndices(featureNeuronsActive, cs, fs, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+		if(multipleDendriticBranchesBinaryTree):
+			binaryTreeRootFeatureNeuronsActive = selectFeatureNeuronsBinaryTreeRootSegment(featureNeuronsActive)
+			connectionIndices = calculateFeatureConnectionsActiveTrainSpatialAxesSparseIndices(binaryTreeRootFeatureNeuronsActive, cs, fs, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+		else:
+			connectionIndices = calculateFeatureConnectionsActiveTrainSpatialAxesSparseIndices(featureNeuronsActive, cs, fs, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+		if(multipleDendriticBranchesBinaryTree):
+			connectionIndices = calculateFeatureConnectionsBinaryTreeBranchIndicesFromRootBranches(connectionIndices, connectionTargetSize)
 		connectionValues = pt.ones((connectionIndices.shape[1],), dtype=arrayType, device=connectionDevice)
 		result = pt.sparse_coo_tensor(connectionIndices, connectionValues, size=connectionTargetSize, dtype=arrayType, device=connectionDevice).coalesce()
 		if(result._nnz() > 0):
@@ -660,9 +682,9 @@ def calculateFeatureConnectionsSpatialAxesSegmentMaskTensor(sequenceObservedColu
 		segmentMaskCollapsed = segmentMaskCollapsed & featureAxisMaskTensor.view(1, fs, 1)
 		featureCentralColumnMaskTensor = getImageAxesFeatureCentralColumnMask(sequenceObservedColumns, targetDevice)
 		segmentMaskCollapsed = segmentMaskCollapsed & featureCentralColumnMaskTensor.view(1, 1, fs)
-		result = pt.zeros((numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=targetDevice)
+		result = pt.zeros((multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=targetDevice)
 		if(modalityORimageSequenceEncodeAxesColumnRandom):
-			result[:, :, axesSourceColumnIndex, :, :, :] = segmentMaskCollapsed.view(1, int(arrayNumberOfSegments), int(fs), 1, int(fs)).expand(int(numberOfDendriticBranches), int(arrayNumberOfSegments), int(fs), int(cs), int(fs))
+			result[:, :, axesSourceColumnIndex, :, :, :] = segmentMaskCollapsed.view(1, int(arrayNumberOfSegments), int(fs), 1, int(fs)).expand(int(multipleDendriticBranchesNumber), int(arrayNumberOfSegments), int(fs), int(cs), int(fs))
 		else:
 			axesTargetColumnIndex = getImageSequenceEncodeAxesTargetColumnIndex(cs)
 			result[:, :, axesSourceColumnIndex, :, axesTargetColumnIndex, :] = segmentMaskCollapsed
@@ -791,18 +813,26 @@ def getImageAxesCentralFieldCoordinates(sequenceObservedColumns):
 	return result
 
 def createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns):
-	connectionTargetSize = (numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs)
+	connectionTargetSize = (multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs, cs, fs)
 	connectionDevice = featureNeuronsActive.device
 	combinedIndices = pt.empty((len(connectionTargetSize), 0), dtype=pt.long, device=connectionDevice)
 	combinedValues = pt.empty((0,), dtype=arrayType, device=connectionDevice)
 	indicesList = []
 	if(useSANI):
-		for segmentIndex in range(arrayNumberOfSegments):
-			segmentActive = featureNeuronsActive[:, segmentIndex]
-			if(pt.any(segmentActive)):
-				segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
-				if(segmentConnectionIndices.numel() > 0):
-					indicesList.append(segmentConnectionIndices)
+		if(multipleDendriticBranchesBinaryTree):
+			segmentActive = featureNeuronsActive[:, arrayIndexSegmentFirst]
+			if(not pt.any(segmentActive)):
+				raise RuntimeError("createFeatureConnectionsActiveTrainSparse error: binary tree root segment has no active features")
+			segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+			if(segmentConnectionIndices.numel() > 0):
+				indicesList.append(segmentConnectionIndices)
+		else:
+			for segmentIndex in range(arrayNumberOfSegments):
+				segmentActive = featureNeuronsActive[:, segmentIndex]
+				if(pt.any(segmentActive)):
+					segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+					if(segmentConnectionIndices.numel() > 0):
+						indicesList.append(segmentConnectionIndices)
 	else:
 		segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(featureNeuronsActive[:, arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
 		if(segmentConnectionIndices.numel() > 0):
@@ -811,6 +841,8 @@ def createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, colu
 		combinedIndices = pt.cat(indicesList, dim=1)
 		if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
 			combinedIndices = collapseFeatureConnectionsSpatialAxesSparseIndices(combinedIndices, cs)
+		if(multipleDendriticBranchesBinaryTree):
+			combinedIndices = calculateFeatureConnectionsBinaryTreeBranchIndicesFromRootBranches(combinedIndices, connectionTargetSize)
 		combinedValues = pt.ones((combinedIndices.shape[1],), dtype=arrayType, device=connectionDevice)
 	result = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=connectionTargetSize, dtype=arrayType, device=connectionDevice).coalesce()
 	if(result._nnz() > 0):
@@ -821,7 +853,9 @@ def createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, colu
 	connectionDevice = segmentActive.device
 	combinedIndices = pt.empty((6, 0), dtype=pt.long, device=connectionDevice)
 	indicesList = []
-	if(multipleDendriticBranches):
+	if(multipleDendriticBranchesBinaryTree):
+		combinedIndices = createFeatureConnectionsActiveTrainSparseBinaryTreeRootBranches(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+	elif(multipleDendriticBranches):
 		sourceActive = segmentActive.amax(dim=0)
 		sourceIndices = pt.nonzero(sourceActive > 0, as_tuple=False)
 		repeatedFeatureMask = (segmentActive > 0).sum(dim=0) > 1
@@ -839,6 +873,65 @@ def createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, colu
 	if(len(indicesList) > 0):
 		combinedIndices = pt.cat(indicesList, dim=1)
 	return combinedIndices
+
+def createFeatureConnectionsActiveTrainSparseBinaryTreeRootBranches(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns):
+	connectionDevice = segmentActive.device
+	result = pt.empty((6, 0), dtype=pt.long, device=connectionDevice)
+	sourceActive = None
+	sourceIndices = None
+	targetBranchIndices = None
+	targetConceptIndices = None
+	targetFeatureIndices = None
+	sourceCount = None
+	targetCount = None
+	sourceConceptIndices = None
+	sourceFeatureIndices = None
+	branchIndices = None
+	sourceWordOrder = None
+	targetWordOrder = None
+	connectionMask = None
+	selfMask = None
+	repeatedFeatureMask = None
+	repeatedSourceMask = None
+	sourceColumnWordOrder = None
+	targetColumnWordOrder = None
+	if(multipleDendriticBranchesBinaryTree):
+		if(not pt.is_tensor(segmentActive) or segmentActive.dim() != 3):
+			raise RuntimeError("createFeatureConnectionsActiveTrainSparseBinaryTreeRootBranches error: segmentActive must be a rank 3 tensor")
+		if(int(segmentActive.shape[0]) != multipleDendriticBranchesNumber or int(segmentActive.shape[1]) != int(cs) or int(segmentActive.shape[2]) != int(fs)):
+			raise RuntimeError("createFeatureConnectionsActiveTrainSparseBinaryTreeRootBranches error: segmentActive dimensions are invalid")
+		sourceActive = segmentActive.amax(dim=0)
+		sourceIndices = pt.nonzero(sourceActive > 0, as_tuple=False)
+		targetBranchIndices, targetConceptIndices, targetFeatureIndices = pt.nonzero(segmentActive > 0, as_tuple=True)
+		if(sourceIndices.shape[0] > 0 and targetBranchIndices.shape[0] > 0):
+			sourceCount = sourceIndices.shape[0]
+			targetCount = targetBranchIndices.shape[0]
+			sourceConceptIndices = sourceIndices[:, 0].repeat_interleave(targetCount)
+			sourceFeatureIndices = sourceIndices[:, 1].repeat_interleave(targetCount)
+			branchIndices = targetBranchIndices.repeat(sourceCount)
+			targetConceptIndices = targetConceptIndices.repeat(sourceCount)
+			targetFeatureIndices = targetFeatureIndices.repeat(sourceCount)
+			sourceWordOrder = featureNeuronsWordOrder[sourceConceptIndices, sourceFeatureIndices]
+			targetWordOrder = featureNeuronsWordOrder[targetConceptIndices, targetFeatureIndices]
+			connectionMask = pt.ones((sourceConceptIndices.shape[0],), dtype=pt.bool, device=connectionDevice)
+			if(featureNeuronsWordOrder is not None):
+				connectionMask = connectionMask & createFeatureWordOrderConnectionMask(sourceWordOrder, targetWordOrder, trainConnectionsIncludeSameTimeIndex)
+			if(columnsWordOrder is not None):
+				sourceColumnWordOrder = columnsWordOrder[sourceConceptIndices]
+				targetColumnWordOrder = columnsWordOrder[targetConceptIndices]
+				if(debugConnectColumnsToNextColumnsInSequenceOnly):
+					connectionMask = connectionMask & pt.logical_and(targetColumnWordOrder >= sourceColumnWordOrder, targetColumnWordOrder <= sourceColumnWordOrder+1)
+				else:
+					connectionMask = connectionMask & (targetColumnWordOrder >= sourceColumnWordOrder)
+			selfMask = (sourceConceptIndices == targetConceptIndices) & (sourceFeatureIndices == targetFeatureIndices)
+			repeatedFeatureMask = (segmentActive > 0).sum(dim=0) > 1
+			repeatedSourceMask = repeatedFeatureMask[sourceConceptIndices, sourceFeatureIndices]
+			connectionMask = connectionMask | (selfMask & repeatedSourceMask)
+			if(connectionMask.any()):
+				result = assignFeatureConnectionsToTargetSegmentsSparse(branchIndices[connectionMask], sourceConceptIndices[connectionMask], sourceFeatureIndices[connectionMask], targetConceptIndices[connectionMask], targetFeatureIndices[connectionMask], sourceWordOrder[connectionMask], targetWordOrder[connectionMask], sequenceObservedColumns)
+	else:
+		raise RuntimeError("createFeatureConnectionsActiveTrainSparseBinaryTreeRootBranches error: requires multipleDendriticBranchesBinaryTree")
+	return result
 
 def createFeatureConnectionsActiveTrainSparseBranch(branchIndex, sourceIndices, targetIndices, repeatedFeatureMask, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns):
 	connectionDevice = sourceIndices.device
@@ -942,7 +1035,7 @@ def assignFeatureConnectionsToTargetSegmentsSparse(branchIndices, sourceConceptI
 	return result
 
 def buildSequenceFeaturePropertySparse(featureIndices, featureValues, cs, fs):
-	targetSize = (numberOfDendriticBranches, arrayNumberOfSegments, cs, fs)
+	targetSize = (multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs)
 	targetDevice = deviceSparse
 	sparseIndices = featureIndices
 	sparseValues = featureValues
@@ -958,7 +1051,7 @@ def buildSequenceFeaturePropertySparse(featureIndices, featureValues, cs, fs):
 	return result
 
 def buildSequenceConnectionPropertySparse(connectionIndices, connectionValues, cs, fs):
-	targetSize = (numberOfDendriticBranches, arrayNumberOfSegments, cs, fs, cs, fs)
+	targetSize = (multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs, cs, fs)
 	targetDevice = deviceSparse
 	sparseIndices = connectionIndices
 	sparseValues = connectionValues
@@ -1155,8 +1248,97 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 		featureConnectionsActive = featureConnectionsSegmentMask * featureConnectionsActive.unsqueeze(0)
 	if(getTrainConnectionsUseSpatialAxis(sequenceObservedColumns)):
 		featureConnectionsActive, featureConnectionsSegmentMask = expandFeatureConnectionsSpatialAxis(sequenceObservedColumns, featureConnectionsActive, featureConnectionsSegmentMask, cs)
+	if(multipleDendriticBranchesBinaryTree):
+		featureConnectionsActive = mapFeatureConnectionsBinaryTreeRootBranches(featureConnectionsActive)
+		featureConnectionsSegmentMask = pt.logical_and(featureConnectionsSegmentMask, calculateFeatureConnectionsBinaryTreeValidSegmentBranchMask(featureConnectionsSegmentMask))
 
 	return featureConnectionsActive, featureConnectionsSegmentMask
+
+def mapFeatureConnectionsBinaryTreeRootBranches(featureConnectionsActive):
+	result = None
+	featureConnectionsActiveSparse = None
+	featureConnectionsActiveIndices = None
+	featureConnectionsActiveValues = None
+	featureConnectionsSegmentIndices = None
+	featureConnectionsBranchDivisors = None
+	if(multipleDendriticBranchesBinaryTree):
+		if(not pt.is_tensor(featureConnectionsActive)):
+			raise RuntimeError("mapFeatureConnectionsBinaryTreeRootBranches error: featureConnectionsActive must be a tensor")
+		if(int(featureConnectionsActive.shape[0]) != multipleDendriticBranchesNumber or int(featureConnectionsActive.shape[1]) != arrayNumberOfSegments):
+			raise RuntimeError("mapFeatureConnectionsBinaryTreeRootBranches error: featureConnectionsActive binary tree dimensions are invalid")
+		featureConnectionsActiveSparse = featureConnectionsActive.to_sparse_coo().coalesce()
+		featureConnectionsActiveIndices = featureConnectionsActiveSparse.indices().clone()
+		featureConnectionsActiveValues = featureConnectionsActiveSparse.values()
+		if(featureConnectionsActiveIndices.numel() > 0):
+			if(bool(pt.any(featureConnectionsActiveIndices[0] < arrayIndexSegmentFirst).item()) or bool(pt.any(featureConnectionsActiveIndices[0] >= multipleDendriticBranchesNumber).item()) or bool(pt.any(featureConnectionsActiveIndices[1] < arrayIndexSegmentFirst).item()) or bool(pt.any(featureConnectionsActiveIndices[1] >= arrayNumberOfSegments).item())):
+				raise RuntimeError("mapFeatureConnectionsBinaryTreeRootBranches error: feature connection root branch or segment index is invalid")
+			featureConnectionsSegmentIndices = featureConnectionsActiveIndices[1]
+			featureConnectionsBranchDivisors = pt.pow(pt.full_like(featureConnectionsSegmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor), featureConnectionsSegmentIndices)
+			featureConnectionsActiveIndices[0] = pt.div(featureConnectionsActiveIndices[0], featureConnectionsBranchDivisors, rounding_mode="floor")
+		result = pt.sparse_coo_tensor(featureConnectionsActiveIndices, featureConnectionsActiveValues, size=featureConnectionsActive.shape, dtype=featureConnectionsActive.dtype, device=featureConnectionsActive.device).coalesce()
+		if(result._nnz() > 0):
+			result.values().clamp_(max=1.0)
+		result = result.to_dense()
+	else:
+		raise RuntimeError("mapFeatureConnectionsBinaryTreeRootBranches error: requires multipleDendriticBranchesBinaryTree")
+	return result
+
+def calculateFeatureConnectionsBinaryTreeValidSegmentBranchMask(featureConnectionsTensor):
+	result = None
+	branchIndices = None
+	segmentIndices = None
+	branchDivisors = None
+	validBranchCounts = None
+	if(multipleDendriticBranchesBinaryTree):
+		if(not pt.is_tensor(featureConnectionsTensor)):
+			raise RuntimeError("calculateFeatureConnectionsBinaryTreeValidSegmentBranchMask error: featureConnectionsTensor must be a tensor")
+		if(int(featureConnectionsTensor.shape[0]) != multipleDendriticBranchesNumber or int(featureConnectionsTensor.shape[1]) != arrayNumberOfSegments):
+			raise RuntimeError("calculateFeatureConnectionsBinaryTreeValidSegmentBranchMask error: featureConnectionsTensor binary tree dimensions are invalid")
+		branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=featureConnectionsTensor.device).view(multipleDendriticBranchesNumber, 1, 1, 1, 1, 1)
+		segmentIndices = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=featureConnectionsTensor.device).view(1, arrayNumberOfSegments, 1, 1, 1, 1)
+		branchDivisors = pt.pow(pt.full_like(segmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor), segmentIndices)
+		validBranchCounts = multipleDendriticBranchesNumber//branchDivisors
+		result = (branchIndices < validBranchCounts).expand_as(featureConnectionsTensor)
+	else:
+		raise RuntimeError("calculateFeatureConnectionsBinaryTreeValidSegmentBranchMask error: requires multipleDendriticBranchesBinaryTree")
+	return result
+
+def calculateFeatureConnectionsBinaryTreeBranchIndicesFromRootBranches(connectionIndices, connectionTargetSize):
+	result = None
+	connectionSegmentIndices = None
+	connectionBranchDivisors = None
+	if(multipleDendriticBranchesBinaryTree):
+		if(not pt.is_tensor(connectionIndices)):
+			raise RuntimeError("calculateFeatureConnectionsBinaryTreeBranchIndicesFromRootBranches error: connectionIndices must be a tensor")
+		if(connectionIndices.dim() != 2 or int(connectionIndices.shape[0]) != len(connectionTargetSize)):
+			raise RuntimeError("calculateFeatureConnectionsBinaryTreeBranchIndicesFromRootBranches error: connectionIndices shape is invalid")
+		if(int(connectionTargetSize[0]) != multipleDendriticBranchesNumber or int(connectionTargetSize[1]) != arrayNumberOfSegments):
+			raise RuntimeError("calculateFeatureConnectionsBinaryTreeBranchIndicesFromRootBranches error: connectionTargetSize binary tree dimensions are invalid")
+		result = connectionIndices.clone()
+		if(result.numel() > 0):
+			if(bool(pt.any(result[0] < arrayIndexSegmentFirst).item()) or bool(pt.any(result[0] >= multipleDendriticBranchesNumber).item()) or bool(pt.any(result[1] < arrayIndexSegmentFirst).item()) or bool(pt.any(result[1] >= arrayNumberOfSegments).item())):
+				raise RuntimeError("calculateFeatureConnectionsBinaryTreeBranchIndicesFromRootBranches error: connection root branch or segment index is invalid")
+			connectionSegmentIndices = result[1]
+			connectionBranchDivisors = pt.pow(pt.full_like(connectionSegmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor), connectionSegmentIndices)
+			result[0] = pt.div(result[0], connectionBranchDivisors, rounding_mode="floor")
+	else:
+		raise RuntimeError("calculateFeatureConnectionsBinaryTreeBranchIndicesFromRootBranches error: requires multipleDendriticBranchesBinaryTree")
+	return result
+
+def selectFeatureNeuronsBinaryTreeRootSegment(featureNeuronsActive):
+	result = None
+	if(multipleDendriticBranchesBinaryTree):
+		if(not pt.is_tensor(featureNeuronsActive) or featureNeuronsActive.dim() != 4):
+			raise RuntimeError("selectFeatureNeuronsBinaryTreeRootSegment error: featureNeuronsActive must be a rank 4 tensor")
+		if(int(featureNeuronsActive.shape[0]) != multipleDendriticBranchesNumber or int(featureNeuronsActive.shape[1]) != arrayNumberOfSegments):
+			raise RuntimeError("selectFeatureNeuronsBinaryTreeRootSegment error: featureNeuronsActive binary tree dimensions are invalid")
+		if(not pt.any(featureNeuronsActive[:, arrayIndexSegmentFirst])):
+			raise RuntimeError("selectFeatureNeuronsBinaryTreeRootSegment error: binary tree root segment has no active features")
+		result = pt.zeros_like(featureNeuronsActive)
+		result[:, arrayIndexSegmentFirst] = featureNeuronsActive[:, arrayIndexSegmentFirst]
+	else:
+		raise RuntimeError("selectFeatureNeuronsBinaryTreeRootSegment error: requires multipleDendriticBranchesBinaryTree")
+	return result
 
 
 def calculateFeatureConnectionsSpatialDistanceSegmentMask(sequenceObservedColumns, cs, fs, targetDevice):

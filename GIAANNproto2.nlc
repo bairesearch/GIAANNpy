@@ -343,3 +343,41 @@ v2d (Codex IDE GPT-5.5) [under development]:
 		- ensure to encapsulate all useTrainDuringInference specific behaviour within context if(useTrainDuringInference) as per AGENTS.md.
 - upgrade useTrainDuringInference to print the final printInferenceTop1Accuracy exactly the same way inferenceMode prints the eval accuracies.
 - patch useTrainDuringInference:updateSequenceBar - with trainDuringInference the tqdm execution progress bar only uses the total number of trained sequences (trainMaxSequences) for its progress monitoring. 
+
+---
+v2e (Codex IDE GPT-5.5) [under development]:
+- add proto GIAANNproto2e1a - start option multipleDendriticBranchesBinaryTree:
+	- during train if multipleDendriticBranchesBinaryTree==False (randomly) assigns an independent branchIndex for all trained neuron segments (see selectFeatureBranchIndex()). [NO CHANGE]
+	- during train if multipleDendriticBranchesBinaryTree==True derives the branch index of each segment based on the randomly assigned branchIndex:
+		- for segmentIndex 0:arrayNumberOfSegments-1(ie for depthIndex multipleDendriticBranchesBinaryTreeDepth-1:0):
+			- it derives the branch index of the segment by dividing the randomly assigned branchIndex by 2^segmentIndex:
+				- note if segmentIndex==0 it will simply use the randomly assigned branch index for the segment (i.e. branchIndex/(2^0) == branchIndex).
+				- note if segmentIndex==arrayNumberOfSegments-1 it will simply use branch index 0 for the segment (ie the only branch in the segment at depthIndex==0).
+				- note higher segmentIndex (ie lower depthIndex) will have lower branch indices assigned than lower segmentIndex (ie higher depthIndex).
+		- if useTrainDuringInference:multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches:
+			- selects the trained the branch index for each target neuron based on the most completely active set of root branches activated by the inference phase.
+				- randomly selects a branch index that corresponds to the portion of activated root branches between:
+					- multipleDendriticBranchesNumber/(2^numberOfContiguouslyActiveFinalSegments-1)*branchIndex and multipleDendriticBranchesNumber/(2^numberOfContiguouslyActiveFinalSegments-1)*(branchIndex+1); assuming neurons last numberOfContiguouslyActiveFinalSegments were activated during the inference phase, and assuming the last contiguous segment to be activated in the inference phase was on branchIndex.
+					- eg if neurons last 3 segments were activated during the inference phase, and the third last segment (ie numberOfContiguouslyActiveFinalSegments==3) to be activated was on branchIndex==3 [of possible values 0->3] then assuming multipleDendriticBranchesBinaryTreeDepth==arrayNumberOfSegments==7:
+						 - the randomly assigned branch index to be trained for the neuron must be between multipleDendriticBranchesNumber/(2^(3-1))*3 and multipleDendriticBranchesNumber/(2^(3-1)*(3+1)
+			- multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches assumes that enforceSequentialActivation==False was set during the inference phase of useTrainDuringInference:
+				- ie segment activation was not sequentially dependent (higher segment indices at lower branch depths could be activated without lower segment indices at higher branch depths first being activated).
+				- eg inferenceSegmentTiming=="biased" or inferenceSegmentTiming = "none" was selected during the inference phase of useTrainDuringInference (either of these options will disable enforceSequentialActivation).
+		- initalises multipleDendriticBranchesBinaryTreeDepth = numSeedTokensInference (ie arrayNumberOfSegments) - depth of the dendritic binary tree.
+		- initalises multipleDendriticBranchesNumber = 2^(multipleDendriticBranchesBinaryTreeDepth-1).
+		- assumes multipleDendriticBranchesRandom==True.
+	- during inference if multipleDendriticBranchesBinaryTree==True:
+		- update the enforceSequentialActivation==True logic to reflect the binary tree connectivity:
+			- if multipleDendriticBranchesBinaryTree==True then segment activations must be filtered based on their prior segment branch indices in the binary tree.
+		- update the neuron activation logic (segment summation) to reflect the binary tree connectivity:
+			- if multipleDendriticBranchesBinaryTree==False segment activations are summed first (independently across branches). [NO CHANGE]
+			- if multipleDendriticBranchesBinaryTree==True segment activations are summed based on their prior segment branch indices in the binary tree.
+		- update any other inference code that is required to reflect the binary tree connectivity (ensure to report on what has been changed). 
+	MANUAL; - rename numberOfDendriticBranches/randomlyAssignBranches to multipleDendriticBranchesNumber/multipleDendriticBranchesRandom.
+	Implementation Notes:
+		- implementation must use vectorised pytorch code (no python for loops across branches, python for loops only across segments where necessary).
+		- do not change any existing code in the codebase unrelated to specific multipleDendriticBranchesBinaryTree==True behaviour.
+		- ensure to encapsulate all multipleDendriticBranchesBinaryTree==True specific behaviour within context if(multipleDendriticBranchesBinaryTree) as per AGENTS.md.
+
+
+

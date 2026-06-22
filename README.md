@@ -158,8 +158,8 @@ For standard execution (train or inference);
 #### Dendritic branches
 
 * `multipleDendriticBranches` - support cases where a trained sequence has repeated references to a column feature 
-* `numberOfDendriticBranches` - number of dendritic branches
-* `randomlyAssignBranches` to support increasingly conflicting reuse of phrases throughout dataset
+* `multipleDendriticBranchesNumber` - number of dendritic branches
+* `multipleDendriticBranchesRandom` to support increasingly conflicting reuse of phrases throughout dataset
 
 #### Dataset
 

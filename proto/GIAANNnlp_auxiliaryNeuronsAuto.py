@@ -74,7 +74,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 	def initialiseReverseFeatureConnections(databaseNetworkObject, targetDevice):
 		indices = pt.empty((5, 0), dtype=pt.long, device=targetDevice)
 		values = pt.empty((0,), dtype=arrayType, device=targetDevice)
-		result = pt.sparse_coo_tensor(indices, values, size=(databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f), dtype=arrayType, device=targetDevice)
+		result = pt.sparse_coo_tensor(indices, values, size=(databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f), dtype=arrayType, device=targetDevice)
 		return result
 
 	def normaliseReverseTargetFeatureIndex(databaseNetworkObject, targetFeatureIndex):
@@ -195,7 +195,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 		return
 
 	def getObservedColumnReverseFeatureConnectionsTargetSize(observedColumn):
-		result = (observedColumn.databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, observedColumn.databaseNetworkObject.c, observedColumn.databaseNetworkObject.f)
+		result = (observedColumn.databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, observedColumn.databaseNetworkObject.c, observedColumn.databaseNetworkObject.f)
 		return result
 
 	def saveObservedColumnReverseFeatureConnectionsToDisk(observedColumn, saveAllTargetFeatures):
@@ -265,7 +265,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 			uniqueTargetCombinedKeys, counts = pt.unique_consecutive(sortedTargetCombinedKeys, return_counts=True)
 			starts = pt.cumsum(counts, 0) - counts
 			observedColumnsByConceptIndex = sequenceObservedColumns.getObservedColumnsByConceptIndex(sequenceObservedColumnsDict)
-			targetSize = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
+			targetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
 			for targetCombinedKey, start, count in zip(uniqueTargetCombinedKeys.tolist(), starts.tolist(), counts.tolist()):
 				end = start + count
 				targetConceptIndexValue = int(targetCombinedKey // databaseNetworkObject.f)
@@ -287,7 +287,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 			connectionDevice, sourceConceptIndex, sourceFeatureIndex, targetConceptIndex, targetFeatureIndex = buildReverseConnectionMappedTensors(sequenceObservedColumns, connectionIndices)
 			targetCombinedKeys = targetConceptIndex * databaseNetworkObject.f + targetFeatureIndex
 			targetCombinedKeysUnique = pt.unique(targetCombinedKeys, sorted=True)
-			targetSize = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, targetCombinedKeysUnique.shape[0], databaseNetworkObject.c, databaseNetworkObject.f)
+			targetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, targetCombinedKeysUnique.shape[0], databaseNetworkObject.c, databaseNetworkObject.f)
 			observedColumnsByConceptIndex = sequenceObservedColumns.getObservedColumnsByConceptIndex(sequenceObservedColumnsDict)
 			targetSparse = gatherReverseConnectionTargetBucketTensor(observedColumnsByConceptIndex, targetCombinedKeysUnique, databaseNetworkObject, connectionDevice)
 			updateSparse = buildReverseConnectionTargetBucketUpdateSparse(databaseNetworkObject, connectionIndices, connectionValues, sourceConceptIndex, sourceFeatureIndex, targetConceptIndex, targetFeatureIndex, targetCombinedKeysUnique, targetSize)
@@ -318,7 +318,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 			return result
 
 		def gatherReverseConnectionTargetBucketTensor(observedColumnsByConceptIndex, targetCombinedKeysUnique, databaseNetworkObject, targetDevice):
-			targetSize = (databaseNetworkObject.arrayNumberOfProperties, numberOfDendriticBranches, arrayNumberOfSegments, targetCombinedKeysUnique.shape[0], databaseNetworkObject.c, databaseNetworkObject.f)
+			targetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, targetCombinedKeysUnique.shape[0], databaseNetworkObject.c, databaseNetworkObject.f)
 			combinedIndicesList = []
 			combinedValuesList = []
 			targetConceptIndexList = pt.div(targetCombinedKeysUnique, databaseNetworkObject.f, rounding_mode='floor').detach().cpu().tolist()
