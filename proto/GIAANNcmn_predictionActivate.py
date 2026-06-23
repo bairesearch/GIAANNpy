@@ -584,6 +584,71 @@ def processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuro
 	return result
 
 def calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex):
+	result = None
+	if(multipleDendriticBranchesBinaryTree):
+		result = calculateFeatureNeuronSourceActivationPredictBinaryTree(globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex)
+	else:
+		result = calculateFeatureNeuronSourceActivationPredictNonBinary(globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex)
+	return result
+
+def calculateFeatureNeuronSourceActivationPredictBinaryTree(globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex):
+	result = None
+	if(multipleDendriticBranchesBinaryTree):
+		if(globalFeatureNeuronsActivation is None):
+			raise RuntimeError("calculateFeatureNeuronSourceActivationPredictBinaryTree error: globalFeatureNeuronsActivation is None")
+		if(globalFeatureNeuronsActivation.dim() != 4 or globalFeatureNeuronsActivation.shape[0] != multipleDendriticBranchesNumber or globalFeatureNeuronsActivation.shape[1] != arrayNumberOfSegments):
+			raise RuntimeError("calculateFeatureNeuronSourceActivationPredictBinaryTree error: globalFeatureNeuronsActivation shape is invalid")
+		sourceColumnIndex = int(sourceColumnIndex)
+		sourceFeatureIndex = int(sourceFeatureIndex)
+		if(sourceColumnIndex < arrayIndexSegmentFirst or sourceColumnIndex >= globalFeatureNeuronsActivation.shape[2] or sourceFeatureIndex < arrayIndexSegmentFirst or sourceFeatureIndex >= globalFeatureNeuronsActivation.shape[3]):
+			raise RuntimeError("calculateFeatureNeuronSourceActivationPredictBinaryTree error: source neuron index out of range")
+		activationSparse = globalFeatureNeuronsActivation.coalesce() if globalFeatureNeuronsActivation.is_sparse else globalFeatureNeuronsActivation.to_sparse_coo().coalesce()
+		activationIndices = activationSparse.indices()
+		activationValues = activationSparse.values()
+		sourceMask = (activationIndices[2] == sourceColumnIndex) & (activationIndices[3] == sourceFeatureIndex)
+		if(not sourceMask.any()):
+			result = pt.zeros((), dtype=activationValues.dtype, device=activationValues.device)
+		else:
+			sourceActivationSparse = pt.sparse_coo_tensor(activationIndices[:, sourceMask], activationValues[sourceMask], size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
+			segmentActivations = []
+			for segmentIndex in range(arrayNumberOfSegments):
+				segmentActivations.append(GIAANNcmn_sparseTensors.projectBinaryTreeSegmentActivation(sourceActivationSparse, segmentIndex))
+			combinedIndices = pt.empty((activationSparse.dim()-1, arrayIndexSegmentFirst), dtype=pt.long, device=activationSparse.device)
+			combinedValues = pt.empty((arrayIndexSegmentFirst,), dtype=activationSparse.dtype, device=activationSparse.device)
+			if(len(segmentActivations) > arrayIndexSegmentFirst):
+				combinedIndices = pt.cat([segmentActivation.indices() for segmentActivation in segmentActivations], dim=1)
+				combinedValues = pt.cat([segmentActivation.values() for segmentActivation in segmentActivations], dim=0)
+			featureNeuronsActive = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=(multipleDendriticBranchesNumber, *activationSparse.size()[2:]), dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
+			if(useSANI):
+				if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
+					if(enforceActivationAcrossSegmentsIgnoreInternalColumn):
+						lastSegmentConstraint = arrayIndexSegmentAdjacentColumn
+					else:
+						lastSegmentConstraint = arrayIndexSegmentLast
+					if(lastSegmentConstraint < arrayIndexSegmentFirst or lastSegmentConstraint >= arrayNumberOfSegments):
+						raise RuntimeError("calculateFeatureNeuronSourceActivationPredictBinaryTree error: lastSegmentConstraint out of range")
+					if(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+						featureNeuronsActive = GIAANNcmn_sparseTensors.selectAindicesContainedInBBinaryTree(featureNeuronsActive, segmentActivations[lastSegmentConstraint])
+					elif(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):
+						for segmentIndex in range(lastSegmentConstraint+1):
+							featureNeuronsActive = GIAANNcmn_sparseTensors.selectAindicesContainedInBBinaryTree(featureNeuronsActive, segmentActivations[segmentIndex])
+					elif(algorithmMatrixSANIenforceRequirement!="enforceAnySegmentMustBeActive"):
+						raise RuntimeError("calculateFeatureNeuronSourceActivationPredictBinaryTree error: algorithmMatrixSANIenforceRequirement is invalid")
+				elif(algorithmMatrixSANImethod!="doNotEnforceActivationAcrossSegments"):
+					raise RuntimeError("calculateFeatureNeuronSourceActivationPredictBinaryTree error: algorithmMatrixSANImethod is invalid")
+			else:
+				featureNeuronsActive = segmentActivations[arrayIndexSegmentLast]
+			if(featureNeuronsActive._nnz() == arrayIndexSegmentFirst):
+				result = pt.zeros((), dtype=activationValues.dtype, device=activationValues.device)
+			else:
+				result = featureNeuronsActive.values().max()
+			if(inferenceSourceActivationsBoolean):
+				result = (result > arrayIndexSegmentFirst).to(result.dtype)
+	else:
+		raise RuntimeError("calculateFeatureNeuronSourceActivationPredictBinaryTree error: requires multipleDendriticBranchesBinaryTree")
+	return result
+
+def calculateFeatureNeuronSourceActivationPredictNonBinary(globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex):
 	featureNeuronsActive = GIAANNcmn_sparseTensors.neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANImethod)
 	
 	sourceColumnIndex = int(sourceColumnIndex)
@@ -622,12 +687,7 @@ def calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalF
 	if(inferenceSourceActivationsBoolean):
 		featureNeuronsActive = (featureNeuronsActive > 0).to(featureNeuronsActive.dtype)	#ensure the source activation signal is binary (even with useSANI)
 	if(multipleDendriticBranches and featureNeuronsActive.dim() == 1):
-		if(multipleDendriticBranchesBinaryTree):
-			# A tree path already sums each compatible segment; retain its strongest complete path without counting shared segments across descendant roots.
-			featureNeuronsActive = featureNeuronsActive.max()
-		else:
-			# Collapse branch-local source activations so each target branch receives the same drive.
-			featureNeuronsActive = featureNeuronsActive.sum()
+		featureNeuronsActive = featureNeuronsActive.sum()
 	result = featureNeuronsActive
 	return result
 

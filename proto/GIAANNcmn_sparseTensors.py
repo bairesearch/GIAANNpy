@@ -587,6 +587,57 @@ def selectAindicesContainedInB(A, B):
 	
 	return A_intersect_B
 
+def selectAindicesContainedInBBinaryTree(A, B):
+	result = None
+	if(multipleDendriticBranchesBinaryTree):
+		if(not A.is_sparse or not B.is_sparse):
+			raise RuntimeError("selectAindicesContainedInBBinaryTree error: A and B must be sparse")
+		A = A.coalesce()
+		B = B.coalesce()
+		if(A.size() != B.size()):
+			raise RuntimeError("selectAindicesContainedInBBinaryTree error: A and B sizes must match")
+		if(A.dim() != 3):
+			raise RuntimeError("selectAindicesContainedInBBinaryTree error: A and B must have three dimensions")
+		if(A._nnz() == arrayIndexSegmentFirst or B._nnz() == arrayIndexSegmentFirst):
+			emptyIndices = pt.empty((A.dim(), arrayIndexSegmentFirst), dtype=pt.long, device=A.device)
+			emptyValues = pt.empty((arrayIndexSegmentFirst,), dtype=A.dtype, device=A.device)
+			result = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=A.size(), dtype=A.dtype, device=A.device).coalesce()
+		else:
+			AlinearIndices = calculateBinaryTreeSparseTensorLinearIndices(A.indices(), A.size())
+			BlinearIndices = calculateBinaryTreeSparseTensorLinearIndices(B.indices(), B.size())
+			sortedBlinearIndices = pt.sort(BlinearIndices).values
+			positions = pt.searchsorted(sortedBlinearIndices, AlinearIndices)
+			validPositions = positions < sortedBlinearIndices.shape[0]
+			safePositions = positions.clamp(max=sortedBlinearIndices.shape[0]-1)
+			containedMask = validPositions & (sortedBlinearIndices[safePositions] == AlinearIndices)
+			result = pt.sparse_coo_tensor(A.indices()[:, containedMask], A.values()[containedMask], size=A.size(), dtype=A.dtype, device=A.device).coalesce()
+	else:
+		raise RuntimeError("selectAindicesContainedInBBinaryTree error: requires multipleDendriticBranchesBinaryTree")
+	return result
+
+def calculateBinaryTreeSparseTensorLinearIndices(indices, size):
+	result = None
+	if(multipleDendriticBranchesBinaryTree):
+		if(indices.dim() != 2):
+			raise RuntimeError("calculateBinaryTreeSparseTensorLinearIndices error: indices must have two dimensions")
+		if(len(size) != indices.shape[0]):
+			raise RuntimeError("calculateBinaryTreeSparseTensorLinearIndices error: indices and size dimensions must match")
+		if(len(size) != 3):
+			raise RuntimeError("calculateBinaryTreeSparseTensorLinearIndices error: binary tree neuron activations must have three dimensions")
+		maximumLinearIndex = multipleDendriticBranchesBinaryTreeBranchingFactor**arrayIndexSegmentFirst
+		for dimensionSize in size:
+			if(dimensionSize <= arrayIndexSegmentFirst):
+				raise RuntimeError("calculateBinaryTreeSparseTensorLinearIndices error: size dimensions must be positive")
+			maximumLinearIndex = maximumLinearIndex*dimensionSize
+		if(maximumLinearIndex > pt.iinfo(pt.long).max):
+			raise RuntimeError("calculateBinaryTreeSparseTensorLinearIndices error: sparse tensor shape exceeds supported linear index range")
+		result = indices[arrayIndexSegmentFirst].clone()
+		for dimensionIndex in range(arrayIndexSegmentFirst+1, indices.shape[0]):
+			result = result*size[dimensionIndex] + indices[dimensionIndex]
+	else:
+		raise RuntimeError("calculateBinaryTreeSparseTensorLinearIndices error: requires multipleDendriticBranchesBinaryTree")
+	return result
+
 def neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANImethod):
 	hasBranchDim = globalFeatureNeuronsActivation.dim() == 4
 	isSparse = globalFeatureNeuronsActivation.is_sparse
@@ -662,10 +713,10 @@ def neuronActivationSparseBinaryTree(globalFeatureNeuronsActivation, algorithmMa
 				if(lastSegmentConstraint < arrayIndexSegmentFirst or lastSegmentConstraint >= arrayNumberOfSegments):
 					raise RuntimeError("neuronActivationSparseBinaryTree error: lastSegmentConstraint out of range")
 				if(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
-					featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, segmentActivations[lastSegmentConstraint])
+					featureNeuronsActive = selectAindicesContainedInBBinaryTree(featureNeuronsActive, segmentActivations[lastSegmentConstraint])
 				elif(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):
 					for segmentIndex in range(lastSegmentConstraint+1):
-						featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, segmentActivations[segmentIndex])
+						featureNeuronsActive = selectAindicesContainedInBBinaryTree(featureNeuronsActive, segmentActivations[segmentIndex])
 				elif(algorithmMatrixSANIenforceRequirement!="enforceAnySegmentMustBeActive"):
 					raise RuntimeError("neuronActivationSparseBinaryTree error: algorithmMatrixSANIenforceRequirement is invalid")
 			elif(algorithmMatrixSANImethod!="doNotEnforceActivationAcrossSegments"):
