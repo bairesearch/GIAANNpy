@@ -84,7 +84,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = True	#default: False/True
+	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
@@ -252,7 +252,7 @@ elif(useModalityNLP):
 		else:
 			useGPUdense = True	#default: True
 		if(executionMode=="train"):
-			useGPUsparse = False	#default: True		#slight performance increase during train (does not use significant additional GPU ram during train)
+			useGPUsparse = True	#default: True		#slight performance increase during train (does not use significant additional GPU ram during train)
 		else:
 			useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors	#inference can be slightly faster CPU sparse tensor operations
 useGPUsparseStrict = True	#default: True	#orig: False	#optional	#enforce strict sparse device during transfer to/from dense tensors (make conversion process always use sparse device)	 #no significant difference in speed; can theoretically affect peak CPU or GPU RAM
@@ -267,14 +267,14 @@ else:
 if(trainSparseNeuronsTensor):
 	assert trainSparseConnectionsTensor, "trainSparseNeuronsTensor requires trainSparseConnectionsTensor=True"
 
-storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = True	#default: False	#orig2: True	#orig1: False	#optional	#store database feature connections and column separated feature neuron data in RAM, else dynamically load these from filesystem per sequence
+storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = False	#default: False	#orig2: True	#orig1: False	#optional	#store database feature connections and column separated feature neuron data in RAM, else dynamically load these from filesystem per sequence
 if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 	useGPUdatabase = False	#default: False	#default: False
 	resizeTensorsOnRAMdatabaseSave = False	#default: False #orig: True	#resize all feature neuron and connections tensors during final RAM database save
 	resizeTensorsOnRAMdatabaseLoad = False	#default: False #orig: True	#resize all feature neuron and connections tensors during initial RAM database load
 
 if(executionMode=="train"):
-	storeDatabaseGlobalFeatureNeuronsInRam = True		 #default: False	#orig: True	 #not required to be True for inference compatibility	#optional
+	storeDatabaseGlobalFeatureNeuronsInRam = False		 #default: False	#orig: True	 #not required to be True for inference compatibility	#optional
 else:
 	storeDatabaseGlobalFeatureNeuronsInRam = True		#mandatory: True	#if storeDatabaseGlobalFeatureNeuronsInRam=True use global feature neuron tensors, else use feature neuron tensors in observed columns (note feature connection tensors are always in observed columns)
 trainEndGenerateGlobalFeatureNeuronsTensor = False	#derived var

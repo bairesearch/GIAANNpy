@@ -72,7 +72,9 @@ def countUsesPersistedGlobalFeatureNeurons():
 def debugCountObservedColumnConnections(databaseNetworkObject, conceptIndex, lemma, columnIndex):
 	import GIAANNcmn_databaseNetworkFiles
 	columnConnections = 0
-	if(GIAANNcmn_databaseNetworkFiles.observedColumnMetadataExists(conceptIndex)):
+	if(GIAANNcmn_databaseNetworkFiles.observedColumnHasPersistedData(conceptIndex)):
+		if(not GIAANNcmn_databaseNetworkFiles.observedColumnHasConsistentPersistedMetadata(conceptIndex)):
+			raise RuntimeError("debugCountObservedColumnConnections error: inconsistent observed column storage for conceptIndex = " + str(conceptIndex) + ", lemma = " + lemma)
 		sourceFeatureIndices = GIAANNcmn_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(conceptIndex)
 		for sourceFeatureIndex in sourceFeatureIndices:
 			featureConnections = GIAANNcmn_databaseNetworkFiles.loadObservedColumnSourceFeatureConnectionsTensor(databaseNetworkObject, conceptIndex, sourceFeatureIndex, deviceDatabase)
@@ -94,15 +96,16 @@ def loadAndCountObservedColumnFeatureNeurons(databaseNetworkObject, conceptIndex
 		raise RuntimeError("loadAndCountObservedColumnFeatureNeurons error: databaseNetworkObject is None")
 	if(conceptIndex is None):
 		raise RuntimeError("loadAndCountObservedColumnFeatureNeurons error: conceptIndex is None")
-	if(not GIAANNcmn_databaseNetworkFiles.observedColumnMetadataExists(conceptIndex)):
-		raise RuntimeError("loadAndCountObservedColumnFeatureNeurons error: observed column metadata does not exist for conceptIndex = " + str(conceptIndex))
-	featureNeuronsTensorName = f"observedColumn.featureNeurons[{conceptIndex}]"
-	featureNeurons = GIAANNcmn_databaseNetworkFiles.loadTensor(GIAANNcmn_databaseNetworkFiles.getObservedColumnFolder(conceptIndex), GIAANNcmn_databaseNetworkFiles.getObservedColumnFeatureNeuronsFileBaseName(), targetDevice=deviceDatabase)
-	featureNeurons = GIAANNcmn_databaseNetworkFiles.adjustPropertyDimensions(databaseNetworkObject.inferenceMode, featureNeurons, featureNeuronsTensorName)
-	featureNeurons = GIAANNcmn_databaseNetworkFiles.adjustBranchDimensions(featureNeurons, featureNeuronsTensorName, expectedRank=4)
-	if(debugLimitFeatures):
-		featureNeurons = applyDebugLimitFeatureNeuronsTensor(featureNeurons, databaseNetworkObject.f, featureNeuronsTensorName)
-	result = countAssignedFeatureNeuronsInTensor(featureNeurons, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureNeuronsTensorName)
+	if(GIAANNcmn_databaseNetworkFiles.observedColumnHasPersistedData(conceptIndex)):
+		if(not GIAANNcmn_databaseNetworkFiles.observedColumnHasConsistentPersistedMetadata(conceptIndex)):
+			raise RuntimeError("loadAndCountObservedColumnFeatureNeurons error: inconsistent observed column storage for conceptIndex = " + str(conceptIndex))
+		featureNeuronsTensorName = f"observedColumn.featureNeurons[{conceptIndex}]"
+		featureNeurons = GIAANNcmn_databaseNetworkFiles.loadTensor(GIAANNcmn_databaseNetworkFiles.getObservedColumnFolder(conceptIndex), GIAANNcmn_databaseNetworkFiles.getObservedColumnFeatureNeuronsFileBaseName(), targetDevice=deviceDatabase)
+		featureNeurons = GIAANNcmn_databaseNetworkFiles.adjustPropertyDimensions(databaseNetworkObject.inferenceMode, featureNeurons, featureNeuronsTensorName)
+		featureNeurons = GIAANNcmn_databaseNetworkFiles.adjustBranchDimensions(featureNeurons, featureNeuronsTensorName, expectedRank=4)
+		if(debugLimitFeatures):
+			featureNeurons = applyDebugLimitFeatureNeuronsTensor(featureNeurons, databaseNetworkObject.f, featureNeuronsTensorName)
+		result = countAssignedFeatureNeuronsInTensor(featureNeurons, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureNeuronsTensorName)
 	return result
 
 def debugCalculateDatabasePtSizeGiB():

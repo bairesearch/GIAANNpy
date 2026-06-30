@@ -15,7 +15,7 @@ Tokens are produced by spaCy (models \texttt{en\_core\_web\_trf} or \texttt{en\_
 Training runs for 1 epoch (\texttt{numberEpochs=1}) with a maximum of 1000000 sequences (\texttt{trainMaxSequences<=1000000}), sequence length capped at 80 tokens (\texttt{maxSequenceLength=80}). \texttt{numSeedTokensInference=8,12,16} is retained for segment sizing. Single-sentence sequences are used by default (\texttt{multisentencePredictions=False}, \texttt{numSentencesPerSequence=1}). The database is stored at \texttt{/media/user/ssdpro/GIAANN/database/}.
 
 \paragraph{Hardware.}
-ASUS B760 Intel Chipset. ASUS NVIDIA GeForce RTX 5070 (12GB GDDR7). Intel i7 14700F. Patriot 64GB DDR4. Samsung 990 Pro PCIe 4.0 NVMe M.2 SSD (1TB).
+ASUS B760 Intel Chipset. ASUS NVIDIA GeForce RTX 5070 (12GB GDDR7). Intel i7 14700F. Patriot 64GB 2666Mhz DDR4 (or Corsair 64GB 6000MT/s DDR5). Samsung 990 Pro PCIe 4.0 NVMe M.2 SSD (1TB).
 
 \paragraph{Software.}
 NVIDIA Driver 580.126.09. CUDA 12.8. Ubuntu 24.04 LTS. IceWM. NEdit. Codex IDE extension for Visual Studio Code \citep{openai2026codexIdeExtension}.
@@ -589,9 +589,11 @@ The filesystem database is stored on a locally connected SSD drive.
 
 \Cref{tab:oscar-performance-trainGlobalOrColumnFeatureNeuronTensors} contains OSCAR-2201 training performance measurements for different store database feature neurons location (global feature neurons tensor, independent tensors for each column; \texttt{storeDatabaseGlobalFeatureNeuronsInRam=True/False}) and training sizes, with store database feature neurons and connections actively in RAM (\texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True}).
 
-\Cref{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse} contains OSCAR-2201 training performance measurements for different train phase feature neuron tensor types (\texttt{trainSparseNeuronsTensor=True/False}) and connection tensor types (\texttt{trainSparseConnectionsTensor=True/False}); dense or sparse, tensor device (GPU/CPU; \texttt{useGPUsparse=True/False}), and training sizes, with store database feature neurons and connections actively in RAM (\texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True}), and feature neuron sparse tensors stored independently for each column (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}). The device indicated is assigned to both tensor types; sparse/dense (\texttt{useGPUsparse}/\texttt{useGPUdense}).
+\Cref{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse} contains OSCAR-2201 training performance measurements for different train phase feature neuron tensor types (\texttt{trainSparseNeuronsTensor=True/False}) and connection tensor types (\texttt{trainSparseConnectionsTensor=True/False}); dense or sparse, tensor device (GPU/CPU DDR4; \texttt{useGPUsparse=True/False}), and training sizes, with store database feature neurons and connections actively in RAM (\texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True}), and feature neuron sparse tensors stored independently for each column (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}). The device indicated is assigned to both tensor types; sparse/dense (\texttt{useGPUsparse}/\texttt{useGPUdense}).
 
-\Cref{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse-storeDatabase} contains OSCAR-2201 training performance measurements for different database feature connections active storage location (RAM/filesystem; \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True/False}) and training sizes, with train phase feature neuron and connection sparse tensors (\texttt{trainSparseNeuronsTensor=True}, \texttt{trainSparseConnectionsTensor=True}), sparse tensor device CPU (\texttt{useGPUsparse=False}), and feature neuron sparse tensors stored independently for each column (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}).
+\Cref{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse-storeDatabaseFeatureConnectionsAndColumnFeatureNeurons-DDR4} contains OSCAR-2201 training performance measurements for different database feature connections active storage location (DDR4 RAM/filesystem; \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True/False}) and training sizes, with train phase feature neuron and connection sparse tensors (\texttt{trainSparseNeuronsTensor=True}, \texttt{trainSparseConnectionsTensor=True}), sparse tensor device CPU (\texttt{useGPUsparse=False}), and feature neuron sparse tensors stored independently for each column (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}).
+
+\Cref{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse-storeDatabaseFeatureConnectionsAndColumnFeatureNeurons-DDR5} contains OSCAR-2201 training performance measurements for different database feature connections active storage location (DDR5 RAM/filesystem; \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True/False}) and training sizes, with train phase feature neuron and connection sparse tensors (\texttt{trainSparseNeuronsTensor=True}, \texttt{trainSparseConnectionsTensor=True}), sparse tensor device CPU (\texttt{useGPUsparse=False}), and feature neuron sparse tensors stored independently for each column (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}).
 
 \Cref{tab:oscar-performance-storeDatabaseFeatureNeuronsInRamFalse-storeDatabase} contains OSCAR-2201 training performance measurements for different database feature connections active storage location (RAM/filesystem; \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True/False}) and training sizes, with train phase feature neuron and connection dense tensors (\texttt{trainSparseNeuronsTensor=False}, \texttt{trainSparseConnectionsTensor=False}), dense tensor device GPU (\texttt{useGPUdense=True}), and feature neuron sparse tensors stored independently for each column (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}).
 
@@ -615,6 +617,24 @@ The filesystem database is stored on a locally connected SSD drive.
 \bottomrule
 \end{tabular}
 \end{table}
+%\begin{table}[H]
+%\centering
+%\caption{OSCAR-2201 DDR5 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes, with store database feature connections actively in RAM}
+%\label{tab:oscar-performance-storeDatabaseInRamTrue}
+%\begin{tabular}{rrrrrrrrrrrrr}
+%\toprule
+%\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{phase} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{gpu ram} & \textbf{cpu ram} \\
+%\midrule
+%8 & 3 & 5 & 5,000       & train & 00:01:00 & 00:00:53 & 00:00:07 & 0.9GB & 2.1GB \\
+%8 & 3 & 5 & 200,000     & train & 01:25:37 & 01:22:13 & 00:03:24 & 1.9GB & 8.0GB \\
+%8 & 3 & 5 & 5,000       & tr eval & 00:00:39 & 00:00:21 & 00:00:17 & 0.0GB & 1.6GB \\
+%8 & 3 & 5 & 200,000     & tr eval & 00:17:12 & 00:09:17 & 00:07:55 & 0.4GB & 7.6GB \\
+%8 & 3 & 5 & 5,000       & ts eval & 00:00:50 & 00:00:33  & 00:00:17 & 0.0GB & 1.7GB \\
+%8 & 3 & 5 & 200,000     & ts eval & 00:22:35 & 00:14:29 & 00:08:05 & 0.4GB & 8.1GB \\
+%\bottomrule
+%\end{tabular}
+%\end{table}
+
 
 \begin{table}[H]
 \centering
@@ -683,7 +703,7 @@ The filesystem database is stored on a locally connected SSD drive.
 
 \begin{table}[H]
 \centering
-\caption{OSCAR-2201 training performance measurements for different train phase feature neuron and connection tensor types (dense/sparse), tensor device (GPU/CPU), and training sizes, with store database feature neurons and connections actively in RAM, and feature neuron sparse tensors stored independently for each column}
+\caption{OSCAR-2201 training performance measurements for different train phase feature neuron and connection tensor types (dense/sparse), tensor device (GPU/CPU DDR4), and training sizes, with store database feature neurons and connections actively in RAM, and feature neuron sparse tensors stored independently for each column}
 \label{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse}
 \begin{tabular}{rrrrrrrrrrrrrr}
 \toprule
@@ -701,8 +721,8 @@ The filesystem database is stored on a locally connected SSD drive.
 
 \begin{table}[H]
 \centering
-\caption{OSCAR-2201 training performance measurements for different database feature connections active storage location (RAM/filesystem) and training sizes, with train phase feature neuron and connection sparse tensors, sparse tensor device CPU, and feature neuron sparse tensors stored independently for each column}
-\label{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse-storeDatabase}
+\caption{OSCAR-2201 training performance measurements for different database feature connections active storage location (DDR4 RAM/filesystem) and training sizes, with train phase feature neuron and connection sparse tensors, sparse tensor device CPU, and feature neuron sparse tensors stored independently for each column}
+\label{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse-storeDatabaseFeatureConnectionsAndColumnFeatureNeurons-DDR4}
 \begin{tabular}{rrrrrrrrrrrrr}
 \toprule
 \textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{database} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{gpu ram} & \textbf{cpu ram} \\
@@ -711,6 +731,22 @@ The filesystem database is stored on a locally connected SSD drive.
 8 & 3 & 5 & 200,000     & RAM & 01:01:01 & 00:57:33 & 00:03:27 & 0.0GB & 8.2GB \\
 8 & 3 & 5 & 5,000       & filesys & 00:02:07 & 00:02:07 & 00:00:00 & 0.0GB & 1.7GB \\
 8 & 3 & 5 & 200,000     & filesys & 01:34:21 & 01:34:21 & 00:00:00 & 0.0GB & 2.0GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{OSCAR-2201 training performance measurements for different database feature connections active storage location (DDR5 RAM/filesystem) and training sizes, with train phase feature neuron and connection sparse tensors, sparse tensor device CPU, and feature neuron sparse tensors stored independently for each column}
+\label{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse-storeDatabaseFeatureConnectionsAndColumnFeatureNeurons-DDR5}
+\begin{tabular}{rrrrrrrrrrrrr}
+\toprule
+\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{database} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{gpu ram} & \textbf{cpu ram} \\
+\midrule
+8 & 3 & 5 & 5,000       & RAM & 00:00:34 & 00:00:28 & 00:00:06 & 0.0GB & 1.8GB \\
+8 & 3 & 5 & 200,000     & RAM & 00:30:58 & 00:28:38 & 00:02:19 & 0.0GB & 8.2GB \\
+8 & 3 & 5 & 5,000       & filesys & 00:00:49 & 00:00:49 & 00:00:00 & 0.0GB & 1.7GB \\
+8 & 3 & 5 & 200,000     & filesys & 00:56:58 & 00:56:58 & 00:00:00 & 0.0GB & 2.0GB \\
 \bottomrule
 \end{tabular}
 \end{table}

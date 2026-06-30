@@ -65,6 +65,37 @@ def isObservedColumnFolderName(pathPart):
 			result = True
 	return result
 
+def parseObservedColumnFolderIndex(pathPart):
+	result = None
+	if(not isObservedColumnFolderName(pathPart)):
+		raise RuntimeError("countParametersAndSize error: invalid observed column folder name = " + pathPart)
+	result = int(pathPart[len("cIndex"):])
+	return result
+
+def parseLegacyObservedColumnFileIndex(relativeName, suffix):
+	result = None
+	if("/" in relativeName or not relativeName.lower().endswith(suffix.lower())):
+		raise RuntimeError("countParametersAndSize error: invalid legacy observed column file name = " + relativeName)
+	indexText = relativeName[:-len(suffix)]
+	if(not isUnsignedIntegerText(indexText)):
+		raise RuntimeError("countParametersAndSize error: invalid legacy observed column index in file name = " + relativeName)
+	result = int(indexText)
+	return result
+
+def validateObservedColumnIndexBounds(columnIndices, numberColumns, columnIndexType):
+	if(numberColumns < 0):
+		raise RuntimeError("countParametersAndSize error: numberColumns must be >= 0")
+	for columnIndex in columnIndices:
+		if(columnIndex < 0 or columnIndex >= numberColumns):
+			raise RuntimeError("countParametersAndSize error: " + columnIndexType + " observed column index out of range = " + str(columnIndex) + ", numberColumns = " + str(numberColumns))
+	return
+
+def validatePersistedObservedColumnMetadata(metadataColumnIndices, persistedColumnIndices):
+	missingMetadataColumnIndices = sorted(persistedColumnIndices - metadataColumnIndices)
+	if(len(missingMetadataColumnIndices) > 0):
+		raise RuntimeError("countParametersAndSize error: persisted observed column tensor exists without metadata for concept indices = " + str(missingMetadataColumnIndices))
+	return
+
 def isObservedColumnSourceFeatureTensorFileName(pathPart):
 	result = False
 	tensorExtension = ".pt"
@@ -139,6 +170,8 @@ def main():
 	numSkipped = 0
 	numMetadataFiles = 0
 	numFeatureNeuronsTensorFiles = 0
+	metadataColumnIndices = set()
+	persistedColumnIndices = set()
 	totalAssignedFeatureNeurons = 0
 	featureNeuronCountMethod = None
 	numberColumns = 0
@@ -171,15 +204,19 @@ def main():
 				isFeatureNeuronsTensor = False
 				isSourceFeatureTensor = False
 				isRecognisedEntry = False
+				observedColumnIndex = None
 				if(len(pathParts) == 2 and isObservedColumnFolderName(pathParts[0]) and pathParts[1] == "data.pkl"):
 					isMetadata = True
 					isRecognisedEntry = True
+					observedColumnIndex = parseObservedColumnFolderIndex(pathParts[0])
 				if(len(pathParts) == 2 and isObservedColumnFolderName(pathParts[0]) and pathParts[1] == "featureNeurons.pt"):
 					isFeatureNeuronsTensor = True
 					isRecognisedEntry = True
+					observedColumnIndex = parseObservedColumnFolderIndex(pathParts[0])
 				if(len(pathParts) == 3 and isObservedColumnFolderName(pathParts[0]) and pathParts[1] == "featureConnections" and isObservedColumnSourceFeatureTensorFileName(pathParts[2])):
 					isSourceFeatureTensor = True
 					isRecognisedEntry = True
+					observedColumnIndex = parseObservedColumnFolderIndex(pathParts[0])
 				if(not isRecognisedEntry):
 					if(relativeName.lower().endswith(".pt") or relativeName.lower().endswith(".pkl")):
 						raise RuntimeError("countParametersAndSize error: unsupported v1l observedColumns entry = " + name)
@@ -187,6 +224,9 @@ def main():
 				if(isMetadata):
 					totalDataPklBytesUncompressed += int(info.file_size)
 					numMetadataFiles += 1
+					metadataColumnIndices.add(observedColumnIndex)
+				if(isFeatureNeuronsTensor or isSourceFeatureTensor):
+					persistedColumnIndices.add(observedColumnIndex)
 				if(not name.lower().endswith(".pt")):
 					continue
 				if(isSourceFeatureTensor):
@@ -239,6 +279,13 @@ def main():
 				isLegacyFeatureConnectionsTensor = isLegacyFeatureConnectionsTensorFileName(relativeName)
 				isFeatureNeuronsTensor = isLegacyFeatureNeuronsTensorFileName(relativeName)
 				isRecognisedEntry = isMetadata or isLegacyFeatureConnectionsTensor or isFeatureNeuronsTensor
+				observedColumnIndex = None
+				if(isMetadata):
+					observedColumnIndex = parseLegacyObservedColumnFileIndex(relativeName, "_data.pkl")
+				if(isLegacyFeatureConnectionsTensor):
+					observedColumnIndex = parseLegacyObservedColumnFileIndex(relativeName, "_featureConnections.pt")
+				if(isFeatureNeuronsTensor):
+					observedColumnIndex = parseLegacyObservedColumnFileIndex(relativeName, "_featureNeurons.pt")
 				if(not isRecognisedEntry):
 					if(relativeName.lower().endswith(".pt") or relativeName.lower().endswith(".pkl")):
 						raise RuntimeError("countParametersAndSize error: unsupported legacy observedColumns entry = " + name)
@@ -246,6 +293,9 @@ def main():
 				if(isMetadata):
 					totalDataPklBytesUncompressed += int(info.file_size)
 					numMetadataFiles += 1
+					metadataColumnIndices.add(observedColumnIndex)
+				if(isFeatureNeuronsTensor or isLegacyFeatureConnectionsTensor):
+					persistedColumnIndices.add(observedColumnIndex)
 				if(not name.lower().endswith(".pt")):
 					continue
 				if(isLegacyFeatureConnectionsTensor):
@@ -277,8 +327,11 @@ def main():
 
 	totalPtGiB = totalPtBytesUncompressed / (1024 ** 3)
 	totalZipGiBUncompressed = totalZipBytesUncompressed / (1024 ** 3)
-	if(numMetadataFiles != numberColumns):
-		raise RuntimeError("countParametersAndSize error: observed column metadata file count does not match conceptColumnsDict count")
+	validateObservedColumnIndexBounds(metadataColumnIndices, numberColumns, "metadata")
+	validateObservedColumnIndexBounds(persistedColumnIndices, numberColumns, "persisted tensor")
+	validatePersistedObservedColumnMetadata(metadataColumnIndices, persistedColumnIndices)
+	if(numMetadataFiles > numberColumns):
+		raise RuntimeError("countParametersAndSize error: observed column metadata file count exceeds conceptColumnsDict count")
 	
 	#print(f"Zip: {zipPath}")
 	#print(f"Observed-columns prefix scanned: {prefix}")
