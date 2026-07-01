@@ -1149,6 +1149,9 @@ class SequenceObservedColumns:
 					combinedConnectionUpdates = connectionUpdatesAddSource
 				if(addPropertiesEnabled):
 					connectionTargetSparse = self.addSparseUpdate(connectionTargetSparse, combinedConnectionUpdates)
+					if(inferenceDuringTrainAdjustSynapseStrength):
+						if(inferenceDuringTrainAdjustSynapseStrengthDecrementInference):
+							connectionTargetSparse = self.clampAndPruneConnectionStrengthSparse(connectionTargetSparse)
 				if(arrayIndexPropertiesPos):
 					connectionTargetSparse = self.applySparseMaxUpdate(connectionTargetSparse, connectionUpdatesPosSource)
 				observedColumn.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, connectionTargetSparse)
@@ -1341,6 +1344,9 @@ class SequenceObservedColumns:
 					if(trainVerifyConnectionNonexistentAcrossBranches):
 						connectionUpdates = filterTrainVerifyConnectionNonexistentAcrossBranchesUpdates(connectionTargetSparse, connectionUpdates, databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
 					connectionTargetSparse = self.addSparseUpdateNonNegative(connectionTargetSparse, connectionUpdates)
+					if(inferenceDuringTrainAdjustSynapseStrength):
+						if(inferenceDuringTrainAdjustSynapseStrengthDecrementInference):
+							connectionTargetSparse = self.clampAndPruneConnectionStrengthSparse(connectionTargetSparse)
 				self.scatterConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionTargetSparse)
 		if(updateObservedColumnsEfficientFeatureConnectionsPhaseLabel is not None):
 			GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocalGrouped(updateObservedColumnsEfficientFeatureConnectionsPhaseLabel, updateObservedColumnsEfficientAggregatePhaseLabel)
@@ -1364,6 +1370,27 @@ class SequenceObservedColumns:
 		emptyIndices = pt.empty((len(targetSize), 0), dtype=pt.long, device=targetDevice)
 		emptyValues = pt.empty((0,), dtype=arrayType, device=targetDevice)
 		result = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=targetSize, dtype=arrayType, device=targetDevice)
+		return result
+
+	def clampAndPruneConnectionStrengthSparse(self, connectionSparse):
+		result = connectionSparse
+		if(inferenceDuringTrainAdjustSynapseStrength):
+			if(inferenceDuringTrainAdjustSynapseStrengthDecrementInference):
+				if(connectionSparse is None):
+					raise RuntimeError("clampAndPruneConnectionStrengthSparse error: connectionSparse is None")
+				if(not pt.is_tensor(connectionSparse) or connectionSparse.layout != pt.sparse_coo):
+					raise RuntimeError("clampAndPruneConnectionStrengthSparse error: connectionSparse must be sparse COO")
+				connectionSparse = connectionSparse.coalesce()
+				connectionIndices = connectionSparse.indices()
+				connectionValues = connectionSparse.values()
+				if(connectionIndices.numel() > 0):
+					strengthPropertyMask = connectionIndices[0] == self.databaseNetworkObject.arrayIndexPropertiesStrengthIndex
+					updatedValues = connectionValues
+					if(strengthPropertyMask.any()):
+						updatedValues = connectionValues.clone()
+						updatedValues[strengthPropertyMask] = updatedValues[strengthPropertyMask].clamp(min=inferenceDuringTrainConnectionStrengthMinimum)
+					keepMask = pt.logical_or(pt.logical_not(strengthPropertyMask), updatedValues > inferenceDuringTrainConnectionStrengthMinimum)
+					result = pt.sparse_coo_tensor(connectionIndices[:, keepMask], updatedValues[keepMask], size=connectionSparse.size(), dtype=arrayType, device=connectionSparse.device).coalesce()
 		return result
 
 	def buildFeaturePropertyUpdateSparseBatched(self, indices, values, propertyIndex, featureIndicesInObserved, conceptIndicesTensor, targetSize, compactConceptIndices=None):
@@ -1795,6 +1822,9 @@ class SequenceObservedColumns:
 				if(trainVerifyConnectionNonexistentAcrossBranches):
 					updateSparse = filterTrainVerifyConnectionNonexistentAcrossBranchesUpdates(connectionTargetSparse, updateSparse, observedColumn.databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
 				connectionTargetSparse = self.addSparseUpdateNonNegative(connectionTargetSparse, updateSparse)
+				if(inferenceDuringTrainAdjustSynapseStrength):
+					if(inferenceDuringTrainAdjustSynapseStrengthDecrementInference):
+						connectionTargetSparse = self.clampAndPruneConnectionStrengthSparse(connectionTargetSparse)
 				if(connectionStorageDevice is not None):
 					if(connectionTargetSparse.device != connectionStorageDevice):
 						connectionTargetSparse = connectionTargetSparse.to(connectionStorageDevice)

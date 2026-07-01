@@ -371,6 +371,8 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		if(numSeedTokens >= len(sequence)):
 			if(useTrainDuringInference):
 				tokens = GIAANNnlp_sequenceTokens.getTokens(sequence)
+				if(inferenceDuringTrainAdjustSynapseStrength):
+					GIAANNcmn_prediction.initialiseInferenceDuringTrainConnectionsActive(databaseNetworkObject)
 				inferenceSuccessfulPredictionMask = GIAANNcmn_prediction.createInferenceSuccessfulPredictionMask(tokens)
 				return inferenceSuccessfulPredictionMask
 			return

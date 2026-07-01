@@ -720,7 +720,10 @@ def applyFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeat
 			globalFeatureNeuronsActivation += featureNeuronsTargetActivation
 	else:
 		globalFeatureNeuronsActivation += featureNeuronsTargetActivation
-	if(inferenceSegmentActivationsBoolean and applySegmentActivations):
+	applySegmentActivationsBooleanCurrent = inferenceSegmentActivationsBoolean and applySegmentActivations
+	if(inferenceDuringTrainAdjustSynapseStrengthBiasTimingCalculations):
+		applySegmentActivationsBooleanCurrent = False
+	if(applySegmentActivationsBooleanCurrent):
 		globalFeatureNeuronsActivation = applySegmentActivationsBoolean(globalFeatureNeuronsActivation)
 	if(inferenceUseNeuronFeaturePropertiesTime):
 		# spec step (a): store last timeValue for activated segments during each prediction step
@@ -737,35 +740,87 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 	featureNeuronsActive = calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex)
 
 	#target neuron activation dependence on connection strength;
-	featureConnectionsStrength = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
+	featureConnectionsStrengthStored = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
+	featureConnectionsStrength = featureConnectionsStrengthStored
 	if(inferenceConnectionStrengthPOSdependence):
 		featureConnectionsPos = featureConnections[databaseNetworkObject.arrayIndexPropertiesPosIndex]
 	if(inferenceConnectionStrengthPOSdependence):
 		featureConnectionsStrength = applyConnectionStrengthPOSdependenceInference(databaseNetworkObject, featureConnectionsStrength, featureConnectionsPos, sourceColumnIndex)
+	featureConnectionsStrengthRaw = featureConnectionsStrength
 	if(inferenceConnectionsStrengthBoolean):
 		featureConnectionsStrength = featureConnectionsStrength.bool().float()
 	
 	if(featureNeuronsActive.dim() > 0):
 		featureNeuronsActive = featureNeuronsActive.reshape(-1)
-	if featureConnectionsStrength.is_sparse:
-		if(featureNeuronsActive.dim() == 0):
-			branchCount = featureConnectionsStrength.size(0)
-			branchValues = pt.full((branchCount,), featureNeuronsActive.item(), dtype=featureNeuronsActive.dtype, device=featureNeuronsActive.device)
-			featureNeuronsTargetActivation = GIAANNcmn_sparseTensors.scaleSparseTensorByBranchValues(featureConnectionsStrength, branchValues)
-		else:
-			featureNeuronsTargetActivation = GIAANNcmn_sparseTensors.scaleSparseTensorByBranchValues(featureConnectionsStrength, featureNeuronsActive)
-	else:
-		if(featureNeuronsActive.dim() == 0):
-			featureNeuronsTargetActivation = featureConnectionsStrength * featureNeuronsActive
-		else:
-			featureNeuronsTargetActivation = featureConnectionsStrength * featureNeuronsActive.view(-1, 1, 1, 1)
+	featureNeuronsTargetActivation = calculateFeatureNeuronsTargetActivationPredict(featureConnectionsStrength, featureNeuronsActive)
+	if(inferenceDuringTrainAdjustSynapseStrengthBiasTimingCalculations):
+		if(inferenceConnectionsStrengthBoolean):
+			featureNeuronsTargetActivation = calculateFeatureNeuronsTargetActivationPredict(featureConnectionsStrengthRaw, featureNeuronsActive)
 
 	if(sourceActivationMultiplier is not None):
 		sourceActivationMultiplier = float(sourceActivationMultiplier)
 		if(sourceActivationMultiplier < auxiliaryNeuronsSimilarWordsMinimumSimilarity or sourceActivationMultiplier > auxiliaryNeuronsSimilarWordsMaximumSimilarity):
 			raise RuntimeError("processFeaturesActivePredict error: sourceActivationMultiplier out of range")
 		featureNeuronsTargetActivation = featureNeuronsTargetActivation * sourceActivationMultiplier
+	if(inferenceDuringTrainAdjustSynapseStrength):
+		if(inferenceDuringTrainAdjustSynapseStrengthDecrementInference):
+			updateInferenceDuringTrainConnectionsActive(databaseNetworkObject, featureNeuronsTargetActivation, featureConnectionsStrengthStored, sourceColumnIndex, sourceFeatureIndex)
 	result = processFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureNeuronsTargetActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
+	return result
+
+def calculateFeatureNeuronsTargetActivationPredict(featureConnectionsStrength, featureNeuronsActive):
+	result = None
+	if(featureConnectionsStrength.is_sparse):
+		if(featureNeuronsActive.dim() == 0):
+			branchCount = featureConnectionsStrength.size(0)
+			branchValues = pt.full((branchCount,), featureNeuronsActive.item(), dtype=featureNeuronsActive.dtype, device=featureNeuronsActive.device)
+			result = GIAANNcmn_sparseTensors.scaleSparseTensorByBranchValues(featureConnectionsStrength, branchValues)
+		else:
+			result = GIAANNcmn_sparseTensors.scaleSparseTensorByBranchValues(featureConnectionsStrength, featureNeuronsActive)
+	else:
+		if(featureNeuronsActive.dim() == 0):
+			result = featureConnectionsStrength * featureNeuronsActive
+		else:
+			result = featureConnectionsStrength * featureNeuronsActive.view(-1, 1, 1, 1)
+	return result
+
+def updateInferenceDuringTrainConnectionsActive(databaseNetworkObject, featureNeuronsTargetActivation, featureConnectionsStrengthStored, sourceColumnIndex, sourceFeatureIndex):
+	result = None
+	if(inferenceDuringTrainAdjustSynapseStrength):
+		if(inferenceDuringTrainAdjustSynapseStrengthDecrementInference):
+			if(not useTrainDuringInference or executionMode!="trainDuringInference"):
+				raise RuntimeError("updateInferenceDuringTrainConnectionsActive error: requires executionMode trainDuringInference")
+			if(databaseNetworkObject is None):
+				raise RuntimeError("updateInferenceDuringTrainConnectionsActive error: databaseNetworkObject is None")
+			if(not hasattr(databaseNetworkObject, "inferenceDuringTrainConnectionsActive")):
+				raise RuntimeError("updateInferenceDuringTrainConnectionsActive error: inferenceDuringTrainConnectionsActive has not been initialised")
+			if(featureNeuronsTargetActivation is None):
+				raise RuntimeError("updateInferenceDuringTrainConnectionsActive error: featureNeuronsTargetActivation is None")
+			if(featureConnectionsStrengthStored is None):
+				raise RuntimeError("updateInferenceDuringTrainConnectionsActive error: featureConnectionsStrengthStored is None")
+			activationSparse = featureNeuronsTargetActivation
+			if(not activationSparse.is_sparse):
+				activationSparse = activationSparse.to_sparse_coo()
+			activationSparse = activationSparse.coalesce()
+			if(activationSparse.dim() != inferenceDuringTrainTargetConnectionTensorRank):
+				raise RuntimeError("updateInferenceDuringTrainConnectionsActive error: activation tensor rank invalid")
+			if(activationSparse._nnz() > 0):
+				activationIndices = activationSparse.indices()
+				activationValues = activationSparse.values()
+				activationMask = activationValues > inferenceDuringTrainConnectionStrengthActiveThreshold
+				if(activationMask.any()):
+					activeIndices = activationIndices[:, activationMask]
+					connectionStrengthValues = GIAANNcmn_sparseTensors.gatherSparseTensorValuesAtIndices(featureConnectionsStrengthStored, activeIndices, activationValues.dtype)
+					connectionStrengthMask = connectionStrengthValues > inferenceDuringTrainConnectionStrengthActiveThreshold
+					if(connectionStrengthMask.any()):
+						filteredActiveIndices = activeIndices[:, connectionStrengthMask]
+						filteredConnectionStrengthValues = connectionStrengthValues[connectionStrengthMask]
+						sourceConceptIndices = pt.full_like(filteredActiveIndices[inferenceDuringTrainConnectionIndexBranch], int(sourceColumnIndex))
+						sourceFeatureIndices = pt.full_like(filteredActiveIndices[inferenceDuringTrainConnectionIndexBranch], int(sourceFeatureIndex))
+						connectionIndices = pt.stack((filteredActiveIndices[inferenceDuringTrainConnectionIndexBranch], filteredActiveIndices[inferenceDuringTrainConnectionIndexSegment], sourceConceptIndices, sourceFeatureIndices, filteredActiveIndices[2], filteredActiveIndices[3]), dim=0)
+						connectionSize = (multipleDendriticBranchesNumber, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f, databaseNetworkObject.c, databaseNetworkObject.f)
+						connectionSparse = pt.sparse_coo_tensor(connectionIndices, filteredConnectionStrengthValues, size=connectionSize, dtype=arrayType, device=filteredConnectionStrengthValues.device).coalesce()
+						databaseNetworkObject.inferenceDuringTrainConnectionsActive = GIAANNcmn_sparseTensors.maximumSparseTensorValues(databaseNetworkObject.inferenceDuringTrainConnectionsActive, connectionSparse)
 	return result
 
 def selectActivatedBranchIndex(globalFeatureNeuronsActivation, columnIndex, featureIndex):

@@ -94,7 +94,7 @@ elif(useTrainDuringInference):
 		useBenchmarkDefaultsEvalTrainSet = False	#default: False	#execute executionMode="trainDuringInference" must use inferenceSegmentTiming = "exact" to approximate executionMode = "train"
 		useBenchmarkDefaultsEvalTestSet = useBenchmarkDefaultsEvalTrainSet	#alias only
 	elif(executionMode == "inference"):
-		useBenchmarkDefaultsEvalTestSet = False	#default: True: eval test-set
+		useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 	
 if(useBenchmarkDefaultsEvalTestSet):
 	inferenceEvaluateTestSet = True
@@ -659,6 +659,31 @@ featureIndexPrimeConceptNeuron = 0
 
 #Inference prediction selection;
 if(useInference):
+	inferenceDuringTrainAdjustSynapseStrength = False	#derived var
+	inferenceDuringTrainAdjustSynapseStrengthBiasTimingCalculations = False		#derived var
+	if(useTrainDuringInference):
+		if(executionMode=="inference" or executionMode=="trainDuringInference"):
+			inferenceDuringTrainAdjustSynapseStrengthBiasTimingCalculations = True		#default:True #orig: False	#adjusts individual segment activations during total neuron activation value calculation based on the strength of each activated connected synapse (not only their last recorded activation time; inferenceUseNeuronFeaturePropertiesTime). . note if inferenceConnectionsStrengthBoolean=False, this is the only time the numerical synapse connection strength values are actually used (beyond their converted boolean values; 1.0/0.0).
+			#assumes inferenceDuringTrainAdjustSynapseStrength during train
+		if(executionMode=="trainDuringInference"):
+			inferenceDuringTrainAdjustSynapseStrength = True	#default: True	#orig: False
+			if(inferenceDuringTrainAdjustSynapseStrength):
+				#implements pseudo spike-timing-dependent plasticity (STDP): if the presynaptic neuron fires shortly before the postsynaptic neuron fires, the synapse is strengthened. if the presynaptic neuron fires shortly after the postsynaptic neuron fires, the synapse is weakened. additional rule: if the presynaptic neuron fires a significant time before the postsynaptic neuron fires (and is thus also unassociated with its firing), the synapse is weakened.
+				inferenceDuringTrainAdjustSynapseStrengthDecrementInference = True	#default:True #orig: False	#synapses which are activated both during both the a) inference phase and b) train phase of useTrainDuringInference, are decremented. #note this is an efficient implementation functionally equivalent to inferenceDynamicSynapseStrengthDecrementUntrained.
+				if(inferenceDuringTrainAdjustSynapseStrengthDecrementInference):
+					inferenceDuringTrainDecrementNonlinear = True	#apply non linear decrement (use same algorithm as inferenceDecrementActivationsNonlinear)
+					inferenceDuringTrainDecrement = 0.1		#CHECKTHIS - assumes connection strength increment == 1.0
+				inferenceDuringTrainAdjustSynapseStrengthIncrementTrain = True	#mandatory:True	#already implemented by default (train increments connection strengths).	#synapses activated during train phase of useTrainDuringInference are incremented.	#note connection strengths can still grow past 1.0 during training (unless trainConnectionStrengthLimitMax or trainConnectionStrengthLimitTanh is enabled).
+				inferenceDuringTrainConnectionStrengthActiveThreshold = 0.0
+				inferenceDuringTrainConnectionStrengthMinimum = 0.0
+				inferenceDuringTrainConnectionIndexBranch = 0
+				inferenceDuringTrainConnectionIndexSegment = 1
+				inferenceDuringTrainConnectionIndexSourceConcept = 2
+				inferenceDuringTrainConnectionIndexSourceFeature = 3
+				inferenceDuringTrainConnectionIndexTargetConcept = 4
+				inferenceDuringTrainConnectionIndexTargetFeature = 5
+				inferenceDuringTrainConnectionTensorRank = 6
+				inferenceDuringTrainTargetConnectionTensorRank = 4
 	inferenceDeactivateNeuronsUponPrediction = True	#default: True
 	inferenceDecrementActivations = False	#default: False - CHECKTHIS #orig: False
 	if(inferenceDecrementActivations):
@@ -676,7 +701,8 @@ if(useInference):
 	if(not executionMode == "train"):
 		assert storeDatabaseGlobalFeatureNeuronsInRam, "useInference: global feature neuron lists are required" 
 	assert useSaveData,  "useInference: useSaveData is required" 
-		
+
+
 
 #Database save paths;
 conceptColumnsDictFile = databaseFolder + 'conceptColumnsDict.pkl'

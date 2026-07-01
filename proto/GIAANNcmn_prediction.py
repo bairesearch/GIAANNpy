@@ -409,6 +409,8 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 			if(not multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
 				raise RuntimeError("processConceptWordsInference error: multipleDendriticBranchesBinaryTree requires root-branch selection during useTrainDuringInference")
 			databaseNetworkObject.multipleDendriticBranchesBinaryTreeInferenceActivation = None
+		if(inferenceDuringTrainAdjustSynapseStrength):
+			initialiseInferenceDuringTrainConnectionsActive(databaseNetworkObject)
 	if(useTrainDuringInference):
 		globalFeatureNeuronsActivation = createInferenceTransientGlobalFeatureNeuronsProperty(databaseNetworkObject)
 	else:
@@ -482,6 +484,18 @@ def createInferenceTransientGlobalFeatureNeuronsProperty(databaseNetworkObject):
 	if(databaseNetworkObject.c < 0 or databaseNetworkObject.f < 0):
 		raise RuntimeError("createInferenceTransientGlobalFeatureNeuronsProperty error: database dimensions must be non-negative")
 	result = GIAANNcmn_sparseTensors.createEmptySparseTensor((multipleDendriticBranchesNumber, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f))
+	return result
+
+def initialiseInferenceDuringTrainConnectionsActive(databaseNetworkObject):
+	result = None
+	if(inferenceDuringTrainAdjustSynapseStrength):
+		if(not useTrainDuringInference or executionMode!="trainDuringInference"):
+			raise RuntimeError("initialiseInferenceDuringTrainConnectionsActive error: requires executionMode trainDuringInference")
+		if(databaseNetworkObject is None):
+			raise RuntimeError("initialiseInferenceDuringTrainConnectionsActive error: databaseNetworkObject is None")
+		if(databaseNetworkObject.c < 0 or databaseNetworkObject.f < 0):
+			raise RuntimeError("initialiseInferenceDuringTrainConnectionsActive error: database dimensions must be non-negative")
+		databaseNetworkObject.inferenceDuringTrainConnectionsActive = GIAANNcmn_sparseTensors.createEmptySparseTensor((multipleDendriticBranchesNumber, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f, databaseNetworkObject.c, databaseNetworkObject.f))
 	return result
 
 def createInferenceSuccessfulPredictionMask(tokensSequence):

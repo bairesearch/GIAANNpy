@@ -25,6 +25,87 @@ def createEmptySparseTensor(shape):
 	sparseZeroTensor = pt.sparse_coo_tensor(indices=pt.empty((len(shape), 0), dtype=pt.long), values=pt.empty(0), size=shape, device=deviceSparse)
 	return sparseZeroTensor
 
+def buildSparseTensorIndexKeys(indices, size):
+	result = None
+	if(indices is None):
+		raise RuntimeError("buildSparseTensorIndexKeys error: indices is None")
+	if(indices.dim() != 2):
+		raise RuntimeError("buildSparseTensorIndexKeys error: indices must be rank 2")
+	if(len(size) != indices.shape[0]):
+		raise RuntimeError("buildSparseTensorIndexKeys error: size rank mismatch")
+	sizeTensor = pt.tensor(tuple(size), dtype=pt.long, device=indices.device)
+	if(sizeTensor.numel() == 0):
+		raise RuntimeError("buildSparseTensorIndexKeys error: size must not be empty")
+	if(indices.numel() > 0):
+		if(bool(pt.any(indices < 0).item()) or bool(pt.any(indices >= sizeTensor.view(-1, 1)).item())):
+			raise RuntimeError("buildSparseTensorIndexKeys error: index out of range")
+	stridesCumulative = pt.flip(pt.cumprod(pt.flip(sizeTensor, dims=(0,)), dim=0), dims=(0,))
+	strides = pt.cat((stridesCumulative[1:], pt.ones((1,), dtype=pt.long, device=indices.device)), dim=0)
+	result = (indices*strides.view(-1, 1)).sum(dim=0)
+	return result
+
+def gatherSparseTensorValuesAtIndices(tensor, indices, dtype):
+	result = None
+	if(indices is None):
+		raise RuntimeError("gatherSparseTensorValuesAtIndices error: indices is None")
+	if(indices.dim() != 2):
+		raise RuntimeError("gatherSparseTensorValuesAtIndices error: indices must be rank 2")
+	if(tensor is None):
+		result = pt.zeros((indices.shape[1],), dtype=dtype, device=indices.device)
+	else:
+		if(len(tensor.size()) != indices.shape[0]):
+			raise RuntimeError("gatherSparseTensorValuesAtIndices error: tensor/index rank mismatch")
+		queryKeys = buildSparseTensorIndexKeys(indices, tensor.size())
+		if(tensor.is_sparse):
+			tensor = tensor.coalesce()
+			if(tensor._nnz() == 0):
+				result = pt.zeros((indices.shape[1],), dtype=dtype, device=indices.device)
+			else:
+				tensorKeys = buildSparseTensorIndexKeys(tensor.indices(), tensor.size())
+				sortedTensorKeys, sortOrder = pt.sort(tensorKeys)
+				sortedTensorValues = tensor.values().index_select(0, sortOrder)
+				positions = pt.searchsorted(sortedTensorKeys, queryKeys)
+				validMask = positions < sortedTensorKeys.shape[0]
+				safePositions = positions.clamp(max=sortedTensorKeys.shape[0]-1)
+				matchMask = validMask & (sortedTensorKeys[safePositions] == queryKeys)
+				result = pt.zeros((queryKeys.shape[0],), dtype=sortedTensorValues.dtype, device=sortedTensorValues.device)
+				if(matchMask.any()):
+					result[matchMask] = sortedTensorValues.index_select(0, safePositions[matchMask])
+		else:
+			flatValues = tensor.reshape(-1)
+			result = flatValues.index_select(0, queryKeys.to(flatValues.device))
+		if(result.dtype != dtype):
+			result = result.to(dtype)
+	return result
+
+def maximumSparseTensorValues(targetSparse, updateSparse):
+	result = targetSparse
+	if(targetSparse is None):
+		raise RuntimeError("maximumSparseTensorValues error: targetSparse is None")
+	if(updateSparse is None):
+		raise RuntimeError("maximumSparseTensorValues error: updateSparse is None")
+	if(not targetSparse.is_sparse or not updateSparse.is_sparse):
+		raise RuntimeError("maximumSparseTensorValues error: tensors must be sparse")
+	targetSparse = targetSparse.coalesce()
+	updateSparse = updateSparse.coalesce()
+	if(targetSparse.dim() != updateSparse.dim() or tuple(targetSparse.size()) != tuple(updateSparse.size())):
+		raise RuntimeError("maximumSparseTensorValues error: tensor size mismatch")
+	if(updateSparse._nnz() > 0):
+		combinedIndices = pt.cat((targetSparse.indices(), updateSparse.indices()), dim=1)
+		combinedValues = pt.cat((targetSparse.values(), updateSparse.values()), dim=0)
+		combinedKeys = buildSparseTensorIndexKeys(combinedIndices, targetSparse.size())
+		sortedKeys, sortOrder = pt.sort(combinedKeys)
+		sortedIndices = combinedIndices.index_select(1, sortOrder)
+		sortedValues = combinedValues.index_select(0, sortOrder)
+		uniqueKeys, counts = pt.unique_consecutive(sortedKeys, return_counts=True)
+		segmentStarts = pt.cumsum(counts, dim=0) - counts
+		uniqueIndices = sortedIndices.index_select(1, segmentStarts)
+		segmentIds = pt.repeat_interleave(pt.arange(uniqueKeys.shape[0], dtype=pt.long, device=sortedValues.device), counts)
+		uniqueValues = pt.empty((uniqueKeys.shape[0],), dtype=sortedValues.dtype, device=sortedValues.device)
+		uniqueValues.scatter_reduce_(0, segmentIds, sortedValues, reduce="amax", include_self=False)
+		result = pt.sparse_coo_tensor(uniqueIndices, uniqueValues, size=targetSparse.size(), dtype=targetSparse.dtype, device=targetSparse.device).coalesce()
+	return result
+
 def subtractValueFromSparseTensorValues(sparseTensor, value):
 	sparseTensor = addValueToSparseTensorValues(sparseTensor, -value)
 	sparseTensor.values().clamp_(min=0)

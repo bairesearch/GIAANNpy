@@ -408,3 +408,30 @@ v2f (Codex IDE GPT-5.5) [under development]:
 - patch printCountTotalParameters for case storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=False (+storeDatabaseGlobalFeatureNeuronsInRam=False) - count dictionary-only observed columns as empty - allow printCountTotalParameters to skip unpersisted columns while still failing on partial/corrupt observed-column storage.
 - patch countParametersAndSize.py for case storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=False (+storeDatabaseGlobalFeatureNeuronsInRam=False) - relax standalone metadata count invariant - validate persisted tensor metadata coverage instead of requiring observed-column metadata count to equal conceptColumnsDict count.
 MANUAL; - update paper
+
+---
+v2g (Codex IDE GPT-5.5) [under development]:
+- add proto GIAANNproto2g1a - start option inferenceDuringTrainAdjustSynapseStrength:
+	- inferenceDuringTrainAdjustSynapseStrength implements pseudo spike-timing-dependent plasticity (STDP):
+		- if the presynaptic neuron fires shortly before the postsynaptic neuron fires, the synapse is strengthened. 
+		- if the presynaptic neuron fires shortly after the postsynaptic neuron fires, the synapse is weakened. 
+		- additional rule: if the presynaptic neuron fires a significant time before the postsynaptic neuron fires (and is thus unassociated with its firing), the synapse is weakened. 
+	- implement inferenceDuringTrainAdjustSynapseStrengthDecrementInference - synapses which are activated both during both the a) inference phase and b) train phase of useTrainDuringInference, are decremented. 
+		- note this is an efficient implementation functionally equivalent to inferenceDynamicSynapseStrengthDecrementUntrained.
+		- inferenceDuringTrainAdjustSynapseStrengthDecrementInference respects parameters inferenceDuringTrainDecrementNonlinear and inferenceDuringTrainDecrement.
+		- a synapse strength being decremented to zero is equivalent to removing that synapse (it should automatically be removed from the sparse tensor).
+		- never decrement a connection strength below 0.
+		- ensure that all inferenceDuringTrainAdjustSynapseStrength strength modifications only occur during the train and inference phases of useTrainDuringInference:executeMode=="trainDuringInference" (not "inference").
+	- assume inferenceDuringTrainAdjustSynapseStrengthIncrementTrain - already implemented by default (train increments connection strengths). 
+		- synapses activated during train phase of useTrainDuringInference are incremented. 
+		- note connection strengths can still grow past 1.0 during training (unless trainConnectionStrengthLimitMax or trainConnectionStrengthLimitTanh is enabled).
+	- implement inferenceDuringTrainAdjustSynapseStrengthBiasTimingCalculations - adjusts individual segment activations during total neuron activation value calculation based on the strength of each activated connected synapse (not only their last recorded activation time; inferenceUseNeuronFeaturePropertiesTime). 
+		- note if inferenceConnectionsStrengthBoolean=False, this is the only time the numerical synapse connection strength values are actually used (beyond their converted boolean values; 1.0/0.0).
+		- inferenceDuringTrainAdjustSynapseStrength:BiasTimingCalculations needs to be performed in both executeMode=="trainDuringInference" and executeMode=="inference". It does not modify the connection strengths, it only uses them to bias the segment activations.
+	Implementation Notes:
+		- implementation must use vectorised pytorch code only (no python for loops).
+		- do not change any existing code in the codebase unrelated to specific inferenceDuringTrainAdjustSynapseStrength==True behaviour.
+		- ensure to encapsulate all inferenceDuringTrainAdjustSynapseStrength==True specific behaviour within context if(inferenceDuringTrainAdjustSynapseStrength) as per AGENTS.md.
+
+	
+
