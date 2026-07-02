@@ -28,6 +28,7 @@ import GIAANNcmn_databaseNetwork
 import GIAANNcmn_databaseNetworkTrain
 import GIAANNcmn_databaseNetworkDraw
 import GIAANNcmn_sparseTensors
+import GIAANNcmn_inferenceDuringTrain
 import GIAANNnlp_sequenceTokens
 import GIAANNcmn_predictionBeamSearch
 import GIAANNnlp_sequenceConcepts
@@ -495,7 +496,7 @@ def initialiseInferenceDuringTrainConnectionsActive(databaseNetworkObject):
 			raise RuntimeError("initialiseInferenceDuringTrainConnectionsActive error: databaseNetworkObject is None")
 		if(databaseNetworkObject.c < 0 or databaseNetworkObject.f < 0):
 			raise RuntimeError("initialiseInferenceDuringTrainConnectionsActive error: database dimensions must be non-negative")
-		databaseNetworkObject.inferenceDuringTrainConnectionsActive = GIAANNcmn_sparseTensors.createEmptySparseTensor((multipleDendriticBranchesNumber, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f, databaseNetworkObject.c, databaseNetworkObject.f))
+		GIAANNcmn_inferenceDuringTrain.initialiseConnectionsActive(databaseNetworkObject)
 	return result
 
 def createInferenceSuccessfulPredictionMask(tokensSequence):

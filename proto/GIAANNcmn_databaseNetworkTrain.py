@@ -23,6 +23,7 @@ import time
 from GIAANNcmn_globalDefs import *
 import GIAANNcmn_debug
 import GIAANNcmn_sparseTensors
+import GIAANNcmn_inferenceDuringTrain
 import GIAANNnlp_sequenceConcepts
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	import GIAANNnlp_auxiliaryNeuronsSimilarWords
@@ -386,7 +387,7 @@ def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceOb
 
 		if(inferenceDuringTrainAdjustSynapseStrength):
 			if(inferenceDuringTrainAdjustSynapseStrengthDecrementInference):
-				featureConnectionsStrengthUpdate = applyInferenceDuringTrainAdjustSynapseStrengthDecrementDense(sequenceObservedColumns, featureConnectionsActive, featureConnectionsStrengthUpdate, cs, fs)
+				featureConnectionsStrengthUpdate = GIAANNcmn_inferenceDuringTrain.applyInferenceDuringTrainAdjustSynapseStrengthDecrementDense(sequenceObservedColumns, featureConnectionsActive, featureConnectionsStrengthUpdate, cs, fs)
 
 		addSequenceFeatureConnectionsProperty(sequenceObservedColumns, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureConnectionsStrengthUpdate)
 	if(arrayIndexPropertiesPermanence):
@@ -515,7 +516,7 @@ def processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, feature
 				strengthValues = applyConnectionStrengthPOSdependenceTrainSparse(sequenceObservedColumns, strengthValues, featureNeuronsPos, sourceConceptIndices, sourceFeatureIndices, targetConceptIndices)
 			if(inferenceDuringTrainAdjustSynapseStrength):
 				if(inferenceDuringTrainAdjustSynapseStrengthDecrementInference):
-					strengthValues = applyInferenceDuringTrainAdjustSynapseStrengthDecrementSparse(sequenceObservedColumns, connectionActiveSparse, strengthValues)
+					strengthValues = GIAANNcmn_inferenceDuringTrain.applyInferenceDuringTrainAdjustSynapseStrengthDecrementSparse(sequenceObservedColumns, connectionActiveSparse, strengthValues)
 		strengthSparse = buildSequenceConnectionPropertySparse(connectionActiveIndices, strengthValues, cs, fs)
 		addSequenceFeatureConnectionsProperty(sequenceObservedColumns, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, strengthSparse)
 	if(arrayIndexPropertiesPermanence):
@@ -533,83 +534,6 @@ def processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, feature
 		posSparse = buildSequenceConnectionPropertySparse(connectionActiveIndices, posValues, cs, fs)
 		setSequenceFeatureConnectionsProperty(sequenceObservedColumns, databaseNetworkObject.arrayIndexPropertiesPosIndex, posSparse)
 	return
-
-def applyInferenceDuringTrainAdjustSynapseStrengthDecrementDense(sequenceObservedColumns, featureConnectionsActive, featureConnectionsStrengthUpdate, cs, fs):
-	result = featureConnectionsStrengthUpdate
-	if(inferenceDuringTrainAdjustSynapseStrength):
-		if(inferenceDuringTrainAdjustSynapseStrengthDecrementInference):
-			if(featureConnectionsActive is None):
-				raise RuntimeError("applyInferenceDuringTrainAdjustSynapseStrengthDecrementDense error: featureConnectionsActive is None")
-			if(featureConnectionsStrengthUpdate is None):
-				raise RuntimeError("applyInferenceDuringTrainAdjustSynapseStrengthDecrementDense error: featureConnectionsStrengthUpdate is None")
-			if(not pt.is_tensor(featureConnectionsActive) or not pt.is_tensor(featureConnectionsStrengthUpdate)):
-				raise RuntimeError("applyInferenceDuringTrainAdjustSynapseStrengthDecrementDense error: tensors are required")
-			if(featureConnectionsActive.shape != featureConnectionsStrengthUpdate.shape):
-				raise RuntimeError("applyInferenceDuringTrainAdjustSynapseStrengthDecrementDense error: tensor shape mismatch")
-			connectionActiveSparse = featureConnectionsActive.to_sparse_coo().coalesce()
-			connectionDecrementValues = calculateInferenceDuringTrainAdjustSynapseStrengthDecrementValues(sequenceObservedColumns, connectionActiveSparse)
-			connectionActiveIndices = connectionActiveSparse.indices()
-			decrementMask = connectionDecrementValues > inferenceDuringTrainConnectionStrengthActiveThreshold
-			if(decrementMask.any()):
-				connectionDecrementSparse = pt.sparse_coo_tensor(connectionActiveIndices[:, decrementMask], connectionDecrementValues[decrementMask], size=(multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs, cs, fs), dtype=arrayType, device=featureConnectionsStrengthUpdate.device).coalesce()
-				result = featureConnectionsStrengthUpdate - connectionDecrementSparse.to_dense()
-	return result
-
-def applyInferenceDuringTrainAdjustSynapseStrengthDecrementSparse(sequenceObservedColumns, connectionActiveSparse, strengthValues):
-	result = strengthValues
-	if(inferenceDuringTrainAdjustSynapseStrength):
-		if(inferenceDuringTrainAdjustSynapseStrengthDecrementInference):
-			if(strengthValues is None):
-				raise RuntimeError("applyInferenceDuringTrainAdjustSynapseStrengthDecrementSparse error: strengthValues is None")
-			connectionDecrementValues = calculateInferenceDuringTrainAdjustSynapseStrengthDecrementValues(sequenceObservedColumns, connectionActiveSparse)
-			if(connectionDecrementValues.shape != strengthValues.shape):
-				raise RuntimeError("applyInferenceDuringTrainAdjustSynapseStrengthDecrementSparse error: decrement shape mismatch")
-			result = strengthValues - connectionDecrementValues
-	return result
-
-def calculateInferenceDuringTrainAdjustSynapseStrengthDecrementValues(sequenceObservedColumns, connectionActiveSparse):
-	result = None
-	if(inferenceDuringTrainAdjustSynapseStrength):
-		if(not useTrainDuringInference or executionMode!="trainDuringInference"):
-			raise RuntimeError("calculateInferenceDuringTrainAdjustSynapseStrengthDecrementValues error: requires executionMode trainDuringInference")
-		if(sequenceObservedColumns is None):
-			raise RuntimeError("calculateInferenceDuringTrainAdjustSynapseStrengthDecrementValues error: sequenceObservedColumns is None")
-		if(connectionActiveSparse is None):
-			raise RuntimeError("calculateInferenceDuringTrainAdjustSynapseStrengthDecrementValues error: connectionActiveSparse is None")
-		if(not pt.is_tensor(connectionActiveSparse) or connectionActiveSparse.layout != pt.sparse_coo):
-			raise RuntimeError("calculateInferenceDuringTrainAdjustSynapseStrengthDecrementValues error: connectionActiveSparse must be sparse COO")
-		connectionActiveSparse = connectionActiveSparse.coalesce()
-		if(connectionActiveSparse.dim() != inferenceDuringTrainConnectionTensorRank):
-			raise RuntimeError("calculateInferenceDuringTrainAdjustSynapseStrengthDecrementValues error: connectionActiveSparse rank invalid")
-		connectionActiveIndices = connectionActiveSparse.indices()
-		connectionActiveValues = connectionActiveSparse.values()
-		result = pt.zeros_like(connectionActiveValues)
-		if(connectionActiveIndices.numel() > 0):
-			databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
-			if(not hasattr(databaseNetworkObject, "inferenceDuringTrainConnectionsActive")):
-				raise RuntimeError("calculateInferenceDuringTrainAdjustSynapseStrengthDecrementValues error: inferenceDuringTrainConnectionsActive has not been initialised")
-			inferenceConnectionsActive = databaseNetworkObject.inferenceDuringTrainConnectionsActive
-			if(not pt.is_tensor(inferenceConnectionsActive) or inferenceConnectionsActive.layout != pt.sparse_coo):
-				raise RuntimeError("calculateInferenceDuringTrainAdjustSynapseStrengthDecrementValues error: inferenceDuringTrainConnectionsActive must be sparse COO")
-			conceptIndicesTensor = sequenceObservedColumns.conceptIndicesInSequenceObservedTensor.to(connectionActiveIndices.device)
-			featureIndicesInObservedTensor = sequenceObservedColumns.featureIndicesInObservedTensor.to(connectionActiveIndices.device)
-			sourceConceptIndices = conceptIndicesTensor[connectionActiveIndices[inferenceDuringTrainConnectionIndexSourceConcept]]
-			targetConceptIndices = conceptIndicesTensor[connectionActiveIndices[inferenceDuringTrainConnectionIndexTargetConcept]]
-			sourceFeatureIndices = connectionActiveIndices[inferenceDuringTrainConnectionIndexSourceFeature]
-			targetFeatureIndices = connectionActiveIndices[inferenceDuringTrainConnectionIndexTargetFeature]
-			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
-				sourceFeatureIndices = featureIndicesInObservedTensor[sourceFeatureIndices]
-				targetFeatureIndices = featureIndicesInObservedTensor[targetFeatureIndices]
-			globalConnectionIndices = pt.stack((connectionActiveIndices[inferenceDuringTrainConnectionIndexBranch], connectionActiveIndices[inferenceDuringTrainConnectionIndexSegment], sourceConceptIndices, sourceFeatureIndices, targetConceptIndices, targetFeatureIndices), dim=0)
-			inferenceConnectionStrengthValues = GIAANNcmn_sparseTensors.gatherSparseTensorValuesAtIndices(inferenceConnectionsActive, globalConnectionIndices, connectionActiveValues.dtype)
-			inferenceConnectionMask = inferenceConnectionStrengthValues > inferenceDuringTrainConnectionStrengthActiveThreshold
-			if(inferenceConnectionMask.any()):
-				if(inferenceDuringTrainDecrementNonlinear):
-					connectionDecrementValues = inferenceConnectionStrengthValues[inferenceConnectionMask] * inferenceDuringTrainDecrement
-				else:
-					connectionDecrementValues = pt.full_like(inferenceConnectionStrengthValues[inferenceConnectionMask], inferenceDuringTrainDecrement)
-				result[inferenceConnectionMask] = connectionDecrementValues
-	return result
 
 def createFeatureConnectionsActiveTrainSpatialAxes(featureNeuronsActive, cs, fs, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns):
 	result = None

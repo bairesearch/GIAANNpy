@@ -432,6 +432,7 @@ v2g (Codex IDE GPT-5.5) [under development]:
 		- implementation must use vectorised pytorch code only (no python for loops).
 		- do not change any existing code in the codebase unrelated to specific inferenceDuringTrainAdjustSynapseStrength==True behaviour.
 		- ensure to encapsulate all inferenceDuringTrainAdjustSynapseStrength==True specific behaviour within context if(inferenceDuringTrainAdjustSynapseStrength) as per AGENTS.md.
+- store inferenceDuringTrainConnectionsActive in the same source-feature-split form as persistent connections, keyed by (sourceConcept, sourceFeature), with per-key sparse tensors (branch, segment, targetConcept, targetFeature). This does not change semantics, but reduces sparse COO index overhead versus the current 6-D global sparse tensor.
+- move all inferenceDuringTrain specific code to new file GIAANNcmn_inferenceDuringTrain.py
 
-	
 
