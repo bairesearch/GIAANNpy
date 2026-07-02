@@ -22,6 +22,7 @@ import torch as pt
 
 from GIAANNcmn_globalDefs import *
 import GIAANNcmn_databaseNetworkFiles
+import GIAANNcmn_sparseTensors
 
 
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
@@ -459,7 +460,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			targetColumnIndices = featureConnectionsStrength.indices()
 			activationValues = auxiliaryActivations.to(featureConnectionsStrength.device).index_select(0, targetColumnIndices[2])
 			activeMask = activationValues > auxiliaryNeuronsSimilarWordsMinimumSimilarity
-			if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments" and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+			if(GIAANNcmn_sparseTensors.requiresLastSegmentConnectionConstraint()):
 				activeMask = activeMask & (targetColumnIndices[1] == arrayIndexSegmentLast)
 			if(activeMask.any()):
 				targetColumnIndices = targetColumnIndices[:, activeMask]

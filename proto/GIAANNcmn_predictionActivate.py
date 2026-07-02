@@ -88,22 +88,29 @@ def applySequentialActivationDense(globalFeatureNeuronsActivation, featureNeuron
 			branchTargetActivation = featureNeuronsTargetActivationDense[branchIndex]
 			branchTargetActivationApplied = featureNeuronsTargetActivationAppliedDense[branchIndex]
 			if(useSANIfeaturesAndColumns):
-				# For useSANIfeaturesAndColumns, enforce sequential activation independently for:
-				# a) concept/column segments and b) feature segments.
 				featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
 				assert featureSegmentsOffset >= 0 and featureSegmentsOffset < arrayNumberOfSegments
-				previousConceptChannelActivation = branchActivation[:featureSegmentsOffset-1] > 0 if featureSegmentsOffset > 1 else None
 				previousFeatureChannelActivation = branchActivation[featureSegmentsOffset:arrayNumberOfSegments-1] > 0 if featureSegmentsOffset+1 < arrayNumberOfSegments else None
-				if(previousConceptChannelActivation is not None):
-					branchActivation[1:featureSegmentsOffset] += branchTargetActivation[1:featureSegmentsOffset] * previousConceptChannelActivation
-					branchTargetActivationApplied[1:featureSegmentsOffset] = branchTargetActivation[1:featureSegmentsOffset] * previousConceptChannelActivation
+				if(enforceSequentialActivationFeatureSegmentsOnly):
+					branchActivation[:featureSegmentsOffset+1] += branchTargetActivation[:featureSegmentsOffset+1]
+					branchTargetActivationApplied[:featureSegmentsOffset+1] = branchTargetActivation[:featureSegmentsOffset+1]
+				else:
+					if(arrayIndexSegmentInternalColumn < arrayIndexSegmentFirst or arrayIndexSegmentInternalColumn >= featureSegmentsOffset):
+						raise RuntimeError("applySequentialActivationDense error: arrayIndexSegmentInternalColumn out of range")
+					if(arrayIndexSegmentInternalColumn > arrayIndexSegmentFirst+1):
+						previousConceptChannelActivation = branchActivation[arrayIndexSegmentFirst:arrayIndexSegmentInternalColumn-1] > 0
+						branchActivation[arrayIndexSegmentFirst+1:arrayIndexSegmentInternalColumn] += branchTargetActivation[arrayIndexSegmentFirst+1:arrayIndexSegmentInternalColumn] * previousConceptChannelActivation
+						branchTargetActivationApplied[arrayIndexSegmentFirst+1:arrayIndexSegmentInternalColumn] = branchTargetActivation[arrayIndexSegmentFirst+1:arrayIndexSegmentInternalColumn] * previousConceptChannelActivation
+					branchActivation[arrayIndexSegmentFirst] += branchTargetActivation[arrayIndexSegmentFirst]
+					branchTargetActivationApplied[arrayIndexSegmentFirst] = branchTargetActivation[arrayIndexSegmentFirst]
+					if(arrayIndexSegmentInternalColumn > arrayIndexSegmentFirst):
+						branchActivation[arrayIndexSegmentInternalColumn] += branchTargetActivation[arrayIndexSegmentInternalColumn]
+						branchTargetActivationApplied[arrayIndexSegmentInternalColumn] = branchTargetActivation[arrayIndexSegmentInternalColumn]
+					branchActivation[featureSegmentsOffset] += branchTargetActivation[featureSegmentsOffset]
+					branchTargetActivationApplied[featureSegmentsOffset] = branchTargetActivation[featureSegmentsOffset]
 				if(previousFeatureChannelActivation is not None):
 					branchActivation[featureSegmentsOffset+1:] += branchTargetActivation[featureSegmentsOffset+1:] * previousFeatureChannelActivation
 					branchTargetActivationApplied[featureSegmentsOffset+1:] = branchTargetActivation[featureSegmentsOffset+1:] * previousFeatureChannelActivation
-				branchActivation[0] += branchTargetActivation[0]
-				branchActivation[featureSegmentsOffset] += branchTargetActivation[featureSegmentsOffset]
-				branchTargetActivationApplied[0] = branchTargetActivation[0]
-				branchTargetActivationApplied[featureSegmentsOffset] = branchTargetActivation[featureSegmentsOffset]
 			else:
 				previousChannelActivation = branchActivation[:-1] > 0
 				branchActivation[1:] += branchTargetActivation[1:] * previousChannelActivation
@@ -145,7 +152,12 @@ def applySequentialActivationSparse(globalFeatureNeuronsActivation, featureNeuro
 				featureSegmentStart = arrayNumberOfSegmentsColumnDistance
 				if(featureSegmentStart < 0 or featureSegmentStart >= arrayNumberOfSegments):
 					raise RuntimeError("applySequentialActivationSparse: featureSegmentStart out of range")
-				requireCheck = (segmentIndices != 0) & (segmentIndices != featureSegmentStart)
+				if(enforceSequentialActivationFeatureSegmentsOnly):
+					requireCheck = segmentIndices > featureSegmentStart
+				else:
+					if(arrayIndexSegmentInternalColumn < arrayIndexSegmentFirst or arrayIndexSegmentInternalColumn >= featureSegmentStart):
+						raise RuntimeError("applySequentialActivationSparse: arrayIndexSegmentInternalColumn out of range")
+					requireCheck = (segmentIndices != arrayIndexSegmentFirst) & (segmentIndices != featureSegmentStart) & (segmentIndices != arrayIndexSegmentInternalColumn)
 				if(requireCheck.any()):
 					checkIndices = pt.nonzero(requireCheck, as_tuple=False).view(-1)
 					prevIndices = indices.index_select(1, checkIndices).clone()
@@ -195,12 +207,26 @@ def applySequentialActivationDenseBinaryTree(globalFeatureNeuronsActivation, fea
 			segmentIndices = pt.arange(1, arrayNumberOfSegments, dtype=pt.long, device=globalFeatureNeuronsActivationDense.device).unsqueeze(0)
 			validBranchCounts = multipleDendriticBranchesNumber//pt.pow(pt.full_like(segmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor), segmentIndices)
 			validBranchMask = branchIndices < validBranchCounts
-			featureNeuronsTargetActivationAppliedDense[:, 1:] = featureNeuronsTargetActivationDense[:, 1:]*previousSegmentActivation*validBranchMask.view(multipleDendriticBranchesNumber, arrayNumberOfSegments-1, *([1]*(featureNeuronsTargetActivationDense.dim()-2)))
-			if(useSANIfeaturesAndColumns):
+			if(useSANIfeaturesAndColumns and enforceSequentialActivationFeatureSegmentsOnly):
 				featureSegmentStart = arrayNumberOfSegmentsColumnDistance
 				if(featureSegmentStart <= arrayIndexSegmentFirst or featureSegmentStart >= arrayNumberOfSegments):
 					raise RuntimeError("applySequentialActivationDenseBinaryTree error: featureSegmentStart out of range")
+				if(featureSegmentStart > arrayIndexSegmentFirst+1):
+					featureNeuronsTargetActivationAppliedDense[:, arrayIndexSegmentFirst+1:featureSegmentStart] = featureNeuronsTargetActivationDense[:, arrayIndexSegmentFirst+1:featureSegmentStart]*validBranchMask[:, :featureSegmentStart-1].view(multipleDendriticBranchesNumber, featureSegmentStart-1, *([1]*(featureNeuronsTargetActivationDense.dim()-2)))
 				featureNeuronsTargetActivationAppliedDense[:, featureSegmentStart] = featureNeuronsTargetActivationDense[:, featureSegmentStart]*validBranchMask[:, featureSegmentStart-1].view(multipleDendriticBranchesNumber, *([1]*(featureNeuronsTargetActivationDense.dim()-2)))
+				if(featureSegmentStart+1 < arrayNumberOfSegments):
+					featureNeuronsTargetActivationAppliedDense[:, featureSegmentStart+1:] = featureNeuronsTargetActivationDense[:, featureSegmentStart+1:]*previousSegmentActivation[:, featureSegmentStart:]*validBranchMask[:, featureSegmentStart:].view(multipleDendriticBranchesNumber, arrayNumberOfSegments-featureSegmentStart-1, *([1]*(featureNeuronsTargetActivationDense.dim()-2)))
+			else:
+				featureNeuronsTargetActivationAppliedDense[:, 1:] = featureNeuronsTargetActivationDense[:, 1:]*previousSegmentActivation*validBranchMask.view(multipleDendriticBranchesNumber, arrayNumberOfSegments-1, *([1]*(featureNeuronsTargetActivationDense.dim()-2)))
+				if(useSANIfeaturesAndColumns):
+					featureSegmentStart = arrayNumberOfSegmentsColumnDistance
+					if(featureSegmentStart <= arrayIndexSegmentFirst or featureSegmentStart >= arrayNumberOfSegments):
+						raise RuntimeError("applySequentialActivationDenseBinaryTree error: featureSegmentStart out of range")
+					if(arrayIndexSegmentInternalColumn < arrayIndexSegmentFirst or arrayIndexSegmentInternalColumn >= featureSegmentStart):
+						raise RuntimeError("applySequentialActivationDenseBinaryTree error: arrayIndexSegmentInternalColumn out of range")
+					if(arrayIndexSegmentInternalColumn > arrayIndexSegmentFirst):
+						featureNeuronsTargetActivationAppliedDense[:, arrayIndexSegmentInternalColumn] = featureNeuronsTargetActivationDense[:, arrayIndexSegmentInternalColumn]*validBranchMask[:, arrayIndexSegmentInternalColumn-1].view(multipleDendriticBranchesNumber, *([1]*(featureNeuronsTargetActivationDense.dim()-2)))
+					featureNeuronsTargetActivationAppliedDense[:, featureSegmentStart] = featureNeuronsTargetActivationDense[:, featureSegmentStart]*validBranchMask[:, featureSegmentStart-1].view(multipleDendriticBranchesNumber, *([1]*(featureNeuronsTargetActivationDense.dim()-2)))
 		resultActivation = (globalFeatureNeuronsActivationDense + featureNeuronsTargetActivationAppliedDense).to_sparse_coo()
 		featureNeuronsTargetActivationApplied = featureNeuronsTargetActivationAppliedDense.to_sparse_coo() if featureNeuronsTargetActivationSparse else featureNeuronsTargetActivationAppliedDense
 	else:
@@ -280,7 +306,12 @@ def calculateBinaryTreeSequentialActivationRequiredMask(segmentIndices):
 			featureSegmentStart = arrayNumberOfSegmentsColumnDistance
 			if(featureSegmentStart <= arrayIndexSegmentFirst or featureSegmentStart >= arrayNumberOfSegments):
 				raise RuntimeError("calculateBinaryTreeSequentialActivationRequiredMask error: featureSegmentStart out of range")
-			result = result & (segmentIndices != featureSegmentStart)
+			if(enforceSequentialActivationFeatureSegmentsOnly):
+				result = segmentIndices > featureSegmentStart
+			else:
+				if(arrayIndexSegmentInternalColumn < arrayIndexSegmentFirst or arrayIndexSegmentInternalColumn >= featureSegmentStart):
+					raise RuntimeError("calculateBinaryTreeSequentialActivationRequiredMask error: arrayIndexSegmentInternalColumn out of range")
+				result = result & (segmentIndices != featureSegmentStart) & (segmentIndices != arrayIndexSegmentInternalColumn)
 	else:
 		raise RuntimeError("calculateBinaryTreeSequentialActivationRequiredMask error: requires multipleDendriticBranchesBinaryTree")
 	return result
@@ -332,6 +363,30 @@ def gatherSparseTensorValuesAtIndices(tensor, indices, dtype):
 					result[matches] = sortedTensorValues.index_select(0, safePositions[matches])
 				if(result.dtype != dtype):
 					result = result.to(dtype)
+	return result
+
+def gatherSparseTensorPresenceAtIndices(tensor, indices):
+	result = None
+	if(tensor is None):
+		raise RuntimeError("gatherSparseTensorPresenceAtIndices: tensor is None")
+	else:
+		if(not tensor.is_sparse):
+			result = pt.ones((indices.shape[1],), dtype=pt.bool, device=indices.device)
+		else:
+			tensor = tensor.coalesce()
+			if(tensor._nnz() == 0):
+				result = pt.zeros((indices.shape[1],), dtype=pt.bool, device=indices.device)
+			else:
+				size = tensor.size()
+				if(len(size) != indices.shape[0]):
+					raise RuntimeError("gatherSparseTensorPresenceAtIndices: tensor/index size mismatch")
+				tensorKeys = buildSparseIndexKeys(tensor.indices(), size)
+				queryKeys = buildSparseIndexKeys(indices, size)
+				sortedTensorKeys = pt.sort(tensorKeys).values
+				positions = pt.searchsorted(sortedTensorKeys, queryKeys)
+				valid = positions < sortedTensorKeys.shape[0]
+				safePositions = positions.clamp(max=sortedTensorKeys.shape[0]-1)
+				result = valid & (sortedTensorKeys[safePositions] == queryKeys)
 	return result
 
 def replaceSparseTensorValuesAtIndices(sparseTensor, updateIndices, updateValues):
@@ -456,10 +511,16 @@ def applyExactTimeActivationConstraint(featureNeuronsTargetActivation, globalFea
 				if(useSANIfeaturesAndColumns):
 					featureMask = segmentIndices >= arrayNumberOfSegmentsColumnDistance
 					columnMask = ~featureMask
-					if(columnMask.any()):
-						requiresCheck = requiresCheck | (columnMask & (segmentIndices > 0))
-					if(featureMask.any()):
-						requiresCheck = requiresCheck | (featureMask & (segmentIndices > arrayNumberOfSegmentsColumnDistance))
+					if(enforceSequentialActivationFeatureSegmentsOnly):
+						if(featureMask.any()):
+							requiresCheck = requiresCheck | (featureMask & (segmentIndices > arrayNumberOfSegmentsColumnDistance))
+					else:
+						if(columnMask.any()):
+							if(arrayIndexSegmentInternalColumn < arrayIndexSegmentFirst or arrayIndexSegmentInternalColumn >= arrayNumberOfSegmentsColumnDistance):
+								raise RuntimeError("applyExactTimeActivationConstraint: arrayIndexSegmentInternalColumn out of range")
+							requiresCheck = requiresCheck | (columnMask & (segmentIndices > arrayIndexSegmentFirst) & (segmentIndices != arrayIndexSegmentInternalColumn))
+						if(featureMask.any()):
+							requiresCheck = requiresCheck | (featureMask & (segmentIndices > arrayNumberOfSegmentsColumnDistance))
 				else:
 					requiresCheck = segmentIndices > 0
 			allowedMask = pt.ones((segmentIndices.shape[0],), dtype=pt.bool, device=segmentIndices.device)
@@ -469,6 +530,7 @@ def applyExactTimeActivationConstraint(featureNeuronsTargetActivation, globalFea
 				if(multipleDendriticBranchesBinaryTree):
 					previousIndices = buildBinaryTreePreviousSegmentIndices(indices.index_select(1, checkIndices), activationSparse.size())
 					previousStoredTimes = gatherSparseTensorValuesAtIndices(globalFeatureNeuronsTime, previousIndices, values.dtype).view(checkIndices.shape[0], multipleDendriticBranchesBinaryTreeBranchingFactor)
+					previousStoredTimesExist = gatherSparseTensorPresenceAtIndices(globalFeatureNeuronsTime, previousIndices).view(checkIndices.shape[0], multipleDendriticBranchesBinaryTreeBranchingFactor)
 					currentTimeValues = pt.zeros((checkIndices.shape[0],), dtype=values.dtype, device=values.device)
 					if(useSANIfeaturesAndColumns):
 						featureMaskCheck = localSegmentIndices >= arrayNumberOfSegmentsColumnDistance
@@ -486,12 +548,13 @@ def applyExactTimeActivationConstraint(featureNeuronsTargetActivation, globalFea
 						currentTimeValues = pt.full_like(currentTimeValues, float(sequenceColumnIndex))
 					else:
 						raise RuntimeError("applyExactTimeActivationConstraint: useSANI feature mode not configured")
-					allowedMask[checkIndices] = pt.any((currentTimeValues.unsqueeze(1) - previousStoredTimes) == 1, dim=1)
+					allowedMask[checkIndices] = pt.any(previousStoredTimesExist & ((currentTimeValues.unsqueeze(1) - previousStoredTimes) == 1), dim=1)
 				else:
 					prevIndices = indices.index_select(1, checkIndices).clone()
 					prevSegmentIndices = localSegmentIndices - 1
 					prevIndices[1] = prevSegmentIndices
 					prevStoredTimes = gatherSparseTensorValuesAtIndices(globalFeatureNeuronsTime, prevIndices, values.dtype)
+					prevStoredTimesExist = gatherSparseTensorPresenceAtIndices(globalFeatureNeuronsTime, prevIndices)
 					currentTimeValues = pt.zeros_like(prevStoredTimes)
 					if(useSANIfeaturesAndColumns):
 						featureMaskCheck = localSegmentIndices >= arrayNumberOfSegmentsColumnDistance
@@ -509,7 +572,7 @@ def applyExactTimeActivationConstraint(featureNeuronsTargetActivation, globalFea
 						currentTimeValues = pt.full_like(prevStoredTimes, float(sequenceColumnIndex))
 					else:
 						raise RuntimeError("applyExactTimeActivationConstraint: useSANI feature mode not configured")
-					allowedMask[checkIndices] = (currentTimeValues - prevStoredTimes) == 1
+					allowedMask[checkIndices] = prevStoredTimesExist & ((currentTimeValues - prevStoredTimes) == 1)
 			keepIndices = pt.nonzero(allowedMask, as_tuple=False).view(-1)
 			if(keepIndices.numel() == 0):
 				emptyIndices = pt.empty((indices.shape[0], 0), dtype=indices.dtype, device=indices.device)
@@ -631,7 +694,7 @@ def calculateFeatureNeuronSourceActivationPredictBinaryTree(globalFeatureNeurons
 					if(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 						featureNeuronsActive = GIAANNcmn_sparseTensors.selectAindicesContainedInBBinaryTree(featureNeuronsActive, segmentActivations[lastSegmentConstraint])
 					elif(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):
-						for segmentIndex in range(lastSegmentConstraint+1):
+						for segmentIndex in GIAANNcmn_sparseTensors.calculateAllSegmentConstraintIndexRange(lastSegmentConstraint):
 							featureNeuronsActive = GIAANNcmn_sparseTensors.selectAindicesContainedInBBinaryTree(featureNeuronsActive, segmentActivations[segmentIndex])
 					elif(algorithmMatrixSANIenforceRequirement!="enforceAnySegmentMustBeActive"):
 						raise RuntimeError("calculateFeatureNeuronSourceActivationPredictBinaryTree error: algorithmMatrixSANIenforceRequirement is invalid")

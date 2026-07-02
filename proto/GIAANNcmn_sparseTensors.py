@@ -756,7 +756,7 @@ def neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANIme
 					lastConstraintSegmentActive = sliceSegment(globalFeatureNeuronsActivation, lastSegmentConstraint)
 					featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, lastConstraintSegmentActive)
 				elif(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):
-					for s in range(lastSegmentConstraint+1):	#ignore internal column activation requirement
+					for s in calculateAllSegmentConstraintIndexRange(lastSegmentConstraint):	#ignore internal column activation requirement
 						featureNeuronsActive = selectAindicesContainedInB(featureNeuronsActive, sliceSegment(globalFeatureNeuronsActivation, s))
 		else:
 			#select last (most proximal) segment activation
@@ -796,7 +796,7 @@ def neuronActivationSparseBinaryTree(globalFeatureNeuronsActivation, algorithmMa
 				if(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 					featureNeuronsActive = selectAindicesContainedInBBinaryTree(featureNeuronsActive, segmentActivations[lastSegmentConstraint])
 				elif(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):
-					for segmentIndex in range(lastSegmentConstraint+1):
+					for segmentIndex in calculateAllSegmentConstraintIndexRange(lastSegmentConstraint):
 						featureNeuronsActive = selectAindicesContainedInBBinaryTree(featureNeuronsActive, segmentActivations[segmentIndex])
 				elif(algorithmMatrixSANIenforceRequirement!="enforceAnySegmentMustBeActive"):
 					raise RuntimeError("neuronActivationSparseBinaryTree error: algorithmMatrixSANIenforceRequirement is invalid")
@@ -807,6 +807,48 @@ def neuronActivationSparseBinaryTree(globalFeatureNeuronsActivation, algorithmMa
 		result = featureNeuronsActive if wasSparse else featureNeuronsActive.to_dense()
 	else:
 		raise RuntimeError("neuronActivationSparseBinaryTree error: requires multipleDendriticBranchesBinaryTree")
+	return result
+
+def calculateAllSegmentConstraintIndexRange(lastSegmentConstraint):
+	result = None
+	if(lastSegmentConstraint < arrayIndexSegmentFirst or lastSegmentConstraint >= arrayNumberOfSegments):
+		raise RuntimeError("calculateAllSegmentConstraintIndexRange error: lastSegmentConstraint out of range")
+	firstSegmentConstraint = arrayIndexSegmentFirst
+	if(useSANIfeaturesAndColumns and enforceAllSegmentsMustBeActiveFeatureSegmentsOnly and lastSegmentConstraint >= arrayNumberOfSegmentsColumnDistance):
+		if(arrayNumberOfSegmentsColumnDistance <= arrayIndexSegmentFirst or arrayNumberOfSegmentsColumnDistance >= arrayNumberOfSegments):
+			raise RuntimeError("calculateAllSegmentConstraintIndexRange error: arrayNumberOfSegmentsColumnDistance out of range")
+		firstSegmentConstraint = arrayNumberOfSegmentsColumnDistance
+	if(firstSegmentConstraint < arrayIndexSegmentFirst or firstSegmentConstraint > lastSegmentConstraint):
+		raise RuntimeError("calculateAllSegmentConstraintIndexRange error: firstSegmentConstraint out of range")
+	if(useSANIfeaturesAndColumns and not enforceAllSegmentsMustBeActiveFeatureSegmentsOnly and lastSegmentConstraint >= arrayNumberOfSegmentsColumnDistance):
+		if(arrayIndexSegmentInternalColumn < arrayIndexSegmentFirst or arrayIndexSegmentInternalColumn >= arrayNumberOfSegmentsColumnDistance):
+			raise RuntimeError("calculateAllSegmentConstraintIndexRange error: arrayIndexSegmentInternalColumn out of range")
+		result = []
+		for segmentIndex in range(firstSegmentConstraint, lastSegmentConstraint+1):
+			if(segmentIndex != arrayIndexSegmentInternalColumn):
+				result.append(segmentIndex)
+	else:
+		result = range(firstSegmentConstraint, lastSegmentConstraint+1)
+	return result
+
+def requiresLastSegmentConnectionConstraint():
+	result = False
+	if(not useSANI):
+		result = False
+	elif(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
+		if(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+			result = True
+		elif(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):
+			if(enforceSequentialActivation and useSANIfeaturesAndColumns and enforceSequentialActivationFeatureSegmentsOnly and enforceAllSegmentsMustBeActiveFeatureSegmentsOnly):
+				result = True
+		elif(algorithmMatrixSANIenforceRequirement=="enforceAnySegmentMustBeActive"):
+			result = False
+		else:
+			raise RuntimeError("requiresLastSegmentConnectionConstraint error: algorithmMatrixSANIenforceRequirement is invalid")
+	elif(algorithmMatrixSANImethod=="doNotEnforceActivationAcrossSegments"):
+		result = False
+	else:
+		raise RuntimeError("requiresLastSegmentConnectionConstraint error: algorithmMatrixSANImethod is invalid")
 	return result
 
 def projectBinaryTreeSegmentActivation(activationSparse, segmentIndex):

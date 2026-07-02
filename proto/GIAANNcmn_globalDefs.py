@@ -803,6 +803,7 @@ arrayNumberOfPropertiesInference = len(arrayPropertiesListInference)
 
 #SANI settings;
 arrayIndexSegmentFirst = 0
+enforceSequentialActivationFeatureSegmentsOnly = False #derived var
 if(useSANI):
 	SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens = True	#default: True	#orig: True	#first feature segment captures all prior train sequence tokens
 	if(modalityName=="OR"):
@@ -857,6 +858,8 @@ if(useSANI):
 		#algorithmMatrixSANIenforceRequirement="enforceAnySegmentMustBeActive"	#activate neuron if any segment is active
 		algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default	#only activate neuron if last segment active
 		#algorithmMatrixSANIenforceRequirement="enforceAllSegmentsMustBeActive" #only activate neuron if all segments are active	#if(enforceSequentialActivation) then redundant; use enforceLastSegmentMustBeActive instead
+		if(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):
+			enforceAllSegmentsMustBeActiveFeatureSegmentsOnly = True	#default: True	#orig: False
 		if(enforceDirectConnectionsSANIminimal):
 			enforceSequentialActivation = False
 		else:
@@ -866,6 +869,8 @@ if(useSANI):
 				enforceSequentialActivation = True	#optional	#default: True #orig: True	#only activation next segment if previous segment activated
 			else:
 				printe("inferenceSegmentTiming error")
+		if(enforceSequentialActivation):
+			enforceSequentialActivationFeatureSegmentsOnly = True	#default: True	#orig: True
 	else:
 		enforceSequentialActivation = False
 
@@ -879,11 +884,12 @@ if(useSANI):
 		if(SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens):
 			assert arrayNumberOfSegments >= 2		#note if arrayNumberOfSegments=2 then; sIndex=1: sequential segment connections for adjacent feature, sIndex=0: sequential segment connections for all other feature
 		assert algorithmMatrixSANImethod=="enforceActivationAcrossSegments", "enforceDirectConnectionsSANI requires enforceActivationAcrossSegments"
-		assert algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive", "enforceDirectConnectionsSANI requires enforceLastSegmentMustBeActive"
+		assert algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive" or algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive", "enforceDirectConnectionsSANI requires enforceLastSegmentMustBeActive or enforceAllSegmentsMustBeActive"
 		
 	if(useSANIfeaturesAndColumns):
 		arrayIndexSegmentLast = arrayNumberOfSegments-1	#last feature index
-		#arrayIndexSegmentAdjacentColumn = arrayNumberOfSegmentsColumnDistance-1
+		arrayIndexSegmentInternalColumn = arrayNumberOfSegmentsColumnDistance-1	#last concept segment/current internal column
+		#arrayIndexSegmentAdjacentColumn = arrayIndexSegmentInternalColumn
 	elif(useSANIcolumns):
 		arrayIndexSegmentLast = arrayNumberOfSegments-1
 		arrayIndexSegmentAdjacentColumn = arrayNumberOfSegments-2
