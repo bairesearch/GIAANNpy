@@ -440,8 +440,11 @@ v2h (Codex IDE GPT-5.5) [under development]:
 - add proto GIAANNproto2h1a - start patch algorithmMatrixSANIenforceRequirements
 	- patch algorithmMatrixSANIenforceRequirement="enforceAllSegmentsMustBeActive" top-1 candidate gating across standard and binary-tree dendritic branch modes. 
 	- patch SANI seed activation for enforceAllSegmentsMustBeActive and enforceSequentialActivation=True modes so top-1 inference respects required dendritic segment chains, not just last-segment activation.
-	- patch exact-time sequential gating to require an existing previous-segment time entry before accepting a segment activation.
+	- patch exact-time SANI segment gating so missing previous-segment time entries are no longer treated as time 0; candidate segment activation now requires the previous segment to have an explicit stored time and currentTime - previousTime == 1 in both standard and binary-tree paths.
 	- add option enforceSequentialActivationFeatureSegmentsOnly (default: True, orig: True) - ensures that sequential enforcement (either enforceAllSegmentsMustBeActive or enforceLastSegmentMustBeActive) only checks that feature segments have a previous feature segment active (column segments are ignore in sequential enforcement).
 	- add option enforceAllSegmentsMustBeActiveFeatureSegmentsOnly (default: True, rig: False) - ensures that enforceAllSegmentsMustBeActive (regardless of the value of enforceSequentialActivation) only checks that all feature segments are active, not column segments.
 	- update algorithmMatrixSANIenforceRequirement="enforceAllSegmentsMustBeActive"+enforceAllSegmentsMustBeActiveFeatureSegmentsOnly=False: never check the activation value of the last concept segment (as this corresponds to the current/internal column in the sequence and may be inactive if the prediction target is an initial feature in this column).
 	- update enforceSequentialActivationFeatureSegmentsOnly=False: never enforce the activation value of the last concept segment (as this corresponds to the current/internal column in the sequence and may be inactive if the prediction target is an initial feature in this column).
+MANUAL; - if(executionMode=="train"): re-enable defaults useGPUdense=False+useGPUsparse=False.
+MANUAL; - if(executionMode=="train"): optionally set storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = True (non-default optimisation: only possible for training of low database sizes <= ~1M training sequences).
+MANUAL; - update paper

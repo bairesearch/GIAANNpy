@@ -15,7 +15,7 @@ Tokens are produced by spaCy (models \texttt{en\_core\_web\_trf} or \texttt{en\_
 Training runs for 1 epoch (\texttt{numberEpochs=1}) with a maximum of 1000000 sequences (\texttt{trainMaxSequences<=1000000}), sequence length capped at 80 tokens (\texttt{maxSequenceLength=80}). \texttt{numSeedTokensInference=8,12,16} is retained for segment sizing. Single-sentence sequences are used by default (\texttt{multisentencePredictions=False}, \texttt{numSentencesPerSequence=1}). The database is stored at \texttt{/media/user/ssdpro/GIAANN/database/}.
 
 \paragraph{Hardware.}
-ASUS B760 Intel Chipset. ASUS NVIDIA GeForce RTX 5070 (12GB GDDR7). Intel i7 14700F. Patriot 64GB 2666Mhz DDR4 (or Corsair 64GB 6000MT/s DDR5). Samsung 990 Pro PCIe 4.0 NVMe M.2 SSD (1TB).
+ASUS PRIME B760-PLUS D4 (or non-D4). ASUS NVIDIA GeForce RTX 5070 (12GB GDDR7). Intel i7 14700F. 64GB Patriot 2666Mhz DDR4 (or 64GB Corsair 6000MT/s DDR5). 1TB Samsung 990 Pro PCIe 4.0 NVMe M.2 SSD.
 
 \paragraph{Software.}
 NVIDIA Driver 580.126.09. CUDA 12.8. Ubuntu 24.04 LTS. IceWM. NEdit. Codex IDE extension for Visual Studio Code \citep{openai2026codexIdeExtension}.
@@ -43,7 +43,7 @@ Top-1 accuracy has been calculated as a baseline performance metric.
 
 \subsection{Results}
 
-The accuracy measurements were taken with GIAANN Proto 1k. 
+The accuracy measurements were taken with GIAANN Proto 1k (equivalent to 1m).
 
 \subsubsection{Training-set Accuracy}
 
@@ -294,9 +294,9 @@ Wikipedia sentences are typically longer than OSCAR-2201 sentences, so multiple 
 
 \paragraph{Settings}
 
-There is a tradeoff between recall/memorisation (train accuracy) and generalisation (test accuracy), and the optimum GIAANN parameters differ for both cases. Likewise, GIAANN uses word (vs subword) tokens and does not use word-vectors, which limits generalisation compared to contemporary gradient based models. GIAANN also relies on independent concept experts, which relates to robustness to hallucination.
+There is a tradeoff between recall/memorisation (train accuracy) and generalisation (test accuracy), and the optimum GIAANN parameters differ for both cases. Likewise, GIAANN uses word (vs subword) tokens and does not use word-vectors, which limits generalisation to words unseen in the test-set compared to contemporary gradient based models. GIAANN also relies on independent concept experts, which relates to robustness to hallucination.
 
-Although GIAANN is designed to support prime concept feature name independence (by detecting all columns matching a prompt), this is computationally expensive as it requires bursting matching features across the entire trained network. Thus, test-set (prime) concept features must currently be present within the train-set. This limitation is strengthened by \texttt{enforceSequentialActivation} and \texttt{inferenceUseNeuronFeaturePropertiesTimeExact}.
+Although GIAANN is designed to support prime concept feature name independence (by detecting all columns matching a prompt), this is computationally expensive as it requires bursting matching features across the entire trained network during test time. Thus, test-set (prime) concept features must currently be present within the train-set. This limitation is strengthened by \texttt{enforceSequentialActivation} and \texttt{inferenceUseNeuronFeaturePropertiesTimeExact}.
 
 Furthermore, the Wikipedia dataset cannot easily be used to perform a standardised NLP test-set accuracy measurement as it is divided into unique knowledgebase articles. Splitting the Wikipedia dataset into train/test portions would result in the train data being out of distribution with respect to the test data, especially when text is arranged/segmented into concepts (GIAANN).
 
@@ -319,6 +319,11 @@ Therefore, a number of changes were introduced for test-set accuracy measurement
 \Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceActivations-multisentencePredictionsInference} contains another version of the previous table but with multiple sentence predictions used during test-set inference. Inference was effectively performed with a different test-set (\texttt{multisentencePredictions=True}) than usual for this train database.
 
 \Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-multipleDendriticBranches} contains OSCAR-2201 top-1 test-set accuracy for different training sizes, dendritic branches and time constraints, with targets fed as input. The default time constraints used for benchmarking of the test-set (``t-1 bias'') are \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=False} and \texttt{enforceSequentialActivation=False}. It also contains results for these non-default time settings: \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=True} + \texttt{enforceSequentialActivation=True} (``top-1 exact''), \texttt{inferenceUseNeuronFeaturePropertiesTime=False} (``top-1 none''), and activations constraints (with t-1 none): \texttt{inferenceSegmentActivationsBoolean=False} (``int f+c''). The default dendritic branch settings used for benchmarking are \texttt{multipleDendriticBranches=True}, \texttt{randomlyAssignBranches=False}, and \texttt{numberOfDendriticBranches=2} (``2 uniq''), where branches are uniquely assigned for repeated feature instances within sequences. It also contains results for these non-default dendritic branch settings: \texttt{randomlyAssignBranches=True}, and \texttt{numberOfDendriticBranches=5} (``5 rand''), \texttt{numberOfDendriticBranches=5} (``10 rand''). It was also trained with \texttt{spacyPipelineOptimisations=True} for efficiency.
+
+\Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} contains OSCAR-2201 Top-1 test-set accuracy for different inference connection strength types, training sizes, and inference activations, with segment timing none (t-1 none), and targets fed as input. The different inference connection strength types used were ``bool'' (\texttt{inferenceConnectionsStrengthBoolean=True}) and ``float'' (\texttt{inferenceConnectionsStrengthBoolean=False}). The default strength type used during benchmarking is ``bool''. 
+
+\caption{OSCAR-2201 Top-1 test-set accuracy for different inference connection strength types (bool or float), training sizes, and inference activations, with segment timing none (t-1 none), and targets fed as input.}
+\label{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes}
 
 149 test-set sequences were used during inference for the OSCAR-2201 dataset (taken from later in the dataset).
 
@@ -348,6 +353,7 @@ Although the vast majority of inference evaluations were performed with \texttt{
 \Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceActivations} and \Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceActivations-multisentencePredictionsInference} demonstrate that non-default inference activations can perform better during test-set evaluation, and require further investigation; \texttt{inferenceSegmentActivationsBoolean=False} (``int f+c''). 
 
 \Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceActivations} and \Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceActivations-multisentencePredictionsInference} demonstrate that higher trained segment counts require longer evaluation sequences; \texttt{multisentencePredictions=True}.
+
 
 \begin{table}[H]
 \centering
@@ -433,6 +439,7 @@ Although the vast majority of inference evaluations were performed with \texttt{
 8 & 3 & 5 & 5,000     & 0.029 & 0.029 & 2.2M & 0.1GB \\
 8 & 3 & 5 & 200,000   & 0.100 & 0.100 & 76.6M & 4.5GB \\
 8 & 3 & 5 & 1,000,000 & 0.135 & 0.130 & 353.7M & 20.3GB \\
+8 & 3 & 5 & 3,000,000 & 0.153 & 0.142 & 986.1M & 69.4GB \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -530,6 +537,26 @@ Although the vast majority of inference evaluations were performed with \texttt{
 \end{tabular}
 \end{table}
 
+\begin{table}[H]
+\centering
+\caption{OSCAR-2201 Top-1 test-set accuracy for different inference connection strength types, training sizes, and inference activations, with segment timing none (t-1 none), and targets fed as input.}
+\label{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes}
+\begin{tabular}{rrrrrrrrr}
+\toprule
+\textbf{seed} & \textbf{c seg} & \textbf{f seg} & \textbf{sequences} & \textbf{strength} & \textbf{int f+c} & \textbf{bool f} & \textbf{param} & \textbf{db size} \\
+\midrule
+8 & 3 & 5 & 5,000     & bool & 0.029 & 0.029 & 2.2M & 0.1GB \\
+8 & 3 & 5 & 200,000   & bool & 0.100 & 0.100 & 76.6M & 4.5GB \\
+8 & 3 & 5 & 1,000,000 & bool & 0.134 & 0.130 & 353.7M & 20.3GB \\
+8 & 3 & 5 & 3,000,000 & bool & 0.153 & 0.142 & 986.1M & 69.4GB \\
+8 & 3 & 5 & 5,000     & float & 0.030 & 0.029 & 2.2M & 0.1GB \\
+8 & 3 & 5 & 200,000   & float & 0.106 & 0.107 & 76.6M & 4.5GB \\
+8 & 3 & 5 & 1,000,000 & float & 0.133 & 0.139 & 353.7M & 20.3GB \\
+8 & 3 & 5 & 3,000,000 & float & 0.147 & 0.150 & 986.1M & 69.4GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \FloatBarrier
 
 \subsection{Ablations}
@@ -591,9 +618,9 @@ The filesystem database is stored on a locally connected SSD drive.
 
 \Cref{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse} contains OSCAR-2201 training performance measurements for different train phase feature neuron tensor types (\texttt{trainSparseNeuronsTensor=True/False}) and connection tensor types (\texttt{trainSparseConnectionsTensor=True/False}); dense or sparse, tensor device (GPU/CPU DDR4; \texttt{useGPUsparse=True/False}), and training sizes, with store database feature neurons and connections actively in RAM (\texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True}), and feature neuron sparse tensors stored independently for each column (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}). The device indicated is assigned to both tensor types; sparse/dense (\texttt{useGPUsparse}/\texttt{useGPUdense}).
 
-\Cref{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse-storeDatabaseFeatureConnectionsAndColumnFeatureNeurons-DDR4} contains OSCAR-2201 training performance measurements for different database feature connections active storage location (DDR4 RAM/filesystem; \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True/False}) and training sizes, with train phase feature neuron and connection sparse tensors (\texttt{trainSparseNeuronsTensor=True}, \texttt{trainSparseConnectionsTensor=True}), sparse tensor device CPU (\texttt{useGPUsparse=False}), and feature neuron sparse tensors stored independently for each column (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}).
+\Cref{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse-storeDatabaseFeatureConnectionsAndColumnFeatureNeurons-DDR4} contains OSCAR-2201 training performance measurements for different database feature connections active storage location (DDR4 RAM/filesystem; \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True/False}) and training sizes, with train phase feature neuron and connection sparse tensors (\texttt{trainSparseNeuronsTensor=True}, \texttt{trainSparseConnectionsTensor=True}), sparse tensor device CPU (\texttt{useGPUsparse=False}), and feature neuron sparse tensors stored independently for each column (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}). The device indicated is assigned to both tensor types; sparse/dense (\texttt{useGPUsparse=False}/\texttt{useGPUdense=False}).
 
-\Cref{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse-storeDatabaseFeatureConnectionsAndColumnFeatureNeurons-DDR5} contains OSCAR-2201 training performance measurements for different database feature connections active storage location (DDR5 RAM/filesystem; \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True/False}) and training sizes, with train phase feature neuron and connection sparse tensors (\texttt{trainSparseNeuronsTensor=True}, \texttt{trainSparseConnectionsTensor=True}), sparse tensor device CPU (\texttt{useGPUsparse=False}), and feature neuron sparse tensors stored independently for each column (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}).
+\Cref{tab:oscar-performance-trainSparseConnectionsNeuronsTensor-storeDatabaseFeatureNeuronsInRamFalse-storeDatabaseFeatureConnectionsAndColumnFeatureNeurons-DDR5} contains OSCAR-2201 training performance measurements for different database feature connections active storage location (DDR5 RAM/filesystem; \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True/False}) and training sizes, with train phase feature neuron and connection sparse tensors (\texttt{trainSparseNeuronsTensor=True}, \texttt{trainSparseConnectionsTensor=True}), sparse tensor device CPU (\texttt{useGPUsparse=False}), and feature neuron sparse tensors stored independently for each column (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}). The device indicated is assigned to both tensor types; sparse/dense (\texttt{useGPUsparse=False}/\texttt{useGPUdense=False}).
 
 \Cref{tab:oscar-performance-storeDatabaseFeatureNeuronsInRamFalse-storeDatabase} contains OSCAR-2201 training performance measurements for different database feature connections active storage location (RAM/filesystem; \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True/False}) and training sizes, with train phase feature neuron and connection dense tensors (\texttt{trainSparseNeuronsTensor=False}, \texttt{trainSparseConnectionsTensor=False}), dense tensor device GPU (\texttt{useGPUdense=True}), and feature neuron sparse tensors stored independently for each column (\texttt{storeDatabaseGlobalFeatureNeuronsInRam=False}).
 
@@ -665,6 +692,7 @@ The filesystem database is stored on a locally connected SSD drive.
 8 & 3 & 5 & 5,000       & 60,364 & 2,150,611 & 9,964 & 6,263 & 0.2GB \\
 8 & 3 & 5 & 200,000     & 1,382,140 & 76,581,459 & 203,804 & 43,636 & 6.0GB \\
 8 & 3 & 5 & 1,000,000   & 5,274,133 & 353,715,670 & 795,326 & 113,756 & 25.5GB \\
+8 & 3 & 5 & 3,000,000   & 12,963,467 & 986,063,778 & 2,035,793 & 235,761 & 69.4GB \\
 \bottomrule
 \end{tabular}
 \end{table}

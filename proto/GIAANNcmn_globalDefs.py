@@ -51,7 +51,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -249,9 +249,9 @@ elif(useModalityNLP):
 		if(useTrainDuringInference):
 			useGPUdense = False	#this is a temporary fail-safe mode that allows for seamless transition between per sequence inference and train phase
 		else:
-			useGPUdense = True	#default: True
+			useGPUdense = False	#default: False #orig: True
 		if(executionMode=="train"):
-			useGPUsparse = True	#default: True		#slight performance increase during train (does not use significant additional GPU ram during train)
+			useGPUsparse = False	#default: False	#orig: True		#slight performance increase during train (does not use significant additional GPU ram during train)
 		else:
 			useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors	#inference can be slightly faster CPU sparse tensor operations
 useGPUsparseStrict = True	#default: True	#orig: False	#optional	#enforce strict sparse device during transfer to/from dense tensors (make conversion process always use sparse device)	 #no significant difference in speed; can theoretically affect peak CPU or GPU RAM
@@ -266,7 +266,10 @@ else:
 if(trainSparseNeuronsTensor):
 	assert trainSparseConnectionsTensor, "trainSparseNeuronsTensor requires trainSparseConnectionsTensor=True"
 
-storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = False	#default: False	#orig2: True	#orig1: False	#optional	#store database feature connections and column separated feature neuron data in RAM, else dynamically load these from filesystem per sequence
+if(executionMode=="train"):
+	storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = True	#default: False	#orig2: True	#train is faster with True	#orig1: False	#required to be False for high database sizes > ~1M training sequences	#store database feature connections and column separated feature neuron data in RAM, else dynamically load these from filesystem per sequence
+else:
+	storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = False	#default: False		#optional	#inference is faster with False
 if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 	useGPUdatabase = False	#default: False	#default: False
 	resizeTensorsOnRAMdatabaseSave = False	#default: False #orig: True	#resize all feature neuron and connections tensors during final RAM database save
@@ -378,7 +381,7 @@ if(useInference):
 	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	if(useSANI):
 		inferenceApplySequentialActivationSparse = True	#default: True	#orig: False
-		inferenceConnectionsStrengthBoolean = True	#default: True	#do not overweight by common features (e.g. determiners)
+		inferenceConnectionsStrengthBoolean = True	#default: True	#False: with inferenceActivationsType = "boolf" this typically provides lower train-set accuracy, higher test-set accuracy	#do not overweight by common features (e.g. determiners)
 		if(inferenceActivationsType == "intf+c"):
 			inferenceSegmentActivationsBoolean = False
 		elif(inferenceActivationsType == "boolf"):
@@ -709,7 +712,6 @@ if(useInference):
 	if(not executionMode == "train"):
 		assert storeDatabaseGlobalFeatureNeuronsInRam, "useInference: global feature neuron lists are required" 
 	assert useSaveData,  "useInference: useSaveData is required" 
-
 
 
 #Database save paths;
