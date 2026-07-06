@@ -23,28 +23,46 @@ from GIAANNcmn_globalDefs import *
 
 if(usePOS):
 	import GIAANNnlp_sequencePOS
+if(tokeniserSubword):
+	try:
+		import tiktoken
+	except ImportError as exception:
+		raise RuntimeError("GIAANNnlp_sequenceTokens error: tokeniserSubword requires the tiktoken package") from exception
+	_tokeniserSubwordEncoding = None
 
 def loadPOSdatabase():
 	GIAANNnlp_sequencePOS.loadPOSdatabase()
 
 def isTokenReferenceSetDelimiterDeterministic(token):
 	result = False
-	if(token.word in conceptColumnsDelimiterWordTypes or token.tag in conceptColumnsDelimiterTagTypes):
-		result = True
-	elif(GIAANNnlp_sequencePOS.isWordEverInPOStypeList(token.word, conceptColumnsDelimiterPOStypes)):
-		result = True
-	elif(token.lemma is not None and GIAANNnlp_sequencePOS.isWordEverInPOStypeList(token.lemma, conceptColumnsDelimiterPOStypes)):
-		result = True
+	if(tokeniserSubword and tokeniserSubwordPOS):
+		if(token.word in conceptColumnsDelimiterWordTypes or token.tag in conceptColumnsDelimiterTagTypes):
+			result = True
+		elif(token.pos in conceptColumnsDelimiterPOStypes):
+			result = True
+	else:
+		if(token.word in conceptColumnsDelimiterWordTypes or token.tag in conceptColumnsDelimiterTagTypes):
+			result = True
+		elif(GIAANNnlp_sequencePOS.isWordEverInPOStypeList(token.word, conceptColumnsDelimiterPOStypes)):
+			result = True
+		elif(token.lemma is not None and GIAANNnlp_sequencePOS.isWordEverInPOStypeList(token.lemma, conceptColumnsDelimiterPOStypes)):
+			result = True
 	return result
 	
 def isTokenReferenceSetDelimiterProbabilistic(token):
 	result = False
-	if(token.word in detectReferenceSetDelimitersBetweenNounsWordTypes or token.tag in detectReferenceSetDelimitersBetweenNounsTagTypes):
-		result = True
-	elif(GIAANNnlp_sequencePOS.isWordEverInPOStypeList(token.word, detectReferenceSetDelimitersBetweenNounsPOStypes)):
-		result = True
-	elif(token.lemma is not None and GIAANNnlp_sequencePOS.isWordEverInPOStypeList(token.lemma, detectReferenceSetDelimitersBetweenNounsPOStypes)):
-		result = True
+	if(tokeniserSubword and tokeniserSubwordPOS):
+		if(token.word in detectReferenceSetDelimitersBetweenNounsWordTypes or token.tag in detectReferenceSetDelimitersBetweenNounsTagTypes):
+			result = True
+		elif(token.pos in detectReferenceSetDelimitersBetweenNounsPOStypes):
+			result = True
+	else:
+		if(token.word in detectReferenceSetDelimitersBetweenNounsWordTypes or token.tag in detectReferenceSetDelimitersBetweenNounsTagTypes):
+			result = True
+		elif(GIAANNnlp_sequencePOS.isWordEverInPOStypeList(token.word, detectReferenceSetDelimitersBetweenNounsPOStypes)):
+			result = True
+		elif(token.lemma is not None and GIAANNnlp_sequencePOS.isWordEverInPOStypeList(token.lemma, detectReferenceSetDelimitersBetweenNounsPOStypes)):
+			result = True
 	return result
 	
 
@@ -112,13 +130,101 @@ def createSinglePreprocessedToken(token):
 	return PreprocessedToken(text, lemma, pos, tag)
 
 def pretrain(sequence):
-	if(pretrainCombineHyphenatedNouns):
-		sequence = pretrainCombineConsecutiveNounHyphenated(sequence)
-	if(pretrainCombineConsecutiveNouns):
-		sequence = pretrainCombineConsecutiveNoun(sequence)
-	if(pretrainConceptColumnsDelimitByPOSenforce):
-		sequence = pretrainConceptColumnsDelimitByPOSenforce(sequence)
+	if(tokeniserSubword):
+		sequence = pretrainTokeniserSubword(sequence)
+	else:
+		if(pretrainCombineHyphenatedNouns):
+			sequence = pretrainCombineConsecutiveNounHyphenated(sequence)
+		if(pretrainCombineConsecutiveNouns):
+			sequence = pretrainCombineConsecutiveNoun(sequence)
+		if(pretrainConceptColumnsDelimitByPOSenforce):
+			sequence = pretrainConceptColumnsDelimitByPOSenforce(sequence)
 	return sequence
+
+if(tokeniserSubword):
+
+	def pretrainTokeniserSubword(sequence):
+		result = None
+		if(not usePOS):
+			raise RuntimeError("pretrainTokeniserSubword error: tokeniserSubword requires usePOS")
+		if(isinstance(sequence, PreprocessedSequence)):
+			result = sequence
+		else:
+			preprocessedTokens = []
+			for token in sequence:
+				subwordTokens = createTokeniserSubwordPreprocessedTokens(token)
+				preprocessedTokens.extend(subwordTokens)
+			result = PreprocessedSequence(preprocessedTokens)
+		return result
+
+	def createTokeniserSubwordPreprocessedTokens(token):
+		result = []
+		tokenText = token.text
+		if(not isinstance(tokenText, str)):
+			raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: token text must be a str")
+		if(tokenText == ""):
+			raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: token text must not be empty")
+		encoding = getTokeniserSubwordEncoding()
+		tokenIds = encoding.encode_ordinary(tokenText)
+		if(len(tokenIds) == 0):
+			raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: no subword token ids generated")
+		for tokenId in tokenIds:
+			subwordText = decodeTokeniserSubwordTokenText(encoding, tokenId)
+			subwordPos, subwordTag = detectTokeniserSubwordPOS(token, subwordText)
+			result.append(PreprocessedToken(subwordText, subwordText, subwordPos, subwordTag))
+		return result
+
+	def getTokeniserSubwordEncoding():
+		global _tokeniserSubwordEncoding
+		result = None
+		if(_tokeniserSubwordEncoding is None):
+			try:
+				_tokeniserSubwordEncoding = tiktoken.get_encoding(tokeniserSubwordTiktokenEncodingName)
+			except Exception as exception:
+				raise RuntimeError("getTokeniserSubwordEncoding error: failed to load tiktoken encoding " + tokeniserSubwordTiktokenEncodingName) from exception
+		result = _tokeniserSubwordEncoding
+		return result
+
+	def decodeTokeniserSubwordTokenText(encoding, tokenId):
+		result = None
+		byteTokenGenerated = False
+		if(not isinstance(tokenId, int) or isinstance(tokenId, bool) or tokenId < 0):
+			raise RuntimeError("decodeTokeniserSubwordTokenText error: tokenId must be a non-negative int")
+		tokenBytes = encoding.decode_single_token_bytes(tokenId)
+		try:
+			result = tokenBytes.decode(tokeniserSubwordTextEncoding, errors=tokeniserSubwordTextEncodingErrorMode)
+		except UnicodeDecodeError:
+			result = tokeniserSubwordByteTokenPrefix + tokenBytes.hex() + tokeniserSubwordByteTokenSuffix
+			byteTokenGenerated = True
+		if(result == ""):
+			raise RuntimeError("decodeTokeniserSubwordTokenText error: decoded subword text must not be empty")
+		if(not byteTokenGenerated and result.startswith(tokeniserSubwordByteTokenPrefix)):
+			raise RuntimeError("decodeTokeniserSubwordTokenText error: decoded subword text uses reserved byte-token prefix")
+		return result
+
+	def detectTokeniserSubwordPOS(parentToken, subwordText):
+		resultPos = parentToken.pos_
+		resultTag = parentToken.tag_
+		if(tokeniserSubwordPOS):
+			if(isTokeniserSubwordByteTokenText(subwordText)):
+				resultPos = parentToken.pos_
+				resultTag = parentToken.tag_
+			elif(GIAANNnlp_sequencePOS.isPunctWord(subwordText)):
+				resultPos = tokeniserSubwordPOSpunct
+				resultTag = tokeniserSubwordTagPunct
+			elif(GIAANNnlp_sequencePOS.isNumericWord(subwordText)):
+				resultPos = tokeniserSubwordPOSnum
+				resultTag = tokeniserSubwordTagNum
+			elif(GIAANNnlp_sequencePOS.isSymbolWord(subwordText)):
+				resultPos = tokeniserSubwordPOSsym
+				resultTag = tokeniserSubwordTagSym
+		return resultPos, resultTag
+
+	def isTokeniserSubwordByteTokenText(subwordText):
+		result = False
+		if(subwordText.startswith(tokeniserSubwordByteTokenPrefix) and subwordText.endswith(tokeniserSubwordByteTokenSuffix)):
+			result = True
+		return result
 
 if(pretrainConceptColumnsDelimitByPOSenforce):
 	
@@ -279,7 +385,10 @@ def isConcept(token, pretrain=False):
 		tokenPos = token.pos
 		tokenWord = token.word
 		tokenLemma = token.lemma
-	if(useSpacyForConceptNounPOSdetection):
+	if(tokeniserSubword):
+		if tokenPos in nounPos:
+			result = True
+	elif(useSpacyForConceptNounPOSdetection):
 		if tokenPos in nounPos:
 			result = True
 		#if tokenPos in nounTags:

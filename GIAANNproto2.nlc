@@ -448,3 +448,22 @@ v2h (Codex IDE GPT-5.5) [under development]:
 MANUAL; - if(executionMode=="train"): re-enable defaults useGPUdense=False+useGPUsparse=False.
 MANUAL; - if(executionMode=="train"): optionally set storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = True (non-default optimisation: only possible for training of low database sizes <= ~1M training sequences).
 MANUAL; - update paper
+
+---
+v2i (Codex IDE GPT-5.5) [under development]:
+- add proto GIAANNproto2i1a - start option tokeniserSubword:
+	- implement a modern BPE/SentencePiece subword tokeniser (or reuse one like o200k_base if it meets the the other requirements below).
+		- you will need to perform an extensive internet search to determine if an existing third-party tokeniser can be used.
+	- the implementation must be able to classify all subword tokens into noun or non-noun pieces:
+		- if tokeniserSubwordPOS=True, use a new optimal POS detector for tokeniserSubword.
+		- if tokeniserSubwordPOS=False, use the existing spacy noun detection code (NOUN/PROPN) 
+	- the implementation must be able to classify all reference-set delimiter non-noun subword tokens based on the existing conceptColumnsDelimitByPOS criteria (e.g. verb/preposition):
+		- if tokeniserSubwordPOS=True, use the new optimal POS detector for tokeniserSubword (i.e. the same POS system used to identify noun and non-noun pieces).
+		- if tokeniserSubwordPOS=False, use the existing conceptColumnsDelimitByPOS code to identify non-noun reference-set delimiter pieces.
+	- upgrade the concept column identification code to accept consecutive noun tokens, and always use the first consecutive noun token as the concept column as the prime concept feature (ie the unique name of the concept column). 
+		- disable all existing consecutive noun combination code (e.g. pretrainCombineConsecutiveNouns, pretrainCombineHyphenatedNouns) as tokeniserSubword supports consecutive noun tokens within a concept column.
+	- the codebase already detects consecutive reference-set delimiter non-noun tokens, so that only the last one is used for concept column segregation (and exclusive external connections):
+		- ensure that this code supports option tokeniserSubwordPOS.
+	Implementation Notes:
+		- do not change any existing code in the codebase unrelated to specific tokeniserSubword==True behaviour.
+		- ensure to encapsulate all tokeniserSubword==True specific behaviour within context if(tokeniserSubword) as per AGENTS.md.

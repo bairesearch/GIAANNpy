@@ -53,7 +53,6 @@ from GIAANNcmn_globalDefs import multipleDendriticBranchesBinaryTree
 from GIAANNcmn_globalDefs import trainVerifyConnectionNonexistentAcrossBranches
 
 
-
 #Dataset Type;
 if(useQuickExecution):
 	datasetType = "textfile"
@@ -189,6 +188,25 @@ else:
 	spacyPipelineOptimisations = True	#default: True
 
 
+#Tokensier:
+tokeniserSubword = False	#default: False #orig: False
+if(tokeniserSubword):
+	tokeniserSubwordPOS = True	#default: ?	#orig: False
+	tokeniserSubwordTiktokenEncodingName = "o200k_base"
+	tokeniserSubwordTextEncoding = "utf-8"
+	tokeniserSubwordTextEncodingErrorMode = "strict"
+	tokeniserSubwordByteTokenPrefix = "<tokeniserSubwordByte:"
+	tokeniserSubwordByteTokenSuffix = ">"
+	tokeniserSubwordPOSpunct = "PUNCT"
+	tokeniserSubwordPOSnum = "NUM"
+	tokeniserSubwordPOSsym = "SYM"
+	tokeniserSubwordTagPunct = "."
+	tokeniserSubwordTagNum = "CD"
+	tokeniserSubwordTagSym = "SYM"
+else:
+	tokeniserSubwordPOS = False
+	
+
 #Concept column delimiters:
 conceptColumnsDelimitByPOS = True	#mandatory: True	#orig: False	#closer to original GIA specification	#FUTURE: still requires working for edge cases
 if(conceptColumnsDelimitByPOS):
@@ -202,12 +220,17 @@ if(conceptColumnsDelimitByPOS):
 		detectReferenceSetDelimitersBetweenNounsWordTypes = ['is', 'are', ',', '(']	#eg a dog is an animal / dogs are animals	#'-'
 		detectReferenceSetDelimitersBetweenNounsTagTypes = []
 	predictionColumnsMustActivateConceptFeature = False	#default: False	#orig: False
-	pretrainCombineConsecutiveNouns = True #default: True	#orig: False
-	pretrainCombineHyphenatedNouns = True	#default: True	#orig: False
-	if(useBenchmarkDefaults):
-		pretrainConceptColumnsDelimitByPOSenforce = False	
+	if(tokeniserSubword):
+		pretrainCombineConsecutiveNouns = False
+		pretrainCombineHyphenatedNouns = False
+		pretrainConceptColumnsDelimitByPOSenforce = False
 	else:
-		pretrainConceptColumnsDelimitByPOSenforce = True	#default: True	#orig: False	#disable when debugging debugTerminateOnConceptColumnsDelimitByPOSwarning	#when consecutive concepts are detected without a delimiter between them, it modifies all tokens to the left of the right most concept token (noun) as ordinary non-concept (non-noun) tokens.
+		pretrainCombineConsecutiveNouns = True #default: True	#orig: False
+		pretrainCombineHyphenatedNouns = True	#default: True	#orig: False
+		if(useBenchmarkDefaults):
+			pretrainConceptColumnsDelimitByPOSenforce = False	
+		else:
+			pretrainConceptColumnsDelimitByPOSenforce = True	#default: True	#orig: False	#disable when debugging debugTerminateOnConceptColumnsDelimitByPOSwarning	#when consecutive concepts are detected without a delimiter between them, it modifies all tokens to the left of the right most concept token (noun) as ordinary non-concept (non-noun) tokens.
 
 
 #Connection strength modifiers;
@@ -549,6 +572,11 @@ if(useBenchmark):
 	#v2 benchmarks;
 	if(inferenceReportGroundedAccuracy):
 		benchmarkAblationText = "-inferenceReportGroundedAccuracy"
+	elif(tokeniserSubword):
+		if(tokeniserSubwordPOS):
+			benchmarkAblationText = "-tokeniserSubwordPOS"
+		else:
+			benchmarkAblationText = "-tokeniserSubword"
 	elif(auxiliaryNeurons):
 		benchmarkAblationText = "-auxiliaryNeurons"
 	elif(useTrainDuringInference):

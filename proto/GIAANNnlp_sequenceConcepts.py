@@ -25,17 +25,42 @@ import GIAANNcmn_databaseNetwork
 import GIAANNnlp_sequenceTokens
 
 
+def isTokenConceptColumnCandidate(token, tokens, tokenIndex):
+	result = False
+	if(tokeniserSubword):
+		if(tokens is None):
+			raise RuntimeError("isTokenConceptColumnCandidate error: tokens must not be None when tokeniserSubword is enabled")
+		if(not isinstance(tokenIndex, int) or isinstance(tokenIndex, bool)):
+			raise RuntimeError("isTokenConceptColumnCandidate error: tokenIndex must be an int")
+		if(tokenIndex < 0 or tokenIndex >= len(tokens)):
+			raise RuntimeError("isTokenConceptColumnCandidate error: tokenIndex out of range")
+	if usePOS:
+		if(GIAANNnlp_sequenceTokens.isConcept(token)):
+			result = True
+			if(tokeniserSubword):
+				if(tokenIndex > 0 and GIAANNnlp_sequenceTokens.isConcept(tokens[tokenIndex - 1])):
+					result = False
+	else:
+		result = True
+	return result
+
 def firstPass(databaseNetworkObject, sequence, allowNewFeatures):
 	newConceptsAdded = False
 	conceptsFound = False
 	conceptMask = []
+	tokens = None
+	if(tokeniserSubword):
+		tokens = GIAANNnlp_sequenceTokens.getTokens(sequence)
 	
-	for preprocessedToken in sequence:
-		token = GIAANNnlp_sequenceTokens.convertPreprocessedTokenToSequenceToken(preprocessedToken)
+	for tokenIndex, preprocessedToken in enumerate(sequence):
+		if(tokeniserSubword):
+			token = tokens[tokenIndex]
+		else:
+			token = GIAANNnlp_sequenceTokens.convertPreprocessedTokenToSequenceToken(preprocessedToken)
 
 		conceptFound = False
 		if usePOS:
-			if GIAANNnlp_sequenceTokens.isConcept(token):
+			if isTokenConceptColumnCandidate(token, tokens, tokenIndex):
 				# Only assign unique concept columns for nouns
 				conceptFound = True
 		else:
@@ -71,7 +96,7 @@ def secondPass(databaseNetworkObject, tokens, inferenceMode):
 		lemma = token.lemma
 		pos = token.pos
 		if usePOS:
-			if GIAANNnlp_sequenceTokens.isConcept(token):
+			if isTokenConceptColumnCandidate(token, tokens, i):
 				conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
 				if(inferenceMode and inferenceOnlyRetainPredictedTargetObservedColumn):
 					observedColumn = GIAANNcmn_databaseNetwork.ObservedColumnStub(databaseNetworkObject, conceptIndex, lemma, i)
@@ -139,7 +164,7 @@ def processFeatureDetection(databaseNetworkObject, tokenIndex, token, tokens, al
 	
 	featureWord = token.word
 
-	if usePOS and (GIAANNnlp_sequenceTokens.isConcept(token)):
+	if usePOS and isTokenConceptColumnCandidate(token, tokens, tokenIndex):
 		return False  # Skip nouns as features
 	else:
 		if featureWord not in databaseNetworkObject.conceptFeaturesDict:
