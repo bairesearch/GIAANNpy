@@ -44,6 +44,33 @@ def isTokenConceptColumnCandidate(token, tokens, tokenIndex):
 		result = True
 	return result
 
+def getTokenConceptName(databaseNetworkObject, token):
+	result = None
+	if(useDedicatedConceptsLists):
+		if(tokeniserSubword and useDedicatedConceptListsSubword):
+			conceptIndex = getTokenConceptIndex(databaseNetworkObject, token)
+			result = databaseNetworkObject.conceptColumnsList[conceptIndex]
+		else:
+			raise RuntimeError("getTokenConceptName error: useDedicatedConceptsLists is only implemented for tokeniserSubword/useDedicatedConceptListsSubword")
+	else:
+		result = token.lemma
+	return result
+
+def getTokenConceptIndex(databaseNetworkObject, token):
+	result = None
+	if(useDedicatedConceptsLists):
+		if(tokeniserSubword and useDedicatedConceptListsSubword):
+			result = GIAANNnlp_sequenceTokens.getTokeniserSubwordConceptIndex(token)
+			if(result < 0 or result >= databaseNetworkObject.c):
+				raise RuntimeError("getTokenConceptIndex error: tokeniserSubword concept index out of range")
+		else:
+			raise RuntimeError("getTokenConceptIndex error: useDedicatedConceptsLists is only implemented for tokeniserSubword/useDedicatedConceptListsSubword")
+	else:
+		if(token.lemma not in databaseNetworkObject.conceptColumnsDict):
+			raise RuntimeError("getTokenConceptIndex error: concept lemma not found (" + token.lemma + ")")
+		result = databaseNetworkObject.conceptColumnsDict[token.lemma]
+	return result
+
 def firstPass(databaseNetworkObject, sequence, allowNewFeatures):
 	newConceptsAdded = False
 	conceptsFound = False
@@ -68,12 +95,16 @@ def firstPass(databaseNetworkObject, sequence, allowNewFeatures):
 			conceptFound = True
 		
 		if(conceptFound):
-			if(allowNewFeatures):
-				conceptsFound, newConceptsAdded = GIAANNcmn_databaseNetwork.addConceptToConceptColumnsDict(databaseNetworkObject, token.lemma, conceptsFound, newConceptsAdded)
-			else:
-				if(token.lemma not in databaseNetworkObject.conceptColumnsDict):
-					raise RuntimeError("firstPass error: concept lemma not found while allowNewFeatures is False (" + token.lemma + ")")
+			if(useDedicatedConceptsLists):
+				getTokenConceptIndex(databaseNetworkObject, token)
 				conceptsFound = True
+			else:
+				if(allowNewFeatures):
+					conceptsFound, newConceptsAdded = GIAANNcmn_databaseNetwork.addConceptToConceptColumnsDict(databaseNetworkObject, token.lemma, conceptsFound, newConceptsAdded)
+				else:
+					if(token.lemma not in databaseNetworkObject.conceptColumnsDict):
+						raise RuntimeError("firstPass error: concept lemma not found while allowNewFeatures is False (" + token.lemma + ")")
+					conceptsFound = True
 			conceptMask.append(True)
 		else:
 			conceptMask.append(False)
@@ -93,27 +124,15 @@ def secondPass(databaseNetworkObject, tokens, inferenceMode):
 	observedColumnsDict = {}
 	observedColumnsSequenceWordIndexDict = {}
 	for i, token in enumerate(tokens):
-		lemma = token.lemma
-		pos = token.pos
+		conceptFound = False
 		if usePOS:
 			if isTokenConceptColumnCandidate(token, tokens, i):
-				conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
-				if(inferenceMode and inferenceOnlyRetainPredictedTargetObservedColumn):
-					observedColumn = GIAANNcmn_databaseNetwork.ObservedColumnStub(databaseNetworkObject, conceptIndex, lemma, i)
-					observedColumnsSequenceWordIndexDict[i] = observedColumn
-				else:
-					# Load observed column from disk or create new one (reuse per-lemma instance for multi-occurrence concepts)
-					if(lemma in observedColumnsDict):
-						observedColumn = observedColumnsDict[lemma]
-					else:
-						if(inferenceMode):
-							observedColumn = GIAANNcmn_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, deviceLoadColumnInference, inferenceMode and deviceLoadColumnInferenceCopy)
-						else:
-							observedColumn = GIAANNcmn_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
-						observedColumnsDict[lemma] = observedColumn
-					observedColumnsSequenceWordIndexDict[i] = observedColumn
+				conceptFound = True
 		else:
-			conceptIndex = databaseNetworkObject.conceptColumnsDict[lemma]
+			conceptFound = True
+		if(conceptFound):
+			lemma = getTokenConceptName(databaseNetworkObject, token)
+			conceptIndex = getTokenConceptIndex(databaseNetworkObject, token)
 			if(inferenceMode and inferenceOnlyRetainPredictedTargetObservedColumn):
 				observedColumn = GIAANNcmn_databaseNetwork.ObservedColumnStub(databaseNetworkObject, conceptIndex, lemma, i)
 				observedColumnsSequenceWordIndexDict[i] = observedColumn
@@ -543,7 +562,10 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 		if(trainSequenceObservedColumnsMatchSequenceWords):
 			sequenceConceptIndex = i
 		else:
-			conceptLemma = tokens[sequenceConceptWordIndex].lemma
+			if(useDedicatedConceptsLists):
+				conceptLemma = getTokenConceptName(sequenceObservedColumns.databaseNetworkObject, tokens[sequenceConceptWordIndex])
+			else:
+				conceptLemma = tokens[sequenceConceptWordIndex].lemma
 			sequenceConceptIndex = sequenceObservedColumns.conceptNameToIndex[conceptLemma] 
 				
 		if(useSANI):

@@ -1353,17 +1353,29 @@ class SequenceObservedColumns:
 				connectionSourceCombinedKeys = self.buildConnectionSourceCombinedKeys(connectionIndices, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor)
 			if(connectionSourceCombinedKeys is not None and connectionSourceCombinedKeys.numel() > 0):
 				connectionSourceCombinedKeysUnique = pt.unique(connectionSourceCombinedKeys, sorted=True)
-				connectionTargetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, connectionSourceCombinedKeysUnique.shape[0], databaseNetworkObject.c, databaseNetworkObject.f)
-				connectionTargetSparse = self.gatherConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionDevice)
+				connectionTargetConceptIndicesUnique = None
+				connectionTargetSequenceBucketLookup = None
+				if(useDedicatedConceptListsSubword):
+					connectionTargetSequenceConceptIndicesUnique = pt.unique(connectionIndices[4], sorted=True)
+					connectionTargetConceptIndicesUnique = pt.unique(conceptIndicesConnectionTensor[connectionTargetSequenceConceptIndicesUnique], sorted=True)
+					connectionTargetSequenceBucketLookup = self.buildConnectionTargetSequenceBucketLookup(connectionTargetSequenceConceptIndicesUnique, connectionTargetConceptIndicesUnique, conceptIndicesConnectionTensor, connectionDevice)
+					connectionTargetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, connectionSourceCombinedKeysUnique.shape[0], connectionTargetConceptIndicesUnique.shape[0], databaseNetworkObject.f)
+					connectionTargetSparse = self.gatherConnectionSourceTargetBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionTargetConceptIndicesUnique, connectionDevice)
+				else:
+					connectionTargetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, connectionSourceCombinedKeysUnique.shape[0], databaseNetworkObject.c, databaseNetworkObject.f)
+					connectionTargetSparse = self.gatherConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionDevice)
 				if(connectionIndices.numel() > 0):
-					connectionUpdates = self.buildConnectionSourceBucketUpdateSparse(connectionIndices, connectionValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor, connectionSourceCombinedKeysUnique, connectionTargetSize)
+					connectionUpdates = self.buildConnectionSourceBucketUpdateSparse(connectionIndices, connectionValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor, connectionSourceCombinedKeysUnique, connectionTargetSize, connectionTargetConceptIndicesUnique, connectionTargetSequenceBucketLookup)
 					if(trainVerifyConnectionNonexistentAcrossBranches):
 						connectionUpdates = filterTrainVerifyConnectionNonexistentAcrossBranchesUpdates(connectionTargetSparse, connectionUpdates, databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
 					connectionTargetSparse = self.addSparseUpdateNonNegative(connectionTargetSparse, connectionUpdates)
 					if(inferenceDuringTrainAdjustSynapseStrength):
 						if(inferenceDuringTrainAdjustSynapseStrengthDecrementInference):
 							connectionTargetSparse = self.clampAndPruneConnectionStrengthSparse(connectionTargetSparse)
-				self.scatterConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionTargetSparse)
+				if(useDedicatedConceptListsSubword):
+					self.scatterConnectionSourceTargetBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionTargetConceptIndicesUnique, connectionTargetSparse)
+				else:
+					self.scatterConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionTargetSparse)
 		if(updateObservedColumnsEfficientFeatureConnectionsPhaseLabel is not None):
 			GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocalGrouped(updateObservedColumnsEfficientFeatureConnectionsPhaseLabel, updateObservedColumnsEfficientAggregatePhaseLabel)
 			
@@ -1492,7 +1504,25 @@ class SequenceObservedColumns:
 			result = sourceConceptIndex * self.databaseNetworkObject.f + sourceFeatureIndex
 		return result
 
-	def buildConnectionSourceBucketUpdateSparse(self, indices, values, propertyIndex, featureIndicesInObserved, conceptIndicesTensor, sourceCombinedKeysUnique, targetSize):
+	def buildConnectionTargetSequenceBucketLookup(self, targetSequenceConceptIndicesUnique, targetConceptIndicesUnique, conceptIndicesTensor, targetDevice):
+		result = None
+		if(not useDedicatedConceptListsSubword):
+			raise RuntimeError("buildConnectionTargetSequenceBucketLookup error: useDedicatedConceptListsSubword must be True")
+		if(targetSequenceConceptIndicesUnique.numel() == 0):
+			raise RuntimeError("buildConnectionTargetSequenceBucketLookup error: targetSequenceConceptIndicesUnique is empty")
+		if(bool(pt.any(targetSequenceConceptIndicesUnique < 0).item()) or bool(pt.any(targetSequenceConceptIndicesUnique >= self.cs).item())):
+			raise RuntimeError("buildConnectionTargetSequenceBucketLookup error: target sequence concept index out of range")
+		targetConceptIndicesBySequence = conceptIndicesTensor[targetSequenceConceptIndicesUnique]
+		targetBucketIndices = pt.searchsorted(targetConceptIndicesUnique, targetConceptIndicesBySequence)
+		if(bool(pt.any(targetBucketIndices >= targetConceptIndicesUnique.shape[0]).item())):
+			raise RuntimeError("buildConnectionTargetSequenceBucketLookup error: target bucket index out of range")
+		if(bool(pt.any(targetConceptIndicesUnique[targetBucketIndices] != targetConceptIndicesBySequence).item())):
+			raise RuntimeError("buildConnectionTargetSequenceBucketLookup error: target concept bucket lookup mismatch")
+		result = pt.empty((self.cs,), dtype=pt.long, device=targetDevice)
+		result[targetSequenceConceptIndicesUnique] = targetBucketIndices
+		return result
+
+	def buildConnectionSourceBucketUpdateSparse(self, indices, values, propertyIndex, featureIndicesInObserved, conceptIndicesTensor, sourceCombinedKeysUnique, targetSize, compactTargetConceptIndices=None, targetSequenceBucketLookup=None):
 		result = self.initialiseSparseTensor(targetSize, indices.device)
 		if(indices.numel() > 0):
 			branch = indices[0]
@@ -1506,9 +1536,55 @@ class SequenceObservedColumns:
 				targetFeatureIndex = featureIndicesInObserved[targetFeatureIndex]
 			sourceCombinedKeys = sourceConceptIndex * self.databaseNetworkObject.f + sourceFeatureIndex
 			sourceBucketIndex = pt.searchsorted(sourceCombinedKeysUnique, sourceCombinedKeys)
+			if(compactTargetConceptIndices is not None):
+				if(targetSequenceBucketLookup is not None):
+					if(targetSequenceBucketLookup.shape[0] != self.cs):
+						raise RuntimeError("buildConnectionSourceBucketUpdateSparse error: targetSequenceBucketLookup size mismatch")
+					targetSequenceConceptIndex = indices[4]
+					if(bool(pt.any(targetSequenceConceptIndex < 0).item()) or bool(pt.any(targetSequenceConceptIndex >= targetSequenceBucketLookup.shape[0]).item())):
+						raise RuntimeError("buildConnectionSourceBucketUpdateSparse error: target sequence concept index out of range")
+					targetConceptIndex = targetSequenceBucketLookup[targetSequenceConceptIndex]
+				else:
+					targetConceptIndex = pt.searchsorted(compactTargetConceptIndices, targetConceptIndex)
 			propertyRow = pt.full_like(segment, propertyIndex)
 			updateIndices = pt.stack((propertyRow, branch, segment, sourceBucketIndex, targetConceptIndex, targetFeatureIndex), dim=0)
 			result = pt.sparse_coo_tensor(updateIndices, values, size=targetSize, dtype=arrayType, device=indices.device)
+		return result
+
+	def gatherConnectionSourceTargetBucketTensor(self, observedColumnsByConceptIndex, sourceCombinedKeysUnique, targetConceptIndicesUnique, targetDevice):
+		targetSize = (self.databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, sourceCombinedKeysUnique.shape[0], targetConceptIndicesUnique.shape[0], self.databaseNetworkObject.f)
+		result = None
+		if(not useDedicatedConceptListsSubword):
+			raise RuntimeError("gatherConnectionSourceTargetBucketTensor error: useDedicatedConceptListsSubword must be True")
+		combinedIndicesList = []
+		combinedValuesList = []
+		sourceConceptIndexList = pt.div(sourceCombinedKeysUnique, self.databaseNetworkObject.f, rounding_mode='floor').detach().cpu().tolist()
+		sourceFeatureIndexList = pt.remainder(sourceCombinedKeysUnique, self.databaseNetworkObject.f).detach().cpu().tolist()
+		for sourceBucketIndex, (conceptIndexValue, sourceFeatureIndexValue) in enumerate(zip(sourceConceptIndexList, sourceFeatureIndexList)):
+			if(int(conceptIndexValue) not in observedColumnsByConceptIndex):
+				raise RuntimeError(f"gatherConnectionSourceTargetBucketTensor error: missing observed column for conceptIndex {int(conceptIndexValue)}")
+			sourceTensor = observedColumnsByConceptIndex[int(conceptIndexValue)].getFeatureConnectionsForSourceFeature(int(sourceFeatureIndexValue), targetDevice=targetDevice, createMissing=False)
+			sourceTensor = sourceTensor.coalesce()
+			if(sourceTensor._nnz() > 0):
+				sourceIndices = sourceTensor.indices()
+				sourceValues = sourceTensor.values()
+				targetConceptIndex = sourceIndices[3]
+				targetConceptBucketIndex = pt.searchsorted(targetConceptIndicesUnique, targetConceptIndex)
+				targetConceptBucketIndexInRange = targetConceptBucketIndex < targetConceptIndicesUnique.shape[0]
+				targetConceptMask = pt.zeros((targetConceptBucketIndex.shape[0],), dtype=pt.bool, device=targetConceptBucketIndex.device)
+				if(targetConceptBucketIndexInRange.any()):
+					targetConceptMask[targetConceptBucketIndexInRange] = targetConceptIndicesUnique[targetConceptBucketIndex[targetConceptBucketIndexInRange]] == targetConceptIndex[targetConceptBucketIndexInRange]
+				if(targetConceptMask.any()):
+					sourceBucketRow = pt.full((1, int(targetConceptMask.sum().item())), sourceBucketIndex, dtype=pt.long, device=sourceIndices.device)
+					batchedIndices = pt.cat([sourceIndices[0:3, targetConceptMask], sourceBucketRow, targetConceptBucketIndex[targetConceptMask].unsqueeze(0), sourceIndices[4:5, targetConceptMask]], dim=0)
+					combinedIndicesList.append(batchedIndices)
+					combinedValuesList.append(sourceValues[targetConceptMask])
+		if(len(combinedIndicesList) > 0):
+			combinedIndices = pt.cat(combinedIndicesList, dim=1)
+			combinedValues = pt.cat(combinedValuesList, dim=0)
+			result = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSize, dtype=arrayType, device=targetDevice)
+		else:
+			result = self.initialiseSparseTensor(targetSize, targetDevice)
 		return result
 
 	def gatherConnectionSourceBucketTensor(self, observedColumnsByConceptIndex, sourceCombinedKeysUnique, targetDevice):
@@ -1546,6 +1622,62 @@ class SequenceObservedColumns:
 				GIAANNcmn_debug.debugTrainSectionTimesContextPop(self.databaseNetworkObject)
 				GIAANNcmn_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient:gatherConnectionSourceBucketTensor", time.perf_counter() - gatherConnectionSourceBucketTensorStartTime)
 		return result
+
+	def scatterConnectionSourceTargetBucketTensor(self, observedColumnsByConceptIndex, sourceCombinedKeysUnique, targetConceptIndicesUnique, connectionTargetSparse):
+		if(not useDedicatedConceptListsSubword):
+			raise RuntimeError("scatterConnectionSourceTargetBucketTensor error: useDedicatedConceptListsSubword must be True")
+		connectionTargetSparse = connectionTargetSparse.coalesce()
+		connectionTargetIndices = connectionTargetSparse.indices()
+		connectionTargetValues = connectionTargetSparse.values()
+		connectionTargetSortedIndices = connectionTargetIndices
+		connectionTargetSortedValues = connectionTargetValues
+		connectionTargetBucketRanges = {}
+		if(connectionTargetIndices.numel() > 0):
+			sortedBucketIndices, sortOrder = pt.sort(connectionTargetIndices[3])
+			connectionTargetSortedIndices = connectionTargetIndices[:, sortOrder]
+			connectionTargetSortedValues = connectionTargetValues.index_select(0, sortOrder)
+			uniqueBuckets, counts = pt.unique_consecutive(sortedBucketIndices, return_counts=True)
+			starts = pt.cumsum(counts, 0) - counts
+			for sourceBucketIndexValue, start, count in zip(uniqueBuckets.tolist(), starts.tolist(), counts.tolist()):
+				connectionTargetBucketRanges[int(sourceBucketIndexValue)] = (int(start), int(start + count))
+		sourceConceptIndexList = pt.div(sourceCombinedKeysUnique, self.databaseNetworkObject.f, rounding_mode='floor').detach().cpu().tolist()
+		sourceFeatureIndexList = pt.remainder(sourceCombinedKeysUnique, self.databaseNetworkObject.f).detach().cpu().tolist()
+		sourceTensorSize = (self.databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, self.databaseNetworkObject.c, self.databaseNetworkObject.f)
+		for sourceBucketIndex, (conceptIndexValue, sourceFeatureIndexValue) in enumerate(zip(sourceConceptIndexList, sourceFeatureIndexList)):
+			if(int(conceptIndexValue) not in observedColumnsByConceptIndex):
+				raise RuntimeError(f"scatterConnectionSourceTargetBucketTensor error: missing observed column for conceptIndex {int(conceptIndexValue)}")
+			observedColumn = observedColumnsByConceptIndex[int(conceptIndexValue)]
+			if(not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam and observedColumn.hasTrainPreparedSourceFeatureIndices()):
+				if(int(sourceFeatureIndexValue) not in observedColumn.trainPreparedSourceFeatureIndices):
+					raise RuntimeError(f"scatterConnectionSourceTargetBucketTensor error: sourceFeatureIndex {int(sourceFeatureIndexValue)} was not prepared for conceptIndex {int(conceptIndexValue)}")
+			sourceTensor = observedColumn.getFeatureConnectionsForSourceFeature(int(sourceFeatureIndexValue), targetDevice=connectionTargetSparse.device, createMissing=False).coalesce()
+			sourceIndices = sourceTensor.indices()
+			sourceValues = sourceTensor.values()
+			sourceKeepMask = pt.ones((sourceIndices.shape[1],), dtype=pt.bool, device=sourceIndices.device)
+			if(sourceIndices.numel() > 0):
+				targetConceptIndex = sourceIndices[3]
+				targetConceptBucketIndex = pt.searchsorted(targetConceptIndicesUnique, targetConceptIndex)
+				targetConceptBucketIndexInRange = targetConceptBucketIndex < targetConceptIndicesUnique.shape[0]
+				targetConceptMask = pt.zeros((targetConceptBucketIndex.shape[0],), dtype=pt.bool, device=targetConceptBucketIndex.device)
+				if(targetConceptBucketIndexInRange.any()):
+					targetConceptMask[targetConceptBucketIndexInRange] = targetConceptIndicesUnique[targetConceptBucketIndex[targetConceptBucketIndexInRange]] == targetConceptIndex[targetConceptBucketIndexInRange]
+				sourceKeepMask = pt.logical_not(targetConceptMask)
+			sourceIndicesKept = sourceIndices[:, sourceKeepMask]
+			sourceValuesKept = sourceValues[sourceKeepMask]
+			if(sourceBucketIndex in connectionTargetBucketRanges):
+				start, end = connectionTargetBucketRanges[sourceBucketIndex]
+				targetConceptBucketIndex = connectionTargetSortedIndices[4, start:end]
+				targetConceptIndex = targetConceptIndicesUnique[targetConceptBucketIndex]
+				sourceIndicesUpdated = pt.stack((connectionTargetSortedIndices[0, start:end], connectionTargetSortedIndices[1, start:end], connectionTargetSortedIndices[2, start:end], targetConceptIndex, connectionTargetSortedIndices[5, start:end]), dim=0)
+				sourceValuesUpdated = connectionTargetSortedValues[start:end]
+				sourceIndicesNew = pt.cat([sourceIndicesKept, sourceIndicesUpdated], dim=1)
+				sourceValuesNew = pt.cat([sourceValuesKept, sourceValuesUpdated], dim=0)
+			else:
+				sourceIndicesNew = sourceIndicesKept
+				sourceValuesNew = sourceValuesKept
+			sourceTensorNew = pt.sparse_coo_tensor(sourceIndicesNew, sourceValuesNew, size=sourceTensorSize, dtype=arrayType, device=connectionTargetSparse.device)
+			observedColumn.setFeatureConnectionsForSourceFeature(int(sourceFeatureIndexValue), sourceTensorNew.coalesce())
+		return
 
 	def scatterConnectionSourceBucketTensor(self, observedColumnsByConceptIndex, sourceCombinedKeysUnique, connectionTargetSparse):
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):

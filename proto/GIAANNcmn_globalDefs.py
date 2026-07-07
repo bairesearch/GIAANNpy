@@ -51,7 +51,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -1171,6 +1171,13 @@ if(printConfiguration):
 		if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
 			print("algorithmMatrixSANIenforceRequirement: ", algorithmMatrixSANIenforceRequirement)
 		print("enforceSequentialActivation: ", enforceSequentialActivation)
+	print("")
+	print("#Tokeniser settings;")
+	print("tokeniserSubword:", tokeniserSubword)
+	if(tokeniserSubword):
+		print("tokeniserSubwordPOS:", tokeniserSubwordPOS)
+		print("useDedicatedFeatureListsSubword:", useDedicatedFeatureListsSubword)
+		print("useDedicatedConceptListsSubword:", useDedicatedConceptListsSubword)
 	print("")
 	print("************************************ ")
 	

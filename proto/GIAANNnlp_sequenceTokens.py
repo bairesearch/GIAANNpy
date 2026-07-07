@@ -33,6 +33,24 @@ if(tokeniserSubword):
 def loadPOSdatabase():
 	GIAANNnlp_sequencePOS.loadPOSdatabase()
 
+def getTokenPOSword(token):
+	result = token.word
+	if(tokeniserSubword and not tokeniserSubwordPOS):
+		if(not hasattr(token, "posWord")):
+			raise RuntimeError("getTokenPOSword error: tokeniserSubwordPOS=False token has no posWord")
+		result = token.posWord
+		if(result is None):
+			raise RuntimeError("getTokenPOSword error: tokeniserSubwordPOS=False token posWord is None")
+	return result
+
+def getTokenPOSlemma(token):
+	result = token.lemma
+	if(tokeniserSubword and not tokeniserSubwordPOS):
+		if(not hasattr(token, "posLemma")):
+			raise RuntimeError("getTokenPOSlemma error: tokeniserSubwordPOS=False token has no posLemma")
+		result = token.posLemma
+	return result
+
 def isTokenReferenceSetDelimiterDeterministic(token):
 	result = False
 	if(tokeniserSubword and tokeniserSubwordPOS):
@@ -41,11 +59,13 @@ def isTokenReferenceSetDelimiterDeterministic(token):
 		elif(token.pos in conceptColumnsDelimiterPOStypes):
 			result = True
 	else:
-		if(token.word in conceptColumnsDelimiterWordTypes or token.tag in conceptColumnsDelimiterTagTypes):
+		tokenPOSword = getTokenPOSword(token)
+		tokenPOSlemma = getTokenPOSlemma(token)
+		if(tokenPOSword in conceptColumnsDelimiterWordTypes or token.tag in conceptColumnsDelimiterTagTypes):
 			result = True
-		elif(GIAANNnlp_sequencePOS.isWordEverInPOStypeList(token.word, conceptColumnsDelimiterPOStypes)):
+		elif(GIAANNnlp_sequencePOS.isWordEverInPOStypeList(tokenPOSword, conceptColumnsDelimiterPOStypes)):
 			result = True
-		elif(token.lemma is not None and GIAANNnlp_sequencePOS.isWordEverInPOStypeList(token.lemma, conceptColumnsDelimiterPOStypes)):
+		elif(tokenPOSlemma is not None and GIAANNnlp_sequencePOS.isWordEverInPOStypeList(tokenPOSlemma, conceptColumnsDelimiterPOStypes)):
 			result = True
 	return result
 	
@@ -57,34 +77,42 @@ def isTokenReferenceSetDelimiterProbabilistic(token):
 		elif(token.pos in detectReferenceSetDelimitersBetweenNounsPOStypes):
 			result = True
 	else:
-		if(token.word in detectReferenceSetDelimitersBetweenNounsWordTypes or token.tag in detectReferenceSetDelimitersBetweenNounsTagTypes):
+		tokenPOSword = getTokenPOSword(token)
+		tokenPOSlemma = getTokenPOSlemma(token)
+		if(tokenPOSword in detectReferenceSetDelimitersBetweenNounsWordTypes or token.tag in detectReferenceSetDelimitersBetweenNounsTagTypes):
 			result = True
-		elif(GIAANNnlp_sequencePOS.isWordEverInPOStypeList(token.word, detectReferenceSetDelimitersBetweenNounsPOStypes)):
+		elif(GIAANNnlp_sequencePOS.isWordEverInPOStypeList(tokenPOSword, detectReferenceSetDelimitersBetweenNounsPOStypes)):
 			result = True
-		elif(token.lemma is not None and GIAANNnlp_sequencePOS.isWordEverInPOStypeList(token.lemma, detectReferenceSetDelimitersBetweenNounsPOStypes)):
+		elif(tokenPOSlemma is not None and GIAANNnlp_sequencePOS.isWordEverInPOStypeList(tokenPOSlemma, detectReferenceSetDelimitersBetweenNounsPOStypes)):
 			result = True
 	return result
 	
 
 class SequenceToken:
-	def __init__(self, word, lemma, pos, tag, tokenId=None):
+	def __init__(self, word, lemma, pos, tag, tokenId=None, posWord=None, posLemma=None):
 		self.word = word
 		self.lemma = lemma
 		self.pos = pos
 		self.tag = tag
 		self.tokenId = tokenId
+		self.posWord = posWord
+		self.posLemma = posLemma
 
 # Preprocessing helpers
 class PreprocessedToken:
-	__slots__ = ("text", "lemma_", "pos_", "tag_", "tokenId")
-	def __init__(self, text, lemma, pos, tag, tokenId=None):
+	__slots__ = ("text", "lemma_", "pos_", "tag_", "tokenId", "posWord", "posLemma")
+	def __init__(self, text, lemma, pos, tag, tokenId=None, posWord=None, posLemma=None):
 		self.text = text
 		self.lemma_ = lemma
 		self.pos_ = pos
 		self.tag_ = tag
 		self.tokenId = tokenId
+		self.posWord = posWord
+		self.posLemma = posLemma
 
 def convertPreprocessedTokenToSequenceToken(preprocessedToken):
+	posWord = None
+	posLemma = None
 	if(tokeniserSubword and useDedicatedFeatureListsSubword):
 		word = preprocessedToken.text
 		lemma = preprocessedToken.lemma_
@@ -93,9 +121,14 @@ def convertPreprocessedTokenToSequenceToken(preprocessedToken):
 	else:
 		word = preprocessedToken.text.lower()
 		lemma = preprocessedToken.lemma_.lower()
+	if(tokeniserSubword):
+		if(preprocessedToken.posWord is not None):
+			posWord = preprocessedToken.posWord.lower()
+		if(preprocessedToken.posLemma is not None):
+			posLemma = preprocessedToken.posLemma.lower()
 	pos = preprocessedToken.pos_  #coarse Part-of-speech (e.g. PRON) 
 	tag = preprocessedToken.tag_	#fine-grained POS (e.g., PRP, PRP$, WP, WP$, etc.)
-	token = SequenceToken(word, lemma, pos, tag, preprocessedToken.tokenId)
+	token = SequenceToken(word, lemma, pos, tag, preprocessedToken.tokenId, posWord, posLemma)
 	return token
 
 def getTokens(sequence):
@@ -189,7 +222,7 @@ if(tokeniserSubword):
 			parentToken = getTokeniserSubwordParentToken(parentTokenSpans, subwordStartByte, subwordEndByte)
 			subwordText = decodeTokeniserSubwordTokenBytes(tokenBytes)
 			subwordPos, subwordTag = detectTokeniserSubwordPOS(parentToken, subwordText)
-			result.append(PreprocessedToken(subwordText, subwordText, subwordPos, subwordTag, tokenId))
+			result.append(PreprocessedToken(subwordText, subwordText, subwordPos, subwordTag, tokenId, parentToken.text, parentToken.lemma_))
 			byteIndex = subwordEndByte
 		if(byteIndex != len(sequenceBytes)):
 			raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: subword token bytes do not cover sequence bytes")
@@ -298,6 +331,27 @@ if(tokeniserSubword):
 		result = int(encoding.max_token_value) + tokeniserSubwordFeatureIndexOffset + 1
 		return result
 
+	def getTokeniserSubwordConceptCount():
+		encoding = getTokeniserSubwordEncoding()
+		result = int(encoding.max_token_value) + 1
+		return result
+
+	def getTokeniserSubwordConceptIndex(token):
+		if(not hasattr(token, "tokenId")):
+			raise RuntimeError("getTokeniserSubwordConceptIndex error: token has no tokenId")
+		result = getTokeniserSubwordConceptIndexFromTokenId(token.tokenId)
+		return result
+
+	def getTokeniserSubwordConceptIndexFromTokenId(tokenId):
+		result = None
+		encoding = getTokeniserSubwordEncoding()
+		if(not isinstance(tokenId, int) or isinstance(tokenId, bool)):
+			raise RuntimeError("getTokeniserSubwordConceptIndexFromTokenId error: tokenId must be an int")
+		if(tokenId < 0 or tokenId > int(encoding.max_token_value)):
+			raise RuntimeError("getTokeniserSubwordConceptIndexFromTokenId error: tokenId out of range")
+		result = tokenId
+		return result
+
 	def getTokeniserSubwordFeatureIndex(token):
 		if(not hasattr(token, "tokenId")):
 			raise RuntimeError("getTokeniserSubwordFeatureIndex error: token has no tokenId")
@@ -325,6 +379,10 @@ if(tokeniserSubword):
 			result = decodeTokeniserSubwordTokenBytes(tokenBytes)
 		except KeyError:
 			result = tokeniserSubwordInvalidTokenFeatureNamePrefix + str(tokenId) + tokeniserSubwordInvalidTokenFeatureNameSuffix
+		return result
+
+	def getTokeniserSubwordConceptNameForTokenId(encoding, tokenId):
+		result = getTokeniserSubwordFeatureNameForTokenId(encoding, tokenId)
 		return result
 
 	def decodeTokeniserSubwordTokenText(encoding, tokenId):

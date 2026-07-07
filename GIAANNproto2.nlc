@@ -474,9 +474,23 @@ v2i (Codex IDE GPT-5.5) [under development]:
 	- preserve exact whitespace-aware BPE behavior.
 - update tokeniserSubword to support dedicated feature indices based on tiktoken token IDs:
 	- implement this change with option useDedicatedFeatureLists=True and new suboption useDedicatedFeatureListsSubword=True, as the software has already been designed to support fixed feature list sizes.
-	- useDedicatedFeatureListsSubword=True is the fixed feature-list mode for tokeniserSubword=True: it forces useDedicatedFeatureLists=True, preallocates the full tiktoken subword vocabulary as feature indices, and maps every non-concept subword by tokeniserSubwordFeatureIndexOffset + tokenId.
-	- Concept-column prime features still use featureIndexPrimeConceptNeuron, while subword continuation pieces remain normal in-column features rather than being merged into concept names.
-	- Dynamic feature creation is disabled, but delimiter detection still runs so conceptColumnsDelimitByPOS can populate global and sequence-local reference-set delimiter metadata, with sequence-local delimiter flags used for stable train/inference concept-boundary assignment.
+	- summary:
+		- useDedicatedFeatureListsSubword=True is the fixed feature-list mode for tokeniserSubword=True: it forces useDedicatedFeatureLists=True, preallocates the full tiktoken subword vocabulary as feature indices, and maps every non-concept subword by tokeniserSubwordFeatureIndexOffset + tokenId.
+		- Concept-column prime features still use featureIndexPrimeConceptNeuron, while subword continuation pieces remain normal in-column features rather than being merged into concept names.
+		- Dynamic feature creation is disabled, but delimiter detection still runs so conceptColumnsDelimitByPOS can populate global and sequence-local reference-set delimiter metadata, with sequence-local delimiter flags used for stable train/inference concept-boundary assignment.
 	- fix(tokeniserSubword): map useDedicatedFeatureListsSubword observed-column features by tiktoken token ID.
 	- fix(useDedicatedFeatureListsSubword): run conceptColumnsDelimitByPOS delimiter detection despite fixed feature lists.
 	- fix(tokeniserSubwordPOS): use sequence-local reference-set delimiter flags for subword concept boundaries.
+- update tokeniserSubword to support dedicated concept indices based on tiktoken token IDs:
+	- implement option tokeniserSubword:useDedicatedConceptListsSubword=True.
+	- useDedicatedConceptsLists should be used to encapsulate the more general useDedicatedConceptsLists feature functionality not specific to useDedicatedConceptListsSubword (similar to useDedicatedFeatureLists).
+	- summary:
+		- implement `tokeniserSubword:useDedicatedConceptListsSubword=True` by enabling the general `useDedicatedConceptsLists` fixed concept-list pathway and deriving concept columns from the same tiktoken vocabulary used by `useDedicatedFeatureListsSubword`.
+		- map subword concept columns directly by tiktoken `tokenId`, while preserving `useDedicatedFeatureListsSubword` feature indexing as `tokenId + tokeniserSubwordFeatureIndexOffset` so feature index `0` remains reserved for `featureIndexPrimeConceptNeuron`.
+		- under `useDedicatedConceptsLists`, disable dynamic concept-column insertion, validate fixed concept-list sizes on database load, and load only persisted observed columns into RAM so the full tokenizer concept dictionary does not instantiate unused observed columns.
+	Implementation Notes:
+		- do not change any existing code in the codebase unrelated to specific useDedicatedConceptListsSubword==True behaviour.
+		- ensure to encapsulate all useDedicatedConceptListsSubword==True specific behaviour within context if(useDedicatedConceptListsSubword) as per AGENTS.md.
+	- optimize `useDedicatedConceptListsSubword=True` by using compact active target concept tensors in `updateObservedColumnsEfficient` for non-serial feature-connection updates instead of full `databaseNetworkObject.c` target width.
+	- add `useDedicatedConceptListsSubword=True` sequence-local target bucket mapping via `buildConnectionTargetSequenceBucketLookup()` plus compact tensor gather/scatter helpers so updates map tiktoken concept IDs back into the existing full-size stored connection tensors.
+- patch tokeniserSubword:tokeniserSubwordPOS=False so subword delimiter POS detection uses parent spaCy posWord/posLemma lookup fields, matching the tokeniserSubword=False POS method while preserving subword feature/concept identities.

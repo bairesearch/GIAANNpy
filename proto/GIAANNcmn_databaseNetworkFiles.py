@@ -182,6 +182,20 @@ def observedColumnHasConsistentPersistedMetadata(conceptIndex):
 			result = False
 	return result
 
+def listPersistedObservedColumnConceptIndices():
+	result = []
+	if(pathExists(observedColumnsDir)):
+		for folderName in os.listdir(observedColumnsDir):
+			if(folderName.startswith(observedColumnFolderNamePrefix)):
+				conceptIndexText = folderName[len(observedColumnFolderNamePrefix):]
+				if(conceptIndexText == "" or not conceptIndexText.isdigit()):
+					raise RuntimeError("listPersistedObservedColumnConceptIndices error: invalid observed column folder name = " + folderName)
+				conceptIndex = int(conceptIndexText)
+				if(observedColumnHasPersistedData(conceptIndex)):
+					result.append(conceptIndex)
+	result.sort()
+	return result
+
 def listObservedColumnSourceFeatureIndices(conceptIndex):
 	validateObservedColumnStorageFormat(conceptIndex)
 	connectionsFolder = getObservedColumnFeatureConnectionsFolder(conceptIndex)
@@ -464,16 +478,17 @@ def generateGlobalFeatureNeuronsTensor(databaseNetworkObject, useRAMcolumnFeatur
 		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: trainEndGenerateGlobalFeatureNeuronsTensor or inferenceStartGenerateGlobalFeatureNeuronsTensor must be True")
 	if(databaseNetworkObject is None):
 		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: databaseNetworkObject is None")
-	conceptIndices = sorted(int(conceptIndex) for conceptIndex in databaseNetworkObject.conceptColumnsDict.values())
-	if(len(conceptIndices) != databaseNetworkObject.c):
+	conceptIndicesAll = sorted(int(conceptIndex) for conceptIndex in databaseNetworkObject.conceptColumnsDict.values())
+	if(len(conceptIndicesAll) != databaseNetworkObject.c):
 		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: concept index count mismatch")
-	for expectedConceptIndex, conceptIndex in enumerate(conceptIndices):
+	for expectedConceptIndex, conceptIndex in enumerate(conceptIndicesAll):
 		if(conceptIndex != expectedConceptIndex):
 			raise RuntimeError(f"generateGlobalFeatureNeuronsTensor error: concept indices must be contiguous from 0; found {conceptIndex} at position {expectedConceptIndex}")
 	targetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, databaseNetworkObject.c, databaseNetworkObject.f)
 	combinedIndicesList = []
 	combinedValuesList = []
 	observedColumnsByConceptIndex = None
+	conceptIndicesToMaterialise = conceptIndicesAll
 	if(useRAMcolumnFeatureNeurons):
 		if(databaseNetworkObject.observedColumnsDictRAM is None):
 			raise RuntimeError("generateGlobalFeatureNeuronsTensor error: observedColumnsDictRAM is None")
@@ -487,7 +502,13 @@ def generateGlobalFeatureNeuronsTensor(databaseNetworkObject, useRAMcolumnFeatur
 			if(conceptIndex in observedColumnsByConceptIndex):
 				raise RuntimeError(f"generateGlobalFeatureNeuronsTensor error: duplicate observed column for conceptIndex {conceptIndex}")
 			observedColumnsByConceptIndex[conceptIndex] = observedColumn
-	for conceptIndex in conceptIndices:
+		if(useDedicatedConceptsLists):
+			conceptIndicesToMaterialise = sorted(observedColumnsByConceptIndex.keys())
+	elif(useDedicatedConceptsLists):
+		conceptIndicesToMaterialise = listPersistedObservedColumnConceptIndices()
+	for conceptIndex in conceptIndicesToMaterialise:
+		if(conceptIndex < 0 or conceptIndex >= databaseNetworkObject.c):
+			raise RuntimeError("generateGlobalFeatureNeuronsTensor error: concept index to materialise out of range")
 		featureNeurons = None
 		featureNeuronsTensorName = f"lowMemGlobalFeatureNeurons[{conceptIndex}]"
 		if(useRAMcolumnFeatureNeurons):

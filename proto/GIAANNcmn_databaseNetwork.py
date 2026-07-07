@@ -163,6 +163,26 @@ def generateHighMemGlobalFeatureNeuronsForInferenceStartup(databaseNetworkObject
 	return
 
 if(tokeniserSubword):
+	def initialiseDedicatedConceptListsSubword():
+		resultConceptColumnsDict = {}
+		resultConceptColumnsList = None
+		resultC = None
+		if(not useDedicatedConceptListsSubword):
+			raise RuntimeError("initialiseDedicatedConceptListsSubword error: useDedicatedConceptListsSubword must be True")
+		if(not useDedicatedConceptsLists):
+			raise RuntimeError("initialiseDedicatedConceptListsSubword error: useDedicatedConceptsLists must be True")
+		encoding = GIAANNnlp_sequenceTokens.getTokeniserSubwordEncoding()
+		resultC = GIAANNnlp_sequenceTokens.getTokeniserSubwordConceptCount()
+		resultConceptColumnsList = [None]*resultC
+		for conceptIndex in range(resultC):
+			tokenId = conceptIndex
+			conceptName = GIAANNnlp_sequenceTokens.getTokeniserSubwordConceptNameForTokenId(encoding, tokenId)
+			if(conceptName in resultConceptColumnsDict):
+				raise RuntimeError("initialiseDedicatedConceptListsSubword error: duplicate subword concept name for tokenId " + str(tokenId))
+			resultConceptColumnsList[conceptIndex] = conceptName
+			resultConceptColumnsDict[conceptName] = conceptIndex
+		return resultConceptColumnsDict, resultConceptColumnsList, resultC
+
 	def initialiseDedicatedFeatureListsSubword():
 		resultConceptFeaturesDict = {}
 		resultConceptFeaturesList = None
@@ -185,6 +205,43 @@ if(tokeniserSubword):
 			resultConceptFeaturesDict[featureWord] = featureIndex
 		return resultConceptFeaturesDict, resultConceptFeaturesList, resultF
 
+def initialiseDedicatedConceptsLists():
+	resultConceptColumnsDict = None
+	resultConceptColumnsList = None
+	resultC = None
+	if(not useDedicatedConceptsLists):
+		raise RuntimeError("initialiseDedicatedConceptsLists error: useDedicatedConceptsLists must be True")
+	if(tokeniserSubword and useDedicatedConceptListsSubword):
+		resultConceptColumnsDict, resultConceptColumnsList, resultC = initialiseDedicatedConceptListsSubword()
+	else:
+		raise RuntimeError("initialiseDedicatedConceptsLists error: useDedicatedConceptsLists is only implemented for tokeniserSubword/useDedicatedConceptListsSubword")
+	return resultConceptColumnsDict, resultConceptColumnsList, resultC
+
+def getDedicatedConceptsListsExpectedCount():
+	result = None
+	if(not useDedicatedConceptsLists):
+		raise RuntimeError("getDedicatedConceptsListsExpectedCount error: useDedicatedConceptsLists must be True")
+	if(tokeniserSubword and useDedicatedConceptListsSubword):
+		result = GIAANNnlp_sequenceTokens.getTokeniserSubwordConceptCount()
+	else:
+		raise RuntimeError("getDedicatedConceptsListsExpectedCount error: useDedicatedConceptsLists is only implemented for tokeniserSubword/useDedicatedConceptListsSubword")
+	return result
+
+def validateDedicatedConceptsLists(conceptColumnsDict, conceptColumnsList, c):
+	if(not useDedicatedConceptsLists):
+		raise RuntimeError("validateDedicatedConceptsLists error: useDedicatedConceptsLists must be True")
+	expectedC = getDedicatedConceptsListsExpectedCount()
+	if(c != expectedC):
+		raise RuntimeError("validateDedicatedConceptsLists error: loaded conceptColumnsDict size does not match dedicated concept list size; clear and rebuild this database")
+	if(len(conceptColumnsList) != c):
+		raise RuntimeError("validateDedicatedConceptsLists error: conceptColumnsList size does not match c")
+	for conceptIndex, conceptName in enumerate(conceptColumnsList):
+		if(conceptName not in conceptColumnsDict):
+			raise RuntimeError("validateDedicatedConceptsLists error: conceptColumnsList entry missing from conceptColumnsDict")
+		if(conceptColumnsDict[conceptName] != conceptIndex):
+			raise RuntimeError("validateDedicatedConceptsLists error: conceptColumnsDict index does not match conceptColumnsList position")
+	return
+
 def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False):
 
 	conceptColumnsDict = {}  # key: lemma, value: index
@@ -201,6 +258,8 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 	auxiliarySimilarFeatureWordWeightsByParentWord = None
 	loadExistingDatabase = inferenceMode or loadExistingDatabaseOverride or (trainLoadExistingDatabase and GIAANNcmn_databaseNetworkFiles.pathExists(conceptColumnsDictFile))
 	databaseLoadedFromDisk = loadExistingDatabase and GIAANNcmn_databaseNetworkFiles.pathExists(conceptColumnsDictFile)
+	if(useDedicatedConceptsLists and debugLimitFeatures):
+		raise RuntimeError("initialiseDatabaseNetwork error: debugLimitFeatures is not supported with useDedicatedConceptsLists because fixed concept indices must remain aligned to their source dictionary")
 
 	# Initialize the concept columns dictionary
 	if(databaseLoadedFromDisk):
@@ -210,6 +269,8 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 		conceptFeaturesDict = GIAANNcmn_databaseNetworkFiles.loadDictFile(conceptFeaturesDictFile)
 		f = len(conceptFeaturesDict)
 		conceptFeaturesList = list(conceptFeaturesDict.keys())
+		if(useDedicatedConceptsLists):
+			validateDedicatedConceptsLists(conceptColumnsDict, conceptColumnsList, c)
 		if(tokeniserSubword and useDedicatedFeatureListsSubword):
 			expectedF = GIAANNnlp_sequenceTokens.getTokeniserSubwordFeatureCount()
 			if(f != expectedF):
@@ -239,6 +300,9 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			auxiliarySimilarFeaturesDict, auxiliarySimilarFeaturesList, auxiliarySimilarFeatureWordWeightsByParentWord = GIAANNnlp_auxiliaryNeuronsSimilarWords.loadOrCreateDatabaseAuxiliaryFeatureMaps(loadExistingDatabase)
 	else:
+		if(useDedicatedConceptsLists):
+			conceptColumnsDict, conceptColumnsList, c = initialiseDedicatedConceptsLists()
+
 		if(useDedicatedConceptNames and not (tokeniserSubword and useDedicatedFeatureListsSubword)):
 			# Add dummy feature for prime concept neuron (different per concept column)
 			conceptFeaturesList.append(variablePrimeConceptFeatureNeuronName)
@@ -289,6 +353,8 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 	
 
 def addConceptToConceptColumnsDict(databaseNetworkObject, lemma, conceptsFound, newConceptsAdded):
+	if(useDedicatedConceptsLists):
+		raise RuntimeError("addConceptToConceptColumnsDict error: dynamic concept insertion is disabled when useDedicatedConceptsLists is enabled")
 	conceptsFound = True
 	if lemma not in databaseNetworkObject.conceptColumnsDict:
 		# Add to concept columns dictionary
@@ -352,6 +418,32 @@ def loadObservedColumnToRamStartup(databaseNetworkObject, conceptIndex, lemma, i
 		result = ObservedColumn(databaseNetworkObject, conceptIndex, lemma, i)
 	return result
 
+def loadPersistedDedicatedConceptObservedColumnsToRam(databaseNetworkObject):
+	result = {}
+	if(not useDedicatedConceptsLists):
+		raise RuntimeError("loadPersistedDedicatedConceptObservedColumnsToRam error: useDedicatedConceptsLists must be True")
+	conceptIndices = GIAANNcmn_databaseNetworkFiles.listPersistedObservedColumnConceptIndices()
+	for i, conceptIndex in enumerate(conceptIndices):
+		if(conceptIndex < 0 or conceptIndex >= databaseNetworkObject.c):
+			raise RuntimeError("loadPersistedDedicatedConceptObservedColumnsToRam error: persisted conceptIndex out of range")
+		lemma = databaseNetworkObject.conceptColumnsList[conceptIndex]
+		conceptColumn = loadObservedColumnToRamStartup(databaseNetworkObject, conceptIndex, lemma, i)
+		result[lemma] = conceptColumn
+	return result
+
+def loadPersistedDedicatedConceptObservedColumns(databaseNetworkObject):
+	result = {}
+	if(not useDedicatedConceptsLists):
+		raise RuntimeError("loadPersistedDedicatedConceptObservedColumns error: useDedicatedConceptsLists must be True")
+	conceptIndices = GIAANNcmn_databaseNetworkFiles.listPersistedObservedColumnConceptIndices()
+	for i, conceptIndex in enumerate(conceptIndices):
+		if(conceptIndex < 0 or conceptIndex >= databaseNetworkObject.c):
+			raise RuntimeError("loadPersistedDedicatedConceptObservedColumns error: persisted conceptIndex out of range")
+		lemma = databaseNetworkObject.conceptColumnsList[conceptIndex]
+		conceptColumn = loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, targetDevice=deviceDatabase, createDeviceCopy=False, loadAllSourceFeatures=False)
+		result[lemma] = conceptColumn
+	return result
+
 def generateGlobalFeatureConnections(databaseNetworkObject):
 	conceptColumnsListTemp = []
 	for i, (lemma, conceptIndex) in enumerate(databaseNetworkObject.conceptColumnsDict.items()):
@@ -373,13 +465,19 @@ def loadAllColumns(databaseNetworkObject):
 			for observedColumn in observedColumnsDict.values():
 				observedColumn.ensureObservedColumnFeatureArraysFeatures(databaseNetworkObject.f)
 		else:
-			for i, (lemma, conceptIndex) in enumerate(databaseNetworkObject.conceptColumnsDict.items()):
-				conceptColumn = loadObservedColumnToRamStartup(databaseNetworkObject, conceptIndex, lemma, i)
-				observedColumnsDict[lemma] = conceptColumn
+			if(useDedicatedConceptsLists):
+				observedColumnsDict = loadPersistedDedicatedConceptObservedColumnsToRam(databaseNetworkObject)
+			else:
+				for i, (lemma, conceptIndex) in enumerate(databaseNetworkObject.conceptColumnsDict.items()):
+					conceptColumn = loadObservedColumnToRamStartup(databaseNetworkObject, conceptIndex, lemma, i)
+					observedColumnsDict[lemma] = conceptColumn
 	else:
-		for i, (lemma, conceptIndex) in enumerate(databaseNetworkObject.conceptColumnsDict.items()):
-			conceptColumn = loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, targetDevice=deviceDatabase, createDeviceCopy=False, loadAllSourceFeatures=False)
-			observedColumnsDict[lemma] = conceptColumn
+		if(useDedicatedConceptsLists):
+			observedColumnsDict = loadPersistedDedicatedConceptObservedColumns(databaseNetworkObject)
+		else:
+			for i, (lemma, conceptIndex) in enumerate(databaseNetworkObject.conceptColumnsDict.items()):
+				conceptColumn = loadOrCreateObservedColumn(databaseNetworkObject, conceptIndex, lemma, i, targetDevice=deviceDatabase, createDeviceCopy=False, loadAllSourceFeatures=False)
+				observedColumnsDict[lemma] = conceptColumn
 	return observedColumnsDict
 
 def loadAllObservedColumnsToRam(databaseNetworkObject):

@@ -360,14 +360,20 @@ def posStringToPosInt(nlp, posString):
 	return nlp.vocab.strings[posString]
 
 
-#Dedicated feature lists (non-dynamic);
+#Dedicated concept/feature lists (non-dynamic);
 useDedicatedFeatureLists = False	#derived var
 useDedicatedFeatureListsSubword = False	#derived var
+useDedicatedConceptsLists = False	#derived var
+useDedicatedConceptListsSubword = False	#derived var
 if(tokeniserSubword):
 	useDedicatedFeatureListsSubword = True	#default: True	#orig: False
+	useDedicatedConceptListsSubword = True	#default: True	#orig: False
 	if(useDedicatedFeatureListsSubword):
 		useDedicatedFeatureLists = True
 		useDedicatedFeatureListsSubwordBenchmarkAblationSuffix = "-useDedicatedFeatureListsSubword"
+	if(useDedicatedConceptListsSubword):
+		useDedicatedConceptsLists = True
+		useDedicatedConceptListsSubwordBenchmarkAblationSuffix = "-useDedicatedConceptListsSubword"
 else:
 	useDedicatedFeatureLists = False	#default: False - dynamically learn concept features	#True: use static feature lists (depreciated)
 	#if usePOS and storeDatabaseGlobalFeatureNeuronsInRam:
@@ -592,6 +598,8 @@ if(useBenchmark):
 			benchmarkAblationText = "-tokeniserSubword"
 		if(useDedicatedFeatureListsSubword):
 			benchmarkAblationText += useDedicatedFeatureListsSubwordBenchmarkAblationSuffix
+		if(useDedicatedConceptListsSubword):
+			benchmarkAblationText += useDedicatedConceptListsSubwordBenchmarkAblationSuffix
 	elif(auxiliaryNeurons):
 		benchmarkAblationText = "-auxiliaryNeurons"
 	elif(useTrainDuringInference):
