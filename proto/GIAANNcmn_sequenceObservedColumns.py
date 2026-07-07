@@ -292,17 +292,11 @@ class SequenceObservedColumns:
 			featureIndicesInObserved = []
 			#print("\nidentifyObservedColumnFeatureWords: num words = ", len(tokens))
 			for wordIndex, token in enumerate(tokens):
-				featureWord = token.word
-				featureLemma = token.lemma
-				if(useDedicatedConceptNames and wordIndex in self.observedColumnsSequenceWordIndexDict):	
-					if(useDedicatedConceptNames2):
-						#only provide 1 observedColumn to identifyObservedColumnFeatureWords (therefore this condition will only be triggered once when when featureLemma == observedColumn.conceptName of some arbitrary concept column. Once triggered a singular artificial variablePrimeConceptFeatureNeuronName will be added)
-						featureWords.append(variablePrimeConceptFeatureNeuronName)
-					featureIndicesInObserved.append(featureIndexPrimeConceptNeuron)
-					#print("concept node found = ", featureLemma)
-				elif(featureWord in observedColumn.featureWordToIndex):
+				featureIndex = self.getTokenFeatureIndexForObservedColumn(observedColumn, token, wordIndex, allowMissing=True)
+				if(featureIndex is not None):
+					featureWord = self.getTokenFeatureWordForObservedColumn(token, wordIndex)
 					featureWords.append(featureWord)
-					featureIndicesInObserved.append(observedColumn.featureWordToIndex[featureWord])
+					featureIndicesInObserved.append(featureIndex)
 			if(not trainSequenceObservedColumnsMatchSequenceWords):
 				featureIndicesInObserved = self.removeDuplicates(featureIndicesInObserved)
 				featureWords = self.removeDuplicates(featureWords)
@@ -320,6 +314,31 @@ class SequenceObservedColumns:
 			fIdxTensor = pt.tensor([featureWordToIndex[fw] for fw in featureWords], dtype=pt.long)
 		
 		return featureWords, featureIndicesInObservedTensor, fIdxTensor
+
+	def getTokenFeatureIndexForObservedColumn(self, observedColumn, token, tokenIndex, allowMissing):
+		result = None
+		if(useDedicatedConceptNames and tokenIndex in self.observedColumnsSequenceWordIndexDict):
+			result = featureIndexPrimeConceptNeuron
+		elif(tokeniserSubword and useDedicatedFeatureListsSubword):
+			result = GIAANNnlp_sequenceConcepts.getTokenFeatureIndex(self.databaseNetworkObject, token)
+		else:
+			featureWord = token.word
+			if(featureWord in observedColumn.featureWordToIndex):
+				result = int(observedColumn.featureWordToIndex[featureWord])
+			elif(not allowMissing):
+				raise RuntimeError("getTokenFeatureIndexForObservedColumn error: feature word not found in observed column (" + featureWord + ")")
+		return result
+
+	def getTokenFeatureWordForObservedColumn(self, token, tokenIndex):
+		result = None
+		if(useDedicatedConceptNames and tokenIndex in self.observedColumnsSequenceWordIndexDict):
+			if(useDedicatedConceptNames2):
+				result = variablePrimeConceptFeatureNeuronName
+			else:
+				result = token.lemma
+		else:
+			result = token.word
+		return result
 		
 	def getObservedColumnFeatureIndices(self):
 		return self.featureIndicesInObservedTensor, self.fIdxTensor
@@ -349,10 +368,7 @@ class SequenceObservedColumns:
 			if(tokenIndex in self.columnsIndexSequenceWordIndexDict):
 				sourceFeatureIndex = featureIndexPrimeConceptNeuron
 			else:
-				featureWord = self.tokens[tokenIndex].word
-				if(featureWord not in observedColumn.featureWordToIndex):
-					raise RuntimeError(f"getTrainRequiredSourceFeatureIndicesByObservedColumnGeneric error: feature word '{featureWord}' not found in observed column '{observedColumn.conceptName}'")
-				sourceFeatureIndex = int(observedColumn.featureWordToIndex[featureWord])
+				sourceFeatureIndex = self.getTokenFeatureIndexForObservedColumn(observedColumn, self.tokens[tokenIndex], tokenIndex, allowMissing=False)
 			result[normalisedConceptIndex].add(int(sourceFeatureIndex))
 		for conceptIndex, requiredSourceFeatureIndices in result.items():
 			if(len(requiredSourceFeatureIndices) == 0):

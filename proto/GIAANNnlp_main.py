@@ -413,9 +413,13 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		if(debugPrintTrainSectionTimes and trainMode):
 			GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "getTokens", time.perf_counter() - getTokensStartTime)
 
-		# When usePOS is enabled, detect all possible new features in the sequence
+		# Detect dynamic features, and run dedicated subword delimiter detection side effects.
 		detectNewFeaturesStartTime = None
-		if not (useDedicatedFeatureLists):
+		runFeatureDetection = not useDedicatedFeatureLists
+		if(tokeniserSubword):
+			if(useDedicatedFeatureListsSubword):
+				runFeatureDetection = True
+		if(runFeatureDetection):
 			if(debugPrintTrainSectionTimes and trainMode):
 				detectNewFeaturesStartTime = time.perf_counter()
 			if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):

@@ -28,6 +28,8 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	import GIAANNnlp_auxiliaryNeuronsSimilarWords
 if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 	import GIAANNnlp_auxiliaryNeuronsAuto
+if(tokeniserSubword):
+	import GIAANNnlp_sequenceTokens
 
 def calculateArrayNumberOfProperties(inferenceMode):
 	if(inferenceMode):
@@ -160,6 +162,29 @@ def generateHighMemGlobalFeatureNeuronsForInferenceStartup(databaseNetworkObject
 	generateGlobalFeatureNeuronsForStartup(databaseNetworkObject, saveToDisk=True, useRAMcolumnFeatureNeurons=False)
 	return
 
+if(tokeniserSubword):
+	def initialiseDedicatedFeatureListsSubword():
+		resultConceptFeaturesDict = {}
+		resultConceptFeaturesList = None
+		resultF = None
+		if(not useDedicatedFeatureListsSubword):
+			raise RuntimeError("initialiseDedicatedFeatureListsSubword error: useDedicatedFeatureListsSubword must be True")
+		if(tokeniserSubwordFeatureIndexOffset <= featureIndexPrimeConceptNeuron):
+			raise RuntimeError("initialiseDedicatedFeatureListsSubword error: tokeniserSubwordFeatureIndexOffset must reserve featureIndexPrimeConceptNeuron")
+		encoding = GIAANNnlp_sequenceTokens.getTokeniserSubwordEncoding()
+		resultF = GIAANNnlp_sequenceTokens.getTokeniserSubwordFeatureCount()
+		resultConceptFeaturesList = [None]*resultF
+		resultConceptFeaturesList[featureIndexPrimeConceptNeuron] = variablePrimeConceptFeatureNeuronName
+		resultConceptFeaturesDict[variablePrimeConceptFeatureNeuronName] = featureIndexPrimeConceptNeuron
+		for featureIndex in range(tokeniserSubwordFeatureIndexOffset, resultF):
+			tokenId = featureIndex - tokeniserSubwordFeatureIndexOffset
+			featureWord = GIAANNnlp_sequenceTokens.getTokeniserSubwordFeatureNameForTokenId(encoding, tokenId)
+			if(featureWord in resultConceptFeaturesDict):
+				raise RuntimeError("initialiseDedicatedFeatureListsSubword error: duplicate subword feature name for tokenId " + str(tokenId))
+			resultConceptFeaturesList[featureIndex] = featureWord
+			resultConceptFeaturesDict[featureWord] = featureIndex
+		return resultConceptFeaturesDict, resultConceptFeaturesList, resultF
+
 def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False):
 
 	conceptColumnsDict = {}  # key: lemma, value: index
@@ -185,6 +210,10 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 		conceptFeaturesDict = GIAANNcmn_databaseNetworkFiles.loadDictFile(conceptFeaturesDictFile)
 		f = len(conceptFeaturesDict)
 		conceptFeaturesList = list(conceptFeaturesDict.keys())
+		if(tokeniserSubword and useDedicatedFeatureListsSubword):
+			expectedF = GIAANNnlp_sequenceTokens.getTokeniserSubwordFeatureCount()
+			if(f != expectedF):
+				raise RuntimeError("initialiseDatabaseNetwork error: loaded conceptFeaturesDict size does not match tokeniserSubword dedicated feature list size; clear and rebuild this database")
 		if(conceptColumnsDelimitByPOS):
 			if(detectReferenceSetDelimitersBetweenNouns):	
 				conceptFeaturesReferenceSetDelimiterDeterministicDict = GIAANNcmn_databaseNetworkFiles.loadDictFile(conceptFeaturesReferenceSetDelimiterDeterministicListFile)
@@ -210,24 +239,32 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			auxiliarySimilarFeaturesDict, auxiliarySimilarFeaturesList, auxiliarySimilarFeatureWordWeightsByParentWord = GIAANNnlp_auxiliaryNeuronsSimilarWords.loadOrCreateDatabaseAuxiliaryFeatureMaps(loadExistingDatabase)
 	else:
-		if(useDedicatedConceptNames):
+		if(useDedicatedConceptNames and not (tokeniserSubword and useDedicatedFeatureListsSubword)):
 			# Add dummy feature for prime concept neuron (different per concept column)
 			conceptFeaturesList.append(variablePrimeConceptFeatureNeuronName)
 			conceptFeaturesDict[variablePrimeConceptFeatureNeuronName] = len(conceptFeaturesDict)
 			f += 1  # Will be updated dynamically based on c
 
-		if useDedicatedFeatureLists:
-			print("error: useDedicatedFeatureLists case not yet coded - need to set f and populate concept_features_list/conceptFeaturesDict etc")
-			exit()
-			# f = max_num_non_nouns + 1  # Maximum number of non-nouns in an English dictionary, plus the prime concept neuron of each column
+		if(useDedicatedFeatureLists):
+			if(tokeniserSubword and useDedicatedFeatureListsSubword):
+				conceptFeaturesDict, conceptFeaturesList, f = initialiseDedicatedFeatureListsSubword()
+			else:
+				raise RuntimeError("initialiseDatabaseNetwork error: useDedicatedFeatureLists is only implemented for tokeniserSubword/useDedicatedFeatureListsSubword")
 
 		if(conceptColumnsDelimitByPOS):
 			#initialise for concept feature;
-			if(detectReferenceSetDelimitersBetweenNouns):
-				conceptFeaturesReferenceSetDelimiterDeterministicList.append(False)
-				conceptFeaturesReferenceSetDelimiterProbabilisticList.append(False)
+			if(tokeniserSubword and useDedicatedFeatureListsSubword):
+				if(detectReferenceSetDelimitersBetweenNouns):
+					conceptFeaturesReferenceSetDelimiterDeterministicList = [False]*f
+					conceptFeaturesReferenceSetDelimiterProbabilisticList = [False]*f
+				else:
+					conceptFeaturesReferenceSetDelimiterList = [False]*f
 			else:
-				conceptFeaturesReferenceSetDelimiterList.append(False)
+				if(detectReferenceSetDelimitersBetweenNouns):
+					conceptFeaturesReferenceSetDelimiterDeterministicList.append(False)
+					conceptFeaturesReferenceSetDelimiterProbabilisticList.append(False)
+				else:
+					conceptFeaturesReferenceSetDelimiterList.append(False)
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			auxiliarySimilarFeaturesDict, auxiliarySimilarFeaturesList, auxiliarySimilarFeatureWordWeightsByParentWord = GIAANNnlp_auxiliaryNeuronsSimilarWords.loadOrCreateDatabaseAuxiliaryFeatureMaps(False)
 	if storeDatabaseGlobalFeatureNeuronsInRam:
@@ -442,8 +479,13 @@ def getTokenConceptFeatureIndex(sequenceObservedColumns, tokensSequence, concept
 	if(conceptMask[sequenceWordIndex]):
 		targetFeatureIndex = featureIndexPrimeConceptNeuron
 	else:
-		word = tokensSequence[sequenceWordIndex].word
-		targetFeatureIndex = databaseNetworkObject.conceptFeaturesDict[word]
+		if(tokeniserSubword and useDedicatedFeatureListsSubword):
+			targetFeatureIndex = GIAANNnlp_sequenceTokens.getTokeniserSubwordFeatureIndex(tokensSequence[sequenceWordIndex])
+			if(targetFeatureIndex < 0 or targetFeatureIndex >= databaseNetworkObject.f):
+				raise RuntimeError("getTokenConceptFeatureIndex error: tokeniserSubword feature index out of range")
+		else:
+			word = tokensSequence[sequenceWordIndex].word
+			targetFeatureIndex = databaseNetworkObject.conceptFeaturesDict[word]
 	assignedColumns = getattr(sequenceObservedColumns, "tokenConceptColumnIndexList", None)
 	if(assignedColumns is not None and sequenceWordIndex < len(assignedColumns)):
 		assignedColumnIndex = assignedColumns[sequenceWordIndex]

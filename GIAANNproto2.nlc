@@ -467,3 +467,16 @@ v2i (Codex IDE GPT-5.5) [under development]:
 	Implementation Notes:
 		- do not change any existing code in the codebase unrelated to specific tokeniserSubword==True behaviour.
 		- ensure to encapsulate all tokeniserSubword==True specific behaviour within context if(tokeniserSubword) as per AGENTS.md.
+- update tokeniserSubword implementation - tokenize the whole sequence once, not each spaCy token independently:
+	- run BPE over the full sequence text;
+	- derive spaCy parent-token spans from character offsets and align BPE pieces by byte-span overlap;
+	- inherit POS/tag from the aligned parent token, with tokeniserSubwordPOS-specific overrides for whitespace/punctuation/numeric/symbol pieces;
+	- preserve exact whitespace-aware BPE behavior.
+- update tokeniserSubword to support dedicated feature indices based on tiktoken token IDs:
+	- implement this change with option useDedicatedFeatureLists=True and new suboption useDedicatedFeatureListsSubword=True, as the software has already been designed to support fixed feature list sizes.
+	- useDedicatedFeatureListsSubword=True is the fixed feature-list mode for tokeniserSubword=True: it forces useDedicatedFeatureLists=True, preallocates the full tiktoken subword vocabulary as feature indices, and maps every non-concept subword by tokeniserSubwordFeatureIndexOffset + tokenId.
+	- Concept-column prime features still use featureIndexPrimeConceptNeuron, while subword continuation pieces remain normal in-column features rather than being merged into concept names.
+	- Dynamic feature creation is disabled, but delimiter detection still runs so conceptColumnsDelimitByPOS can populate global and sequence-local reference-set delimiter metadata, with sequence-local delimiter flags used for stable train/inference concept-boundary assignment.
+	- fix(tokeniserSubword): map useDedicatedFeatureListsSubword observed-column features by tiktoken token ID.
+	- fix(useDedicatedFeatureListsSubword): run conceptColumnsDelimitByPOS delimiter detection despite fixed feature lists.
+	- fix(tokeniserSubwordPOS): use sequence-local reference-set delimiter flags for subword concept boundaries.

@@ -139,6 +139,9 @@ def detectNewFeatures(databaseNetworkObject, tokens, allowNewFeatures):
 
 	if(conceptColumnsDelimitByPOS):
 		databaseNetworkObject.sequenceReferenceSetDelimiterList = [None]*len(tokens)
+		if(detectReferenceSetDelimitersBetweenNouns):
+			databaseNetworkObject.sequenceReferenceSetDelimiterDeterministicList = [False]*len(tokens)
+			databaseNetworkObject.sequenceReferenceSetDelimiterProbabilisticList = [False]*len(tokens)
 
 	numNewFeatures = 0
 	for tokenIndex, token in enumerate(tokens):
@@ -162,36 +165,76 @@ def processFeatureDetection(databaseNetworkObject, tokenIndex, token, tokens, al
 	Helper function to detect new features prior to processing concept words.
 	"""
 	
+	result = False
 	featureWord = token.word
 
 	if usePOS and isTokenConceptColumnCandidate(token, tokens, tokenIndex):
-		return False  # Skip nouns as features
+		result = False  # Skip nouns as features
 	else:
-		if featureWord not in databaseNetworkObject.conceptFeaturesDict:
-			if(not allowNewFeatures):
-				raise RuntimeError("processFeatureDetection error: feature word not found while allowNewFeatures is False (" + featureWord + ")")
-			featureIndex = len(databaseNetworkObject.conceptFeaturesDict)
-			databaseNetworkObject.conceptFeaturesDict[featureWord] = featureIndex
-			databaseNetworkObject.conceptFeaturesList.append(featureWord)
-			if(trainStoreFeatureMapsGlobally):
-				databaseNetworkObject.conceptFeaturesIndexToWordDict[featureIndex] = featureWord
+		if(tokeniserSubword and useDedicatedFeatureListsSubword):
+			featureIndex = getTokenFeatureIndex(databaseNetworkObject, token)
 			isDelimiter, isDelimiterDeterministic, isDelimiterProbabilistic = isFeaturePOSreferenceSetDelimiterType(featureWord, token, tokens, tokenIndex)
 			if(conceptColumnsDelimitByPOS):
 				databaseNetworkObject.sequenceReferenceSetDelimiterList[tokenIndex] = isDelimiter
 				if(detectReferenceSetDelimitersBetweenNouns):
-					databaseNetworkObject.conceptFeaturesReferenceSetDelimiterDeterministicList.append(isDelimiterDeterministic)
-					databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList.append(isDelimiterProbabilistic)
+					databaseNetworkObject.sequenceReferenceSetDelimiterDeterministicList[tokenIndex] = isDelimiterDeterministic
+					databaseNetworkObject.sequenceReferenceSetDelimiterProbabilisticList[tokenIndex] = isDelimiterProbabilistic
+					databaseNetworkObject.conceptFeaturesReferenceSetDelimiterDeterministicList[featureIndex] = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterDeterministicList[featureIndex] or isDelimiterDeterministic
+					databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex] = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex] or isDelimiterProbabilistic
 				else:
-					databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList.append(isDelimiter)
-			return True
+					databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList[featureIndex] = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList[featureIndex] or isDelimiter
+			result = False
 		else:
-			if(conceptColumnsDelimitByPOS):
+			if featureWord not in databaseNetworkObject.conceptFeaturesDict:
+				if(not allowNewFeatures):
+					raise RuntimeError("processFeatureDetection error: feature word not found while allowNewFeatures is False (" + featureWord + ")")
+				featureIndex = len(databaseNetworkObject.conceptFeaturesDict)
+				databaseNetworkObject.conceptFeaturesDict[featureWord] = featureIndex
+				databaseNetworkObject.conceptFeaturesList.append(featureWord)
+				if(trainStoreFeatureMapsGlobally):
+					databaseNetworkObject.conceptFeaturesIndexToWordDict[featureIndex] = featureWord
 				isDelimiter, isDelimiterDeterministic, isDelimiterProbabilistic = isFeaturePOSreferenceSetDelimiterType(featureWord, token, tokens, tokenIndex)
-				databaseNetworkObject.sequenceReferenceSetDelimiterList[tokenIndex] = isDelimiter	#deterministic or incontext probabilistic reference set delimiter detected (train only)
-				if(detectReferenceSetDelimitersBetweenNouns):
-					featureIndex = databaseNetworkObject.conceptFeaturesDict[featureWord]
-					databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex] = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex] or isDelimiterProbabilistic	#reassign probabilistic if ever probabilistic in past (inference only)
-			return False
+				if(conceptColumnsDelimitByPOS):
+					databaseNetworkObject.sequenceReferenceSetDelimiterList[tokenIndex] = isDelimiter
+					if(detectReferenceSetDelimitersBetweenNouns):
+						databaseNetworkObject.sequenceReferenceSetDelimiterDeterministicList[tokenIndex] = isDelimiterDeterministic
+						databaseNetworkObject.sequenceReferenceSetDelimiterProbabilisticList[tokenIndex] = isDelimiterProbabilistic
+						databaseNetworkObject.conceptFeaturesReferenceSetDelimiterDeterministicList.append(isDelimiterDeterministic)
+						databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList.append(isDelimiterProbabilistic)
+					else:
+						databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList.append(isDelimiter)
+				result = True
+			else:
+				if(conceptColumnsDelimitByPOS):
+					isDelimiter, isDelimiterDeterministic, isDelimiterProbabilistic = isFeaturePOSreferenceSetDelimiterType(featureWord, token, tokens, tokenIndex)
+					databaseNetworkObject.sequenceReferenceSetDelimiterList[tokenIndex] = isDelimiter	#deterministic or incontext probabilistic reference set delimiter detected (train only)
+					if(detectReferenceSetDelimitersBetweenNouns):
+						databaseNetworkObject.sequenceReferenceSetDelimiterDeterministicList[tokenIndex] = isDelimiterDeterministic
+						databaseNetworkObject.sequenceReferenceSetDelimiterProbabilisticList[tokenIndex] = isDelimiterProbabilistic
+						featureIndex = databaseNetworkObject.conceptFeaturesDict[featureWord]
+						databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex] = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex] or isDelimiterProbabilistic	#reassign probabilistic if ever probabilistic in past (inference only)
+				result = False
+	return result
+
+def getTokenFeatureIndex(databaseNetworkObject, token):
+	result = None
+	if(tokeniserSubword and useDedicatedFeatureListsSubword):
+		result = GIAANNnlp_sequenceTokens.getTokeniserSubwordFeatureIndex(token)
+		if(result < 0 or result >= databaseNetworkObject.f):
+			raise RuntimeError("getTokenFeatureIndex error: tokeniserSubword feature index out of range")
+	else:
+		if(token.word not in databaseNetworkObject.conceptFeaturesDict):
+			raise RuntimeError("getTokenFeatureIndex error: feature word not found (" + token.word + ")")
+		result = databaseNetworkObject.conceptFeaturesDict[token.word]
+	return result
+
+def getTokenFeatureIndexIfKnown(databaseNetworkObject, token):
+	result = None
+	if(tokeniserSubword and useDedicatedFeatureListsSubword):
+		result = getTokenFeatureIndex(databaseNetworkObject, token)
+	else:
+		result = databaseNetworkObject.conceptFeaturesDict.get(token.word)
+	return result
 	
 def isFeaturePOSreferenceSetDelimiterType(nodeNameString, token, tokens, tokenIndex):
 	isDelimiterDeterministic = False
@@ -312,6 +355,10 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 	if(conceptColumnsDelimitByPOS):
 		databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
 		conceptFeaturesDict = databaseNetworkObject.conceptFeaturesDict
+		useSequenceReferenceSetDelimiterLists = False
+		if(tokeniserSubword):
+			if(useDedicatedFeatureListsSubword):
+				useSequenceReferenceSetDelimiterLists = True
 		if(detectReferenceSetDelimitersBetweenNouns):
 			conceptFeaturesReferenceSetDelimiterDeterministicList = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterDeterministicList
 			conceptFeaturesReferenceSetDelimiterProbabilisticList = databaseNetworkObject.conceptFeaturesReferenceSetDelimiterProbabilisticList
@@ -339,18 +386,28 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 					rightmostDeterministic = None
 					rightmostIndeterministic = None
 					for tokenIndex in range(leftIndex + 1, rightIndex):
-						token = tokens[tokenIndex]
-						featureIndex = conceptFeaturesDict.get(token.word)
-						if(featureIndex is None):
-							continue
-						if(detectReferenceSetDelimitersBetweenNouns):
-							if(featureIndex < len(conceptFeaturesReferenceSetDelimiterDeterministicList) and conceptFeaturesReferenceSetDelimiterDeterministicList[featureIndex]):
-								rightmostDeterministic = tokenIndex
-							elif(featureIndex < len(conceptFeaturesReferenceSetDelimiterProbabilisticList) and conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex]):
-								rightmostIndeterministic = tokenIndex
+						if(useSequenceReferenceSetDelimiterLists):
+							if(detectReferenceSetDelimitersBetweenNouns):
+								if(tokenIndex < len(databaseNetworkObject.sequenceReferenceSetDelimiterDeterministicList) and databaseNetworkObject.sequenceReferenceSetDelimiterDeterministicList[tokenIndex]):
+									rightmostDeterministic = tokenIndex
+								elif(tokenIndex < len(databaseNetworkObject.sequenceReferenceSetDelimiterProbabilisticList) and databaseNetworkObject.sequenceReferenceSetDelimiterProbabilisticList[tokenIndex]):
+									rightmostIndeterministic = tokenIndex
+							else:
+								if(tokenIndex < len(databaseNetworkObject.sequenceReferenceSetDelimiterList) and databaseNetworkObject.sequenceReferenceSetDelimiterList[tokenIndex]):
+									rightmostDeterministic = tokenIndex
 						else:
-							if(featureIndex < len(conceptFeaturesReferenceSetDelimiterList) and conceptFeaturesReferenceSetDelimiterList[featureIndex]):
-								rightmostDeterministic = tokenIndex
+							token = tokens[tokenIndex]
+							featureIndex = getTokenFeatureIndexIfKnown(databaseNetworkObject, token)
+							if(featureIndex is None):
+								continue
+							if(detectReferenceSetDelimitersBetweenNouns):
+								if(featureIndex < len(conceptFeaturesReferenceSetDelimiterDeterministicList) and conceptFeaturesReferenceSetDelimiterDeterministicList[featureIndex]):
+									rightmostDeterministic = tokenIndex
+								elif(featureIndex < len(conceptFeaturesReferenceSetDelimiterProbabilisticList) and conceptFeaturesReferenceSetDelimiterProbabilisticList[featureIndex]):
+									rightmostIndeterministic = tokenIndex
+							else:
+								if(featureIndex < len(conceptFeaturesReferenceSetDelimiterList) and conceptFeaturesReferenceSetDelimiterList[featureIndex]):
+									rightmostDeterministic = tokenIndex
 					if(rightmostDeterministic is not None):
 						delimiterIndices.append(rightmostDeterministic)
 					elif(rightmostIndeterministic is not None):
@@ -592,7 +649,10 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 					if(useDedicatedConceptNames2):
 						sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[variablePrimeConceptFeatureNeuronName]
 					else:
-						sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[featureLemma]
+						if(tokeniserSubword and useDedicatedFeatureListsSubword):
+							sequenceFeatureIndex = getTokenFeatureIndex(sequenceObservedColumns.databaseNetworkObject, tokens[j])
+						else:
+							sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[featureLemma]
 					branchIndex = 0
 					if(multipleDendriticBranches):
 						observedColumn = sequenceObservedColumns.observedColumnsSequenceWordIndexDict.get(sequenceConceptWordIndex)
@@ -619,8 +679,10 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 							featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
 					else:
 						featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, sequenceFeatureIndex] = 1
-				elif(featureWord in sequenceObservedColumns.featureWordToIndex):
-					sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[featureWord]
+				else:
+					sequenceFeatureIndex = getTokenFeatureIndexIfKnown(sequenceObservedColumns.databaseNetworkObject, tokens[j])
+					if(sequenceFeatureIndex is None):
+						continue
 					branchIndex = 0
 					if(multipleDendriticBranches):
 						observedColumn = sequenceObservedColumns.observedColumnsSequenceWordIndexDict.get(sequenceConceptWordIndex)

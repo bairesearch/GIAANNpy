@@ -197,12 +197,17 @@ if(tokeniserSubword):
 	tokeniserSubwordTextEncodingErrorMode = "strict"
 	tokeniserSubwordByteTokenPrefix = "<tokeniserSubwordByte:"
 	tokeniserSubwordByteTokenSuffix = ">"
+	tokeniserSubwordInvalidTokenFeatureNamePrefix = "<tokeniserSubwordInvalidToken:"
+	tokeniserSubwordInvalidTokenFeatureNameSuffix = ">"
+	tokeniserSubwordFeatureIndexOffset = 1
 	tokeniserSubwordPOSpunct = "PUNCT"
 	tokeniserSubwordPOSnum = "NUM"
 	tokeniserSubwordPOSsym = "SYM"
+	tokeniserSubwordPOSspace = "SPACE"
 	tokeniserSubwordTagPunct = "."
 	tokeniserSubwordTagNum = "CD"
 	tokeniserSubwordTagSym = "SYM"
+	tokeniserSubwordTagSpace = "_SP"
 else:
 	tokeniserSubwordPOS = False
 	
@@ -356,29 +361,37 @@ def posStringToPosInt(nlp, posString):
 
 
 #Dedicated feature lists (non-dynamic);
-useDedicatedFeatureLists = False	#default: False - dynamically learn concept features	#True: use static feature lists (depreciated)
-#if usePOS and storeDatabaseGlobalFeatureNeuronsInRam:
-#	useDedicatedFeatureLists = True
-if useDedicatedFeatureLists:
-	nltk.download('punkt')
-	nltk.download('wordnet')
-	nltk.download('omw-1.4')
-	from nltk.corpus import wordnet as wn
-	from nltk.tokenize import sent_tokenize
-	
-	# Obtain lists of nouns and non-nouns using the NLTK wordnet library
-	nouns = set()
-	for synset in wn.all_synsets('n'):
-		for lemma in synset.lemma_names():
-			nouns.add(lemma.lower())
-	
-	allWords = set()
-	for synset in wn.all_synsets():
-		for lemma in synset.lemma_names():
-			allWords.add(lemma.lower())
-	
-	nonNouns = allWords - nouns
-	maxNumNonNouns = len(nonNouns)
+useDedicatedFeatureLists = False	#derived var
+useDedicatedFeatureListsSubword = False	#derived var
+if(tokeniserSubword):
+	useDedicatedFeatureListsSubword = True	#default: True	#orig: False
+	if(useDedicatedFeatureListsSubword):
+		useDedicatedFeatureLists = True
+		useDedicatedFeatureListsSubwordBenchmarkAblationSuffix = "-useDedicatedFeatureListsSubword"
+else:
+	useDedicatedFeatureLists = False	#default: False - dynamically learn concept features	#True: use static feature lists (depreciated)
+	#if usePOS and storeDatabaseGlobalFeatureNeuronsInRam:
+	#	useDedicatedFeatureLists = True
+	if useDedicatedFeatureLists:
+		nltk.download('punkt')
+		nltk.download('wordnet')
+		nltk.download('omw-1.4')
+		from nltk.corpus import wordnet as wn
+		from nltk.tokenize import sent_tokenize
+
+		# Obtain lists of nouns and non-nouns using the NLTK wordnet library
+		nouns = set()
+		for synset in wn.all_synsets('n'):
+			for lemma in synset.lemma_names():
+				nouns.add(lemma.lower())
+
+		allWords = set()
+		for synset in wn.all_synsets():
+			for lemma in synset.lemma_names():
+				allWords.add(lemma.lower())
+
+		nonNouns = allWords - nouns
+		maxNumNonNouns = len(nonNouns)
 
 
 #Closed world grounded dataset constants;
@@ -577,6 +590,8 @@ if(useBenchmark):
 			benchmarkAblationText = "-tokeniserSubwordPOS"
 		else:
 			benchmarkAblationText = "-tokeniserSubword"
+		if(useDedicatedFeatureListsSubword):
+			benchmarkAblationText += useDedicatedFeatureListsSubwordBenchmarkAblationSuffix
 	elif(auxiliaryNeurons):
 		benchmarkAblationText = "-auxiliaryNeurons"
 	elif(useTrainDuringInference):

@@ -67,27 +67,35 @@ def isTokenReferenceSetDelimiterProbabilistic(token):
 	
 
 class SequenceToken:
-	def __init__(self, word, lemma, pos, tag):
+	def __init__(self, word, lemma, pos, tag, tokenId=None):
 		self.word = word
 		self.lemma = lemma
 		self.pos = pos
 		self.tag = tag
+		self.tokenId = tokenId
 
 # Preprocessing helpers
 class PreprocessedToken:
-	__slots__ = ("text", "lemma_", "pos_", "tag_")
-	def __init__(self, text, lemma, pos, tag):
+	__slots__ = ("text", "lemma_", "pos_", "tag_", "tokenId")
+	def __init__(self, text, lemma, pos, tag, tokenId=None):
 		self.text = text
 		self.lemma_ = lemma
 		self.pos_ = pos
 		self.tag_ = tag
+		self.tokenId = tokenId
 
 def convertPreprocessedTokenToSequenceToken(preprocessedToken):
-	word = preprocessedToken.text.lower()
-	lemma = preprocessedToken.lemma_.lower()
+	if(tokeniserSubword and useDedicatedFeatureListsSubword):
+		word = preprocessedToken.text
+		lemma = preprocessedToken.lemma_
+		if(preprocessedToken.tokenId is None):
+			raise RuntimeError("convertPreprocessedTokenToSequenceToken error: tokeniserSubword dedicated feature lists require tokenId")
+	else:
+		word = preprocessedToken.text.lower()
+		lemma = preprocessedToken.lemma_.lower()
 	pos = preprocessedToken.pos_  #coarse Part-of-speech (e.g. PRON) 
 	tag = preprocessedToken.tag_	#fine-grained POS (e.g., PRP, PRP$, WP, WP$, etc.)
-	token = SequenceToken(word, lemma, pos, tag)
+	token = SequenceToken(word, lemma, pos, tag, preprocessedToken.tokenId)
 	return token
 
 def getTokens(sequence):
@@ -98,10 +106,11 @@ def getTokens(sequence):
 	return tokens
 
 class PreprocessedSequence:
-	__slots__ = ("tokens",)
+	__slots__ = ("tokens", "originalText")
 
-	def __init__(self, tokens):
+	def __init__(self, tokens, originalText=None):
 		self.tokens = tokens
+		self.originalText = originalText
 
 	def __len__(self):
 		return len(self.tokens)
@@ -116,7 +125,12 @@ class PreprocessedSequence:
 
 	@property
 	def text(self):
-		return " ".join(token.text for token in self.tokens)
+		result = None
+		if(self.originalText is not None):
+			result = self.originalText
+		else:
+			result = " ".join(token.text for token in self.tokens)
+		return result
 
 
 def preprocessSequence(sequence):
@@ -150,28 +164,122 @@ if(tokeniserSubword):
 		if(isinstance(sequence, PreprocessedSequence)):
 			result = sequence
 		else:
-			preprocessedTokens = []
-			for token in sequence:
-				subwordTokens = createTokeniserSubwordPreprocessedTokens(token)
-				preprocessedTokens.extend(subwordTokens)
-			result = PreprocessedSequence(preprocessedTokens)
+			sequenceText = getTokeniserSubwordSequenceText(sequence)
+			encoding = getTokeniserSubwordEncoding()
+			preprocessedTokens = createTokeniserSubwordPreprocessedTokens(sequence, sequenceText, encoding)
+			result = PreprocessedSequence(preprocessedTokens, sequenceText)
 		return result
 
-	def createTokeniserSubwordPreprocessedTokens(token):
+	def createTokeniserSubwordPreprocessedTokens(sequence, sequenceText, encoding):
 		result = []
-		tokenText = token.text
-		if(not isinstance(tokenText, str)):
-			raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: token text must be a str")
-		if(tokenText == ""):
-			raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: token text must not be empty")
-		encoding = getTokeniserSubwordEncoding()
-		tokenIds = encoding.encode_ordinary(tokenText)
+		parentTokenSpans = createTokeniserSubwordParentTokenSpans(sequence, sequenceText)
+		sequenceBytes = encodeTokeniserSubwordText(sequenceText)
+		tokenIds = encoding.encode_ordinary(sequenceText)
 		if(len(tokenIds) == 0):
 			raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: no subword token ids generated")
+		byteIndex = 0
 		for tokenId in tokenIds:
-			subwordText = decodeTokeniserSubwordTokenText(encoding, tokenId)
-			subwordPos, subwordTag = detectTokeniserSubwordPOS(token, subwordText)
-			result.append(PreprocessedToken(subwordText, subwordText, subwordPos, subwordTag))
+			tokenBytes = getTokeniserSubwordTokenBytes(encoding, tokenId)
+			subwordStartByte = byteIndex
+			subwordEndByte = subwordStartByte + len(tokenBytes)
+			if(subwordEndByte > len(sequenceBytes)):
+				raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: subword byte span exceeds sequence byte length")
+			if(tokenBytes != sequenceBytes[subwordStartByte:subwordEndByte]):
+				raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: subword token bytes do not match sequence bytes")
+			parentToken = getTokeniserSubwordParentToken(parentTokenSpans, subwordStartByte, subwordEndByte)
+			subwordText = decodeTokeniserSubwordTokenBytes(tokenBytes)
+			subwordPos, subwordTag = detectTokeniserSubwordPOS(parentToken, subwordText)
+			result.append(PreprocessedToken(subwordText, subwordText, subwordPos, subwordTag, tokenId))
+			byteIndex = subwordEndByte
+		if(byteIndex != len(sequenceBytes)):
+			raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: subword token bytes do not cover sequence bytes")
+		return result
+
+	def getTokeniserSubwordSequenceText(sequence):
+		result = None
+		if(not hasattr(sequence, "text")):
+			raise RuntimeError("getTokeniserSubwordSequenceText error: sequence has no text attribute")
+		result = sequence.text
+		if(not isinstance(result, str)):
+			raise RuntimeError("getTokeniserSubwordSequenceText error: sequence text must be a str")
+		if(result == ""):
+			raise RuntimeError("getTokeniserSubwordSequenceText error: sequence text must not be empty")
+		return result
+
+	def createTokeniserSubwordParentTokenSpans(sequence, sequenceText):
+		result = []
+		charByteOffsets = createTokeniserSubwordCharacterByteOffsets(sequenceText)
+		currentCharIndex = 0
+		for token in sequence:
+			tokenText = token.text
+			if(not isinstance(tokenText, str)):
+				raise RuntimeError("createTokeniserSubwordParentTokenSpans error: parent token text must be a str")
+			if(tokenText == ""):
+				raise RuntimeError("createTokeniserSubwordParentTokenSpans error: parent token text must not be empty")
+			tokenStartChar = sequenceText.find(tokenText, currentCharIndex)
+			if(tokenStartChar < 0):
+				raise RuntimeError("createTokeniserSubwordParentTokenSpans error: parent token text not found in sequence text")
+			tokenEndChar = tokenStartChar + len(tokenText)
+			tokenStartByte = charByteOffsets[tokenStartChar]
+			tokenEndByte = charByteOffsets[tokenEndChar]
+			result.append((tokenStartByte, tokenEndByte, token))
+			currentCharIndex = tokenEndChar
+		if(len(result) == 0):
+			raise RuntimeError("createTokeniserSubwordParentTokenSpans error: no parent token spans generated")
+		return result
+
+	def createTokeniserSubwordCharacterByteOffsets(sequenceText):
+		result = [0]
+		byteOffset = 0
+		for character in sequenceText:
+			byteOffset += len(encodeTokeniserSubwordText(character))
+			result.append(byteOffset)
+		return result
+
+	def getTokeniserSubwordParentToken(parentTokenSpans, subwordStartByte, subwordEndByte):
+		result = None
+		bestOverlap = 0
+		nextToken = None
+		if(not isinstance(subwordStartByte, int) or isinstance(subwordStartByte, bool)):
+			raise RuntimeError("getTokeniserSubwordParentToken error: subwordStartByte must be an int")
+		if(not isinstance(subwordEndByte, int) or isinstance(subwordEndByte, bool)):
+			raise RuntimeError("getTokeniserSubwordParentToken error: subwordEndByte must be an int")
+		if(subwordStartByte < 0 or subwordEndByte <= subwordStartByte):
+			raise RuntimeError("getTokeniserSubwordParentToken error: invalid subword byte span")
+		if(len(parentTokenSpans) == 0):
+			raise RuntimeError("getTokeniserSubwordParentToken error: parentTokenSpans must not be empty")
+		for parentStartByte, parentEndByte, parentToken in parentTokenSpans:
+			overlapStartByte = max(parentStartByte, subwordStartByte)
+			overlapEndByte = min(parentEndByte, subwordEndByte)
+			overlap = max(0, overlapEndByte - overlapStartByte)
+			if(overlap > bestOverlap):
+				bestOverlap = overlap
+				result = parentToken
+			if(nextToken is None and parentStartByte >= subwordEndByte):
+				nextToken = parentToken
+		if(result is None):
+			if(nextToken is not None):
+				result = nextToken
+			else:
+				result = parentTokenSpans[-1][2]
+		return result
+
+	def encodeTokeniserSubwordText(text):
+		result = None
+		if(not isinstance(text, str)):
+			raise RuntimeError("encodeTokeniserSubwordText error: text must be a str")
+		result = text.encode(tokeniserSubwordTextEncoding, errors=tokeniserSubwordTextEncodingErrorMode)
+		return result
+
+	def getTokeniserSubwordTokenBytes(encoding, tokenId):
+		result = None
+		if(not isinstance(tokenId, int) or isinstance(tokenId, bool) or tokenId < 0):
+			raise RuntimeError("getTokeniserSubwordTokenBytes error: tokenId must be a non-negative int")
+		result = encoding.decode_single_token_bytes(tokenId)
+		if(not isinstance(result, bytes)):
+			raise RuntimeError("getTokeniserSubwordTokenBytes error: token bytes must be bytes")
+		if(len(result) == 0):
+			raise RuntimeError("getTokeniserSubwordTokenBytes error: token bytes must not be empty")
 		return result
 
 	def getTokeniserSubwordEncoding():
@@ -185,21 +293,61 @@ if(tokeniserSubword):
 		result = _tokeniserSubwordEncoding
 		return result
 
+	def getTokeniserSubwordFeatureCount():
+		encoding = getTokeniserSubwordEncoding()
+		result = int(encoding.max_token_value) + tokeniserSubwordFeatureIndexOffset + 1
+		return result
+
+	def getTokeniserSubwordFeatureIndex(token):
+		if(not hasattr(token, "tokenId")):
+			raise RuntimeError("getTokeniserSubwordFeatureIndex error: token has no tokenId")
+		result = getTokeniserSubwordFeatureIndexFromTokenId(token.tokenId)
+		return result
+
+	def getTokeniserSubwordFeatureIndexFromTokenId(tokenId):
+		result = None
+		encoding = getTokeniserSubwordEncoding()
+		if(not isinstance(tokenId, int) or isinstance(tokenId, bool)):
+			raise RuntimeError("getTokeniserSubwordFeatureIndexFromTokenId error: tokenId must be an int")
+		if(tokenId < 0 or tokenId > int(encoding.max_token_value)):
+			raise RuntimeError("getTokeniserSubwordFeatureIndexFromTokenId error: tokenId out of range")
+		result = tokeniserSubwordFeatureIndexOffset + tokenId
+		return result
+
+	def getTokeniserSubwordFeatureNameForTokenId(encoding, tokenId):
+		result = None
+		if(not isinstance(tokenId, int) or isinstance(tokenId, bool)):
+			raise RuntimeError("getTokeniserSubwordFeatureNameForTokenId error: tokenId must be an int")
+		if(tokenId < 0 or tokenId > int(encoding.max_token_value)):
+			raise RuntimeError("getTokeniserSubwordFeatureNameForTokenId error: tokenId out of range")
+		try:
+			tokenBytes = getTokeniserSubwordTokenBytes(encoding, tokenId)
+			result = decodeTokeniserSubwordTokenBytes(tokenBytes)
+		except KeyError:
+			result = tokeniserSubwordInvalidTokenFeatureNamePrefix + str(tokenId) + tokeniserSubwordInvalidTokenFeatureNameSuffix
+		return result
+
 	def decodeTokeniserSubwordTokenText(encoding, tokenId):
+		tokenBytes = getTokeniserSubwordTokenBytes(encoding, tokenId)
+		result = decodeTokeniserSubwordTokenBytes(tokenBytes)
+		return result
+
+	def decodeTokeniserSubwordTokenBytes(tokenBytes):
 		result = None
 		byteTokenGenerated = False
-		if(not isinstance(tokenId, int) or isinstance(tokenId, bool) or tokenId < 0):
-			raise RuntimeError("decodeTokeniserSubwordTokenText error: tokenId must be a non-negative int")
-		tokenBytes = encoding.decode_single_token_bytes(tokenId)
+		if(not isinstance(tokenBytes, bytes)):
+			raise RuntimeError("decodeTokeniserSubwordTokenBytes error: tokenBytes must be bytes")
+		if(len(tokenBytes) == 0):
+			raise RuntimeError("decodeTokeniserSubwordTokenBytes error: tokenBytes must not be empty")
 		try:
 			result = tokenBytes.decode(tokeniserSubwordTextEncoding, errors=tokeniserSubwordTextEncodingErrorMode)
 		except UnicodeDecodeError:
 			result = tokeniserSubwordByteTokenPrefix + tokenBytes.hex() + tokeniserSubwordByteTokenSuffix
 			byteTokenGenerated = True
 		if(result == ""):
-			raise RuntimeError("decodeTokeniserSubwordTokenText error: decoded subword text must not be empty")
+			raise RuntimeError("decodeTokeniserSubwordTokenBytes error: decoded subword text must not be empty")
 		if(not byteTokenGenerated and result.startswith(tokeniserSubwordByteTokenPrefix)):
-			raise RuntimeError("decodeTokeniserSubwordTokenText error: decoded subword text uses reserved byte-token prefix")
+			raise RuntimeError("decodeTokeniserSubwordTokenBytes error: decoded subword text uses reserved byte-token prefix")
 		return result
 
 	def detectTokeniserSubwordPOS(parentToken, subwordText):
@@ -209,6 +357,9 @@ if(tokeniserSubword):
 			if(isTokeniserSubwordByteTokenText(subwordText)):
 				resultPos = parentToken.pos_
 				resultTag = parentToken.tag_
+			elif(isTokeniserSubwordWhitespaceText(subwordText)):
+				resultPos = tokeniserSubwordPOSspace
+				resultTag = tokeniserSubwordTagSpace
 			elif(GIAANNnlp_sequencePOS.isPunctWord(subwordText)):
 				resultPos = tokeniserSubwordPOSpunct
 				resultTag = tokeniserSubwordTagPunct
@@ -223,6 +374,14 @@ if(tokeniserSubword):
 	def isTokeniserSubwordByteTokenText(subwordText):
 		result = False
 		if(subwordText.startswith(tokeniserSubwordByteTokenPrefix) and subwordText.endswith(tokeniserSubwordByteTokenSuffix)):
+			result = True
+		return result
+
+	def isTokeniserSubwordWhitespaceText(subwordText):
+		result = False
+		if(not isinstance(subwordText, str)):
+			raise RuntimeError("isTokeniserSubwordWhitespaceText error: subwordText must be a str")
+		if(subwordText.isspace()):
 			result = True
 		return result
 
