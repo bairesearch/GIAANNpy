@@ -493,4 +493,35 @@ v2i (Codex IDE GPT-5.5) [under development]:
 		- ensure to encapsulate all useDedicatedConceptListsSubword==True specific behaviour within context if(useDedicatedConceptListsSubword) as per AGENTS.md.
 	- optimize `useDedicatedConceptListsSubword=True` by using compact active target concept tensors in `updateObservedColumnsEfficient` for non-serial feature-connection updates instead of full `databaseNetworkObject.c` target width.
 	- add `useDedicatedConceptListsSubword=True` sequence-local target bucket mapping via `buildConnectionTargetSequenceBucketLookup()` plus compact tensor gather/scatter helpers so updates map tiktoken concept IDs back into the existing full-size stored connection tensors.
-- patch tokeniserSubword:tokeniserSubwordPOS=False so subword delimiter POS detection uses parent spaCy posWord/posLemma lookup fields, matching the tokeniserSubword=False POS method while preserving subword feature/concept identities.
+
+---
+v2j (Codex IDE GPT-5.5) [under development]:
+- add proto GIAANNproto2j1a - start option sentencePredictions=False, restore inferenceBurstAllPredictionsOrTargetsInSequence:
+	- patch tokeniserSubword:tokeniserSubwordPOS=False so subword delimiter POS detection uses parent spaCy posWord/posLemma lookup fields, matching the tokeniserSubword=False POS method while preserving subword feature/concept identities.
+	- implement option sequencesCropToMaxLength.
+	- implement option sentencePredictions=False:
+			- sentencePredictions=False implicitly only supports spacyPipelineOptimisations=True and spacyPipelineSingleParse=True and spacyPipelineMinimalComponents=True
+	- implement of option skipSequenceNoDelimiterDetectedBetweenConceptTokens=False for both train and inference modes:
+		- consecutive noun tokens are already tied to their first noun token, assigning the first noun token as a concept column prime concept feature.
+		- if no delimiter is detected between two prime concept tokens, then automatically delimit by the last token in the first concept column (treat that last token as a delimiter feature).
+		Implementation Notes:
+			- ensure to encapsulate all skipSequenceNoDelimiterDetectedBetweenConceptTokens dependent code within context if(skipSequenceNoDelimiterDetectedBetweenConceptTokens). make no changes to the default skipSequenceNoDelimiterDetectedBetweenConceptTokens=True execution pathway.
+	- implement option SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens=False, which affects both useSANIfeaturesAndColumns and useSANIcolumns modes.
+		- set SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=False, which affects both useSANIfeaturesAndColumns and useSANIfeatures modes.
+	- optimise eval:
+		- `perf(eval): vectorize SANI required-segment candidate filtering`
+			- replace Python set/list membership checks in prediction candidate filtering with tensor key membership. This keeps SANI required-segment semantics unchanged while avoiding per-candidate Python loops during long eval sequences.
+		- `perf(eval): prefilter sparse candidate aggregation by required segment keys`
+			- push required SANI column-feature key filtering into sparse aggregation so irrelevant activation entries are removed before branch reduction and candidate aggregation.
+		- `perf(sparse): vectorize sparse branch max reduction`
+			- replace Python grouping loops in `reduceSparseBranchMax()` with tensor `unique`/`scatter_reduce_` operations. This improves multiple-branch sparse activation reduction used during inference candidate selection.
+		- `perf(sparse): replace broadcast sparse intersection with key lookup`
+			- rework `selectAindicesContainedInB()` to use flattened sparse index keys and `searchsorted` membership instead of an O(nnzA * nnzB) broadcast comparison.
+		- `perf(eval): avoid full coalesce in sparse branch selection`
+			- optimise `selectActivatedBranchIndex()` by using sparse `_indices()`/`_values()` and tensor `index_add_` for branch scoring, avoiding full tensor coalescing and Python dictionaries during prediction deactivation.
+	- restore inferenceBurstAllPredictionsOrTargetsInSequence - patch inference to always activate the top-1 selected feature neuron (ie the prediction or target respectively as per inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures).
+		- revert previous 1i patch: "remove option inferenceBurstAllPredictionsOrTargetsInSequence".
+		- inferenceBurstAllPredictionsOrTargetsInSequence explicitly writes activation into the selected source neuron via activateSeedPredictionSegments():
+			- that guarantees the selected top-1 feature is active when the next step uses it as a source.
+			- if the selected prediction/target neuron itself was not already active, the next step could read the correct source connections but multiply them by zero or insufficient source activation.
+

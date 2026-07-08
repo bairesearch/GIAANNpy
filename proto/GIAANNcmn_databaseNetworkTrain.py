@@ -991,8 +991,14 @@ def assignFeatureConnectionsToTargetSegmentsSparse(branchIndices, sourceConceptI
 	elif(useSANIcolumns):
 		conceptDistances = pt.abs(targetConceptIndices - sourceConceptIndices)
 		connectionsSegmentIndex = arrayNumberOfSegments - conceptDistances - 1
-		connectionsSegmentIndex = pt.clamp(connectionsSegmentIndex, min=0)
-		indicesList.append(pt.stack((branchIndices, connectionsSegmentIndex.long(), sourceConceptIndices, sourceFeatureIndices, targetConceptIndices, targetFeatureIndices), dim=0))
+		if(SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens):
+			connectionsSegmentIndex = pt.clamp(connectionsSegmentIndex, min=0)
+			indicesList.append(pt.stack((branchIndices, connectionsSegmentIndex.long(), sourceConceptIndices, sourceFeatureIndices, targetConceptIndices, targetFeatureIndices), dim=0))
+		else:
+			validColumnDistanceMask = conceptDistances < arrayNumberOfSegments
+			if(validColumnDistanceMask.any()):
+				connectionsSegmentIndex = connectionsSegmentIndex[validColumnDistanceMask].clamp(min=0, max=arrayNumberOfSegments-1).long()
+				indicesList.append(pt.stack((branchIndices[validColumnDistanceMask], connectionsSegmentIndex, sourceConceptIndices[validColumnDistanceMask], sourceFeatureIndices[validColumnDistanceMask], targetConceptIndices[validColumnDistanceMask], targetFeatureIndices[validColumnDistanceMask]), dim=0))
 	elif(useSANIfeatures):
 		relativeDistance = targetWordOrder - sourceWordOrder
 		if(SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens):
@@ -1028,10 +1034,17 @@ def assignFeatureConnectionsToTargetSegmentsSparse(branchIndices, sourceConceptI
 				columnSegmentIndex = arrayNumberOfSegmentsColumnDistance - conceptDistances - 1
 			else:
 				columnSegmentIndex = arrayNumberOfSegmentsColumnDistance - conceptDistances
-			columnSegmentIndex = columnSegmentIndex.clamp(min=0, max=arrayNumberOfSegmentsColumnDistance-1).long()
-			validColumnMask = pt.ones((branchIndices.shape[0],), dtype=pt.bool, device=connectionDevice)
-			if(not useSANIfeaturesAndColumnsInternal):
-				validColumnMask = conceptDistances > 0
+			if(SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens):
+				columnSegmentIndex = columnSegmentIndex.clamp(min=0, max=arrayNumberOfSegmentsColumnDistance-1).long()
+				validColumnMask = pt.ones((branchIndices.shape[0],), dtype=pt.bool, device=connectionDevice)
+				if(not useSANIfeaturesAndColumnsInternal):
+					validColumnMask = conceptDistances > 0
+			else:
+				if(useSANIfeaturesAndColumnsInternal):
+					validColumnMask = conceptDistances < arrayNumberOfSegmentsColumnDistance
+				else:
+					validColumnMask = pt.logical_and(conceptDistances > 0, conceptDistances <= arrayNumberOfSegmentsColumnDistance)
+				columnSegmentIndex = columnSegmentIndex.clamp(min=0, max=arrayNumberOfSegmentsColumnDistance-1).long()
 			if(validColumnMask.any()):
 				indicesList.append(pt.stack((branchIndices[validColumnMask], columnSegmentIndex[validColumnMask], sourceConceptIndices[validColumnMask], sourceFeatureIndices[validColumnMask], targetConceptIndices[validColumnMask], targetFeatureIndices[validColumnMask]), dim=0))
 	else:
@@ -1182,12 +1195,20 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 	if(getTrainConnectionsUseSpatialDistance(sequenceObservedColumns)):
 		featureConnectionsSegmentMask = calculateFeatureConnectionsSpatialDistanceSegmentMask(sequenceObservedColumns, cs, fs, featureConnectionsActive.device)
 	elif(useSANIcolumns):
-		conceptNeuronsConceptOrder1d = pt.arange(cs)
+		device = featureConnectionsActive.device
+		conceptNeuronsConceptOrder1d = pt.arange(cs, device=device)
 		conceptNeuronsDistances = pt.abs(conceptNeuronsConceptOrder1d.unsqueeze(1) - conceptNeuronsConceptOrder1d).reshape(cs, cs)
 		connectionsSegmentIndex = arrayNumberOfSegments-conceptNeuronsDistances-1
-		connectionsSegmentIndex = pt.clamp(connectionsSegmentIndex, min=0)
-		featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, cs), dtype=pt.bool)
+		validColumnDistanceMask = None
+		if(SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens):
+			connectionsSegmentIndex = pt.clamp(connectionsSegmentIndex, min=0)
+		else:
+			validColumnDistanceMask = conceptNeuronsDistances < arrayNumberOfSegments
+			connectionsSegmentIndex = connectionsSegmentIndex.clamp(min=0, max=arrayNumberOfSegments-1)
+		featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, cs), dtype=pt.bool, device=device)
 		featureConnectionsSegmentMask = featureConnectionsSegmentMask.scatter_(0, connectionsSegmentIndex.unsqueeze(0), True)
+		if(not SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens):
+			featureConnectionsSegmentMask = featureConnectionsSegmentMask & validColumnDistanceMask.unsqueeze(0)
 		featureConnectionsSegmentMask = featureConnectionsSegmentMask.view(arrayNumberOfSegments, cs, 1, cs, 1).expand(arrayNumberOfSegments, cs, fs, cs, fs)
 	elif(useSANIfeatures):
 		device = featureConnectionsActive.device
@@ -1241,12 +1262,22 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 			else:
 				# External columns only: exclude the internal column from concept segments.
 				columnSegmentIndex = arrayNumberOfSegmentsColumnDistance - conceptNeuronsDistances
-			columnSegmentIndex = columnSegmentIndex.clamp(min=0, max=arrayNumberOfSegmentsColumnDistance-1).long()
+			validColumnMask = None
+			if(SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens):
+				columnSegmentIndex = columnSegmentIndex.clamp(min=0, max=arrayNumberOfSegmentsColumnDistance-1).long()
+			else:
+				if(useSANIfeaturesAndColumnsInternal):
+					validColumnMask = conceptNeuronsDistances < arrayNumberOfSegmentsColumnDistance
+				else:
+					validColumnMask = pt.logical_and(conceptNeuronsDistances > 0, conceptNeuronsDistances <= arrayNumberOfSegmentsColumnDistance)
+				columnSegmentIndex = columnSegmentIndex.clamp(min=0, max=arrayNumberOfSegmentsColumnDistance-1).long()
 			columnSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
 			columnSegmentMask.scatter_(0, columnSegmentIndex.unsqueeze(0), True)
-			if(not useSANIfeaturesAndColumnsInternal):
+			if(SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens and not useSANIfeaturesAndColumnsInternal):
 				externalColumnMask = (conceptNeuronsDistances > 0)
 				columnSegmentMask = columnSegmentMask & externalColumnMask.unsqueeze(0)	#exclude internal column
+			elif(not SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens):
+				columnSegmentMask = columnSegmentMask & validColumnMask.unsqueeze(0)
 			featureConnectionsSegmentMask = featureConnectionsSegmentMask | columnSegmentMask
 
 	if(hasBranchDim):

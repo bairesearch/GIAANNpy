@@ -134,12 +134,14 @@ def filterColumnFeatureCandidatesByConnectedColumns(columnIndices, featureIndice
 	indexTensor = pt.tensor(selectedIndices, dtype=pt.long, device=columnIndices.device)
 	return columnIndices.index_select(0, indexTensor), featureIndices.index_select(0, indexTensor), activationValues.index_select(0, indexTensor)
 
-def aggregateSparseColumnFeatureValues(sparseTensor, maxFeatures):
+def aggregateSparseColumnFeatureValues(sparseTensor, maxFeatures, requiredColumnFeatureKeys=None):
 	aggregatedColumns = None
 	aggregatedFeatures = None
 	aggregatedValues = None
 	if(sparseTensor is not None):
 		workingTensor = sparseTensor
+		if(requiredColumnFeatureKeys is not None and workingTensor.is_sparse):
+			workingTensor = filterSparseTensorByColumnFeatureKeys(workingTensor, maxFeatures, requiredColumnFeatureKeys)
 		if(workingTensor.dim() == 4):
 			if(multipleDendriticBranches):
 				if(workingTensor.is_sparse):
@@ -163,12 +165,70 @@ def aggregateSparseColumnFeatureValues(sparseTensor, maxFeatures):
 				columnIndices = indices[1]
 				featureIndices = indices[2]
 			keys = columnIndices * maxFeatures + featureIndices
-			uniqueKeys, inverseIndices = pt.unique(keys, return_inverse=True)
-			aggregatedValues = pt.zeros((uniqueKeys.shape[0],), dtype=values.dtype, device=values.device)
-			aggregatedValues.scatter_add_(0, inverseIndices, values)
-			aggregatedColumns = uniqueKeys // maxFeatures
-			aggregatedFeatures = uniqueKeys % maxFeatures
+			if(requiredColumnFeatureKeys is not None):
+				requiredMask = buildSortedKeyMembershipMask(keys, requiredColumnFeatureKeys)
+				if(requiredMask is None or requiredMask.sum().item() == 0):
+					keys = None
+				else:
+					requiredIndices = pt.nonzero(requiredMask, as_tuple=False).view(-1)
+					keys = keys.index_select(0, requiredIndices)
+					values = values.index_select(0, requiredIndices)
+			if(keys is not None):
+				uniqueKeys, inverseIndices = pt.unique(keys, return_inverse=True)
+				aggregatedValues = pt.zeros((uniqueKeys.shape[0],), dtype=values.dtype, device=values.device)
+				aggregatedValues.scatter_add_(0, inverseIndices, values)
+				aggregatedColumns = uniqueKeys // maxFeatures
+				aggregatedFeatures = uniqueKeys % maxFeatures
 	return aggregatedColumns, aggregatedFeatures, aggregatedValues
+
+def filterSparseTensorByColumnFeatureKeys(sparseTensor, maxFeatures, requiredColumnFeatureKeys):
+	result = None
+	if(sparseTensor._nnz() == 0 or requiredColumnFeatureKeys is None or requiredColumnFeatureKeys.numel() == 0):
+		emptyIndices = pt.empty((sparseTensor._indices().shape[0], 0), dtype=sparseTensor._indices().dtype, device=sparseTensor._indices().device)
+		emptyValues = pt.empty((0,), dtype=sparseTensor._values().dtype, device=sparseTensor._values().device)
+		result = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=sparseTensor.size(), device=sparseTensor.device).coalesce()
+	else:
+		indices = sparseTensor._indices()
+		values = sparseTensor._values()
+		if(sparseTensor.dim() == 4):
+			columnDim = 2
+			featureDim = 3
+		elif(sparseTensor.dim() == 3):
+			columnDim = 1
+			featureDim = 2
+		elif(sparseTensor.dim() == 2):
+			columnDim = 0
+			featureDim = 1
+		else:
+			raise RuntimeError("filterSparseTensorByColumnFeatureKeys error: unsupported tensor dimensions")
+		columnFeatureKeys = indices[columnDim].long() * int(maxFeatures) + indices[featureDim].long()
+		requiredMask = buildSortedKeyMembershipMask(columnFeatureKeys, requiredColumnFeatureKeys)
+		if(requiredMask is None or requiredMask.sum().item() == 0):
+			emptyIndices = pt.empty((indices.shape[0], 0), dtype=indices.dtype, device=indices.device)
+			emptyValues = pt.empty((0,), dtype=values.dtype, device=values.device)
+			result = pt.sparse_coo_tensor(emptyIndices, emptyValues, size=sparseTensor.size(), device=sparseTensor.device).coalesce()
+		else:
+			requiredIndices = pt.nonzero(requiredMask, as_tuple=False).view(-1)
+			result = pt.sparse_coo_tensor(indices.index_select(1, requiredIndices), values.index_select(0, requiredIndices), size=sparseTensor.size(), device=sparseTensor.device).coalesce()
+	return result
+
+def buildSortedKeyMembershipMask(candidateKeys, sortedReferenceKeys):
+	result = None
+	if(candidateKeys is not None and sortedReferenceKeys is not None):
+		if(candidateKeys.numel() == 0 or sortedReferenceKeys.numel() == 0):
+			result = pt.zeros(candidateKeys.shape, dtype=pt.bool, device=candidateKeys.device)
+		else:
+			referenceKeys = sortedReferenceKeys.to(candidateKeys.device)
+			insertionIndices = pt.searchsorted(referenceKeys, candidateKeys)
+			validInsertionMask = insertionIndices < referenceKeys.shape[0]
+			result = pt.zeros(candidateKeys.shape, dtype=pt.bool, device=candidateKeys.device)
+			if(validInsertionMask.any()):
+				validCandidateIndices = pt.nonzero(validInsertionMask, as_tuple=False).view(-1)
+				validReferenceIndices = insertionIndices.index_select(0, validCandidateIndices)
+				validCandidateKeys = candidateKeys.index_select(0, validCandidateIndices)
+				validReferenceKeys = referenceKeys.index_select(0, validReferenceIndices)
+				result[validCandidateIndices] = validReferenceKeys == validCandidateKeys
+	return result
 
 
 def clearPredictionTensors(conceptColumnsIndicesPred, conceptColumnsFeatureIndicesPred, connectedColumns=None):

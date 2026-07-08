@@ -52,7 +52,6 @@ from GIAANNcmn_globalDefs import useTrainDuringInference
 from GIAANNcmn_globalDefs import multipleDendriticBranchesBinaryTree
 from GIAANNcmn_globalDefs import trainVerifyConnectionNonexistentAcrossBranches
 
-
 #Dataset Type;
 if(useQuickExecution):
 	datasetType = "textfile"
@@ -74,13 +73,27 @@ elif(useTrainDuringInference):
 	useBenchmarkEvalDataSet = True	#default: True	#optional	#use an official eval dataset (prompt) - else user must provide a custom inference_prompt.txt
 
 #Multisentence predictions;
-multisentencePredictions = False	#default: False	#each sequence comprises multiple sentences	#requires higher GPU RAM for train
-if(multisentencePredictions):
-	numSentencesPerSequence = 3 #default: 3
+sentencePredictions = True 	#default: True	orig: True
+if(sentencePredictions):
+	skipSequenceNoDelimiterDetectedBetweenConceptTokens = True	#default: True #orig: True
+	multisentencePredictions = False	#default: False	#each sequence comprises multiple sentences	#requires higher GPU RAM for train
+	if(multisentencePredictions):
+		maxSequenceLength = 80	#512
+		numSentencesPerSequence = 3	#default: 3	#int(maxSequenceLength/25) ~= 20 for maxSequenceLength=512
+		#print("numSentencesPerSequence = ", numSentencesPerSequence)
+	else:
+		maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 	#measured in spacy word tokens, not subword tiktokens (even if tokeniserSubword is enabled).
+		numSentencesPerSequence = 1
+	sequencesCropToMaxLength = False	#default: True	#orig: False
 else:
-	numSentencesPerSequence = 1
-
-
+	skipSequenceNoDelimiterDetectedBetweenConceptTokens = False
+	multisentencePredictions = False	#mandatory: False
+	numSentencesPerSequence = 1	#mandatory: 1
+	sequencesCropToMaxLength = True	#mandatory: True
+	tokensPerWord = 1.25 	#note approx avg 1.25 tiktokens per word, so 80*1.25 = 100 tokens (assuming o200k_base tokeniser with OSCAR-2201 en dataset)
+	targetContextLengthInTokens = 512	#emulate
+	maxSequenceLength = int(targetContextLengthInTokens/tokensPerWord)	#measured in spacy word tokens, not subword tiktokens (even if tokeniserSubword is enabled)
+	
 #Closed world grounded dataset constants;
 datasetTypeClosedWorldGrounded1 = "closedWorldGrounded1"
 datasetTypeClosedWorldGrounded2 = "closedWorldGrounded2"
@@ -157,10 +170,13 @@ if(not datasetType=="textfile"):
 			testSetRatio = 0.1	#ratio of articles in dataset to be used for test (vs train) set - taken from end of dataset
 			assert useLocalDataset	#required for efficiency
 		elif(datasetType=="oscar"):
-			trainMaxSequencesEver = 10000000	#highest value of trainMaxSequences expected during current dev (using this instead of a much high value closer to 1-testSetRatio because testSetStartOffset takes time to load)
-			numSentencesPerSequenceEver = 3
-			datasetOscarAverageEligibleSentencesPerArticle = 32	#measured across 1m raw sentences (therefore appropriate for trainMaxSequencesEver=1m)
-			testSetStartOffset = int(trainMaxSequencesEver / datasetOscarAverageEligibleSentencesPerArticle)*numSentencesPerSequenceEver
+			trainMaxSequencesEver = 10000000	#orig: 1000000	#highest value of trainMaxSequences expected during current dev (using this instead of a much high value closer to 1-testSetRatio because testSetStartOffset takes time to load)
+			if(sentencePredictions):
+				numSentencesPerSequenceEver = 20	#orig: 3
+				datasetOscarAverageEligibleSentencesPerArticle = 32	#measured across 1m raw sentences (therefore appropriate for trainMaxSequencesEver=1m)
+				testSetStartOffset = int(trainMaxSequencesEver / datasetOscarAverageEligibleSentencesPerArticle)*numSentencesPerSequenceEver
+			else:
+				testSetStartOffset = trainMaxSequencesEver
 			testSetSize = 1000	#number of entries to include in test set
 		else:
 			printe("trainTestSet configuration error: unsupported dataset selection")
@@ -265,48 +281,57 @@ if(useInference):
 	else:
 		if(datasetType=="wikipedia"):	
 			if(useBenchmarkEvalDataSet):
-				if(inferenceEvaluateTestSet):
-					inferencePromptFileName = 'inference_prompt.txt.longTestWikipedia'
+				if(sentencePredictions):
+					if(inferenceEvaluateTestSet):
+						inferencePromptFileName = 'inference_prompt.txt.longTestWikipedia'
+					else:
+						inferencePromptFileName = 'inference_prompt.txt.longTrainWikipedia'	
 				else:
-					inferencePromptFileName = 'inference_prompt.txt.longTrainWikipedia'	
+					printe("datasetType==wikipedia sentencePredictions=False eval sets not available")
 			else:
 				inferencePromptFileName = 'inference_prompt.txt'
 		elif(datasetType=="oscar"):
 			if(useBenchmarkEvalDataSet):
-				if(multisentencePredictions):
-					if(inferenceEvaluateTestSet):
-						if(inferenceEvaluateTestSetTrainMaxSequences10M):
-							inferencePromptFileName = 'inference_prompt.txt.longTestOscarMultiSentence2'
-						else:
-							inferencePromptFileName = 'inference_prompt.txt.longTestOscarMultiSentence'
-					else:
-						#ensure within distribution trainset;
-						if(not useBenchmarkDefaults):
-							inferencePromptFileName = 'inference_prompt.txt.longTrainOscarMultiSentence'
-						elif(spacyPipelineOptimisations):
-							printe("datasetType==oscar multisentencePredictions was trained with useBenchmarkDefaults=False")
-						else:
-							printe("datasetType==oscar multisentencePredictions was trained with useBenchmarkDefaults=False")
-				else:
-					if(useBenchmarkDefaults):
+				if(sentencePredictions):				
+					if(multisentencePredictions):
 						if(inferenceEvaluateTestSet):
 							if(inferenceEvaluateTestSetTrainMaxSequences10M):
-								inferencePromptFileName = 'inference_prompt.txt.longTestOscar2'
+								inferencePromptFileName = 'inference_prompt.txt.longTestOscarMultiSentence2'
 							else:
-								inferencePromptFileName = 'inference_prompt.txt.longTestOscar'
+								inferencePromptFileName = 'inference_prompt.txt.longTestOscarMultiSentence'
 						else:
-							#ensure within distribution trainset ;
-							if(spacyPipelineOptimisations):
-								inferencePromptFileName = 'inference_prompt.txt.longTrainOscarOptim'
+							#ensure within distribution trainset;
+							if(not useBenchmarkDefaults):
+								inferencePromptFileName = 'inference_prompt.txt.longTrainOscarMultiSentence'
+							elif(spacyPipelineOptimisations):
+								inferencePromptFileName = 'inference_prompt.txt.longTrainOscarMultiSentence10Optim'
 							else:
-								inferencePromptFileName = 'inference_prompt.txt.longTrainOscar'
+								printe("datasetType==oscar multisentencePredictions dataset incompatibility")
 					else:
-						if(inferenceEvaluateTestSet):
-							inferencePromptFileName = 'inference_prompt.txt.longTestOscar-useBenchmarkDefaultsFalse'
-							#printe("inference_prompt.txt.longTestOscar-useBenchmarkDefaultsFalse not yet created")
+						if(useBenchmarkDefaults):
+							if(inferenceEvaluateTestSet):
+								if(inferenceEvaluateTestSetTrainMaxSequences10M):
+									inferencePromptFileName = 'inference_prompt.txt.longTestOscar2'
+								else:
+									inferencePromptFileName = 'inference_prompt.txt.longTestOscar'
+							else:
+								#ensure within distribution trainset ;
+								if(spacyPipelineOptimisations):
+									inferencePromptFileName = 'inference_prompt.txt.longTrainOscarOptim'
+								else:
+									inferencePromptFileName = 'inference_prompt.txt.longTrainOscar'
 						else:
-							inferencePromptFileName = 'inference_prompt.txt.longTrainOscar-useBenchmarkDefaultsFalse'
-							#printe("inference_prompt.txt.longTrainOscar-useBenchmarkDefaultsFalse.txt not yet created")
+							if(inferenceEvaluateTestSet):
+								inferencePromptFileName = 'inference_prompt.txt.longTestOscar-useBenchmarkDefaultsFalse'
+								#printe("inference_prompt.txt.longTestOscar-useBenchmarkDefaultsFalse not yet created")
+							else:
+								inferencePromptFileName = 'inference_prompt.txt.longTrainOscar-useBenchmarkDefaultsFalse'
+								#printe("inference_prompt.txt.longTrainOscar-useBenchmarkDefaultsFalse.txt not yet created")
+				else:
+					if(inferenceEvaluateTestSet):
+						inferencePromptFileName = 'inference_prompt.txt.longTestOscar-SentencePredictionsFalse-maxSequenceLength409'
+					else:
+						inferencePromptFileName = 'inference_prompt.txt.longTrainOscar-SentencePredictionsFalse-maxSequenceLength409'
 			else:
 				inferencePromptFileName = 'inference_prompt.txt'
 		elif(datasetType=="textfile"):
@@ -329,22 +354,32 @@ posDictFile = "everPos.wordnet.pkl.gz"
 
 #POS;
 useSpacyForConceptNounPOSdetection = True	#orig: True	#False: use GIAANNnlp_sequencePOS predetermined word-POS dictionaries for all pos detection (never use spacy dynamically assigned pos tags)
-if(spacyPipelineOptimisations):
-	spacyModelName = 'en_core_web_sm'	#default: en_core_web_sm
-	spacyPipelineSingleParse = False	#default: False	#Avoid re-parsing each sentence: reuse the original Doc and create sequence docs with Span.as_doc() (or operate directly on spans) instead of nlp(sequenceText).	#parsing sequences individually helps alignment of train/test parsing for dev
-	if(spacyPipelineSingleParse):
+if(sentencePredictions):
+	if(spacyPipelineOptimisations):
+		spacyModelName = 'en_core_web_sm'	#default: en_core_web_sm
+		spacyPipelineSingleParse = False	#default: False	#Avoid re-parsing each sentence: reuse the original Doc and create sequence docs with Span.as_doc() (or operate directly on spans) instead of nlp(sequenceText).	#parsing sequences individually helps alignment of train/test parsing for dev
+		if(spacyPipelineSingleParse):
+			spacyPipelineBatchSequences = False
+			spacyPipelineLightweightSentenceSegmentation = False
+		else:
+			spacyPipelineBatchSequences = True	#default: True		#batch second pass: collect sequenceText and run nlp.pipe(...) with batch_size (and n_process if CPU) to amortize overhead.
+			spacyPipelineLightweightSentenceSegmentation = True	#default: True	#Use sentence segmentation only on a lightweight pipeline (sentencizer), then run full nlp.pipe only for sequences that pass quick length/whitespace filters.
+		spacyPipelineMinimalComponents = True	#default: True		#Disable unused pipeline components at spacy.load(...) (e.g., ner) if you don't use them downstream.
+	else:
+		spacyModelName = 'en_core_web_trf'	#default: en_core_web_trf
+		spacyPipelineSingleParse = False	#default: False #orig: True	#parsing sequences individually helps alignment of train/test parsing for dev
 		spacyPipelineBatchSequences = False
 		spacyPipelineLightweightSentenceSegmentation = False
-	else:
-		spacyPipelineBatchSequences = True	#default: True		#batch second pass: collect sequenceText and run nlp.pipe(...) with batch_size (and n_process if CPU) to amortize overhead.
-		spacyPipelineLightweightSentenceSegmentation = True	#default: True	#Use sentence segmentation only on a lightweight pipeline (sentencizer), then run full nlp.pipe only for sequences that pass quick length/whitespace filters.	
-	spacyPipelineMinimalComponents = True	#default: True		#Disable unused pipeline components at spacy.load(...) (e.g., ner) if you don't use them downstream. 
+		spacyPipelineMinimalComponents = False
 else:
-	spacyModelName = 'en_core_web_trf'	#default: en_core_web_trf
-	spacyPipelineSingleParse = False	#default: False #orig: True	#parsing sequences individually helps alignment of train/test parsing for dev
-	spacyPipelineBatchSequences = False	
-	spacyPipelineLightweightSentenceSegmentation = False
-	spacyPipelineMinimalComponents = False
+	if(not spacyPipelineOptimisations):
+		raise RuntimeError("sentencePredictions=False requires spacyPipelineOptimisations=True")
+	spacyModelName = 'en_core_web_sm'	#default: en_core_web_sm
+	spacyPipelineSingleParse = True	#mandatory: True
+	spacyPipelineBatchSequences = False	#mandatory: False
+	spacyPipelineLightweightSentenceSegmentation = False	#mandatory: False
+	spacyPipelineMinimalComponents = True	#mandatory: True
+
 # Define POS tag sets for nouns and non-nouns
 nounPos = {'NOUN', 'PROPN'}
 nonNounPos = {'ADJ', 'ADV', 'VERB', 'ADP', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NUM', 'PART', 'PRON', 'PUNCT', 'SCONJ', 'SYM', 'X'}	#incomplete as nounTags can be a subset of these (e.g. PRON: 'PRP', 'WP')
@@ -628,6 +663,9 @@ if(useBenchmark):
 		benchmarkAblationText = "-spacyPipelineOptimisations"
 	else:
 		benchmarkAblationText = ""
+	if(not sentencePredictions):
+		sentencePredictionsFalseBenchmarkAblationSuffix = "-sentencePredictionsFalse"
+		benchmarkAblationText = sentencePredictionsFalseBenchmarkAblationSuffix + benchmarkAblationText
 	if(datasetType=="wikipedia"):
 		databaseTypeText = ""	#or Wikipedia
 	elif(datasetType=="oscar"):

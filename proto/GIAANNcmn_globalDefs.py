@@ -51,7 +51,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -77,6 +77,7 @@ if(useInference):
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: False	#False: use current target (default top-1 accuracy measurement)
 	else:
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True		#True: activate next column features using current prediction
+	inferenceBurstAllPredictionsOrTargetsInSequence = True	#default: True	#orig: False	#burst selected top-1 prediction/target after every inference step
 inferenceAddNewFeatures = True	#default: True	#orig: False	#run a controlled expansion pass during inference to add missing columns/features without training updates
 
 if(useQuickExecution):
@@ -152,7 +153,6 @@ databaseFolderTemplateDatasetFileNamePattern = "*.*"
 
 
 #Train settings:
-maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 
 numberEpochs = 1	#default: 1
 trainVerifyConnectionNonexistentAcrossBranches = False	#default: True	#orig: False
 if(trainVerifyConnectionNonexistentAcrossBranches):
@@ -807,7 +807,8 @@ arrayNumberOfPropertiesInference = len(arrayPropertiesListInference)
 arrayIndexSegmentFirst = 0
 enforceSequentialActivationFeatureSegmentsOnly = False #derived var
 if(useSANI):
-	SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens = True	#default: True	#orig: True	#first feature segment captures all prior train sequence tokens
+	SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens = False	#default: True	#orig: True	#first feature segment captures all prior train sequence tokens
+	SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens = False	#default: True	#orig: True	#first column segment captures all prior train sequence concept columns
 	if(modalityName=="OR"):
 		useSANIcolumns = False
 		useSANIfeatures = True
@@ -841,11 +842,11 @@ if(useSANI):
 			arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance + arrayNumberOfSegmentsFeatureDistance
 		elif(useSANIcolumns):
 			if(multisentencePredictions):
-				arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#orig: + 1	#* numSentencesPerSequence 	#default: 5	#min number of external and internal column connections to target node (note first segment captures all other external columns)
+				arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#orig: + 1	#* numSentencesPerSequence 	#default: 5	#min number of external and internal column connections to target node
 			else:
-				arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#orig: + 1	#default: 2	#orig:3		#min number of external and internal column connections to target node (note first segment captures all other external columns)
+				arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#orig: + 1	#default: 2	#orig:3		#min number of external and internal column connections to target node
 					#max number of SANI segments per sequence (= max number of concept columns per sequence - 1)
-					#note if arrayNumberOfSegments=3 then;	sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: all other column connections
+					#note if arrayNumberOfSegments=3 then;	sIndex=2: sequential segment connections for current column, sIndex=1: adjacent column connections, sIndex=0: preceding column connections
 					#must be less than the (total number of concepts in a sequence - total number of concepts in effective predictive seed sequence)
 		elif(useSANIfeatures):
 			if(enforceDirectConnectionsSANIminimal):
@@ -1037,6 +1038,7 @@ if(printConfiguration):
 	print("numSeedTokensInference:", numSeedTokensInference)
 	if(useInference):
 		print("inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures:", inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures)
+		print("inferenceBurstAllPredictionsOrTargetsInSequence:", inferenceBurstAllPredictionsOrTargetsInSequence)
 	print("useBenchmarkDefaultsEvalTestSet:", useBenchmarkDefaultsEvalTestSet)
 	print("inferenceEvaluateTestSet:", inferenceEvaluateTestSet)
 	print("inferenceSegmentTiming:", inferenceSegmentTiming)
@@ -1163,6 +1165,8 @@ if(printConfiguration):
 		print("useSANIcolumns:", useSANIcolumns)
 		print("useSANIfeatures:", useSANIfeatures)
 		print("useSANIfeaturesAndColumns:", useSANIfeaturesAndColumns)
+		print("SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens:", SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens)
+		print("SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens:", SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens)
 		if(useSANIfeaturesAndColumns):
 			print("arrayNumberOfSegmentsColumnDistance: ", arrayNumberOfSegmentsColumnDistance)
 			print("arrayNumberOfSegmentsFeatureDistance: ", arrayNumberOfSegmentsFeatureDistance)

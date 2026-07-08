@@ -67,30 +67,40 @@ def trainAutoAuxiliaryNeuronsEnd(databaseNetworkObject):
 if(useDrawNetworkIndependently):
 	nlpArticle = None
 	nlpSequence = None
-elif(spacyPipelineSingleParse):
-	if(spacyPipelineMinimalComponents or spacyPipelineLightweightSentenceSegmentation):
-		spacyArticleDisableComponents = []
-		if(spacyPipelineMinimalComponents):
-			spacyArticleDisableComponents.append("ner")
-		nlpArticle = spacy.load(spacyModelName, disable=spacyArticleDisableComponents)
-	else:
-		nlpArticle = spacy.load(spacyModelName)
-	nlpSequence = nlpArticle
 else:
-	if(spacyPipelineLightweightSentenceSegmentation):
-		nlpArticle = spacy.blank("en")
-		nlpArticle.add_pipe("sentencizer")
-		if(spacyPipelineMinimalComponents):
-			nlpSequence = spacy.load(spacyModelName, disable=["ner", "parser"])
-		else:
-			nlpSequence = spacy.load(spacyModelName)
-	else:
-		if(spacyPipelineMinimalComponents):
-			nlpArticle = spacy.load(spacyModelName, disable=["ner"])
-			nlpSequence = spacy.load(spacyModelName, disable=["ner", "parser"])
-		else:
-			nlpArticle = spacy.load(spacyModelName)
+	if(sentencePredictions):
+		if(spacyPipelineSingleParse):
+			if(spacyPipelineMinimalComponents or spacyPipelineLightweightSentenceSegmentation):
+				spacyArticleDisableComponents = []
+				if(spacyPipelineMinimalComponents):
+					spacyArticleDisableComponents.append("ner")
+				nlpArticle = spacy.load(spacyModelName, disable=spacyArticleDisableComponents)
+			else:
+				nlpArticle = spacy.load(spacyModelName)
 			nlpSequence = nlpArticle
+		else:
+			if(spacyPipelineLightweightSentenceSegmentation):
+				nlpArticle = spacy.blank("en")
+				nlpArticle.add_pipe("sentencizer")
+				if(spacyPipelineMinimalComponents):
+					nlpSequence = spacy.load(spacyModelName, disable=["ner", "parser"])
+				else:
+					nlpSequence = spacy.load(spacyModelName)
+			else:
+				if(spacyPipelineMinimalComponents):
+					nlpArticle = spacy.load(spacyModelName, disable=["ner"])
+					nlpSequence = spacy.load(spacyModelName, disable=["ner", "parser"])
+				else:
+					nlpArticle = spacy.load(spacyModelName)
+					nlpSequence = nlpArticle
+	else:
+		if(not spacyPipelineOptimisations or not spacyPipelineSingleParse or not spacyPipelineMinimalComponents):
+			raise RuntimeError("sentencePredictions=False requires spacyPipelineOptimisations=True, spacyPipelineSingleParse=True, and spacyPipelineMinimalComponents=True")
+		if(spacyPipelineBatchSequences or spacyPipelineLightweightSentenceSegmentation):
+			raise RuntimeError("sentencePredictions=False requires spacyPipelineBatchSequences=False and spacyPipelineLightweightSentenceSegmentation=False")
+		nlpArticle = spacy.load(spacyModelName, disable=["ner", "parser"])
+		nlpSequence = nlpArticle
+
 
 
 def processPrompt(databaseNetworkObject, inferenceMode, sequenceCount):
@@ -197,6 +207,14 @@ def processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, ar
 							print("\ninferenceTrainFirstSequences: executing train:")
 			else:
 				inferenceSequenceInPrompt = True
+		if(sequencesCropToMaxLength):
+			if(len(sequence) > maxSequenceLength):
+				sequence = sequence[:maxSequenceLength]
+				sequenceRaw = sequence.text
+				#print("sequence cropped")
+			else:
+				pass
+				#print("sequence no crop required")
 		if(len(sequence) <= maxSequenceLength):
 			if(sequenceCount >= trainSetStartOffsetSequences):
 				if(executionMode=="trainDuringInference"):
@@ -236,7 +254,7 @@ def calculateProcessArticlePromptSequenceTotal(sequenceCount, sequences):
 		raise RuntimeError("calculateProcessArticlePromptSequenceTotal error: sequences must be a list")
 	sequenceCountTemp = sequenceCount
 	for sequence in sequences:
-		if(len(sequence) <= maxSequenceLength):
+		if(sequencesCropToMaxLength or len(sequence) <= maxSequenceLength):
 			if(sequenceCountTemp >= trainSetStartOffsetSequences):
 				result += 1
 			sequenceCountTemp += 1
@@ -264,7 +282,7 @@ def calculateProcessArticleEvalSequenceTotal(sequenceCount, sequences):
 				inferenceSequenceInPrompt = True
 		else:
 			inferenceSequenceInPrompt = True
-		if(len(sequence) <= maxSequenceLength):
+		if(sequencesCropToMaxLength or len(sequence) <= maxSequenceLength):
 			if(sequenceCountTemp >= trainSetStartOffsetSequences):
 				if(inferenceSequenceInPrompt):
 					result += 1
@@ -274,52 +292,80 @@ def calculateProcessArticleEvalSequenceTotal(sequenceCount, sequences):
 	return result
 
 def generateSeqencesBatchOrSerial(textParsed, skipMode):
-	sentences = list(textParsed.sents)
 	minSequenceLength = numSeedTokensInference + 1
 	sequences = []
 	sequencesRaw = []
 	sequencesText = []
-	if(multisentencePredictions):
-		for i in range(0, len(sentences), numSentencesPerSequence):
-			startIndex = sentences[i].start
-			endIndex = sentences[min(i + numSentencesPerSequence, len(sentences)) - 1].end
-			span = textParsed[startIndex:endIndex]
-			sequenceText = span.text
-			if(not sequenceText.strip()):
-				continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
-			sequenceText = sequenceText.lstrip()
-			if(not spacyPipelineBatchSequences):
-				if(spacyPipelineSingleParse or skipMode):
-					sequenceParsed = span.as_doc()
+	if(sentencePredictions):
+		sentences = list(textParsed.sents)
+		if(multisentencePredictions):
+			for i in range(0, len(sentences), numSentencesPerSequence):
+				startIndex = sentences[i].start
+				endIndex = sentences[min(i + numSentencesPerSequence, len(sentences)) - 1].end
+				span = textParsed[startIndex:endIndex]
+				sequenceText = span.text
+				if(not sequenceText.strip()):
+					continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
+				sequenceText = sequenceText.lstrip()
+				if(not spacyPipelineBatchSequences):
+					if(spacyPipelineSingleParse or skipMode):
+						sequenceParsed = span.as_doc()
+					else:
+						sequenceParsed = nlpSequence(sequenceText)
+					if(len(sequenceParsed) == 0):
+						continue
+					if(len(sequenceParsed) < minSequenceLength):
+						continue
+					sequences.append(sequenceParsed)
+					sequencesRaw.append(sequenceText)
 				else:
-					sequenceParsed = nlpSequence(sequenceText)
-				if(len(sequenceParsed) == 0):
-					continue
-				if(len(sequenceParsed) < minSequenceLength):
-					continue
-				sequences.append(sequenceParsed)
-				sequencesRaw.append(sequenceText)
-			else:
-				sequencesText.append(sequenceText)
+					sequencesText.append(sequenceText)
+		else:
+			for sentence in sentences:
+				sequenceText = sentence.text
+				if(not sequenceText.strip()):
+					continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
+				sequenceText = sequenceText.lstrip()
+				if(not spacyPipelineBatchSequences):
+					if(spacyPipelineSingleParse or skipMode):
+						sequenceParsed = sentence.as_doc()
+					else:
+						sequenceParsed = nlpSequence(sequenceText)
+					if(len(sequenceParsed) == 0):
+						continue
+					if(len(sequenceParsed) < minSequenceLength):
+						continue
+					sequences.append(sequenceParsed)
+					sequencesRaw.append(sequenceText)
+				else:
+					sequencesText.append(sequenceText)
 	else:
-		for sentence in sentences:
-			sequenceText = sentence.text
-			if(not sequenceText.strip()):
-				continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
-			sequenceText = sequenceText.lstrip()
-			if(not spacyPipelineBatchSequences):
-				if(spacyPipelineSingleParse or skipMode):
-					sequenceParsed = sentence.as_doc()
-				else:
-					sequenceParsed = nlpSequence(sequenceText)
-				if(len(sequenceParsed) == 0):
-					continue
-				if(len(sequenceParsed) < minSequenceLength):
-					continue
+		startIndex = 0
+		endIndex = len(textParsed)
+		sequenceEndIndex = None
+		sequenceStartIndex = None
+		sequenceParsed = None
+		sequenceText = None
+		if(maxSequenceLength < minSequenceLength):
+			raise RuntimeError("generateSeqencesBatchOrSerial error: maxSequenceLength must be >= minSequenceLength")
+		while(startIndex < endIndex and textParsed[startIndex].is_space):
+			startIndex += 1
+		while(endIndex > startIndex and textParsed[endIndex-1].is_space):
+			endIndex -= 1
+		while(startIndex < endIndex):
+			sequenceStartIndex = startIndex
+			sequenceEndIndex = min(startIndex+maxSequenceLength, endIndex)
+			while(sequenceStartIndex < sequenceEndIndex and textParsed[sequenceStartIndex].is_space):
+				sequenceStartIndex += 1
+			while(sequenceEndIndex > sequenceStartIndex and textParsed[sequenceEndIndex-1].is_space):
+				sequenceEndIndex -= 1
+			if(sequenceStartIndex < sequenceEndIndex):
+				sequenceParsed = textParsed[sequenceStartIndex:sequenceEndIndex]
+				sequenceText = sequenceParsed.text
+			if(sequenceStartIndex < sequenceEndIndex and len(sequenceParsed) >= minSequenceLength):
 				sequences.append(sequenceParsed)
 				sequencesRaw.append(sequenceText)
-			else:
-				sequencesText.append(sequenceText)
+			startIndex += maxSequenceLength
 	if(spacyPipelineBatchSequences):
 		for sequenceIndex, sequenceParsed in enumerate(nlpSequence.pipe(sequencesText)):
 			if(len(sequenceParsed) == 0):
@@ -464,7 +510,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 			GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "SequenceObservedColumns.__init__", time.perf_counter() - sequenceObservedColumnsInitStartTime)
 
 		if(inferenceMode):
-			if(conceptColumnsDelimitByPOS and sequenceObservedColumns.noDelimiterDetectedBetweenConceptTokens):
+			if(skipSequenceNoDelimiterDetectedBetweenConceptTokens and conceptColumnsDelimitByPOS and sequenceObservedColumns.noDelimiterDetectedBetweenConceptTokens):
 				if(debugWarningInferenceNoDelimiterDetectedBetweenConceptTokens):
 					print("warning: inference skipped due to missing concept column delimiter detection in sequence")
 			else:

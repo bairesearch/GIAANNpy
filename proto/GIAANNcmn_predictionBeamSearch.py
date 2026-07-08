@@ -300,15 +300,25 @@ def calculateSelectionActivationDistribution(databaseNetworkObject, stateFeature
 	if(inferenceUseNeuronFeaturePropertiesTime):
 		# spec step (b): apply time-based activation modifier during beam candidate selection
 		stateFeaturesSelection = GIAANNcmn_predictionActivate.applyTimeBasedActivationModifier(stateFeaturesSelection, stateTime, sequenceWordIndex, sequenceColumnIndex)
-	columnIndices, featureIndices, activationValues = GIAANNcmn_predictionConstraints.aggregateSparseColumnFeatureValues(stateFeaturesSelection, databaseNetworkObject.f)
+	requiredSegmentKeys = None
+	if(requiresCandidateRequiredSegmentFilter()):
+		requiredSegmentKeys = calculateRequiredSegmentConstraintKeyTensor(stateFeaturesSelection, databaseNetworkObject.f, stateFeaturesSelection.device)
+	columnIndices, featureIndices, activationValues = GIAANNcmn_predictionConstraints.aggregateSparseColumnFeatureValues(stateFeaturesSelection, databaseNetworkObject.f, requiredSegmentKeys)
 	if(columnIndices is not None):
 		columnIndices, featureIndices, activationValues = filterCandidatesByActivationThreshold(columnIndices, featureIndices, activationValues)
-		columnIndices, featureIndices, activationValues = filterCandidatesByRequiredSegments(columnIndices, featureIndices, activationValues, stateFeaturesSelection, databaseNetworkObject.f)
+		if(requiredSegmentKeys is None):
+			columnIndices, featureIndices, activationValues = filterCandidatesByRequiredSegments(columnIndices, featureIndices, activationValues, stateFeaturesSelection, databaseNetworkObject.f)
 		if(columnIndices is not None):
 			columnIndices, featureIndices, activationValues = GIAANNcmn_predictionConstraints.filterColumnFeatureCandidatesByConnectedColumns(columnIndices, featureIndices, activationValues, connectedColumnsTensor, connectedColumnsFeatures)
 		if(columnIndices is not None and applyConstraintFilter):
 			columnIndices, featureIndices, activationValues = GIAANNcmn_predictionConstraints.filterColumnFeatureCandidatesByConstraint(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
 	return columnIndices, featureIndices, activationValues
+
+def requiresCandidateRequiredSegmentFilter():
+	result = False
+	if(useSANI and algorithmMatrixSANImethod=="enforceActivationAcrossSegments" and algorithmMatrixSANIenforceRequirement!="enforceAnySegmentMustBeActive"):
+		result = True
+	return result
 
 def filterCandidatesByRequiredSegments(columnIndices, featureIndices, activationValues, stateFeatures, maxFeatures):
 	filteredColumns = columnIndices
@@ -320,29 +330,95 @@ def filterCandidatesByRequiredSegments(columnIndices, featureIndices, activation
 			filteredFeatures = None
 			filteredActivations = None
 		else:
-			constraintActivation = calculateRequiredSegmentConstraintActivation(stateFeatures)
-			constraintKeySet = buildConstraintActivationKeySet(constraintActivation, maxFeatures)
-			if(constraintKeySet is None or len(constraintKeySet) == 0):
+			constraintKeys = calculateRequiredSegmentConstraintKeyTensor(stateFeatures, maxFeatures, filteredColumns.device)
+			if(constraintKeys is None or constraintKeys.numel() == 0):
 				filteredColumns = None
 				filteredFeatures = None
 				filteredActivations = None
 			else:
-				selectedIndices = []
-				for idx in range(filteredColumns.shape[0]):
-					key = int(filteredColumns[idx].item()) * maxFeatures + int(filteredFeatures[idx].item())
-					if(key in constraintKeySet):
-						selectedIndices.append(idx)
-				if(len(selectedIndices) == 0):
+				candidateKeys = filteredColumns.long() * int(maxFeatures) + filteredFeatures.long()
+				selectedMask = GIAANNcmn_predictionConstraints.buildSortedKeyMembershipMask(candidateKeys, constraintKeys)
+				if(selectedMask is None or selectedMask.sum().item() == 0):
 					filteredColumns = None
 					filteredFeatures = None
 					filteredActivations = None
 				else:
-					indexTensor = pt.tensor(selectedIndices, dtype=pt.long, device=filteredColumns.device)
+					indexTensor = pt.nonzero(selectedMask, as_tuple=False).view(-1)
 					filteredColumns = filteredColumns.index_select(0, indexTensor)
 					filteredFeatures = filteredFeatures.index_select(0, indexTensor)
 					filteredActivations = filteredActivations.index_select(0, indexTensor)
 
 	return filteredColumns, filteredFeatures, filteredActivations
+
+def buildConstraintActivationKeyTensor(constraintActivation, maxFeatures, device):
+	result = None
+	if(constraintActivation is not None):
+		if(not constraintActivation.is_sparse):
+			constraintActivation = constraintActivation.to_sparse()
+		if(constraintActivation.dim() == 3):
+			if(multipleDendriticBranches):
+				constraintActivation = GIAANNcmn_sparseTensors.reduceSparseBranchMax(constraintActivation)
+			else:
+				constraintActivation = GIAANNcmn_sparseTensors.collapseSparseBranchDimension(constraintActivation)
+		if(constraintActivation.dim() != 2):
+			raise RuntimeError("buildConstraintActivationKeyTensor error: constraintActivation must collapse to column/feature dimensions")
+		constraintActivation = constraintActivation.coalesce()
+		if(constraintActivation._nnz() == 0):
+			result = pt.empty((0,), dtype=pt.long, device=device)
+		else:
+			constraintIndices = constraintActivation.indices().to(device)
+			constraintKeys = constraintIndices[0].long() * int(maxFeatures) + constraintIndices[1].long()
+			result = pt.sort(pt.unique(constraintKeys)).values
+	return result
+
+def calculateRequiredSegmentConstraintKeyTensor(stateFeatures, maxFeatures, device):
+	result = None
+	if(stateFeatures is None):
+		result = None
+	else:
+		if(algorithmMatrixSANIenforceRequirement=="enforceAnySegmentMustBeActive"):
+			result = None
+		elif(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+			result = calculateLastSegmentConstraintKeyTensor(stateFeatures, maxFeatures, device)
+		elif(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):
+			constraintActivation = calculateRequiredSegmentConstraintActivation(stateFeatures)
+			result = buildConstraintActivationKeyTensor(constraintActivation, maxFeatures, device)
+		else:
+			raise RuntimeError("calculateRequiredSegmentConstraintKeyTensor error: algorithmMatrixSANIenforceRequirement is invalid")
+	return result
+
+def calculateLastSegmentConstraintKeyTensor(stateFeatures, maxFeatures, device):
+	result = None
+	if(stateFeatures is None):
+		result = None
+	else:
+		if(stateFeatures.is_sparse):
+			if(stateFeatures._nnz() == 0):
+				result = pt.empty((0,), dtype=pt.long, device=device)
+			else:
+				lastSegmentConstraint = calculateLastSegmentConstraintIndex()
+				indices = stateFeatures._indices()
+				hasBranchDim = stateFeatures.dim() == 4
+				if(hasBranchDim):
+					segmentDim = 1
+					columnDim = 2
+					featureDim = 3
+				else:
+					if(stateFeatures.dim() != 3):
+						raise RuntimeError("calculateLastSegmentConstraintKeyTensor error: sparse stateFeatures must have segment/column/feature dimensions")
+					segmentDim = 0
+					columnDim = 1
+					featureDim = 2
+				segmentMask = indices[segmentDim] == lastSegmentConstraint
+				if(segmentMask.sum().item() == 0):
+					result = pt.empty((0,), dtype=pt.long, device=device)
+				else:
+					constraintKeys = indices[columnDim, segmentMask].to(device).long() * int(maxFeatures) + indices[featureDim, segmentMask].to(device).long()
+					result = pt.sort(pt.unique(constraintKeys)).values
+		else:
+			constraintActivation = calculateLastSegmentConstraintActivation(stateFeatures)
+			result = buildConstraintActivationKeyTensor(constraintActivation, maxFeatures, device)
+	return result
 
 def calculateRequiredSegmentConstraintActivation(stateFeatures):
 	result = None
@@ -362,12 +438,17 @@ def calculateRequiredSegmentConstraintActivation(stateFeatures):
 			raise RuntimeError("calculateRequiredSegmentConstraintActivation error: algorithmMatrixSANIenforceRequirement is invalid")
 	return result
 
+def calculateLastSegmentConstraintIndex():
+	result = None
+	if(enforceActivationAcrossSegmentsIgnoreInternalColumn):
+		result = arrayIndexSegmentAdjacentColumn
+	else:
+		result = arrayIndexSegmentLast
+	return result
+
 def calculateLastSegmentConstraintActivation(stateFeatures):
 	lastSegmentActivation = None
-	if(enforceActivationAcrossSegmentsIgnoreInternalColumn):
-		lastSegmentConstraint = arrayIndexSegmentAdjacentColumn
-	else:
-		lastSegmentConstraint = arrayIndexSegmentLast
+	lastSegmentConstraint = calculateLastSegmentConstraintIndex()
 	hasBranchDim = (stateFeatures.dim() == 4)
 	if(stateFeatures.is_sparse):
 		if(hasBranchDim):

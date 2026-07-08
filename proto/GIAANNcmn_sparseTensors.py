@@ -166,24 +166,14 @@ def reduceSparseBranchMax(sparseTensor):
 		for i in range(len(newSize)-2, -1, -1):
 			strides[i] = strides[i+1] * newSize[i+1]
 		keys = (indicesTail * strides.unsqueeze(1)).sum(dim=0)
-		sortedKeys, sortOrder = pt.sort(keys)
-		sortedValues = values.index_select(0, sortOrder)
-		sortedIndices = indicesTail.index_select(1, sortOrder)
-		uniqueKeys, counts = pt.unique_consecutive(sortedKeys, return_counts=True)
-		maxValuesList = []
-		maxIndicesList = []
-		start = 0
-		for countValue in counts.tolist():
-			end = start + countValue
-			segmentValues = sortedValues[start:end]
-			maxValue, maxPos = pt.max(segmentValues, dim=0)
-			maxValuesList.append(maxValue)
-			maxIndex = sortedIndices[:, start + int(maxPos.item())]
-			maxIndicesList.append(maxIndex)
-			start = end
-		if(len(maxValuesList) > 0):
-			newIndices = pt.stack(maxIndicesList, dim=1)
-			newValues = pt.stack(maxValuesList)
+		uniqueKeys, inverseIndices = pt.unique(keys, sorted=True, return_inverse=True)
+		if(uniqueKeys.numel() > 0):
+			newValues = pt.empty((uniqueKeys.shape[0],), dtype=values.dtype, device=values.device)
+			newValues.scatter_reduce_(0, inverseIndices, values, reduce="amax", include_self=False)
+			newIndicesList = []
+			for i in range(len(newSize)):
+				newIndicesList.append(pt.remainder(pt.div(uniqueKeys, strides[i], rounding_mode="floor"), int(newSize[i])))
+			newIndices = pt.stack(newIndicesList, dim=0)
 			result = pt.sparse_coo_tensor(newIndices, newValues, size=newSize, device=sparseTensor.device)
 		else:
 			emptyIndices = pt.empty((len(newSize), 0), dtype=pt.long, device=sparseTensor.device)
@@ -631,42 +621,42 @@ def sparse_rowwise_max(x):
 	return out
 
 def selectAindicesContainedInB(A, B):
-	# Suppose A and B are sparse tensors of the same shape.
-	# Make sure they are coalesced so .indices() and .values() behave nicely.
 	A = A.coalesce()
 	B = B.coalesce()
+	A_indices = A.indices()
+	A_values = A.values()
+	B_indices = B.indices()
+	if(A.size() != B.size()):
+		raise RuntimeError("selectAindicesContainedInB error: tensor sizes do not match")
+	if(A_indices.shape[0] != B_indices.shape[0]):
+		raise RuntimeError("selectAindicesContainedInB error: tensor ranks do not match")
+	if(A_indices.numel() == 0 or B_indices.numel() == 0):
+		A_indices_in_B = pt.empty((A_indices.shape[0], 0), dtype=A_indices.dtype, device=A_indices.device)
+		A_values_in_B = pt.empty((0,), dtype=A_values.dtype, device=A_values.device)
+	else:
+		A_keys = buildSparseTensorIndexKeys(A_indices, A.size())
+		B_keys = buildSparseTensorIndexKeys(B_indices, B.size())
+		B_keys = pt.sort(pt.unique(B_keys)).values
+		positions = pt.searchsorted(B_keys, A_keys)
+		valid = positions < B_keys.shape[0]
+		safePositions = positions.clamp(max=B_keys.shape[0]-1)
+		mask = valid & (B_keys[safePositions] == A_keys)
+		A_indices_in_B = A_indices[:, mask]
+		A_values_in_B = A_values[mask]
+	result = pt.sparse_coo_tensor(A_indices_in_B, A_values_in_B, size=A.shape, device=A.device)
+	return result
 
-	# Extract indices (shape: [ndim, nnz]) and values (shape: [nnz])
-	A_indices = A.indices()  # [dim, nnzA]
-	A_values  = A.values()   # [nnzA]
-	B_indices = B.indices()  # [dim, nnzB]
-
-	# Transpose the indices to shape [nnz, dim] for comparison
-	A_indices_t = A_indices.t()  # [nnzA, dim]
-	B_indices_t = B_indices.t()  # [nnzB, dim]
-
-	# Compare every index in A to every index in B using broadcasting:
-	#  1)  Expand A_indices_t to [nnzA, 1, dim]
-	#  2)  Expand B_indices_t to [1, nnzB, dim]
-	#  3)  Compare elementwise (==), giving [nnzA, nnzB, dim]
-	#  4)  Check all coordinates match with .all(dim=2), giving [nnzA, nnzB]
-	#  5)  Reduce along nnzB dimension with .any(dim=1), yielding [nnzA]
-	mask = (A_indices_t.unsqueeze(1) == B_indices_t.unsqueeze(0)).all(dim=2).any(dim=1)
-
-	# mask[i] = True if A_indices_t[i] is in B, else False
-
-	# Use the mask to pick out the "intersection" of A's indices
-	A_indices_in_B = A_indices[:, mask]
-	A_values_in_B  = A_values[mask]
-
-	# Build the new sparse tensor that contains only A's entries whose
-	# indices appear in B
-	A_intersect_B = pt.sparse_coo_tensor(A_indices_in_B,  A_values_in_B, size=A.shape, device=A.device)
-
-	# Now A_intersect_B has only those (index, value) pairs from A 
-	# whose indices are also present in B.
-	
-	return A_intersect_B
+def buildSparseTensorIndexKeys(indices, size):
+	result = None
+	if(indices.dim() != 2):
+		raise RuntimeError("buildSparseTensorIndexKeys error: indices must be rank 2")
+	if(len(size) != indices.shape[0]):
+		raise RuntimeError("buildSparseTensorIndexKeys error: index rank does not match tensor size")
+	strides = pt.ones((len(size),), dtype=pt.long, device=indices.device)
+	for i in range(len(size)-2, -1, -1):
+		strides[i] = strides[i+1] * int(size[i+1])
+	result = (indices * strides.unsqueeze(1)).sum(dim=0)
+	return result
 
 def selectAindicesContainedInBBinaryTree(A, B):
 	result = None

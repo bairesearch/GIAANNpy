@@ -432,14 +432,17 @@ def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens
 					elif(rightmostIndeterministic is not None):
 						delimiterIndices.append(rightmostIndeterministic)
 					else:
-						noDelimiterDetectedBetweenConceptTokens = True
-						if(debugTerminateOnConceptColumnsDelimitByPOSwarning):
-							print("warning: no delimiter detected between concept tokens: concept #1: Position = ", conceptPosition, ", Index = ", leftIndex, ", Name = ", getTokenDisplayText(tokens[leftIndex]), ". concept #2: Position = ", conceptPosition+1, ", Index = ", rightIndex, ", Name = ", getTokenDisplayText(tokens[rightIndex]), ".")						
-						if(debugTerminateOnConceptColumnsDelimitByPOSerror):
-							exitWithError()
-						#sequenceObservedColumns.noDelimiterDetectedBetweenConceptTokens = True
-						#return None
-						delimiterIndices.append(leftIndex)	#or rightIndex	#append dummy so that sequence can still be printed
+						if(skipSequenceNoDelimiterDetectedBetweenConceptTokens):
+							noDelimiterDetectedBetweenConceptTokens = True
+							if(debugTerminateOnConceptColumnsDelimitByPOSwarning):
+								print("warning: no delimiter detected between concept tokens: concept #1: Position = ", conceptPosition, ", Index = ", leftIndex, ", Name = ", getTokenDisplayText(tokens[leftIndex]), ". concept #2: Position = ", conceptPosition+1, ", Index = ", rightIndex, ", Name = ", getTokenDisplayText(tokens[rightIndex]), ".")
+							if(debugTerminateOnConceptColumnsDelimitByPOSerror):
+								exitWithError()
+							#sequenceObservedColumns.noDelimiterDetectedBetweenConceptTokens = True
+							#return None
+							delimiterIndices.append(leftIndex)	#or rightIndex	#append dummy so that sequence can still be printed
+						if(not skipSequenceNoDelimiterDetectedBetweenConceptTokens):
+							delimiterIndices.append(rightIndex-1)
 				startIndices = pt.zeros_like(conceptIndicesSorted)
 				endIndices = pt.full_like(conceptIndicesSorted, sequenceLength)
 				for conceptPosition, delimiterIndex in enumerate(delimiterIndices):

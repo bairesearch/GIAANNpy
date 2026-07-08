@@ -604,6 +604,9 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	if(printPredictionsDuringInferencePredict):
 		print("\t sequenceWordIndex = ", sequenceWordIndex, ", wordPredictionIndex = ", wordPredictionIndex, ", targetWord = ", targetWord, ", predictedWord = ", predictedWord, ", targetColumn = ", targetColumnName, ", predictedColumn = ", predictedColumnName)
 
+	if(inferenceBurstAllPredictionsOrTargetsInSequence):
+		globalFeatureNeuronsActivation = activateSelectedFeatureNeuronAfterPredictionPhase(seedPhase, globalFeatureNeuronsActivation, conceptColumnIndexNext, conceptColumnFeatureIndexNext)
+
 	#load predicted feature observed column; 
 	if(inferenceOnlyRetainPredictedTargetObservedColumn):
 		if(conceptColumnIndexPred is None):
@@ -621,6 +624,15 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		if(executionMode=="inference"):
 			GIAANNcmn_debug.debugPrintRamUsage("processColumnInferencePrediction", "sequenceIndex = " + str(sequenceIndex) + ", sequenceWordIndex = " + str(sequenceWordIndex) + ", wordPredictionIndex = " + str(wordPredictionIndex) + ", seedPhase = " + str(seedPhase))
 	return featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime
+
+def activateSelectedFeatureNeuronAfterPredictionPhase(seedPhase, globalFeatureNeuronsActivation, conceptColumnIndexNext, conceptColumnFeatureIndexNext):
+	globalFeatureNeuronsActivationResult = globalFeatureNeuronsActivation
+	if(inferenceBurstAllPredictionsOrTargetsInSequence):
+		if(not seedPhase):
+			if(conceptColumnIndexNext is None or conceptColumnFeatureIndexNext is None):
+				raise RuntimeError("activateSelectedFeatureNeuronAfterPredictionPhase error: selected column/feature is required")
+			globalFeatureNeuronsActivationResult = activateSeedPredictionSegments(globalFeatureNeuronsActivationResult, conceptColumnIndexNext, conceptColumnFeatureIndexNext)
+	return globalFeatureNeuronsActivationResult
 
 def ensurePredictionStateAvailable(conceptColumnsIndices, conceptColumnsFeatureIndices, sequenceWordIndex, wordPredictionIndex, tokensSequence, reason):
 	if(conceptColumnsIndices is None or conceptColumnsIndices.numel() == 0):

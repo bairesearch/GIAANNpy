@@ -857,19 +857,14 @@ def selectActivatedBranchIndex(globalFeatureNeuronsActivation, columnIndex, feat
 	elif(globalFeatureNeuronsActivation is None):
 		result = arrayIndexSegmentFirst
 	elif(globalFeatureNeuronsActivation.is_sparse):
-		sparseActivation = globalFeatureNeuronsActivation.coalesce()
-		if(sparseActivation._nnz() != arrayIndexSegmentFirst):
-			indices = sparseActivation.indices()
-			values = sparseActivation.values()
+		if(globalFeatureNeuronsActivation._nnz() != arrayIndexSegmentFirst):
+			indices = globalFeatureNeuronsActivation._indices()
+			values = globalFeatureNeuronsActivation._values()
 			mask = (indices[2] == columnIndex) & (indices[3] == featureIndex)
 			if(pt.any(mask)):
-				branchIndices = indices[0, mask].tolist()
-				branchValues = values[mask].tolist()
-				branchScores = {}
-				for branchIndex, value in zip(branchIndices, branchValues):
-					branchScores[branchIndex] = branchScores.get(branchIndex, 0.0) + float(value)
-				bestBranch = max(branchScores, key=branchScores.get)
-				result = int(bestBranch)
+				branchScores = pt.zeros((globalFeatureNeuronsActivation.size(0),), dtype=values.dtype, device=values.device)
+				branchScores.index_add_(arrayIndexSegmentFirst, indices[0, mask], values[mask])
+				result = int(pt.argmax(branchScores).item())
 	else:
 		activationSlice = globalFeatureNeuronsActivation[:, :, columnIndex, featureIndex]
 		if(activationSlice.numel() != arrayIndexSegmentFirst):
