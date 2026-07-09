@@ -646,18 +646,6 @@ def selectAindicesContainedInB(A, B):
 	result = pt.sparse_coo_tensor(A_indices_in_B, A_values_in_B, size=A.shape, device=A.device)
 	return result
 
-def buildSparseTensorIndexKeys(indices, size):
-	result = None
-	if(indices.dim() != 2):
-		raise RuntimeError("buildSparseTensorIndexKeys error: indices must be rank 2")
-	if(len(size) != indices.shape[0]):
-		raise RuntimeError("buildSparseTensorIndexKeys error: index rank does not match tensor size")
-	strides = pt.ones((len(size),), dtype=pt.long, device=indices.device)
-	for i in range(len(size)-2, -1, -1):
-		strides[i] = strides[i+1] * int(size[i+1])
-	result = (indices * strides.unsqueeze(1)).sum(dim=0)
-	return result
-
 def selectAindicesContainedInBBinaryTree(A, B):
 	result = None
 	if(multipleDendriticBranchesBinaryTree):

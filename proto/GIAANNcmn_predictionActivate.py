@@ -862,9 +862,12 @@ def selectActivatedBranchIndex(globalFeatureNeuronsActivation, columnIndex, feat
 			values = globalFeatureNeuronsActivation._values()
 			mask = (indices[2] == columnIndex) & (indices[3] == featureIndex)
 			if(pt.any(mask)):
-				branchScores = pt.zeros((globalFeatureNeuronsActivation.size(0),), dtype=values.dtype, device=values.device)
-				branchScores.index_add_(arrayIndexSegmentFirst, indices[0, mask], values[mask])
-				result = int(pt.argmax(branchScores).item())
+				selectedActivation = pt.sparse_coo_tensor(indices[:2, mask], values[mask], size=globalFeatureNeuronsActivation.size()[:2], dtype=values.dtype, device=values.device).coalesce()
+				branchIndices = selectedActivation.indices()[0]
+				uniqueBranchIndices, inverseBranchIndices = pt.unique(branchIndices, sorted=True, return_inverse=True)
+				branchScores = pt.zeros((uniqueBranchIndices.shape[0],), dtype=values.dtype, device=values.device)
+				branchScores.index_add_(arrayIndexSegmentFirst, inverseBranchIndices, selectedActivation.values())
+				result = int(uniqueBranchIndices[pt.argmax(branchScores)].item())
 	else:
 		activationSlice = globalFeatureNeuronsActivation[:, :, columnIndex, featureIndex]
 		if(activationSlice.numel() != arrayIndexSegmentFirst):

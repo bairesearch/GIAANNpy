@@ -183,6 +183,7 @@ def aggregateSparseColumnFeatureValues(sparseTensor, maxFeatures, requiredColumn
 
 def filterSparseTensorByColumnFeatureKeys(sparseTensor, maxFeatures, requiredColumnFeatureKeys):
 	result = None
+	sparseTensor = sparseTensor.coalesce()
 	if(sparseTensor._nnz() == 0 or requiredColumnFeatureKeys is None or requiredColumnFeatureKeys.numel() == 0):
 		emptyIndices = pt.empty((sparseTensor._indices().shape[0], 0), dtype=sparseTensor._indices().dtype, device=sparseTensor._indices().device)
 		emptyValues = pt.empty((0,), dtype=sparseTensor._values().dtype, device=sparseTensor._values().device)

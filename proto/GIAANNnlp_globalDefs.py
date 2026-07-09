@@ -329,7 +329,8 @@ if(useInference):
 								#printe("inference_prompt.txt.longTrainOscar-useBenchmarkDefaultsFalse.txt not yet created")
 				else:
 					if(inferenceEvaluateTestSet):
-						inferencePromptFileName = 'inference_prompt.txt.longTestOscar-SentencePredictionsFalse-maxSequenceLength409'
+						#inferencePromptFileName = 'inference_prompt.txt.longTestOscar-SentencePredictionsFalse-maxSequenceLength409'
+						inferencePromptFileName = 'inference_prompt.txt.longTestOscar'	#optionally keep same for direct comparison
 					else:
 						inferencePromptFileName = 'inference_prompt.txt.longTrainOscar-SentencePredictionsFalse-maxSequenceLength409'
 			else:
@@ -626,6 +627,8 @@ if(useBenchmark):
 	#v2 benchmarks;
 	if(inferenceReportGroundedAccuracy):
 		benchmarkAblationText = "-inferenceReportGroundedAccuracy"
+	elif(not sentencePredictions):
+		benchmarkAblationText = "-sentencePredictionsFalse"
 	elif(tokeniserSubword):
 		if(tokeniserSubwordPOS):
 			benchmarkAblationText = "-tokeniserSubwordPOS"
@@ -663,9 +666,6 @@ if(useBenchmark):
 		benchmarkAblationText = "-spacyPipelineOptimisations"
 	else:
 		benchmarkAblationText = ""
-	if(not sentencePredictions):
-		sentencePredictionsFalseBenchmarkAblationSuffix = "-sentencePredictionsFalse"
-		benchmarkAblationText = sentencePredictionsFalseBenchmarkAblationSuffix + benchmarkAblationText
 	if(datasetType=="wikipedia"):
 		databaseTypeText = ""	#or Wikipedia
 	elif(datasetType=="oscar"):

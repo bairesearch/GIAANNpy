@@ -301,7 +301,7 @@ def calculateSelectionActivationDistribution(databaseNetworkObject, stateFeature
 		# spec step (b): apply time-based activation modifier during beam candidate selection
 		stateFeaturesSelection = GIAANNcmn_predictionActivate.applyTimeBasedActivationModifier(stateFeaturesSelection, stateTime, sequenceWordIndex, sequenceColumnIndex)
 	requiredSegmentKeys = None
-	if(requiresCandidateRequiredSegmentFilter()):
+	if(requiresCandidateRequiredSegmentFilter() and stateFeaturesSelection is not None):
 		requiredSegmentKeys = calculateRequiredSegmentConstraintKeyTensor(stateFeaturesSelection, databaseNetworkObject.f, stateFeaturesSelection.device)
 	columnIndices, featureIndices, activationValues = GIAANNcmn_predictionConstraints.aggregateSparseColumnFeatureValues(stateFeaturesSelection, databaseNetworkObject.f, requiredSegmentKeys)
 	if(columnIndices is not None):

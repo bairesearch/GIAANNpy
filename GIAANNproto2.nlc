@@ -509,19 +509,23 @@ v2j (Codex IDE GPT-5.5) [under development]:
 	- implement option SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens=False, which affects both useSANIfeaturesAndColumns and useSANIcolumns modes.
 		- set SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=False, which affects both useSANIfeaturesAndColumns and useSANIfeatures modes.
 	- optimise eval:
-		- `perf(eval): vectorize SANI required-segment candidate filtering`
+		- 1. `perf(eval): vectorize SANI required-segment candidate filtering`
 			- replace Python set/list membership checks in prediction candidate filtering with tensor key membership. This keeps SANI required-segment semantics unchanged while avoiding per-candidate Python loops during long eval sequences.
-		- `perf(eval): prefilter sparse candidate aggregation by required segment keys`
+		- 2. `perf(eval): prefilter sparse candidate aggregation by required segment keys`
 			- push required SANI column-feature key filtering into sparse aggregation so irrelevant activation entries are removed before branch reduction and candidate aggregation.
-		- `perf(sparse): vectorize sparse branch max reduction`
+		- 3. `perf(sparse): vectorize sparse branch max reduction`
 			- replace Python grouping loops in `reduceSparseBranchMax()` with tensor `unique`/`scatter_reduce_` operations. This improves multiple-branch sparse activation reduction used during inference candidate selection.
-		- `perf(sparse): replace broadcast sparse intersection with key lookup`
+		- 4. `perf(sparse): replace broadcast sparse intersection with key lookup`
 			- rework `selectAindicesContainedInB()` to use flattened sparse index keys and `searchsorted` membership instead of an O(nnzA * nnzB) broadcast comparison.
-		- `perf(eval): avoid full coalesce in sparse branch selection`
+		- 5. `perf(eval): avoid full coalesce in sparse branch selection`
 			- optimise `selectActivatedBranchIndex()` by using sparse `_indices()`/`_values()` and tensor `index_add_` for branch scoring, avoiding full tensor coalescing and Python dictionaries during prediction deactivation.
 	- restore inferenceBurstAllPredictionsOrTargetsInSequence - patch inference to always activate the top-1 selected feature neuron (ie the prediction or target respectively as per inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures).
 		- revert previous 1i patch: "remove option inferenceBurstAllPredictionsOrTargetsInSequence".
 		- inferenceBurstAllPredictionsOrTargetsInSequence explicitly writes activation into the selected source neuron via activateSeedPredictionSegments():
 			- that guarantees the selected top-1 feature is active when the next step uses it as a source.
 			- if the selected prediction/target neuron itself was not already active, the next step could read the correct source connections but multiply them by zero or insufficient source activation.
+- patch eval optimisations:
+	- 2. fix(eval): preserve exact aggregation semantics when prefiltering sparse candidates by required segment keys.
+	- 4. fix(sparse): reuse validated sparse index key generation for sparse intersection.
+	- 5. fix(eval): preserve present-branch semantics in optimized sparse branch selection.
 
