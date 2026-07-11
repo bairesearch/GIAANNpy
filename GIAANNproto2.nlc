@@ -1,7 +1,7 @@
 //GIAANNpy Specification (prompts):
 
 ---
-v2a (Codex IDE GPT-5.4->GPT-5.5) [under development]:
+v2a (Codex IDE GPT-5.4->GPT-5.5):
 - add proto GIAANNproto2a1a - start option useModalityOR=True:
 	- GIAANNor_datasets.py: add huggingface datasetType for video (find an appropriate dataset for short approx 1-3 minute lengthed, moderate resolution, video streams).
 	- GIAANNor_RFfilters.py: initialise a set of receptive field (RF) filters:
@@ -117,7 +117,7 @@ MANUAL; - update database save paths to only use specialised inference_prompt.tx
 MANUAL; - add option modalityORsnapshotCentreFOVonly
 
 ---
-v2b (Codex IDE GPT-5.5) [under development]:
+v2b (Codex IDE GPT-5.5):
 - add proto GIAANNproto2b1a - start option datasetType=="closedWorldGroundedX" and inferenceReportGroundedAccuracy:
 	- due to the whole-word tokenisation of GIAANN, it limits prediction outside of the training-set. However it is not clear the extent to which this limitation is a) preventing hallucination (either false predictions or correct predictions without sufficient grounding within the training-set), or b) not making predictions that are justifiable within the training set (i.e. undergeneralisation).
 	- as recommended in the conclusion of GIAANN-grounded-eval-deep-research-report.md, please implement;
@@ -142,7 +142,7 @@ MANUAL; - extract execution mode useDefault
 - update printTrainSequenceText() and buildSequenceWithDelimiters() to use a terminal safe version of token.text - ie certain special characters should not stop the terminal output from being printed. Add a function to convert token.text to a safe text version that will not interfere with terminal printing.
 
 ---
-v2c (Codex IDE GPT-5.5) [under development]:
+v2c (Codex IDE GPT-5.5):
 REMOVED; 
 	- add proto GIAANNproto2c1a - start option auxiliaryNeuronsTokenisationSubwordStatic=True
 		- auxiliaryNeuronsTokenisationSubwordStatic=True adds source-column-scoped lemma/morph/suffix auxiliary source features for NLP whole-word parent features, improving morphological generalisation without creating subword output prediction candidates.
@@ -331,7 +331,7 @@ MANUAL; - restore default inferenceUseNextTokenPredictionsOrTargetsToActivateNex
 - update calculateSubwordSimilaritySparseMatrix to avoid dense tensors.
 
 ---
-v2d (Codex IDE GPT-5.5) [under development]:
+v2d (Codex IDE GPT-5.5):
 - add proto GIAANNproto2d1a - start option useTrainDuringInference (executionMode=="trainDuringInference"):
 	MANUAL; - in processArticle() it executes processSequence in inferenceMode==True then in inferenceMode==False
 	MANUAL; - mandate inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False
@@ -346,7 +346,7 @@ v2d (Codex IDE GPT-5.5) [under development]:
 - patch useTrainDuringInference:updateSequenceBar - with trainDuringInference the tqdm execution progress bar only uses the total number of trained sequences (trainMaxSequences) for its progress monitoring. 
 
 ---
-v2e (Codex IDE GPT-5.5) [under development]:
+v2e (Codex IDE GPT-5.5):
 - add proto GIAANNproto2e1a - start option multipleDendriticBranchesBinaryTree:
 	- during train if multipleDendriticBranchesBinaryTree==False (randomly) assigns an independent branchIndex for all trained neuron segments (see selectFeatureBranchIndex()). [NO CHANGE]
 	- during train if multipleDendriticBranchesBinaryTree==True derives the branch index of each segment based on the randomly assigned branchIndex:
@@ -381,7 +381,7 @@ v2e (Codex IDE GPT-5.5) [under development]:
 		- ensure to encapsulate all multipleDendriticBranchesBinaryTree==True specific behaviour within context if(multipleDendriticBranchesBinaryTree) as per AGENTS.md.
 
 ---
-v2f (Codex IDE GPT-5.5) [under development]:
+v2f (Codex IDE GPT-5.5):
 - add proto GIAANNproto2f1a - start option trainVerifyConnectionNonexistentAcrossBranches:
 	- upgrade train with option trainVerifyConnectionNonexistentAcrossBranches:
 		- do not create a segment connection (ie connection to target segment) between two sequence neurons if the segment connection already exists in a branch.
@@ -410,7 +410,7 @@ v2f (Codex IDE GPT-5.5) [under development]:
 MANUAL; - update paper
 
 ---
-v2g (Codex IDE GPT-5.5) [under development]:
+v2g (Codex IDE GPT-5.5):
 - add proto GIAANNproto2g1a - start option inferenceDuringTrainAdjustSynapseStrength:
 	- inferenceDuringTrainAdjustSynapseStrength implements pseudo spike-timing-dependent plasticity (STDP):
 		- if the presynaptic neuron fires shortly before the postsynaptic neuron fires, the synapse is strengthened. 
@@ -436,7 +436,7 @@ v2g (Codex IDE GPT-5.5) [under development]:
 - move all inferenceDuringTrain specific code to new file GIAANNcmn_inferenceDuringTrain.py
 
 ---
-v2h (Codex IDE GPT-5.5) [under development]:
+v2h (Codex IDE GPT-5.5):
 - add proto GIAANNproto2h1a - start patch algorithmMatrixSANIenforceRequirements
 	- patch algorithmMatrixSANIenforceRequirement="enforceAllSegmentsMustBeActive" top-1 candidate gating across standard and binary-tree dendritic branch modes. 
 	- patch SANI seed activation for enforceAllSegmentsMustBeActive and enforceSequentialActivation=True modes so top-1 inference respects required dendritic segment chains, not just last-segment activation.
@@ -450,7 +450,7 @@ MANUAL; - if(executionMode=="train"): optionally set storeDatabaseFeatureConnect
 MANUAL; - update paper
 
 ---
-v2i (Codex IDE GPT-5.5) [under development]:
+v2i (Codex IDE GPT-5.5):
 - add proto GIAANNproto2i1a - start option tokeniserSubword:
 	- implement a modern BPE/SentencePiece subword tokeniser (or reuse one like o200k_base if it meets the the other requirements below).
 		- you will need to perform an extensive internet search to determine if an existing third-party tokeniser can be used.
@@ -495,7 +495,7 @@ v2i (Codex IDE GPT-5.5) [under development]:
 	- add `useDedicatedConceptListsSubword=True` sequence-local target bucket mapping via `buildConnectionTargetSequenceBucketLookup()` plus compact tensor gather/scatter helpers so updates map tiktoken concept IDs back into the existing full-size stored connection tensors.
 
 ---
-v2j (Codex IDE GPT-5.5) [under development]:
+v2j (Codex IDE GPT-5.5):
 - add proto GIAANNproto2j1a - start option sentencePredictions=False, restore inferenceBurstAllPredictionsOrTargetsInSequence:
 	- patch tokeniserSubword:tokeniserSubwordPOS=False so subword delimiter POS detection uses parent spaCy posWord/posLemma lookup fields, matching the tokeniserSubword=False POS method while preserving subword feature/concept identities.
 	- implement option sequencesCropToMaxLength.
@@ -528,4 +528,10 @@ v2j (Codex IDE GPT-5.5) [under development]:
 	- 2. fix(eval): preserve exact aggregation semantics when prefiltering sparse candidates by required segment keys.
 	- 4. fix(sparse): reuse validated sparse index key generation for sparse intersection.
 	- 5. fix(eval): preserve present-branch semantics in optimized sparse branch selection.
+- implement options debugPrintTrainTotalWords and debugPrintTrainTotalTokens:
+	- they count the total words and parsed tokens (requires tokeniserSubword) during training respectively. It should be very simple to implement these global counters (less than 10 lines of code total).
+	- Implementation Notes: Do not make any changes to the execution of the existing codebase, and wrap all changes within context if(debugPrintTrainTotalWords) / if(debugPrintTrainTotalTokens).
+- implement option debugPrintTrainTotalSkip - skip training sequence after counting total words/tokens.
+MANUAL; - add option useBenchmarkDefaultsEvalTestSetOptim - set inferenceSegmentTiming = "none", inferenceConnectionsStrengthBoolean = False by default during test-set evaluation.
+MANUAL; - update paper
 

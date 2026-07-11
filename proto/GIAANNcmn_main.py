@@ -245,6 +245,8 @@ def executeMode(inferenceMode):
 		if(inferenceMode and inferenceReportGroundedAccuracy and not useAutoresearch):
 			GIAANNnlp_groundedEval.printInferenceGroundedAccuracy(databaseNetworkObject)
 
+	if(not inferenceMode and useModalityNLP and debugPrintTrainTotalWords): print("debugPrintTrainTotalWords: totalTrainWords = ", GIAANNcmn_debug.totalTrainWords)
+	if(not inferenceMode and useModalityNLP and debugPrintTrainTotalTokens): print("debugPrintTrainTotalTokens: totalTrainTokens = ", GIAANNcmn_debug.totalTrainTokens)
 	if(debugPrintSpacySectionTimes):
 		processArticlePart1averageTime = processArticlePart1totalTime/processArticlePart1count
 		processArticlePart2averageTime = processArticlePart2totalTime/processArticlePart2count

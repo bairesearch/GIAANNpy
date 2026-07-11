@@ -392,7 +392,13 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 	if(debugPrintTrainSectionTimes and trainMode):
 		preprocessSequenceStartTime = time.perf_counter()
 
+	if(debugPrintTrainTotalWords and trainMode): 
+		GIAANNcmn_debug.totalTrainWords += len(sequence)
 	sequence = GIAANNnlp_sequenceTokens.preprocessSequence(sequence)
+	if(debugPrintTrainTotalTokens and trainMode): 
+		GIAANNcmn_debug.totalTrainTokens += len(sequence)
+	if(debugPrintTrainTotalSkip and trainMode): 
+		return inferenceSuccessfulPredictionMask
 	
 	if(debugPrintTrainSectionTimes and trainMode):
 		GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "preprocessSequence", time.perf_counter() - preprocessSequenceStartTime)
@@ -537,7 +543,8 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 				GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("trainConceptWords")
 			
 			trained = GIAANNcmn_databaseNetworkTrain.trainConceptWords(sequenceObservedColumns, sequenceCount, sequence, tokens, inferenceSuccessfulPredictionMask)
-			
+			#print("debug: sequenceCount = ", sequenceCount, ", trained = ", trained, ", noDelimiterDetectedBetweenConceptTokens = ", sequenceObservedColumns.noDelimiterDetectedBetweenConceptTokens)
+
 			if(debugPrintRamMaxUsagePhaseLocal):
 				GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("trainConceptWords")
 			

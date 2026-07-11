@@ -41,7 +41,7 @@ NVIDIA Driver 580.126.09. CUDA 12.8. Ubuntu 24.04 LTS. IceWM. NEdit. Codex IDE e
 \subsection{Metrics}
 Top-1 accuracy has been calculated as a baseline performance metric.
 
-\subsection{Results}
+\subsection{Results (proto v1)}
 
 The accuracy measurements were taken with GIAANN Proto 1k (equivalent to 1m).
 
@@ -320,10 +320,7 @@ Therefore, a number of changes were introduced for test-set accuracy measurement
 
 \Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-multipleDendriticBranches} contains OSCAR-2201 top-1 test-set accuracy for different training sizes, dendritic branches and time constraints, with targets fed as input. The default time constraints used for benchmarking of the test-set (``t-1 bias'') are \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=False} and \texttt{enforceSequentialActivation=False}. It also contains results for these non-default time settings: \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=True} + \texttt{enforceSequentialActivation=True} (``top-1 exact''), \texttt{inferenceUseNeuronFeaturePropertiesTime=False} (``top-1 none''), and activations constraints (with t-1 none): \texttt{inferenceSegmentActivationsBoolean=False} (``int f+c''). The default dendritic branch settings used for benchmarking are \texttt{multipleDendriticBranches=True}, \texttt{randomlyAssignBranches=False}, and \texttt{numberOfDendriticBranches=2} (``2 uniq''), where branches are uniquely assigned for repeated feature instances within sequences. It also contains results for these non-default dendritic branch settings: \texttt{randomlyAssignBranches=True}, and \texttt{numberOfDendriticBranches=5} (``5 rand''), \texttt{numberOfDendriticBranches=5} (``10 rand''). It was also trained with \texttt{spacyPipelineOptimisations=True} for efficiency.
 
-\Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} contains OSCAR-2201 Top-1 test-set accuracy for different inference connection strength types, training sizes, and inference activations, with segment timing none (t-1 none), and targets fed as input. The different inference connection strength types used were ``bool'' (\texttt{inferenceConnectionsStrengthBoolean=True}) and ``float'' (\texttt{inferenceConnectionsStrengthBoolean=False}). The default strength type used during benchmarking is ``bool''. 
-
-\caption{OSCAR-2201 Top-1 test-set accuracy for different inference connection strength types (bool or float), training sizes, and inference activations, with segment timing none (t-1 none), and targets fed as input.}
-\label{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes}
+\Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} contains OSCAR-2201 Top-1 test-set accuracy for different inference connection strength types, training sizes, and inference activations, with segment timing none (t-1 none), and targets fed as input. The different inference connection strength types used were ``bool'' (\texttt{inferenceConnectionsStrengthBoolean=True}) and ``float'' (\texttt{inferenceConnectionsStrengthBoolean=False}). The default strength type used during benchmarking is ``bool''.
 
 149 test-set sequences were used during inference for the OSCAR-2201 dataset (taken from later in the dataset).
 
@@ -559,13 +556,7 @@ Although the vast majority of inference evaluations were performed with \texttt{
 
 \FloatBarrier
 
-\subsection{Ablations}
-Additional ablations to be conducted over:
-\begin{itemize}
-\item beam search depth/width,
-\end{itemize}
-
-\subsection{Performance}
+\subsection{Performance (proto v1)}
 
 The performance measurements were taken with GIAANN Proto 1l/1m, after splitting the column souce feature connections tensors per source feature.
 
@@ -796,6 +787,58 @@ The filesystem database is stored on a locally connected SSD drive.
 \bottomrule
 \end{tabular}
 \end{table}
+
+
+\subsection{Results (proto v2)}
+
+An additional set of accuracy measurements were taken with GIAANN Proto 2j.
+
+A number of changes to the default settings were introduced in GIAANN Proto 2 that affect evaluation accuracies:
+
+\begin{itemize}
+ 	\item Implement option tokeniserSubword - a modern BPE/SentencePiece subword tokeniser (\texttt{o200k_base} encoding of the OpenAI \texttt{tiktoken} library).
+    \item Implement option \texttt{SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens=False}, which affects both \texttt{useSANIfeaturesAndColumns} and \texttt{useSANIcolumns} modes.
+    \item Enable option \texttt{SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=False}, which affects both \texttt{useSANIfeaturesAndColumns} and \texttt{useSANIfeatures} modes.
+    \item Restore \texttt{inferenceBurstAllPredictionsOrTargetsInSequence} - patch inference to always activate the top-1 selected feature neuron (i.e. the prediction or target respectively as per \texttt{inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures}). This guarantees the selected top-1 feature is active when the next step uses it as a source.
+	\item add option \texttt{useBenchmarkDefaultsEvalTestSetOptim} - set \texttt{inferenceSegmentTiming = "none"}, \texttt{inferenceConnectionsStrengthBoolean = False} (and \texttt{inferenceActivationsType = "boolf"}) by default during test-set evaluation.
+\end{itemize}
+
+
+\subsubsection{Test-set Accuracy}
+
+\paragraph{Tables}
+
+\Cref{tab:protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} contains Proto v2 OSCAR-2201 Top-1 test-set accuracy for different inference connection strength types, training sizes, and inference activations, with segment timing none (t-1 none), and targets fed as input. The different inference connection strength types used were ``bool'' (\texttt{inferenceConnectionsStrengthBoolean=True}) and ``float'' (\texttt{inferenceConnectionsStrengthBoolean=False}). The default inference activation type used during proto v2 benchmarking is still ``bool f''. The default strength type used during proto v2 benchmarking is ``float''. The table also includes the total number of trained words and tokens. \Cref{fig:protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} graphs the results with the default settings.
+
+\begin{table}[H]
+\centering
+\caption{Proto v2 OSCAR-2201 Top-1 test-set accuracy for different inference connection strength types, training sizes, and inference activations, with segment timing none (t-1 none), and targets fed as input.}
+\label{tab:protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes}
+\begin{tabular}{rrrrrrrrrrr}
+\toprule
+\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{str} & \textbf{int f+c} & \textbf{bool f} & \textbf{param} & \textbf{db size} & \textbf{words} & \textbf{tokens} \\
+\midrule
+8 & 3 & 5 & 5,000     & bool & 0.073 & 0.068 & 1.0M & 0.2GB & 0.1M & 0.1M \\
+8 & 3 & 5 & 200,000   & bool & 0.178 & 0.182 & 34.0M & 3.9GB & 5.0M & 5.5M \\
+8 & 3 & 5 & 1,000,000 & bool & 0.227 & 0.225 & 157.0M & 15.0GB & 24.6M & 27.1M \\
+8 & 3 & 5 & 2,000,000 & bool & 0.237 & 0.230 & 296.4M & 26.2GB & 49.2M & 54.3M \\
+8 & 3 & 5 & 3,000,000 & bool & 0.238 & 0.230 & 433.5M & 36.8GB & 73.8M & 81.4M \\
+8 & 3 & 5 & 5,000     & float & 0.078 & 0.074 & 1.0M & 0.2GB & 0.1M & 0.1M \\
+8 & 3 & 5 & 200,000   & float & 0.205 & 0.192 & 34.0M & 3.9GB & 5.0M & 5.5M \\
+8 & 3 & 5 & 1,000,000 & float & 0.238 & 0.237 & 157.0M & 15.0GB & 24.6M & 27.1M \\
+8 & 3 & 5 & 2,000,000 & float & 0.253 & 0.253 & 296.4M & 26.2GB & 49.2M & 54.3M \\
+8 & 3 & 5 & 3,000,000 & float & 0.256 & 0.262 & 433.5M & 36.8GB & 73.8M & 81.4M \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+ \begin{figure}[htbp]
+      \centering
+      \includegraphics[width=\linewidth]{graphs/protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes.pdf}
+      \caption{GIAANN Proto 2j test-set accuracy.}
+      \label{fig:protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes}
+  \end{figure}
+
 
 
 \FloatBarrier

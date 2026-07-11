@@ -26,6 +26,8 @@ debugPrintGPUramUsage = debugPrintRamCurrentUsage or debugPrintRamAverageUsage o
 totalInferenceTokensSeed = 0
 totalInferenceTokensPrediction = 0
 totalInferenceTokensAll = 0
+if(useModalityNLP and debugPrintTrainTotalWords): totalTrainWords = 0
+if(useModalityNLP and debugPrintTrainTotalTokens): totalTrainTokens = 0
 
 if(debugPrintGPUramUsage):
 	debugPrintRamUsageStatistics = {}

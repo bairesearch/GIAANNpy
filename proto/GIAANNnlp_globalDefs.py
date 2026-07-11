@@ -244,7 +244,7 @@ if(conceptColumnsDelimitByPOS):
 	if(tokeniserSubword):
 		pretrainCombineConsecutiveNouns = False
 		pretrainCombineHyphenatedNouns = False
-		pretrainConceptColumnsDelimitByPOSenforce = False
+		pretrainConceptColumnsDelimitByPOSenforce = False	#not used by tokeniserSubword - if(tokeniserSubword): pretrainTokeniserSubword() is called, pretrainConceptColumnsDelimitByPOSenforce() is not; relies on skipSequenceNoDelimiterDetectedBetweenConceptTokens instead
 	else:
 		pretrainCombineConsecutiveNouns = True #default: True	#orig: False
 		pretrainCombineHyphenatedNouns = True	#default: True	#orig: False
@@ -634,10 +634,14 @@ if(useBenchmark):
 			benchmarkAblationText = "-tokeniserSubwordPOS"
 		else:
 			benchmarkAblationText = "-tokeniserSubword"
+		''' implied true;
 		if(useDedicatedFeatureListsSubword):
 			benchmarkAblationText += useDedicatedFeatureListsSubwordBenchmarkAblationSuffix
 		if(useDedicatedConceptListsSubword):
 			benchmarkAblationText += useDedicatedConceptListsSubwordBenchmarkAblationSuffix
+		'''
+		if(multisentencePredictions):
+			benchmarkAblationText += "-multisentencePredictions"
 	elif(auxiliaryNeurons):
 		benchmarkAblationText = "-auxiliaryNeurons"
 	elif(useTrainDuringInference):
@@ -688,5 +692,13 @@ elif(datasetType in closedWorldGroundedDatasetTypes):
 else:
 	databaseFolderExtension = ""
 	
+
+#Debug vars;
+debugPrintTrainTotalWords = False
+debugPrintTrainTotalTokens = False		#requires tokeniserSubword
+debugPrintTrainTotalSkip = False	#default: False
+if(debugPrintTrainTotalTokens):
+	if(not tokeniserSubword):
+		raise RuntimeError("GIAANNnlp_globalDefs error: debugPrintTrainTotalTokens requires tokeniserSubword")
 
 	

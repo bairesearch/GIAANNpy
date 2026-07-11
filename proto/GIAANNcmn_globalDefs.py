@@ -51,7 +51,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -100,23 +100,20 @@ elif(useTrainDuringInference):
 if(useBenchmarkDefaultsEvalTestSet):
 	inferenceEvaluateTestSet = True
 	inferenceEvaluateTestSetTrainMaxSequences10M = False	#default: False	#orig: False	#required if performing test-set eval on database trained with > 3M sequences (based on how the original test-set was generated)
-	#inferenceSegmentTiming = "none"	#~optimum
-	inferenceSegmentTiming = "biased"	#default
-	#inferenceSegmentTiming = "exact"
-	#inferenceSegmentTiming = "seq"
-	inferenceActivationsType = "boolf"	#default
-	#inferenceActivationsType = "boolf+c"
-	#inferenceActivationsType = "intf+c" 	#~optimum
+	useBenchmarkDefaultsEvalTestSetOptim = True	#default: True #orig: False
+	if(useBenchmarkDefaultsEvalTestSetOptim):
+		inferenceSegmentTiming = "none"	#~optimum	#none, biased, exact, seq
+		inferenceActivationsType = "boolf"	#optimum
+	else:
+		inferenceSegmentTiming = "biased"	#default: biased	#none, biased, exact, seq
+		inferenceActivationsType = "boolf"	#default: boolf	#boolf, boolf+c, intf+c
 else:
 	inferenceEvaluateTestSet = False
 	inferenceEvaluateTestSetTrainMaxSequences10M = False
-	#inferenceSegmentTiming = "none"
-	#inferenceSegmentTiming = "biased"
-	inferenceSegmentTiming = "exact"		#default
-	#inferenceSegmentTiming = "seq"
-	inferenceActivationsType = "boolf"	#default
-	#inferenceActivationsType = "boolf+c"
-	#inferenceActivationsType = "intf+c"
+	useBenchmarkDefaultsEvalTestSetOptim = False		#default: False #orig: False
+	inferenceSegmentTiming = "exact"	#default: exact	#none, biased, exact, seq
+	inferenceActivationsType = "boolf"	#default: boolf	#boolf, boolf+c, intf+c
+
 inferenceReportTokenAccuracyConstrainByColumn = False	#default: False	#orig: False
 
 
@@ -381,7 +378,10 @@ if(useInference):
 	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	if(useSANI):
 		inferenceApplySequentialActivationSparse = True	#default: True	#orig: False
-		inferenceConnectionsStrengthBoolean = True	#default: True	#False: with inferenceActivationsType = "boolf" this typically provides lower train-set accuracy, higher test-set accuracy	#do not overweight by common features (e.g. determiners)
+		if(useBenchmarkDefaultsEvalTestSetOptim):
+			inferenceConnectionsStrengthBoolean = False		#False: with inferenceActivationsType = "boolf" this typically provides lower train-set accuracy, higher test-set accuracy	#do not overweight by common features (e.g. determiners)
+		else:
+			inferenceConnectionsStrengthBoolean = True	#default: True
 		if(inferenceActivationsType == "intf+c"):
 			inferenceSegmentActivationsBoolean = False
 		elif(inferenceActivationsType == "boolf"):
