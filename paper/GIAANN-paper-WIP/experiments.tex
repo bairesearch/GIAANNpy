@@ -803,12 +803,54 @@ A number of changes to the default settings were introduced in GIAANN Proto 2 th
 	\item add option \texttt{useBenchmarkDefaultsEvalTestSetOptim} - set \texttt{inferenceSegmentTiming = "none"}, \texttt{inferenceConnectionsStrengthBoolean = False} (and \texttt{inferenceActivationsType = "boolf"}) by default during test-set evaluation.
 \end{itemize}
 
+\Cref{fig:protov2j-oscar-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} graphs the training-set and test-set eval results with the default settings.
+
+ \begin{figure}[htbp]
+      \centering
+      \includegraphics[width=\linewidth]{graphs/protov2j-oscar-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes.pdf}
+      \caption{GIAANN Proto 2j training-set and test-set accuracy.}
+      \label{fig:protov2j-oscar-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes}
+  \end{figure}
+
+\subsubsection{Training-set Accuracy}
+
+\paragraph{Tables}
+
+\Cref{tab:protov2j-oscar-train-top1-accuracy} contains Proto v2 OSCAR-2201 Top-1 training-set accuracy for different numbers training sizes, with targets fed as input.
+
+\Cref{fig:protov2j-oscar-train-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} graphs the training-set eval results with the default settings.
+
+\begin{table}[H]
+\centering
+\caption{Proto v2 OSCAR-2201 Top-1 training-set accuracy for different numbers training sizes, with targets fed as input.}
+\label{tab:protov2j-oscar-train-top1-accuracy}
+\begin{tabular}{rrrrrrrrr}
+\toprule
+\textbf{s} & \textbf{c} & \textbf{f} & \textbf{seq} & \textbf{t-1 exact} & \textbf{param} & \textbf{db size} & \textbf{words} & \textbf{tokens} \\
+\midrule
+8 & 3 & 5 & 5,000     & 1.000 & 1.0M & 0.2GB & 0.1M & 0.1M \\
+8 & 3 & 5 & 200,000   & 0.992 & 34.0M & 3.9GB & 5.0M & 5.5M \\
+8 & 3 & 5 & 1,000,000 & 0.976 & 157.0M & 15.0GB & 24.6M & 27.1M \\
+8 & 3 & 5 & 2,000,000 & 0.961 & 296.4M & 26.2GB & 49.2M & 54.3M \\
+8 & 3 & 5 & 3,000,000 & 0.949 & 433.5M & 36.8GB & 73.8M & 81.4M \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+ \begin{figure}[htbp]
+      \centering
+      \includegraphics[width=\linewidth]{graphs/protov2j-oscar-train-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes.pdf}
+      \caption{GIAANN Proto 2j training-set accuracy.}
+      \label{fig:protov2j-oscar-train-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes}
+  \end{figure}
 
 \subsubsection{Test-set Accuracy}
 
 \paragraph{Tables}
 
-\Cref{tab:protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} contains Proto v2 OSCAR-2201 Top-1 test-set accuracy for different inference connection strength types, training sizes, and inference activations, with segment timing none (t-1 none), and targets fed as input. The different inference connection strength types used were ``bool'' (\texttt{inferenceConnectionsStrengthBoolean=True}) and ``float'' (\texttt{inferenceConnectionsStrengthBoolean=False}). The default inference activation type used during proto v2 benchmarking is still ``bool f''. The default strength type used during proto v2 benchmarking is ``float''. The table also includes the total number of trained words and tokens. \Cref{fig:protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} graphs the results with the default settings.
+\Cref{tab:protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} contains Proto v2 OSCAR-2201 Top-1 test-set accuracy for different inference connection strength types, training sizes, and inference activations, with segment timing none (t-1 none), and targets fed as input. The different inference connection strength types used were ``bool'' (\texttt{inferenceConnectionsStrengthBoolean=True}) and ``float'' (\texttt{inferenceConnectionsStrengthBoolean=False}). The default inference activation type used during proto v2 benchmarking is still ``bool f''. The default strength type used during proto v2 benchmarking is ``float''. The table also includes the total number of trained words and tokens. 
+
+\Cref{fig:protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} graphs the test-set eval results with the default settings.
 
 \begin{table}[H]
 \centering
@@ -839,7 +881,51 @@ A number of changes to the default settings were introduced in GIAANN Proto 2 th
       \label{fig:protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes}
   \end{figure}
 
-
-
 \FloatBarrier
 
+
+\subsection{Performance (proto v2)}
+
+An additional set of performance measurements were taken with GIAANN Proto 2j.
+
+A number of optimisations were introduced in GIAANN Proto 2 that affect evaluation performance:
+
+\begin{itemize}
+ 	\item perf(eval): vectorize SANI required-segment candidate filtering
+			- replace Python set/list membership checks in prediction candidate filtering with tensor key membership. This keeps SANI required-segment semantics unchanged while avoiding per-candidate Python loops during long eval sequences.
+ 	\item perf(eval): prefilter sparse candidate aggregation by required segment keys
+			- push required SANI column-feature key filtering into sparse aggregation so irrelevant activation entries are removed before branch reduction and candidate aggregation.
+ 	\item perf(sparse): vectorize sparse branch max reduction
+			- replace Python grouping loops in \texttt{reduceSparseBranchMax()} with tensor \texttt{unique}/\texttt{scatter_reduce_} operations. This improves multiple-branch sparse activation reduction used during inference candidate selection.
+ 	\item perf(sparse): replace broadcast sparse intersection with key lookup
+			- rework \texttt{selectAindicesContainedInB()} to use flattened sparse index keys and \texttt{searchsorted} membership instead of an $O(nnzA * nnzB)$ broadcast comparison.
+ 	\item perf(eval): avoid full coalesce in sparse branch selection
+			- optimise \texttt{selectActivatedBranchIndex()} by using sparse \texttt{_indices()}/\texttt{_values()} and tensor \texttt{index_add_} for branch scoring, avoiding full tensor coalescing and Python dictionaries during prediction deactivation.
+\end{itemize}
+
+
+\paragraph{Tables}
+
+\Cref{tab:protov2j-oscar-performance} contains Proto v2 OSCAR-2201 performance measurements for different execution phases (train, eval test-set) and training sizes and different training sizes, with different database feature connections active storage location for train/eval (DDR5 RAM/filesystem), with train phase feature neuron and connection sparse tensors, sparse tensor device CPU, and feature neuron sparse tensors stored independently for each column. Train times were measured cumulatively > 1M sequences.
+
+\begin{table}[H]
+\centering
+\caption{Proto v2 OSCAR-2201 performance measurements for different execution phases (train, eval test-set) and training sizes and different training sizes, with different database feature connections active storage location for train/eval (DDR5 RAM/filesystem), with train phase feature neuron and connection sparse tensors, sparse tensor device CPU, and feature neuron sparse tensors stored independently for each column.}
+\label{tab:protov2j-oscar-performance}
+\begin{tabular}{rrrrrrrrrrrr}
+\toprule
+\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{phase} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{cpu ram} \\
+\midrule
+8 & 3 & 5 & 5,000       & train   & 00:00:32 & 00:00:27 & 00:00:05 & 1.4GB \\
+8 & 3 & 5 & 200,000     & train   & 00:25:09 & 00:23:31 & 00:01:37 & 5.6GB \\
+8 & 3 & 5 & 1,000,000   & train   & 02:53:06 & 02:47:08 & 00:05:57 & 18.7GB \\
+8 & 3 & 5 & 2,000,000   & train   & 08:10:49 & 07:23:41 & 00:11:10 & 31.9GB \\
+8 & 3 & 5 & 3,000,000   & train   & 18:54:29 & 16:40:48 & 00:17:03 & 44.9GB \\
+8 & 3 & 5 & 5,000       & ts eval & 00:00:02 & 00:00:02 & 00:00:00 & 1.1GB \\
+8 & 3 & 5 & 200,000     & ts eval & 00:00:04 & 00:00:04 & 00:00:00 & 1.1GB \\
+8 & 3 & 5 & 1,000,000   & ts eval & 00:00:11 & 00:00:11 & 00:00:00 & 1.1GB \\
+8 & 3 & 5 & 2,000,000   & ts eval & 00:00:16 & 00:00:16 & 00:00:00 & 1.1GB \\
+8 & 3 & 5 & 3,000,000   & ts eval & 00:00:21 & 00:00:21 & 00:00:00 & 1.1GB \\
+\bottomrule
+\end{tabular}
+\end{table}
