@@ -4,3 +4,6 @@ dev/
 
 # Results file
 results.tsv
+
+# Current run output
+run.log

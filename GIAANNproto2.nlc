@@ -535,3 +535,6 @@ v2j (Codex IDE GPT-5.5):
 MANUAL; - add option useBenchmarkDefaultsEvalTestSetOptim - set inferenceSegmentTiming = "none", inferenceConnectionsStrengthBoolean = False by default during test-set evaluation.
 MANUAL; - update paper
 
+v2k (Codex IDE GPT-5.5):
+- add proto GIAANNproto2k1a - update autoresearch:
+	- check that all autoresearch (folder) files are up-to-date with the current version of GIAANN.
