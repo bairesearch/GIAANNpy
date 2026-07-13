@@ -404,7 +404,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "preprocessSequence", time.perf_counter() - preprocessSequenceStartTime)
 	if(debugReloadGlobalFeatureNeuronsEverySequence):
 		GIAANNcmn_databaseNetwork.initialiseDatabaseNetwork(inferenceMode)
-		if(storeDatabaseGlobalFeatureNeuronsInRam):
+		if(storeDatabaseGlobalFeatureNeuronsInRam or inferenceMode):
 			databaseNetworkObject.globalFeatureNeurons = GIAANNcmn_databaseNetwork.initialiseFeatureNeuronsGlobal(inferenceMode, databaseNetworkObject.c, databaseNetworkObject.f)
 	
 	if(inferenceMode):

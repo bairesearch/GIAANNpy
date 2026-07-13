@@ -431,16 +431,16 @@ def buildStandaloneDrawColumnActivityMaps(databaseNetworkObject, sortedConceptCo
 		raise RuntimeError("buildStandaloneDrawColumnActivityMaps error: sortedConceptColumns is None")
 	activeFeatureIndicesByConceptIndex = {}
 	primeFeatureIndexByConceptIndex = {}
-	if(storeDatabaseGlobalFeatureNeuronsInRam):
+	if(storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode):
 		if(not useGlobalFeatureNeurons):
-			raise RuntimeError("buildStandaloneDrawColumnActivityMaps error: useGlobalFeatureNeurons must be True while storeDatabaseGlobalFeatureNeuronsInRam is True")
+			raise RuntimeError("buildStandaloneDrawColumnActivityMaps error: useGlobalFeatureNeurons must be True while global feature neuron storage is enabled")
 		activeFeatureIndicesByConceptIndex = getActiveFeatureIndicesByConceptIndexGlobal(databaseNetworkObject, sortedConceptColumns)
 		for lemma, conceptIndex, sequenceIndex in sortedConceptColumns:
 			observedColumn = getStandaloneDrawObservedColumn(databaseNetworkObject, conceptIndex, lemma, sequenceIndex, loadFeatureNeurons=False)
 			primeFeatureIndexByConceptIndex[conceptIndex] = observedColumn.featureWordToIndex.get(variablePrimeConceptFeatureNeuronName)
 	else:
 		if(useGlobalFeatureNeurons):
-			raise RuntimeError("buildStandaloneDrawColumnActivityMaps error: useGlobalFeatureNeurons must be False while storeDatabaseGlobalFeatureNeuronsInRam is False")
+			raise RuntimeError("buildStandaloneDrawColumnActivityMaps error: useGlobalFeatureNeurons must be False while global feature neuron storage is disabled")
 		for lemma, conceptIndex, sequenceIndex in sortedConceptColumns:
 			observedColumn = getStandaloneDrawObservedColumn(databaseNetworkObject, conceptIndex, lemma, sequenceIndex, loadFeatureNeurons=True)
 			if(not hasattr(observedColumn, "featureNeurons")):
@@ -455,7 +455,7 @@ def buildStandaloneDrawColumnActivityMaps(databaseNetworkObject, sortedConceptCo
 def ensureStandaloneDrawObservedColumnFeatureState(observedColumn, newF, loadFeatureNeurons):
 	if(observedColumn is None):
 		raise RuntimeError("ensureStandaloneDrawObservedColumnFeatureState error: observedColumn is None")
-	if(loadFeatureNeurons or storeDatabaseGlobalFeatureNeuronsInRam or hasattr(observedColumn, "featureNeurons")):
+	if(loadFeatureNeurons or storeDatabaseGlobalFeatureNeuronsInRam or observedColumn.databaseNetworkObject.inferenceMode or hasattr(observedColumn, "featureNeurons")):
 		observedColumn.ensureObservedColumnFeatureArraysFeatures(newF)
 	else:
 		if(observedColumn.requiresExpandFeatureMapsFeatures(newF)):
@@ -474,7 +474,7 @@ def getStandaloneDrawObservedColumn(databaseNetworkObject, conceptIndex, lemma, 
 			raise RuntimeError(f"getStandaloneDrawObservedColumn error: missing RAM observed column for lemma {lemma}")
 		observedColumn = databaseNetworkObject.observedColumnsDictRAM[lemma]
 		ensureStandaloneDrawObservedColumnFeatureState(observedColumn, databaseNetworkObject.f, loadFeatureNeurons)
-		if(loadFeatureNeurons and (not storeDatabaseGlobalFeatureNeuronsInRam) and (not hasattr(observedColumn, "featureNeurons"))):
+		if(loadFeatureNeurons and (not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)) and (not hasattr(observedColumn, "featureNeurons"))):
 			raise RuntimeError(f"getStandaloneDrawObservedColumn error: RAM observed column missing featureNeurons for lemma {lemma}")
 	else:
 		if(GIAANNcmn_databaseNetworkFiles.observedColumnHasPersistedData(conceptIndex)):
@@ -497,7 +497,7 @@ def unloadStandaloneDrawObservedColumnFeatureNeurons(observedColumn):
 def determineStandaloneDrawNeuronSource(databaseNetworkObject):
 	if(databaseNetworkObject is None):
 		raise RuntimeError("determineStandaloneDrawNeuronSource error: databaseNetworkObject is None")
-	useGlobalFeatureNeurons = storeDatabaseGlobalFeatureNeuronsInRam
+	useGlobalFeatureNeurons = storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode
 	if(useGlobalFeatureNeurons):
 		if(databaseNetworkObject.globalFeatureNeurons is None):
 			raise RuntimeError("determineStandaloneDrawNeuronSource error: globalFeatureNeurons is required but is None")

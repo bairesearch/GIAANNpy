@@ -33,7 +33,7 @@ def printCountTotalParametersRun(databaseNetworkObject):
 		raise RuntimeError("printCountTotalParametersRun error: conceptColumnsList is empty")
 	totalConnections = 0
 	totalFeatureNeurons = 0
-	usePersistedGlobalFeatureNeurons = countUsesPersistedGlobalFeatureNeurons()
+	usePersistedGlobalFeatureNeurons = countUsesPersistedGlobalFeatureNeurons(databaseNetworkObject)
 	if(usePersistedGlobalFeatureNeurons):
 		if(databaseNetworkObject.globalFeatureNeurons is None):
 			raise RuntimeError("printCountTotalParametersRun error: databaseNetworkObject.globalFeatureNeurons is None")
@@ -62,10 +62,12 @@ def printCountTotalParametersRun(databaseNetworkObject):
 		print(f"database size (uncompressed GB): {databaseSizeGB:.3f}")
 	return databaseMemoryGb
 
-def countUsesPersistedGlobalFeatureNeurons():
+def countUsesPersistedGlobalFeatureNeurons(databaseNetworkObject):
 	import GIAANNcmn_databaseNetworkFiles
 	result = False
-	if(storeDatabaseGlobalFeatureNeuronsInRam):
+	if(databaseNetworkObject is None):
+		raise RuntimeError("countUsesPersistedGlobalFeatureNeurons error: databaseNetworkObject is None")
+	if(storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode):
 		result = GIAANNcmn_databaseNetworkFiles.pathExists(globalFeatureNeuronsFileFull)
 	return result
 

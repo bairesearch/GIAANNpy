@@ -442,8 +442,8 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 			
 	saveGlobalState = ((sequenceCount + 1) % saveGlobalFeatureNeuronsRate == 0) or forceSaveGlobalState
 	if(saveGlobalState):
-		# Save global feature neuron arrays if storeDatabaseGlobalFeatureNeuronsInRam or trainEndGenerateGlobalFeatureNeuronsTensor
-		if storeDatabaseGlobalFeatureNeuronsInRam:
+		# Save global feature neuron arrays if configured globally, required by inference, or generated at train end.
+		if(storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode):
 			saveTensor(databaseNetworkObject.globalFeatureNeurons, databaseFolder, globalFeatureNeuronsFile)
 		else:
 			if(trainEndGenerateGlobalFeatureNeuronsTensor):
@@ -471,13 +471,13 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 		GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "saveData.total", time.perf_counter() - saveDataStartTime)
 
 def generateGlobalFeatureNeuronsTensor(databaseNetworkObject, useRAMcolumnFeatureNeurons):
-	if(storeDatabaseGlobalFeatureNeuronsInRam):
-		if(not inferenceStartGenerateGlobalFeatureNeuronsTensor):
-			raise RuntimeError("generateGlobalFeatureNeuronsTensor error: storeDatabaseGlobalFeatureNeuronsInRam must be False unless inferenceStartGenerateGlobalFeatureNeuronsTensor is enabled")
-	if(not trainEndGenerateGlobalFeatureNeuronsTensor and not inferenceStartGenerateGlobalFeatureNeuronsTensor):
-		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: trainEndGenerateGlobalFeatureNeuronsTensor or inferenceStartGenerateGlobalFeatureNeuronsTensor must be True")
 	if(databaseNetworkObject is None):
 		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: databaseNetworkObject is None")
+	if(storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode):
+		if(not inferenceStartGenerateGlobalFeatureNeuronsTensor):
+			raise RuntimeError("generateGlobalFeatureNeuronsTensor error: global feature neuron storage must be disabled unless inferenceStartGenerateGlobalFeatureNeuronsTensor is enabled")
+	if(not trainEndGenerateGlobalFeatureNeuronsTensor and not inferenceStartGenerateGlobalFeatureNeuronsTensor):
+		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: trainEndGenerateGlobalFeatureNeuronsTensor or inferenceStartGenerateGlobalFeatureNeuronsTensor must be True")
 	conceptIndicesAll = sorted(int(conceptIndex) for conceptIndex in databaseNetworkObject.conceptColumnsDict.values())
 	if(len(conceptIndicesAll) != databaseNetworkObject.c):
 		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: concept index count mismatch")
@@ -620,7 +620,7 @@ def observedColumnSaveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsTo
 		import GIAANNnlp_auxiliaryNeuronsAuto
 		GIAANNnlp_auxiliaryNeuronsAuto.saveObservedColumnReverseFeatureConnectionsToDisk(self, saveAllSourceFeatures)
 	
-	if not storeDatabaseGlobalFeatureNeuronsInRam:
+	if(not (storeDatabaseGlobalFeatureNeuronsInRam or self.databaseNetworkObject.inferenceMode)):
 		saveTensor(self.featureNeurons, getObservedColumnFolder(self.conceptIndex), getObservedColumnFeatureNeuronsFileBaseName())
 
 def loadObservedColumnSourceFeatureConnectionsTensor(databaseNetworkObject, conceptIndex, sourceFeatureIndex, targetDevice, ensureCurrentSizeOnLoad=False):
@@ -676,7 +676,7 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 	with open(metadataFile, 'rb') as f:
 		data = pickle.load(f)
 	instance = cls(databaseNetworkObject, conceptIndex, lemma, i)
-	if((not storeDatabaseGlobalFeatureNeuronsInRam) and (not loadFeatureNeurons) and hasattr(instance, "featureNeurons")):
+	if((not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)) and (not loadFeatureNeurons) and hasattr(instance, "featureNeurons")):
 		del instance.featureNeurons
 	if(data.get('featureConnectionsFormat') != observedColumnFeatureConnectionsFormat):
 		raise RuntimeError(f"Unsupported observed column connection storage format for conceptIndex={conceptIndex}. Clear and rebuild the database.")
@@ -695,7 +695,7 @@ def observedColumnLoadFromDisk(cls, databaseNetworkObject, conceptIndex, lemma, 
 				raise RuntimeError("observedColumnLoadFromDisk error: nextFeatureIndex < 0")
 			if(instance.nextFeatureIndex > databaseNetworkObject.f):
 				instance.nextFeatureIndex = databaseNetworkObject.f
-	if((not storeDatabaseGlobalFeatureNeuronsInRam) and loadFeatureNeurons):
+	if((not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)) and loadFeatureNeurons):
 		instance.featureNeurons = loadObservedColumnFeatureNeuronsTensor(databaseNetworkObject, conceptIndex, targetDevice=targetDevice, ensureCurrentSizeOnLoad=resizeFeatureTensorsToCurrentSize)
 	if(loadAllSourceFeatures):
 		sourceFeatureIndices = listObservedColumnSourceFeatureIndices(conceptIndex)

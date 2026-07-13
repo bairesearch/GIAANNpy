@@ -104,8 +104,8 @@ def restoreGlobalArrays(databaseNetworkObject):
 
 def ensureGlobalFeatureNeuronsSize(databaseNetworkObject, updateBackup):
 	expanded = False
-	if(not storeDatabaseGlobalFeatureNeuronsInRam):
-		raise RuntimeError("ensureGlobalFeatureNeuronsSize error: storeDatabaseGlobalFeatureNeuronsInRam must be True")
+	if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
+		raise RuntimeError("ensureGlobalFeatureNeuronsSize error: storeDatabaseGlobalFeatureNeuronsInRam or inferenceMode must be True")
 	if(databaseNetworkObject.globalFeatureNeurons is None):
 		raise RuntimeError("ensureGlobalFeatureNeuronsSize error: globalFeatureNeurons is None")
 	if(databaseNetworkObject.globalFeatureNeurons.shape[3] < databaseNetworkObject.c or databaseNetworkObject.globalFeatureNeurons.shape[4] < databaseNetworkObject.f):
@@ -119,26 +119,25 @@ def ensureGlobalFeatureNeuronsSize(databaseNetworkObject, updateBackup):
 			expanded = True
 	return expanded
 
-# Initialize global feature neuron arrays if storeDatabaseGlobalFeatureNeuronsInRam is enabled
-if storeDatabaseGlobalFeatureNeuronsInRam:
-	def initialiseFeatureNeuronsGlobal(inferenceMode, c, f):
-		arrayNumberOfProperties = calculateArrayNumberOfProperties(inferenceMode)
-		globalFeatureNeurons = GIAANNcmn_sparseTensors.createEmptySparseTensor((arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, c, f))
-		return globalFeatureNeurons
-		
-	def loadFeatureNeuronsGlobal(inferenceMode, c, f):
-		if GIAANNcmn_databaseNetworkFiles.pathExists(globalFeatureNeuronsFileFull):
-			globalFeatureNeurons = GIAANNcmn_databaseNetworkFiles.loadFeatureNeuronsGlobalFile(inferenceMode)
-			if(debugLimitFeatures):
-				globalFeatureNeurons = GIAANNcmn_debug.applyDebugLimitGlobalFeatureNeuronsTensor(globalFeatureNeurons, c, f, "globalFeatureNeurons")
-				if(globalFeatureNeurons.size(3) < c or globalFeatureNeurons.size(4) < f):
-					print("globalFeatureNeurons.size(3) = ", globalFeatureNeurons.size(3))
-					print("globalFeatureNeurons.size(4) = ", globalFeatureNeurons.size(4))
-					raise RuntimeError("loadFeatureNeuronsGlobal error: debugLimitFeatures requires limits that do not exceed saved globalFeatureNeurons dimensions")
-		else:
-			globalFeatureNeurons = initialiseFeatureNeuronsGlobal(inferenceMode, c, f)
-			#print("initialiseFeatureNeuronsGlobal: globalFeatureNeurons = ", globalFeatureNeurons)
-		return globalFeatureNeurons
+# Global feature neuron helpers must be available when inferenceMode enables global storage at runtime.
+def initialiseFeatureNeuronsGlobal(inferenceMode, c, f):
+	arrayNumberOfProperties = calculateArrayNumberOfProperties(inferenceMode)
+	globalFeatureNeurons = GIAANNcmn_sparseTensors.createEmptySparseTensor((arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, c, f))
+	return globalFeatureNeurons
+
+def loadFeatureNeuronsGlobal(inferenceMode, c, f):
+	if GIAANNcmn_databaseNetworkFiles.pathExists(globalFeatureNeuronsFileFull):
+		globalFeatureNeurons = GIAANNcmn_databaseNetworkFiles.loadFeatureNeuronsGlobalFile(inferenceMode)
+		if(debugLimitFeatures):
+			globalFeatureNeurons = GIAANNcmn_debug.applyDebugLimitGlobalFeatureNeuronsTensor(globalFeatureNeurons, c, f, "globalFeatureNeurons")
+			if(globalFeatureNeurons.size(3) < c or globalFeatureNeurons.size(4) < f):
+				print("globalFeatureNeurons.size(3) = ", globalFeatureNeurons.size(3))
+				print("globalFeatureNeurons.size(4) = ", globalFeatureNeurons.size(4))
+				raise RuntimeError("loadFeatureNeuronsGlobal error: debugLimitFeatures requires limits that do not exceed saved globalFeatureNeurons dimensions")
+	else:
+		globalFeatureNeurons = initialiseFeatureNeuronsGlobal(inferenceMode, c, f)
+		#print("initialiseFeatureNeuronsGlobal: globalFeatureNeurons = ", globalFeatureNeurons)
+	return globalFeatureNeurons
 
 def generateGlobalFeatureNeuronsForStartup(databaseNetworkObject, saveToDisk, useRAMcolumnFeatureNeurons):
 	if(not inferenceStartGenerateGlobalFeatureNeuronsTensor):
@@ -331,7 +330,7 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 					conceptFeaturesReferenceSetDelimiterList.append(False)
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			auxiliarySimilarFeaturesDict, auxiliarySimilarFeaturesList, auxiliarySimilarFeatureWordWeightsByParentWord = GIAANNnlp_auxiliaryNeuronsSimilarWords.loadOrCreateDatabaseAuxiliaryFeatureMaps(False)
-	if storeDatabaseGlobalFeatureNeuronsInRam:
+	if(storeDatabaseGlobalFeatureNeuronsInRam or inferenceMode):
 		if(loadExistingDatabase):
 			globalFeatureNeurons = loadFeatureNeuronsGlobal(inferenceMode, c, f)
 		else:
@@ -501,7 +500,7 @@ def cloneObservedColumnToDevice(databaseNetworkObject, observedColumn, lemma, i,
 		copiedObservedColumn.loadRequiredSourceFeatureConnections(sourceFeatureIndices, targetDevice, createMissing=False)
 	elif(requiredSourceFeatureIndices is not None):
 		copiedObservedColumn.loadRequiredSourceFeatureConnections(requiredSourceFeatureIndices, targetDevice, createMissing=False)
-	if(not storeDatabaseGlobalFeatureNeuronsInRam):
+	if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
 		copiedObservedColumn.featureNeurons = observedColumn.featureNeurons.to(targetDevice)
 	return copiedObservedColumn
 

@@ -150,19 +150,20 @@ def getDrawModeDatabaseInferenceMode():
 		raise RuntimeError(f"getDrawModeDatabaseInferenceMode error: unsupported executionMode {executionMode}")
 	return inferenceMode
 
-def validateDrawModeExistingDatabaseFiles():
+def validateDrawModeExistingDatabaseFiles(inferenceMode):
 	if(not GIAANNcmn_databaseNetworkFiles.pathExists(conceptColumnsDictFile)):
 		raise RuntimeError(f"validateDrawModeExistingDatabaseFiles error: missing conceptColumnsDictFile {conceptColumnsDictFile}")
 	if(not GIAANNcmn_databaseNetworkFiles.pathExists(conceptFeaturesDictFile)):
 		raise RuntimeError(f"validateDrawModeExistingDatabaseFiles error: missing conceptFeaturesDictFile {conceptFeaturesDictFile}")
-	if(storeDatabaseGlobalFeatureNeuronsInRam):
+	if(storeDatabaseGlobalFeatureNeuronsInRam or inferenceMode):
 		if(not GIAANNcmn_databaseNetworkFiles.pathExists(globalFeatureNeuronsFileFull)):
 			raise RuntimeError(f"validateDrawModeExistingDatabaseFiles error: missing globalFeatureNeuronsFileFull {globalFeatureNeuronsFileFull}")
 	return
 
 def executeDrawMode():
-	validateDrawModeExistingDatabaseFiles()
-	databaseNetworkObject = GIAANNcmn_databaseNetwork.initialiseDatabaseNetwork(getDrawModeDatabaseInferenceMode(), loadExistingDatabaseOverride=True)
+	inferenceMode = getDrawModeDatabaseInferenceMode()
+	validateDrawModeExistingDatabaseFiles(inferenceMode)
+	databaseNetworkObject = GIAANNcmn_databaseNetwork.initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=True)
 	if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 		GIAANNcmn_databaseNetwork.loadAllObservedColumnsToRam(databaseNetworkObject)
 	GIAANNcmn_databaseNetworkDrawLarge.drawDatabaseGraphStandalone(databaseNetworkObject, save=True, fileName=drawNetworkIndependentSaveFilename, display=False)

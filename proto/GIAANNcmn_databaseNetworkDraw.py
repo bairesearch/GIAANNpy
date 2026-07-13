@@ -266,7 +266,7 @@ def visualizeGraph(sequenceObservedColumns, inferenceMode, save=False, fileName=
 	for lemma, observedColumn in observedColumnsDict.items():
 		conceptIndexToLemma[observedColumn.conceptIndex] = lemma
 
-	if storeDatabaseGlobalFeatureNeuronsInRam:
+	if(storeDatabaseGlobalFeatureNeuronsInRam or inferenceMode):
 		global globalFeatureNeurons
 
 	excitatoryNodeMap = drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, databaseNetworkObject, drawRelationTypes, drawSegments, drawBranches, drawDelimiters, drawDefault, inferenceMode)
@@ -337,7 +337,7 @@ def drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, d
 		else:
 			featureWordToIndex = observedColumn.featureWordToIndex
 			yOffset = 1
-			if not storeDatabaseGlobalFeatureNeuronsInRam:
+			if(not (storeDatabaseGlobalFeatureNeuronsInRam or inferenceMode)):
 				featureNeurons = selectDrawBranch(observedColumn.featureNeurons, drawBranches)
 				if(drawBranches):
 					featureNeurons = collapseBranchDimensionForNodes(featureNeurons, drawBranches)
@@ -449,7 +449,7 @@ def drawExcitatoryFeatureNeurons(sequenceObservedColumns, observedColumnsDict, d
 							sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)
 						sourceFeatureNeurons = sourceFeatureNeurons[:, :, cIdx]
 					else:
-						if not storeDatabaseGlobalFeatureNeuronsInRam:
+						if(not (storeDatabaseGlobalFeatureNeuronsInRam or inferenceMode)):
 							sourceFeatureNeurons = selectDrawBranch(observedColumn.featureNeurons, drawBranches)
 							if(drawBranches):
 								sourceFeatureNeurons = collapseBranchDimensionForNodes(sourceFeatureNeurons, drawBranches)

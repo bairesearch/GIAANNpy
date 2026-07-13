@@ -263,7 +263,7 @@ else:
 if(trainSparseNeuronsTensor):
 	assert trainSparseConnectionsTensor, "trainSparseNeuronsTensor requires trainSparseConnectionsTensor=True"
 
-if(executionMode=="train"):
+if(executionMode=="train" or executionMode=="trainAndInference"):
 	storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = True	#default: False	#orig2: True	#train is faster with True	#orig1: False	#required to be False for high database sizes > ~1M training sequences	#store database feature connections and column separated feature neuron data in RAM, else dynamically load these from filesystem per sequence
 else:
 	storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = False	#default: False		#optional	#inference is faster with False
@@ -272,10 +272,10 @@ if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 	resizeTensorsOnRAMdatabaseSave = False	#default: False #orig: True	#resize all feature neuron and connections tensors during final RAM database save
 	resizeTensorsOnRAMdatabaseLoad = False	#default: False #orig: True	#resize all feature neuron and connections tensors during initial RAM database load
 
-if(executionMode=="train"):
-	storeDatabaseGlobalFeatureNeuronsInRam = False		 #default: False	#orig: True	 #not required to be True for inference compatibility	#optional
+if(executionMode=="train" or executionMode=="trainAndInference"):
+	storeDatabaseGlobalFeatureNeuronsInRam = False		 #default: False	#orig: True		#optional	#if storeDatabaseGlobalFeatureNeuronsInRam=False use feature neuron tensors in observed columns (note feature connection tensors are always in observed columns)	#inferenceMode=True always overrides with storeDatabaseGlobalFeatureNeuronsInRam=True	
 else:
-	storeDatabaseGlobalFeatureNeuronsInRam = True		#mandatory: True	#if storeDatabaseGlobalFeatureNeuronsInRam=True use global feature neuron tensors, else use feature neuron tensors in observed columns (note feature connection tensors are always in observed columns)
+	storeDatabaseGlobalFeatureNeuronsInRam = True		#mandatory: True	#if storeDatabaseGlobalFeatureNeuronsInRam=True use global feature neuron tensors	#inferenceMode=True always overrides with storeDatabaseGlobalFeatureNeuronsInRam=True
 trainEndGenerateGlobalFeatureNeuronsTensor = False	#derived var
 inferenceStartGenerateGlobalFeatureNeuronsTensor = False	#derived var
 if(not storeDatabaseGlobalFeatureNeuronsInRam):
@@ -508,8 +508,8 @@ randomiseColumnFeatureXposition = True	#shuffle x position of column internal fe
 
 #print vars (Information);
 if(useAutoresearch):
-	printTrainSequenceBar = False
-	printEvalSequenceBar = False
+	printTrainSequenceBar = True
+	printEvalSequenceBar = True
 else:
 	printTrainSequenceBar = True	#default: True	#orig: False	#print each training sequence iteration using standard tqdm bar
 	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures or useQuickExecution):
@@ -709,8 +709,6 @@ if(useInference):
 	kcMax = 1 	#topk next concept column prediction
 	kf = 1
 	assert kcNetwork==1 and kf==1 and kcMax==1, "multiple prediction column/feature pairs not supported"
-	if(not executionMode == "train"):
-		assert storeDatabaseGlobalFeatureNeuronsInRam, "useInference: global feature neuron lists are required" 
 	assert useSaveData,  "useInference: useSaveData is required" 
 
 

@@ -756,7 +756,7 @@ class SequenceObservedColumns:
 			cIdxList.append(pt.full((numFeatures,), cIdx, dtype=pt.long))
 			fIdxList.append(fIdxTensor)
 
-			if not storeDatabaseGlobalFeatureNeuronsInRam:
+			if(not (storeDatabaseGlobalFeatureNeuronsInRam or self.databaseNetworkObject.inferenceMode)):
 				featureNeurons = observedColumn.featureNeurons.coalesce()
 			else:
 				# Slice the globalFeatureNeurons as before
@@ -1042,7 +1042,7 @@ class SequenceObservedColumns:
 		if(arrayIndexPropertiesPos):
 			posPropertyMaskLookupConnection = self.buildMaskLookup(self.databaseNetworkObject.arrayNumberOfProperties, posPropertyIndices.to(connectionDevice), connectionDevice)
 
-		if storeDatabaseGlobalFeatureNeuronsInRam:
+		if(storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode):
 			globalFeatureNeurons = self.databaseNetworkObject.globalFeatureNeurons.coalesce()
 
 		for cIdx, observedColumn in sequenceObservedColumnsDict.items():
@@ -1052,7 +1052,7 @@ class SequenceObservedColumns:
 				updateCount = inferenceConceptUpdateCounts.get(conceptIndex, 0) + 1
 				inferenceConceptUpdateCounts[conceptIndex] = updateCount
 
-			if not storeDatabaseGlobalFeatureNeuronsInRam:
+			if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
 				featureTargetSparse = observedColumn.featureNeurons.coalesce()
 				featureTargetSize = featureTargetSparse.size()
 			else:
@@ -1062,11 +1062,11 @@ class SequenceObservedColumns:
 			connectionUpdatesPos = None
 
 			if(addPropertiesEnabled):
-				featureUpdatesAdd = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsDeltaSparse, addPropertyMaskLookup, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if not storeDatabaseGlobalFeatureNeuronsInRam else conceptIndex)
+				featureUpdatesAdd = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsDeltaSparse, addPropertyMaskLookup, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode) else conceptIndex)
 			if(replacePropertiesEnabled):
-				featureUpdatesReplace = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsCurrentSparse, replacePropertyMaskLookup, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if not storeDatabaseGlobalFeatureNeuronsInRam else conceptIndex)
+				featureUpdatesReplace = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsCurrentSparse, replacePropertyMaskLookup, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode) else conceptIndex)
 			if(arrayIndexPropertiesPos):
-				featureUpdatesPos = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsCurrentSparse, posPropertyMaskLookupFeature, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if not storeDatabaseGlobalFeatureNeuronsInRam else conceptIndex)
+				featureUpdatesPos = self.extractSequenceFeatureUpdates(cIdx, fIdxTensor, featureIndicesObservedDevice, featureNeuronsCurrentSparse, posPropertyMaskLookupFeature, sequenceFeatureMaskLookup, featureTargetSize, insertConceptIndex=None if not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode) else conceptIndex)
 
 			if(replacePropertiesEnabled):
 				activationUpdateBranches = None
@@ -1077,14 +1077,14 @@ class SequenceObservedColumns:
 					activationUpdates = featureUpdatesReplace.coalesce()
 					activationUpdateIndices = activationUpdates.indices()
 					activationUpdateMask = (activationUpdateIndices[0] == databaseNetworkObject.arrayIndexPropertiesActivationIndex)
-					if(storeDatabaseGlobalFeatureNeuronsInRam):
+					if(storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode):
 						activationUpdateMask = activationUpdateMask & (activationUpdateIndices[3] == conceptIndex)
 					if(activationUpdateMask.any()):
 						activationUpdateBranches = pt.unique(activationUpdateIndices[1][activationUpdateMask])
 				featureTargetSparse = featureTargetSparse.coalesce()
 				targetIndices = featureTargetSparse.indices()
 				targetValues = featureTargetSparse.values()
-				if not storeDatabaseGlobalFeatureNeuronsInRam:
+				if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
 					removeMask = replacePropertyMaskLookup[targetIndices[0]] & observedFeatureMaskLookup[targetIndices[3]]
 				else:
 					removeMask = replacePropertyMaskLookup[targetIndices[0]] & (targetIndices[3] == conceptIndex) & observedFeatureMaskLookup[targetIndices[4]]
@@ -1094,7 +1094,7 @@ class SequenceObservedColumns:
 					if(activationUpdateBranches is not None and activationUpdateBranches.numel() > 0):
 						activationBranchLookup = self.buildMaskLookup(multipleDendriticBranchesNumber, activationUpdateBranches.to(targetIndices.device), targetIndices.device)
 						activationMask = (targetIndices[0] == databaseNetworkObject.arrayIndexPropertiesActivationIndex)
-						if(not storeDatabaseGlobalFeatureNeuronsInRam):
+						if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
 							activationMask = activationMask & observedFeatureMaskLookup[targetIndices[3]]
 						else:
 							activationMask = activationMask & (targetIndices[3] == conceptIndex) & observedFeatureMaskLookup[targetIndices[4]]
@@ -1114,7 +1114,7 @@ class SequenceObservedColumns:
 			if(arrayIndexPropertiesPos):
 				featureTargetSparse = self.applySparseMaxUpdate(featureTargetSparse, featureUpdatesPos)
 
-			if not storeDatabaseGlobalFeatureNeuronsInRam:
+			if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
 				observedColumn.featureNeurons = featureTargetSparse
 			else:
 				globalFeatureNeurons = featureTargetSparse
@@ -1172,7 +1172,7 @@ class SequenceObservedColumns:
 					connectionTargetSparse = self.applySparseMaxUpdate(connectionTargetSparse, connectionUpdatesPosSource)
 				observedColumn.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, connectionTargetSparse)
 
-		if storeDatabaseGlobalFeatureNeuronsInRam:
+		if(storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode):
 			self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
 		if(GIAANNcmn_debug.debugPrintGPUramUsage):
 			if(executionMode=="train"):
@@ -1267,7 +1267,7 @@ class SequenceObservedColumns:
 			
 			globalFeatureNeurons = None
 			globalFeatureNeuronUpdates = None
-			if(storeDatabaseGlobalFeatureNeuronsInRam):
+			if(storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode):
 				globalFeatureNeurons = self.databaseNetworkObject.globalFeatureNeurons
 				if(optimisationCombineSparseUpdatesPerSequence):
 					globalFeatureNeuronUpdates = []
@@ -1276,7 +1276,7 @@ class SequenceObservedColumns:
 				conceptIndex = observedColumn.conceptIndex
 
 				#A: update feature neurons;
-				if(not storeDatabaseGlobalFeatureNeuronsInRam):
+				if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
 					featureTargetSparse = observedColumn.featureNeurons
 					featureTargetSize = featureTargetSparse.size()
 				else:
@@ -1287,21 +1287,21 @@ class SequenceObservedColumns:
 					start, end = featureRange
 					featureUpdateIndices = featureIndicesSorted[:, start:end]
 					featureUpdateValues = featureValuesSorted[start:end]
-					featureUpdates = self.buildFeaturePropertyUpdateSparse(featureUpdateIndices, featureUpdateValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, featureTargetSize, insertConceptIndex=None if not storeDatabaseGlobalFeatureNeuronsInRam else conceptIndex)
-					if(not storeDatabaseGlobalFeatureNeuronsInRam):
+					featureUpdates = self.buildFeaturePropertyUpdateSparse(featureUpdateIndices, featureUpdateValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, featureTargetSize, insertConceptIndex=None if not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode) else conceptIndex)
+					if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
 						featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
 					else:
 						if(optimisationCombineSparseUpdatesPerSequence):
 							globalFeatureNeuronUpdates.append(featureUpdates)
 						else:
 							featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
-				if(not storeDatabaseGlobalFeatureNeuronsInRam):
+				if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
 					observedColumn.featureNeurons = featureTargetSparse
 				else:
 					if(not optimisationCombineSparseUpdatesPerSequence):
 						globalFeatureNeurons = featureTargetSparse
 
-			if(storeDatabaseGlobalFeatureNeuronsInRam):
+			if(storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode):
 				if(optimisationCombineSparseUpdatesPerSequence):
 					if(globalFeatureNeuronUpdates is None):
 						raise RuntimeError("updateObservedColumnsEfficient error: globalFeatureNeuronUpdates is None while optimisationCombineSparseUpdatesPerSequence")
@@ -1311,7 +1311,7 @@ class SequenceObservedColumns:
 				self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
 		else:
 			if(featureIndices.numel() > 0):
-				if(not storeDatabaseGlobalFeatureNeuronsInRam):
+				if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
 					featureConceptIndicesUnique = pt.unique(conceptIndicesFeatureTensor[featureIndices[2]], sorted=True)
 					featureTargetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, featureConceptIndicesUnique.shape[0], databaseNetworkObject.f)
 					featureTargetSparse = self.gatherFeatureNeuronConceptBucketTensor(observedColumnsByConceptIndex, featureConceptIndicesUnique, featureDevice)

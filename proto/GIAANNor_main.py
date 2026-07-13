@@ -284,7 +284,7 @@ def processTokenisedSequence(databaseNetworkObject, inferenceMode, sequenceCount
 				print(f"Processing sequenceCount: {sequenceCount}")
 
 
-		if(storeDatabaseGlobalFeatureNeuronsInRam):
+		if(storeDatabaseGlobalFeatureNeuronsInRam or inferenceMode):
 			GIAANNcmn_databaseNetwork.ensureGlobalFeatureNeuronsSize(databaseNetworkObject, False)
 		observedColumnsDict = GIAANNor_sequenceConcepts.secondPass(databaseNetworkObject, sequenceData, inferenceMode)
 		sequenceObservedColumns = GIAANNor_sequenceConcepts.createSequenceObservedColumns(databaseNetworkObject, observedColumnsDict, sequenceData, inferenceMode)

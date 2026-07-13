@@ -179,17 +179,17 @@ class ObservedColumnConnectionBase:
 
 	def requiresExpandFeatureNeuronArraysFeatures(self, newF):
 		result = False
-		if(not storeDatabaseGlobalFeatureNeuronsInRam):
+		if(not (storeDatabaseGlobalFeatureNeuronsInRam or self.databaseNetworkObject.inferenceMode)):
 			if(not hasattr(self, "featureNeurons")):
-				raise RuntimeError(f"{self.getObservedColumnErrorName()}.requiresExpandFeatureNeuronArraysFeatures error: featureNeurons missing while storeDatabaseGlobalFeatureNeuronsInRam is False")
+				raise RuntimeError(f"{self.getObservedColumnErrorName()}.requiresExpandFeatureNeuronArraysFeatures error: featureNeurons missing while global feature neuron storage is disabled")
 			if(newF > self.featureNeurons.shape[3]):
 				result = True
 		return result
 
 	def expandFeatureNeuronArraysFeatures(self, newF):
-		if(not storeDatabaseGlobalFeatureNeuronsInRam):
+		if(not (storeDatabaseGlobalFeatureNeuronsInRam or self.databaseNetworkObject.inferenceMode)):
 			if(not hasattr(self, "featureNeurons")):
-				raise RuntimeError(f"{self.getObservedColumnErrorName()}.expandFeatureNeuronArraysFeatures error: featureNeurons missing while storeDatabaseGlobalFeatureNeuronsInRam is False")
+				raise RuntimeError(f"{self.getObservedColumnErrorName()}.expandFeatureNeuronArraysFeatures error: featureNeurons missing while global feature neuron storage is disabled")
 			if(newF > self.featureNeurons.shape[3]):
 				expandedSizeNeurons = (self.featureNeurons.shape[0], self.featureNeurons.shape[1], self.featureNeurons.shape[2], newF)
 				self.featureNeurons = GIAANNcmn_databaseNetworkFiles.expandSparseTensorSize(self.featureNeurons, expandedSizeNeurons, f"{self.getObservedColumnErrorName()}.expandFeatureNeuronArraysFeatures")
@@ -322,14 +322,14 @@ class ObservedColumnConnectionBase:
 
 class ObservedColumn(ObservedColumnConnectionBase):
 	"""
-	Create a class defining observed columns. The observed column class contains an index to the dataset concept column dictionary. The observed column class contains a list of feature connection arrays. The observed column class also contains a list of feature neuron arrays when storeDatabaseGlobalFeatureNeuronsInRam is False.
+	Create a class defining observed columns. The observed column class contains an index to the dataset concept column dictionary. The observed column class contains a list of feature connection arrays. The observed column class also contains a list of feature neuron arrays when storeDatabaseGlobalFeatureNeuronsInRam and inferenceMode are False.
 	"""
 	def __init__(self, databaseNetworkObject, conceptIndex, lemma, i):
 		self.databaseNetworkObject = databaseNetworkObject
 		self.conceptIndex = conceptIndex
 		self.conceptName = lemma
 		self.conceptSequenceWordIndex = i
-		if not storeDatabaseGlobalFeatureNeuronsInRam:
+		if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
 			self.featureNeurons = self.initialiseFeatureNeurons(databaseNetworkObject.f)
 		if(trainStoreFeatureMapsGlobally):
 			self.featureWordToIndex = databaseNetworkObject.conceptFeaturesDict
@@ -488,7 +488,7 @@ class ObservedColumnProxy(ObservedColumnConnectionBase):
 			GIAANNnlp_auxiliaryNeuronsSimilarWords.initialiseObservedColumnProxyAuxiliaryStorage(self)
 		if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 			GIAANNnlp_auxiliaryNeuronsAuto.initialiseObservedColumnReverseConnectionStorage(self)
-		if((not storeDatabaseGlobalFeatureNeuronsInRam) and hasattr(observedColumn, "featureNeurons")):
+		if((not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)) and hasattr(observedColumn, "featureNeurons")):
 			self.featureNeurons = observedColumn.featureNeurons.to(targetDevice)
 
 	def getDefaultConnectionTargetDevice(self):
