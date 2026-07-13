@@ -191,7 +191,7 @@ def printInferenceTop1AccuracyAutoresearchSummary(databaseNetworkObject, metricN
 	peakRamMb = float(peakRamBytes) / (1024.0 * 1024.0)
 	print("---")
 	print(metricName + ": ", metricValue)
-	databaseMemoryGb = GIAANNcmn_count.printCountTotalParametersRun(databaseNetworkObject)
+	databaseMemoryGb = GIAANNcmn_count.calculateDatabaseSizeGiBFast()
 	print("databaseMemoryGb: ", databaseMemoryGb)
 	print("training_seconds: ", autoresearchExecutionTimeTrain)
 	print("total_seconds: ", totalExecutionTimeSeconds)

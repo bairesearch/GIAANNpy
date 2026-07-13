@@ -21,6 +21,8 @@ import torch as pt
 import math
 import sys
 
+bytesPerGiB = 1024 ** 3
+
 if(__name__ == "__main__"):
 	sys.modules["GIAANNcmn_globalDefs"] = sys.modules[__name__]
 

@@ -126,6 +126,24 @@ def debugCalculateDatabasePtSizeGiB():
 	totalPtGiB = totalPtBytesUncompressed / (1024 ** 3)
 	return totalPtGiB
 
+def calculateDatabaseSizeGiBFast():
+	if(not os.path.isdir(databaseFolder)):
+		raise RuntimeError("calculateDatabaseSizeGiBFast error: missing databaseFolder = " + databaseFolder)
+	totalDatabaseBytes = 0
+	pendingDirectoryPaths = [databaseFolder]
+	while(len(pendingDirectoryPaths) > 0):
+		directoryPath = pendingDirectoryPaths.pop()
+		with os.scandir(directoryPath) as directoryEntries:
+			for directoryEntry in directoryEntries:
+				if(directoryEntry.is_dir(follow_symlinks=False)):
+					pendingDirectoryPaths.append(directoryEntry.path)
+				elif(directoryEntry.is_file(follow_symlinks=False)):
+					totalDatabaseBytes = totalDatabaseBytes + directoryEntry.stat(follow_symlinks=False).st_size
+				else:
+					raise RuntimeError("calculateDatabaseSizeGiBFast error: unsupported database entry = " + directoryEntry.path)
+	totalDatabaseGiB = totalDatabaseBytes / bytesPerGiB
+	return totalDatabaseGiB
+
 def debugCalculateDatabaseSizeGiB():
 	if(not os.path.isdir(databaseFolder)):
 		raise RuntimeError("debugCalculateDatabaseSizeGiB error: missing databaseFolder = " + databaseFolder)
