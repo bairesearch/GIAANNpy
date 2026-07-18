@@ -53,7 +53,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -377,7 +377,7 @@ if(useInference):
 
 #Inference activations;
 if(useInference):
-	inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
+	inferenceActivationFunction = False	#default2:False	#default1:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	if(useSANI):
 		inferenceApplySequentialActivationSparse = True	#default: True	#orig: False
 		if(useBenchmarkDefaultsEvalTestSetOptim):
@@ -499,7 +499,7 @@ z2 = 1  # Decrement value when not activated
 if(inferenceActivationFunction):
 	j1 = 1 #default: 1
 else:
-	j1 = 5   # Activation trace duration
+	j1 = 0.5	#orig: 5   # Activation trace duration
 	
 
 #Mandatory vars;
