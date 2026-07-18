@@ -542,3 +542,4 @@ v2k (Codex IDE GPT-5.5):
 - patch the GIAANN codebase to make inference execution (GIAANNcmn_main.py: "executeMode(True)") effectively always use storeDatabaseGlobalFeatureNeuronsInRam=True, regardless of how this parameter is set in globalDefs. To implement this, replace all codebase checks of if(storeDatabaseGlobalFeatureNeuronsInRam) with if(storeDatabaseGlobalFeatureNeuronsInRam or inferenceMode). 
 MANUAL; - update trainAndInference to support train ram settings (storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True, storeDatabaseGlobalFeatureNeuronsInRam=False).
 - for useAutoresearch eval results report, create a new function to quickly measure the size of the database by just reading the total size of the database folder.
+MANUAL; - add autoresearch campaignRequirements.md

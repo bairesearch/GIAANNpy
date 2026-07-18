@@ -4,6 +4,8 @@ This is an experiment to have GIAANN do its own research.
 
 All paths in this file are relative to the repository root unless stated otherwise. Follow `AGENTS.md` throughout the campaign. Treat `GIAANNproto*.nlc` as read-only requirements.
 
+Read campaignRequirements.md to understand the user requirements specific to the particular autoresearch campaign being initialised (see Setup) and executed (see Experimentation).
+
 ## Setup
 
 To set up a new experiment, work with the user to:
