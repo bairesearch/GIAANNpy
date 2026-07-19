@@ -130,7 +130,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 200000	#5000, 200000, 1000000
+	trainMaxSequences = 5000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 5000	#5000
@@ -697,10 +697,10 @@ if(useInference):
 					inferenceDuringTrainTargetConnectionIndexTargetFeature = 3
 					inferenceDuringTrainTargetConnectionTensorRank = 4
 	inferenceDeactivateNeuronsUponPrediction = True	#default: True
-	inferenceDecrementActivations = False	#default: False - CHECKTHIS #orig: False
+	inferenceDecrementActivations = True	#default: False - CHECKTHIS #orig: False
 	if(inferenceDecrementActivations):
 		inferenceDecrementActivationsNonlinear = True
-		activationDecrementPerPredictedToken = 0.1	#0.05	#CHECKTHIS
+		activationDecrementPerPredictedToken = 0.05	#orig: 0.1	#CHECKTHIS
 		activationDecrementPerPredictedSequence = 0.5
 	if(inferenceSeedNetwork):
 		numSeedTokens = numSeedTokensInference	#default: 5	#number of seed tokens in last sequence of inference prompt (remaining tokens will be prediction tokens)

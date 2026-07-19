@@ -545,3 +545,4 @@ MANUAL; - update trainAndInference to support train ram settings (storeDatabaseF
 MANUAL; - add autoresearch campaignRequirements.md
 AUTORESEARCH; - set j1=0.5 with inferenceActivationFunction=False
 MANUAL; - update inferenceEvaluateTestSetTrainMaxSequences10M
+AUTORESEARCH; - set inferenceDecrementActivations=True and activationDecrementPerPredictedToken=0.05
