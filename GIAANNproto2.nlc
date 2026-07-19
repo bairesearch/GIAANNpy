@@ -544,3 +544,4 @@ MANUAL; - update trainAndInference to support train ram settings (storeDatabaseF
 - for useAutoresearch eval results report, create a new function to quickly measure the size of the database by just reading the total size of the database folder.
 MANUAL; - add autoresearch campaignRequirements.md
 AUTORESEARCH; - set j1=0.5 with inferenceActivationFunction=False
+MANUAL; - update inferenceEvaluateTestSetTrainMaxSequences10M

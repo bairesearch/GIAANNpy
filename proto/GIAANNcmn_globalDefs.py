@@ -53,7 +53,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -99,19 +99,18 @@ elif(useTrainDuringInference):
 	elif(executionMode == "inference"):
 		useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 	
+inferenceEvaluateTestSetTrainMaxSequences10M = False	#default: False	#orig: False	#version 2 of eval datasets (1000 sequences) that supports much larger train datasets (10M sequences)	#required if performing test-set eval on database trained with > 3M sequences (based on how the original test-set was generated)
 if(useBenchmarkDefaultsEvalTestSet):
 	inferenceEvaluateTestSet = True
-	inferenceEvaluateTestSetTrainMaxSequences10M = False	#default: False	#orig: False	#required if performing test-set eval on database trained with > 3M sequences (based on how the original test-set was generated)
 	useBenchmarkDefaultsEvalTestSetOptim = True	#default: True #orig: False
 	if(useBenchmarkDefaultsEvalTestSetOptim):
 		inferenceSegmentTiming = "none"	#~optimum	#none, biased, exact, seq
-		inferenceActivationsType = "boolf"	#optimum
+		inferenceActivationsType = "boolf"	#default: "boolf"	#boolf, boolf+c, intf+c
 	else:
 		inferenceSegmentTiming = "biased"	#default: biased	#none, biased, exact, seq
 		inferenceActivationsType = "boolf"	#default: boolf	#boolf, boolf+c, intf+c
 else:
 	inferenceEvaluateTestSet = False
-	inferenceEvaluateTestSetTrainMaxSequences10M = False
 	useBenchmarkDefaultsEvalTestSetOptim = False		#default: False #orig: False
 	inferenceSegmentTiming = "exact"	#default: exact	#none, biased, exact, seq
 	inferenceActivationsType = "boolf"	#default: boolf	#boolf, boolf+c, intf+c
@@ -131,7 +130,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 5000	#5000, 200000, 1000000
+	trainMaxSequences = 200000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 5000	#5000

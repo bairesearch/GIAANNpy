@@ -52,6 +52,7 @@ from GIAANNcmn_globalDefs import useTrainDuringInference
 from GIAANNcmn_globalDefs import multipleDendriticBranchesBinaryTree
 from GIAANNcmn_globalDefs import trainVerifyConnectionNonexistentAcrossBranches
 
+
 #Dataset Type;
 if(useQuickExecution):
 	datasetType = "textfile"
@@ -92,7 +93,7 @@ else:
 	sequencesCropToMaxLength = True	#mandatory: True
 	tokensPerWord = 1.25 	#note approx avg 1.25 tiktokens per word, so 80*1.25 = 100 tokens (assuming o200k_base tokeniser with OSCAR-2201 en dataset)
 	targetContextLengthInTokens = 512	#emulate
-	maxSequenceLength = int(targetContextLengthInTokens/tokensPerWord)	#measured in spacy word tokens, not subword tiktokens (even if tokeniserSubword is enabled)
+	maxSequenceLength = int(targetContextLengthInTokens/tokensPerWord)	#512/1.25=409	#measured in spacy word tokens, not subword tiktokens (even if tokeniserSubword is enabled)
 	
 #Closed world grounded dataset constants;
 datasetTypeClosedWorldGrounded1 = "closedWorldGrounded1"
@@ -170,9 +171,15 @@ if(not datasetType=="textfile"):
 			testSetRatio = 0.1	#ratio of articles in dataset to be used for test (vs train) set - taken from end of dataset
 			assert useLocalDataset	#required for efficiency
 		elif(datasetType=="oscar"):
-			trainMaxSequencesEver = 10000000	#orig: 1000000	#highest value of trainMaxSequences expected during current dev (using this instead of a much high value closer to 1-testSetRatio because testSetStartOffset takes time to load)
+			if(inferenceEvaluateTestSetTrainMaxSequences10M):
+				trainMaxSequencesEver = 10000000	#highest value of trainMaxSequences expected during current dev (using this instead of a much high value closer to 1-testSetRatio because testSetStartOffset takes time to load)
+			else:
+				trainMaxSequencesEver = 1000000
 			if(sentencePredictions):
-				numSentencesPerSequenceEver = 20	#orig: 3
+				if(inferenceEvaluateTestSetTrainMaxSequences10M):
+					numSentencesPerSequenceEver = 20
+				else:
+					numSentencesPerSequenceEver = 3
 				datasetOscarAverageEligibleSentencesPerArticle = 32	#measured across 1m raw sentences (therefore appropriate for trainMaxSequencesEver=1m)
 				testSetStartOffset = int(trainMaxSequencesEver / datasetOscarAverageEligibleSentencesPerArticle)*numSentencesPerSequenceEver
 			else:
@@ -294,19 +301,28 @@ if(useInference):
 			if(useBenchmarkEvalDataSet):
 				if(sentencePredictions):				
 					if(multisentencePredictions):
-						if(inferenceEvaluateTestSet):
-							if(inferenceEvaluateTestSetTrainMaxSequences10M):
-								inferencePromptFileName = 'inference_prompt.txt.longTestOscarMultiSentence2'
+						if(useBenchmarkDefaults):
+							if(inferenceEvaluateTestSet):
+								if(inferenceEvaluateTestSetTrainMaxSequences10M):
+									inferencePromptFileName = 'inference_prompt.txt.longTestOscar2-multisentencePredictions'
+								elif(spacyPipelineOptimisations):
+									#inferencePromptFileName = 'inference_prompt.txt.longTestOscarMultiSentence'
+									print("inferenceEvaluateTestSetTrainMaxSequences10M is required to test multisentencePredictions with useBenchmarkDefaults") 
 							else:
-								inferencePromptFileName = 'inference_prompt.txt.longTestOscarMultiSentence'
+								#ensure within distribution trainset;
+								if(inferenceEvaluateTestSetTrainMaxSequences10M):
+									inferencePromptFileName = 'inference_prompt.txt.longTrainOscar2-multisentencePredictions'
+								elif(spacyPipelineOptimisations):
+									print("inferenceEvaluateTestSetTrainMaxSequences10M is required to test multisentencePredictions with useBenchmarkDefaults") 
+								else:
+									printe("datasetType==oscar multisentencePredictions dataset incompatibility")
 						else:
-							#ensure within distribution trainset;
-							if(not useBenchmarkDefaults):
-								inferencePromptFileName = 'inference_prompt.txt.longTrainOscarMultiSentence'
-							elif(spacyPipelineOptimisations):
-								inferencePromptFileName = 'inference_prompt.txt.longTrainOscarMultiSentence10Optim'
+							#legacy used during old benchmarks (may also be non-Optim)
+							if(inferenceEvaluateTestSet):
+								inferencePromptFileName = 'inference_prompt.txt.longTestOscarMultiSentence-useBenchmarkDefaultsFalse'
 							else:
-								printe("datasetType==oscar multisentencePredictions dataset incompatibility")
+								#ensure within distribution trainset;
+								inferencePromptFileName = 'inference_prompt.txt.longTrainOscarMultiSentence-useBenchmarkDefaultsFalse'
 					else:
 						if(useBenchmarkDefaults):
 							if(inferenceEvaluateTestSet):
@@ -316,23 +332,26 @@ if(useInference):
 									inferencePromptFileName = 'inference_prompt.txt.longTestOscar'
 							else:
 								#ensure within distribution trainset ;
-								if(spacyPipelineOptimisations):
-									inferencePromptFileName = 'inference_prompt.txt.longTrainOscarOptim'
+								if(inferenceEvaluateTestSetTrainMaxSequences10M):
+									inferencePromptFileName = 'inference_prompt.txt.longTrainOscar2'
+								elif(spacyPipelineOptimisations):
+									inferencePromptFileName = 'inference_prompt.txt.longTrainOscar-spacyPipelineOptimisations'
 								else:
 									inferencePromptFileName = 'inference_prompt.txt.longTrainOscar'
 						else:
 							if(inferenceEvaluateTestSet):
 								inferencePromptFileName = 'inference_prompt.txt.longTestOscar-useBenchmarkDefaultsFalse'
-								#printe("inference_prompt.txt.longTestOscar-useBenchmarkDefaultsFalse not yet created")
 							else:
 								inferencePromptFileName = 'inference_prompt.txt.longTrainOscar-useBenchmarkDefaultsFalse'
-								#printe("inference_prompt.txt.longTrainOscar-useBenchmarkDefaultsFalse.txt not yet created")
 				else:
-					if(inferenceEvaluateTestSet):
-						#inferencePromptFileName = 'inference_prompt.txt.longTestOscar-SentencePredictionsFalse-maxSequenceLength409'
-						inferencePromptFileName = 'inference_prompt.txt.longTestOscar'	#optionally keep same for direct comparison
+					if(inferenceEvaluateTestSetTrainMaxSequences10M):
+						if(inferenceEvaluateTestSet):
+							inferencePromptFileName = 'inference_prompt.txt.longTestOscar2-SentencePredictionsFalse'
+							#inferencePromptFileName = 'inference_prompt.txt.longTestOscar'	#optionally keep same for direct comparison
+						else:
+							inferencePromptFileName = 'inference_prompt.txt.longTrainOscar2-SentencePredictionsFalse'
 					else:
-						inferencePromptFileName = 'inference_prompt.txt.longTrainOscar-SentencePredictionsFalse-maxSequenceLength409'
+						printe("!sentencePredictions requires inferenceEvaluateTestSetTrainMaxSequences10M")
 			else:
 				inferencePromptFileName = 'inference_prompt.txt'
 		elif(datasetType=="textfile"):
@@ -661,9 +680,9 @@ if(useBenchmark):
 			printe("multipleDendriticBranchesRandom currently assumes spacyPipelineOptimisations")
 	elif(multisentencePredictions):
 		if(not useBenchmarkDefaults):
-			benchmarkAblationText = "-multisentencePredictions"
+			benchmarkAblationText = "-multisentencePredictions-useBenchmarkDefaultsFalse"	#orig saved benchmarks benchmarkAblationText: -multisentencePredictions
 		else:
-			printe("multisentencePredictions currently assumes not useBenchmarkDefaults")
+			benchmarkAblationText = "-multisentencePredictions"
 	elif(not useBenchmarkDefaults):
 		benchmarkAblationText = "-useBenchmarkDefaultsFalse"
 	elif(spacyPipelineOptimisations):
