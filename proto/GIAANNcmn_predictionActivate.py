@@ -608,7 +608,11 @@ def applyTimeBasedActivationModifier(globalFeatureNeuronsActivation, globalFeatu
 			storedTimes = gatherSparseTensorValuesAtIndices(globalFeatureNeuronsTime, indices, values.dtype)
 			segmentIndices = indices[1]
 			penaltyValues = computeTimePenaltyForSegments(segmentIndices, storedTimes, sequenceWordIndex, sequenceColumnIndex)
-			modifiedValues = values - penaltyValues
+			if(inferenceSegmentTimingMultipicativeBias):
+				biasFactorValues = pt.full_like(values, inferenceSegmentTimingMultipicativeBiasFactor)
+				modifiedValues = values*pt.pow(biasFactorValues, penaltyValues)
+			else:
+				modifiedValues = values - penaltyValues
 			result = pt.sparse_coo_tensor(indices, modifiedValues, size=activationSparse.size(), device=activationSparse.device).coalesce()
 	return result
 

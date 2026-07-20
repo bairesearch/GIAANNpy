@@ -104,16 +104,21 @@ if(useBenchmarkDefaultsEvalTestSet):
 	inferenceEvaluateTestSet = True
 	useBenchmarkDefaultsEvalTestSetOptim = True	#default: True #orig: False
 	if(useBenchmarkDefaultsEvalTestSetOptim):
-		inferenceSegmentTiming = "none"	#~optimum	#none, biased, exact, seq
-		inferenceActivationsType = "boolf"	#default: "boolf"	#boolf, boolf+c, intf+c
+		inferenceSegmentTiming = "biased"	#default: biased	#orig: none	#none, biased, exact, seq
+		inferenceActivationsType = "intf+c"	#default: intf+c #orig: boolf	#boolf, boolf+c, intf+c
 	else:
 		inferenceSegmentTiming = "biased"	#default: biased	#none, biased, exact, seq
-		inferenceActivationsType = "boolf"	#default: boolf	#boolf, boolf+c, intf+c
+		inferenceActivationsType = "boolf"		#default: boolf	#boolf, boolf+c, intf+c
 else:
 	inferenceEvaluateTestSet = False
 	useBenchmarkDefaultsEvalTestSetOptim = False		#default: False #orig: False
 	inferenceSegmentTiming = "exact"	#default: exact	#none, biased, exact, seq
 	inferenceActivationsType = "boolf"	#default: boolf	#boolf, boolf+c, intf+c
+inferenceSegmentTimingMultipicativeBias = True	#default: True	#apply a non-negative multiplicative timing bias instead of the legacy subtractive timing bias when inferenceSegmentTiming="biased"
+if(inferenceSegmentTimingMultipicativeBias):
+	inferenceSegmentTimingMultipicativeBiasFactor = 0.9	#default: 0.9	#activation multiplier applied per unit of segment timing error
+	if(inferenceSegmentTimingMultipicativeBiasFactor <= 0.0 or inferenceSegmentTimingMultipicativeBiasFactor > 1.0):
+		raise RuntimeError("GIAANNcmn_globalDefs error: inferenceSegmentTimingMultipicativeBiasFactor must be within (0, 1]")
 
 inferenceReportTokenAccuracyConstrainByColumn = False	#default: False	#orig: False
 
@@ -130,7 +135,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 5000	#5000, 200000, 1000000
+	trainMaxSequences = 200000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 5000	#5000
@@ -306,10 +311,7 @@ if(useInference):
 		inferenceUseNeuronFeaturePropertiesTime = True
 		inferenceUseNeuronFeaturePropertiesTimeExact = True
 	elif(inferenceSegmentTiming=="seq"):
-		if(useBenchmark):
-			inferenceUseNeuronFeaturePropertiesTime = True	#benchmark uses temporal biasing in conjunction with sequentiality checks
-		else:
-			inferenceUseNeuronFeaturePropertiesTime = False
+		inferenceUseNeuronFeaturePropertiesTime = False	#seq applies sequentiality checks only, without timing bias
 		inferenceUseNeuronFeaturePropertiesTimeExact = False
 	else:
 		printe("inferenceSegmentTiming error")
@@ -836,8 +838,13 @@ if(useSANI):
 		if(useSANIfeaturesAndColumns):
 			useSANIfeaturesAndColumnsInternal = True	#default: True	#orig: False	#also include internal columns in column segments (not just external columns)
 			#these are highly dependent on numSeedTokensInference and the specific seed text (ie number of features per column);
-			arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#orig: + 1	#min number of concept/column segments (if useSANIfeaturesAndColumnsInternal, includes internal column segment)
-			arrayNumberOfSegmentsFeatureDistance = math.ceil(numSeedTokensInference / 2) + 1 	#number of nearest features to target node
+			SANIfeaturesAndColumnsDistribution="doubleFeatureSegments"	#default: doubleFeatureSegments	#doubleFeatureSegments/matchedSegments
+			if(SANIfeaturesAndColumnsDistribution=="doubleFeatureSegments"):
+				arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#orig: + 1	#min number of concept/column segments (if useSANIfeaturesAndColumnsInternal, includes internal column segment)
+				arrayNumberOfSegmentsFeatureDistance = math.ceil(numSeedTokensInference / 2) + 1 	#number of nearest features to target node
+			elif(SANIfeaturesAndColumnsDistribution=="matchedSegments"):
+				arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 2)
+				arrayNumberOfSegmentsFeatureDistance = math.floor(numSeedTokensInference / 2)
 			arrayNumberOfSegments = arrayNumberOfSegmentsColumnDistance + arrayNumberOfSegmentsFeatureDistance
 		elif(useSANIcolumns):
 			if(multisentencePredictions):
@@ -1041,6 +1048,10 @@ if(printConfiguration):
 	print("useBenchmarkDefaultsEvalTestSet:", useBenchmarkDefaultsEvalTestSet)
 	print("inferenceEvaluateTestSet:", inferenceEvaluateTestSet)
 	print("inferenceSegmentTiming:", inferenceSegmentTiming)
+	if(inferenceSegmentTiming=="biased"):
+		print("inferenceSegmentTimingMultipicativeBias:", inferenceSegmentTimingMultipicativeBias)
+		if(inferenceSegmentTimingMultipicativeBias):
+			print("inferenceSegmentTimingMultipicativeBiasFactor:", inferenceSegmentTimingMultipicativeBiasFactor)
 	print("inferenceActivationsType:", inferenceActivationsType)
 	print("inferenceReportTokenAccuracyConstrainByColumn:", inferenceReportTokenAccuracyConstrainByColumn)
 	print("inferenceReportGroundedAccuracy:", inferenceReportGroundedAccuracy)
