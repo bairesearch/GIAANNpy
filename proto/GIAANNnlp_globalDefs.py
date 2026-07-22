@@ -32,6 +32,7 @@ from GIAANNcmn_globalDefs import useAutoresearch
 from GIAANNcmn_globalDefs import useDrawNetworkIndependently
 from GIAANNcmn_globalDefs import useDefault
 from GIAANNcmn_globalDefs import useTrainDuringInference
+from GIAANNcmn_globalDefs import inferenceTrainFirstSequences
 #from GIAANNcmn_globalDefs import multipleDendriticBranches
 #from GIAANNcmn_globalDefs import multipleDendriticBranchesNumber
 from GIAANNcmn_globalDefs import useSANI
@@ -51,6 +52,9 @@ from GIAANNcmn_globalDefs import inferenceEvaluateTestSetTrainMaxSequences10M
 from GIAANNcmn_globalDefs import useTrainDuringInference
 from GIAANNcmn_globalDefs import multipleDendriticBranchesBinaryTree
 from GIAANNcmn_globalDefs import trainVerifyConnectionNonexistentAcrossBranches
+from GIAANNcmn_globalDefs import useBenchmarkV2
+
+
 
 
 #Dataset Type;
@@ -76,16 +80,29 @@ elif(useTrainDuringInference):
 #Multisentence predictions;
 sentencePredictions = True 	#default: True	orig: True
 if(sentencePredictions):
-	skipSequenceNoDelimiterDetectedBetweenConceptTokens = True	#default: True #orig: True
-	multisentencePredictions = False	#default: False	#each sequence comprises multiple sentences	#requires higher GPU RAM for train
+	if(useBenchmarkV2):
+		skipSequenceNoDelimiterDetectedBetweenConceptTokens = False	#default: True 
+	else:
+		skipSequenceNoDelimiterDetectedBetweenConceptTokens = True	#orig: True
+	if(inferenceTrainFirstSequences):
+		multisentencePredictions = False	#not supported by useQuickExecution:inferenceTrainFirstSequences based on inference_prompt.txt.trainAndInference file format (expects last sentence not last sequence to be used for inference).
+	else:
+		if(useBenchmarkV2):
+			multisentencePredictions = True	#default: True	#each sequence comprises multiple sentences	#requires higher GPU RAM for train	#required to train longer sequences
+		else:
+			multisentencePredictions = False	#orig: False
 	if(multisentencePredictions):
+		spacyPipelineMultisentenceParseSentencesIndividually = False	#default: True	#orig: False	#ensure that train and inference sentences are parsed identically
 		maxSequenceLength = 80	#512
 		numSentencesPerSequence = 3	#default: 3	#int(maxSequenceLength/25) ~= 20 for maxSequenceLength=512
 		#print("numSentencesPerSequence = ", numSentencesPerSequence)
 	else:
 		maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 	#measured in spacy word tokens, not subword tiktokens (even if tokeniserSubword is enabled).
 		numSentencesPerSequence = 1
-	sequencesCropToMaxLength = False	#default: True	#orig: False
+	if(useBenchmarkV2):
+		sequencesCropToMaxLength = True	#default: True	
+	else:
+		sequencesCropToMaxLength = False	#orig: False
 else:
 	skipSequenceNoDelimiterDetectedBetweenConceptTokens = False
 	multisentencePredictions = False	#mandatory: False
@@ -121,6 +138,10 @@ closedWorldGroundedMaxSentencesPerArticle = 1
 
 #Dataset;
 datasetsLibrary4plus = False	#default: False	#orig: False	#set False during dev to maintain benchmark consistency
+datasetSanitiseNullCharacters = True	#remove invalid NUL characters from corpus articles before spaCy parsing
+if(datasetSanitiseNullCharacters):
+	datasetNullCharacter = "\x00"
+	datasetNullCharacterReplacement = ""
 trainTestSet = False	#default: False	#only set True to generate an inference test set (with printSequenceRaw=True)
 if(trainTestSet):
 	generateEvalText = True	#mandatory: True
@@ -212,7 +233,10 @@ else:
 
 
 #Tokensier:
-tokeniserSubword = False	#default: False #orig: False
+if(useBenchmarkV2):
+	tokeniserSubword = True	#default: False
+else:
+	tokeniserSubword = False	 #orig: False
 if(tokeniserSubword):
 	tokeniserSubwordPOS = True	#default: ?	#orig: False
 	tokeniserSubwordTiktokenEncodingName = "o200k_base"

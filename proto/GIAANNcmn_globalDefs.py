@@ -47,13 +47,15 @@ useDrawNetworkIndependently = False
 useTrainDuringInference = False
 
 inferenceTrainFirstSequences = False	#dependent var
+useBenchmarkV2 = False	#dependent var
 if(useQuickExecution):
 	executionMode = "inference" 	#mandatory: "inference" (effective trainAndInference but uses a text datafile)
 	inferenceTrainFirstSequences = True	#trains first sequences in inference_prompt.txt, performs inference only on last sequence
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
+	useBenchmarkV2 = True	#default: True	#orig: False
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -79,7 +81,10 @@ if(useInference):
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: False	#False: use current target (default top-1 accuracy measurement)
 	else:
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True		#True: activate next column features using current prediction
-	inferenceBurstAllPredictionsOrTargetsInSequence = True	#default: True	#orig: False	#burst selected top-1 prediction/target after every inference step
+	if(useBenchmarkV2):
+		inferenceBurstAllPredictionsOrTargetsInSequence = True	#default: True		#burst selected top-1 prediction/target after every inference step
+	else:
+		inferenceBurstAllPredictionsOrTargetsInSequence = False	#orig: False
 inferenceAddNewFeatures = True	#default: True	#orig: False	#run a controlled expansion pass during inference to add missing columns/features without training updates
 
 if(useQuickExecution):
@@ -87,7 +92,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
+	useBenchmarkDefaultsEvalTestSet = True	#default: False/True
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
@@ -98,11 +103,15 @@ elif(useTrainDuringInference):
 		useBenchmarkDefaultsEvalTestSet = useBenchmarkDefaultsEvalTrainSet	#alias only
 	elif(executionMode == "inference"):
 		useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
-	
-inferenceEvaluateTestSetTrainMaxSequences10M = False	#default: False	#orig: False	#version 2 of eval datasets (1000 sequences) that supports much larger train datasets (10M sequences)	#required if performing test-set eval on database trained with > 3M sequences (based on how the original test-set was generated)
+
+if(useBenchmarkV2):
+	inferenceEvaluateTestSetTrainMaxSequences10M = True		#version 2 of eval datasets (1000 sequences) that supports much larger train datasets (10M sequences)	#required if performing test-set eval on database trained with > 3M sequences (based on how the original test-set was generated)
+	useBenchmarkDefaultsEvalTestSetOptim = True	
+else:
+	inferenceEvaluateTestSetTrainMaxSequences10M = False
+	useBenchmarkDefaultsEvalTestSetOptim = False
 if(useBenchmarkDefaultsEvalTestSet):
 	inferenceEvaluateTestSet = True
-	useBenchmarkDefaultsEvalTestSetOptim = True	#default: True #orig: False
 	if(useBenchmarkDefaultsEvalTestSetOptim):
 		inferenceSegmentTiming = "biased"	#default: biased	#orig: none	#none, biased, exact, seq
 		inferenceActivationsType = "intf+c"	#default: intf+c #orig: boolf	#boolf, boolf+c, intf+c
@@ -111,10 +120,12 @@ if(useBenchmarkDefaultsEvalTestSet):
 		inferenceActivationsType = "boolf"		#default: boolf	#boolf, boolf+c, intf+c
 else:
 	inferenceEvaluateTestSet = False
-	useBenchmarkDefaultsEvalTestSetOptim = False		#default: False #orig: False
 	inferenceSegmentTiming = "exact"	#default: exact	#none, biased, exact, seq
 	inferenceActivationsType = "boolf"	#default: boolf	#boolf, boolf+c, intf+c
-inferenceSegmentTimingMultipicativeBias = True	#default: True	#apply a non-negative multiplicative timing bias instead of the legacy subtractive timing bias when inferenceSegmentTiming="biased"
+if(useBenchmarkV2):
+	inferenceSegmentTimingMultipicativeBias = True	#default: True	#apply a non-negative multiplicative timing bias instead of the legacy subtractive timing bias when inferenceSegmentTiming="biased"
+else:
+	inferenceSegmentTimingMultipicativeBias = False	#orig: False
 if(inferenceSegmentTimingMultipicativeBias):
 	inferenceSegmentTimingMultipicativeBiasFactor = 0.9	#default: 0.9	#activation multiplier applied per unit of segment timing error
 	if(inferenceSegmentTimingMultipicativeBiasFactor <= 0.0 or inferenceSegmentTimingMultipicativeBiasFactor > 1.0):
@@ -378,7 +389,10 @@ if(useInference):
 
 #Inference activations;
 if(useInference):
-	inferenceActivationFunction = False	#default2:False	#default1:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
+	if(useBenchmarkV2):
+		inferenceActivationFunction = False	#default:False	
+	else:
+		inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	if(useSANI):
 		inferenceApplySequentialActivationSparse = True	#default: True	#orig: False
 		if(useBenchmarkDefaultsEvalTestSetOptim):
@@ -500,7 +514,7 @@ z2 = 1  # Decrement value when not activated
 if(inferenceActivationFunction):
 	j1 = 1 #default: 1
 else:
-	j1 = 0.5	#orig: 5   # Activation trace duration
+	j1 = 0.5	#default: 0.5	#orig: 5   # Activation trace duration
 	
 
 #Mandatory vars;
@@ -699,7 +713,10 @@ if(useInference):
 					inferenceDuringTrainTargetConnectionIndexTargetFeature = 3
 					inferenceDuringTrainTargetConnectionTensorRank = 4
 	inferenceDeactivateNeuronsUponPrediction = True	#default: True
-	inferenceDecrementActivations = True	#default: False - CHECKTHIS #orig: False
+	if(useBenchmarkV2):
+		inferenceDecrementActivations = True	#default: True
+	else:
+		inferenceDecrementActivations = False	#orig: False
 	if(inferenceDecrementActivations):
 		inferenceDecrementActivationsNonlinear = True
 		activationDecrementPerPredictedToken = 0.05	#orig: 0.1	#CHECKTHIS
@@ -808,8 +825,11 @@ arrayNumberOfPropertiesInference = len(arrayPropertiesListInference)
 arrayIndexSegmentFirst = 0
 enforceSequentialActivationFeatureSegmentsOnly = False #derived var
 if(useSANI):
-	SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens = False	#default: True	#orig: True	#first feature segment captures all prior train sequence tokens
-	SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens = False	#default: True	#orig: True	#first column segment captures all prior train sequence concept columns
+	if(useBenchmarkV2):
+		SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens = False	#default: False
+	else:
+		SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens = True	#orig: True	#first feature segment captures all prior train sequence tokens
+	SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens = False	#default: False	#orig: False	#first column segment captures all prior train sequence concept columns
 	if(modalityName=="OR"):
 		useSANIcolumns = False
 		useSANIfeatures = True
@@ -838,7 +858,10 @@ if(useSANI):
 		if(useSANIfeaturesAndColumns):
 			useSANIfeaturesAndColumnsInternal = True	#default: True	#orig: False	#also include internal columns in column segments (not just external columns)
 			#these are highly dependent on numSeedTokensInference and the specific seed text (ie number of features per column);
-			SANIfeaturesAndColumnsDistribution="doubleFeatureSegments"	#default: doubleFeatureSegments	#doubleFeatureSegments/matchedSegments
+			if(useBenchmarkV2):
+				SANIfeaturesAndColumnsDistribution="matchedSegments"	#default: doubleFeatureSegments	#doubleFeatureSegments/matchedSegments
+			else:
+				SANIfeaturesAndColumnsDistribution="doubleFeatureSegments"	#orig: doubleFeatureSegments
 			if(SANIfeaturesAndColumnsDistribution=="doubleFeatureSegments"):
 				arrayNumberOfSegmentsColumnDistance = math.floor(numSeedTokensInference / 4) + 1	#orig: + 1	#min number of concept/column segments (if useSANIfeaturesAndColumnsInternal, includes internal column segment)
 				arrayNumberOfSegmentsFeatureDistance = math.ceil(numSeedTokensInference / 2) + 1 	#number of nearest features to target node

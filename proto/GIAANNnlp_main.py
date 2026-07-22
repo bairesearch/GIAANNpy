@@ -22,6 +22,7 @@ import gc
 import time
 import torch as pt
 import spacy
+from spacy.tokens import Doc
 
 pt.set_grad_enabled(False)
 
@@ -142,6 +143,8 @@ def processDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset)
 			getDatasetEntryTextDuration = 0.0
 			getDatasetEntryTextStartTime = time.perf_counter()
 		text = GIAANNnlp_datasets.getDatasetEntryText(datasetEntry, articleIndex)
+		if(datasetSanitiseNullCharacters):
+			text = sanitiseDatasetNullCharacters(text, articleIndex)
 		if(debugPrintSpacySectionTimes):
 			getDatasetEntryTextDuration = time.perf_counter() - getDatasetEntryTextStartTime
 			print(f"debugPrintSpacySectionTimes: articleIndex={articleIndex} sequenceCount={sequenceCount} sequenceCount={sequenceCount} datasetEntryTextSeconds={getDatasetEntryTextDuration:.6f}")
@@ -149,6 +152,20 @@ def processDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset)
 		if(sequenceCount >= trainMaxSequences and inferenceMode==False):
 			break
 	return sequenceCount
+
+def sanitiseDatasetNullCharacters(text, articleIndex):
+	result = None
+	if(datasetSanitiseNullCharacters):
+		if(not isinstance(text, str)):
+			raise RuntimeError("sanitiseDatasetNullCharacters error: text must be a str; articleIndex = " + str(articleIndex))
+		if(not isinstance(articleIndex, int) or isinstance(articleIndex, bool) or articleIndex < 0):
+			raise RuntimeError("sanitiseDatasetNullCharacters error: articleIndex must be an int >= 0")
+		result = text.replace(datasetNullCharacter, datasetNullCharacterReplacement)
+		if(result != text and not result.strip()):
+			raise RuntimeError("sanitiseDatasetNullCharacters error: removing NUL characters produced an empty article; articleIndex = " + str(articleIndex))
+	else:
+		raise RuntimeError("sanitiseDatasetNullCharacters error: requires datasetSanitiseNullCharacters")
+	return result
 
 def processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, articleIndex):
 	#sequences = sent_tokenize(text)
@@ -307,19 +324,30 @@ def generateSeqencesBatchOrSerial(textParsed, skipMode):
 				if(not sequenceText.strip()):
 					continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
 				sequenceText = sequenceText.lstrip()
-				if(not spacyPipelineBatchSequences):
-					if(spacyPipelineSingleParse or skipMode):
-						sequenceParsed = span.as_doc()
-					else:
-						sequenceParsed = nlpSequence(sequenceText)
+				if(spacyPipelineSingleParse or skipMode):
+					sequenceParsed = span.as_doc()
+				elif(spacyPipelineMultisentenceParseSentencesIndividually):
+					sequenceSentences = sentences[i:min(i + numSentencesPerSequence, len(sentences))]
+					sequenceParsed = parseMultisentenceSequenceSentencesIndividually(sequenceSentences, sequenceText)
+				else:
+					sequenceParsed = None
+				if(sequenceParsed is not None):
 					if(len(sequenceParsed) == 0):
 						continue
 					if(len(sequenceParsed) < minSequenceLength):
 						continue
 					sequences.append(sequenceParsed)
 					sequencesRaw.append(sequenceText)
-				else:
+				elif(spacyPipelineBatchSequences):
 					sequencesText.append(sequenceText)
+				else:
+					sequenceParsed = nlpSequence(sequenceText)
+					if(len(sequenceParsed) == 0):
+						continue
+					if(len(sequenceParsed) < minSequenceLength):
+						continue
+					sequences.append(sequenceParsed)
+					sequencesRaw.append(sequenceText)
 		else:
 			for sentence in sentences:
 				sequenceText = sentence.text
@@ -375,6 +403,46 @@ def generateSeqencesBatchOrSerial(textParsed, skipMode):
 			sequences.append(sequenceParsed)
 			sequencesRaw.append(sequencesText[sequenceIndex])
 	return sequences, sequencesRaw
+
+def parseMultisentenceSequenceSentencesIndividually(sequenceSentences, sequenceText):
+	result = None
+	if(spacyPipelineMultisentenceParseSentencesIndividually):
+		if(not multisentencePredictions):
+			raise RuntimeError("parseMultisentenceSequenceSentencesIndividually error: requires multisentencePredictions")
+		if(spacyPipelineSingleParse):
+			raise RuntimeError("parseMultisentenceSequenceSentencesIndividually error: requires spacyPipelineSingleParse=False")
+		if(sequenceSentences is None or len(sequenceSentences) == 0):
+			raise RuntimeError("parseMultisentenceSequenceSentencesIndividually error: sequenceSentences must not be empty")
+		if(not isinstance(sequenceText, str) or not sequenceText.strip()):
+			raise RuntimeError("parseMultisentenceSequenceSentencesIndividually error: sequenceText must not be empty")
+		sequenceSentenceTexts = []
+		for sequenceSentenceIndex, sequenceSentence in enumerate(sequenceSentences):
+			if(sequenceSentenceIndex == len(sequenceSentences)-1):
+				sequenceSentenceText = sequenceSentence.text
+			else:
+				sequenceSentenceText = sequenceSentence.text_with_ws
+			if(sequenceSentenceIndex == 0):
+				sequenceSentenceText = sequenceSentenceText.lstrip()
+			if(not sequenceSentenceText.strip()):
+				raise RuntimeError("parseMultisentenceSequenceSentencesIndividually error: sentence text must not be empty")
+			sequenceSentenceTexts.append(sequenceSentenceText)
+		if("".join(sequenceSentenceTexts) != sequenceText):
+			raise RuntimeError("parseMultisentenceSequenceSentencesIndividually error: sentence texts do not reconstruct sequenceText")
+		if(spacyPipelineBatchSequences):
+			sequenceSentenceDocs = list(nlpSequence.pipe(sequenceSentenceTexts))
+		else:
+			sequenceSentenceDocs = [nlpSequence(sequenceSentenceText) for sequenceSentenceText in sequenceSentenceTexts]
+		if(len(sequenceSentenceDocs) != len(sequenceSentenceTexts)):
+			raise RuntimeError("parseMultisentenceSequenceSentencesIndividually error: parsed sentence count mismatch")
+		for sequenceSentenceDoc in sequenceSentenceDocs:
+			if(len(sequenceSentenceDoc) == 0):
+				raise RuntimeError("parseMultisentenceSequenceSentencesIndividually error: parsed sentence must not be empty")
+		result = Doc.from_docs(sequenceSentenceDocs, ensure_whitespace=False)
+		if(result.text != sequenceText):
+			raise RuntimeError("parseMultisentenceSequenceSentencesIndividually error: parsed sequence text mismatch")
+	else:
+		raise RuntimeError("parseMultisentenceSequenceSentencesIndividually error: requires spacyPipelineMultisentenceParseSentencesIndividually")
+	return result
 
 
 def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw, inferenceSuccessfulPredictionMask=None):

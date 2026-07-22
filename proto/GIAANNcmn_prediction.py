@@ -826,7 +826,11 @@ def selectNextColumnFeatureSeedPhase(sequenceObservedColumns, databaseNetworkObj
 	conceptColumnFeatureIndexNext = int(targetFeatureIndex)
 	conceptColumnIndexNextTensor = pt.tensor([conceptColumnIndexNext], dtype=pt.long)
 	conceptColumnFeatureIndexNextTensor = pt.tensor([conceptColumnFeatureIndexNext], dtype=pt.long)
-	conceptColumnIndexNextTensor, conceptColumnFeatureIndexNextTensor = GIAANNcmn_predictionConstraints.applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnIndexNextTensor, conceptColumnFeatureIndexNextTensor, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap)
+	if(tokeniserSubword):
+		# Subword seeds are observed targets and can cross concept-column boundaries before generation starts.
+		conceptColumnIndexNextTensor, conceptColumnFeatureIndexNextTensor = GIAANNcmn_predictionConstraints.applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnIndexNextTensor, conceptColumnFeatureIndexNextTensor, allowedColumnsConstraint, None, connectedColumnsConstraint, connectedColumnsFeatureMap)
+	else:
+		conceptColumnIndexNextTensor, conceptColumnFeatureIndexNextTensor = GIAANNcmn_predictionConstraints.applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnIndexNextTensor, conceptColumnFeatureIndexNextTensor, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap)
 	if(conceptColumnIndexNextTensor is None or conceptColumnFeatureIndexNextTensor is None or conceptColumnIndexNextTensor.numel() == 0 or conceptColumnFeatureIndexNextTensor.numel() == 0):
 		GIAANNcmn_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no prediction candidates available")
 	if(conceptColumnIndexNextTensor.numel() != 1 or conceptColumnFeatureIndexNextTensor.numel() != 1):
