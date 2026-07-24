@@ -507,7 +507,7 @@ v2j (Codex IDE GPT-5.5):
 		Implementation Notes:
 			- ensure to encapsulate all skipSequenceNoDelimiterDetectedBetweenConceptTokens dependent code within context if(skipSequenceNoDelimiterDetectedBetweenConceptTokens). make no changes to the default skipSequenceNoDelimiterDetectedBetweenConceptTokens=True execution pathway.
 	- implement option SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens=False, which affects both useSANIfeaturesAndColumns and useSANIcolumns modes.
-		- useBenchmarkV2: set SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=False, which affects both useSANIfeaturesAndColumns and useSANIfeatures modes.
+		- useDefaultsV2: set SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=False, which affects both useSANIfeaturesAndColumns and useSANIfeatures modes.
 	- optimise eval:
 		- 1. `perf(eval): vectorize SANI required-segment candidate filtering`
 			- replace Python set/list membership checks in prediction candidate filtering with tensor key membership. This keeps SANI required-segment semantics unchanged while avoiding per-candidate Python loops during long eval sequences.
@@ -519,7 +519,7 @@ v2j (Codex IDE GPT-5.5):
 			- rework `selectAindicesContainedInB()` to use flattened sparse index keys and `searchsorted` membership instead of an O(nnzA * nnzB) broadcast comparison.
 		- 5. `perf(eval): avoid full coalesce in sparse branch selection`
 			- optimise `selectActivatedBranchIndex()` by using sparse `_indices()`/`_values()` and tensor `index_add_` for branch scoring, avoiding full tensor coalescing and Python dictionaries during prediction deactivation.
-	- useBenchmarkV2: restore inferenceBurstAllPredictionsOrTargetsInSequence - patch inference to always activate the top-1 selected feature neuron (ie the prediction or target respectively as per inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures).
+	- useDefaultsV2: restore inferenceBurstAllPredictionsOrTargetsInSequence - patch inference to always activate the top-1 selected feature neuron (ie the prediction or target respectively as per inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures).
 		- revert previous 1i patch: "remove option inferenceBurstAllPredictionsOrTargetsInSequence".
 		- inferenceBurstAllPredictionsOrTargetsInSequence explicitly writes activation into the selected source neuron via activateSeedPredictionSegments():
 			- that guarantees the selected top-1 feature is active when the next step uses it as a source.
@@ -543,15 +543,19 @@ v2k (Codex IDE GPT-5.6):
 MANUAL; - update trainAndInference to support train ram settings (storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=True, storeDatabaseGlobalFeatureNeuronsInRam=False).
 - for useAutoresearch eval results report, create a new function to quickly measure the size of the database by just reading the total size of the database folder.
 MANUAL; - add autoresearch campaignRequirements.md
-AUTORESEARCH; - useBenchmarkV2: set j1=0.5 with inferenceActivationFunction=False
+AUTORESEARCH; - useDefaultsV2: set j1=0.5 with inferenceActivationFunction=False
 MANUAL; - update inferenceEvaluateTestSetTrainMaxSequences10M
-AUTORESEARCH; - useBenchmarkV2: set inferenceDecrementActivations=True and activationDecrementPerPredictedToken=0.05
-- useBenchmarkV2: set inferenceActivationsType = "intf+c" (required with inferenceDecrementActivations).
-- useBenchmarkV2: add option inferenceSegmentTimingMultipicativeBias=True that affects option inferenceSegmentTiming="biased" only.
-AUTORESEARCH; - useBenchmarkV2: set SANIfeaturesAndColumnsDistribution=="matchedSegments" (equal number of feature and column segments).
-MANUAL; - useBenchmarkV2: set skipSequenceNoDelimiterDetectedBetweenConceptTokens=False.
+AUTORESEARCH; - useDefaultsV2: set inferenceDecrementActivations=True and activationDecrementPerPredictedToken=0.05
+- useDefaultsV2: set inferenceActivationsType = "intf+c" (required with inferenceDecrementActivations).
+- useDefaultsV2: add option inferenceSegmentTimingMultipicativeBias=True that affects option inferenceSegmentTiming="biased" only.
+AUTORESEARCH; - useDefaultsV2: set SANIfeaturesAndColumnsDistribution=="matchedSegments" (equal number of feature and column segments).
+MANUAL; - useDefaultsV2: set skipSequenceNoDelimiterDetectedBetweenConceptTokens=False.
 - add option datasetSanitiseTrailingNullCharacters - sanitise dataset articles by stripping trailing NUL padding before spaCy parsing and hard-failing on embedded NULs or empty results.
 - fix(tokeniserSubword): preserve observed concept columns while processing inference seed targets.
-- useBenchmarkV2: enable multisentencePredictions and sequencesCropToMaxLength.
+- useDefaultsV2: enable multisentencePredictions and sequencesCropToMaxLength.
 - add option spacyPipelineMultisentenceParseSentencesIndividually.
-MANUAL; - extract option useBenchmarkV2.
+MANUAL; - extract option useDefaultsV2.
+- add option datasetSanitiseNullCharacters - sanitise dataset articles by removing NUL characters anywhere in the article before spaCy parsing.
+- implement maxSequenceLengthTokens enforcement (by default skip the sequence if the check fails).
+- when sequencesCropToMaxLength=True, crop to the token limit (only implement this option if it is safe; ie spacy pos values can still be assigned to the cropped subword tiktokens). Otherwise (sequencesCropToMaxLength==False) skip the sequence.
+- implement option tokenisationEnforcePrecharacterByteLimit.

@@ -52,7 +52,7 @@ from GIAANNcmn_globalDefs import inferenceEvaluateTestSetTrainMaxSequences10M
 from GIAANNcmn_globalDefs import useTrainDuringInference
 from GIAANNcmn_globalDefs import multipleDendriticBranchesBinaryTree
 from GIAANNcmn_globalDefs import trainVerifyConnectionNonexistentAcrossBranches
-from GIAANNcmn_globalDefs import useBenchmarkV2
+from GIAANNcmn_globalDefs import useDefaultsV2
 
 
 
@@ -80,14 +80,14 @@ elif(useTrainDuringInference):
 #Multisentence predictions;
 sentencePredictions = True 	#default: True	orig: True
 if(sentencePredictions):
-	if(useBenchmarkV2):
+	if(useDefaultsV2):
 		skipSequenceNoDelimiterDetectedBetweenConceptTokens = False	#default: True 
 	else:
 		skipSequenceNoDelimiterDetectedBetweenConceptTokens = True	#orig: True
 	if(inferenceTrainFirstSequences):
 		multisentencePredictions = False	#not supported by useQuickExecution:inferenceTrainFirstSequences based on inference_prompt.txt.trainAndInference file format (expects last sentence not last sequence to be used for inference).
 	else:
-		if(useBenchmarkV2):
+		if(useDefaultsV2):
 			multisentencePredictions = True	#default: True	#each sequence comprises multiple sentences	#requires higher GPU RAM for train	#required to train longer sequences
 		else:
 			multisentencePredictions = False	#orig: False
@@ -99,7 +99,7 @@ if(sentencePredictions):
 	else:
 		maxSequenceLength = 80	#default:80	#orig:100		#in words	#depends on CPU/GPU RAM availability during train 	#measured in spacy word tokens, not subword tiktokens (even if tokeniserSubword is enabled).
 		numSentencesPerSequence = 1
-	if(useBenchmarkV2):
+	if(useDefaultsV2):
 		sequencesCropToMaxLength = True	#default: True	
 	else:
 		sequencesCropToMaxLength = False	#orig: False
@@ -111,7 +111,7 @@ else:
 	tokensPerWord = 1.25 	#note approx avg 1.25 tiktokens per word, so 80*1.25 = 100 tokens (assuming o200k_base tokeniser with OSCAR-2201 en dataset)
 	targetContextLengthInTokens = 512	#emulate
 	maxSequenceLength = int(targetContextLengthInTokens/tokensPerWord)	#512/1.25=409	#measured in spacy word tokens, not subword tiktokens (even if tokeniserSubword is enabled)
-	
+
 #Closed world grounded dataset constants;
 datasetTypeClosedWorldGrounded1 = "closedWorldGrounded1"
 datasetTypeClosedWorldGrounded2 = "closedWorldGrounded2"
@@ -233,12 +233,20 @@ else:
 
 
 #Tokensier:
-if(useBenchmarkV2):
+if(useDefaultsV2):
 	tokeniserSubword = True	#default: False
 else:
 	tokeniserSubword = False	 #orig: False
 if(tokeniserSubword):
 	tokeniserSubwordPOS = True	#default: ?	#orig: False
+
+	maxTokensPerWord = 2.0 	#note approx avg 1.25 tiktokens per word, so 80*1.25 = 100 tokens (assuming o200k_base tokeniser with OSCAR-2201 en dataset)
+	maxSequenceLengthTokens = int(maxSequenceLength*maxTokensPerWord)
+	tokenisationEnforcePrecharacterByteLimit = True	#default: True	#orig: False
+	if(tokenisationEnforcePrecharacterByteLimit):
+		tokenisationPrecharacterMaxBytesPerToken = 16	#pre-tokenisation byte allowance per configured maximum subword token
+		tokenisationPrecharacterByteLimit = maxSequenceLengthTokens*tokenisationPrecharacterMaxBytesPerToken
+
 	tokeniserSubwordTiktokenEncodingName = "o200k_base"
 	tokeniserSubwordTextEncoding = "utf-8"
 	tokeniserSubwordTextEncodingErrorMode = "strict"
@@ -672,6 +680,8 @@ if(useBenchmark):
 		benchmarkAblationText = "-inferenceReportGroundedAccuracy"
 	elif(not sentencePredictions):
 		benchmarkAblationText = "-sentencePredictionsFalse"
+	elif(useDefaultsV2):	
+		benchmarkAblationText = "-useDefaultsV2"
 	elif(tokeniserSubword):
 		if(tokeniserSubwordPOS):
 			benchmarkAblationText = "-tokeniserSubwordPOS"
@@ -713,6 +723,7 @@ if(useBenchmark):
 		benchmarkAblationText = "-spacyPipelineOptimisations"
 	else:
 		benchmarkAblationText = ""
+	
 	if(datasetType=="wikipedia"):
 		databaseTypeText = ""	#or Wikipedia
 	elif(datasetType=="oscar"):

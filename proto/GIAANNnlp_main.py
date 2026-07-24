@@ -234,11 +234,16 @@ def processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, ar
 				#print("sequence no crop required")
 		if(len(sequence) <= maxSequenceLength):
 			if(sequenceCount >= trainSetStartOffsetSequences):
-				if(executionMode=="trainDuringInference"):
-					inferenceSuccessfulPredictionMask = processSequence(databaseNetworkObject, True, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw)
-					processSequence(databaseNetworkObject, False, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw, inferenceSuccessfulPredictionMask)
+				sequenceWordLength = len(sequence)
+				sequence, sequenceRaw, sequenceAccepted = enforceSequenceLengthTokenLimits(sequence, sequenceRaw)
+				if(sequenceAccepted):
+					if(executionMode=="trainDuringInference"):
+						inferenceSuccessfulPredictionMask = processSequence(databaseNetworkObject, True, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw, sequenceWordLength=sequenceWordLength)
+						processSequence(databaseNetworkObject, False, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw, inferenceSuccessfulPredictionMask, sequenceWordLength)
+					else:
+						processSequence(databaseNetworkObject, inferenceSequenceInPrompt, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw, sequenceWordLength=sequenceWordLength)
 				else:
-					processSequence(databaseNetworkObject, inferenceSequenceInPrompt, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw)
+					updateExecutionProgressForSkippedSequence(inferenceSequenceInPrompt, sequenceCount)
 			else:
 				#if(printSequenceCount):
 				print(f"(sequenceCount < trainSetStartOffsetSequences: Processing sequenceCount: {sequenceCount}")	
@@ -259,6 +264,37 @@ def processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, ar
 		processArticlePart2count += 1
 
 	return sequenceCount
+
+def enforceSequenceLengthTokenLimits(sequence, sequenceRaw):
+	resultSequence = sequence
+	resultSequenceRaw = sequenceRaw
+	resultSequenceAccepted = True
+	if(tokeniserSubword):
+		if(not isinstance(maxSequenceLengthTokens, int) or isinstance(maxSequenceLengthTokens, bool) or maxSequenceLengthTokens <= 0):
+			raise RuntimeError("enforceSequenceLengthTokenLimits error: maxSequenceLengthTokens must be an int > 0")
+		if(tokenisationEnforcePrecharacterByteLimit):
+			resultSequenceAccepted = GIAANNnlp_sequenceTokens.isTokeniserSubwordSequenceWithinPrecharacterByteLimit(resultSequence)
+		if(resultSequenceAccepted):
+			resultSequence = GIAANNnlp_sequenceTokens.preprocessSequence(resultSequence)
+			if(len(resultSequence) > maxSequenceLengthTokens):
+				if(sequencesCropToMaxLength):
+					resultSequence = GIAANNnlp_sequenceTokens.cropTokeniserSubwordSequence(resultSequence, maxSequenceLengthTokens)
+					resultSequenceRaw = resultSequence.text
+				else:
+					resultSequenceAccepted = False
+	return resultSequence, resultSequenceRaw, resultSequenceAccepted
+
+def updateExecutionProgressForSkippedSequence(inferenceMode, sequenceCount):
+	trainMode = not inferenceMode
+	if(executionMode=="trainDuringInference"):
+		trainMode = True
+	if(inferenceTrainFirstSequences and (printTrainSequenceBar or printEvalSequenceBar)):
+		GIAANNcmn_executionProgress.updatePromptSequenceBar(sequenceCount)
+	elif(printTrainSequenceBar and trainMode):
+		GIAANNcmn_executionProgress.updateTrainSequenceBar(sequenceCount)
+	elif(printEvalSequenceBar and not trainMode and executionMode!="trainDuringInference"):
+		GIAANNcmn_executionProgress.updateEvalSequenceBar(sequenceCount)
+	return
 
 def calculateProcessArticlePromptSequenceTotal(sequenceCount, sequences):
 	result = 0
@@ -445,7 +481,7 @@ def parseMultisentenceSequenceSentencesIndividually(sequenceSentences, sequenceT
 	return result
 
 
-def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw, inferenceSuccessfulPredictionMask=None):
+def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw, inferenceSuccessfulPredictionMask=None, sequenceWordLength=None):
 	trainMode = not inferenceMode
 	if(inferenceMode):
 		if(useTrainDuringInference):
@@ -461,7 +497,9 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		preprocessSequenceStartTime = time.perf_counter()
 
 	if(debugPrintTrainTotalWords and trainMode): 
-		GIAANNcmn_debug.totalTrainWords += len(sequence)
+		if(not isinstance(sequenceWordLength, int) or isinstance(sequenceWordLength, bool) or sequenceWordLength <= 0):
+			raise RuntimeError("processSequence error: debugPrintTrainTotalWords requires sequenceWordLength to be an int > 0")
+		GIAANNcmn_debug.totalTrainWords += sequenceWordLength
 	sequence = GIAANNnlp_sequenceTokens.preprocessSequence(sequence)
 	if(debugPrintTrainTotalTokens and trainMode): 
 		GIAANNcmn_debug.totalTrainTokens += len(sequence)

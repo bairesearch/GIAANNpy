@@ -47,7 +47,7 @@ useDrawNetworkIndependently = False
 useTrainDuringInference = False
 
 inferenceTrainFirstSequences = False	#dependent var
-useBenchmarkV2 = False	#dependent var
+useDefaultsV2 = True	#default: True	#orig: False	#an upgraded set of defaults
 if(useQuickExecution):
 	executionMode = "inference" 	#mandatory: "inference" (effective trainAndInference but uses a text datafile)
 	inferenceTrainFirstSequences = True	#trains first sequences in inference_prompt.txt, performs inference only on last sequence
@@ -55,7 +55,6 @@ elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
-	useBenchmarkV2 = True	#default: True	#orig: False
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -81,7 +80,7 @@ if(useInference):
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: False	#False: use current target (default top-1 accuracy measurement)
 	else:
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True		#True: activate next column features using current prediction
-	if(useBenchmarkV2):
+	if(useDefaultsV2):
 		inferenceBurstAllPredictionsOrTargetsInSequence = True	#default: True		#burst selected top-1 prediction/target after every inference step
 	else:
 		inferenceBurstAllPredictionsOrTargetsInSequence = False	#orig: False
@@ -92,7 +91,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = True	#default: False/True
+	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
@@ -104,7 +103,7 @@ elif(useTrainDuringInference):
 	elif(executionMode == "inference"):
 		useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 
-if(useBenchmarkV2):
+if(useDefaultsV2):
 	inferenceEvaluateTestSetTrainMaxSequences10M = True		#version 2 of eval datasets (1000 sequences) that supports much larger train datasets (10M sequences)	#required if performing test-set eval on database trained with > 3M sequences (based on how the original test-set was generated)
 	useBenchmarkDefaultsEvalTestSetOptim = True	
 else:
@@ -122,7 +121,7 @@ else:
 	inferenceEvaluateTestSet = False
 	inferenceSegmentTiming = "exact"	#default: exact	#none, biased, exact, seq
 	inferenceActivationsType = "boolf"	#default: boolf	#boolf, boolf+c, intf+c
-if(useBenchmarkV2):
+if(useDefaultsV2):
 	inferenceSegmentTimingMultipicativeBias = True	#default: True	#apply a non-negative multiplicative timing bias instead of the legacy subtractive timing bias when inferenceSegmentTiming="biased"
 else:
 	inferenceSegmentTimingMultipicativeBias = False	#orig: False
@@ -146,7 +145,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 200000	#5000, 200000, 1000000
+	trainMaxSequences = 5000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 5000	#5000
@@ -389,7 +388,7 @@ if(useInference):
 
 #Inference activations;
 if(useInference):
-	if(useBenchmarkV2):
+	if(useDefaultsV2):
 		inferenceActivationFunction = False	#default:False	
 	else:
 		inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
@@ -713,7 +712,7 @@ if(useInference):
 					inferenceDuringTrainTargetConnectionIndexTargetFeature = 3
 					inferenceDuringTrainTargetConnectionTensorRank = 4
 	inferenceDeactivateNeuronsUponPrediction = True	#default: True
-	if(useBenchmarkV2):
+	if(useDefaultsV2):
 		inferenceDecrementActivations = True	#default: True
 	else:
 		inferenceDecrementActivations = False	#orig: False
@@ -825,7 +824,7 @@ arrayNumberOfPropertiesInference = len(arrayPropertiesListInference)
 arrayIndexSegmentFirst = 0
 enforceSequentialActivationFeatureSegmentsOnly = False #derived var
 if(useSANI):
-	if(useBenchmarkV2):
+	if(useDefaultsV2):
 		SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens = False	#default: False
 	else:
 		SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens = True	#orig: True	#first feature segment captures all prior train sequence tokens
@@ -858,7 +857,7 @@ if(useSANI):
 		if(useSANIfeaturesAndColumns):
 			useSANIfeaturesAndColumnsInternal = True	#default: True	#orig: False	#also include internal columns in column segments (not just external columns)
 			#these are highly dependent on numSeedTokensInference and the specific seed text (ie number of features per column);
-			if(useBenchmarkV2):
+			if(useDefaultsV2):
 				SANIfeaturesAndColumnsDistribution="matchedSegments"	#default: doubleFeatureSegments	#doubleFeatureSegments/matchedSegments
 			else:
 				SANIfeaturesAndColumnsDistribution="doubleFeatureSegments"	#orig: doubleFeatureSegments
@@ -1213,6 +1212,10 @@ if(printConfiguration):
 	print("tokeniserSubword:", tokeniserSubword)
 	if(tokeniserSubword):
 		print("tokeniserSubwordPOS:", tokeniserSubwordPOS)
+		print("maxSequenceLengthTokens:", maxSequenceLengthTokens)
+		print("tokenisationEnforcePrecharacterByteLimit:", tokenisationEnforcePrecharacterByteLimit)
+		if(tokenisationEnforcePrecharacterByteLimit):
+			print("tokenisationPrecharacterByteLimit:", tokenisationPrecharacterByteLimit)
 		print("useDedicatedFeatureListsSubword:", useDedicatedFeatureListsSubword)
 		print("useDedicatedConceptListsSubword:", useDedicatedConceptListsSubword)
 	print("")

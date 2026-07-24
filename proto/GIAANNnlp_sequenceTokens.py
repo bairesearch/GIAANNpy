@@ -203,6 +203,66 @@ if(tokeniserSubword):
 			result = PreprocessedSequence(preprocessedTokens, sequenceText)
 		return result
 
+	def isTokeniserSubwordSequenceWithinPrecharacterByteLimit(sequence):
+		result = True
+		sequenceText = None
+		sequenceByteLength = 0
+		if(not tokenisationEnforcePrecharacterByteLimit):
+			raise RuntimeError("isTokeniserSubwordSequenceWithinPrecharacterByteLimit error: requires tokenisationEnforcePrecharacterByteLimit")
+		if(not isinstance(tokenisationPrecharacterByteLimit, int) or isinstance(tokenisationPrecharacterByteLimit, bool) or tokenisationPrecharacterByteLimit <= 0):
+			raise RuntimeError("isTokeniserSubwordSequenceWithinPrecharacterByteLimit error: tokenisationPrecharacterByteLimit must be an int > 0")
+		sequenceText = getTokeniserSubwordSequenceText(sequence)
+		for character in sequenceText:
+			sequenceByteLength += len(encodeTokeniserSubwordText(character))
+			if(sequenceByteLength > tokenisationPrecharacterByteLimit):
+				result = False
+				break
+		return result
+
+	def cropTokeniserSubwordSequence(sequence, sequenceLengthLimit):
+		result = None
+		croppedLength = None
+		croppedText = None
+		if(not isinstance(sequence, PreprocessedSequence)):
+			raise RuntimeError("cropTokeniserSubwordSequence error: sequence must be a PreprocessedSequence")
+		if(not isinstance(sequenceLengthLimit, int) or isinstance(sequenceLengthLimit, bool) or sequenceLengthLimit <= 0):
+			raise RuntimeError("cropTokeniserSubwordSequence error: sequenceLengthLimit must be an int > 0")
+		if(len(sequence) <= sequenceLengthLimit):
+			raise RuntimeError("cropTokeniserSubwordSequence error: sequence length must exceed sequenceLengthLimit")
+		croppedLength, croppedText = getTokeniserSubwordCroppedLengthAndText(sequence, sequenceLengthLimit)
+		result = PreprocessedSequence(sequence.tokens[:croppedLength], croppedText)
+		return result
+
+	def getTokeniserSubwordCroppedLengthAndText(sequence, sequenceLengthLimit):
+		resultLength = None
+		resultText = None
+		encoding = None
+		tokenBytesList = []
+		if(not isinstance(sequence, PreprocessedSequence)):
+			raise RuntimeError("getTokeniserSubwordCroppedLengthAndText error: sequence must be a PreprocessedSequence")
+		if(not isinstance(sequenceLengthLimit, int) or isinstance(sequenceLengthLimit, bool) or sequenceLengthLimit <= 0):
+			raise RuntimeError("getTokeniserSubwordCroppedLengthAndText error: sequenceLengthLimit must be an int > 0")
+		if(sequenceLengthLimit > len(sequence)):
+			raise RuntimeError("getTokeniserSubwordCroppedLengthAndText error: sequenceLengthLimit must not exceed sequence length")
+		resultLength = sequenceLengthLimit
+		encoding = getTokeniserSubwordEncoding()
+		for tokenIndex in range(sequenceLengthLimit):
+			token = sequence.tokens[tokenIndex]
+			if(token.tokenId is None):
+				raise RuntimeError("getTokeniserSubwordCroppedLengthAndText error: tokenId is None")
+			tokenBytesList.append(getTokeniserSubwordTokenBytes(encoding, token.tokenId))
+		while(resultLength > 0 and resultText is None):
+			croppedBytes = b"".join(tokenBytesList[:resultLength])
+			try:
+				resultText = croppedBytes.decode(tokeniserSubwordTextEncoding, errors=tokeniserSubwordTextEncodingErrorMode)
+			except UnicodeDecodeError:
+				resultLength -= 1
+		if(resultLength <= 0 or resultText is None):
+			raise RuntimeError("getTokeniserSubwordCroppedLengthAndText error: unable to crop at a valid text boundary")
+		if(encodeTokeniserSubwordText(resultText) != b"".join(tokenBytesList[:resultLength])):
+			raise RuntimeError("getTokeniserSubwordCroppedLengthAndText error: cropped text does not match cropped token bytes")
+		return resultLength, resultText
+
 	def createTokeniserSubwordPreprocessedTokens(sequence, sequenceText, encoding):
 		result = []
 		parentTokenSpans = createTokeniserSubwordParentTokenSpans(sequence, sequenceText)
