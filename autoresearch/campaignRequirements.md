@@ -8,11 +8,9 @@ These are the user requirements specific to this autoresearch campaign:
 2. Perform autoresearch with the following non-default baseline settings (do not modify these);
    useAutoresearch=True
    trainMaxSequences=50000
-   tokeniserSubword=True
-   skipSequenceNoDelimiterDetectedBetweenConceptTokens=False
    multisentencePredictions=True
-3. Increase the campaign hard limit from 20 minutes to 2 hours. This should give you more room to explore significant parameter changes (eg increases in c/f segs).
+3. Increase the campaign hard limit from 20 minutes to 2 hours. This should give you more room to explore significant algorithm or implementation changes.
 4. Ensure all descriptions added to results.tsv use real GIAANNpy globalDef feature or function names so they can be traced.
 5. GIAANN useAutoresearch mode has been tested as working. If you experience any huggingface slow-down issues upon autoresearch initialisation do not stop unless you experience a time-out or crash.
-6. Never change SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=False or SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens=False (as these are basic GIAANN proto v2 requirements as described in the documentation).
-7. Do not accept parameter changes that increase training time by 4x but only deliver a fractional (e.g. 0.005) accuracy increase. Never keep changes that provide non-significant accuracy increases (< +0.0001), unless they significantly reduce the training time.
+6. This autoresearch is focused on fundamental GIAANN algorithm or implementation (i.e. code) issues in the train or eval phase that limit test-set accuracy eval. It is not focused on minor incremental improvements via parameter tweaking.
+7. Never keep changes that provide non-significant accuracy increases (< +0.005), unless they significantly reduce the training time.

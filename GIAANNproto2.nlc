@@ -559,3 +559,7 @@ MANUAL; - extract option useDefaultsV2.
 - implement maxSequenceLengthTokens enforcement (by default skip the sequence if the check fails).
 - when sequencesCropToMaxLength=True, crop to the token limit (only implement this option if it is safe; ie spacy pos values can still be assigned to the cropped subword tiktokens). Otherwise (sequencesCropToMaxLength==False) skip the sequence.
 - implement option tokenisationEnforcePrecharacterByteLimit.
+- update paper
+- patchMultipleDendriticBranchesBurstActivationBranch - fix forced dendritic bursts to activate the neurons most-active branch and prevent residual branch-zero activation after deactivation.
+- patchMultipleDendriticBranchesSourceActivationBoolean - fix Boolean dendritic source activation by collapsing branches before converting the fired neuron signal to zero or one.
+- patchMultipleDendriticBranchesOverflowBranch - fix random dendritic branch overflow by saturating at the final shuffled branch to preserve forward and reverse occurrence mapping.

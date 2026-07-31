@@ -530,9 +530,13 @@ def selectFeatureBranchIndex(featureBranchCounts, branchAssignments, conceptInde
 		if(branchIndex < multipleDendriticBranchesNumber):
 			branchIndex = branchOrder[branchIndex]
 		else:
-			branchIndex = multipleDendriticBranchesNumber - 1
+			if(patchMultipleDendriticBranchesOverflowBranch):
+				# Saturate at the final permutation position so reverse branch mapping selects the same occurrence rank.
+				branchIndex = branchOrder[multipleDendriticBranchesIndexLast]
+			else:
+				branchIndex = multipleDendriticBranchesIndexLast
 	if(branchIndex >= multipleDendriticBranchesNumber):
-		branchIndex = multipleDendriticBranchesNumber - 1
+		branchIndex = multipleDendriticBranchesIndexLast
 	return branchIndex
 	
 def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices):

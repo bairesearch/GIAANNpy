@@ -54,7 +54,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -109,8 +109,13 @@ if(useDefaultsV2):
 else:
 	inferenceEvaluateTestSetTrainMaxSequences10M = False
 	useBenchmarkDefaultsEvalTestSetOptim = False
+
+switchTrainTestSetInferenceSettings = False	#default: False
 if(useBenchmarkDefaultsEvalTestSet):
 	inferenceEvaluateTestSet = True
+else:
+	inferenceEvaluateTestSet = False
+if(useBenchmarkDefaultsEvalTestSet ^ switchTrainTestSetInferenceSettings): #if((useBenchmarkDefaultsEvalTestSet and not switchTrainTestSetInferenceSettings) or (not useBenchmarkDefaultsEvalTestSet and switchTrainTestSetInferenceSettings)):
 	if(useBenchmarkDefaultsEvalTestSetOptim):
 		inferenceSegmentTiming = "biased"	#default: biased	#orig: none	#none, biased, exact, seq
 		inferenceActivationsType = "intf+c"	#default: intf+c #orig: boolf	#boolf, boolf+c, intf+c
@@ -118,9 +123,9 @@ if(useBenchmarkDefaultsEvalTestSet):
 		inferenceSegmentTiming = "biased"	#default: biased	#none, biased, exact, seq
 		inferenceActivationsType = "boolf"		#default: boolf	#boolf, boolf+c, intf+c
 else:
-	inferenceEvaluateTestSet = False
 	inferenceSegmentTiming = "exact"	#default: exact	#none, biased, exact, seq
 	inferenceActivationsType = "boolf"	#default: boolf	#boolf, boolf+c, intf+c
+
 if(useDefaultsV2):
 	inferenceSegmentTimingMultipicativeBias = True	#default: True	#apply a non-negative multiplicative timing bias instead of the legacy subtractive timing bias when inferenceSegmentTiming="biased"
 else:
@@ -145,10 +150,10 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 5000	#5000, 200000, 1000000
+	trainMaxSequences = 50000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
-	trainMaxSequences = 5000	#5000
+	trainMaxSequences = 50000	#5000
 	#databaseFolderBase = "../database"
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useDrawNetworkIndependently):
@@ -185,6 +190,9 @@ if(trainVerifyConnectionNonexistentAcrossBranches):
 
 
 #Dendritic branches;
+patchMultipleDendriticBranchesBurstActivationBranch = True
+patchMultipleDendriticBranchesSourceActivationBoolean = True
+patchMultipleDendriticBranchesOverflowBranch = True
 multipleDendriticBranches = True	#default: True	#orig: False
 if(multipleDendriticBranches):
 	multipleDendriticBranchesBinaryTree = False	#default: False	#True: binary tree of dendritic branches, False: independent dendritic branches
@@ -212,11 +220,12 @@ if(multipleDendriticBranches):
 		else:
 			multipleDendriticBranchesNumber = 5
 	else:
-		multipleDendriticBranchesNumber = 2	#default: 5, 2	#affects train+inference RAM
+		multipleDendriticBranchesNumber = 2	#default: 2	#5, 2	#affects train+inference RAM
 else:
 	#multipleDendriticBranchesBinaryTree = False
 	multipleDendriticBranchesNumber = 1
 	multipleDendriticBranchesRandom = False
+multipleDendriticBranchesIndexLast = multipleDendriticBranchesNumber - 1
 if(trainVerifyConnectionNonexistentAcrossBranches):
 	if(not multipleDendriticBranches or not multipleDendriticBranchesRandom):
 		raise RuntimeError("GIAANNcmn_globalDefs error: trainVerifyConnectionNonexistentAcrossBranches requires multipleDendriticBranches and multipleDendriticBranchesRandom")

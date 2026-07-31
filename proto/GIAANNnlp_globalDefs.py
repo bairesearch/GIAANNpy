@@ -682,6 +682,8 @@ if(useBenchmark):
 		benchmarkAblationText = "-sentencePredictionsFalse"
 	elif(useDefaultsV2):	
 		benchmarkAblationText = "-useDefaultsV2"
+		if(multipleDendriticBranchesRandom):
+			benchmarkAblationText += "-multipleDendriticBranchesRandom" + str(multipleDendriticBranchesNumber)
 	elif(tokeniserSubword):
 		if(tokeniserSubwordPOS):
 			benchmarkAblationText = "-tokeniserSubwordPOS"
@@ -748,9 +750,14 @@ else:
 	
 
 #Debug vars;
-debugPrintTrainTotalWords = False
-debugPrintTrainTotalTokens = False		#requires tokeniserSubword
-debugPrintTrainTotalSkip = False	#default: False
+if(useBenchmark):
+	debugPrintTrainTotalWords = True
+	if(useDefaultsV2):
+		debugPrintTrainTotalTokens = True		#requires tokeniserSubword
+else:	
+	debugPrintTrainTotalWords = False
+	debugPrintTrainTotalTokens = False
+debugPrintTrainTotalSkip = False	#default: False	#skip actual training (count words/tokens only)
 if(debugPrintTrainTotalTokens):
 	if(not tokeniserSubword):
 		raise RuntimeError("GIAANNnlp_globalDefs error: debugPrintTrainTotalTokens requires tokeniserSubword")

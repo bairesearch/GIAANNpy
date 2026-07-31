@@ -752,10 +752,17 @@ def calculateFeatureNeuronSourceActivationPredictNonBinary(globalFeatureNeuronsA
 			featureNeuronsActive = featureNeuronsActive[:, sourceColumnIndex, sourceFeatureIndex]
 		else:
 			featureNeuronsActive = featureNeuronsActive[sourceColumnIndex, sourceFeatureIndex]
-	if(inferenceSourceActivationsBoolean):
-		featureNeuronsActive = (featureNeuronsActive > 0).to(featureNeuronsActive.dtype)	#ensure the source activation signal is binary (even with useSANI)
-	if(multipleDendriticBranches and featureNeuronsActive.dim() == 1):
-		featureNeuronsActive = featureNeuronsActive.sum()
+	if(patchMultipleDendriticBranchesSourceActivationBoolean):
+		# Collapse branch outputs before Booleanisation so one fired neuron always emits a source activation of one.
+		if(multipleDendriticBranches and featureNeuronsActive.dim() == 1):
+			featureNeuronsActive = featureNeuronsActive.sum()
+		if(inferenceSourceActivationsBoolean):
+			featureNeuronsActive = (featureNeuronsActive > 0).to(featureNeuronsActive.dtype)	#ensure the source activation signal is binary (even with useSANI)
+	else:
+		if(inferenceSourceActivationsBoolean):
+			featureNeuronsActive = (featureNeuronsActive > 0).to(featureNeuronsActive.dtype)	#ensure the source activation signal is binary (even with useSANI)
+		if(multipleDendriticBranches and featureNeuronsActive.dim() == 1):
+			featureNeuronsActive = featureNeuronsActive.sum()
 	result = featureNeuronsActive
 	return result
 

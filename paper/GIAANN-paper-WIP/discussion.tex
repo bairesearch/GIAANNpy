@@ -6,6 +6,7 @@ Here, in the discussion we critically analyse how GIAANN diverges from those pri
 \subsection{Synthesis and Novelty}
 
 The GIAANN prototype brings together all the above themes into a unified architecture, and in doing so, it differs from prior works in significant ways while also addressing some of their limitations.
+
 A key distinguishing feature is GIAANN’s explicit combination of multiple brain-inspired mechanisms in one system.
 Where most previous models or theories focused on one or two of these aspects in isolation (e.g., HTM on columns and sequences, or dendritic ANNs on neuron substructures, or Hopfield nets on associative memory), GIAANN integrates semantic graphs, Hopfield dynamics, sequential spiking, dendritic compartments, concept cells, and columnar organisation into a single algorithmic framework.
 
@@ -29,9 +30,12 @@ Thus, GIAANN’s neurons are more powerful, potentially reducing the number of n
 Against the backdrop of modern deep learning (e.g. Transformers), GIAANN stands out by eschewing backpropagation and dense continuous representations.
 Instead, it relies on local learning rules (Hebbian) and highly sparse, event-driven computation.
 
-The prediction performance of GIAANN is lower than that of a Transformer, however experiments are indicative of consistent scaling.
-GIAANN produced an OSCAR-2201 whole-word token top-1 test accuracy $\approx 0.15$ after 1M samples (\Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-trainsize}), whereas a RoBERTa Causal Transformer Language Model can deliver a subword token top-1 test accuracy $\approx 0.3$ after 1M samples \citep{bairesearch2022TSBNLP}.
-For the OSCAR-2201 web crawl text (`oscar-corpus/OSCAR-2201' `en' split) a subword prediction accuracy of $\approx 0.3$ translates to a whole word-accuracy of $\approx 0.17$ to $\approx 0.24$, which is above what is measured by GIAANN.
+The prediction performance of GIAANN appears lower than that of a Transformer, however experiments are indicative of consistent scaling.
+
+GIAANN proto v1 produced an OSCAR-2201 whole-word token top-1 test accuracy $\approx 0.15$ after 3M sequences comprising 70M words---equivalent to 80M tokens (\Cref{tab:oscar-test-top1-accuracy-spacyPipelineOptimisations-trainsize}), whereas a 6-layer 512-token context RoBERTa Causal Transformer Language Model \citep{liu2019roberta} can deliver a subword token top-1 test accuracy $\approx 0.3$ after 1M sequences comprising  $\approx$ 500M tokens \citep{bairesearch2022TSBNLP}.
+For the OSCAR-2201 web crawl text (`oscar-corpus/OSCAR-2201' `en' split) a subword prediction accuracy of $\approx 0.3$ translates to a whole word-accuracy of $\approx 0.17$ to $\approx 0.24$, which is above what was measured by GIAANN proto v1.
+
+GIAANN proto v2 produced an OSCAR-2201 subword token top-1 test accuracy $\approx 0.26$ after 3M sequences comprising 80M tokens (\Cref{tab:protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes}), whereas a 6-layer 512-token context RoBERTa Causal Transformer Language Model can deliver a subword token top-1 test accuracy $\approx 0.3$ after 1M sequences comprising  $\approx$ 500M tokens \citep{bairesearch2022TSBNLP}. While the GIAANN proto v2 benchmarks produce more similar results to the transformer architecture when extrapolated to the same number of input tokens, they still contain a number of constraints that can artificially enhance their peformance (e.g. single-sentence sequence prediction, discarding of sequence concept column segmentation errors). RoBERTa is likewise not a SOTA (state-of-the-art) transformer implementation.
 
 GIAANN also offers advantages in interpretability, incremental learning, and energy efficiency.
 Every activation in GIAANN can be traced to a concept, every connection to a relation---a transparency that is largely missing in black-box deep nets.
@@ -50,7 +54,7 @@ Inhibitory interneurons are also critical in cortex for shaping activity; GIAANN
 Additionally, GIAANN’s reliance on a predefined semantic cues (POS identification for concept column delimitation) could be seen as a limitation compared to deep learning models that learn representations purely from data.
 However, one might argue GIAANN is simply incorporating prior knowledge (thing/relation distinction) which is a strength, not a weakness, especially for AGI aspirations.
 
-GIAANN is also implemented using whole-word tokenisation, which limits generalistion to new test set words not seen in the training set.
+GIAANN (proto v1 as primarily described in this paper) was also first implemented using whole-word tokenisation, which limited generalistion to new test set words not seen in the training set.
 
 \subsection{Conclusion}
 

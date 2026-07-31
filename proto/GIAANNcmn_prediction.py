@@ -663,6 +663,10 @@ def activateSeedPredictionSegments(globalFeatureNeuronsActivation, conceptColumn
 	else:
 		segmentIndices = pt.tensor([arrayIndexSegmentFirst], dtype=pt.long, device=globalFeatureNeuronsActivation.device)
 	branchIndex = arrayIndexSegmentFirst
+	if(patchMultipleDendriticBranchesBurstActivationBranch):
+		if(multipleDendriticBranches):
+			# Keep forced and learned activation on the same branch so single-branch deactivation clears both.
+			branchIndex = GIAANNcmn_predictionActivate.selectActivatedBranchIndex(globalFeatureNeuronsActivation, int(conceptColumnIndex), int(conceptColumnFeatureIndex))
 	branchIndices = pt.full_like(segmentIndices, branchIndex)
 	if(multipleDendriticBranchesBinaryTree):
 		branchDivisors = pt.pow(pt.full_like(segmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor), segmentIndices)
