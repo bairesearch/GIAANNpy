@@ -365,7 +365,7 @@ def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceOb
 			else:
 				featureNeuronsWordOrder1d = featureNeuronsWordOrder.flatten()
 				featureConnectionsDistances = pt.abs(featureNeuronsWordOrder1d.unsqueeze(1) - featureNeuronsWordOrder1d).reshape(cs, fs, cs, fs)
-			featureConnectionsProximity = 1/(featureConnectionsDistances + 1) * 10
+			featureConnectionsProximity = trainConnectionStrengthProximityScale/pt.pow(featureConnectionsDistances + trainConnectionStrengthProximityDistanceOffset, trainConnectionStrengthProximityExponent)
 			featureConnectionsProximity.unsqueeze(0)
 			featureConnectionsStrengthUpdate = featureConnectionsActive*featureConnectionsProximity
 		else:
@@ -505,7 +505,7 @@ def processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, feature
 					sourceWordOrder = featureNeuronsWordOrder[sourceConceptIndices, sourceFeatureIndices].to(connectionActiveValues.dtype)
 					targetWordOrder = featureNeuronsWordOrder[targetConceptIndices, targetFeatureIndices].to(connectionActiveValues.dtype)
 					connectionDistances = pt.abs(targetWordOrder - sourceWordOrder)
-				connectionProximity = 1/(connectionDistances + 1) * 10
+				connectionProximity = trainConnectionStrengthProximityScale/pt.pow(connectionDistances + trainConnectionStrengthProximityDistanceOffset, trainConnectionStrengthProximityExponent)
 				strengthValues = strengthValues * connectionProximity
 			if(trainConnectionStrengthIncreaseColumnInternal):
 				internalConnectionMask = sourceConceptIndices == targetConceptIndices

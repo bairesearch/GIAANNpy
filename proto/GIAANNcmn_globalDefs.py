@@ -54,7 +54,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "trainAndInference"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -76,8 +76,12 @@ useInference = True  #mandatory: True	#enable options that support inference mod
 if(useInference):
 	if(useTrainDuringInference):
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#mandatory: False
-	elif(useBenchmark or useAutoresearch):
+	elif(useBenchmark):
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: False	#False: use current target (default top-1 accuracy measurement)
+	elif(useAutoresearch):
+		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False
+	elif(useQuickExecution):
+		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True
 	else:
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True		#True: activate next column features using current prediction
 	if(useDefaultsV2):
@@ -91,7 +95,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
+	useBenchmarkDefaultsEvalTestSet = True	#default: False/True
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
@@ -511,6 +515,16 @@ inferenceNormaliseFeatureSelectionByFeatureConnections = False	#default: False
 if(inferenceNormaliseFeatureSelectionByFeatureConnections):
 	inferenceNormaliseFeatureSelectionByFeatureConnectionsStrength = True	#mandatory
 trainConnectionStrengthNormaliseWrtContextLength = True	#default: True
+if(trainConnectionStrengthNormaliseWrtContextLength):
+	trainConnectionStrengthProximityScale = 10.0	#default: 10.0	#connection-strength contribution at zero distance
+	trainConnectionStrengthProximityExponent = 1.0	#default: 1.0	#0.0: uniform, 0.5: gentle decay, 1.0: inverse distance, 2.0: inverse-square distance
+	trainConnectionStrengthProximityDistanceOffset = 1.0	#mandatory: 1.0	#prevents division by zero while preserving the zero-distance scale
+	if(not isinstance(trainConnectionStrengthProximityScale, (int, float)) or isinstance(trainConnectionStrengthProximityScale, bool) or not math.isfinite(trainConnectionStrengthProximityScale) or trainConnectionStrengthProximityScale <= 0.0):
+		raise RuntimeError("GIAANNcmn_globalDefs error: trainConnectionStrengthProximityScale must be a finite number > 0")
+	if(not isinstance(trainConnectionStrengthProximityExponent, (int, float)) or isinstance(trainConnectionStrengthProximityExponent, bool) or not math.isfinite(trainConnectionStrengthProximityExponent) or trainConnectionStrengthProximityExponent < 0.0):
+		raise RuntimeError("GIAANNcmn_globalDefs error: trainConnectionStrengthProximityExponent must be a finite number >= 0")
+	if(not isinstance(trainConnectionStrengthProximityDistanceOffset, (int, float)) or isinstance(trainConnectionStrengthProximityDistanceOffset, bool) or not math.isfinite(trainConnectionStrengthProximityDistanceOffset) or trainConnectionStrengthProximityDistanceOffset <= 0.0):
+		raise RuntimeError("GIAANNcmn_globalDefs error: trainConnectionStrengthProximityDistanceOffset must be a finite number > 0")
 trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections = False	#default: True
 trainConnectionStrengthIncreaseColumnInternal = False	#not required as internal column nodes will be predicted unless current node is a reference set delimiter
 
@@ -1151,6 +1165,11 @@ if(printConfiguration):
 	print("")
 	print("#Array properties;")
 	print("arrayIndexPropertiesEfficient:", arrayIndexPropertiesEfficient)
+	print("trainConnectionStrengthNormaliseWrtContextLength:", trainConnectionStrengthNormaliseWrtContextLength)
+	if(trainConnectionStrengthNormaliseWrtContextLength):
+		print("trainConnectionStrengthProximityScale:", trainConnectionStrengthProximityScale)
+		print("trainConnectionStrengthProximityExponent:", trainConnectionStrengthProximityExponent)
+		print("trainConnectionStrengthProximityDistanceOffset:", trainConnectionStrengthProximityDistanceOffset)
 	print("")
 	print("#SANI;")
 	print("useSANI:", useSANI)
@@ -1217,10 +1236,27 @@ if(printConfiguration):
 			print("algorithmMatrixSANIenforceRequirement: ", algorithmMatrixSANIenforceRequirement)
 		print("enforceSequentialActivation: ", enforceSequentialActivation)
 	print("")
+	print("#Auxiliary neurons;")
+	print("auxiliaryNeurons:", auxiliaryNeurons)
+	if(auxiliaryNeurons):
+		print("auxiliaryNeuronsPOS:", auxiliaryNeuronsPOS)
+		print("auxiliaryNeuronsAuto:", auxiliaryNeuronsAuto)
+		if(auxiliaryNeuronsPOS):
+			print("auxiliaryNeuronsPOSlemma:", auxiliaryNeuronsPOSlemma)
+			print("auxiliaryNeuronsPOSpartOfSpeech:", auxiliaryNeuronsPOSpartOfSpeech)
+			print("auxiliaryNeuronsPOSsubwordRole:", auxiliaryNeuronsPOSsubwordRole)
+			print("auxiliaryNeuronsPOSLemmaActivationWeight:", auxiliaryNeuronsPOSLemmaActivationWeight)
+			print("auxiliaryNeuronsPOSPartOfSpeechActivationWeight:", auxiliaryNeuronsPOSPartOfSpeechActivationWeight)
+			print("auxiliaryNeuronsPOSSubwordRoleActivationWeight:", auxiliaryNeuronsPOSSubwordRoleActivationWeight)
+			print("auxiliaryNeuronsPOSRegistrationThreshold:", auxiliaryNeuronsPOSRegistrationThreshold)
+	print("")
 	print("#Tokeniser settings;")
 	print("tokeniserSubword:", tokeniserSubword)
 	if(tokeniserSubword):
 		print("tokeniserSubwordPOS:", tokeniserSubwordPOS)
+		print("tokeniserSubwordColumnIdentificationByFirstNounToken:", tokeniserSubwordColumnIdentificationByFirstNounToken)
+		print("tokeniserSubwordColumnIdentificationByConsecutiveNounTokens:", tokeniserSubwordColumnIdentificationByConsecutiveNounTokens)
+		print("tokeniserSubwordColumnIdentificationByLemma:", tokeniserSubwordColumnIdentificationByLemma)
 		print("maxSequenceLengthTokens:", maxSequenceLengthTokens)
 		print("tokenisationEnforcePrecharacterByteLimit:", tokenisationEnforcePrecharacterByteLimit)
 		if(tokenisationEnforcePrecharacterByteLimit):

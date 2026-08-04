@@ -44,32 +44,91 @@ def isTokenConceptColumnCandidate(token, tokens, tokenIndex):
 		result = True
 	return result
 
-def getTokenConceptName(databaseNetworkObject, token):
+def getTokenConceptName(databaseNetworkObject, token, tokens=None, tokenIndex=None):
 	result = None
-	if(useDedicatedConceptsLists):
-		if(tokeniserSubword and useDedicatedConceptListsSubword):
+	if(tokeniserSubword):
+		validateTokenConceptSequenceContext(tokens, tokenIndex)
+		if(tokeniserSubwordColumnIdentificationByFirstNounToken):
 			conceptIndex = getTokenConceptIndex(databaseNetworkObject, token)
 			result = databaseNetworkObject.conceptColumnsList[conceptIndex]
+		elif(tokeniserSubwordColumnIdentificationByConsecutiveNounTokens):
+			result = getTokeniserSubwordConsecutiveNounTokensConceptName(tokens, tokenIndex)
+		elif(tokeniserSubwordColumnIdentificationByLemma):
+			result = getTokeniserSubwordLemmaConceptName(tokens, tokenIndex)
 		else:
-			raise RuntimeError("getTokenConceptName error: useDedicatedConceptsLists is only implemented for tokeniserSubword/useDedicatedConceptListsSubword")
+			raise RuntimeError("getTokenConceptName error: tokeniserSubword column identification mode is undefined")
 	else:
 		result = token.lemma
 	return result
 
-def getTokenConceptIndex(databaseNetworkObject, token):
+def getTokenConceptIndex(databaseNetworkObject, token, tokens=None, tokenIndex=None):
 	result = None
-	if(useDedicatedConceptsLists):
-		if(tokeniserSubword and useDedicatedConceptListsSubword):
+	if(tokeniserSubword):
+		if(tokeniserSubwordColumnIdentificationByFirstNounToken):
+			if(not useDedicatedConceptsLists or not useDedicatedConceptListsSubword):
+				raise RuntimeError("getTokenConceptIndex error: first-noun-token identification requires dedicated subword concept lists")
 			result = GIAANNnlp_sequenceTokens.getTokeniserSubwordConceptIndex(token)
 			if(result < 0 or result >= databaseNetworkObject.c):
 				raise RuntimeError("getTokenConceptIndex error: tokeniserSubword concept index out of range")
 		else:
-			raise RuntimeError("getTokenConceptIndex error: useDedicatedConceptsLists is only implemented for tokeniserSubword/useDedicatedConceptListsSubword")
+			if(useDedicatedConceptsLists or useDedicatedConceptListsSubword):
+				raise RuntimeError("getTokenConceptIndex error: consecutive-noun-token and lemma identification require dynamic concept lists")
+			conceptName = getTokenConceptName(databaseNetworkObject, token, tokens, tokenIndex)
+			if(conceptName not in databaseNetworkObject.conceptColumnsDict):
+				raise RuntimeError("getTokenConceptIndex error: concept name not found (" + conceptName + ")")
+			result = databaseNetworkObject.conceptColumnsDict[conceptName]
 	else:
 		if(token.lemma not in databaseNetworkObject.conceptColumnsDict):
 			raise RuntimeError("getTokenConceptIndex error: concept lemma not found (" + token.lemma + ")")
 		result = databaseNetworkObject.conceptColumnsDict[token.lemma]
 	return result
+
+def getTokeniserSubwordConsecutiveNounTokensConceptName(tokens, tokenIndex):
+	result = None
+	spanEndIndex = getTokeniserSubwordConceptSpanEndIndex(tokens, tokenIndex)
+	conceptTokenWords = [tokens[spanTokenIndex].word for spanTokenIndex in range(tokenIndex, spanEndIndex)]
+	result = tokeniserSubwordConsecutiveNounTokensJoinDelimiter.join(conceptTokenWords).strip()
+	if(result == ""):
+		raise RuntimeError("getTokeniserSubwordConsecutiveNounTokensConceptName error: concept name must not be empty")
+	return result
+
+def getTokeniserSubwordLemmaConceptName(tokens, tokenIndex):
+	result = None
+	spanEndIndex = getTokeniserSubwordConceptSpanEndIndex(tokens, tokenIndex)
+	parentLemmas = []
+	previousParentTokenIndex = None
+	for spanTokenIndex in range(tokenIndex, spanEndIndex):
+		spanToken = tokens[spanTokenIndex]
+		if(spanToken.parentTokenIndex is None):
+			raise RuntimeError("getTokeniserSubwordLemmaConceptName error: noun subword token has no parentTokenIndex")
+		if(spanToken.parentTokenIndex != previousParentTokenIndex):
+			if(spanToken.posLemma is None or spanToken.posLemma == ""):
+				raise RuntimeError("getTokeniserSubwordLemmaConceptName error: noun subword token has no parent spaCy lemma")
+			parentLemmas.append(spanToken.posLemma.lower())
+			previousParentTokenIndex = spanToken.parentTokenIndex
+	result = tokeniserSubwordLemmaJoinDelimiter.join(parentLemmas)
+	if(result == ""):
+		raise RuntimeError("getTokeniserSubwordLemmaConceptName error: concept name must not be empty")
+	return result
+
+def getTokeniserSubwordConceptSpanEndIndex(tokens, tokenIndex):
+	result = None
+	validateTokenConceptSequenceContext(tokens, tokenIndex)
+	if(not GIAANNnlp_sequenceTokens.isConcept(tokens[tokenIndex])):
+		raise RuntimeError("getTokeniserSubwordConceptSpanEndIndex error: tokenIndex must identify a noun token")
+	result = tokenIndex + 1
+	while(result < len(tokens) and GIAANNnlp_sequenceTokens.isConcept(tokens[result])):
+		result += 1
+	return result
+
+def validateTokenConceptSequenceContext(tokens, tokenIndex):
+	if(tokens is None):
+		raise RuntimeError("validateTokenConceptSequenceContext error: tokens must not be None")
+	if(not isinstance(tokenIndex, int) or isinstance(tokenIndex, bool)):
+		raise RuntimeError("validateTokenConceptSequenceContext error: tokenIndex must be an int")
+	if(tokenIndex < 0 or tokenIndex >= len(tokens)):
+		raise RuntimeError("validateTokenConceptSequenceContext error: tokenIndex out of range")
+	return
 
 def firstPass(databaseNetworkObject, sequence, allowNewFeatures):
 	newConceptsAdded = False
@@ -95,15 +154,16 @@ def firstPass(databaseNetworkObject, sequence, allowNewFeatures):
 			conceptFound = True
 		
 		if(conceptFound):
+			conceptName = getTokenConceptName(databaseNetworkObject, token, tokens, tokenIndex)
 			if(useDedicatedConceptsLists):
-				getTokenConceptIndex(databaseNetworkObject, token)
+				getTokenConceptIndex(databaseNetworkObject, token, tokens, tokenIndex)
 				conceptsFound = True
 			else:
 				if(allowNewFeatures):
-					conceptsFound, newConceptsAdded = GIAANNcmn_databaseNetwork.addConceptToConceptColumnsDict(databaseNetworkObject, token.lemma, conceptsFound, newConceptsAdded)
+					conceptsFound, newConceptsAdded = GIAANNcmn_databaseNetwork.addConceptToConceptColumnsDict(databaseNetworkObject, conceptName, conceptsFound, newConceptsAdded)
 				else:
-					if(token.lemma not in databaseNetworkObject.conceptColumnsDict):
-						raise RuntimeError("firstPass error: concept lemma not found while allowNewFeatures is False (" + token.lemma + ")")
+					if(conceptName not in databaseNetworkObject.conceptColumnsDict):
+						raise RuntimeError("firstPass error: concept name not found while allowNewFeatures is False (" + conceptName + ")")
 					conceptsFound = True
 			conceptMask.append(True)
 		else:
@@ -131,8 +191,8 @@ def secondPass(databaseNetworkObject, tokens, inferenceMode):
 		else:
 			conceptFound = True
 		if(conceptFound):
-			lemma = getTokenConceptName(databaseNetworkObject, token)
-			conceptIndex = getTokenConceptIndex(databaseNetworkObject, token)
+			lemma = getTokenConceptName(databaseNetworkObject, token, tokens, i)
+			conceptIndex = getTokenConceptIndex(databaseNetworkObject, token, tokens, i)
 			if(inferenceMode and inferenceOnlyRetainPredictedTargetObservedColumn):
 				observedColumn = GIAANNcmn_databaseNetwork.ObservedColumnStub(databaseNetworkObject, conceptIndex, lemma, i)
 				observedColumnsSequenceWordIndexDict[i] = observedColumn
@@ -569,10 +629,7 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 		if(trainSequenceObservedColumnsMatchSequenceWords):
 			sequenceConceptIndex = i
 		else:
-			if(useDedicatedConceptsLists):
-				conceptLemma = getTokenConceptName(sequenceObservedColumns.databaseNetworkObject, tokens[sequenceConceptWordIndex])
-			else:
-				conceptLemma = tokens[sequenceConceptWordIndex].lemma
+			conceptLemma = getTokenConceptName(sequenceObservedColumns.databaseNetworkObject, tokens[sequenceConceptWordIndex], tokens, sequenceConceptWordIndex)
 			sequenceConceptIndex = sequenceObservedColumns.conceptNameToIndex[conceptLemma] 
 				
 		if(useSANI):

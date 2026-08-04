@@ -220,9 +220,14 @@ def getInferenceTargetWord(tokensSequence, conceptMask, sequenceWordIndex):
 	targetToken = tokensSequence[sequenceWordIndex]
 	targetIsConceptFeature = bool(conceptMask[sequenceWordIndex].item())
 	if(targetIsConceptFeature):
-		if(targetToken.lemma is None):
-			raise RuntimeError("getInferenceTargetWord error: concept token lemma is None")
-		targetWord = targetToken.lemma
+		if(tokeniserSubword and tokeniserSubwordColumnIdentificationByConsecutiveNounTokens):
+			targetWord = GIAANNnlp_sequenceConcepts.getTokeniserSubwordConsecutiveNounTokensConceptName(tokensSequence, sequenceWordIndex)
+		elif(tokeniserSubword and tokeniserSubwordColumnIdentificationByLemma):
+			targetWord = GIAANNnlp_sequenceConcepts.getTokeniserSubwordLemmaConceptName(tokensSequence, sequenceWordIndex)
+		else:
+			if(targetToken.lemma is None):
+				raise RuntimeError("getInferenceTargetWord error: concept token lemma is None")
+			targetWord = targetToken.lemma
 	else:
 		targetWord = targetToken.word
 	return targetWord
@@ -904,7 +909,7 @@ def calculateInferencePredictionMatch(tokensSequence, sequenceWordIndex, concept
 	#calculate featurePredictionTargetMatch; 
 	featurePredictionTargetMatch = False
 	targetToken = tokensSequence[sequenceWordIndex]
-	targetWord = targetToken.word
+	targetWord = getInferenceTargetWord(tokensSequence, conceptMask, sequenceWordIndex)
 	targetLemma = targetToken.lemma
 	targetIsConceptFeature = bool(conceptMask[sequenceWordIndex].item())
 	#compare topk column/feature predictions to sequencePredict (target words);
@@ -917,14 +922,18 @@ def calculateInferencePredictionMatch(tokensSequence, sequenceWordIndex, concept
 		predictedIsConceptFeature = (observedColumnFeatureIndex == featureIndexPrimeConceptNeuron)
 		if(predictedIsConceptFeature):
 			predictedWord = columnName
+			if(tokeniserSubword and (tokeniserSubwordColumnIdentificationByConsecutiveNounTokens or tokeniserSubwordColumnIdentificationByLemma)):
+				predictedColumnName = columnName
 		else:
 			predictedWord = databaseNetworkObject.conceptFeaturesList[observedColumnFeatureIndex]
-		predictedColumnName = columnName
+			predictedColumnName = columnName
 		if(targetNextColumnIndex is None):
 			targetColumnName = databaseNetworkObject.conceptColumnsList[targetPreviousColumnIndex]
 		else:
 			targetColumnName = databaseNetworkObject.conceptColumnsList[targetPreviousColumnIndex] + "/" + databaseNetworkObject.conceptColumnsList[targetNextColumnIndex]
 		if(targetWord == predictedWord):
+			featurePredictionTargetMatch = True
+		elif(tokeniserSubword and (tokeniserSubwordColumnIdentificationByConsecutiveNounTokens or tokeniserSubwordColumnIdentificationByLemma) and targetIsConceptFeature and predictedIsConceptFeature and conceptColumnIndexPred == int(targetPreviousColumnIndex)):
 			featurePredictionTargetMatch = True
 		elif(targetIsConceptFeature and predictedIsConceptFeature and targetLemma == predictedColumnName and targetColumnName == predictedColumnName):
 			featurePredictionTargetMatch = True

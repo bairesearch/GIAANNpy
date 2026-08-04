@@ -64,6 +64,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		observedColumn.similarAuxiliaryFeatureConnectionsBySourceFeature = {}
 		observedColumn.similarAuxiliaryLoadedSourceFeatureIndices = set()
 		observedColumn.similarAuxiliaryTrainPreparedSourceFeatureIndices = set()
+		observedColumn.similarAuxiliaryStoredSourceFeatureIndicesCache = None
 		observedColumn.similarAuxiliarySecondaryInputConnections = None
 		observedColumn.similarAuxiliarySecondaryOutputConnectionsMaterialised = None
 		return
@@ -72,6 +73,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		observedColumnProxy.similarAuxiliaryFeatureConnectionsBySourceFeature = {}
 		observedColumnProxy.similarAuxiliaryLoadedSourceFeatureIndices = set()
 		observedColumnProxy.similarAuxiliaryTrainPreparedSourceFeatureIndices = set()
+		observedColumnProxy.similarAuxiliaryStoredSourceFeatureIndicesCache = None
 		observedColumnProxy.similarAuxiliarySecondaryInputConnections = None
 		observedColumnProxy.similarAuxiliarySecondaryOutputConnectionsMaterialised = None
 		return
@@ -106,9 +108,9 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		sourceActivation = GIAANNcmn_predictionActivate.calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivationResult, sourceColumnIndex, sourceFeatureIndex)
 		sourceActivationValue = collapseSourceActivationForAuxiliaryInput(sourceActivation)
 		if(float(sourceActivationValue.item()) > auxiliaryNeuronsSimilarWordsMinimumSimilarity):
-			if(auxiliaryNeuronsSimilarWordsPrimeConceptFeatures and int(sourceFeatureIndex) == featureIndexPrimeConceptNeuron):
+			if(len(getPrimeAuxiliaryFeaturePrefixes()) > 0 and int(sourceFeatureIndex) == featureIndexPrimeConceptNeuron):
 				globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = processAuxiliaryPrimeFeaturePredictionActivations(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, int(sourceColumnIndex), int(sourceFeatureIndex), sourceActivationValue, globalFeatureNeuronsTimeResult, sequenceWordIndex, sequenceColumnIndex, connectionDevice)
-			if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures and int(sourceFeatureIndex) != featureIndexPrimeConceptNeuron and secondaryAuxiliaryFeatureHasSimilarityWord(databaseNetworkObject, int(sourceFeatureIndex))):
+			if(len(getSecondaryAuxiliaryFeaturePrefixes()) > 0 and int(sourceFeatureIndex) != featureIndexPrimeConceptNeuron and secondaryAuxiliaryFeatureHasSimilarityWord(databaseNetworkObject, int(sourceFeatureIndex))):
 				globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = processAuxiliarySecondaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, int(sourceFeatureIndex), sourceActivationValue, globalFeatureNeuronsTimeResult, sequenceWordIndex, sequenceColumnIndex, connectionDevice)
 		result = globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult
 		return result
@@ -134,7 +136,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		globalFeatureNeuronsTimeResult = globalFeatureNeuronsTime
 		auxiliaryActivations = calculateSecondaryAuxiliaryFeatureActivations(observedColumn, sourceFeatureIndex, sourceActivationValue, connectionDevice)
 		if(auxiliaryActivationVectorHasActiveValues(auxiliaryActivations)):
-			materialisedConnections = getSecondaryOutputConnectionsMaterialised(observedColumn, connectionDevice)
+			materialisedConnections = getSecondaryOutputConnectionsMaterialised(observedColumn, connectionDevice, auxiliaryActivations)
 			featureNeuronsTargetActivation = calculateAuxiliaryFeatureTargetActivation(databaseNetworkObject, materialisedConnections, auxiliaryActivations)
 			if(sparseTensorHasValues(featureNeuronsTargetActivation)):
 				globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = GIAANNcmn_predictionActivate.applyFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, featureNeuronsTargetActivation, globalFeatureNeuronsTimeResult, sequenceWordIndex, sequenceColumnIndex, applySegmentActivations=False)
@@ -146,7 +148,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		targetColumnsList = []
 		columnFeatureMap = {}
 		activationValue = pt.tensor(auxiliaryNeuronsSimilarWordsIdentitySimilarity, dtype=arrayType, device=deviceSparse)
-		if(auxiliaryNeuronsSimilarWordsPrimeConceptFeatures and int(parentFeatureIndex) == featureIndexPrimeConceptNeuron):
+		if(len(getPrimeAuxiliaryFeaturePrefixes()) > 0 and int(parentFeatureIndex) == featureIndexPrimeConceptNeuron):
 			auxiliaryActivations = calculatePrimeAuxiliaryConceptActivations(databaseNetworkObject, int(observedColumn.conceptIndex), int(parentFeatureIndex), activationValue, deviceSparse)
 			if(auxiliaryActivationVectorHasActiveValues(auxiliaryActivations)):
 				materialisedConnections = getPrimeOutputConnectionsMaterialised(databaseNetworkObject, deviceSparse, auxiliaryActivations)
@@ -155,10 +157,10 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 				if(includeFeatureDetails):
 					for columnValue, featureSet in auxiliaryColumnFeatureMap.items():
 						columnFeatureMap.setdefault(columnValue, set()).update(featureSet)
-		if(auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures and int(parentFeatureIndex) != featureIndexPrimeConceptNeuron and secondaryAuxiliaryFeatureHasSimilarityWord(databaseNetworkObject, int(parentFeatureIndex))):
+		if(len(getSecondaryAuxiliaryFeaturePrefixes()) > 0 and int(parentFeatureIndex) != featureIndexPrimeConceptNeuron and secondaryAuxiliaryFeatureHasSimilarityWord(databaseNetworkObject, int(parentFeatureIndex))):
 			auxiliaryActivations = calculateSecondaryAuxiliaryFeatureActivations(observedColumn, int(parentFeatureIndex), activationValue, deviceSparse)
 			if(auxiliaryActivationVectorHasActiveValues(auxiliaryActivations)):
-				materialisedConnections = getSecondaryOutputConnectionsMaterialised(observedColumn, deviceSparse)
+				materialisedConnections = getSecondaryOutputConnectionsMaterialised(observedColumn, deviceSparse, auxiliaryActivations)
 				auxiliaryTargetColumnsList, auxiliaryColumnFeatureMap = getConnectedColumnsForMaterialisedAuxiliaryConnections(databaseNetworkObject, materialisedConnections, auxiliaryActivations, includeFeatureDetails)
 				targetColumnsList.extend(auxiliaryTargetColumnsList)
 				if(includeFeatureDetails):
@@ -198,6 +200,9 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		if(auxiliaryNeuronsAuto and auxiliaryNeuronsAutoInference):
 			import GIAANNnlp_auxiliaryNeuronsAuto
 			result = GIAANNnlp_auxiliaryNeuronsAuto.calculateDynamicAutoSecondaryAuxiliaryFeatureActivations(observedColumn, sourceFeatureIndex, sourceActivationValue, targetDevice)
+		elif(auxiliaryNeuronsPOS):
+			import GIAANNnlp_auxiliaryNeuronsPOS
+			result = GIAANNnlp_auxiliaryNeuronsPOS.calculatePOSAuxiliaryFeatureActivations(databaseNetworkObject, observedColumn.conceptIndex, sourceFeatureIndex, sourceActivationValue, targetDevice)
 		else:
 			inputConnections = getSecondaryInputConnections(observedColumn, targetDevice)
 			sourceVector = pt.zeros((databaseNetworkObject.f, 1), dtype=arrayType, device=targetDevice)
@@ -253,9 +258,15 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		secondaryFeaturePrefixes = getSecondaryAuxiliaryFeaturePrefixes()
 		for parentKey, auxiliaryActivationRecords in databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeatureIndexWeightsByParentWord.items():
 			parentPrefix, parentWord = parseSimilarityParentKey(parentKey)
-			if(parentPrefix in secondaryFeaturePrefixes and parentWord in databaseNetworkObject.conceptFeaturesDict):
+			sourceFeatureIndex = None
+			if(parentPrefix in secondaryFeaturePrefixes):
+				if(auxiliaryNeuronsPOS and parentPrefix in getPOSAuxiliaryFeaturePrefixes()):
+					import GIAANNnlp_auxiliaryNeuronsPOS
+					sourceFeatureIndex = GIAANNnlp_auxiliaryNeuronsPOS.getPOSAuxiliarySourceFeatureIndex(databaseNetworkObject, parentWord)
+				elif(parentWord in databaseNetworkObject.conceptFeaturesDict):
+					sourceFeatureIndex = databaseNetworkObject.conceptFeaturesDict[parentWord]
+			if(sourceFeatureIndex is not None):
 				similarityThreshold = getSimilarityThresholdForAuxiliaryFeaturePrefix(parentPrefix)
-				sourceFeatureIndex = databaseNetworkObject.conceptFeaturesDict[parentWord]
 				for auxiliaryConceptIndex, auxiliaryFeatureIndex, activationWeight in auxiliaryActivationRecords:
 					if(auxiliaryConceptIndex == conceptIndex and activationWeight >= similarityThreshold):
 						auxiliaryFeatureWord = getAuxiliaryFeatureWordForIndex(databaseNetworkObject, auxiliaryFeatureIndex)
@@ -330,20 +341,41 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		result = buildMaterialisedAuxiliaryFeatureConnections(databaseNetworkObject, indicesList, valuesList, databaseNetworkObject.fas, targetDevice)
 		return result
 
-	def getSecondaryOutputConnectionsMaterialised(observedColumn, targetDevice):
+	def getSecondaryOutputConnectionsMaterialised(observedColumn, targetDevice, auxiliaryActivations=None):
 		databaseNetworkObject = observedColumn.databaseNetworkObject
-		targetSize = getMaterialisedAuxiliaryFeatureConnectionsTargetSize(databaseNetworkObject, databaseNetworkObject.fas)
-		ensureObservedColumnAuxiliaryStorage(observedColumn)
-		result = observedColumn.similarAuxiliarySecondaryOutputConnectionsMaterialised
-		if(result is None or tuple(result.size()) != targetSize):
-			indicesList = []
-			valuesList = []
+		if(auxiliaryNeuronsPOS):
+			if(auxiliaryActivations is None):
+				raise RuntimeError("getSecondaryOutputConnectionsMaterialised error: auxiliaryNeuronsPOS requires auxiliaryActivations")
+			activeAuxiliaryFeatureIndices = getActiveAuxiliaryActivationIndices(auxiliaryActivations)
+			result = buildSecondaryOutputConnectionsMaterialised(observedColumn, targetDevice, activeAuxiliaryFeatureIndices)
+		else:
+			targetSize = getMaterialisedAuxiliaryFeatureConnectionsTargetSize(databaseNetworkObject, databaseNetworkObject.fas)
+			ensureObservedColumnAuxiliaryStorage(observedColumn)
+			result = observedColumn.similarAuxiliarySecondaryOutputConnectionsMaterialised
+			if(result is None or tuple(result.size()) != targetSize):
+				result = buildSecondaryOutputConnectionsMaterialised(observedColumn, targetDevice)
+				observedColumn.similarAuxiliarySecondaryOutputConnectionsMaterialised = result
+			elif(result.device != targetDevice):
+				result = result.to(targetDevice)
+				observedColumn.similarAuxiliarySecondaryOutputConnectionsMaterialised = result
+		return result
+
+	def buildSecondaryOutputConnectionsMaterialised(observedColumn, targetDevice, auxiliaryFeatureIndices=None):
+		databaseNetworkObject = observedColumn.databaseNetworkObject
+		indicesList = []
+		valuesList = []
+		if(auxiliaryFeatureIndices is None):
 			appendObservedColumnSecondaryAuxiliaryConnectionsMaterialised(indicesList, valuesList, observedColumn, targetDevice)
-			result = buildMaterialisedAuxiliaryFeatureConnections(databaseNetworkObject, indicesList, valuesList, databaseNetworkObject.fas, targetDevice)
-			observedColumn.similarAuxiliarySecondaryOutputConnectionsMaterialised = result
-		elif(result.device != targetDevice):
-			result = result.to(targetDevice)
-			observedColumn.similarAuxiliarySecondaryOutputConnectionsMaterialised = result
+		else:
+			for auxiliaryFeatureIndex in auxiliaryFeatureIndices:
+				auxiliaryFeatureWord = getAuxiliaryFeatureWordForIndex(databaseNetworkObject, auxiliaryFeatureIndex)
+				if(not auxiliaryFeatureWordHasAnyPrefix(auxiliaryFeatureWord, getSecondaryAuxiliaryFeaturePrefixes())):
+					raise RuntimeError("buildSecondaryOutputConnectionsMaterialised error: active auxiliary feature is not a secondary feature")
+				auxiliaryConceptIndex, auxiliaryBaseWord = parseConceptColumnAuxiliaryFeatureName(databaseNetworkObject, auxiliaryFeatureWord)
+				if(auxiliaryConceptIndex != int(observedColumn.conceptIndex)):
+					raise RuntimeError("buildSecondaryOutputConnectionsMaterialised error: auxiliary concept index mismatch")
+				appendObservedColumnAuxiliaryConnectionsMaterialised(indicesList, valuesList, observedColumn, auxiliaryFeatureIndex, auxiliaryFeatureIndex, targetDevice)
+		result = buildMaterialisedAuxiliaryFeatureConnections(databaseNetworkObject, indicesList, valuesList, databaseNetworkObject.fas, targetDevice)
 		return result
 
 	def appendObservedColumnPrimeAuxiliaryConnectionsMaterialised(indicesList, valuesList, observedColumn, targetDevice):
@@ -522,6 +554,18 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			result.append(auxiliaryNeuronsSimilarWordsFeatureNamePrefixSecondary)
 		if(auxiliaryNeuronsSimilarSubwordAuto and auxiliaryNeuronsSimilarSubwordSecondaryConceptFeatures):
 			result.append(auxiliaryNeuronsSimilarWordsFeatureNamePrefixSubwordSecondary)
+		result.extend(getPOSAuxiliaryFeaturePrefixes())
+		return result
+
+	def getPOSAuxiliaryFeaturePrefixes():
+		result = []
+		if(auxiliaryNeuronsPOS):
+			if(auxiliaryNeuronsPOSlemma):
+				result.append(auxiliaryNeuronsPOSFeatureNamePrefixLemma)
+			if(auxiliaryNeuronsPOSpartOfSpeech):
+				result.append(auxiliaryNeuronsPOSFeatureNamePrefixPartOfSpeech)
+			if(auxiliaryNeuronsPOSsubwordRole):
+				result.append(auxiliaryNeuronsPOSFeatureNamePrefixSubwordRole)
 		return result
 
 	def ensureRAMdatabaseAuxiliaryFeatureTensorSizes(observedColumn):
@@ -544,7 +588,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 
 	def loadObservedColumnAuxiliaryConnectionsFromDisk(observedColumn, targetDevice=None, loadAllSourceFeatures=False, resizeFeatureTensorsToCurrentSize=False):
 		ensureObservedColumnAuxiliaryStorage(observedColumn)
-		if(loadAllSourceFeatures):
+		if(loadAllSourceFeatures and not auxiliaryNeuronsPOS):
 			sourceFeatureIndices = listObservedColumnAuxiliarySourceFeatureIndices(observedColumn.databaseNetworkObject, observedColumn.conceptIndex)
 			loadTargetDevice = targetDevice if targetDevice is not None else deviceDatabase
 			for sourceFeatureIndex in sourceFeatureIndices:
@@ -585,6 +629,9 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		if(auxiliaryNeuronsAuto):
 			import GIAANNnlp_auxiliaryNeuronsAuto
 			result = GIAANNnlp_auxiliaryNeuronsAuto.getTokenAutoAuxiliaryFeatureIndices(databaseNetworkObject, token, isConcept, conceptIndex, allowNewFeatures, registerParent)
+		elif(auxiliaryNeuronsPOS):
+			import GIAANNnlp_auxiliaryNeuronsPOS
+			result = GIAANNnlp_auxiliaryNeuronsPOS.getTokenPOSAuxiliaryFeatureIndices(databaseNetworkObject, token, isConcept, conceptIndex, allowNewFeatures, registerParent)
 		return result
 
 	def buildAuxiliarySourceOccurrenceTensors(sequenceObservedColumns, conceptIndices, startIndices, endIndices, targetDevice):
@@ -645,7 +692,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 					baseValues = pt.ones((branchIndices.shape[0],), dtype=arrayType, device=connectionDevice)
 					if(trainConnectionStrengthNormaliseWrtContextLength):
 						connectionDistances = pt.abs(targetWordOrder - sourceWordOrderPair).to(baseValues.dtype)
-						baseValues = baseValues * (auxiliaryNeuronsSimilarWordsConnectionProximityMultiplier/(connectionDistances + 1))
+						baseValues = baseValues * (auxiliaryNeuronsSimilarWordsConnectionProximityMultiplier/pt.pow(connectionDistances + trainConnectionStrengthProximityDistanceOffset, trainConnectionStrengthProximityExponent))
 					appendAuxiliaryConnectionSegmentIndices(indicesList, valuesList, branchIndices, sourceConceptIndicesPair, sourceAuxiliaryFeatureIndicesPair, targetConceptIndices, targetFeatureIndices, sourceWordOrderPair, targetWordOrder, baseValues)
 		if(len(indicesList) > 0):
 			combinedIndices = pt.cat(indicesList, dim=1)
@@ -714,6 +761,30 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			result = databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeatureIndexWeightsByParentWord[parentKey]
 		return result
 
+	def getAuxiliaryFeatureActivationRecordsForParentKeyAndConceptIndex(databaseNetworkObject, parentKey, conceptIndex):
+		normalisedConceptIndex = normaliseAuxiliaryParentMapConceptIndex(databaseNetworkObject, conceptIndex)
+		result = []
+		if(parentKey in databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeatureIndexWeightsByParentWord):
+			activationRecords = databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeatureIndexWeightsByParentWord[parentKey]
+			lowerIndex = 0
+			upperIndex = len(activationRecords)
+			while(lowerIndex < upperIndex):
+				middleIndex = (lowerIndex + upperIndex) // 2
+				if(activationRecords[middleIndex][0] < normalisedConceptIndex):
+					lowerIndex = middleIndex + 1
+				else:
+					upperIndex = middleIndex
+			startIndex = lowerIndex
+			upperIndex = len(activationRecords)
+			while(lowerIndex < upperIndex):
+				middleIndex = (lowerIndex + upperIndex) // 2
+				if(activationRecords[middleIndex][0] <= normalisedConceptIndex):
+					lowerIndex = middleIndex + 1
+				else:
+					upperIndex = middleIndex
+			result = activationRecords[startIndex:lowerIndex]
+		return result
+
 	def getObservedColumnForAuxiliaryFeatureActivation(databaseNetworkObject, observedColumn, auxiliaryConceptIndex, targetDevice):
 		result = observedColumn
 		normalisedConceptIndex = normaliseAuxiliaryParentMapConceptIndex(databaseNetworkObject, auxiliaryConceptIndex)
@@ -766,12 +837,15 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		if(normalisedActivationWeight >= similarityThreshold):
 			if(currentActivationWeight is None or normalisedActivationWeight > currentActivationWeight):
 				parentFeatureWords[auxiliaryFeatureWord] = normalisedActivationWeight
-				databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeatureIndexWeightsByParentWord[parentKey] = buildAuxiliaryFeatureIndexWeightListForParentFeatureWords(databaseNetworkObject, parentFeatureWords)
-				invalidateDatabaseAuxiliaryInputConnectionCaches(databaseNetworkObject)
+				if(not auxiliaryNeuronsPOS or databaseNetworkObject.inferenceMode or useTrainDuringInference):
+					databaseNetworkObject.auxiliaryNeuronsSimilarWordsFeatureIndexWeightsByParentWord[parentKey] = buildAuxiliaryFeatureIndexWeightListForParentFeatureWords(databaseNetworkObject, parentFeatureWords)
+					invalidateDatabaseAuxiliaryInputConnectionCaches(databaseNetworkObject)
 		return
 
 	def getSimilarityThresholdForAuxiliaryFeaturePrefix(auxiliaryFeaturePrefix):
-		if(auxiliaryNeuronsAuto and auxiliaryNeuronsSimilarSubwordAuto and (auxiliaryFeaturePrefix == auxiliaryNeuronsSimilarWordsFeatureNamePrefixSubwordPrimeConcept or auxiliaryFeaturePrefix == auxiliaryNeuronsSimilarWordsFeatureNamePrefixSubwordSecondary)):
+		if(auxiliaryNeuronsPOS and auxiliaryFeaturePrefix in getPOSAuxiliaryFeaturePrefixes()):
+			result = auxiliaryNeuronsPOSRegistrationThreshold
+		elif(auxiliaryNeuronsAuto and auxiliaryNeuronsSimilarSubwordAuto and (auxiliaryFeaturePrefix == auxiliaryNeuronsSimilarWordsFeatureNamePrefixSubwordPrimeConcept or auxiliaryFeaturePrefix == auxiliaryNeuronsSimilarWordsFeatureNamePrefixSubwordSecondary)):
 			result = auxiliaryNeuronsSimilarSubwordAutoThreshold
 		else:
 			result = auxiliaryNeuronsSimilarWordsThreshold
@@ -824,7 +898,10 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 				sourceTensor = getObservedColumnAuxiliaryFeatureConnectionsForSourceFeature(observedColumn.sourceObservedColumn, normalisedSourceFeatureIndex, observedColumn.sourceObservedColumn.getDefaultConnectionTargetDevice(), createMissing, ensureCurrentSizeOnLoad)
 				result = sourceTensor.to(resolvedTargetDevice)
 			elif(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam and observedColumn.databaseNetworkObject.observedColumnsRAMLoaded):
-				result = initialiseAuxiliaryFeatureConnections(observedColumn.databaseNetworkObject, resolvedTargetDevice)
+				if(auxiliaryNeuronsPOS and normalisedSourceFeatureIndex in getObservedColumnAuxiliaryStoredSourceFeatureIndices(observedColumn)):
+					result = loadObservedColumnAuxiliaryFeatureConnectionsTensor(observedColumn.databaseNetworkObject, observedColumn.conceptIndex, normalisedSourceFeatureIndex, resolvedTargetDevice, ensureCurrentSizeOnLoad=ensureCurrentSizeOnLoad)
+				else:
+					result = initialiseAuxiliaryFeatureConnections(observedColumn.databaseNetworkObject, resolvedTargetDevice)
 			else:
 				storedSourceFeatureIndices = listObservedColumnAuxiliarySourceFeatureIndices(observedColumn.databaseNetworkObject, observedColumn.conceptIndex)
 				if(normalisedSourceFeatureIndex in storedSourceFeatureIndices):
@@ -908,6 +985,13 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		result.sort()
 		return result
 
+	def getObservedColumnAuxiliaryStoredSourceFeatureIndices(observedColumn):
+		ensureObservedColumnAuxiliaryStorage(observedColumn)
+		if(observedColumn.similarAuxiliaryStoredSourceFeatureIndicesCache is None):
+			observedColumn.similarAuxiliaryStoredSourceFeatureIndicesCache = set(listObservedColumnAuxiliarySourceFeatureIndices(observedColumn.databaseNetworkObject, observedColumn.conceptIndex))
+		result = observedColumn.similarAuxiliaryStoredSourceFeatureIndicesCache
+		return result
+
 	def loadObservedColumnAuxiliaryFeatureConnectionsTensor(databaseNetworkObject, conceptIndex, sourceFeatureIndex, targetDevice, ensureCurrentSizeOnLoad=False):
 		connectionsFolder = getObservedColumnAuxiliaryFeatureConnectionsFolder(conceptIndex)
 		fileBaseName = getObservedColumnAuxiliarySourceFeatureConnectionsFileBaseName(sourceFeatureIndex)
@@ -943,6 +1027,8 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		if(not hasattr(observedColumn, "similarAuxiliaryFeatureConnectionsBySourceFeature")):
 			initialiseObservedColumnAuxiliaryStorage(observedColumn)
 		else:
+			if(not hasattr(observedColumn, "similarAuxiliaryStoredSourceFeatureIndicesCache")):
+				observedColumn.similarAuxiliaryStoredSourceFeatureIndicesCache = None
 			if(not hasattr(observedColumn, "similarAuxiliarySecondaryInputConnections")):
 				observedColumn.similarAuxiliarySecondaryInputConnections = None
 			if(not hasattr(observedColumn, "similarAuxiliarySecondaryOutputConnectionsMaterialised")):
@@ -1171,7 +1257,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		return result
 
 	def validateSimilarWordsConfiguration():
-		if(not auxiliaryNeuronsSimilarWordsPrimeConceptFeatures and not auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures and not auxiliaryNeuronsSimilarSubwordAuto):
+		if(len(getPrimeAuxiliaryFeaturePrefixes()) == 0 and len(getSecondaryAuxiliaryFeaturePrefixes()) == 0):
 			raise RuntimeError("validateSimilarWordsConfiguration error: no auxiliary similarity feature suboption is enabled")
 		if(auxiliaryNeuronsSimilarWordsThreshold < auxiliaryNeuronsSimilarWordsMinimumSimilarity or auxiliaryNeuronsSimilarWordsThreshold > auxiliaryNeuronsSimilarWordsMaximumSimilarity):
 			raise RuntimeError("validateSimilarWordsConfiguration error: auxiliaryNeuronsSimilarWordsThreshold out of range")

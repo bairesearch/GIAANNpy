@@ -89,7 +89,7 @@ def isTokenReferenceSetDelimiterProbabilistic(token):
 	
 
 class SequenceToken:
-	def __init__(self, word, lemma, pos, tag, tokenId=None, posWord=None, posLemma=None):
+	def __init__(self, word, lemma, pos, tag, tokenId=None, posWord=None, posLemma=None, parentTokenIndex=None, subwordRole=None, parentPos=None):
 		self.word = word
 		self.lemma = lemma
 		self.pos = pos
@@ -97,11 +97,16 @@ class SequenceToken:
 		self.tokenId = tokenId
 		self.posWord = posWord
 		self.posLemma = posLemma
+		if(tokeniserSubword):
+			self.parentTokenIndex = parentTokenIndex
+			if(auxiliaryNeurons and auxiliaryNeuronsPOS):
+				self.subwordRole = subwordRole
+				self.parentPos = parentPos
 
 # Preprocessing helpers
 class PreprocessedToken:
-	__slots__ = ("text", "lemma_", "pos_", "tag_", "tokenId", "posWord", "posLemma")
-	def __init__(self, text, lemma, pos, tag, tokenId=None, posWord=None, posLemma=None):
+	__slots__ = ("text", "lemma_", "pos_", "tag_", "tokenId", "posWord", "posLemma", "parentTokenIndex") + (("subwordRole", "parentPos") if auxiliaryNeurons and auxiliaryNeuronsPOS else ())
+	def __init__(self, text, lemma, pos, tag, tokenId=None, posWord=None, posLemma=None, parentTokenIndex=None, subwordRole=None, parentPos=None):
 		self.text = text
 		self.lemma_ = lemma
 		self.pos_ = pos
@@ -109,10 +114,16 @@ class PreprocessedToken:
 		self.tokenId = tokenId
 		self.posWord = posWord
 		self.posLemma = posLemma
+		if(tokeniserSubword):
+			self.parentTokenIndex = parentTokenIndex
+			if(auxiliaryNeurons and auxiliaryNeuronsPOS):
+				self.subwordRole = subwordRole
+				self.parentPos = parentPos
 
 def convertPreprocessedTokenToSequenceToken(preprocessedToken):
 	posWord = None
 	posLemma = None
+	parentTokenIndex = None
 	if(tokeniserSubword and useDedicatedFeatureListsSubword):
 		word = preprocessedToken.text
 		lemma = preprocessedToken.lemma_
@@ -126,9 +137,13 @@ def convertPreprocessedTokenToSequenceToken(preprocessedToken):
 			posWord = preprocessedToken.posWord.lower()
 		if(preprocessedToken.posLemma is not None):
 			posLemma = preprocessedToken.posLemma.lower()
+		parentTokenIndex = preprocessedToken.parentTokenIndex
 	pos = preprocessedToken.pos_  #coarse Part-of-speech (e.g. PRON) 
 	tag = preprocessedToken.tag_	#fine-grained POS (e.g., PRP, PRP$, WP, WP$, etc.)
-	token = SequenceToken(word, lemma, pos, tag, preprocessedToken.tokenId, posWord, posLemma)
+	if(auxiliaryNeurons and auxiliaryNeuronsPOS):
+		token = SequenceToken(word, lemma, pos, tag, preprocessedToken.tokenId, posWord, posLemma, parentTokenIndex, preprocessedToken.subwordRole, preprocessedToken.parentPos)
+	else:
+		token = SequenceToken(word, lemma, pos, tag, preprocessedToken.tokenId, posWord, posLemma, parentTokenIndex)
 	return token
 
 def getTokens(sequence):
@@ -279,14 +294,39 @@ if(tokeniserSubword):
 				raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: subword byte span exceeds sequence byte length")
 			if(tokenBytes != sequenceBytes[subwordStartByte:subwordEndByte]):
 				raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: subword token bytes do not match sequence bytes")
-			parentToken = getTokeniserSubwordParentToken(parentTokenSpans, subwordStartByte, subwordEndByte)
+			parentToken, parentTokenIndex = getTokeniserSubwordParentToken(parentTokenSpans, subwordStartByte, subwordEndByte)
 			subwordText = decodeTokeniserSubwordTokenBytes(tokenBytes)
 			subwordPos, subwordTag = detectTokeniserSubwordPOS(parentToken, subwordText)
-			result.append(PreprocessedToken(subwordText, subwordText, subwordPos, subwordTag, tokenId, parentToken.text, parentToken.lemma_))
+			if(auxiliaryNeurons and auxiliaryNeuronsPOS):
+				result.append(PreprocessedToken(subwordText, subwordText, subwordPos, subwordTag, tokenId, parentToken.text, parentToken.lemma_, parentTokenIndex, parentPos=parentToken.pos_))
+			else:
+				result.append(PreprocessedToken(subwordText, subwordText, subwordPos, subwordTag, tokenId, parentToken.text, parentToken.lemma_, parentTokenIndex))
 			byteIndex = subwordEndByte
 		if(byteIndex != len(sequenceBytes)):
 			raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: subword token bytes do not cover sequence bytes")
+		if(auxiliaryNeurons and auxiliaryNeuronsPOS):
+			assignTokeniserSubwordRoles(result)
 		return result
+
+	if(auxiliaryNeurons and auxiliaryNeuronsPOS):
+
+		def assignTokeniserSubwordRoles(preprocessedTokens):
+			if(len(preprocessedTokens) == 0):
+				raise RuntimeError("assignTokeniserSubwordRoles error: preprocessedTokens must not be empty")
+			for tokenIndex, preprocessedToken in enumerate(preprocessedTokens):
+				if(preprocessedToken.parentTokenIndex is None):
+					raise RuntimeError("assignTokeniserSubwordRoles error: parentTokenIndex must not be None")
+				previousTokenHasSameParent = tokenIndex > 0 and preprocessedTokens[tokenIndex-1].parentTokenIndex == preprocessedToken.parentTokenIndex
+				nextTokenHasSameParent = tokenIndex+1 < len(preprocessedTokens) and preprocessedTokens[tokenIndex+1].parentTokenIndex == preprocessedToken.parentTokenIndex
+				if(not previousTokenHasSameParent and not nextTokenHasSameParent):
+					preprocessedToken.subwordRole = tokeniserSubwordRoleSingle
+				elif(not previousTokenHasSameParent and nextTokenHasSameParent):
+					preprocessedToken.subwordRole = tokeniserSubwordRoleBegin
+				elif(previousTokenHasSameParent and nextTokenHasSameParent):
+					preprocessedToken.subwordRole = tokeniserSubwordRoleMiddle
+				else:
+					preprocessedToken.subwordRole = tokeniserSubwordRoleEnd
+			return
 
 	def getTokeniserSubwordSequenceText(sequence):
 		result = None
@@ -303,7 +343,7 @@ if(tokeniserSubword):
 		result = []
 		charByteOffsets = createTokeniserSubwordCharacterByteOffsets(sequenceText)
 		currentCharIndex = 0
-		for token in sequence:
+		for parentTokenIndex, token in enumerate(sequence):
 			tokenText = token.text
 			if(not isinstance(tokenText, str)):
 				raise RuntimeError("createTokeniserSubwordParentTokenSpans error: parent token text must be a str")
@@ -315,7 +355,7 @@ if(tokeniserSubword):
 			tokenEndChar = tokenStartChar + len(tokenText)
 			tokenStartByte = charByteOffsets[tokenStartChar]
 			tokenEndByte = charByteOffsets[tokenEndChar]
-			result.append((tokenStartByte, tokenEndByte, token))
+			result.append((tokenStartByte, tokenEndByte, token, parentTokenIndex))
 			currentCharIndex = tokenEndChar
 		if(len(result) == 0):
 			raise RuntimeError("createTokeniserSubwordParentTokenSpans error: no parent token spans generated")
@@ -341,20 +381,20 @@ if(tokeniserSubword):
 			raise RuntimeError("getTokeniserSubwordParentToken error: invalid subword byte span")
 		if(len(parentTokenSpans) == 0):
 			raise RuntimeError("getTokeniserSubwordParentToken error: parentTokenSpans must not be empty")
-		for parentStartByte, parentEndByte, parentToken in parentTokenSpans:
+		for parentStartByte, parentEndByte, parentToken, parentTokenIndex in parentTokenSpans:
 			overlapStartByte = max(parentStartByte, subwordStartByte)
 			overlapEndByte = min(parentEndByte, subwordEndByte)
 			overlap = max(0, overlapEndByte - overlapStartByte)
 			if(overlap > bestOverlap):
 				bestOverlap = overlap
-				result = parentToken
+				result = (parentToken, parentTokenIndex)
 			if(nextToken is None and parentStartByte >= subwordEndByte):
-				nextToken = parentToken
+				nextToken = (parentToken, parentTokenIndex)
 		if(result is None):
 			if(nextToken is not None):
 				result = nextToken
 			else:
-				result = parentTokenSpans[-1][2]
+				result = (parentTokenSpans[-1][2], parentTokenSpans[-1][3])
 		return result
 
 	def encodeTokeniserSubwordText(text):

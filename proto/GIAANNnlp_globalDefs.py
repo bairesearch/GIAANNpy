@@ -55,8 +55,6 @@ from GIAANNcmn_globalDefs import trainVerifyConnectionNonexistentAcrossBranches
 from GIAANNcmn_globalDefs import useDefaultsV2
 
 
-
-
 #Dataset Type;
 if(useQuickExecution):
 	datasetType = "textfile"
@@ -76,6 +74,7 @@ elif(useDrawNetworkIndependently):
 elif(useTrainDuringInference):
 	datasetType = "oscar"	#"oscar" / "wikipedia" / "textfile" [experimental: "closedWorldGrounded1" / "closedWorldGrounded2" / "closedWorldGrounded3"]
 	useBenchmarkEvalDataSet = True	#default: True	#optional	#use an official eval dataset (prompt) - else user must provide a custom inference_prompt.txt
+
 
 #Multisentence predictions;
 sentencePredictions = True 	#default: True	orig: True
@@ -111,6 +110,7 @@ else:
 	tokensPerWord = 1.25 	#note approx avg 1.25 tiktokens per word, so 80*1.25 = 100 tokens (assuming o200k_base tokeniser with OSCAR-2201 en dataset)
 	targetContextLengthInTokens = 512	#emulate
 	maxSequenceLength = int(targetContextLengthInTokens/tokensPerWord)	#512/1.25=409	#measured in spacy word tokens, not subword tiktokens (even if tokeniserSubword is enabled)
+
 
 #Closed world grounded dataset constants;
 datasetTypeClosedWorldGrounded1 = "closedWorldGrounded1"
@@ -239,6 +239,17 @@ else:
 	tokeniserSubword = False	 #orig: False
 if(tokeniserSubword):
 	tokeniserSubwordPOS = True	#default: ?	#orig: False
+	tokeniserSubwordColumnIdentificationByFirstNounToken = True	#orig: True	#compatibility: identify a consecutive noun span by its first BPE noun token ID
+	tokeniserSubwordColumnIdentificationByConsecutiveNounTokens = False	#default: True	#identify a concept column by the complete consecutive noun-token surface span
+	tokeniserSubwordColumnIdentificationByLemma = False	#identify a concept column by the normalized spaCy parent-lemma span
+	tokeniserSubwordColumnIdentificationEnabledCount = int(tokeniserSubwordColumnIdentificationByFirstNounToken) + int(tokeniserSubwordColumnIdentificationByConsecutiveNounTokens) + int(tokeniserSubwordColumnIdentificationByLemma)
+	if(tokeniserSubwordColumnIdentificationEnabledCount != 1):
+		raise RuntimeError("GIAANNnlp_globalDefs error: exactly one tokeniserSubword column identification option must be True")
+	tokeniserSubwordConsecutiveNounTokensJoinDelimiter = ""
+	tokeniserSubwordLemmaJoinDelimiter = "_"
+	tokeniserSubwordColumnIdentificationByFirstNounTokensBenchmarkAblationSuffix = "-tokeniserSubwordColumnIdentificationByFirstNounTokens"
+	tokeniserSubwordColumnIdentificationByConsecutiveNounTokensBenchmarkAblationSuffix = "-tokeniserSubwordColumnIdentificationByConsecutiveNounTokens"
+	tokeniserSubwordColumnIdentificationByLemmaBenchmarkAblationSuffix = "-tokeniserSubwordColumnIdentificationByLemma"
 
 	maxTokensPerWord = 2.0 	#note approx avg 1.25 tiktokens per word, so 80*1.25 = 100 tokens (assuming o200k_base tokeniser with OSCAR-2201 en dataset)
 	maxSequenceLengthTokens = int(maxSequenceLength*maxTokensPerWord)
@@ -265,6 +276,9 @@ if(tokeniserSubword):
 	tokeniserSubwordTagSpace = "_SP"
 else:
 	tokeniserSubwordPOS = False
+	tokeniserSubwordColumnIdentificationByFirstNounToken = False
+	tokeniserSubwordColumnIdentificationByConsecutiveNounTokens = False
+	tokeniserSubwordColumnIdentificationByLemma = False
 	
 
 #Concept column delimiters:
@@ -454,7 +468,7 @@ useDedicatedConceptsLists = False	#derived var
 useDedicatedConceptListsSubword = False	#derived var
 if(tokeniserSubword):
 	useDedicatedFeatureListsSubword = True	#default: True	#orig: False
-	useDedicatedConceptListsSubword = True	#default: True	#orig: False
+	useDedicatedConceptListsSubword = tokeniserSubwordColumnIdentificationByFirstNounToken	#fixed tokenizer concept indices are compatible only with first-noun-token identification
 	if(useDedicatedFeatureListsSubword):
 		useDedicatedFeatureLists = True
 		useDedicatedFeatureListsSubwordBenchmarkAblationSuffix = "-useDedicatedFeatureListsSubword"
@@ -591,9 +605,48 @@ if(inferenceReportGroundedAccuracy):
 #Auxiliary neurons;
 auxiliaryNeurons=False	#default: False	#orig: False
 if(auxiliaryNeurons):
+	auxiliaryNeuronsPOS = False	#default: False	#deterministic parent-lemma/POS/subword-role auxiliary source features
 	auxiliaryNeuronsAuto = True	#default: True	#orig: False
-	trainReverseConnections = True
-	if(auxiliaryNeuronsAuto):
+	assert auxiliaryNeuronsPOS or auxiliaryNeuronsAuto
+	if(auxiliaryNeuronsPOS):
+		trainReverseConnections = False
+		auxiliaryNeuronsPOSlemma = True
+		auxiliaryNeuronsPOSpartOfSpeech = False
+		auxiliaryNeuronsPOSsubwordRole = False
+		auxiliaryNeuronsPOSFeatureTypeEnabledCount = int(auxiliaryNeuronsPOSlemma) + int(auxiliaryNeuronsPOSpartOfSpeech) + int(auxiliaryNeuronsPOSsubwordRole)
+		if(auxiliaryNeuronsPOSFeatureTypeEnabledCount == 0):
+			raise RuntimeError("GIAANNnlp_globalDefs error: auxiliaryNeuronsPOS requires at least one auxiliary feature type")
+		auxiliaryNeuronsPOSFeatureNamePrefixLemma = "POSL"
+		auxiliaryNeuronsPOSFeatureNamePrefixPartOfSpeech = "POSP"
+		auxiliaryNeuronsPOSFeatureNamePrefixSubwordRole = "POSR"
+		auxiliaryNeuronsPOSParentFeatureIndexPrefix = "f"
+		auxiliaryNeuronsPOSLemmaActivationWeight = 0.25
+		auxiliaryNeuronsPOSPartOfSpeechActivationWeight = 0.05
+		auxiliaryNeuronsPOSSubwordRoleActivationWeight = 0.01
+		auxiliaryNeuronsPOSRegistrationThreshold = 0.0
+		auxiliaryNeuronsPOSActivationWeightMinimum = 0.0
+		auxiliaryNeuronsPOSActivationWeightMaximum = 1.0
+		auxiliaryNeuronsPOSActivationWeights = [auxiliaryNeuronsPOSLemmaActivationWeight, auxiliaryNeuronsPOSPartOfSpeechActivationWeight, auxiliaryNeuronsPOSSubwordRoleActivationWeight]
+		for auxiliaryNeuronsPOSActivationWeightValue in auxiliaryNeuronsPOSActivationWeights:
+			if(not isinstance(auxiliaryNeuronsPOSActivationWeightValue, (int, float)) or isinstance(auxiliaryNeuronsPOSActivationWeightValue, bool) or not math.isfinite(auxiliaryNeuronsPOSActivationWeightValue) or auxiliaryNeuronsPOSActivationWeightValue <= auxiliaryNeuronsPOSActivationWeightMinimum or auxiliaryNeuronsPOSActivationWeightValue > auxiliaryNeuronsPOSActivationWeightMaximum):
+				raise RuntimeError("GIAANNnlp_globalDefs error: auxiliaryNeuronsPOS activation weights must be finite numbers in (0, 1]")
+		if(not isinstance(auxiliaryNeuronsPOSRegistrationThreshold, (int, float)) or isinstance(auxiliaryNeuronsPOSRegistrationThreshold, bool) or not math.isfinite(auxiliaryNeuronsPOSRegistrationThreshold) or auxiliaryNeuronsPOSRegistrationThreshold < auxiliaryNeuronsPOSActivationWeightMinimum or auxiliaryNeuronsPOSRegistrationThreshold > auxiliaryNeuronsPOSActivationWeightMaximum):
+			raise RuntimeError("GIAANNnlp_globalDefs error: auxiliaryNeuronsPOSRegistrationThreshold must be a finite number in [0, 1]")
+		tokeniserSubwordRoleSingle = "single"
+		tokeniserSubwordRoleBegin = "begin"
+		tokeniserSubwordRoleMiddle = "middle"
+		tokeniserSubwordRoleEnd = "end"
+		auxiliaryNeuronsPOSCompletedSubwordRoleList = [tokeniserSubwordRoleSingle] if tokeniserSubword else []
+		auxiliaryNeuronsSimilarWordsAuto = False
+		auxiliaryNeuronsSimilarWordsPrimeConceptFeatures = False
+		auxiliaryNeuronsSimilarWordsSecondaryConceptFeatures = False
+		auxiliaryNeuronsSimilarSubwordAuto = False
+		auxiliaryNeuronsSimilarSubwordPrimeConceptFeatures = False
+		auxiliaryNeuronsSimilarSubwordSecondaryConceptFeatures = False
+		auxiliaryNeuronsAutoInference = False
+		auxiliaryNeuronsSimilar = True
+	elif(auxiliaryNeuronsAuto):
+		trainReverseConnections = True
 		'''
 		note current auxiliaryNeuronsSimilarWords implementation is computationally efficient but not biologically feasible as it relies on the existence of reverse connections
 			CONSIDER adding option auxiliaryNeuronsSimilarWordsCofire:
@@ -661,6 +714,8 @@ if(auxiliaryNeurons):
 		auxiliaryNeuronsAutoFeatureDatasetSimilarityFormat = "{:.6f}"
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilarWordsAuto):
 			auxiliaryNeuronsSimilarWordsThreshold = auxiliaryNeuronsSimilarWordsAutoThreshold
+		elif(auxiliaryNeuronsPOS):
+			auxiliaryNeuronsSimilarWordsThreshold = auxiliaryNeuronsPOSRegistrationThreshold
 		auxiliaryNeuronsSimilarWordsFeaturesDictFileName = "auxiliarySimilarFeaturesDict.pkl"
 		auxiliaryNeuronsSimilarWordsFeatureWordWeightsByParentWordFileName = "auxiliarySimilarFeatureWordWeightsByParentWord.pkl"
 		auxiliaryNeuronsSimilarWordsConnectionsFolderName = "auxiliarySimilarFeatureConnections"
@@ -680,15 +735,24 @@ if(useBenchmark):
 		benchmarkAblationText = "-inferenceReportGroundedAccuracy"
 	elif(not sentencePredictions):
 		benchmarkAblationText = "-sentencePredictionsFalse"
-	elif(useDefaultsV2):	
-		benchmarkAblationText = "-useDefaultsV2"
-		if(multipleDendriticBranchesRandom):
-			benchmarkAblationText += "-multipleDendriticBranchesRandom" + str(multipleDendriticBranchesNumber)
+	elif(auxiliaryNeurons):
+		if(auxiliaryNeuronsPOS):
+			benchmarkAblationText = "-auxiliaryNeuronsPOS"
+		elif(auxiliaryNeuronsAuto):
+			benchmarkAblationText = "-auxiliaryNeuronsAuto"
 	elif(tokeniserSubword):
-		if(tokeniserSubwordPOS):
-			benchmarkAblationText = "-tokeniserSubwordPOS"
-		else:
-			benchmarkAblationText = "-tokeniserSubword"
+		benchmarkAblationText = ""
+		if(not useDefaultsV2):
+			if(tokeniserSubwordPOS):
+				benchmarkAblationText = "-tokeniserSubwordPOS"
+			else:
+				benchmarkAblationText = "-tokeniserSubword"
+		if(tokeniserSubwordColumnIdentificationByFirstNounToken):
+			benchmarkAblationText += tokeniserSubwordColumnIdentificationByFirstNounTokensBenchmarkAblationSuffix
+		if(tokeniserSubwordColumnIdentificationByConsecutiveNounTokens):
+			benchmarkAblationText += tokeniserSubwordColumnIdentificationByConsecutiveNounTokensBenchmarkAblationSuffix
+		elif(tokeniserSubwordColumnIdentificationByLemma):
+			benchmarkAblationText += tokeniserSubwordColumnIdentificationByLemmaBenchmarkAblationSuffix
 		''' implied true;
 		if(useDedicatedFeatureListsSubword):
 			benchmarkAblationText += useDedicatedFeatureListsSubwordBenchmarkAblationSuffix
@@ -697,8 +761,6 @@ if(useBenchmark):
 		'''
 		if(multisentencePredictions):
 			benchmarkAblationText += "-multisentencePredictions"
-	elif(auxiliaryNeurons):
-		benchmarkAblationText = "-auxiliaryNeurons"
 	elif(useTrainDuringInference):
 		benchmarkAblationText = "-useTrainDuringInference"
 	elif(trainVerifyConnectionNonexistentAcrossBranches):
@@ -725,7 +787,10 @@ if(useBenchmark):
 		benchmarkAblationText = "-spacyPipelineOptimisations"
 	else:
 		benchmarkAblationText = ""
-	
+
+	if(useDefaultsV2):
+		benchmarkAblationText = "-useDefaultsV2" + benchmarkAblationText
+
 	if(datasetType=="wikipedia"):
 		databaseTypeText = ""	#or Wikipedia
 	elif(datasetType=="oscar"):

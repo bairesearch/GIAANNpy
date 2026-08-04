@@ -559,7 +559,13 @@ MANUAL; - extract option useDefaultsV2.
 - implement maxSequenceLengthTokens enforcement (by default skip the sequence if the check fails).
 - when sequencesCropToMaxLength=True, crop to the token limit (only implement this option if it is safe; ie spacy pos values can still be assigned to the cropped subword tiktokens). Otherwise (sequencesCropToMaxLength==False) skip the sequence.
 - implement option tokenisationEnforcePrecharacterByteLimit.
-- update paper
+MANUAL; - update paper
 - patchMultipleDendriticBranchesBurstActivationBranch - fix forced dendritic bursts to activate the neurons most-active branch and prevent residual branch-zero activation after deactivation.
 - patchMultipleDendriticBranchesSourceActivationBoolean - fix Boolean dendritic source activation by collapsing branches before converting the fired neuron signal to zero or one.
 - patchMultipleDendriticBranchesOverflowBranch - fix random dendritic branch overflow by saturating at the final shuffled branch to preserve forward and reverse occurrence mapping.
+- add trainConnectionStrengthProximityScale - connection-strength contribution at zero distance
+- add trainConnectionStrengthProximityExponent - 0.0: uniform, 0.5: gentle decay, 1.0: inverse distance, 2.0: inverse-square distance
+- extract option tokeniserSubwordColumnIdentificationByFirstNounToken - compatibility: identify a consecutive noun span by its first BPE noun token ID
+- add option tokeniserSubwordColumnIdentificationByConsecutiveNounTokens - identify a concept column by the complete consecutive noun-token surface span
+- add option tokeniserSubwordColumnIdentificationByLemma -= identify a concept column by the normalized spaCy parent-lemma span
+- add option auxiliaryNeuronsPOS - deterministic parent-lemma/POS/subword-role auxiliary source features
