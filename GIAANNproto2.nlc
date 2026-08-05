@@ -569,3 +569,6 @@ MANUAL; - update paper
 - add option tokeniserSubwordColumnIdentificationByConsecutiveNounTokens - identify a concept column by the complete consecutive noun-token surface span
 - add option tokeniserSubwordColumnIdentificationByLemma -= identify a concept column by the normalized spaCy parent-lemma span
 - add option auxiliaryNeuronsPOS - deterministic parent-lemma/POS/subword-role auxiliary source features
+- set useBenchmarkDefaultsEvalTestSetOptim=False
+- move useDefaultsV2:inferenceActivationFunction=False/inferenceConnectionsStrengthBoolean=False settings to useBenchmarkDefaultsEvalTestSetOptim
+

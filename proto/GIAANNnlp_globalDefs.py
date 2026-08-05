@@ -53,7 +53,7 @@ from GIAANNcmn_globalDefs import useTrainDuringInference
 from GIAANNcmn_globalDefs import multipleDendriticBranchesBinaryTree
 from GIAANNcmn_globalDefs import trainVerifyConnectionNonexistentAcrossBranches
 from GIAANNcmn_globalDefs import useDefaultsV2
-
+from GIAANNcmn_globalDefs import useBenchmarkDefaultsEvalTestSetOptim
 
 #Dataset Type;
 if(useQuickExecution):
@@ -790,7 +790,9 @@ if(useBenchmark):
 
 	if(useDefaultsV2):
 		benchmarkAblationText = "-useDefaultsV2" + benchmarkAblationText
-
+		if(not useBenchmarkDefaultsEvalTestSetOptim):
+			benchmarkAblationText = "-useBenchmarkDefaultsEvalTestSetOptimFalse"
+		
 	if(datasetType=="wikipedia"):
 		databaseTypeText = ""	#or Wikipedia
 	elif(datasetType=="oscar"):

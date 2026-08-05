@@ -54,7 +54,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "trainAndInference"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -95,7 +95,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = True	#default: False/True
+	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
@@ -109,10 +109,10 @@ elif(useTrainDuringInference):
 
 if(useDefaultsV2):
 	inferenceEvaluateTestSetTrainMaxSequences10M = True		#version 2 of eval datasets (1000 sequences) that supports much larger train datasets (10M sequences)	#required if performing test-set eval on database trained with > 3M sequences (based on how the original test-set was generated)
-	useBenchmarkDefaultsEvalTestSetOptim = True	
+	useBenchmarkDefaultsEvalTestSetOptim = False	#default: False	#higher test-set eval accuracy, but less robustness to hallucination
 else:
 	inferenceEvaluateTestSetTrainMaxSequences10M = False
-	useBenchmarkDefaultsEvalTestSetOptim = False
+	useBenchmarkDefaultsEvalTestSetOptim = False	#default: False
 
 switchTrainTestSetInferenceSettings = False	#default: False
 if(useBenchmarkDefaultsEvalTestSet):
@@ -120,12 +120,16 @@ if(useBenchmarkDefaultsEvalTestSet):
 else:
 	inferenceEvaluateTestSet = False
 if(useBenchmarkDefaultsEvalTestSet ^ switchTrainTestSetInferenceSettings): #if((useBenchmarkDefaultsEvalTestSet and not switchTrainTestSetInferenceSettings) or (not useBenchmarkDefaultsEvalTestSet and switchTrainTestSetInferenceSettings)):
-	if(useBenchmarkDefaultsEvalTestSetOptim):
+	if(useDefaultsV2):
 		inferenceSegmentTiming = "biased"	#default: biased	#orig: none	#none, biased, exact, seq
-		inferenceActivationsType = "intf+c"	#default: intf+c #orig: boolf	#boolf, boolf+c, intf+c
+		inferenceActivationsType = "intf+c"		#default: intf+c #orig: boolf	#boolf, boolf+c, intf+c
 	else:
-		inferenceSegmentTiming = "biased"	#default: biased	#none, biased, exact, seq
-		inferenceActivationsType = "boolf"		#default: boolf	#boolf, boolf+c, intf+c
+		if(useBenchmarkDefaultsEvalTestSetOptim):
+			inferenceSegmentTiming = "none"
+			inferenceActivationsType = "intf+c"
+		else:
+			inferenceSegmentTiming = "biased"	#default: biased	#none, biased, exact, seq
+			inferenceActivationsType = "boolf"		#default: boolf	#boolf, boolf+c, intf+c
 else:
 	inferenceSegmentTiming = "exact"	#default: exact	#none, biased, exact, seq
 	inferenceActivationsType = "boolf"	#default: boolf	#boolf, boolf+c, intf+c
@@ -401,7 +405,7 @@ if(useInference):
 
 #Inference activations;
 if(useInference):
-	if(useDefaultsV2):
+	if(useBenchmarkDefaultsEvalTestSetOptim):
 		inferenceActivationFunction = False	#default:False	
 	else:
 		inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
@@ -1068,6 +1072,11 @@ if(printConfiguration):
 	#print("useDefault:", useDefault)
 	print("executionMode:", executionMode)
 	print("inferenceTrainFirstSequences:", inferenceTrainFirstSequences)
+	print("")
+	print("#Version settings;")
+	print("useDefaultsV2:", useDefaultsV2)
+	print("inferenceEvaluateTestSetTrainMaxSequences10M:", inferenceEvaluateTestSetTrainMaxSequences10M)
+	print("useBenchmarkDefaultsEvalTestSetOptim:", useBenchmarkDefaultsEvalTestSetOptim)
 	print("")
 	print("#Primary Draw settings;")
 	print("drawNetworkDuringTrain:", drawNetworkDuringTrain)
