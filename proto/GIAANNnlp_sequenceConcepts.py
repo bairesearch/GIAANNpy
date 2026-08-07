@@ -831,8 +831,12 @@ def calculateFeatureBinaryTreeBranchIndices(branchIndex, segmentIndices):
 			raise RuntimeError("calculateFeatureBinaryTreeBranchIndices error: segmentIndices must be a rank 1 tensor")
 		if(segmentIndices.numel() > 0 and (bool(pt.any(segmentIndices < arrayIndexSegmentFirst).item()) or bool(pt.any(segmentIndices >= arrayNumberOfSegments).item()))):
 			raise RuntimeError("calculateFeatureBinaryTreeBranchIndices error: segmentIndices out of range")
-		if(multipleDendriticBranchesBinaryTreeDepth != arrayNumberOfSegments):
-			raise RuntimeError("calculateFeatureBinaryTreeBranchIndices error: binary tree depth must equal arrayNumberOfSegments")
+		if(inferenceLeakyIntegrateAndFire):
+			if(multipleDendriticBranchesBinaryTreeDepth != arrayIndexSegmentSoma):
+				raise RuntimeError("calculateFeatureBinaryTreeBranchIndices error: binary tree depth must equal the number of dendritic segments")
+		else:
+			if(multipleDendriticBranchesBinaryTreeDepth != arrayNumberOfSegments):
+				raise RuntimeError("calculateFeatureBinaryTreeBranchIndices error: binary tree depth must equal arrayNumberOfSegments")
 		branchIndices = pt.full_like(segmentIndices, branchIndex)
 		branchingFactors = pt.full_like(segmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor)
 		branchDivisors = pt.pow(branchingFactors, segmentIndices)
@@ -852,8 +856,12 @@ def selectFeatureBinaryTreeBranchIndexFromInference(databaseNetworkObject, conce
 			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromInference error: conceptIndexKey and featureIndex must be ints")
 		if(not isinstance(defaultBranchIndex, int) or isinstance(defaultBranchIndex, bool) or defaultBranchIndex < arrayIndexSegmentFirst or defaultBranchIndex >= multipleDendriticBranchesNumber):
 			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromInference error: defaultBranchIndex out of range")
-		if(multipleDendriticBranchesBinaryTreeDepth != arrayNumberOfSegments):
-			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromInference error: binary tree depth must equal arrayNumberOfSegments")
+		if(inferenceLeakyIntegrateAndFire):
+			if(multipleDendriticBranchesBinaryTreeDepth != arrayIndexSegmentSoma):
+				raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromInference error: binary tree depth must equal the number of dendritic segments")
+		else:
+			if(multipleDendriticBranchesBinaryTreeDepth != arrayNumberOfSegments):
+				raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromInference error: binary tree depth must equal arrayNumberOfSegments")
 		inferenceActivation = getattr(databaseNetworkObject, "multipleDendriticBranchesBinaryTreeInferenceActivation", None)
 		if(inferenceActivation is None):
 			raise RuntimeError("selectFeatureBinaryTreeBranchIndexFromInference error: inference activation is unavailable")
@@ -871,8 +879,11 @@ def selectFeatureBinaryTreeBranchIndexFromInference(databaseNetworkObject, conce
 				branchActivation.index_put_((inferenceActivationIndices[0, inferenceActivationMask], inferenceActivationIndices[1, inferenceActivationMask]), inferenceActivationValues[inferenceActivationMask], accumulate=True)
 		else:
 			branchActivation = inferenceActivation[:, :, conceptIndexKey, featureIndex]
+		branchPathNumberOfSegments = arrayNumberOfSegments
+		if(inferenceLeakyIntegrateAndFire):
+			branchPathNumberOfSegments = arrayIndexSegmentSoma
 		rootBranchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=branchActivation.device).unsqueeze(1)
-		segmentIndices = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=branchActivation.device).unsqueeze(0)
+		segmentIndices = pt.arange(branchPathNumberOfSegments, dtype=pt.long, device=branchActivation.device).unsqueeze(0)
 		branchingFactors = pt.full_like(segmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor)
 		branchDivisors = pt.pow(branchingFactors, segmentIndices)
 		pathBranchIndices = pt.div(rootBranchIndices, branchDivisors, rounding_mode="floor")
@@ -882,7 +893,7 @@ def selectFeatureBinaryTreeBranchIndexFromInference(databaseNetworkObject, conce
 		numberOfContiguouslyActiveFinalSegments = contiguouslyActiveFinalPath.sum(dim=1)
 		maximumNumberOfContiguouslyActiveFinalSegments = int(numberOfContiguouslyActiveFinalSegments.max().item())
 		if(maximumNumberOfContiguouslyActiveFinalSegments > arrayIndexSegmentFirst):
-			firstContiguouslyActiveFinalSegmentIndex = arrayNumberOfSegments - maximumNumberOfContiguouslyActiveFinalSegments
+			firstContiguouslyActiveFinalSegmentIndex = branchPathNumberOfSegments - maximumNumberOfContiguouslyActiveFinalSegments
 			mostCompleteRootBranches = pt.nonzero(numberOfContiguouslyActiveFinalSegments == maximumNumberOfContiguouslyActiveFinalSegments, as_tuple=False).view(-1)
 			firstContiguouslyActiveFinalSegmentBranchDivisor = multipleDendriticBranchesBinaryTreeBranchingFactor**firstContiguouslyActiveFinalSegmentIndex
 			mostCompleteBranchIndices = pt.div(mostCompleteRootBranches, firstContiguouslyActiveFinalSegmentBranchDivisor, rounding_mode="floor")

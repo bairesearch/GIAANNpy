@@ -1020,6 +1020,8 @@ def assignFeatureConnectionsToTargetSegmentsSparse(branchIndices, sourceConceptI
 			relativeDistanceFeature = pt.clamp(relativeDistance, min=1, max=arrayNumberOfSegmentsFeatureDistance)
 			featureSegmentIndex = featureSegmentsOffset + arrayNumberOfSegmentsFeatureDistance - relativeDistanceFeature
 			featureSegmentIndex = featureSegmentIndex.clamp(min=featureSegmentsOffset, max=arrayNumberOfSegments-1).long()
+			if(inferenceLeakyIntegrateAndFire):
+				featureSegmentIndex = pt.where(featureSegmentIndex == arrayIndexSegmentLast, pt.full_like(featureSegmentIndex, arrayIndexSegmentSoma), featureSegmentIndex+1)
 			indicesList.append(pt.stack((branchIndices, featureSegmentIndex, sourceConceptIndices, sourceFeatureIndices, targetConceptIndices, targetFeatureIndices), dim=0))
 		else:
 			relativeDistanceFeature = pt.clamp(relativeDistance, min=1)
@@ -1027,6 +1029,8 @@ def assignFeatureConnectionsToTargetSegmentsSparse(branchIndices, sourceConceptI
 			if(validFeatureDistanceMask.any()):
 				featureSegmentIndex = featureSegmentsOffset + arrayNumberOfSegmentsFeatureDistance - relativeDistanceFeature
 				featureSegmentIndex = featureSegmentIndex.clamp(min=featureSegmentsOffset, max=arrayNumberOfSegments-1).long()
+				if(inferenceLeakyIntegrateAndFire):
+					featureSegmentIndex = pt.where(featureSegmentIndex == arrayIndexSegmentLast, pt.full_like(featureSegmentIndex, arrayIndexSegmentSoma), featureSegmentIndex+1)
 				indicesList.append(pt.stack((branchIndices[validFeatureDistanceMask], featureSegmentIndex[validFeatureDistanceMask], sourceConceptIndices[validFeatureDistanceMask], sourceFeatureIndices[validFeatureDistanceMask], targetConceptIndices[validFeatureDistanceMask], targetFeatureIndices[validFeatureDistanceMask]), dim=0))
 		if(arrayNumberOfSegmentsColumnDistance > 0):
 			conceptDistances = pt.abs(targetConceptIndices - sourceConceptIndices)
@@ -1045,6 +1049,8 @@ def assignFeatureConnectionsToTargetSegmentsSparse(branchIndices, sourceConceptI
 				else:
 					validColumnMask = pt.logical_and(conceptDistances > 0, conceptDistances <= arrayNumberOfSegmentsColumnDistance)
 				columnSegmentIndex = columnSegmentIndex.clamp(min=0, max=arrayNumberOfSegmentsColumnDistance-1).long()
+			if(inferenceLeakyIntegrateAndFire):
+				columnSegmentIndex = pt.where(columnSegmentIndex == arrayIndexSegmentInternalColumn, pt.full_like(columnSegmentIndex, arrayIndexSegmentSoma), columnSegmentIndex+1)
 			if(validColumnMask.any()):
 				indicesList.append(pt.stack((branchIndices[validColumnMask], columnSegmentIndex[validColumnMask], sourceConceptIndices[validColumnMask], sourceFeatureIndices[validColumnMask], targetConceptIndices[validColumnMask], targetFeatureIndices[validColumnMask]), dim=0))
 	else:
@@ -1240,6 +1246,8 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 			featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
 			featureSegmentIndex = featureSegmentsOffset + arrayNumberOfSegmentsFeatureDistance - relativeDistance
 			featureSegmentIndex = featureSegmentIndex.clamp(min=featureSegmentsOffset, max=arrayNumberOfSegments-1).long()
+			if(inferenceLeakyIntegrateAndFire):
+				featureSegmentIndex = pt.where(featureSegmentIndex == arrayIndexSegmentLast, pt.full_like(featureSegmentIndex, arrayIndexSegmentSoma), featureSegmentIndex+1)
 			featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
 			featureConnectionsSegmentMask.scatter_(0, featureSegmentIndex.unsqueeze(0), True)
 		else:
@@ -1248,6 +1256,8 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 			featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
 			featureSegmentIndex = featureSegmentsOffset + arrayNumberOfSegmentsFeatureDistance - relativeDistance
 			featureSegmentIndex = featureSegmentIndex.clamp(min=featureSegmentsOffset, max=arrayNumberOfSegments-1).long()
+			if(inferenceLeakyIntegrateAndFire):
+				featureSegmentIndex = pt.where(featureSegmentIndex == arrayIndexSegmentLast, pt.full_like(featureSegmentIndex, arrayIndexSegmentSoma), featureSegmentIndex+1)
 			featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
 			featureConnectionsSegmentMask.scatter_(0, featureSegmentIndex.unsqueeze(0), True)
 			featureConnectionsSegmentMask = featureConnectionsSegmentMask & validDistanceMask.unsqueeze(0)
@@ -1271,6 +1281,8 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 				else:
 					validColumnMask = pt.logical_and(conceptNeuronsDistances > 0, conceptNeuronsDistances <= arrayNumberOfSegmentsColumnDistance)
 				columnSegmentIndex = columnSegmentIndex.clamp(min=0, max=arrayNumberOfSegmentsColumnDistance-1).long()
+			if(inferenceLeakyIntegrateAndFire):
+				columnSegmentIndex = pt.where(columnSegmentIndex == arrayIndexSegmentInternalColumn, pt.full_like(columnSegmentIndex, arrayIndexSegmentSoma), columnSegmentIndex+1)
 			columnSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
 			columnSegmentMask.scatter_(0, columnSegmentIndex.unsqueeze(0), True)
 			if(SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens and not useSANIfeaturesAndColumnsInternal):
@@ -1337,6 +1349,8 @@ def calculateFeatureConnectionsBinaryTreeValidSegmentBranchMask(featureConnectio
 		segmentIndices = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=featureConnectionsTensor.device).view(1, arrayNumberOfSegments, 1, 1, 1, 1)
 		branchDivisors = pt.pow(pt.full_like(segmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor), segmentIndices)
 		validBranchCounts = multipleDendriticBranchesNumber//branchDivisors
+		if(inferenceLeakyIntegrateAndFire):
+			validBranchCounts = pt.where(segmentIndices == arrayIndexSegmentSoma, pt.ones_like(validBranchCounts), validBranchCounts)
 		result = (branchIndices < validBranchCounts).expand_as(featureConnectionsTensor)
 	else:
 		raise RuntimeError("calculateFeatureConnectionsBinaryTreeValidSegmentBranchMask error: requires multipleDendriticBranchesBinaryTree")

@@ -572,3 +572,30 @@ MANUAL; - update paper
 - set useBenchmarkDefaultsEvalTestSetOptim=False
 - move useDefaultsV2:inferenceActivationFunction=False/inferenceConnectionsStrengthBoolean=False settings to useBenchmarkDefaultsEvalTestSetOptim
 
+---
+v2l (Codex IDE GPT-5.6):
+- add proto GIAANNproto2l1a - start option inferenceLeakyIntegrateAndFire:
+	- leaky integrate and fire code replaces all current segment activation storage/propagation code (which was designed to short-cut dendritic flow calculations):
+		- inferenceUseNeuronFeaturePropertiesTime, inferenceUseNeuronFeaturePropertiesTimeExact, inferenceSegmentTiming, inferenceActivationsType [CHECKTHIS Codex: I think activations should never be bool with inferenceLeakyIntegrateAndFire so this variable is redundant].
+	- leaky integrate and fire code calculates neuron activations by calculating the activation level of each segment at time t during its propagation to the soma.
+	- store the soma activation level in the final segment index (arrayIndexSegmentSoma) of the neuron array.
+	- The soma fires if it reaches a certain activation level.
+	- soma activations decay over time (for each iteration) - inferenceDecrementActivationsSomaPerPredictedToken:
+		- it also supports non-linear decay - inferenceDecrementActivationsSomaNonlinear
+		- the decay implementation can use similar code to non-inferenceLeakyIntegrateAndFire:inferenceDecrementActivations
+	- soma activations deactivate upon action potential if inferenceDeactivateNeuronsUponPrediction=True
+	Algorithm Notes:
+		- for every iteration update global neuron array:
+			- segment activations get moved (added) to next segment.
+				- this simulates propagation (flow) of dendritic signals.
+				- ensure to support all dendritic branch implementation variations: multipleDendriticBranches, multipleDendriticBranchesBinaryTree, etc
+			- new segment activations added (calculate connections signal from last firing neuron).
+				- this is already implemented in the inferenceLeakyIntegrateAndFire=False code.
+			- soma (segment X) activation decay - inferenceDecrementActivationsSomaPerPredictedToken
+				support option non-linear decay 
+			- apply soma activation function to current soma activation level; required for a neuron (soma) to fire - inferenceLeakyIntegrateAndFireSomaActivationThreshold
+				- apply this as an additional filtering criteria before top-1 selection of neuron candidates is made. 
+	Implementation Notes:
+		- do not change any existing code in the codebase unrelated to specific inferenceLeakyIntegrateAndFire==True behaviour.
+		- ensure to encapsulate all inferenceLeakyIntegrateAndFire==True specific behaviour within context if(inferenceLeakyIntegrateAndFire) as per AGENTS.md.
+

@@ -54,6 +54,7 @@ from GIAANNcmn_globalDefs import multipleDendriticBranchesBinaryTree
 from GIAANNcmn_globalDefs import trainVerifyConnectionNonexistentAcrossBranches
 from GIAANNcmn_globalDefs import useDefaultsV2
 from GIAANNcmn_globalDefs import useBenchmarkDefaultsEvalTestSetOptim
+from GIAANNcmn_globalDefs import inferenceLeakyIntegrateAndFire
 
 #Dataset Type;
 if(useQuickExecution):
@@ -731,7 +732,10 @@ else:
 if(useBenchmark):
 	#generate benchmark filename:
 	#v2 benchmarks;
-	if(inferenceReportGroundedAccuracy):
+	
+	if(inferenceLeakyIntegrateAndFire):
+		benchmarkAblationText = "-inferenceLeakyIntegrateAndFire"	
+	elif(inferenceReportGroundedAccuracy):
 		benchmarkAblationText = "-inferenceReportGroundedAccuracy"
 	elif(not sentencePredictions):
 		benchmarkAblationText = "-sentencePredictionsFalse"
@@ -747,8 +751,8 @@ if(useBenchmark):
 				benchmarkAblationText = "-tokeniserSubwordPOS"
 			else:
 				benchmarkAblationText = "-tokeniserSubword"
-		if(tokeniserSubwordColumnIdentificationByFirstNounToken):
-			benchmarkAblationText += tokeniserSubwordColumnIdentificationByFirstNounTokensBenchmarkAblationSuffix
+		#if(tokeniserSubwordColumnIdentificationByFirstNounToken):
+		#	benchmarkAblationText += tokeniserSubwordColumnIdentificationByFirstNounTokensBenchmarkAblationSuffix
 		if(tokeniserSubwordColumnIdentificationByConsecutiveNounTokens):
 			benchmarkAblationText += tokeniserSubwordColumnIdentificationByConsecutiveNounTokensBenchmarkAblationSuffix
 		elif(tokeniserSubwordColumnIdentificationByLemma):
@@ -759,8 +763,8 @@ if(useBenchmark):
 		if(useDedicatedConceptListsSubword):
 			benchmarkAblationText += useDedicatedConceptListsSubwordBenchmarkAblationSuffix
 		'''
-		if(multisentencePredictions):
-			benchmarkAblationText += "-multisentencePredictions"
+		#if(multisentencePredictions):
+		#	benchmarkAblationText += "-multisentencePredictions"
 	elif(useTrainDuringInference):
 		benchmarkAblationText = "-useTrainDuringInference"
 	elif(trainVerifyConnectionNonexistentAcrossBranches):
@@ -790,8 +794,6 @@ if(useBenchmark):
 
 	if(useDefaultsV2):
 		benchmarkAblationText = "-useDefaultsV2" + benchmarkAblationText
-		if(not useBenchmarkDefaultsEvalTestSetOptim):
-			benchmarkAblationText = "-useBenchmarkDefaultsEvalTestSetOptimFalse"
 		
 	if(datasetType=="wikipedia"):
 		databaseTypeText = ""	#or Wikipedia
@@ -814,6 +816,8 @@ elif(datasetType in closedWorldGroundedDatasetTypes):
 		databaseFolderExtension += closedWorldGroundedStrongerGroundedNLPmetricName
 else:
 	databaseFolderExtension = ""
+if(inferenceLeakyIntegrateAndFire and not useBenchmark):
+	databaseFolderExtension += "-inferenceLeakyIntegrateAndFire"
 	
 
 #Debug vars;

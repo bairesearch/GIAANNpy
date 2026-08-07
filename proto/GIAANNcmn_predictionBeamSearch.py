@@ -74,7 +74,9 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 				newSequence = beam["sequence"] + [candidate]
 				activationGain = computeCandidateActivationGain(newState["features"], oldState["features"], candidate["nodes"])
 				if(inferenceBeamScoreStrategy == "nodeActivation"):
-					if(inferenceUseNeuronFeaturePropertiesTime):
+					if(inferenceLeakyIntegrateAndFire):
+						activationGain = candidate.get("activationValue", activationGain)
+					elif(inferenceUseNeuronFeaturePropertiesTime):
 						# spec step (b): score beam nodes using time-modified activation.
 						activationGain = candidate.get("activationValue", activationGain)
 				candidateScore = computeBeamNodeScore(activationGain, candidate["connectionValue"])
@@ -182,6 +184,8 @@ def cloneBeamActivationState(state):
 	return clonedState
 
 def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state, columnIndex, featureIndex, sequenceWordIndex, sequenceColumnIndex):
+	if(inferenceLeakyIntegrateAndFire):
+		state["features"] = GIAANNcmn_predictionActivate.propagateLeakyIntegrateAndFireActivations(state["features"])
 	lemma = databaseNetworkObject.conceptColumnsList[columnIndex]
 	if(lemma in observedColumnsDict):
 		observedColumn = observedColumnsDict[lemma]
@@ -196,6 +200,8 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 	state["features"], state["connections"], state["time"] = GIAANNcmn_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, state["features"], state["connections"], featureConnections, columnIndex, featureIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex)
 	if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		state["features"], state["connections"], state["time"] = GIAANNnlp_auxiliaryNeuronsSimilarWords.processAuxiliaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, state["features"], state["connections"], columnIndex, featureIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex)
+	if(inferenceLeakyIntegrateAndFire):
+		state["features"] = GIAANNcmn_predictionActivate.decrementLeakyIntegrateAndFireSomaActivation(state["features"])
 	applyBeamNodePredictionEffects(state, columnIndex, featureIndex, sequenceWordIndex)
 	if(predictionColumnsMustActivateConceptFeature):
 		conceptState = state.get("conceptActivations")
@@ -222,7 +228,16 @@ def buildBeamNodeIndices(device, columnIndex, featureIndex, branchIndex=0):
 	columnTensor = pt.tensor(columnIndex, dtype=pt.long, device=device)
 	featureTensor = pt.tensor(featureIndex, dtype=pt.long, device=device)
 	branchTensor = pt.tensor(branchIndex, dtype=pt.long, device=device)
-	if(useSANI):
+	if(inferenceLeakyIntegrateAndFire):
+		if(inferenceDeactivateSegmentsUponPrediction):
+			branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=device).repeat_interleave(arrayNumberOfSegments)
+			segmentIndices = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=device).repeat(multipleDendriticBranchesNumber)
+			indicesToUpdate = pt.stack([branchIndices, segmentIndices, columnTensor.expand(branchIndices.shape[0]), featureTensor.expand(branchIndices.shape[0])], dim=1)
+		if(not inferenceDeactivateSegmentsUponPrediction):
+			branchIndices = pt.tensor([inferenceLeakyIntegrateAndFireSomaBranchIndex], dtype=pt.long, device=device)
+			segmentIndices = pt.tensor([arrayIndexSegmentSoma], dtype=pt.long, device=device)
+			indicesToUpdate = pt.stack([branchIndices, segmentIndices, columnTensor.expand(branchIndices.shape[0]), featureTensor.expand(branchIndices.shape[0])], dim=1)
+	elif(useSANI):
 		if(multipleDendriticBranchesBinaryTree):
 			segmentIndices = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=device)
 			branchIndices = pt.full_like(segmentIndices, branchIndex)
@@ -282,6 +297,30 @@ def filterCandidatesByActivationThreshold(columnIndices, featureIndices, activat
 	indexTensor = pt.nonzero(activeMask, as_tuple=False).view(-1)
 	return columnIndices.index_select(0, indexTensor), featureIndices.index_select(0, indexTensor), activationValues.index_select(0, indexTensor)
 
+def filterCandidatesByLeakyIntegrateAndFireSomaActivationThreshold(columnIndices, featureIndices, activationValues):
+	filteredColumnIndices = columnIndices
+	filteredFeatureIndices = featureIndices
+	filteredActivationValues = activationValues
+	if(inferenceLeakyIntegrateAndFire):
+		if(columnIndices is None or featureIndices is None or activationValues is None or columnIndices.numel() == 0 or featureIndices.numel() == 0 or activationValues.numel() == 0):
+			filteredColumnIndices = None
+			filteredFeatureIndices = None
+			filteredActivationValues = None
+		else:
+			activeMask = activationValues >= inferenceLeakyIntegrateAndFireSomaActivationThreshold
+			if(activeMask.sum().item() == 0):
+				filteredColumnIndices = None
+				filteredFeatureIndices = None
+				filteredActivationValues = None
+			else:
+				indexTensor = pt.nonzero(activeMask, as_tuple=False).view(-1)
+				filteredColumnIndices = columnIndices.index_select(0, indexTensor)
+				filteredFeatureIndices = featureIndices.index_select(0, indexTensor)
+				filteredActivationValues = activationValues.index_select(0, indexTensor)
+	else:
+		raise RuntimeError("filterCandidatesByLeakyIntegrateAndFireSomaActivationThreshold error: requires inferenceLeakyIntegrateAndFire")
+	return filteredColumnIndices, filteredFeatureIndices, filteredActivationValues
+
 def selectBeamCandidates(stateFeatures, stateTime, strengthLookup, candidateLimit, databaseNetworkObject, constraintState=None, conceptActivationState=None, connectedColumnsTensor=None, connectedColumnsFeatures=None, sequenceWordIndex=None, sequenceColumnIndex=None):
 	candidateLimit = max(1, candidateLimit)
 	debugTimeStart = None
@@ -297,7 +336,9 @@ def calculateSelectionActivationDistribution(databaseNetworkObject, stateFeature
 	featureIndices = None
 	activationValues = None
 	stateFeaturesSelection = stateFeatures
-	if(inferenceUseNeuronFeaturePropertiesTime):
+	if(inferenceLeakyIntegrateAndFire):
+		stateFeaturesSelection = GIAANNcmn_predictionActivate.calculateLeakyIntegrateAndFireSomaActivation(stateFeaturesSelection)
+	elif(inferenceUseNeuronFeaturePropertiesTime):
 		# spec step (b): apply time-based activation modifier during beam candidate selection
 		stateFeaturesSelection = GIAANNcmn_predictionActivate.applyTimeBasedActivationModifier(stateFeaturesSelection, stateTime, sequenceWordIndex, sequenceColumnIndex)
 	requiredSegmentKeys = None
@@ -305,7 +346,12 @@ def calculateSelectionActivationDistribution(databaseNetworkObject, stateFeature
 		requiredSegmentKeys = calculateRequiredSegmentConstraintKeyTensor(stateFeaturesSelection, databaseNetworkObject.f, stateFeaturesSelection.device)
 	columnIndices, featureIndices, activationValues = GIAANNcmn_predictionConstraints.aggregateSparseColumnFeatureValues(stateFeaturesSelection, databaseNetworkObject.f, requiredSegmentKeys)
 	if(columnIndices is not None):
-		columnIndices, featureIndices, activationValues = filterCandidatesByActivationThreshold(columnIndices, featureIndices, activationValues)
+		if(inferenceLeakyIntegrateAndFire):
+			columnIndices, featureIndices, activationValues = filterCandidatesByActivationThreshold(columnIndices, featureIndices, activationValues)
+			if(columnIndices is not None):
+				columnIndices, featureIndices, activationValues = filterCandidatesByLeakyIntegrateAndFireSomaActivationThreshold(columnIndices, featureIndices, activationValues)
+		else:
+			columnIndices, featureIndices, activationValues = filterCandidatesByActivationThreshold(columnIndices, featureIndices, activationValues)
 		if(requiredSegmentKeys is None):
 			columnIndices, featureIndices, activationValues = filterCandidatesByRequiredSegments(columnIndices, featureIndices, activationValues, stateFeaturesSelection, databaseNetworkObject.f)
 		if(columnIndices is not None):

@@ -700,7 +700,14 @@ def calculateBinaryTreeSparseTensorLinearIndices(indices, size):
 def neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANImethod):
 	hasBranchDim = globalFeatureNeuronsActivation.dim() == 4
 	isSparse = globalFeatureNeuronsActivation.is_sparse
-	if(multipleDendriticBranchesBinaryTree):
+	if(inferenceLeakyIntegrateAndFire):
+		if(not hasBranchDim or globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireSegmentDimension] != arrayNumberOfSegments):
+			raise RuntimeError("neuronActivationSparse error: leaky integrate-and-fire activation tensor shape is invalid")
+		if(isSparse):
+			featureNeuronsActive = collapseSparseBranchDimension(sliceSparseTensor(globalFeatureNeuronsActivation, inferenceLeakyIntegrateAndFireSegmentDimension, arrayIndexSegmentSoma))
+		else:
+			featureNeuronsActive = globalFeatureNeuronsActivation[:, arrayIndexSegmentSoma].sum(dim=inferenceLeakyIntegrateAndFireBranchDimension)
+	elif(multipleDendriticBranchesBinaryTree):
 		featureNeuronsActive = neuronActivationSparseBinaryTree(globalFeatureNeuronsActivation, algorithmMatrixSANImethod)
 	else:
 		# Sparse tensors cannot be sliced with native indexing on CPU; use sliceSparseTensor.
@@ -811,7 +818,9 @@ def calculateAllSegmentConstraintIndexRange(lastSegmentConstraint):
 
 def requiresLastSegmentConnectionConstraint():
 	result = False
-	if(not useSANI):
+	if(inferenceLeakyIntegrateAndFire):
+		result = False
+	elif(not useSANI):
 		result = False
 	elif(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
 		if(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):

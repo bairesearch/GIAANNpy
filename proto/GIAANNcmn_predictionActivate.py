@@ -25,18 +25,136 @@ import GIAANNcmn_inferenceDuringTrain
 
 
 def decrementActivationDense(featureNeuronsActivation, activationDecrement):
-	if(inferenceDecrementActivationsNonlinear):
-		featureNeuronsActivation = featureNeuronsActivation * (1-activationDecrement)
+	if(inferenceLeakyIntegrateAndFire):
+		raise RuntimeError("decrementActivationDense error: legacy activation decrement is unavailable with inferenceLeakyIntegrateAndFire")
 	else:
-		featureNeuronsActivation = featureNeuronsActivation - activationDecrementPerPredictedSequence
+		if(inferenceDecrementActivationsNonlinear):
+			featureNeuronsActivation = featureNeuronsActivation * (1-activationDecrement)
+		else:
+			featureNeuronsActivation = featureNeuronsActivation - activationDecrementPerPredictedSequence
 	return featureNeuronsActivation
 
 def decrementActivation(featureNeuronsActivation, activationDecrement):
-	if(inferenceDecrementActivationsNonlinear):
-		featureNeuronsActivation = featureNeuronsActivation * (1-activationDecrement)
+	if(inferenceLeakyIntegrateAndFire):
+		raise RuntimeError("decrementActivation error: legacy activation decrement is unavailable with inferenceLeakyIntegrateAndFire")
 	else:
-		featureNeuronsActivation = GIAANNcmn_sparseTensors.subtractValueFromSparseTensorValues(featureNeuronsActivation, activationDecrementPerPredictedSequence)
+		if(inferenceDecrementActivationsNonlinear):
+			featureNeuronsActivation = featureNeuronsActivation * (1-activationDecrement)
+		else:
+			featureNeuronsActivation = GIAANNcmn_sparseTensors.subtractValueFromSparseTensorValues(featureNeuronsActivation, activationDecrementPerPredictedSequence)
 	return featureNeuronsActivation
+
+def propagateLeakyIntegrateAndFireActivations(globalFeatureNeuronsActivation):
+	result = None
+	if(inferenceLeakyIntegrateAndFire):
+		if(globalFeatureNeuronsActivation is None):
+			raise RuntimeError("propagateLeakyIntegrateAndFireActivations error: globalFeatureNeuronsActivation is None")
+		if(not globalFeatureNeuronsActivation.is_sparse):
+			raise RuntimeError("propagateLeakyIntegrateAndFireActivations error: globalFeatureNeuronsActivation must be sparse")
+		if(globalFeatureNeuronsActivation.dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireBranchDimension] != multipleDendriticBranchesNumber or globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireSegmentDimension] != arrayNumberOfSegments):
+			raise RuntimeError("propagateLeakyIntegrateAndFireActivations error: activation tensor shape is invalid")
+		if(arrayIndexSegmentSoma != arrayNumberOfSegments-1):
+			raise RuntimeError("propagateLeakyIntegrateAndFireActivations error: soma must be the final segment")
+		activationSparse = globalFeatureNeuronsActivation.coalesce()
+		activationIndices = activationSparse.indices()
+		activationValues = activationSparse.values()
+		if(activationValues.numel() > 0):
+			if(not bool(pt.all(pt.isfinite(activationValues)).item())):
+				raise RuntimeError("propagateLeakyIntegrateAndFireActivations error: activation values must be finite")
+			if(bool(pt.any(activationValues < 0).item())):
+				raise RuntimeError("propagateLeakyIntegrateAndFireActivations error: activation values must be non-negative")
+			segmentIndices = activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension]
+			branchIndices = activationIndices[inferenceLeakyIntegrateAndFireBranchDimension]
+			if(bool(pt.any(segmentIndices < arrayIndexSegmentFirst).item()) or bool(pt.any(segmentIndices > arrayIndexSegmentSoma).item())):
+				raise RuntimeError("propagateLeakyIntegrateAndFireActivations error: segment index out of range")
+			if(bool(pt.any(branchIndices < arrayIndexSegmentFirst).item()) or bool(pt.any(branchIndices >= multipleDendriticBranchesNumber).item())):
+				raise RuntimeError("propagateLeakyIntegrateAndFireActivations error: branch index out of range")
+		dendriticMask = activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] < arrayIndexSegmentSoma
+		somaMask = activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
+		propagatedIndices = activationIndices[:, dendriticMask].clone()
+		propagatedValues = activationValues[dendriticMask]
+		if(propagatedIndices.shape[1] > 0):
+			propagatedSourceSegmentIndices = propagatedIndices[inferenceLeakyIntegrateAndFireSegmentDimension].clone()
+			propagatedIndices[inferenceLeakyIntegrateAndFireSegmentDimension] += 1
+			if(useSANIfeaturesAndColumns):
+				conceptSegmentToSomaMask = propagatedSourceSegmentIndices == arrayIndexSegmentInternalColumn
+				propagatedIndices[inferenceLeakyIntegrateAndFireSegmentDimension, conceptSegmentToSomaMask] = arrayIndexSegmentSoma
+			propagatedToSomaMask = propagatedIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
+			if(multipleDendriticBranchesBinaryTree):
+				propagatedWithinDendritesMask = pt.logical_not(propagatedToSomaMask)
+				propagatedIndices[inferenceLeakyIntegrateAndFireBranchDimension, propagatedWithinDendritesMask] = pt.div(propagatedIndices[inferenceLeakyIntegrateAndFireBranchDimension, propagatedWithinDendritesMask], multipleDendriticBranchesBinaryTreeBranchingFactor, rounding_mode="floor")
+			propagatedIndices[inferenceLeakyIntegrateAndFireBranchDimension, propagatedToSomaMask] = inferenceLeakyIntegrateAndFireSomaBranchIndex
+		somaIndices = activationIndices[:, somaMask].clone()
+		somaValues = activationValues[somaMask]
+		if(somaIndices.shape[1] > 0):
+			somaIndices[inferenceLeakyIntegrateAndFireBranchDimension] = inferenceLeakyIntegrateAndFireSomaBranchIndex
+		resultIndices = pt.cat((propagatedIndices, somaIndices), dim=1)
+		resultValues = pt.cat((propagatedValues, somaValues), dim=0)
+		result = pt.sparse_coo_tensor(resultIndices, resultValues, size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
+	else:
+		raise RuntimeError("propagateLeakyIntegrateAndFireActivations error: requires inferenceLeakyIntegrateAndFire")
+	return result
+
+def decrementLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation):
+	result = None
+	if(inferenceLeakyIntegrateAndFire):
+		if(globalFeatureNeuronsActivation is None):
+			raise RuntimeError("decrementLeakyIntegrateAndFireSomaActivation error: globalFeatureNeuronsActivation is None")
+		if(not globalFeatureNeuronsActivation.is_sparse):
+			raise RuntimeError("decrementLeakyIntegrateAndFireSomaActivation error: globalFeatureNeuronsActivation must be sparse")
+		if(globalFeatureNeuronsActivation.dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireBranchDimension] != multipleDendriticBranchesNumber or globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireSegmentDimension] != arrayNumberOfSegments):
+			raise RuntimeError("decrementLeakyIntegrateAndFireSomaActivation error: activation tensor shape is invalid")
+		activationSparse = globalFeatureNeuronsActivation.coalesce()
+		activationIndices = activationSparse.indices()
+		activationValues = activationSparse.values()
+		if(activationValues.numel() > 0):
+			if(not bool(pt.all(pt.isfinite(activationValues)).item())):
+				raise RuntimeError("decrementLeakyIntegrateAndFireSomaActivation error: activation values must be finite")
+			if(bool(pt.any(activationValues < 0).item())):
+				raise RuntimeError("decrementLeakyIntegrateAndFireSomaActivation error: activation values must be non-negative")
+		somaMask = activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
+		dendriticIndices = activationIndices[:, pt.logical_not(somaMask)]
+		dendriticValues = activationValues[pt.logical_not(somaMask)]
+		somaIndices = activationIndices[:, somaMask].clone()
+		somaValues = activationValues[somaMask]
+		if(somaIndices.shape[1] > 0):
+			somaIndices[inferenceLeakyIntegrateAndFireBranchDimension] = inferenceLeakyIntegrateAndFireSomaBranchIndex
+		combinedIndices = pt.cat((dendriticIndices, somaIndices), dim=1)
+		combinedValues = pt.cat((dendriticValues, somaValues), dim=0)
+		combinedActivation = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
+		combinedIndices = combinedActivation.indices()
+		combinedValues = combinedActivation.values().clone()
+		decrementMask = combinedIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
+		if(inferenceDecrementActivationsSomaNonlinear):
+			combinedValues[decrementMask] = combinedValues[decrementMask] * (1.0-inferenceDecrementActivationsSomaPerPredictedToken)
+		else:
+			combinedValues[decrementMask] = pt.clamp(combinedValues[decrementMask]-inferenceDecrementActivationsSomaPerPredictedToken, min=0.0)
+		positiveMask = combinedValues > 0
+		result = pt.sparse_coo_tensor(combinedIndices[:, positiveMask], combinedValues[positiveMask], size=combinedActivation.size(), dtype=combinedActivation.dtype, device=combinedActivation.device).coalesce()
+	else:
+		raise RuntimeError("decrementLeakyIntegrateAndFireSomaActivation error: requires inferenceLeakyIntegrateAndFire")
+	return result
+
+def calculateLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation):
+	result = None
+	if(inferenceLeakyIntegrateAndFire):
+		if(globalFeatureNeuronsActivation is None):
+			raise RuntimeError("calculateLeakyIntegrateAndFireSomaActivation error: globalFeatureNeuronsActivation is None")
+		if(not globalFeatureNeuronsActivation.is_sparse):
+			raise RuntimeError("calculateLeakyIntegrateAndFireSomaActivation error: globalFeatureNeuronsActivation must be sparse")
+		if(globalFeatureNeuronsActivation.dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireBranchDimension] != multipleDendriticBranchesNumber or globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireSegmentDimension] != arrayNumberOfSegments):
+			raise RuntimeError("calculateLeakyIntegrateAndFireSomaActivation error: activation tensor shape is invalid")
+		activationSparse = globalFeatureNeuronsActivation.coalesce()
+		activationIndices = activationSparse.indices()
+		activationValues = activationSparse.values()
+		somaMask = activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
+		somaIndices = pt.stack((activationIndices[inferenceLeakyIntegrateAndFireConceptDimension, somaMask], activationIndices[inferenceLeakyIntegrateAndFireFeatureDimension, somaMask]), dim=0)
+		somaValues = activationValues[somaMask]
+		resultSize = (activationSparse.shape[inferenceLeakyIntegrateAndFireConceptDimension], activationSparse.shape[inferenceLeakyIntegrateAndFireFeatureDimension])
+		result = pt.sparse_coo_tensor(somaIndices, somaValues, size=resultSize, dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
+	else:
+		raise RuntimeError("calculateLeakyIntegrateAndFireSomaActivation error: requires inferenceLeakyIntegrateAndFire")
+	return result
 
 if(inferenceSegmentActivationsBoolean):
 	def applySegmentActivationsBooleanFeatureSegmentsOnly(globalFeatureNeuronsActivation):
@@ -653,10 +771,32 @@ def processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuro
 
 def calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex):
 	result = None
-	if(multipleDendriticBranchesBinaryTree):
+	if(inferenceLeakyIntegrateAndFire):
+		result = calculateFeatureNeuronSourceActivationPredictLeakyIntegrateAndFire(globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex)
+	elif(multipleDendriticBranchesBinaryTree):
 		result = calculateFeatureNeuronSourceActivationPredictBinaryTree(globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex)
 	else:
 		result = calculateFeatureNeuronSourceActivationPredictNonBinary(globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex)
+	return result
+
+def calculateFeatureNeuronSourceActivationPredictLeakyIntegrateAndFire(globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex):
+	result = None
+	if(inferenceLeakyIntegrateAndFire):
+		sourceColumnIndex = int(sourceColumnIndex)
+		sourceFeatureIndex = int(sourceFeatureIndex)
+		if(sourceColumnIndex < arrayIndexSegmentFirst or sourceColumnIndex >= globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireConceptDimension] or sourceFeatureIndex < arrayIndexSegmentFirst or sourceFeatureIndex >= globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireFeatureDimension]):
+			raise RuntimeError("calculateFeatureNeuronSourceActivationPredictLeakyIntegrateAndFire error: source neuron index out of range")
+		somaActivation = calculateLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation)
+		somaActivation = somaActivation.coalesce()
+		somaIndices = somaActivation.indices()
+		somaValues = somaActivation.values()
+		sourceMask = (somaIndices[inferenceLeakyIntegrateAndFireSomaActivationConceptDimension] == sourceColumnIndex) & (somaIndices[inferenceLeakyIntegrateAndFireSomaActivationFeatureDimension] == sourceFeatureIndex)
+		sourceActivation = pt.zeros((), dtype=somaActivation.dtype, device=somaActivation.device)
+		if(sourceMask.any()):
+			sourceActivation = somaValues[sourceMask].sum()
+		result = (sourceActivation >= inferenceLeakyIntegrateAndFireSomaActivationThreshold).to(somaActivation.dtype)
+	else:
+		raise RuntimeError("calculateFeatureNeuronSourceActivationPredictLeakyIntegrateAndFire error: requires inferenceLeakyIntegrateAndFire")
 	return result
 
 def calculateFeatureNeuronSourceActivationPredictBinaryTree(globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex):
@@ -775,34 +915,43 @@ def transformFeatureNeuronsTargetActivationPredict(featureNeuronsTargetActivatio
 	return result
 
 def applyFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureNeuronsTargetActivation, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None, applySegmentActivations=True):
-	if(inferenceUseNeuronFeaturePropertiesTimeExact):
-		# spec step (a): only allow segment activation when the time difference to the previous segment is exactly 1.
-		featureNeuronsTargetActivation = applyExactTimeActivationConstraint(featureNeuronsTargetActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
-
 	featureNeuronsTargetActivationApplied = featureNeuronsTargetActivation
-
-	#update the activations of the target nodes;
-	if(useSANI):
-		if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
-			if(enforceSequentialActivation):
-				if(inferenceApplySequentialActivationSparse):
-					globalFeatureNeuronsActivation, featureNeuronsTargetActivationApplied = applySequentialActivationSparse(globalFeatureNeuronsActivation, featureNeuronsTargetActivation)
-				else:
-					globalFeatureNeuronsActivation, featureNeuronsTargetActivationApplied = applySequentialActivationDense(globalFeatureNeuronsActivation, featureNeuronsTargetActivation)
-			else:
-				globalFeatureNeuronsActivation += featureNeuronsTargetActivation
-		elif(algorithmMatrixSANImethod=="doNotEnforceActivationAcrossSegments"):
-			globalFeatureNeuronsActivation += featureNeuronsTargetActivation
+	if(inferenceLeakyIntegrateAndFire):
+		if(globalFeatureNeuronsActivation is None or featureNeuronsTargetActivation is None):
+			raise RuntimeError("applyFeatureNeuronsTargetActivationPredict error: leaky integrate-and-fire activation tensors must not be None")
+		if(not globalFeatureNeuronsActivation.is_sparse or not featureNeuronsTargetActivation.is_sparse):
+			raise RuntimeError("applyFeatureNeuronsTargetActivationPredict error: leaky integrate-and-fire activation tensors must be sparse")
+		if(globalFeatureNeuronsActivation.size() != featureNeuronsTargetActivation.size()):
+			raise RuntimeError("applyFeatureNeuronsTargetActivationPredict error: leaky integrate-and-fire activation tensor shapes must match")
+		globalFeatureNeuronsActivation = (globalFeatureNeuronsActivation.coalesce() + featureNeuronsTargetActivation.coalesce()).coalesce()
 	else:
-		globalFeatureNeuronsActivation += featureNeuronsTargetActivation
-	applySegmentActivationsBooleanCurrent = inferenceSegmentActivationsBoolean and applySegmentActivations
-	if(inferenceDuringTrainAdjustSynapseStrengthBiasTimingCalculations):
-		applySegmentActivationsBooleanCurrent = False
-	if(applySegmentActivationsBooleanCurrent):
-		globalFeatureNeuronsActivation = applySegmentActivationsBoolean(globalFeatureNeuronsActivation)
-	if(inferenceUseNeuronFeaturePropertiesTime):
-		# spec step (a): store last timeValue for activated segments during each prediction step
-		globalFeatureNeuronsTime = updateTimeValuesFromActivation(globalFeatureNeuronsTime, featureNeuronsTargetActivationApplied, sequenceWordIndex, sequenceColumnIndex)
+		if(inferenceUseNeuronFeaturePropertiesTimeExact):
+			# spec step (a): only allow segment activation when the time difference to the previous segment is exactly 1.
+			featureNeuronsTargetActivation = applyExactTimeActivationConstraint(featureNeuronsTargetActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
+			featureNeuronsTargetActivationApplied = featureNeuronsTargetActivation
+
+		#update the activations of the target nodes;
+		if(useSANI):
+			if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
+				if(enforceSequentialActivation):
+					if(inferenceApplySequentialActivationSparse):
+						globalFeatureNeuronsActivation, featureNeuronsTargetActivationApplied = applySequentialActivationSparse(globalFeatureNeuronsActivation, featureNeuronsTargetActivation)
+					else:
+						globalFeatureNeuronsActivation, featureNeuronsTargetActivationApplied = applySequentialActivationDense(globalFeatureNeuronsActivation, featureNeuronsTargetActivation)
+				else:
+					globalFeatureNeuronsActivation += featureNeuronsTargetActivation
+			elif(algorithmMatrixSANImethod=="doNotEnforceActivationAcrossSegments"):
+				globalFeatureNeuronsActivation += featureNeuronsTargetActivation
+		else:
+			globalFeatureNeuronsActivation += featureNeuronsTargetActivation
+		applySegmentActivationsBooleanCurrent = inferenceSegmentActivationsBoolean and applySegmentActivations
+		if(inferenceDuringTrainAdjustSynapseStrengthBiasTimingCalculations):
+			applySegmentActivationsBooleanCurrent = False
+		if(applySegmentActivationsBooleanCurrent):
+			globalFeatureNeuronsActivation = applySegmentActivationsBoolean(globalFeatureNeuronsActivation)
+		if(inferenceUseNeuronFeaturePropertiesTime):
+			# spec step (a): store last timeValue for activated segments during each prediction step
+			globalFeatureNeuronsTime = updateTimeValuesFromActivation(globalFeatureNeuronsTime, featureNeuronsTargetActivationApplied, sequenceWordIndex, sequenceColumnIndex)
 	result = globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime
 	return result
 
@@ -861,7 +1010,9 @@ def calculateFeatureNeuronsTargetActivationPredict(featureConnectionsStrength, f
 
 def selectActivatedBranchIndex(globalFeatureNeuronsActivation, columnIndex, featureIndex):
 	result = arrayIndexSegmentFirst
-	if(multipleDendriticBranchesBinaryTree):
+	if(inferenceLeakyIntegrateAndFire):
+		result = inferenceLeakyIntegrateAndFireSomaBranchIndex
+	elif(multipleDendriticBranchesBinaryTree):
 		result = selectActivatedBinaryTreeRootBranchIndex(globalFeatureNeuronsActivation, columnIndex, featureIndex)
 	elif(not multipleDendriticBranches):
 		result = arrayIndexSegmentFirst

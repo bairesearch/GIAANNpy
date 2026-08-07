@@ -10,12 +10,10 @@ A number of changes to the default settings were introduced in GIAANN Proto 2 th
     \item Implement option \texttt{SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens=False}, which affects both \texttt{useSANIfeaturesAndColumns} and \texttt{useSANIcolumns} modes.
     \item Enable option \texttt{SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=False}, which affects both \texttt{useSANIfeaturesAndColumns} and \texttt{useSANIfeatures} modes.
     \item Restore \texttt{inferenceBurstAllPredictionsOrTargetsInSequence} - patch inference to always activate the top-1 selected feature neuron (i.e. the prediction or target respectively as per \texttt{inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures}). This guarantees the selected top-1 feature is active when the next step uses it as a source.
-	\item \texttt{useBenchmarkDefaultsEvalTestSetOptim} - set \texttt{inferenceSegmentTiming = "none"}, \texttt{inferenceConnectionsStrengthBoolean = False} by default during test-set evaluation.
 \end{itemize}
 
 \subsection{proto v2k settings}
 \begin{itemize}
-	\item set \texttt{j1=0.5} with \texttt{inferenceActivationFunction=False}.
 	\item update \texttt{inferenceEvaluateTestSetTrainMaxSequences10M}. Eval datasets contain 1000 sequences, and were extracted to support 10M training sequences. set \texttt{inferenceEvaluateTestSetTrainMaxSequences10M=True}.
 	\item set \texttt{inferenceDecrementActivations=True} and \texttt{activationDecrementPerPredictedToken=0.05}
 	\item set \texttt{inferenceActivationsType = "intf+c"} (required with inferenceDecrementActivations).
@@ -107,7 +105,7 @@ A number of changes to the default settings were introduced in GIAANN Proto 2 th
 
 \Cref{tab:protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} contains Proto v2j OSCAR-2201 Top-1 test-set accuracy for different inference connection strength types, training sizes, and inference activations, with segment timing none (t-1 none), and targets fed as input. The different inference connection strength types used were ``bool'' (\texttt{inferenceConnectionsStrengthBoolean=True}) and ``float'' (\texttt{inferenceConnectionsStrengthBoolean=False}). The default segment timings used during proto v2j benchmarking is ``none''. The default inference activation type used during proto v2j benchmarking is ``bool f''. The default strength type used during proto v2j benchmarking is ``float''. The table also includes the total number of trained words and tokens. 
 
-\Cref{tab:protov2k-oscar-test-top1-accuracy} contains proto v2k OSCAR-2201 Top-1 test-set accuracy for different training sizes, with targets fed as input. The default segment timings used during proto v2k benchmarking is ``biased''. The default inference activation type used during proto v2k benchmarking is ``int c+f''. The default strength type used during proto v2k benchmarking is ``float''. The table also includes the total number of trained words and tokens. 
+\Cref{tab:protov2k-oscar-test-top1-accuracy} contains proto v2k OSCAR-2201 Top-1 test-set accuracy for different training sizes, with targets fed as input. The default segment timings used during proto v2k benchmarking is ``biased''. The default inference activation type used during proto v2k benchmarking is ``int c+f''. The default strength type used during proto v2k benchmarking is ``float''. \texttt{inferenceActivationFunction} was also disabled during proto v2k benchmarking. The table also includes the total number of trained words and tokens. 
 
 \Cref{tab:protov2k-oscar-test-top1-accuracy-multisentencePredictions} contains proto v2k OSCAR-2201 Top-1 test-set accuracy for different training sizes, with targets fed as input, and multi-sentence predictions.
 

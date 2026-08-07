@@ -54,7 +54,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "trainAndInference"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -113,35 +113,48 @@ if(useDefaultsV2):
 else:
 	inferenceEvaluateTestSetTrainMaxSequences10M = False
 	useBenchmarkDefaultsEvalTestSetOptim = False	#default: False
-
-switchTrainTestSetInferenceSettings = False	#default: False
 if(useBenchmarkDefaultsEvalTestSet):
 	inferenceEvaluateTestSet = True
 else:
 	inferenceEvaluateTestSet = False
-if(useBenchmarkDefaultsEvalTestSet ^ switchTrainTestSetInferenceSettings): #if((useBenchmarkDefaultsEvalTestSet and not switchTrainTestSetInferenceSettings) or (not useBenchmarkDefaultsEvalTestSet and switchTrainTestSetInferenceSettings)):
-	if(useDefaultsV2):
-		inferenceSegmentTiming = "biased"	#default: biased	#orig: none	#none, biased, exact, seq
-		inferenceActivationsType = "intf+c"		#default: intf+c #orig: boolf	#boolf, boolf+c, intf+c
-	else:
-		if(useBenchmarkDefaultsEvalTestSetOptim):
-			inferenceSegmentTiming = "none"
-			inferenceActivationsType = "intf+c"
-		else:
-			inferenceSegmentTiming = "biased"	#default: biased	#none, biased, exact, seq
-			inferenceActivationsType = "boolf"		#default: boolf	#boolf, boolf+c, intf+c
-else:
-	inferenceSegmentTiming = "exact"	#default: exact	#none, biased, exact, seq
-	inferenceActivationsType = "boolf"	#default: boolf	#boolf, boolf+c, intf+c
 
-if(useDefaultsV2):
-	inferenceSegmentTimingMultipicativeBias = True	#default: True	#apply a non-negative multiplicative timing bias instead of the legacy subtractive timing bias when inferenceSegmentTiming="biased"
+inferenceLeakyIntegrateAndFire = False	#default: False	#orig: False
+if(inferenceLeakyIntegrateAndFire):
+	inferenceLeakyIntegrateAndFireSomaActivationThreshold = 0.004	#default: 0.004; must remain below the activation produced by one Boolean-strength connection
+	inferenceLeakyIntegrateAndFireNeuronTensorRank = 4	#mandatory: branch, segment, concept, feature
+	inferenceLeakyIntegrateAndFireBranchDimension = 0	#mandatory
+	inferenceLeakyIntegrateAndFireSegmentDimension = 1	#mandatory
+	inferenceLeakyIntegrateAndFireConceptDimension = 2	#mandatory
+	inferenceLeakyIntegrateAndFireFeatureDimension = 3	#mandatory
+	inferenceLeakyIntegrateAndFireSomaBranchIndex = 0	#mandatory: the single soma is stored on branch zero after branch aggregation
+	inferenceLeakyIntegrateAndFireSomaActivationConceptDimension = 0	#mandatory
+	inferenceLeakyIntegrateAndFireSomaActivationFeatureDimension = 1	#mandatory
+	if(not isinstance(inferenceLeakyIntegrateAndFireSomaActivationThreshold, (int, float)) or isinstance(inferenceLeakyIntegrateAndFireSomaActivationThreshold, bool) or not math.isfinite(inferenceLeakyIntegrateAndFireSomaActivationThreshold) or inferenceLeakyIntegrateAndFireSomaActivationThreshold <= 0.0):
+		raise RuntimeError("GIAANNcmn_globalDefs error: inferenceLeakyIntegrateAndFireSomaActivationThreshold must be a finite number > 0")
 else:
-	inferenceSegmentTimingMultipicativeBias = False	#orig: False
-if(inferenceSegmentTimingMultipicativeBias):
-	inferenceSegmentTimingMultipicativeBiasFactor = 0.9	#default: 0.9	#activation multiplier applied per unit of segment timing error
-	if(inferenceSegmentTimingMultipicativeBiasFactor <= 0.0 or inferenceSegmentTimingMultipicativeBiasFactor > 1.0):
-		raise RuntimeError("GIAANNcmn_globalDefs error: inferenceSegmentTimingMultipicativeBiasFactor must be within (0, 1]")
+	if(useBenchmarkDefaultsEvalTestSet):
+		if(useDefaultsV2):
+			inferenceSegmentTiming = "biased"	#default: biased	#orig: none	#none, biased, exact, seq
+			inferenceActivationsType = "intf+c"		#default: intf+c #orig: boolf	#boolf, boolf+c, intf+c
+		else:
+			if(useBenchmarkDefaultsEvalTestSetOptim):
+				inferenceSegmentTiming = "none"
+				inferenceActivationsType = "intf+c"
+			else:
+				inferenceSegmentTiming = "biased"	#default: biased	#none, biased, exact, seq
+				inferenceActivationsType = "boolf"		#default: boolf	#boolf, boolf+c, intf+c
+	else:
+		inferenceSegmentTiming = "exact"	#default: exact	#none, biased, exact, seq
+		inferenceActivationsType = "boolf"	#default: boolf	#boolf, boolf+c, intf+c
+
+	if(useDefaultsV2):
+		inferenceSegmentTimingMultipicativeBias = True	#default: True	#apply a non-negative multiplicative timing bias instead of the legacy subtractive timing bias when inferenceSegmentTiming="biased"
+	else:
+		inferenceSegmentTimingMultipicativeBias = False	#orig: False
+	if(inferenceSegmentTimingMultipicativeBias):
+		inferenceSegmentTimingMultipicativeBiasFactor = 0.9	#default: 0.9	#activation multiplier applied per unit of segment timing error
+		if(inferenceSegmentTimingMultipicativeBiasFactor <= 0.0 or inferenceSegmentTimingMultipicativeBiasFactor > 1.0):
+			raise RuntimeError("GIAANNcmn_globalDefs error: inferenceSegmentTimingMultipicativeBiasFactor must be within (0, 1]")
 
 inferenceReportTokenAccuracyConstrainByColumn = False	#default: False	#orig: False
 
@@ -158,7 +171,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 50000	#5000, 200000, 1000000
+	trainMaxSequences = 1000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 50000	#5000
@@ -201,7 +214,10 @@ if(trainVerifyConnectionNonexistentAcrossBranches):
 patchMultipleDendriticBranchesBurstActivationBranch = True
 patchMultipleDendriticBranchesSourceActivationBoolean = True
 patchMultipleDendriticBranchesOverflowBranch = True
-multipleDendriticBranches = True	#default: True	#orig: False
+if(inferenceLeakyIntegrateAndFire):
+	multipleDendriticBranches = False	#default: False	#with inferenceLeakyIntegrateAndFire multiple dendritic branches are not required by default to support repeated column features per sequence (they only add representational capacity)
+else:
+	multipleDendriticBranches = True	#default: True	#orig: False
 if(multipleDendriticBranches):
 	multipleDendriticBranchesBinaryTree = False	#default: False	#True: binary tree of dendritic branches, False: independent dendritic branches
 	if(multipleDendriticBranchesBinaryTree):
@@ -216,9 +232,9 @@ if(multipleDendriticBranches):
 		if(useTrainDuringInference):
 			multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches = True
 			if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
-				if(executionMode=="trainDuringInference"):
+				if(executionMode=="trainDuringInference" and not inferenceLeakyIntegrateAndFire):
 					assert inferenceSegmentTiming=="biased" or inferenceSegmentTiming=="none"	#requires enforceSequentialActivation==False during the inference phase of training
-	if(useTrainDuringInference or multipleDendriticBranchesBinaryTree):
+	if(useTrainDuringInference or multipleDendriticBranchesBinaryTree or inferenceLeakyIntegrateAndFire):
 		multipleDendriticBranchesRandom = True	#mandatory: True	#useTrainDuringInference algorithm has automatic protection against replication of same patterns across multiple branches, so it can better capitalise on randomised branch assignment
 	else:
 		multipleDendriticBranchesRandom = False	#optional	#default: False #orig: False
@@ -230,7 +246,7 @@ if(multipleDendriticBranches):
 	else:
 		multipleDendriticBranchesNumber = 2	#default: 2	#5, 2	#affects train+inference RAM
 else:
-	#multipleDendriticBranchesBinaryTree = False
+	multipleDendriticBranchesBinaryTree = False	#mandatory: False when dendritic branches are disabled
 	multipleDendriticBranchesNumber = 1
 	multipleDendriticBranchesRandom = False
 multipleDendriticBranchesIndexLast = multipleDendriticBranchesNumber - 1
@@ -328,20 +344,24 @@ if not trainStoreFeatureMapsGlobally:
 
 #Inference segment activation times;
 if(useInference):
-	if(inferenceSegmentTiming=="none"):
-		inferenceUseNeuronFeaturePropertiesTime = False
-		inferenceUseNeuronFeaturePropertiesTimeExact = False
-	elif(inferenceSegmentTiming=="biased"):
-		inferenceUseNeuronFeaturePropertiesTime = True
-		inferenceUseNeuronFeaturePropertiesTimeExact = False	
-	elif(inferenceSegmentTiming=="exact"):
-		inferenceUseNeuronFeaturePropertiesTime = True
-		inferenceUseNeuronFeaturePropertiesTimeExact = True
-	elif(inferenceSegmentTiming=="seq"):
-		inferenceUseNeuronFeaturePropertiesTime = False	#seq applies sequentiality checks only, without timing bias
-		inferenceUseNeuronFeaturePropertiesTimeExact = False
+	if(inferenceLeakyIntegrateAndFire):
+		inferenceUseNeuronFeaturePropertiesTime = False	#mandatory: False; dendritic propagation explicitly represents signal timing
+		inferenceUseNeuronFeaturePropertiesTimeExact = False	#mandatory: False; dendritic propagation explicitly represents signal timing
 	else:
-		printe("inferenceSegmentTiming error")
+		if(inferenceSegmentTiming=="none"):
+			inferenceUseNeuronFeaturePropertiesTime = False
+			inferenceUseNeuronFeaturePropertiesTimeExact = False
+		elif(inferenceSegmentTiming=="biased"):
+			inferenceUseNeuronFeaturePropertiesTime = True
+			inferenceUseNeuronFeaturePropertiesTimeExact = False	
+		elif(inferenceSegmentTiming=="exact"):
+			inferenceUseNeuronFeaturePropertiesTime = True
+			inferenceUseNeuronFeaturePropertiesTimeExact = True
+		elif(inferenceSegmentTiming=="seq"):
+			inferenceUseNeuronFeaturePropertiesTime = False	#seq applies sequentiality checks only, without timing bias
+			inferenceUseNeuronFeaturePropertiesTimeExact = False
+		else:
+			printe("inferenceSegmentTiming error")
 
 
 #Array properties (disable to optimise train speed/RAM during train);
@@ -415,23 +435,28 @@ if(useInference):
 			inferenceConnectionsStrengthBoolean = False		#False: with inferenceActivationsType = "boolf" this typically provides lower train-set accuracy, higher test-set accuracy	#do not overweight by common features (e.g. determiners)
 		else:
 			inferenceConnectionsStrengthBoolean = True	#default: True
-		if(inferenceActivationsType == "intf+c"):
-			inferenceSegmentActivationsBoolean = False
-		elif(inferenceActivationsType == "boolf"):
-			inferenceSegmentActivationsBoolean = True
-			inferenceSegmentActivationsBooleanFeatureSegmentsOnly = True
-		elif(inferenceActivationsType == "boolf+c"):
-			inferenceSegmentActivationsBoolean = True
-			inferenceSegmentActivationsBooleanFeatureSegmentsOnly = False
-		else:
-			printe("inferenceActivationsType error")
 		inferenceSourceActivationsBoolean = True	#default: True (do not sum SANI segments)	#orig: False
 	else:
-		inferenceConnectionsStrengthBoolean = False	#default: False
-		inferenceSegmentActivationsBoolean = False	#default: False	
+		inferenceConnectionsStrengthBoolean = False	#default: False	
 		inferenceSourceActivationsBoolean = True	#default: True	#orig: False (theoretically effectively True)
+	if(inferenceLeakyIntegrateAndFire):
+		inferenceSegmentActivationsBoolean = False	#mandatory: False; segment and soma activation levels must remain continuous
+	else:
+		if(useSANI):
+			if(inferenceActivationsType == "intf+c"):
+				inferenceSegmentActivationsBoolean = False
+			elif(inferenceActivationsType == "boolf"):
+				inferenceSegmentActivationsBoolean = True
+				inferenceSegmentActivationsBooleanFeatureSegmentsOnly = True
+			elif(inferenceActivationsType == "boolf+c"):
+				inferenceSegmentActivationsBoolean = True
+				inferenceSegmentActivationsBooleanFeatureSegmentsOnly = False
+			else:
+				printe("inferenceActivationsType error")
+		else:
+			inferenceSegmentActivationsBoolean = False	#default: False	
 	inferenceSeedNetwork = True	#default: True
-	
+		
 
 #Train optimisations;
 trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
@@ -739,14 +764,21 @@ if(useInference):
 					inferenceDuringTrainTargetConnectionIndexTargetFeature = 3
 					inferenceDuringTrainTargetConnectionTensorRank = 4
 	inferenceDeactivateNeuronsUponPrediction = True	#default: True
-	if(useDefaultsV2):
-		inferenceDecrementActivations = True	#default: True
+	if(inferenceLeakyIntegrateAndFire):
+		inferenceDecrementActivationsSomaPerPredictedToken = 0.50	#0.05	#CHECKTHIS
+		inferenceDecrementActivationsSomaNonlinear = True
+		if(not isinstance(inferenceDecrementActivationsSomaPerPredictedToken, (int, float)) or isinstance(inferenceDecrementActivationsSomaPerPredictedToken, bool) or not math.isfinite(inferenceDecrementActivationsSomaPerPredictedToken) or inferenceDecrementActivationsSomaPerPredictedToken < 0.0 or inferenceDecrementActivationsSomaPerPredictedToken > 1.0):
+			raise RuntimeError("GIAANNcmn_globalDefs error: inferenceDecrementActivationsSomaPerPredictedToken must be a finite number within [0, 1]")
+		inferenceDeactivateSegmentsUponPrediction = False	#default: False
 	else:
-		inferenceDecrementActivations = False	#orig: False
-	if(inferenceDecrementActivations):
-		inferenceDecrementActivationsNonlinear = True
-		activationDecrementPerPredictedToken = 0.05	#orig: 0.1	#CHECKTHIS
-		activationDecrementPerPredictedSequence = 0.5
+		if(useDefaultsV2):
+			inferenceDecrementActivations = True	#default: True
+		else:
+			inferenceDecrementActivations = False	#orig: False
+		if(inferenceDecrementActivations):
+			inferenceDecrementActivationsNonlinear = True
+			activationDecrementPerPredictedToken = 0.05	#orig: 0.1	#CHECKTHIS
+			activationDecrementPerPredictedSequence = 0.5
 	if(inferenceSeedNetwork):
 		numSeedTokens = numSeedTokensInference	#default: 5	#number of seed tokens in last sequence of inference prompt (remaining tokens will be prediction tokens)
 	else:
@@ -910,40 +942,13 @@ if(useSANI):
 				arrayNumberOfSegments = numSeedTokensInference	#default: 5	#min number of nearest features to target node (note first segment captures all other features)
 				#arrayNumberOfSegments = math.ceil(numSeedTokensInference / 2) + 1	#temp for benchmarking compared to useSANIfeaturesAndColumns/useSANIcolumns [remove this]
 	
-	algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment under conditions		
-	#algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI
-	if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
-		#algorithmMatrixSANIenforceRequirement="enforceAnySegmentMustBeActive"	#activate neuron if any segment is active
-		algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default	#only activate neuron if last segment active
-		#algorithmMatrixSANIenforceRequirement="enforceAllSegmentsMustBeActive" #only activate neuron if all segments are active	#if(enforceSequentialActivation) then redundant; use enforceLastSegmentMustBeActive instead
-		if(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):
-			enforceAllSegmentsMustBeActiveFeatureSegmentsOnly = True	#default: True	#orig: False
-		if(enforceDirectConnectionsSANIminimal):
-			enforceSequentialActivation = False
-		else:
-			if(inferenceSegmentTiming == "none" or inferenceSegmentTiming == "biased"):
-				enforceSequentialActivation = False #default: False
-			elif(inferenceSegmentTiming == "exact" or inferenceSegmentTiming == "seq"):
-				enforceSequentialActivation = True	#optional	#default: True #orig: True	#only activation next segment if previous segment activated
-			else:
-				printe("inferenceSegmentTiming error")
-		if(enforceSequentialActivation):
-			enforceSequentialActivationFeatureSegmentsOnly = True	#default: True	#orig: True
-	else:
-		enforceSequentialActivation = False
-
-	enforceActivationAcrossSegmentsIgnoreInternalColumn = False
-	if(useSANIcolumns):	
-		enforceActivationAcrossSegmentsIgnoreInternalColumn = True	#ignore internal column as this column features do not necessarily have an input from the current column
 	assert (int(useSANIcolumns) + int(useSANIfeatures) + int(useSANIfeaturesAndColumns)) == 1
 
 	if(enforceDirectConnectionsSANI):	#min requirements for enforceDirectConnectionsSANI
 		assert not useSANIcolumns	#enforceDirectConnectionsSANI requires last segment to be adjacent feature segment
 		if(SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens):
 			assert arrayNumberOfSegments >= 2		#note if arrayNumberOfSegments=2 then; sIndex=1: sequential segment connections for adjacent feature, sIndex=0: sequential segment connections for all other feature
-		assert algorithmMatrixSANImethod=="enforceActivationAcrossSegments", "enforceDirectConnectionsSANI requires enforceActivationAcrossSegments"
-		assert algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive" or algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive", "enforceDirectConnectionsSANI requires enforceLastSegmentMustBeActive or enforceAllSegmentsMustBeActive"
-		
+			
 	if(useSANIfeaturesAndColumns):
 		arrayIndexSegmentLast = arrayNumberOfSegments-1	#last feature index
 		arrayIndexSegmentInternalColumn = arrayNumberOfSegmentsColumnDistance-1	#last concept segment/current internal column
@@ -960,7 +965,48 @@ if(useSANI):
 		#absolute minimum, for useSANIcolumns (and useSANIfeaturesAndColumns with arrayNumberOfSegmentsColumnDistance>1), arrayNumberOfSegments must be significantly less than numSeedTokens
 		assert arrayNumberOfSegments <= numSeedTokensInference	
 	'''
+	
+	if(inferenceLeakyIntegrateAndFire):
+		arrayNumberOfSegments += 1	#reserve the final neuron-array segment for the soma activation level
+		arrayIndexSegmentSoma = arrayNumberOfSegments-1
+		algorithmMatrixSANImethod = "leakyIntegrateAndFire"
+		enforceSequentialActivation = False
+		enforceAllSegmentsMustBeActiveFeatureSegmentsOnly = False
+		enforceActivationAcrossSegmentsIgnoreInternalColumn = False
+	else:
+		algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment under conditions		
+		#algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI
+		if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
+			#algorithmMatrixSANIenforceRequirement="enforceAnySegmentMustBeActive"	#activate neuron if any segment is active
+			algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default	#only activate neuron if last segment active
+			#algorithmMatrixSANIenforceRequirement="enforceAllSegmentsMustBeActive" #only activate neuron if all segments are active	#if(enforceSequentialActivation) then redundant; use enforceLastSegmentMustBeActive instead
+			if(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive"):
+				enforceAllSegmentsMustBeActiveFeatureSegmentsOnly = True	#default: True	#orig: False
+			if(enforceDirectConnectionsSANIminimal):
+				enforceSequentialActivation = False
+			else:
+				if(inferenceSegmentTiming == "none" or inferenceSegmentTiming == "biased"):
+					enforceSequentialActivation = False #default: False
+				elif(inferenceSegmentTiming == "exact" or inferenceSegmentTiming == "seq"):
+					enforceSequentialActivation = True	#optional	#default: True #orig: True	#only activation next segment if previous segment activated
+				else:
+					printe("inferenceSegmentTiming error")
+			if(enforceSequentialActivation):
+				enforceSequentialActivationFeatureSegmentsOnly = True	#default: True	#orig: True
+		else:
+			enforceSequentialActivation = False
+
+		enforceActivationAcrossSegmentsIgnoreInternalColumn = False
+		if(useSANIcolumns):	
+			enforceActivationAcrossSegmentsIgnoreInternalColumn = True	#ignore internal column as this column features do not necessarily have an input from the current column
+
+		if(enforceDirectConnectionsSANI):	#min requirements for enforceDirectConnectionsSANI
+			assert algorithmMatrixSANImethod=="enforceActivationAcrossSegments", "enforceDirectConnectionsSANI requires enforceActivationAcrossSegments"
+			assert algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive" or algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive", "enforceDirectConnectionsSANI requires enforceLastSegmentMustBeActive or enforceAllSegmentsMustBeActive"
+			
 else:
+	if(inferenceLeakyIntegrateAndFire):
+		raise RuntimeError("GIAANNcmn_globalDefs error: inferenceLeakyIntegrateAndFire requires useSANI")
 	arrayNumberOfSegments = 1
 	algorithmMatrixSANImethod = "NA"
 	arrayIndexSegmentLast = 0
@@ -970,8 +1016,12 @@ if(multipleDendriticBranchesBinaryTree):
 		raise RuntimeError("GIAANNcmn_globalDefs error: multipleDendriticBranchesBinaryTree requires multipleDendriticBranchesRandom")
 	if(not useSANI):
 		raise RuntimeError("GIAANNcmn_globalDefs error: multipleDendriticBranchesBinaryTree requires useSANI")
-	if(arrayNumberOfSegments != multipleDendriticBranchesBinaryTreeDepth):
-		raise RuntimeError("GIAANNcmn_globalDefs error: multipleDendriticBranchesBinaryTreeDepth must equal arrayNumberOfSegments")
+	if(inferenceLeakyIntegrateAndFire):
+		if(arrayIndexSegmentSoma != multipleDendriticBranchesBinaryTreeDepth):
+			raise RuntimeError("GIAANNcmn_globalDefs error: multipleDendriticBranchesBinaryTreeDepth must equal the number of dendritic segments")
+	else:
+		if(arrayNumberOfSegments != multipleDendriticBranchesBinaryTreeDepth):
+			raise RuntimeError("GIAANNcmn_globalDefs error: multipleDendriticBranchesBinaryTreeDepth must equal arrayNumberOfSegments")
 
 arrayType = pt.float32	#pt.long	#pt.float32
 
@@ -1101,12 +1151,16 @@ if(printConfiguration):
 		print("inferenceBurstAllPredictionsOrTargetsInSequence:", inferenceBurstAllPredictionsOrTargetsInSequence)
 	print("useBenchmarkDefaultsEvalTestSet:", useBenchmarkDefaultsEvalTestSet)
 	print("inferenceEvaluateTestSet:", inferenceEvaluateTestSet)
-	print("inferenceSegmentTiming:", inferenceSegmentTiming)
-	if(inferenceSegmentTiming=="biased"):
-		print("inferenceSegmentTimingMultipicativeBias:", inferenceSegmentTimingMultipicativeBias)
-		if(inferenceSegmentTimingMultipicativeBias):
-			print("inferenceSegmentTimingMultipicativeBiasFactor:", inferenceSegmentTimingMultipicativeBiasFactor)
-	print("inferenceActivationsType:", inferenceActivationsType)
+	print("inferenceLeakyIntegrateAndFire:", inferenceLeakyIntegrateAndFire)
+	if(inferenceLeakyIntegrateAndFire):
+		print("inferenceLeakyIntegrateAndFireSomaActivationThreshold:", inferenceLeakyIntegrateAndFireSomaActivationThreshold)
+	else:
+		print("inferenceSegmentTiming:", inferenceSegmentTiming)
+		if(inferenceSegmentTiming=="biased"):
+			print("inferenceSegmentTimingMultipicativeBias:", inferenceSegmentTimingMultipicativeBias)
+			if(inferenceSegmentTimingMultipicativeBias):
+				print("inferenceSegmentTimingMultipicativeBiasFactor:", inferenceSegmentTimingMultipicativeBiasFactor)
+		print("inferenceActivationsType:", inferenceActivationsType)
 	print("inferenceReportTokenAccuracyConstrainByColumn:", inferenceReportTokenAccuracyConstrainByColumn)
 	print("inferenceReportGroundedAccuracy:", inferenceReportGroundedAccuracy)
 	if(inferenceReportGroundedAccuracy):

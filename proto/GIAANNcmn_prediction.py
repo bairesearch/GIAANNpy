@@ -567,7 +567,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, conceptColumnIndexTensorActivation, conceptColumnFeatureIndexTensorActivation = calculateConceptActivationTarget(conceptColumnIndex, conceptColumnFeatureIndex, conceptActivationState)
 		#populate sequence observed columns;
 		sequenceObservedColumnsPrediction = createSequenceObservedColumnsPrediction(databaseNetworkObject, observedColumnsDict, conceptColumnIndex, sequenceWordIndex)
-		#decrement global activations;
+		#propagate LIF activations/decrement legacy activations;
 		globalFeatureNeuronsActivation = decrementGlobalFeatureActivationsForPrediction(globalFeatureNeuronsActivation)
 		#set activationSequenceWordIndex/activationSequenceColumnIndex;
 		activationSequenceWordIndex, activationSequenceColumnIndex = calculateActivationSequenceIndices(sequenceWordIndex, sequenceColumnIndex, conceptMask)
@@ -599,6 +599,8 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		conceptColumnIndexPred, conceptColumnFeatureIndexPred, conceptColumnIndexNext, conceptColumnFeatureIndexNext, targetPreviousColumnIndex, targetNextColumnIndex, predictionCandidatesAvailable = selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap)
 	if(conceptColumnIndexPred is None or conceptColumnFeatureIndexPred is None):
 		GIAANNcmn_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no prediction candidates available")
+	if(inferenceLeakyIntegrateAndFire):
+		globalFeatureNeuronsActivation = GIAANNcmn_predictionActivate.decrementLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation)
 
 	#calculate featurePredictionTargetMatch; 
 	featurePredictionTargetMatch, targetWord, predictedWord, targetColumnName, predictedColumnName = calculateInferencePredictionMatch(tokensSequence, sequenceWordIndex, conceptMask, databaseNetworkObject, conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex, predictionCandidatesAvailable)
@@ -650,21 +652,24 @@ def activateSeedPredictionSegments(globalFeatureNeuronsActivation, conceptColumn
 	if(not globalFeatureNeuronsActivation.is_sparse):
 		raise RuntimeError("activateSeedPredictionSegments error: globalFeatureNeuronsActivation must be sparse")
 	if(useSANI):
-		if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
-			if(algorithmMatrixSANIenforceRequirement!="enforceAnySegmentMustBeActive" and algorithmMatrixSANIenforceRequirement!="enforceLastSegmentMustBeActive" and algorithmMatrixSANIenforceRequirement!="enforceAllSegmentsMustBeActive"):
-				raise RuntimeError("activateSeedPredictionSegments error: algorithmMatrixSANIenforceRequirement is invalid")
-			if(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive" or enforceSequentialActivation):
-				if(enforceActivationAcrossSegmentsIgnoreInternalColumn):
-					lastSegmentConstraint = arrayIndexSegmentAdjacentColumn
-				else:
-					lastSegmentConstraint = arrayIndexSegmentLast
-				segmentIndices = pt.arange(arrayIndexSegmentFirst, lastSegmentConstraint+1, dtype=pt.long, device=globalFeatureNeuronsActivation.device)
-			else:
-				segmentIndices = pt.tensor([arrayIndexSegmentLast], dtype=pt.long, device=globalFeatureNeuronsActivation.device)
-		elif(algorithmMatrixSANImethod=="doNotEnforceActivationAcrossSegments"):
-			segmentIndices = pt.tensor([arrayIndexSegmentLast], dtype=pt.long, device=globalFeatureNeuronsActivation.device)
+		if(inferenceLeakyIntegrateAndFire):
+			segmentIndices = pt.tensor([arrayIndexSegmentSoma], dtype=pt.long, device=globalFeatureNeuronsActivation.device)
 		else:
-			raise RuntimeError("activateSeedPredictionSegments error: algorithmMatrixSANImethod is invalid")
+			if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
+				if(algorithmMatrixSANIenforceRequirement!="enforceAnySegmentMustBeActive" and algorithmMatrixSANIenforceRequirement!="enforceLastSegmentMustBeActive" and algorithmMatrixSANIenforceRequirement!="enforceAllSegmentsMustBeActive"):
+					raise RuntimeError("activateSeedPredictionSegments error: algorithmMatrixSANIenforceRequirement is invalid")
+				if(algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive" or enforceSequentialActivation):
+					if(enforceActivationAcrossSegmentsIgnoreInternalColumn):
+						lastSegmentConstraint = arrayIndexSegmentAdjacentColumn
+					else:
+						lastSegmentConstraint = arrayIndexSegmentLast
+					segmentIndices = pt.arange(arrayIndexSegmentFirst, lastSegmentConstraint+1, dtype=pt.long, device=globalFeatureNeuronsActivation.device)
+				else:
+					segmentIndices = pt.tensor([arrayIndexSegmentLast], dtype=pt.long, device=globalFeatureNeuronsActivation.device)
+			elif(algorithmMatrixSANImethod=="doNotEnforceActivationAcrossSegments"):
+				segmentIndices = pt.tensor([arrayIndexSegmentLast], dtype=pt.long, device=globalFeatureNeuronsActivation.device)
+			else:
+				raise RuntimeError("activateSeedPredictionSegments error: algorithmMatrixSANImethod is invalid")
 	else:
 		segmentIndices = pt.tensor([arrayIndexSegmentFirst], dtype=pt.long, device=globalFeatureNeuronsActivation.device)
 	branchIndex = arrayIndexSegmentFirst
@@ -679,7 +684,10 @@ def activateSeedPredictionSegments(globalFeatureNeuronsActivation, conceptColumn
 	columnIndices = pt.full_like(segmentIndices, int(conceptColumnIndex))
 	featureIndices = pt.full_like(segmentIndices, int(conceptColumnFeatureIndex))
 	updateIndices = pt.stack([branchIndices, segmentIndices, columnIndices, featureIndices], dim=0)
-	updateValues = pt.full((segmentIndices.shape[0],), j1, dtype=globalFeatureNeuronsActivation.dtype, device=globalFeatureNeuronsActivation.device)
+	burstActivation = j1
+	if(inferenceLeakyIntegrateAndFire):
+		burstActivation = max(j1, inferenceLeakyIntegrateAndFireSomaActivationThreshold)
+	updateValues = pt.full((segmentIndices.shape[0],), burstActivation, dtype=globalFeatureNeuronsActivation.dtype, device=globalFeatureNeuronsActivation.device)
 	updateTensor = pt.sparse_coo_tensor(updateIndices, updateValues, size=globalFeatureNeuronsActivation.size(), dtype=globalFeatureNeuronsActivation.dtype, device=globalFeatureNeuronsActivation.device)
 	globalFeatureNeuronsActivationResult = (globalFeatureNeuronsActivation.coalesce() + updateTensor).coalesce()
 	return globalFeatureNeuronsActivationResult
@@ -760,7 +768,9 @@ def createSequenceObservedColumnsPrediction(databaseNetworkObject, observedColum
 def decrementGlobalFeatureActivationsForPrediction(globalFeatureNeuronsActivation):
 	#decrement global activations;
 	globalFeatureNeuronsActivationResult = globalFeatureNeuronsActivation
-	if(inferenceDecrementActivations):
+	if(inferenceLeakyIntegrateAndFire):
+		globalFeatureNeuronsActivationResult = GIAANNcmn_predictionActivate.propagateLeakyIntegrateAndFireActivations(globalFeatureNeuronsActivationResult)
+	elif(inferenceDecrementActivations):
 		#decrement activation after each prediction interval
 		globalFeatureNeuronsActivationResult = GIAANNcmn_predictionActivate.decrementActivation(globalFeatureNeuronsActivationResult, activationDecrementPerPredictedToken)
 		#if(inferenceUseNeuronFeaturePropertiesTime):	#OLD
@@ -803,25 +813,37 @@ def deactivatePredictedNeuronActivations(globalFeatureNeuronsActivation, concept
 	globalFeatureNeuronsActivationResult = globalFeatureNeuronsActivation
 	conceptActivationStateResult = conceptActivationState
 	if(inferenceDeactivateNeuronsUponPrediction):
-		branchIndex = 0
-		if(multipleDendriticBranches):
-			branchIndex = GIAANNcmn_predictionActivate.selectActivatedBranchIndex(globalFeatureNeuronsActivationResult, int(conceptColumnIndex), int(conceptColumnFeatureIndex))
-		branchTensor = pt.tensor(branchIndex, device=conceptColumnIndexTensor.device)
-		if(useSANI):
-			if(multipleDendriticBranchesBinaryTree):
-				segmentIndices = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=conceptColumnIndexTensor.device)
-				branchIndices = pt.full_like(segmentIndices, branchIndex)
-				branchDivisors = pt.pow(pt.full_like(segmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor), segmentIndices)
-				binaryTreeBranchIndices = pt.div(branchIndices, branchDivisors, rounding_mode="floor")
-				indicesToUpdate = pt.stack([binaryTreeBranchIndices, segmentIndices, conceptColumnIndexTensor.squeeze().expand(arrayNumberOfSegments), conceptColumnFeatureIndexTensorActivation.squeeze().expand(arrayNumberOfSegments)], dim=1)
-			else:
-				indicesToUpdateList = []
-				for segmentIndex in range(arrayNumberOfSegments):
-					indexToUpdate = pt.stack([branchTensor, pt.tensor(segmentIndex, device=conceptColumnIndexTensor.device), conceptColumnIndexTensor.squeeze(), conceptColumnFeatureIndexTensorActivation.squeeze()], dim=0)
-					indicesToUpdateList.append(indexToUpdate)
-				indicesToUpdate = pt.stack(indicesToUpdateList, dim=0)
+		if(inferenceLeakyIntegrateAndFire):
+			if(inferenceDeactivateSegmentsUponPrediction):
+				branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=conceptColumnIndexTensor.device).repeat_interleave(arrayNumberOfSegments)
+				segmentIndices = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=conceptColumnIndexTensor.device).repeat(multipleDendriticBranchesNumber)
+				indicesToUpdate = pt.stack([branchIndices, segmentIndices, conceptColumnIndexTensor.squeeze().expand(branchIndices.shape[0]), conceptColumnFeatureIndexTensorActivation.squeeze().expand(branchIndices.shape[0])], dim=1)
+			if(not inferenceDeactivateSegmentsUponPrediction):
+				branchIndices = pt.tensor([inferenceLeakyIntegrateAndFireSomaBranchIndex], dtype=pt.long, device=globalFeatureNeuronsActivationResult.device)
+				segmentIndices = pt.tensor([arrayIndexSegmentSoma], dtype=pt.long, device=globalFeatureNeuronsActivationResult.device)
+				columnIndices = pt.full_like(branchIndices, int(conceptColumnIndexTensor.squeeze().item()))
+				featureIndices = pt.full_like(branchIndices, int(conceptColumnFeatureIndexTensorActivation.squeeze().item()))
+				indicesToUpdate = pt.stack([branchIndices, segmentIndices, columnIndices, featureIndices], dim=1)
 		else:
-			indicesToUpdate = pt.stack([branchTensor, pt.tensor(arrayIndexSegmentFirst, device=conceptColumnIndexTensor.device), conceptColumnIndexTensor.squeeze(), conceptColumnFeatureIndexTensorActivation.squeeze()], dim=0)
+			branchIndex = 0
+			if(multipleDendriticBranches):
+				branchIndex = GIAANNcmn_predictionActivate.selectActivatedBranchIndex(globalFeatureNeuronsActivationResult, int(conceptColumnIndex), int(conceptColumnFeatureIndex))
+			branchTensor = pt.tensor(branchIndex, device=conceptColumnIndexTensor.device)
+			if(useSANI):
+				if(multipleDendriticBranchesBinaryTree):
+					segmentIndices = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=conceptColumnIndexTensor.device)
+					branchIndices = pt.full_like(segmentIndices, branchIndex)
+					branchDivisors = pt.pow(pt.full_like(segmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor), segmentIndices)
+					binaryTreeBranchIndices = pt.div(branchIndices, branchDivisors, rounding_mode="floor")
+					indicesToUpdate = pt.stack([binaryTreeBranchIndices, segmentIndices, conceptColumnIndexTensor.squeeze().expand(arrayNumberOfSegments), conceptColumnFeatureIndexTensorActivation.squeeze().expand(arrayNumberOfSegments)], dim=1)
+				else:
+					indicesToUpdateList = []
+					for segmentIndex in range(arrayNumberOfSegments):
+						indexToUpdate = pt.stack([branchTensor, pt.tensor(segmentIndex, device=conceptColumnIndexTensor.device), conceptColumnIndexTensor.squeeze(), conceptColumnFeatureIndexTensorActivation.squeeze()], dim=0)
+						indicesToUpdateList.append(indexToUpdate)
+					indicesToUpdate = pt.stack(indicesToUpdateList, dim=0)
+			else:
+				indicesToUpdate = pt.stack([branchTensor, pt.tensor(arrayIndexSegmentFirst, device=conceptColumnIndexTensor.device), conceptColumnIndexTensor.squeeze(), conceptColumnFeatureIndexTensorActivation.squeeze()], dim=0)
 		modifier = 0
 		globalFeatureNeuronsActivationResult = GIAANNcmn_sparseTensors.modifySparseTensor(globalFeatureNeuronsActivationResult, indicesToUpdate, modifier, multiply=False)
 		if(predictionColumnsMustActivateConceptFeature):
