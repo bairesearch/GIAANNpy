@@ -120,7 +120,10 @@ else:
 
 inferenceLeakyIntegrateAndFire = False	#default: False	#orig: False
 if(inferenceLeakyIntegrateAndFire):
-	inferenceLeakyIntegrateAndFireSomaActivationThreshold = 0.004	#default: 0.004; must remain below the activation produced by one Boolean-strength connection
+	if(useBenchmarkDefaultsEvalTestSetOptim):
+		inferenceLeakyIntegrateAndFireSomaActivationThreshold = 0.008	#default: 0.008	 #optimised for continuous connection-strength activations
+	else:
+		inferenceLeakyIntegrateAndFireSomaActivationThreshold = 0.004	#orig: 0.004
 	inferenceLeakyIntegrateAndFireNeuronTensorRank = 4	#mandatory: branch, segment, concept, feature
 	inferenceLeakyIntegrateAndFireBranchDimension = 0	#mandatory
 	inferenceLeakyIntegrateAndFireSegmentDimension = 1	#mandatory
@@ -171,7 +174,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 1000	#5000, 200000, 1000000
+	trainMaxSequences = 5000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 50000	#5000
@@ -425,10 +428,13 @@ if(useInference):
 
 #Inference activations;
 if(useInference):
-	if(useBenchmarkDefaultsEvalTestSetOptim):
-		inferenceActivationFunction = False	#default:False	
+	if(inferenceLeakyIntegrateAndFire):
+		inferenceActivationFunction = True	#default:True
 	else:
-		inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
+		if(useBenchmarkDefaultsEvalTestSetOptim):
+			inferenceActivationFunction = False	#default:False	
+		else:
+			inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
 	if(useSANI):
 		inferenceApplySequentialActivationSparse = True	#default: True	#orig: False
 		if(useBenchmarkDefaultsEvalTestSetOptim):
@@ -765,7 +771,10 @@ if(useInference):
 					inferenceDuringTrainTargetConnectionTensorRank = 4
 	inferenceDeactivateNeuronsUponPrediction = True	#default: True
 	if(inferenceLeakyIntegrateAndFire):
-		inferenceDecrementActivationsSomaPerPredictedToken = 0.50	#0.05	#CHECKTHIS
+		if(useBenchmarkDefaultsEvalTestSetOptim):
+			inferenceDecrementActivationsSomaPerPredictedToken = 0.75	#default: 0.75	
+		else:
+			inferenceDecrementActivationsSomaPerPredictedToken = 0.50	#orig: 0.50
 		inferenceDecrementActivationsSomaNonlinear = True
 		if(not isinstance(inferenceDecrementActivationsSomaPerPredictedToken, (int, float)) or isinstance(inferenceDecrementActivationsSomaPerPredictedToken, bool) or not math.isfinite(inferenceDecrementActivationsSomaPerPredictedToken) or inferenceDecrementActivationsSomaPerPredictedToken < 0.0 or inferenceDecrementActivationsSomaPerPredictedToken > 1.0):
 			raise RuntimeError("GIAANNcmn_globalDefs error: inferenceDecrementActivationsSomaPerPredictedToken must be a finite number within [0, 1]")
