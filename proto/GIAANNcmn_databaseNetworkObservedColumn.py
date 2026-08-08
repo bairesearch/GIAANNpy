@@ -21,6 +21,8 @@ import torch as pt
 import time
 
 from GIAANNcmn_globalDefs import *
+if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
+	import numpy as np
 import GIAANNcmn_debug
 import GIAANNcmn_databaseNetworkFiles
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
@@ -29,7 +31,80 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 	import GIAANNnlp_auxiliaryNeuronsAuto
 
 
+class PackedDatabaseResidentFeatureConnections:
+	__slots__ = ("entries", "tensorSize")
+
+	def __init__(self, tensor):
+		if(not optimisationStoreDatabaseResidentCoordinatesAsInt32):
+			raise RuntimeError("PackedDatabaseResidentFeatureConnections requires optimisationStoreDatabaseResidentCoordinatesAsInt32")
+		if(tensor is None):
+			raise RuntimeError("PackedDatabaseResidentFeatureConnections error: tensor is None")
+		if(tensor.layout != pt.sparse_coo):
+			raise RuntimeError("PackedDatabaseResidentFeatureConnections error: tensor must be sparse COO")
+		if(tensor.dtype != pt.float32 or arrayType != pt.float32):
+			raise RuntimeError("PackedDatabaseResidentFeatureConnections error: tensor and arrayType must be float32")
+		if(not tensor.is_coalesced()):
+			tensor = tensor.coalesce()
+		indices = tensor.indices()
+		values = tensor.values()
+		if(indices.dtype != pt.long):
+			raise RuntimeError("PackedDatabaseResidentFeatureConnections error: sparse COO coordinates must be int64")
+		if(indices.dim() != 2 or indices.shape[0] != tensor.dim() or indices.shape[1] != values.shape[0]):
+			raise RuntimeError("PackedDatabaseResidentFeatureConnections error: invalid sparse COO coordinate/value shapes")
+		for dimensionSize in tensor.size():
+			if(dimensionSize > databaseResidentCoordinateDimensionSizeMaximum):
+				raise RuntimeError(f"PackedDatabaseResidentFeatureConnections error: tensor dimensions must not exceed {databaseResidentCoordinateDimensionSizeMaximum}")
+		if(indices.numel() > 0):
+			coordinateMinimum = int(indices.min().item())
+			coordinateMaximum = int(indices.max().item())
+			if(coordinateMinimum < databaseResidentCoordinateMinimum or coordinateMaximum > databaseResidentCoordinateMaximum):
+				raise RuntimeError(f"PackedDatabaseResidentFeatureConnections error: coordinates must be within [{databaseResidentCoordinateMinimum}, {databaseResidentCoordinateMaximum}]")
+		entryDtype = np.dtype([(databaseResidentPackedIndicesFieldName, np.int32, (tensor.dim(),)), (databaseResidentPackedValuesFieldName, np.float32)])
+		self.entries = np.empty((values.shape[0],), dtype=entryDtype)
+		self.entries[databaseResidentPackedIndicesFieldName] = indices.detach().transpose(0, 1).to(device=deviceDatabase, dtype=databaseResidentCoordinateDtype).numpy()
+		self.entries[databaseResidentPackedValuesFieldName] = values.detach().to(device=deviceDatabase, dtype=arrayType).numpy()
+		self.tensorSize = tuple(tensor.size())
+		return
+
+	def materialise(self, targetDevice):
+		if(not optimisationStoreDatabaseResidentCoordinatesAsInt32):
+			raise RuntimeError("PackedDatabaseResidentFeatureConnections.materialise requires optimisationStoreDatabaseResidentCoordinatesAsInt32")
+		if(targetDevice is None):
+			raise RuntimeError("PackedDatabaseResidentFeatureConnections.materialise error: targetDevice is None")
+		indicesArray = self.entries[databaseResidentPackedIndicesFieldName].transpose()
+		valuesArray = self.entries[databaseResidentPackedValuesFieldName]
+		indices = pt.from_numpy(indicesArray).to(device=targetDevice, dtype=pt.long).contiguous()
+		values = pt.from_numpy(valuesArray).to(device=targetDevice, dtype=arrayType).contiguous()
+		result = pt.sparse_coo_tensor(indices, values, size=self.tensorSize, dtype=arrayType, device=targetDevice, is_coalesced=True)
+		return result
+
+	@property
+	def shape(self):
+		if(not optimisationStoreDatabaseResidentCoordinatesAsInt32):
+			raise RuntimeError("PackedDatabaseResidentFeatureConnections.shape requires optimisationStoreDatabaseResidentCoordinatesAsInt32")
+		result = self.tensorSize
+		return result
+
+	def expandTensorSize(self, expandedSize):
+		if(not optimisationStoreDatabaseResidentCoordinatesAsInt32):
+			raise RuntimeError("PackedDatabaseResidentFeatureConnections.expandTensorSize requires optimisationStoreDatabaseResidentCoordinatesAsInt32")
+		resolvedExpandedSize = tuple(expandedSize)
+		if(len(resolvedExpandedSize) != len(self.tensorSize)):
+			raise RuntimeError("PackedDatabaseResidentFeatureConnections.expandTensorSize error: tensor rank mismatch")
+		for dimensionIndex in range(len(self.tensorSize)):
+			if(resolvedExpandedSize[dimensionIndex] > databaseResidentCoordinateDimensionSizeMaximum):
+				raise RuntimeError(f"PackedDatabaseResidentFeatureConnections.expandTensorSize error: tensor dimensions must not exceed {databaseResidentCoordinateDimensionSizeMaximum}")
+			if(resolvedExpandedSize[dimensionIndex] < self.tensorSize[dimensionIndex]):
+				raise RuntimeError("PackedDatabaseResidentFeatureConnections.expandTensorSize error: tensor dimensions cannot shrink")
+		self.tensorSize = resolvedExpandedSize
+		return
+
+
 class ObservedColumnConnectionBase:
+	def isDatabaseResidentConnectionStorage(self):
+		result = False
+		return result
+
 	def getObservedColumnErrorName(self):
 		result = type(self).__name__
 		return result
@@ -173,8 +248,13 @@ class ObservedColumnConnectionBase:
 			loadC = sourceTensor.shape[3]
 			if(newC > loadC):
 				expandedSize = (sourceTensor.shape[0], sourceTensor.shape[1], sourceTensor.shape[2], newC, sourceTensor.shape[4])
-				sourceTensor = GIAANNcmn_databaseNetworkFiles.expandSparseTensorSize(sourceTensor, expandedSize, f"{self.getObservedColumnErrorName()}.expandFeatureConnectionsArraysConcepts")
-				self.featureConnectionsBySourceFeature[sourceFeatureIndex] = sourceTensor
+				if(optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage()):
+					if(not isinstance(sourceTensor, PackedDatabaseResidentFeatureConnections)):
+						raise RuntimeError(f"{self.getObservedColumnErrorName()}.expandFeatureConnectionsArraysConcepts error: resident source feature tensor {sourceFeatureIndex} is not packed")
+					sourceTensor.expandTensorSize(expandedSize)
+				else:
+					sourceTensor = GIAANNcmn_databaseNetworkFiles.expandSparseTensorSize(sourceTensor, expandedSize, f"{self.getObservedColumnErrorName()}.expandFeatureConnectionsArraysConcepts")
+					self.featureConnectionsBySourceFeature[sourceFeatureIndex] = sourceTensor
 		return
 
 	def requiresExpandFeatureNeuronArraysFeatures(self, newF):
@@ -236,8 +316,13 @@ class ObservedColumnConnectionBase:
 			loadF = sourceTensor.shape[4]
 			if(newF > loadF):
 				expandedSizeConnections = (sourceTensor.shape[0], sourceTensor.shape[1], sourceTensor.shape[2], sourceTensor.shape[3], newF)
-				sourceTensor = GIAANNcmn_databaseNetworkFiles.expandSparseTensorSize(sourceTensor, expandedSizeConnections, f"{self.getObservedColumnErrorName()}.expandFeatureConnectionsArraysFeatures")
-				self.featureConnectionsBySourceFeature[sourceFeatureIndex] = sourceTensor
+				if(optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage()):
+					if(not isinstance(sourceTensor, PackedDatabaseResidentFeatureConnections)):
+						raise RuntimeError(f"{self.getObservedColumnErrorName()}.expandFeatureConnectionsArraysFeatures error: resident source feature tensor {sourceFeatureIndex} is not packed")
+					sourceTensor.expandTensorSize(expandedSizeConnections)
+				else:
+					sourceTensor = GIAANNcmn_databaseNetworkFiles.expandSparseTensorSize(sourceTensor, expandedSizeConnections, f"{self.getObservedColumnErrorName()}.expandFeatureConnectionsArraysFeatures")
+					self.featureConnectionsBySourceFeature[sourceFeatureIndex] = sourceTensor
 		return
 
 	def ensureObservedColumnFeatureArraysFeatures(self, newF):
@@ -276,8 +361,11 @@ class ObservedColumnConnectionBase:
 			raise RuntimeError(f"{errorName}.setFeatureConnectionsForSourceFeature error: tensor size {tuple(tensor.size())} does not match expected size {tuple(expectedSize)}")
 		if(not tensor.is_coalesced()):
 			tensor = tensor.coalesce()
-		self.featureConnectionsBySourceFeature[normalisedSourceFeatureIndex] = tensor
-		self.loadedSourceFeatureIndices.add(normalisedSourceFeatureIndex)
+		if(optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage()):
+			self.featureConnectionsBySourceFeature[normalisedSourceFeatureIndex] = PackedDatabaseResidentFeatureConnections(tensor)
+		else:
+			self.featureConnectionsBySourceFeature[normalisedSourceFeatureIndex] = tensor
+			self.loadedSourceFeatureIndices.add(normalisedSourceFeatureIndex)
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
 			if(debugSectionName is not None):
 				GIAANNcmn_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, debugSectionName, time.perf_counter() - debugSectionStartTime)
@@ -360,6 +448,10 @@ class ObservedColumn(ObservedColumnConnectionBase):
 				self.featureIndexToWord[featureIndex] = featureWord
 				self.nextFeatureIndex += 1
 
+	def isDatabaseResidentConnectionStorage(self):
+		result = storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam
+		return result
+
 	def initialiseFeatureNeurons(self, f, targetDevice=None):
 		deviceTarget = targetDevice if targetDevice is not None else (deviceDatabase if storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam else deviceSparse)
 		indices = pt.empty((4, 0), dtype=pt.long, device=deviceTarget)
@@ -371,7 +463,12 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		deviceTarget = deviceDatabase if storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam else deviceSparse
 		if(len(self.featureConnectionsBySourceFeature) > 0):
 			firstTensor = next(iter(self.featureConnectionsBySourceFeature.values()))
-			deviceTarget = firstTensor.device
+			if(optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage()):
+				if(not isinstance(firstTensor, PackedDatabaseResidentFeatureConnections)):
+					raise RuntimeError("ObservedColumn.getDefaultConnectionTargetDevice error: resident source feature tensor is not packed")
+				deviceTarget = deviceDatabase
+			else:
+				deviceTarget = firstTensor.device
 		return deviceTarget
 
 	def listStoredSourceFeatureIndices(self):
@@ -411,11 +508,19 @@ class ObservedColumn(ObservedColumnConnectionBase):
 					result = GIAANNcmn_databaseNetworkFiles.loadObservedColumnSourceFeatureConnectionsTensor(self.databaseNetworkObject, self.conceptIndex, normalisedSourceFeatureIndex, resolvedTargetDevice, ensureCurrentSizeOnLoad=ensureCurrentSizeOnLoad)
 				else:
 					result = self.initialiseFeatureConnections(self.databaseNetworkObject.c, self.databaseNetworkObject.f, resolvedTargetDevice)
-			self.featureConnectionsBySourceFeature[normalisedSourceFeatureIndex] = result
+			if(optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage()):
+				self.featureConnectionsBySourceFeature[normalisedSourceFeatureIndex] = PackedDatabaseResidentFeatureConnections(result)
+			else:
+				self.featureConnectionsBySourceFeature[normalisedSourceFeatureIndex] = result
+		elif(optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage()):
+			if(not isinstance(result, PackedDatabaseResidentFeatureConnections)):
+				raise RuntimeError(f"ObservedColumn.getFeatureConnectionsForSourceFeature error: resident source feature tensor {normalisedSourceFeatureIndex} is not packed")
+			result = result.materialise(resolvedTargetDevice)
 		elif(result.device != resolvedTargetDevice):
 			result = result.to(resolvedTargetDevice)
 			self.featureConnectionsBySourceFeature[normalisedSourceFeatureIndex] = result
-		self.loadedSourceFeatureIndices.add(normalisedSourceFeatureIndex)
+		if(not (optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage())):
+			self.loadedSourceFeatureIndices.add(normalisedSourceFeatureIndex)
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
 			if(debugSectionName is not None):
 				GIAANNcmn_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, debugSectionName, time.perf_counter() - debugSectionStartTime)
@@ -423,7 +528,10 @@ class ObservedColumn(ObservedColumnConnectionBase):
 
 	def saveLoadedSourceFeatureConnectionsToDisk(self, sourceFeatureIndices=None):
 		if(sourceFeatureIndices is None):
-			resolvedSourceFeatureIndices = sorted(self.loadedSourceFeatureIndices)
+			if(optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage()):
+				resolvedSourceFeatureIndices = sorted(self.featureConnectionsBySourceFeature.keys())
+			else:
+				resolvedSourceFeatureIndices = sorted(self.loadedSourceFeatureIndices)
 		else:
 			resolvedSourceFeatureIndices = self.normaliseSourceFeatureIndices(sourceFeatureIndices)
 		if(optimisationGetFeatureConnectionsForSourceFeatureCache):
@@ -433,6 +541,10 @@ class ObservedColumn(ObservedColumnConnectionBase):
 			if(sourceFeatureIndex not in self.featureConnectionsBySourceFeature):
 				raise RuntimeError(f"saveLoadedSourceFeatureConnectionsToDisk error: missing loaded source feature tensor {sourceFeatureIndex}")
 			sourceTensor = self.featureConnectionsBySourceFeature[sourceFeatureIndex]
+			if(optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage()):
+				if(not isinstance(sourceTensor, PackedDatabaseResidentFeatureConnections)):
+					raise RuntimeError(f"saveLoadedSourceFeatureConnectionsToDisk error: resident source feature tensor {sourceFeatureIndex} is not packed")
+				sourceTensor = sourceTensor.materialise(deviceDatabase)
 			GIAANNcmn_databaseNetworkFiles.saveObservedColumnSourceFeatureConnectionsTensor(self.conceptIndex, sourceFeatureIndex, sourceTensor)
 			if(optimisationGetFeatureConnectionsForSourceFeatureCache):
 				if(sourceTensor.is_sparse):

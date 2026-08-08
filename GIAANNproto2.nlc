@@ -569,14 +569,14 @@ MANUAL; - update paper
 - add option tokeniserSubwordColumnIdentificationByConsecutiveNounTokens - identify a concept column by the complete consecutive noun-token surface span
 - add option tokeniserSubwordColumnIdentificationByLemma -= identify a concept column by the normalized spaCy parent-lemma span
 - add option auxiliaryNeuronsPOS - deterministic parent-lemma/POS/subword-role auxiliary source features
-- set useBenchmarkDefaultsEvalTestSetOptim=False
-- move useDefaultsV2:inferenceActivationFunction=False/inferenceConnectionsStrengthBoolean=False settings to useBenchmarkDefaultsEvalTestSetOptim
+MANUAL; - set useBenchmarkDefaultsEvalTestSetOptim=False
+MANUAL; - move useDefaultsV2:inferenceActivationFunction=False/inferenceConnectionsStrengthBoolean=False settings to useBenchmarkDefaultsEvalTestSetOptim
 
 ---
 v2l (Codex IDE GPT-5.6):
 - add proto GIAANNproto2l1a - start option inferenceLeakyIntegrateAndFire:
 	- leaky integrate and fire code replaces all current segment activation storage/propagation code (which was designed to short-cut dendritic flow calculations):
-		- inferenceUseNeuronFeaturePropertiesTime, inferenceUseNeuronFeaturePropertiesTimeExact, inferenceSegmentTiming, inferenceActivationsType [CHECKTHIS Codex: I think activations should never be bool with inferenceLeakyIntegrateAndFire so this variable is redundant].
+		- inferenceUseNeuronFeaturePropertiesTime, inferenceUseNeuronFeaturePropertiesTimeExact, inferenceSegmentTiming, inferenceActivationsType.
 	- leaky integrate and fire code calculates neuron activations by calculating the activation level of each segment at time t during its propagation to the soma.
 	- store the soma activation level in the final segment index (arrayIndexSegmentSoma) of the neuron array.
 	- The soma fires if it reaches a certain activation level.
@@ -602,4 +602,4 @@ AUTORESEARCH; - update inferenceLeakyIntegrateAndFire:useBenchmarkDefaultsEvalTe
 	- soma threshold: `0.004 -> 0.008`
 	- nonlinear soma decay: `0.50 -> 0.75`
 	- set inferenceConnectionsStrengthBoolean=False - preserve continuous trained connection strengths instead of converting them to Boolean values.
-	
+- add option optimisationStoreDatabaseResidentCoordinatesAsInt32

@@ -69,9 +69,9 @@ A number of changes to the default settings were introduced in GIAANN Proto 2 th
 \toprule
 \textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{t-1} & \textbf{param} & \textbf{db size} & \textbf{words} & \textbf{tokens} \\
 \midrule
-8 & 3 & 5 & 5,000     & 0.858 & 2.0M & 0.3GB & 0.1M & 0.1M \\
-8 & 3 & 5 & 200,000   & 0.844 & 74.9M & 7.4GB &	5.2M & 5.8M \\
-8 & 3 & 5 & 1,000,000 & 0.776 & 347.0M & 29.3GB & 26.0M & 28.8M \\
+8 & 4 & 4 & 5,000     & 0.858 & 2.0M & 0.3GB & 0.1M & 0.1M \\
+8 & 4 & 4 & 200,000   & 0.844 & 74.9M & 7.4GB &	5.2M & 5.8M \\
+8 & 4 & 4 & 1,000,000 & 0.776 & 347.0M & 29.3GB & 26.0M & 28.8M \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -84,9 +84,9 @@ A number of changes to the default settings were introduced in GIAANN Proto 2 th
 \toprule
 \textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{t-1} & \textbf{param} & \textbf{db size} & \textbf{words} & \textbf{tokens} \\
 \midrule
-8 & 3 & 5 & 5,000     & 0.777 & 5.8M & 0.7GB & 0.3M & 0.3M \\
-8 & 3 & 5 & 200,000   & 0.726 & 212.3M & 17.2GB & 11.9M & 13.2M \\
-8 & 3 & 5 & 1,000,000 & 0.645 & 979.4M & 69.9GB & 59.6M & 66.2M \\
+8 & 4 & 4 & 5,000     & 0.777 & 5.8M & 0.7GB & 0.3M & 0.3M \\
+8 & 4 & 4 & 200,000   & 0.726 & 212.3M & 17.2GB & 11.9M & 13.2M \\
+8 & 4 & 4 & 1,000,000 & 0.645 & 979.4M & 69.9GB & 59.6M & 66.2M \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -141,9 +141,9 @@ A number of changes to the default settings were introduced in GIAANN Proto 2 th
 \toprule
 \textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{t-1} & \textbf{param} & \textbf{db size} & \textbf{words} & \textbf{tokens} \\
 \midrule
-8 & 3 & 5 & 5,000     & 0.065 & 2.0M & 0.3GB & 0.1M & 0.1M \\
-8 & 3 & 5 & 200,000   & 0.167 & 74.9M & 7.4GB &	5.2M & 5.8M \\
-8 & 3 & 5 & 1,000,000 & 0.192 & 347.0M & 29.3GB & 26.0M & 28.8M \\
+8 & 4 & 4 & 5,000     & 0.065 & 2.0M & 0.3GB & 0.1M & 0.1M \\
+8 & 4 & 4 & 200,000   & 0.167 & 74.9M & 7.4GB &	5.2M & 5.8M \\
+8 & 4 & 4 & 1,000,000 & 0.192 & 347.0M & 29.3GB & 26.0M & 28.8M \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -156,9 +156,9 @@ A number of changes to the default settings were introduced in GIAANN Proto 2 th
 \toprule
 \textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{t-1} & \textbf{param} & \textbf{db size} & \textbf{words} & \textbf{tokens} \\
 \midrule
-8 & 3 & 5 & 5,000     & 0.081 & 5.8M & 0.7GB & 0.3M & 0.3M \\
-8 & 3 & 5 & 200,000   & 0.164 & 212.3M & 17.2GB & 11.9M & 13.2M \\
-8 & 3 & 5 & 1,000,000 & 0.189 & 979.4M & 69.9GB & 59.6M & 66.2M \\
+8 & 4 & 4 & 5,000     & 0.081 & 5.8M & 0.7GB & 0.3M & 0.3M \\
+8 & 4 & 4 & 200,000   & 0.164 & 212.3M & 17.2GB & 11.9M & 13.2M \\
+8 & 4 & 4 & 1,000,000 & 0.189 & 979.4M & 69.9GB & 59.6M & 66.2M \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -232,15 +232,15 @@ A number of optimisations were introduced in GIAANN Proto 2 that affect evaluati
 \toprule
 \textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{phase} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{cpu ram} \\
 \midrule
-8 & 3 & 5 & 5,000       & train   & 00:00:50 & 00:00:42 & 00:00:07 & 1.4GB \\
-8 & 3 & 5 & 200,000     & train   & 00:56:46 & 00:54:05 & 00:02:40 & 7.9GB \\
-8 & 3 & 5 & 1,000,000   & train   & 05:56:15 & 05:46:32 & 00:09:43 & 31.1GB \\
-8 & 3 & 5 & 5,000       & tr eval & 00:01:07 & 00:01:07 & 00:00:00 & 1.2GB \\
-8 & 3 & 5 & 200,000     & tr eval & 00:02:38 & 00:02:38 & 00:00:00 & 1.2GB \\
-8 & 3 & 5 & 1,000,000   & tr eval & 00:06:24 & 00:06:24 & 00:00:00 & 1.3GB \\
-8 & 3 & 5 & 5,000       & ts eval & 00:00:39 & 00:00:39 & 00:00:00 & 1.2GB \\
-8 & 3 & 5 & 200,000     & ts eval & 00:02:29 & 00:02:29 & 00:00:00 & 1.2GB \\
-8 & 3 & 5 & 1,000,000   & ts eval & 00:06:28 & 00:06:28 & 00:00:00 & 1.3GB \\
+8 & 4 & 4 & 5,000       & train   & 00:00:50 & 00:00:42 & 00:00:07 & 1.4GB \\
+8 & 4 & 4 & 200,000     & train   & 00:56:46 & 00:54:05 & 00:02:40 & 7.9GB \\
+8 & 4 & 4 & 1,000,000   & train   & 05:56:15 & 05:46:32 & 00:09:43 & 31.1GB \\
+8 & 4 & 4 & 5,000       & tr eval & 00:01:07 & 00:01:07 & 00:00:00 & 1.2GB \\
+8 & 4 & 4 & 200,000     & tr eval & 00:02:38 & 00:02:38 & 00:00:00 & 1.2GB \\
+8 & 4 & 4 & 1,000,000   & tr eval & 00:06:24 & 00:06:24 & 00:00:00 & 1.3GB \\
+8 & 4 & 4 & 5,000       & ts eval & 00:00:39 & 00:00:39 & 00:00:00 & 1.2GB \\
+8 & 4 & 4 & 200,000     & ts eval & 00:02:29 & 00:02:29 & 00:00:00 & 1.2GB \\
+8 & 4 & 4 & 1,000,000   & ts eval & 00:06:28 & 00:06:28 & 00:00:00 & 1.3GB \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -253,15 +253,15 @@ A number of optimisations were introduced in GIAANN Proto 2 that affect evaluati
 \toprule
 \textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{phase} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{cpu ram} \\
 \midrule
-8 & 3 & 5 & 5,000       & train   & 00:01:45 & 00:01:28 & 00:00:16 & 1.8GB \\
-8 & 3 & 5 & 200,000     & train   & 02:02:06 & 01:56:42 & 00:05:24 & 17.9GB \\
-8 & 3 & 5 & 1,000,000   & train   & - & - & - & - \\
-8 & 3 & 5 & 5,000       & tr eval & 00:02:41 & 00:02:41 & 00:00:00 & 1.3GB \\
-8 & 3 & 5 & 200,000     & tr eval & 00:14:36 & 00:14:36 & 00:00:00 & 1.3GB \\
-8 & 3 & 5 & 1,000,000   & tr eval & 00:51:26 & 00:51:26 & 00:00:00 & 1.6GB \\
-8 & 3 & 5 & 5,000       & ts eval & 00:02:34 & 00:02:34 & 00:00:00 & 1.3GB \\
-8 & 3 & 5 & 200,000     & ts eval & 00:16:35 & 00:16:35 & 00:00:00 & 1.4GB \\
-8 & 3 & 5 & 1,000,000   & ts eval & 00:51:00 & 00:51:00 & 00:00:00 & 1.7GB \\
+8 & 4 & 4 & 5,000       & train   & 00:01:45 & 00:01:28 & 00:00:16 & 1.8GB \\
+8 & 4 & 4 & 200,000     & train   & 02:02:06 & 01:56:42 & 00:05:24 & 17.9GB \\
+8 & 4 & 4 & 1,000,000   & train   & - & - & - & - \\
+8 & 4 & 4 & 5,000       & tr eval & 00:02:41 & 00:02:41 & 00:00:00 & 1.3GB \\
+8 & 4 & 4 & 200,000     & tr eval & 00:14:36 & 00:14:36 & 00:00:00 & 1.3GB \\
+8 & 4 & 4 & 1,000,000   & tr eval & 00:51:26 & 00:51:26 & 00:00:00 & 1.6GB \\
+8 & 4 & 4 & 5,000       & ts eval & 00:02:34 & 00:02:34 & 00:00:00 & 1.3GB \\
+8 & 4 & 4 & 200,000     & ts eval & 00:16:35 & 00:16:35 & 00:00:00 & 1.4GB \\
+8 & 4 & 4 & 1,000,000   & ts eval & 00:51:00 & 00:51:00 & 00:00:00 & 1.7GB \\
 \bottomrule
 \end{tabular}
 \end{table}

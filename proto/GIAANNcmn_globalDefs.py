@@ -54,7 +54,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "trainAndInference"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -95,7 +95,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
+	useBenchmarkDefaultsEvalTestSet = True	#default: False/True
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
@@ -174,7 +174,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 5000	#5000, 200000, 1000000
+	trainMaxSequences = 200000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 50000	#5000
@@ -479,6 +479,16 @@ optimisationNormaliseSourceFeatureIndicesDisabled = False	#default: False	#orig:
 optimisationObservedColumnsWriteMetadataCheck = False	#default: False, orig: False
 optimisationArrayIndexPropertiesEfficientSerialConnections = False	#default: False #orig: True	#uses less GPU RAM
 optimisationArrayIndexPropertiesEfficientSerialNeurons = False	#default: False #orig: False
+optimisationStoreDatabaseResidentCoordinatesAsInt32 = False	#default: False	#orig: False	#~25% database size reduction in RAM (designed for storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam), approx 25% slower train time
+if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
+	databaseResidentCoordinateDtype = pt.int32
+	databaseResidentCoordinateMinimum = 0
+	databaseResidentCoordinateMaximum = pt.iinfo(databaseResidentCoordinateDtype).max
+	databaseResidentCoordinateDimensionSizeMaximum = databaseResidentCoordinateMaximum + 1
+	databaseResidentPackedIndicesFieldName = "indices"
+	databaseResidentPackedValuesFieldName = "values"
+	if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam and useGPUdatabase):
+		raise RuntimeError("GIAANNcmn_globalDefs error: optimisationStoreDatabaseResidentCoordinatesAsInt32 requires CPU database storage")
 
 
 #Draw;
@@ -1274,6 +1284,8 @@ if(printConfiguration):
 	print("optimisationUseCUDAObservedColumnUpdateKernel:", optimisationUseCUDAObservedColumnUpdateKernel)
 	print("optimisationGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize:", optimisationGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize)
 	print("optimisationGetFeatureConnectionsForSourceFeatureCache:", optimisationGetFeatureConnectionsForSourceFeatureCache)
+	if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
+		print("optimisationStoreDatabaseResidentCoordinatesAsInt32:", optimisationStoreDatabaseResidentCoordinatesAsInt32)
 	print("optimisationNormaliseSourceFeatureIndicesDisabled:", optimisationNormaliseSourceFeatureIndicesDisabled)
 	print("optimisationObservedColumnsWriteMetadataCheck:", optimisationObservedColumnsWriteMetadataCheck)
 	print("")
