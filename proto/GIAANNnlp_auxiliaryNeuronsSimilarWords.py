@@ -115,6 +115,26 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		result = globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult
 		return result
 
+	def processAuxiliaryFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sourceColumnIndex, sourceFeatureIndex, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None):
+		result = None
+		if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+			import GIAANNcmn_predictionActivate
+			globalFeatureNeuronsActivationResult = globalFeatureNeuronsActivation
+			globalFeatureConnectionsActivationResult = globalFeatureConnectionsActivation
+			globalFeatureNeuronsTimeResult = globalFeatureNeuronsTime
+			connectionDevice = globalFeatureNeuronsActivationResult.device
+			sourceActivation = GIAANNcmn_predictionActivate.calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivationResult, sourceColumnIndex, sourceFeatureIndex)
+			sourceActivationValue = collapseSourceActivationForAuxiliaryInput(sourceActivation)
+			if(float(sourceActivationValue.item()) > auxiliaryNeuronsSimilarWordsMinimumSimilarity):
+				if(len(getPrimeAuxiliaryFeaturePrefixes()) > 0 and int(sourceFeatureIndex) == featureIndexPrimeConceptNeuron):
+					globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult, somaActivationFromLastSegmentKeys = processAuxiliaryPrimeFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, int(sourceColumnIndex), int(sourceFeatureIndex), sourceActivationValue, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTimeResult, sequenceWordIndex, sequenceColumnIndex, connectionDevice)
+				if(len(getSecondaryAuxiliaryFeaturePrefixes()) > 0 and int(sourceFeatureIndex) != featureIndexPrimeConceptNeuron and secondaryAuxiliaryFeatureHasSimilarityWord(databaseNetworkObject, int(sourceFeatureIndex))):
+					globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult, somaActivationFromLastSegmentKeys = processAuxiliarySecondaryFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, int(sourceFeatureIndex), sourceActivationValue, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTimeResult, sequenceWordIndex, sequenceColumnIndex, connectionDevice)
+			result = globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult, somaActivationFromLastSegmentKeys
+		else:
+			raise RuntimeError("processAuxiliaryFeaturePredictionActivationsEnforceLastSegment error: requires inferenceLeakyIntegrateAndFire enforceLastSegmentMustBeActive")
+		return result
+
 	def processAuxiliaryPrimeFeaturePredictionActivations(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sourceColumnIndex, sourceFeatureIndex, sourceActivationValue, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex, connectionDevice):
 		import GIAANNcmn_predictionActivate
 		globalFeatureNeuronsActivationResult = globalFeatureNeuronsActivation
@@ -129,6 +149,25 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		result = globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult
 		return result
 
+	def processAuxiliaryPrimeFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sourceColumnIndex, sourceFeatureIndex, sourceActivationValue, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex, connectionDevice):
+		result = None
+		if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+			import GIAANNcmn_predictionActivate
+			globalFeatureNeuronsActivationResult = globalFeatureNeuronsActivation
+			globalFeatureConnectionsActivationResult = globalFeatureConnectionsActivation
+			globalFeatureNeuronsTimeResult = globalFeatureNeuronsTime
+			auxiliaryActivations = calculatePrimeAuxiliaryConceptActivations(databaseNetworkObject, sourceColumnIndex, sourceFeatureIndex, sourceActivationValue, connectionDevice)
+			if(auxiliaryActivationVectorHasActiveValues(auxiliaryActivations)):
+				materialisedConnections = getPrimeOutputConnectionsMaterialised(databaseNetworkObject, connectionDevice, auxiliaryActivations)
+				featureNeuronsTargetActivation = calculateAuxiliaryFeatureTargetActivation(databaseNetworkObject, materialisedConnections, auxiliaryActivations)
+				if(sparseTensorHasValues(featureNeuronsTargetActivation)):
+					featureNeuronsTargetActivation, somaActivationFromLastSegmentKeys = GIAANNcmn_predictionActivate.mergeLeakyIntegrateAndFireCurrentSomaActivationKeys(somaActivationFromLastSegmentKeys, featureNeuronsTargetActivation)
+					globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = GIAANNcmn_predictionActivate.applyFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, featureNeuronsTargetActivation, globalFeatureNeuronsTimeResult, sequenceWordIndex, sequenceColumnIndex, applySegmentActivations=False)
+			result = globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult, somaActivationFromLastSegmentKeys
+		else:
+			raise RuntimeError("processAuxiliaryPrimeFeaturePredictionActivationsEnforceLastSegment error: requires inferenceLeakyIntegrateAndFire enforceLastSegmentMustBeActive")
+		return result
+
 	def processAuxiliarySecondaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sourceFeatureIndex, sourceActivationValue, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex, connectionDevice):
 		import GIAANNcmn_predictionActivate
 		globalFeatureNeuronsActivationResult = globalFeatureNeuronsActivation
@@ -141,6 +180,25 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			if(sparseTensorHasValues(featureNeuronsTargetActivation)):
 				globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = GIAANNcmn_predictionActivate.applyFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, featureNeuronsTargetActivation, globalFeatureNeuronsTimeResult, sequenceWordIndex, sequenceColumnIndex, applySegmentActivations=False)
 		result = globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult
+		return result
+
+	def processAuxiliarySecondaryFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sourceFeatureIndex, sourceActivationValue, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex, connectionDevice):
+		result = None
+		if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+			import GIAANNcmn_predictionActivate
+			globalFeatureNeuronsActivationResult = globalFeatureNeuronsActivation
+			globalFeatureConnectionsActivationResult = globalFeatureConnectionsActivation
+			globalFeatureNeuronsTimeResult = globalFeatureNeuronsTime
+			auxiliaryActivations = calculateSecondaryAuxiliaryFeatureActivations(observedColumn, sourceFeatureIndex, sourceActivationValue, connectionDevice)
+			if(auxiliaryActivationVectorHasActiveValues(auxiliaryActivations)):
+				materialisedConnections = getSecondaryOutputConnectionsMaterialised(observedColumn, connectionDevice, auxiliaryActivations)
+				featureNeuronsTargetActivation = calculateAuxiliaryFeatureTargetActivation(databaseNetworkObject, materialisedConnections, auxiliaryActivations)
+				if(sparseTensorHasValues(featureNeuronsTargetActivation)):
+					featureNeuronsTargetActivation, somaActivationFromLastSegmentKeys = GIAANNcmn_predictionActivate.mergeLeakyIntegrateAndFireCurrentSomaActivationKeys(somaActivationFromLastSegmentKeys, featureNeuronsTargetActivation)
+					globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = GIAANNcmn_predictionActivate.applyFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, featureNeuronsTargetActivation, globalFeatureNeuronsTimeResult, sequenceWordIndex, sequenceColumnIndex, applySegmentActivations=False)
+			result = globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult, somaActivationFromLastSegmentKeys
+		else:
+			raise RuntimeError("processAuxiliarySecondaryFeaturePredictionActivationsEnforceLastSegment error: requires inferenceLeakyIntegrateAndFire enforceLastSegmentMustBeActive")
 		return result
 
 	def getConnectedColumnsForAuxiliaryFeatures(observedColumn, parentFeatureIndex, includeFeatureDetails=False):

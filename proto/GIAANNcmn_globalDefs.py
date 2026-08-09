@@ -54,7 +54,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -95,7 +95,8 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = True	#default: False/True
+	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
+	useBenchmarkDefaultsEvalTrainSetOrig = False
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
@@ -107,16 +108,20 @@ elif(useTrainDuringInference):
 	elif(executionMode == "inference"):
 		useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 
-if(useDefaultsV2):
-	inferenceEvaluateTestSetTrainMaxSequences10M = True		#version 2 of eval datasets (1000 sequences) that supports much larger train datasets (10M sequences)	#required if performing test-set eval on database trained with > 3M sequences (based on how the original test-set was generated)
-	useBenchmarkDefaultsEvalTestSetOptim = False	#default: False	#higher test-set eval accuracy, but less robustness to hallucination
-else:
-	inferenceEvaluateTestSetTrainMaxSequences10M = False
-	useBenchmarkDefaultsEvalTestSetOptim = False	#default: False
 if(useBenchmarkDefaultsEvalTestSet):
 	inferenceEvaluateTestSet = True
 else:
 	inferenceEvaluateTestSet = False
+useBenchmarkDefaultsEvalTestSetOptim = False	#derived var
+if(useDefaultsV2):
+	inferenceEvaluateTestSetTrainMaxSequences10M = True		#version 2 of eval datasets (1000 sequences) that supports much larger train datasets (10M sequences)	#required if performing test-set eval on database trained with > 3M sequences (based on how the original test-set was generated)
+	if(inferenceEvaluateTestSet):
+		useBenchmarkDefaultsEvalTestSetOptim = True	#default: True	#orig: False	#higher test-set eval accuracy, but less robustness to hallucination	#recommended for inferenceLeakyIntegrateAndFire
+else:
+	inferenceEvaluateTestSetTrainMaxSequences10M = False
+	if(inferenceEvaluateTestSet):
+		useBenchmarkDefaultsEvalTestSetOptim = True	#default: True	#orig: False	#higher test-set eval accuracy, but less robustness to hallucination
+
 
 inferenceLeakyIntegrateAndFire = False	#default: False	#orig: False
 if(inferenceLeakyIntegrateAndFire):
@@ -135,7 +140,7 @@ if(inferenceLeakyIntegrateAndFire):
 	if(not isinstance(inferenceLeakyIntegrateAndFireSomaActivationThreshold, (int, float)) or isinstance(inferenceLeakyIntegrateAndFireSomaActivationThreshold, bool) or not math.isfinite(inferenceLeakyIntegrateAndFireSomaActivationThreshold) or inferenceLeakyIntegrateAndFireSomaActivationThreshold <= 0.0):
 		raise RuntimeError("GIAANNcmn_globalDefs error: inferenceLeakyIntegrateAndFireSomaActivationThreshold must be a finite number > 0")
 else:
-	if(useBenchmarkDefaultsEvalTestSet):
+	if(inferenceEvaluateTestSet):
 		if(useDefaultsV2):
 			inferenceSegmentTiming = "biased"	#default: biased	#orig: none	#none, biased, exact, seq
 			inferenceActivationsType = "intf+c"		#default: intf+c #orig: boolf	#boolf, boolf+c, intf+c
@@ -174,7 +179,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 200000	#5000, 200000, 1000000
+	trainMaxSequences = 5000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 50000	#5000
@@ -479,7 +484,7 @@ optimisationNormaliseSourceFeatureIndicesDisabled = False	#default: False	#orig:
 optimisationObservedColumnsWriteMetadataCheck = False	#default: False, orig: False
 optimisationArrayIndexPropertiesEfficientSerialConnections = False	#default: False #orig: True	#uses less GPU RAM
 optimisationArrayIndexPropertiesEfficientSerialNeurons = False	#default: False #orig: False
-optimisationStoreDatabaseResidentCoordinatesAsInt32 = False	#default: False	#orig: False	#~25% database size reduction in RAM (designed for storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam), approx 25% slower train time
+optimisationStoreDatabaseResidentCoordinatesAsInt32 = True	#default: False	#orig: False	#~25% database size reduction in RAM (designed for storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam), approx 25% slower train time
 if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
 	databaseResidentCoordinateDtype = pt.int32
 	databaseResidentCoordinateMinimum = 0
@@ -781,10 +786,13 @@ if(useInference):
 					inferenceDuringTrainTargetConnectionTensorRank = 4
 	inferenceDeactivateNeuronsUponPrediction = True	#default: True
 	if(inferenceLeakyIntegrateAndFire):
-		if(useBenchmarkDefaultsEvalTestSetOptim):
-			inferenceDecrementActivationsSomaPerPredictedToken = 0.75	#default: 0.75	
+		if(inferenceEvaluateTestSet or useBenchmarkDefaultsEvalTrainSetOrig):
+			if(useBenchmarkDefaultsEvalTestSetOptim):
+				inferenceDecrementActivationsSomaPerPredictedToken = 0.75	#default: 0.75	
+			else:
+				inferenceDecrementActivationsSomaPerPredictedToken = 0.50	#orig: 0.50
 		else:
-			inferenceDecrementActivationsSomaPerPredictedToken = 0.50	#orig: 0.50
+			inferenceDecrementActivationsSomaPerPredictedToken = 1.0
 		inferenceDecrementActivationsSomaNonlinear = True
 		if(not isinstance(inferenceDecrementActivationsSomaPerPredictedToken, (int, float)) or isinstance(inferenceDecrementActivationsSomaPerPredictedToken, bool) or not math.isfinite(inferenceDecrementActivationsSomaPerPredictedToken) or inferenceDecrementActivationsSomaPerPredictedToken < 0.0 or inferenceDecrementActivationsSomaPerPredictedToken > 1.0):
 			raise RuntimeError("GIAANNcmn_globalDefs error: inferenceDecrementActivationsSomaPerPredictedToken must be a finite number within [0, 1]")
@@ -992,6 +1000,9 @@ if(useSANI):
 		enforceSequentialActivation = False
 		enforceAllSegmentsMustBeActiveFeatureSegmentsOnly = False
 		enforceActivationAcrossSegmentsIgnoreInternalColumn = False
+		algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default:"enforceLastSegmentMustBeActive"	#orig:"none"	#only activate neuron if last segment active
+		if(algorithmMatrixSANIenforceRequirement!="none" and algorithmMatrixSANIenforceRequirement!="enforceLastSegmentMustBeActive"):
+			raise RuntimeError("GIAANNcmn_globalDefs error: inferenceLeakyIntegrateAndFire algorithmMatrixSANIenforceRequirement is invalid")
 	else:
 		algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment under conditions		
 		#algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI
@@ -1316,7 +1327,7 @@ if(printConfiguration):
 			print("arrayNumberOfSegmentsFeatureDistance: ", arrayNumberOfSegmentsFeatureDistance)
 		print("arrayNumberOfSegments: ", arrayNumberOfSegments)
 		print("algorithmMatrixSANImethod: ", algorithmMatrixSANImethod)
-		if(algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
+		if(inferenceLeakyIntegrateAndFire or algorithmMatrixSANImethod=="enforceActivationAcrossSegments"):
 			print("algorithmMatrixSANIenforceRequirement: ", algorithmMatrixSANIenforceRequirement)
 		print("enforceSequentialActivation: ", enforceSequentialActivation)
 	print("")

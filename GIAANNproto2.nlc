@@ -603,3 +603,7 @@ AUTORESEARCH; - update inferenceLeakyIntegrateAndFire:useBenchmarkDefaultsEvalTe
 	- nonlinear soma decay: `0.50 -> 0.75`
 	- set inferenceConnectionsStrengthBoolean=False - preserve continuous trained connection strengths instead of converting them to Boolean values.
 - add option optimisationStoreDatabaseResidentCoordinatesAsInt32
+- implement option inferenceLeakyIntegrateAndFire:algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive" - only pass neuron candidate selection filter if soma was immediately activated by the last segment in the dendrite. The inferenceLeakyIntegrateAndFire:algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive implementation must be efficient and use no new database structures. Ensure that this functionality makes no changes to the inferenceLeakyIntegrateAndFire=False execution path.
+MANUAL; - update inferenceLeakyIntegrateAndFire - if(not inferenceEvaluateTestSet): set inferenceDecrementActivationsSomaPerPredictedToken = 1.0
+MANUAL; - constrain option useBenchmarkDefaultsEvalTestSetOptim to inferenceEvaluateTestSet, and set True by default
+MANUAL; - merge inferenceEvaluateTestSet with useBenchmarkDefaultsEvalTestSet

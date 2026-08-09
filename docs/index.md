@@ -112,12 +112,12 @@ The `database/inference_prompt.txt.trainAndInference` provided is taken from the
 For standard execution (train or inference);
 * set `useDefault = True`
 * set `executionMode="train"` to train the network from a huggingface dataset (e.g. Wikipedia/OSCAR-2201), or;
-* set `executionMode="inference"` to perform inference on a seeded prompt (`prompt_inference.txt.*`)
+* set `executionMode="inference"` to perform inference on a seeded prompt (`inference_prompt.txt.*`). Set `useBenchmarkEvalDataSet=False` to use a custom prompt file (`inference_prompt.txt`).
 
 See the repository [README](https://github.com/bairesearch/GIAANNpy/blob/main/README.md) for more configuration details.
 
 ## Development
-- Review the [GIAANNproto1.nlc](https://github.com/bairesearch/GIAANNpy/blob/main/GIAANNproto1.nlc) specification for GIAANNpy requirements and design notes.
+- Review the [GIAANNproto1.nlc](https://github.com/bairesearch/GIAANNpy/blob/main/GIAANNproto1.nlc)/[GIAANNproto2.nlc](https://github.com/bairesearch/GIAANNpy/blob/main/GIAANNproto2.nlc) specification for GIAANNpy requirements and design notes.
 
 ## Paper
 Read the current paper draft here: [GIAANN paper]({{ "/paper/" | relative_url }}) ([GIAANN-paper-WIP.pdf](https://github.com/bairesearch/GIAANNpy/releases/download/assets/GIAANN-paper-WIP.pdf)).

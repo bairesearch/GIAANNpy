@@ -816,8 +816,6 @@ elif(datasetType in closedWorldGroundedDatasetTypes):
 		databaseFolderExtension += closedWorldGroundedStrongerGroundedNLPmetricName
 else:
 	databaseFolderExtension = ""
-if(inferenceLeakyIntegrateAndFire and not useBenchmark):
-	databaseFolderExtension += "-inferenceLeakyIntegrateAndFire"
 	
 
 #Debug vars;

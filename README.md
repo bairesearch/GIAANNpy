@@ -117,7 +117,7 @@ The `database/inference_prompt.txt.trainAndInference` provided is taken from the
 For standard execution (train or inference);
 * set `useDefault = True`
 * set `executionMode="train"` to train the network from a huggingface dataset (e.g. Wikipedia/OSCAR-2201), or;
-* set `executionMode="inference"` to perform inference on a seeded prompt (`prompt_inference.txt.*`)
+* set `executionMode="inference"` to perform inference on a seeded prompt (`prompt_inference.txt.*`). Set `useBenchmarkEvalDataSet=False` to use a custom prompt file (`inference_prompt.txt`).
 
 #### Primary Draw settings
 

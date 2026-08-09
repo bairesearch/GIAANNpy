@@ -769,6 +769,19 @@ def processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuro
 	result = processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
 	return result
 
+def processFeaturesActivePredictSingleEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, sourceColumnIndex, sourceFeatureIndex, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None):
+	result = None
+	if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+		if(0 not in sequenceObservedColumnsPrediction.observedColumnsSequenceWordIndexDict):
+			raise RuntimeError("processFeaturesActivePredictSingleEnforceLastSegment error: missing observed column sequence index 0")
+		observedColumn = sequenceObservedColumnsPrediction.observedColumnsSequenceWordIndexDict[0]
+		connectionDevice = globalFeatureNeuronsActivation.device
+		featureConnections = observedColumn.prepareFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=connectionDevice, createMissing=False)
+		result = processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
+	else:
+		raise RuntimeError("processFeaturesActivePredictSingleEnforceLastSegment error: requires inferenceLeakyIntegrateAndFire enforceLastSegmentMustBeActive")
+	return result
+
 def calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex):
 	result = None
 	if(inferenceLeakyIntegrateAndFire):
@@ -990,6 +1003,67 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 		if(inferenceDuringTrainAdjustSynapseStrengthDecrementInference):
 			GIAANNcmn_inferenceDuringTrain.updateInferenceDuringTrainConnectionsActive(databaseNetworkObject, featureNeuronsTargetActivation, featureConnectionsStrengthStored, sourceColumnIndex, sourceFeatureIndex)
 	result = processFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureNeuronsTargetActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
+	return result
+
+def processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None, sourceActivationMultiplier=None):
+	result = None
+	if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+		featureNeuronsActive = calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex)
+		featureConnectionsStrengthStored = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
+		featureConnectionsStrength = featureConnectionsStrengthStored
+		if(inferenceConnectionStrengthPOSdependence):
+			featureConnectionsPos = featureConnections[databaseNetworkObject.arrayIndexPropertiesPosIndex]
+			featureConnectionsStrength = applyConnectionStrengthPOSdependenceInference(databaseNetworkObject, featureConnectionsStrength, featureConnectionsPos, sourceColumnIndex)
+		featureConnectionsStrengthRaw = featureConnectionsStrength
+		if(inferenceConnectionsStrengthBoolean):
+			featureConnectionsStrength = featureConnectionsStrength.bool().float()
+		if(featureNeuronsActive.dim() > 0):
+			featureNeuronsActive = featureNeuronsActive.reshape(-1)
+		featureNeuronsTargetActivation = calculateFeatureNeuronsTargetActivationPredict(featureConnectionsStrength, featureNeuronsActive)
+		if(inferenceDuringTrainAdjustSynapseStrengthBiasTimingCalculations and inferenceConnectionsStrengthBoolean):
+			featureNeuronsTargetActivation = calculateFeatureNeuronsTargetActivationPredict(featureConnectionsStrengthRaw, featureNeuronsActive)
+		if(sourceActivationMultiplier is not None):
+			sourceActivationMultiplier = float(sourceActivationMultiplier)
+			if(sourceActivationMultiplier < auxiliaryNeuronsSimilarWordsMinimumSimilarity or sourceActivationMultiplier > auxiliaryNeuronsSimilarWordsMaximumSimilarity):
+				raise RuntimeError("processFeaturesActivePredictEnforceLastSegment error: sourceActivationMultiplier out of range")
+			featureNeuronsTargetActivation = featureNeuronsTargetActivation * sourceActivationMultiplier
+		if(inferenceDuringTrainAdjustSynapseStrength and inferenceDuringTrainAdjustSynapseStrengthDecrementInference):
+			GIAANNcmn_inferenceDuringTrain.updateInferenceDuringTrainConnectionsActive(databaseNetworkObject, featureNeuronsTargetActivation, featureConnectionsStrengthStored, sourceColumnIndex, sourceFeatureIndex)
+		featureNeuronsTargetActivation = transformFeatureNeuronsTargetActivationPredict(featureNeuronsTargetActivation)
+		featureNeuronsTargetActivation, somaActivationFromLastSegmentKeys = mergeLeakyIntegrateAndFireCurrentSomaActivationKeys(somaActivationFromLastSegmentKeys, featureNeuronsTargetActivation)
+		globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = applyFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureNeuronsTargetActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
+		result = globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, somaActivationFromLastSegmentKeys
+	else:
+		raise RuntimeError("processFeaturesActivePredictEnforceLastSegment error: requires inferenceLeakyIntegrateAndFire enforceLastSegmentMustBeActive")
+	return result
+
+def mergeLeakyIntegrateAndFireCurrentSomaActivationKeys(somaActivationFromLastSegmentKeys, featureNeuronsTargetActivation):
+	result = None
+	if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+		if(somaActivationFromLastSegmentKeys is None or somaActivationFromLastSegmentKeys.dim() != 1 or somaActivationFromLastSegmentKeys.dtype != pt.long):
+			raise RuntimeError("mergeLeakyIntegrateAndFireCurrentSomaActivationKeys error: somaActivationFromLastSegmentKeys is invalid")
+		if(featureNeuronsTargetActivation is None or not featureNeuronsTargetActivation.is_sparse):
+			raise RuntimeError("mergeLeakyIntegrateAndFireCurrentSomaActivationKeys error: featureNeuronsTargetActivation must be sparse")
+		if(featureNeuronsTargetActivation.dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or featureNeuronsTargetActivation.shape[inferenceLeakyIntegrateAndFireBranchDimension] != multipleDendriticBranchesNumber or featureNeuronsTargetActivation.shape[inferenceLeakyIntegrateAndFireSegmentDimension] != arrayNumberOfSegments):
+			raise RuntimeError("mergeLeakyIntegrateAndFireCurrentSomaActivationKeys error: featureNeuronsTargetActivation shape is invalid")
+		if(somaActivationFromLastSegmentKeys.device != featureNeuronsTargetActivation.device):
+			raise RuntimeError("mergeLeakyIntegrateAndFireCurrentSomaActivationKeys error: activation tensors must use the same device")
+		activationSparse = featureNeuronsTargetActivation.coalesce()
+		activationIndices = activationSparse.indices()
+		activationValues = activationSparse.values()
+		# Training maps a connection from the terminal dendritic segment directly onto the soma coordinate.
+		somaActivationMask = (activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma) & (activationValues > 0)
+		maxFeatures = activationSparse.shape[inferenceLeakyIntegrateAndFireFeatureDimension]
+		currentSomaActivationKeys = activationIndices[inferenceLeakyIntegrateAndFireConceptDimension, somaActivationMask].long()*int(maxFeatures)+activationIndices[inferenceLeakyIntegrateAndFireFeatureDimension, somaActivationMask].long()
+		if(somaActivationFromLastSegmentKeys.numel() > 0 and currentSomaActivationKeys.numel() > 0):
+			resultKeys = pt.cat((somaActivationFromLastSegmentKeys, currentSomaActivationKeys))
+		elif(somaActivationFromLastSegmentKeys.numel() > 0):
+			resultKeys = somaActivationFromLastSegmentKeys
+		else:
+			resultKeys = currentSomaActivationKeys
+		result = activationSparse, resultKeys
+	else:
+		raise RuntimeError("mergeLeakyIntegrateAndFireCurrentSomaActivationKeys error: requires inferenceLeakyIntegrateAndFire enforceLastSegmentMustBeActive")
 	return result
 
 def calculateFeatureNeuronsTargetActivationPredict(featureConnectionsStrength, featureNeuronsActive):
