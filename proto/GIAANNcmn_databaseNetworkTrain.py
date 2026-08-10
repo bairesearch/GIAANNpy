@@ -990,14 +990,23 @@ def assignFeatureConnectionsToTargetSegmentsSparse(branchIndices, sourceConceptI
 			indicesList.append(pt.stack((branchIndices, connectionsSegmentIndex, sourceConceptIndices, sourceFeatureIndices, targetConceptIndices, targetFeatureIndices), dim=0))
 	elif(useSANIcolumns):
 		conceptDistances = pt.abs(targetConceptIndices - sourceConceptIndices)
-		connectionsSegmentIndex = arrayNumberOfSegments - conceptDistances - 1
+		if(inferenceLeakyIntegrateAndFire):
+			connectionsSegmentIndex = arrayIndexSegmentLastColumn - conceptDistances
+		else:
+			connectionsSegmentIndex = arrayNumberOfSegments - conceptDistances - 1
 		if(SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens):
 			connectionsSegmentIndex = pt.clamp(connectionsSegmentIndex, min=0)
 			indicesList.append(pt.stack((branchIndices, connectionsSegmentIndex.long(), sourceConceptIndices, sourceFeatureIndices, targetConceptIndices, targetFeatureIndices), dim=0))
 		else:
-			validColumnDistanceMask = conceptDistances < arrayNumberOfSegments
+			if(inferenceLeakyIntegrateAndFire):
+				validColumnDistanceMask = conceptDistances <= arrayIndexSegmentLastColumn
+			else:
+				validColumnDistanceMask = conceptDistances < arrayNumberOfSegments
 			if(validColumnDistanceMask.any()):
-				connectionsSegmentIndex = connectionsSegmentIndex[validColumnDistanceMask].clamp(min=0, max=arrayNumberOfSegments-1).long()
+				if(inferenceLeakyIntegrateAndFire):
+					connectionsSegmentIndex = connectionsSegmentIndex[validColumnDistanceMask].clamp(min=arrayIndexSegmentFirst, max=arrayIndexSegmentLastColumn).long()
+				else:
+					connectionsSegmentIndex = connectionsSegmentIndex[validColumnDistanceMask].clamp(min=0, max=arrayNumberOfSegments-1).long()
 				indicesList.append(pt.stack((branchIndices[validColumnDistanceMask], connectionsSegmentIndex, sourceConceptIndices[validColumnDistanceMask], sourceFeatureIndices[validColumnDistanceMask], targetConceptIndices[validColumnDistanceMask], targetFeatureIndices[validColumnDistanceMask]), dim=0))
 	elif(useSANIfeatures):
 		relativeDistance = targetWordOrder - sourceWordOrder
@@ -1049,8 +1058,6 @@ def assignFeatureConnectionsToTargetSegmentsSparse(branchIndices, sourceConceptI
 				else:
 					validColumnMask = pt.logical_and(conceptDistances > 0, conceptDistances <= arrayNumberOfSegmentsColumnDistance)
 				columnSegmentIndex = columnSegmentIndex.clamp(min=0, max=arrayNumberOfSegmentsColumnDistance-1).long()
-			if(inferenceLeakyIntegrateAndFire):
-				columnSegmentIndex = pt.where(columnSegmentIndex == arrayIndexSegmentInternalColumn, pt.full_like(columnSegmentIndex, arrayIndexSegmentSoma), columnSegmentIndex+1)
 			if(validColumnMask.any()):
 				indicesList.append(pt.stack((branchIndices[validColumnMask], columnSegmentIndex[validColumnMask], sourceConceptIndices[validColumnMask], sourceFeatureIndices[validColumnMask], targetConceptIndices[validColumnMask], targetFeatureIndices[validColumnMask]), dim=0))
 	else:
@@ -1204,13 +1211,20 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 		device = featureConnectionsActive.device
 		conceptNeuronsConceptOrder1d = pt.arange(cs, device=device)
 		conceptNeuronsDistances = pt.abs(conceptNeuronsConceptOrder1d.unsqueeze(1) - conceptNeuronsConceptOrder1d).reshape(cs, cs)
-		connectionsSegmentIndex = arrayNumberOfSegments-conceptNeuronsDistances-1
+		if(inferenceLeakyIntegrateAndFire):
+			connectionsSegmentIndex = arrayIndexSegmentLastColumn-conceptNeuronsDistances
+		else:
+			connectionsSegmentIndex = arrayNumberOfSegments-conceptNeuronsDistances-1
 		validColumnDistanceMask = None
 		if(SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens):
 			connectionsSegmentIndex = pt.clamp(connectionsSegmentIndex, min=0)
 		else:
-			validColumnDistanceMask = conceptNeuronsDistances < arrayNumberOfSegments
-			connectionsSegmentIndex = connectionsSegmentIndex.clamp(min=0, max=arrayNumberOfSegments-1)
+			if(inferenceLeakyIntegrateAndFire):
+				validColumnDistanceMask = conceptNeuronsDistances <= arrayIndexSegmentLastColumn
+				connectionsSegmentIndex = connectionsSegmentIndex.clamp(min=arrayIndexSegmentFirst, max=arrayIndexSegmentLastColumn)
+			else:
+				validColumnDistanceMask = conceptNeuronsDistances < arrayNumberOfSegments
+				connectionsSegmentIndex = connectionsSegmentIndex.clamp(min=0, max=arrayNumberOfSegments-1)
 		featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, cs), dtype=pt.bool, device=device)
 		featureConnectionsSegmentMask = featureConnectionsSegmentMask.scatter_(0, connectionsSegmentIndex.unsqueeze(0), True)
 		if(not SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens):
@@ -1281,8 +1295,6 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 				else:
 					validColumnMask = pt.logical_and(conceptNeuronsDistances > 0, conceptNeuronsDistances <= arrayNumberOfSegmentsColumnDistance)
 				columnSegmentIndex = columnSegmentIndex.clamp(min=0, max=arrayNumberOfSegmentsColumnDistance-1).long()
-			if(inferenceLeakyIntegrateAndFire):
-				columnSegmentIndex = pt.where(columnSegmentIndex == arrayIndexSegmentInternalColumn, pt.full_like(columnSegmentIndex, arrayIndexSegmentSoma), columnSegmentIndex+1)
 			columnSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
 			columnSegmentMask.scatter_(0, columnSegmentIndex.unsqueeze(0), True)
 			if(SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens and not useSANIfeaturesAndColumnsInternal):

@@ -607,3 +607,8 @@ AUTORESEARCH; - update inferenceLeakyIntegrateAndFire:useBenchmarkDefaultsEvalTe
 MANUAL; - update inferenceLeakyIntegrateAndFire - if(not inferenceEvaluateTestSet): set inferenceDecrementActivationsSomaPerPredictedToken = 1.0
 MANUAL; - constrain option useBenchmarkDefaultsEvalTestSetOptim to inferenceEvaluateTestSet, and set True by default
 MANUAL; - merge inferenceEvaluateTestSet with useBenchmarkDefaultsEvalTestSet
+- update inferenceLeakyIntegrateAndFire:useSANIcolumns/useSANIfeaturesAndColumns:
+	- only move column segment activations to next column segment when the selected next neuron (depending on inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures) occurs in a new column, not every token. 
+	- always (per token) add the activation from the last column segment to the soma activation signal. Do not store this added column activation in the soma (unlike the feature dendritic signal propagation) - it only affects its immediate activation value (and whether it passes the activation threshold).
+	- add option inferenceDecrementActivationsLastColumnSegment - decrement the activations of the last column segment (i.e. the interal column segment) by inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn when selected next neuron (depending on inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures) occurs in a new column. Respect inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn and inferenceDecrementActivationsLastColumnSegmentNonlinear.
+- update LIF column-segment training mappings so internal-column activations remain in the last column segment and preceding-column activations advance only on column transitions.

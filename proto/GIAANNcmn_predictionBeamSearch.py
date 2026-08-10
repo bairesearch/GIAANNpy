@@ -30,7 +30,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	import GIAANNnlp_auxiliaryNeuronsSimilarWords
 
 
-def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, conceptActivationState=None, connectedColumnsConstraint=None, connectedColumnsFeatures=None, somaActivationFromLastSegmentKeys=None):
+def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, conceptActivationState=None, connectedColumnsConstraint=None, connectedColumnsFeatures=None, somaActivationFromLastSegmentKeys=None, selectedColumnIndex=None):
 	#generate targets for debug/analysis output
 	targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNcmn_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 
@@ -38,7 +38,9 @@ def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject,
 	if(globalFeatureNeuronsStrength is not None):
 		strengthLookup = buildStrengthLookup(databaseNetworkObject, globalFeatureNeuronsStrength, databaseNetworkObject.f)
 	initialConstraintState = GIAANNcmn_predictionConstraints.createConstraintState(allowedColumns, constraintMode)
-	if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+	if(inferenceLeakyIntegrateAndFire and (useSANIcolumns or useSANIfeaturesAndColumns)):
+		initialState = initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState, somaActivationFromLastSegmentKeys, selectedColumnIndex)
+	elif(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 		initialState = initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState, somaActivationFromLastSegmentKeys)
 	else:
 		initialState = initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState)
@@ -166,11 +168,15 @@ def beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkOb
 		raise RuntimeError("beamSearchSelectSingleStepFeature error: no prediction result available")
 	return result
 
-def initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState, somaActivationFromLastSegmentKeys=None):
+def initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState, somaActivationFromLastSegmentKeys=None, selectedColumnIndex=None):
 	state = {"features": globalFeatureNeuronsActivation.clone()}
 	state["connections"] = None
 	if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 		state["somaActivationFromLastSegmentKeys"] = somaActivationFromLastSegmentKeys
+	if(inferenceLeakyIntegrateAndFire and (useSANIcolumns or useSANIfeaturesAndColumns)):
+		if(selectedColumnIndex is None):
+			raise RuntimeError("initialiseBeamActivationState error: selectedColumnIndex is required for LIF column propagation")
+		state["selectedColumnIndex"] = int(selectedColumnIndex)
 	if(inferenceUseNeuronFeaturePropertiesTime and globalFeatureNeuronsTime is not None):
 		state["time"] = globalFeatureNeuronsTime.clone()
 	else:
@@ -186,6 +192,10 @@ def cloneBeamActivationState(state):
 	clonedState["connections"] = None
 	if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 		clonedState["somaActivationFromLastSegmentKeys"] = state.get("somaActivationFromLastSegmentKeys")
+	if(inferenceLeakyIntegrateAndFire and (useSANIcolumns or useSANIfeaturesAndColumns)):
+		if(state.get("selectedColumnIndex") is None):
+			raise RuntimeError("cloneBeamActivationState error: selectedColumnIndex is required for LIF column propagation")
+		clonedState["selectedColumnIndex"] = state["selectedColumnIndex"]
 	if(inferenceUseNeuronFeaturePropertiesTime and state.get("time") is not None):
 		clonedState["time"] = state["time"].clone()
 	else:
@@ -199,6 +209,12 @@ def cloneBeamActivationState(state):
 def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state, columnIndex, featureIndex, sequenceWordIndex, sequenceColumnIndex):
 	if(inferenceLeakyIntegrateAndFire):
 		state["features"] = GIAANNcmn_predictionActivate.propagateLeakyIntegrateAndFireActivations(state["features"])
+		if(useSANIcolumns or useSANIfeaturesAndColumns):
+			if(state.get("selectedColumnIndex") is None):
+				raise RuntimeError("executeBeamNodeActivation error: selectedColumnIndex is required for LIF column propagation")
+			if(int(columnIndex) != int(state["selectedColumnIndex"])):
+				state["features"] = GIAANNcmn_predictionActivate.advanceLeakyIntegrateAndFireColumnActivations(state["features"])
+			state["selectedColumnIndex"] = int(columnIndex)
 		if(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 			state["somaActivationFromLastSegmentKeys"] = pt.empty((0,), dtype=pt.long, device=state["features"].device)
 	lemma = databaseNetworkObject.conceptColumnsList[columnIndex]
@@ -403,14 +419,13 @@ def calculateLeakyIntegrateAndFireLastSegmentSelectionActivationDistribution(dat
 			raise RuntimeError("calculateLeakyIntegrateAndFireLastSegmentSelectionActivationDistribution error: somaActivationFromLastSegmentKeys is invalid")
 		if(stateFeatures.device != somaActivationFromLastSegmentKeys.device):
 			raise RuntimeError("calculateLeakyIntegrateAndFireLastSegmentSelectionActivationDistribution error: activation tensors must use the same device")
-		stateFeaturesSparse = stateFeatures.coalesce()
-		if(stateFeaturesSparse._nnz() > 0 and somaActivationFromLastSegmentKeys.numel() > 0):
-			stateIndices = stateFeaturesSparse.indices()
-			stateValues = stateFeaturesSparse.values()
-			somaMask = stateIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
-			somaColumnIndices = stateIndices[inferenceLeakyIntegrateAndFireConceptDimension, somaMask].long()
-			somaFeatureIndices = stateIndices[inferenceLeakyIntegrateAndFireFeatureDimension, somaMask].long()
-			somaValues = stateValues[somaMask]
+		stateFeaturesSomaSignal = GIAANNcmn_predictionActivate.calculateLeakyIntegrateAndFireSomaActivation(stateFeatures)
+		if(stateFeaturesSomaSignal._nnz() > 0 and somaActivationFromLastSegmentKeys.numel() > 0):
+			stateIndices = stateFeaturesSomaSignal.indices()
+			stateValues = stateFeaturesSomaSignal.values()
+			somaColumnIndices = stateIndices[inferenceLeakyIntegrateAndFireSomaActivationConceptDimension].long()
+			somaFeatureIndices = stateIndices[inferenceLeakyIntegrateAndFireSomaActivationFeatureDimension].long()
+			somaValues = stateValues
 			candidateKeys = somaColumnIndices*int(databaseNetworkObject.f)+somaFeatureIndices
 			eligibleMask = pt.isin(candidateKeys, somaActivationFromLastSegmentKeys)
 			eligibleIndices = pt.nonzero(eligibleMask, as_tuple=False).view(-1)

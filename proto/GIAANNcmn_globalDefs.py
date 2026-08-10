@@ -95,8 +95,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
-	useBenchmarkDefaultsEvalTrainSetOrig = False
+	useBenchmarkDefaultsEvalTestSet = True	#default: False/True
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
@@ -484,7 +483,7 @@ optimisationNormaliseSourceFeatureIndicesDisabled = False	#default: False	#orig:
 optimisationObservedColumnsWriteMetadataCheck = False	#default: False, orig: False
 optimisationArrayIndexPropertiesEfficientSerialConnections = False	#default: False #orig: True	#uses less GPU RAM
 optimisationArrayIndexPropertiesEfficientSerialNeurons = False	#default: False #orig: False
-optimisationStoreDatabaseResidentCoordinatesAsInt32 = True	#default: False	#orig: False	#~25% database size reduction in RAM (designed for storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam), approx 25% slower train time
+optimisationStoreDatabaseResidentCoordinatesAsInt32 = False	#default: False	#orig: False	#~25% database size reduction in RAM (designed for storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam), approx 25% slower train time
 if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
 	databaseResidentCoordinateDtype = pt.int32
 	databaseResidentCoordinateMinimum = 0
@@ -786,16 +785,25 @@ if(useInference):
 					inferenceDuringTrainTargetConnectionTensorRank = 4
 	inferenceDeactivateNeuronsUponPrediction = True	#default: True
 	if(inferenceLeakyIntegrateAndFire):
-		if(inferenceEvaluateTestSet or useBenchmarkDefaultsEvalTrainSetOrig):
+		inferenceDecrementActivationsSoma = True	#mandatory: True
+		inferenceDecrementActivationsSomaNonlinear = True
+		inferenceDecrementActivationsLastColumnSegment = True	#default: True	#orig: False
+		inferenceDecrementActivationsLastColumnSegmentNonlinear = True
+		inferenceEvaluateTrainSetDeactivateActivationsSoma = True	#default:True #orig: False	#deactivate soma activations every token (enforce exact timings) - under development (not high performance)
+		if(inferenceEvaluateTestSet or not inferenceEvaluateTrainSetDeactivateActivationsSoma):
 			if(useBenchmarkDefaultsEvalTestSetOptim):
-				inferenceDecrementActivationsSomaPerPredictedToken = 0.75	#default: 0.75	
+				inferenceDecrementActivationsSomaPerPredictedToken = 0.75	#default: 0.75
+				inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn = 0.75	#CHECKTHIS - unoptimised
 			else:
 				inferenceDecrementActivationsSomaPerPredictedToken = 0.50	#orig: 0.50
+				inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn = 0.50	#orig: 0.50
 		else:
 			inferenceDecrementActivationsSomaPerPredictedToken = 1.0
-		inferenceDecrementActivationsSomaNonlinear = True
+			inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn = 1.0
 		if(not isinstance(inferenceDecrementActivationsSomaPerPredictedToken, (int, float)) or isinstance(inferenceDecrementActivationsSomaPerPredictedToken, bool) or not math.isfinite(inferenceDecrementActivationsSomaPerPredictedToken) or inferenceDecrementActivationsSomaPerPredictedToken < 0.0 or inferenceDecrementActivationsSomaPerPredictedToken > 1.0):
 			raise RuntimeError("GIAANNcmn_globalDefs error: inferenceDecrementActivationsSomaPerPredictedToken must be a finite number within [0, 1]")
+		if(not isinstance(inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn, (int, float)) or isinstance(inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn, bool) or not math.isfinite(inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn) or inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn < 0.0 or inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn > 1.0):
+			raise RuntimeError("GIAANNcmn_globalDefs error: inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn must be a finite number within [0, 1]")
 		inferenceDeactivateSegmentsUponPrediction = False	#default: False
 	else:
 		if(useDefaultsV2):
@@ -979,9 +987,11 @@ if(useSANI):
 	if(useSANIfeaturesAndColumns):
 		arrayIndexSegmentLast = arrayNumberOfSegments-1	#last feature index
 		arrayIndexSegmentInternalColumn = arrayNumberOfSegmentsColumnDistance-1	#last concept segment/current internal column
+		arrayIndexSegmentLastColumn = arrayIndexSegmentInternalColumn
 		#arrayIndexSegmentAdjacentColumn = arrayIndexSegmentInternalColumn
 	elif(useSANIcolumns):
 		arrayIndexSegmentLast = arrayNumberOfSegments-1
+		arrayIndexSegmentLastColumn = arrayIndexSegmentLast
 		arrayIndexSegmentAdjacentColumn = arrayNumberOfSegments-2
 	elif(useSANIfeatures):
 		arrayIndexSegmentLast = arrayNumberOfSegments-1
@@ -1001,8 +1011,8 @@ if(useSANI):
 		enforceAllSegmentsMustBeActiveFeatureSegmentsOnly = False
 		enforceActivationAcrossSegmentsIgnoreInternalColumn = False
 		algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"	#default:"enforceLastSegmentMustBeActive"	#orig:"none"	#only activate neuron if last segment active
-		if(algorithmMatrixSANIenforceRequirement!="none" and algorithmMatrixSANIenforceRequirement!="enforceLastSegmentMustBeActive"):
-			raise RuntimeError("GIAANNcmn_globalDefs error: inferenceLeakyIntegrateAndFire algorithmMatrixSANIenforceRequirement is invalid")
+		if(enforceDirectConnectionsSANI):
+			assert algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive", "enforceDirectConnectionsSANI requires enforceLastSegmentMustBeActive"
 	else:
 		algorithmMatrixSANImethod="enforceActivationAcrossSegments"	#default	#only activate a segment under conditions		
 		#algorithmMatrixSANImethod="doNotEnforceActivationAcrossSegments"	#orig	#activate segments without any sequentiality requirement	simply addActivationAcrossSegments	#equivalent to !useSANI
@@ -1032,6 +1042,7 @@ if(useSANI):
 
 		if(enforceDirectConnectionsSANI):	#min requirements for enforceDirectConnectionsSANI
 			assert algorithmMatrixSANImethod=="enforceActivationAcrossSegments", "enforceDirectConnectionsSANI requires enforceActivationAcrossSegments"
+		if(enforceDirectConnectionsSANI):	#min requirements for enforceDirectConnectionsSANI
 			assert algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive" or algorithmMatrixSANIenforceRequirement=="enforceAllSegmentsMustBeActive", "enforceDirectConnectionsSANI requires enforceLastSegmentMustBeActive or enforceAllSegmentsMustBeActive"
 			
 else:
@@ -1184,6 +1195,12 @@ if(printConfiguration):
 	print("inferenceLeakyIntegrateAndFire:", inferenceLeakyIntegrateAndFire)
 	if(inferenceLeakyIntegrateAndFire):
 		print("inferenceLeakyIntegrateAndFireSomaActivationThreshold:", inferenceLeakyIntegrateAndFireSomaActivationThreshold)
+		if(useInference):
+			print("inferenceDecrementActivationsSomaPerPredictedToken:", inferenceDecrementActivationsSomaPerPredictedToken)
+			print("inferenceDecrementActivationsLastColumnSegment:", inferenceDecrementActivationsLastColumnSegment)
+			if(inferenceDecrementActivationsLastColumnSegment):
+				print("inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn:", inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn)
+				print("inferenceDecrementActivationsLastColumnSegmentNonlinear:", inferenceDecrementActivationsLastColumnSegmentNonlinear)
 	else:
 		print("inferenceSegmentTiming:", inferenceSegmentTiming)
 		if(inferenceSegmentTiming=="biased"):
