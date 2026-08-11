@@ -54,7 +54,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -178,7 +178,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 5000	#5000, 200000, 1000000
+	trainMaxSequences = 50000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 50000	#5000
@@ -783,8 +783,10 @@ if(useInference):
 					inferenceDuringTrainTargetConnectionIndexTargetConcept = 2
 					inferenceDuringTrainTargetConnectionIndexTargetFeature = 3
 					inferenceDuringTrainTargetConnectionTensorRank = 4
-	inferenceDeactivateNeuronsUponPrediction = True	#default: True
 	if(inferenceLeakyIntegrateAndFire):
+		inferenceDeactivateSomaUponPrediction = True	#default: True
+		inferenceDeactivateLastColumnSegmentUponPrediction = False	#default: False	#orig: False	#TODO: test this (affects column internal recurrent referencing of features)
+		inferenceDeactivateSegmentsUponPrediction = False	#default: False
 		inferenceDecrementActivationsSoma = True	#mandatory: True
 		inferenceDecrementActivationsSomaNonlinear = True
 		inferenceDecrementActivationsLastColumnSegment = True	#default: True	#orig: False
@@ -804,8 +806,8 @@ if(useInference):
 			raise RuntimeError("GIAANNcmn_globalDefs error: inferenceDecrementActivationsSomaPerPredictedToken must be a finite number within [0, 1]")
 		if(not isinstance(inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn, (int, float)) or isinstance(inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn, bool) or not math.isfinite(inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn) or inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn < 0.0 or inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn > 1.0):
 			raise RuntimeError("GIAANNcmn_globalDefs error: inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn must be a finite number within [0, 1]")
-		inferenceDeactivateSegmentsUponPrediction = False	#default: False
 	else:
+		inferenceDeactivateNeuronsUponPrediction = True	#default: True
 		if(useDefaultsV2):
 			inferenceDecrementActivations = True	#default: True
 		else:
@@ -978,6 +980,8 @@ if(useSANI):
 				#arrayNumberOfSegments = math.ceil(numSeedTokensInference / 2) + 1	#temp for benchmarking compared to useSANIfeaturesAndColumns/useSANIcolumns [remove this]
 	
 	assert (int(useSANIcolumns) + int(useSANIfeatures) + int(useSANIfeaturesAndColumns)) == 1
+	if(useInference and inferenceLeakyIntegrateAndFire and inferenceDeactivateLastColumnSegmentUponPrediction and not (useSANIcolumns or useSANIfeaturesAndColumns)):
+		raise RuntimeError("GIAANNcmn_globalDefs error: inferenceDeactivateLastColumnSegmentUponPrediction requires inferenceLeakyIntegrateAndFire with column segments")
 
 	if(enforceDirectConnectionsSANI):	#min requirements for enforceDirectConnectionsSANI
 		assert not useSANIcolumns	#enforceDirectConnectionsSANI requires last segment to be adjacent feature segment
