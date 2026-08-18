@@ -559,7 +559,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 			sequenceColumnIndex = GIAANNcmn_predictionActivate.calculateSequenceColumnIndex(conceptMask, sequenceWordIndex)
 	globalFeatureConnectionsActivation = None
 	if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
-		somaActivationFromLastSegmentKeys = pt.empty((0,), dtype=pt.long, device=globalFeatureNeuronsActivation.device)
+		somaActivationFromLastSegmentKeys = initialiseLeakyIntegrateAndFireSomaActivationKeys(globalFeatureNeuronsActivation, sequenceWordIndex, conceptColumnIndex, conceptColumnFeatureIndex)
 
 	#set constraintModePrediction;
 	allowedColumnsConstraint, constraintModePrediction = calculatePredictionColumnConstraints(databaseNetworkObject, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, seedPhase)
@@ -661,6 +661,24 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		if(executionMode=="inference"):
 			GIAANNcmn_debug.debugPrintRamUsage("processColumnInferencePrediction", "sequenceIndex = " + str(sequenceIndex) + ", sequenceWordIndex = " + str(sequenceWordIndex) + ", wordPredictionIndex = " + str(wordPredictionIndex) + ", seedPhase = " + str(seedPhase))
 	return featurePredictionTargetMatch, conceptColumnIndexNext, conceptColumnFeatureIndexNext, conceptActivationState, globalFeatureNeuronsActivation, globalFeatureNeuronsTime
+
+def initialiseLeakyIntegrateAndFireSomaActivationKeys(globalFeatureNeuronsActivation, sequenceWordIndex, conceptColumnIndex, conceptColumnFeatureIndex):
+	result = None
+	if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+		if(globalFeatureNeuronsActivation is None or not globalFeatureNeuronsActivation.is_sparse):
+			raise RuntimeError("initialiseLeakyIntegrateAndFireSomaActivationKeys error: globalFeatureNeuronsActivation must be sparse")
+		result = pt.empty((arrayIndexSegmentFirst,), dtype=pt.long, device=globalFeatureNeuronsActivation.device)
+		if(printInferenceTop1AccuracyBitsPerByte and sequenceWordIndex == arrayIndexSegmentFirst):
+			conceptColumnIndex = int(conceptColumnIndex)
+			conceptColumnFeatureIndex = int(conceptColumnFeatureIndex)
+			maxConcepts = globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireConceptDimension]
+			maxFeatures = globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireFeatureDimension]
+			if(conceptColumnIndex < arrayIndexSegmentFirst or conceptColumnIndex >= maxConcepts or conceptColumnFeatureIndex < arrayIndexSegmentFirst or conceptColumnFeatureIndex >= maxFeatures):
+				raise RuntimeError("initialiseLeakyIntegrateAndFireSomaActivationKeys error: seed neuron index is out of range")
+			result = pt.as_tensor(conceptColumnIndex*int(maxFeatures)+conceptColumnFeatureIndex, dtype=pt.long, device=globalFeatureNeuronsActivation.device).reshape(-1)
+	else:
+		raise RuntimeError("initialiseLeakyIntegrateAndFireSomaActivationKeys error: requires inferenceLeakyIntegrateAndFire enforceLastSegmentMustBeActive")
+	return result
 
 def advanceLeakyIntegrateAndFireColumnActivationsForSelectedNextNeuron(globalFeatureNeuronsActivation, conceptColumnIndex, conceptColumnIndexNext):
 	result = None

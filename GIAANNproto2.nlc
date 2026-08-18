@@ -618,3 +618,4 @@ MANUAL; - update inferenceLeakyIntegrateAndFire - if(not inferenceEvaluateTestSe
 - Preserve direct LIF terminal-signal eligibility while using propagated terminal-segment activations when no direct soma signal is available.
 - Canonicalize every LIF soma-target activation onto the artificial soma's branch zero before accumulation.
 - Align LIF beam-node transitions with main inference by advancing, decaying, and bursting before propagation and resetting after outgoing activation.
+- Initialize first-token LIF eligibility from the forced seed soma burst when bits-per-byte scoring is enabled.
