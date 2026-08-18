@@ -785,7 +785,7 @@ if(useInference):
 					inferenceDuringTrainTargetConnectionTensorRank = 4
 	if(inferenceLeakyIntegrateAndFire):
 		inferenceDeactivateSomaUponPrediction = True	#default: True
-		inferenceDeactivateLastColumnSegmentUponPrediction = False	#default: False	#orig: False	#TODO: test this (affects column internal recurrent referencing of features)
+		inferenceDeactivateLastColumnSegmentUponPrediction = False	#derived var; enabled below only after the SANI segment layout is known
 		inferenceDeactivateSegmentsUponPrediction = False	#default: False
 		inferenceDecrementActivationsSoma = True	#mandatory: True
 		inferenceDecrementActivationsSomaNonlinear = True
@@ -980,6 +980,14 @@ if(useSANI):
 				#arrayNumberOfSegments = math.ceil(numSeedTokensInference / 2) + 1	#temp for benchmarking compared to useSANIfeaturesAndColumns/useSANIcolumns [remove this]
 	
 	assert (int(useSANIcolumns) + int(useSANIfeatures) + int(useSANIfeaturesAndColumns)) == 1
+	if(useInference and inferenceLeakyIntegrateAndFire):
+		if(useSANIcolumns or useSANIfeaturesAndColumns):
+			if(inferenceEvaluateTestSet):
+				inferenceDeactivateLastColumnSegmentUponPrediction = False
+			else:
+				inferenceDeactivateLastColumnSegmentUponPrediction = True	#default: True	#orig: False	#affects column internal recurrent referencing of features
+		else:
+			inferenceDeactivateLastColumnSegmentUponPrediction = False
 	if(useInference and inferenceLeakyIntegrateAndFire and inferenceDeactivateLastColumnSegmentUponPrediction and not (useSANIcolumns or useSANIfeaturesAndColumns)):
 		raise RuntimeError("GIAANNcmn_globalDefs error: inferenceDeactivateLastColumnSegmentUponPrediction requires inferenceLeakyIntegrateAndFire with column segments")
 
