@@ -617,3 +617,4 @@ MANUAL; - merge inferenceEvaluateTestSet with useBenchmarkDefaultsEvalTestSet
 MANUAL; - update inferenceLeakyIntegrateAndFire - if(not inferenceEvaluateTestSet): set inferenceDeactivateLastColumnSegmentUponPrediction
 - Preserve direct LIF terminal-signal eligibility while using propagated terminal-segment activations when no direct soma signal is available.
 - Canonicalize every LIF soma-target activation onto the artificial soma's branch zero before accumulation.
+- Align LIF beam-node transitions with main inference by advancing, decaying, and bursting before propagation and resetting after outgoing activation.

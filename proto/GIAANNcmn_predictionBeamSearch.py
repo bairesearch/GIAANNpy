@@ -208,17 +208,20 @@ def cloneBeamActivationState(state):
 
 def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state, columnIndex, featureIndex, sequenceWordIndex, sequenceColumnIndex):
 	if(inferenceLeakyIntegrateAndFire):
-		if(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
-			state["features"], somaActivationFromPropagatedLastSegmentKeys = GIAANNcmn_predictionActivate.propagateLeakyIntegrateAndFireActivationsEnforceLastSegment(state["features"])
-			state["somaActivationFromLastSegmentKeys"] = pt.empty((arrayIndexSegmentFirst,), dtype=pt.long, device=state["features"].device)
-		else:
-			state["features"] = GIAANNcmn_predictionActivate.propagateLeakyIntegrateAndFireActivations(state["features"])
 		if(useSANIcolumns or useSANIfeaturesAndColumns):
 			if(state.get("selectedColumnIndex") is None):
 				raise RuntimeError("executeBeamNodeActivation error: selectedColumnIndex is required for LIF column propagation")
 			if(int(columnIndex) != int(state["selectedColumnIndex"])):
 				state["features"] = GIAANNcmn_predictionActivate.advanceLeakyIntegrateAndFireColumnActivations(state["features"])
 			state["selectedColumnIndex"] = int(columnIndex)
+		state["features"] = GIAANNcmn_predictionActivate.decrementLeakyIntegrateAndFireSomaActivation(state["features"])
+		if(inferenceBurstAllPredictionsOrTargetsInSequence):
+			state["features"] = activateBeamNodeLeakyIntegrateAndFireSoma(state["features"], columnIndex, featureIndex)
+		if(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+			state["features"], somaActivationFromPropagatedLastSegmentKeys = GIAANNcmn_predictionActivate.propagateLeakyIntegrateAndFireActivationsEnforceLastSegment(state["features"])
+			state["somaActivationFromLastSegmentKeys"] = pt.empty((arrayIndexSegmentFirst,), dtype=pt.long, device=state["features"].device)
+		else:
+			state["features"] = GIAANNcmn_predictionActivate.propagateLeakyIntegrateAndFireActivations(state["features"])
 	lemma = databaseNetworkObject.conceptColumnsList[columnIndex]
 	if(lemma in observedColumnsDict):
 		observedColumn = observedColumnsDict[lemma]
@@ -241,8 +244,6 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 			state["features"], state["connections"], state["time"], state["somaActivationFromLastSegmentKeys"] = GIAANNnlp_auxiliaryNeuronsSimilarWords.processAuxiliaryFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumn, state["features"], state["connections"], columnIndex, featureIndex, state["somaActivationFromLastSegmentKeys"], state.get("time"), sequenceWordIndex, sequenceColumnIndex)
 		else:
 			state["features"], state["connections"], state["time"] = GIAANNnlp_auxiliaryNeuronsSimilarWords.processAuxiliaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, state["features"], state["connections"], columnIndex, featureIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex)
-	if(inferenceLeakyIntegrateAndFire):
-		state["features"] = GIAANNcmn_predictionActivate.decrementLeakyIntegrateAndFireSomaActivation(state["features"])
 	applyBeamNodePredictionEffects(state, columnIndex, featureIndex, sequenceWordIndex)
 	if(predictionColumnsMustActivateConceptFeature):
 		conceptState = state.get("conceptActivations")
@@ -251,6 +252,26 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 			state["conceptActivations"] = conceptState
 		conceptState.add(columnIndex)
 	return state
+
+def activateBeamNodeLeakyIntegrateAndFireSoma(globalFeatureNeuronsActivation, columnIndex, featureIndex):
+	result = None
+	if(inferenceLeakyIntegrateAndFire and inferenceBurstAllPredictionsOrTargetsInSequence):
+		if(globalFeatureNeuronsActivation is None or not globalFeatureNeuronsActivation.is_sparse):
+			raise RuntimeError("activateBeamNodeLeakyIntegrateAndFireSoma error: globalFeatureNeuronsActivation must be sparse")
+		if(globalFeatureNeuronsActivation.dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireBranchDimension] != multipleDendriticBranchesNumber or globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireSegmentDimension] != arrayNumberOfSegments):
+			raise RuntimeError("activateBeamNodeLeakyIntegrateAndFireSoma error: activation tensor shape is invalid")
+		columnIndex = int(columnIndex)
+		featureIndex = int(featureIndex)
+		if(columnIndex < arrayIndexSegmentFirst or columnIndex >= globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireConceptDimension] or featureIndex < arrayIndexSegmentFirst or featureIndex >= globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireFeatureDimension]):
+			raise RuntimeError("activateBeamNodeLeakyIntegrateAndFireSoma error: neuron index is out of range")
+		updateIndices = pt.tensor([[inferenceLeakyIntegrateAndFireSomaBranchIndex], [arrayIndexSegmentSoma], [columnIndex], [featureIndex]], dtype=pt.long, device=globalFeatureNeuronsActivation.device)
+		burstActivation = max(j1, inferenceLeakyIntegrateAndFireSomaActivationThreshold)
+		updateValues = pt.full((updateIndices.shape[1],), burstActivation, dtype=globalFeatureNeuronsActivation.dtype, device=globalFeatureNeuronsActivation.device)
+		updateTensor = pt.sparse_coo_tensor(updateIndices, updateValues, size=globalFeatureNeuronsActivation.size(), dtype=globalFeatureNeuronsActivation.dtype, device=globalFeatureNeuronsActivation.device)
+		result = (globalFeatureNeuronsActivation.coalesce() + updateTensor).coalesce()
+	else:
+		raise RuntimeError("activateBeamNodeLeakyIntegrateAndFireSoma error: requires burst-enabled inferenceLeakyIntegrateAndFire")
+	return result
 
 def applyBeamNodePredictionEffects(state, columnIndex, featureIndex, sequenceWordIndex):
 	if(inferenceLeakyIntegrateAndFire):
