@@ -1009,6 +1009,7 @@ def applyFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeat
 			raise RuntimeError("applyFeatureNeuronsTargetActivationPredict error: leaky integrate-and-fire activation tensors must be sparse")
 		if(globalFeatureNeuronsActivation.size() != featureNeuronsTargetActivation.size()):
 			raise RuntimeError("applyFeatureNeuronsTargetActivationPredict error: leaky integrate-and-fire activation tensor shapes must match")
+		featureNeuronsTargetActivation = canonicaliseLeakyIntegrateAndFireSomaBranches(featureNeuronsTargetActivation)
 		globalFeatureNeuronsActivation = (globalFeatureNeuronsActivation.coalesce() + featureNeuronsTargetActivation.coalesce()).coalesce()
 	else:
 		if(inferenceUseNeuronFeaturePropertiesTimeExact):
@@ -1039,6 +1040,25 @@ def applyFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeat
 			# spec step (a): store last timeValue for activated segments during each prediction step
 			globalFeatureNeuronsTime = updateTimeValuesFromActivation(globalFeatureNeuronsTime, featureNeuronsTargetActivationApplied, sequenceWordIndex, sequenceColumnIndex)
 	result = globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime
+	return result
+
+def canonicaliseLeakyIntegrateAndFireSomaBranches(featureNeuronsTargetActivation):
+	result = None
+	if(inferenceLeakyIntegrateAndFire):
+		if(featureNeuronsTargetActivation is None or not featureNeuronsTargetActivation.is_sparse):
+			raise RuntimeError("canonicaliseLeakyIntegrateAndFireSomaBranches error: featureNeuronsTargetActivation must be sparse")
+		if(featureNeuronsTargetActivation.dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or featureNeuronsTargetActivation.shape[inferenceLeakyIntegrateAndFireBranchDimension] != multipleDendriticBranchesNumber or featureNeuronsTargetActivation.shape[inferenceLeakyIntegrateAndFireSegmentDimension] != arrayNumberOfSegments):
+			raise RuntimeError("canonicaliseLeakyIntegrateAndFireSomaBranches error: activation tensor shape is invalid")
+		if(inferenceLeakyIntegrateAndFireSomaBranchIndex < arrayIndexSegmentFirst or inferenceLeakyIntegrateAndFireSomaBranchIndex >= multipleDendriticBranchesNumber):
+			raise RuntimeError("canonicaliseLeakyIntegrateAndFireSomaBranches error: soma branch index is invalid")
+		activationSparse = featureNeuronsTargetActivation.coalesce()
+		activationIndices = activationSparse.indices().clone()
+		activationValues = activationSparse.values()
+		somaMask = activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
+		activationIndices[inferenceLeakyIntegrateAndFireBranchDimension, somaMask] = inferenceLeakyIntegrateAndFireSomaBranchIndex
+		result = pt.sparse_coo_tensor(activationIndices, activationValues, size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
+	else:
+		raise RuntimeError("canonicaliseLeakyIntegrateAndFireSomaBranches error: requires inferenceLeakyIntegrateAndFire")
 	return result
 
 def processFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureNeuronsTargetActivation, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None):
