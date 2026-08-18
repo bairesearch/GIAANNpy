@@ -575,7 +575,10 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		#propagate LIF activations/decrement legacy activations;
 		if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 			globalFeatureNeuronsActivation, somaActivationFromPropagatedLastSegmentKeys = GIAANNcmn_predictionActivate.propagateLeakyIntegrateAndFireActivationsEnforceLastSegment(globalFeatureNeuronsActivation)
-			somaActivationFromLastSegmentKeys = pt.empty((arrayIndexSegmentFirst,), dtype=pt.long, device=globalFeatureNeuronsActivation.device)
+			if(enforceDirectConnectionsSANI):
+				somaActivationFromLastSegmentKeys = pt.empty((arrayIndexSegmentFirst,), dtype=pt.long, device=globalFeatureNeuronsActivation.device)
+			else:
+				somaActivationFromLastSegmentKeys = somaActivationFromPropagatedLastSegmentKeys
 		else:
 			globalFeatureNeuronsActivation = decrementGlobalFeatureActivationsForPrediction(globalFeatureNeuronsActivation)
 		#set activationSequenceWordIndex/activationSequenceColumnIndex;
@@ -583,8 +586,6 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		#process features (activate global neurons based on connection targets);
 		if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, somaActivationFromLastSegmentKeys = processFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
-			if(somaActivationFromLastSegmentKeys.numel() == arrayIndexSegmentFirst):
-				somaActivationFromLastSegmentKeys = somaActivationFromPropagatedLastSegmentKeys
 		else:
 			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = processFeaturePredictionActivations(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
 	else:

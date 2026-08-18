@@ -615,6 +615,7 @@ MANUAL; - merge inferenceEvaluateTestSet with useBenchmarkDefaultsEvalTestSet
 - inferenceLeakyIntegrateAndFire: extract inferenceDeactivateSomaUponPrediction from inferenceDeactivateNeuronsUponPrediction.
 - implement option inferenceDeactivateLastColumnSegmentUponPrediction for case inferenceLeakyIntegrateAndFire:useSANIcolumns/useSANIfeaturesAndColumns.
 MANUAL; - update inferenceLeakyIntegrateAndFire - if(not inferenceEvaluateTestSet): set inferenceDeactivateLastColumnSegmentUponPrediction
+- patch inferenceLeakyIntegrateAndFire:useSANIcolumns - record positive arrayIndexSegmentLastColumn targets as immediate last-segment eligibility keys
 - Preserve direct LIF terminal-signal eligibility while using propagated terminal-segment activations when no direct soma signal is available.
 - Canonicalize every LIF soma-target activation onto the artificial soma's branch zero before accumulation.
 - Align LIF beam-node transitions with main inference by advancing, decaying, and bursting before propagation and resetting after outgoing activation.
@@ -623,3 +624,4 @@ MANUAL; - update inferenceLeakyIntegrateAndFire - if(not inferenceEvaluateTestSe
 - Reserve the LIF soma as an additional artificial segment while retaining the full configured hybrid feature receptive-field length.
 - Honor LIF soma-decay and soma, dendritic-segment, and last-column deactivation controls independently in main and beam inference.
 - Canonicalize LIF eligibility keys as sorted unique tensors and use binary-search membership during candidate selection.
+- Require current-step direct LIF terminal-signal keys when direct connections are enforced, without substituting propagated eligibility.

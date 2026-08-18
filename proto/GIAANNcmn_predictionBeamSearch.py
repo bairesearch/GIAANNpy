@@ -220,7 +220,10 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 			state["features"] = activateBeamNodeLeakyIntegrateAndFireSoma(state["features"], columnIndex, featureIndex)
 		if(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 			state["features"], somaActivationFromPropagatedLastSegmentKeys = GIAANNcmn_predictionActivate.propagateLeakyIntegrateAndFireActivationsEnforceLastSegment(state["features"])
-			state["somaActivationFromLastSegmentKeys"] = pt.empty((arrayIndexSegmentFirst,), dtype=pt.long, device=state["features"].device)
+			if(enforceDirectConnectionsSANI):
+				state["somaActivationFromLastSegmentKeys"] = pt.empty((arrayIndexSegmentFirst,), dtype=pt.long, device=state["features"].device)
+			else:
+				state["somaActivationFromLastSegmentKeys"] = somaActivationFromPropagatedLastSegmentKeys
 		else:
 			state["features"] = GIAANNcmn_predictionActivate.propagateLeakyIntegrateAndFireActivations(state["features"])
 	lemma = databaseNetworkObject.conceptColumnsList[columnIndex]
@@ -236,8 +239,6 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 	featureConnections = observedColumn.prepareFeatureConnectionsForSourceFeature(featureIndex, targetDevice=state["features"].device, createMissing=False)
 	if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 		state["features"], state["connections"], state["time"], state["somaActivationFromLastSegmentKeys"] = GIAANNcmn_predictionActivate.processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, state["features"], state["connections"], featureConnections, columnIndex, featureIndex, state["somaActivationFromLastSegmentKeys"], state.get("time"), sequenceWordIndex, sequenceColumnIndex)
-		if(state["somaActivationFromLastSegmentKeys"].numel() == arrayIndexSegmentFirst):
-			state["somaActivationFromLastSegmentKeys"] = somaActivationFromPropagatedLastSegmentKeys
 	else:
 		state["features"], state["connections"], state["time"] = GIAANNcmn_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, state["features"], state["connections"], featureConnections, columnIndex, featureIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex)
 	if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
