@@ -614,3 +614,5 @@ MANUAL; - merge inferenceEvaluateTestSet with useBenchmarkDefaultsEvalTestSet
 - update LIF column-segment training mappings so internal-column activations remain in the last column segment and preceding-column activations advance only on column transitions.
 - inferenceLeakyIntegrateAndFire: extract inferenceDeactivateSomaUponPrediction from inferenceDeactivateNeuronsUponPrediction.
 - implement option inferenceDeactivateLastColumnSegmentUponPrediction for case inferenceLeakyIntegrateAndFire:useSANIcolumns/useSANIfeaturesAndColumns.
+MANUAL; - update inferenceLeakyIntegrateAndFire - if(not inferenceEvaluateTestSet): set inferenceDeactivateLastColumnSegmentUponPrediction
+- Preserve direct LIF terminal-signal eligibility while using propagated terminal-segment activations when no direct soma signal is available.

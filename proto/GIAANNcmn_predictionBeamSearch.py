@@ -208,15 +208,17 @@ def cloneBeamActivationState(state):
 
 def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state, columnIndex, featureIndex, sequenceWordIndex, sequenceColumnIndex):
 	if(inferenceLeakyIntegrateAndFire):
-		state["features"] = GIAANNcmn_predictionActivate.propagateLeakyIntegrateAndFireActivations(state["features"])
+		if(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+			state["features"], somaActivationFromPropagatedLastSegmentKeys = GIAANNcmn_predictionActivate.propagateLeakyIntegrateAndFireActivationsEnforceLastSegment(state["features"])
+			state["somaActivationFromLastSegmentKeys"] = pt.empty((arrayIndexSegmentFirst,), dtype=pt.long, device=state["features"].device)
+		else:
+			state["features"] = GIAANNcmn_predictionActivate.propagateLeakyIntegrateAndFireActivations(state["features"])
 		if(useSANIcolumns or useSANIfeaturesAndColumns):
 			if(state.get("selectedColumnIndex") is None):
 				raise RuntimeError("executeBeamNodeActivation error: selectedColumnIndex is required for LIF column propagation")
 			if(int(columnIndex) != int(state["selectedColumnIndex"])):
 				state["features"] = GIAANNcmn_predictionActivate.advanceLeakyIntegrateAndFireColumnActivations(state["features"])
 			state["selectedColumnIndex"] = int(columnIndex)
-		if(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
-			state["somaActivationFromLastSegmentKeys"] = pt.empty((0,), dtype=pt.long, device=state["features"].device)
 	lemma = databaseNetworkObject.conceptColumnsList[columnIndex]
 	if(lemma in observedColumnsDict):
 		observedColumn = observedColumnsDict[lemma]
@@ -230,6 +232,8 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 	featureConnections = observedColumn.prepareFeatureConnectionsForSourceFeature(featureIndex, targetDevice=state["features"].device, createMissing=False)
 	if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 		state["features"], state["connections"], state["time"], state["somaActivationFromLastSegmentKeys"] = GIAANNcmn_predictionActivate.processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, state["features"], state["connections"], featureConnections, columnIndex, featureIndex, state["somaActivationFromLastSegmentKeys"], state.get("time"), sequenceWordIndex, sequenceColumnIndex)
+		if(state["somaActivationFromLastSegmentKeys"].numel() == arrayIndexSegmentFirst):
+			state["somaActivationFromLastSegmentKeys"] = somaActivationFromPropagatedLastSegmentKeys
 	else:
 		state["features"], state["connections"], state["time"] = GIAANNcmn_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, state["features"], state["connections"], featureConnections, columnIndex, featureIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex)
 	if(auxiliaryNeurons and auxiliaryNeuronsSimilar):

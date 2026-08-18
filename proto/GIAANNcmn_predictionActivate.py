@@ -44,6 +44,26 @@ def decrementActivation(featureNeuronsActivation, activationDecrement):
 			featureNeuronsActivation = GIAANNcmn_sparseTensors.subtractValueFromSparseTensorValues(featureNeuronsActivation, activationDecrementPerPredictedSequence)
 	return featureNeuronsActivation
 
+def propagateLeakyIntegrateAndFireActivationsEnforceLastSegment(globalFeatureNeuronsActivation):
+	result = None
+	if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+		if(globalFeatureNeuronsActivation is None or not globalFeatureNeuronsActivation.is_sparse):
+			raise RuntimeError("propagateLeakyIntegrateAndFireActivationsEnforceLastSegment error: globalFeatureNeuronsActivation must be sparse")
+		activationSparse = globalFeatureNeuronsActivation.coalesce()
+		activationIndices = activationSparse.indices()
+		activationValues = activationSparse.values()
+		maxFeatures = activationSparse.shape[inferenceLeakyIntegrateAndFireFeatureDimension]
+		if(useSANIcolumns):
+			somaActivationFromLastSegmentKeys = pt.empty((arrayIndexSegmentFirst,), dtype=pt.long, device=activationSparse.device)
+		else:
+			lastSegmentMask = (activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentLast) & (activationValues > 0)
+			somaActivationFromLastSegmentKeys = activationIndices[inferenceLeakyIntegrateAndFireConceptDimension, lastSegmentMask].long()*int(maxFeatures)+activationIndices[inferenceLeakyIntegrateAndFireFeatureDimension, lastSegmentMask].long()
+		globalFeatureNeuronsActivationResult = propagateLeakyIntegrateAndFireActivations(globalFeatureNeuronsActivation)
+		result = globalFeatureNeuronsActivationResult, somaActivationFromLastSegmentKeys
+	else:
+		raise RuntimeError("propagateLeakyIntegrateAndFireActivationsEnforceLastSegment error: requires inferenceLeakyIntegrateAndFire enforceLastSegmentMustBeActive")
+	return result
+
 def propagateLeakyIntegrateAndFireActivations(globalFeatureNeuronsActivation):
 	result = None
 	if(inferenceLeakyIntegrateAndFire):
@@ -1106,6 +1126,9 @@ def mergeLeakyIntegrateAndFireCurrentSomaActivationKeys(somaActivationFromLastSe
 		activationValues = activationSparse.values()
 		# Training maps a connection from the terminal dendritic segment directly onto the soma coordinate.
 		somaActivationMask = (activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma) & (activationValues > 0)
+		if(useSANIcolumns):
+			# Column-only LIF keeps the terminal column signal transient in the last column segment rather than storing it in the soma.
+			somaActivationMask = somaActivationMask | ((activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentLastColumn) & (activationValues > 0))
 		maxFeatures = activationSparse.shape[inferenceLeakyIntegrateAndFireFeatureDimension]
 		currentSomaActivationKeys = activationIndices[inferenceLeakyIntegrateAndFireConceptDimension, somaActivationMask].long()*int(maxFeatures)+activationIndices[inferenceLeakyIntegrateAndFireFeatureDimension, somaActivationMask].long()
 		if(somaActivationFromLastSegmentKeys.numel() > 0 and currentSomaActivationKeys.numel() > 0):
