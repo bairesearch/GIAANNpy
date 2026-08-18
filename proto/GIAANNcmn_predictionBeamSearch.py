@@ -214,7 +214,8 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 			if(int(columnIndex) != int(state["selectedColumnIndex"])):
 				state["features"] = GIAANNcmn_predictionActivate.advanceLeakyIntegrateAndFireColumnActivations(state["features"])
 			state["selectedColumnIndex"] = int(columnIndex)
-		state["features"] = GIAANNcmn_predictionActivate.decrementLeakyIntegrateAndFireSomaActivation(state["features"])
+		if(inferenceDecrementActivationsSoma):
+			state["features"] = GIAANNcmn_predictionActivate.decrementLeakyIntegrateAndFireSomaActivation(state["features"])
 		if(inferenceBurstAllPredictionsOrTargetsInSequence):
 			state["features"] = activateBeamNodeLeakyIntegrateAndFireSoma(state["features"], columnIndex, featureIndex)
 		if(algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
@@ -275,7 +276,7 @@ def activateBeamNodeLeakyIntegrateAndFireSoma(globalFeatureNeuronsActivation, co
 
 def applyBeamNodePredictionEffects(state, columnIndex, featureIndex, sequenceWordIndex):
 	if(inferenceLeakyIntegrateAndFire):
-		modifyActivation = inferenceDeactivateSomaUponPrediction or inferenceDeactivateLastColumnSegmentUponPrediction
+		modifyActivation = inferenceDeactivateSomaUponPrediction or inferenceDeactivateSegmentsUponPrediction or inferenceDeactivateLastColumnSegmentUponPrediction
 	else:
 		modifyActivation = inferenceDeactivateNeuronsUponPrediction
 	if(modifyActivation):
@@ -291,23 +292,22 @@ def buildBeamNodeIndices(device, columnIndex, featureIndex, branchIndex=0):
 	featureTensor = pt.tensor(featureIndex, dtype=pt.long, device=device)
 	branchTensor = pt.tensor(branchIndex, dtype=pt.long, device=device)
 	if(inferenceLeakyIntegrateAndFire):
-		if(inferenceDeactivateSomaUponPrediction and inferenceDeactivateSegmentsUponPrediction):
-			branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=device).repeat_interleave(arrayNumberOfSegments)
-			segmentIndices = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=device).repeat(multipleDendriticBranchesNumber)
-			indicesToUpdate = pt.stack([branchIndices, segmentIndices, columnTensor.expand(branchIndices.shape[0]), featureTensor.expand(branchIndices.shape[0])], dim=1)
-		else:
-			indicesToUpdateList = []
-			if(inferenceDeactivateSomaUponPrediction):
-				branchIndices = pt.tensor([inferenceLeakyIntegrateAndFireSomaBranchIndex], dtype=pt.long, device=device)
-				segmentIndices = pt.tensor([arrayIndexSegmentSoma], dtype=pt.long, device=device)
-				indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnTensor.expand(branchIndices.shape[0]), featureTensor.expand(branchIndices.shape[0])], dim=1))
-			if(inferenceDeactivateLastColumnSegmentUponPrediction):
-				if(not (useSANIcolumns or useSANIfeaturesAndColumns)):
-					raise RuntimeError("buildBeamNodeIndices error: inferenceDeactivateLastColumnSegmentUponPrediction requires LIF column segments")
-				branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=device)
-				segmentIndices = pt.full_like(branchIndices, arrayIndexSegmentLastColumn)
-				indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnTensor.expand(branchIndices.shape[0]), featureTensor.expand(branchIndices.shape[0])], dim=1))
-			indicesToUpdate = pt.cat(indicesToUpdateList, dim=0)
+		indicesToUpdateList = []
+		if(inferenceDeactivateSegmentsUponPrediction):
+			branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=device).repeat_interleave(arrayIndexSegmentSoma)
+			segmentIndices = pt.arange(arrayIndexSegmentFirst, arrayIndexSegmentSoma, dtype=pt.long, device=device).repeat(multipleDendriticBranchesNumber)
+			indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnTensor.expand(branchIndices.shape[0]), featureTensor.expand(branchIndices.shape[0])], dim=1))
+		if(inferenceDeactivateSomaUponPrediction):
+			branchIndices = pt.tensor([inferenceLeakyIntegrateAndFireSomaBranchIndex], dtype=pt.long, device=device)
+			segmentIndices = pt.tensor([arrayIndexSegmentSoma], dtype=pt.long, device=device)
+			indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnTensor.expand(branchIndices.shape[0]), featureTensor.expand(branchIndices.shape[0])], dim=1))
+		if(inferenceDeactivateLastColumnSegmentUponPrediction and not inferenceDeactivateSegmentsUponPrediction):
+			if(not (useSANIcolumns or useSANIfeaturesAndColumns)):
+				raise RuntimeError("buildBeamNodeIndices error: inferenceDeactivateLastColumnSegmentUponPrediction requires LIF column segments")
+			branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=device)
+			segmentIndices = pt.full_like(branchIndices, arrayIndexSegmentLastColumn)
+			indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnTensor.expand(branchIndices.shape[0]), featureTensor.expand(branchIndices.shape[0])], dim=1))
+		indicesToUpdate = pt.cat(indicesToUpdateList, dim=0)
 	elif(useSANI):
 		if(multipleDendriticBranchesBinaryTree):
 			segmentIndices = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=device)

@@ -788,7 +788,7 @@ if(useInference):
 		inferenceDeactivateSomaUponPrediction = True	#default: True
 		inferenceDeactivateLastColumnSegmentUponPrediction = False	#derived var; enabled below only after the SANI segment layout is known
 		inferenceDeactivateSegmentsUponPrediction = False	#default: False
-		inferenceDecrementActivationsSoma = True	#mandatory: True
+		inferenceDecrementActivationsSoma = True	#default: True
 		inferenceDecrementActivationsSomaNonlinear = True
 		inferenceDecrementActivationsLastColumnSegment = True	#default: True	#orig: False
 		inferenceDecrementActivationsLastColumnSegmentNonlinear = True

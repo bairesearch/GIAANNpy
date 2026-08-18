@@ -630,7 +630,8 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	if(inferenceLeakyIntegrateAndFire and (useSANIcolumns or useSANIfeaturesAndColumns)):
 		globalFeatureNeuronsActivation = advanceLeakyIntegrateAndFireColumnActivationsForSelectedNextNeuron(globalFeatureNeuronsActivation, conceptColumnIndex, conceptColumnIndexNext)
 	if(inferenceLeakyIntegrateAndFire):
-		globalFeatureNeuronsActivation = GIAANNcmn_predictionActivate.decrementLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation)
+		if(inferenceDecrementActivationsSoma):
+			globalFeatureNeuronsActivation = GIAANNcmn_predictionActivate.decrementLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation)
 
 	#calculate featurePredictionTargetMatch; 
 	featurePredictionTargetMatch, targetWord, predictedWord, targetColumnName, predictedColumnName = calculateInferencePredictionMatch(tokensSequence, sequenceWordIndex, conceptMask, databaseNetworkObject, conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex, predictionCandidatesAvailable)
@@ -896,32 +897,33 @@ def deactivatePredictedNeuronActivations(globalFeatureNeuronsActivation, concept
 	globalFeatureNeuronsActivationResult = globalFeatureNeuronsActivation
 	conceptActivationStateResult = conceptActivationState
 	if(inferenceLeakyIntegrateAndFire):
-		modifyActivation = inferenceDeactivateSomaUponPrediction or inferenceDeactivateLastColumnSegmentUponPrediction
+		modifyActivation = inferenceDeactivateSomaUponPrediction or inferenceDeactivateSegmentsUponPrediction or inferenceDeactivateLastColumnSegmentUponPrediction
 	else:
 		modifyActivation = inferenceDeactivateNeuronsUponPrediction
 	if(modifyActivation):
 		if(inferenceLeakyIntegrateAndFire):
-			if(inferenceDeactivateSomaUponPrediction and inferenceDeactivateSegmentsUponPrediction):
-				branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=conceptColumnIndexTensor.device).repeat_interleave(arrayNumberOfSegments)
-				segmentIndices = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=conceptColumnIndexTensor.device).repeat(multipleDendriticBranchesNumber)
-				indicesToUpdate = pt.stack([branchIndices, segmentIndices, conceptColumnIndexTensor.squeeze().expand(branchIndices.shape[0]), conceptColumnFeatureIndexTensorActivation.squeeze().expand(branchIndices.shape[0])], dim=1)
-			else:
-				indicesToUpdateList = []
-				if(inferenceDeactivateSomaUponPrediction):
-					branchIndices = pt.tensor([inferenceLeakyIntegrateAndFireSomaBranchIndex], dtype=pt.long, device=globalFeatureNeuronsActivationResult.device)
-					segmentIndices = pt.tensor([arrayIndexSegmentSoma], dtype=pt.long, device=globalFeatureNeuronsActivationResult.device)
-					columnIndices = pt.full_like(branchIndices, int(conceptColumnIndexTensor.squeeze().item()))
-					featureIndices = pt.full_like(branchIndices, int(conceptColumnFeatureIndexTensorActivation.squeeze().item()))
-					indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnIndices, featureIndices], dim=1))
-				if(inferenceDeactivateLastColumnSegmentUponPrediction):
-					if(not (useSANIcolumns or useSANIfeaturesAndColumns)):
-						raise RuntimeError("deactivatePredictedNeuronActivations error: inferenceDeactivateLastColumnSegmentUponPrediction requires LIF column segments")
-					branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=globalFeatureNeuronsActivationResult.device)
-					segmentIndices = pt.full_like(branchIndices, arrayIndexSegmentLastColumn)
-					columnIndices = pt.full_like(branchIndices, int(conceptColumnIndexTensor.squeeze().item()))
-					featureIndices = pt.full_like(branchIndices, int(conceptColumnFeatureIndexTensorActivation.squeeze().item()))
-					indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnIndices, featureIndices], dim=1))
-				indicesToUpdate = pt.cat(indicesToUpdateList, dim=0)
+			indicesToUpdateList = []
+			if(inferenceDeactivateSegmentsUponPrediction):
+				branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=globalFeatureNeuronsActivationResult.device).repeat_interleave(arrayIndexSegmentSoma)
+				segmentIndices = pt.arange(arrayIndexSegmentFirst, arrayIndexSegmentSoma, dtype=pt.long, device=globalFeatureNeuronsActivationResult.device).repeat(multipleDendriticBranchesNumber)
+				columnIndices = pt.full_like(branchIndices, int(conceptColumnIndexTensor.squeeze().item()))
+				featureIndices = pt.full_like(branchIndices, int(conceptColumnFeatureIndexTensorActivation.squeeze().item()))
+				indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnIndices, featureIndices], dim=1))
+			if(inferenceDeactivateSomaUponPrediction):
+				branchIndices = pt.tensor([inferenceLeakyIntegrateAndFireSomaBranchIndex], dtype=pt.long, device=globalFeatureNeuronsActivationResult.device)
+				segmentIndices = pt.tensor([arrayIndexSegmentSoma], dtype=pt.long, device=globalFeatureNeuronsActivationResult.device)
+				columnIndices = pt.full_like(branchIndices, int(conceptColumnIndexTensor.squeeze().item()))
+				featureIndices = pt.full_like(branchIndices, int(conceptColumnFeatureIndexTensorActivation.squeeze().item()))
+				indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnIndices, featureIndices], dim=1))
+			if(inferenceDeactivateLastColumnSegmentUponPrediction and not inferenceDeactivateSegmentsUponPrediction):
+				if(not (useSANIcolumns or useSANIfeaturesAndColumns)):
+					raise RuntimeError("deactivatePredictedNeuronActivations error: inferenceDeactivateLastColumnSegmentUponPrediction requires LIF column segments")
+				branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=globalFeatureNeuronsActivationResult.device)
+				segmentIndices = pt.full_like(branchIndices, arrayIndexSegmentLastColumn)
+				columnIndices = pt.full_like(branchIndices, int(conceptColumnIndexTensor.squeeze().item()))
+				featureIndices = pt.full_like(branchIndices, int(conceptColumnFeatureIndexTensorActivation.squeeze().item()))
+				indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnIndices, featureIndices], dim=1))
+			indicesToUpdate = pt.cat(indicesToUpdateList, dim=0)
 		else:
 			branchIndex = 0
 			if(multipleDendriticBranches):
