@@ -461,7 +461,7 @@ def calculateLeakyIntegrateAndFireLastSegmentSelectionActivationDistribution(dat
 			somaFeatureIndices = stateIndices[inferenceLeakyIntegrateAndFireSomaActivationFeatureDimension].long()
 			somaValues = stateValues
 			candidateKeys = somaColumnIndices*int(databaseNetworkObject.f)+somaFeatureIndices
-			eligibleMask = pt.isin(candidateKeys, somaActivationFromLastSegmentKeys)
+			eligibleMask = GIAANNcmn_predictionConstraints.buildSortedKeyMembershipMask(candidateKeys, somaActivationFromLastSegmentKeys)
 			eligibleIndices = pt.nonzero(eligibleMask, as_tuple=False).view(-1)
 			if(eligibleIndices.numel() > 0):
 				eligibleColumnIndices = somaColumnIndices.index_select(0, eligibleIndices)

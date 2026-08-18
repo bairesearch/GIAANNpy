@@ -58,6 +58,8 @@ def propagateLeakyIntegrateAndFireActivationsEnforceLastSegment(globalFeatureNeu
 		else:
 			lastSegmentMask = (activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentLast) & (activationValues > 0)
 			somaActivationFromLastSegmentKeys = activationIndices[inferenceLeakyIntegrateAndFireConceptDimension, lastSegmentMask].long()*int(maxFeatures)+activationIndices[inferenceLeakyIntegrateAndFireFeatureDimension, lastSegmentMask].long()
+		if(somaActivationFromLastSegmentKeys.numel() > 0):
+			somaActivationFromLastSegmentKeys = pt.unique(somaActivationFromLastSegmentKeys, sorted=True)
 		globalFeatureNeuronsActivationResult = propagateLeakyIntegrateAndFireActivations(globalFeatureNeuronsActivation)
 		result = globalFeatureNeuronsActivationResult, somaActivationFromLastSegmentKeys
 	else:
@@ -1157,6 +1159,8 @@ def mergeLeakyIntegrateAndFireCurrentSomaActivationKeys(somaActivationFromLastSe
 			resultKeys = somaActivationFromLastSegmentKeys
 		else:
 			resultKeys = currentSomaActivationKeys
+		if(resultKeys.numel() > 0):
+			resultKeys = pt.unique(resultKeys, sorted=True)
 		result = activationSparse, resultKeys
 	else:
 		raise RuntimeError("mergeLeakyIntegrateAndFireCurrentSomaActivationKeys error: requires inferenceLeakyIntegrateAndFire enforceLastSegmentMustBeActive")

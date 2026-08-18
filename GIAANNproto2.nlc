@@ -622,3 +622,4 @@ MANUAL; - update inferenceLeakyIntegrateAndFire - if(not inferenceEvaluateTestSe
 - Derive last-column deactivation only after selecting the SANI layout so pure-feature LIF inference never enables a nonexistent column segment.
 - Reserve the LIF soma as an additional artificial segment while retaining the full configured hybrid feature receptive-field length.
 - Honor LIF soma-decay and soma, dendritic-segment, and last-column deactivation controls independently in main and beam inference.
+- Canonicalize LIF eligibility keys as sorted unique tensors and use binary-search membership during candidate selection.
