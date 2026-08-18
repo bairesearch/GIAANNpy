@@ -124,6 +124,7 @@ else:
 
 inferenceLeakyIntegrateAndFire = False	#default: False	#orig: False
 if(inferenceLeakyIntegrateAndFire):
+	inferenceLeakyIntegrateAndFireSomaSegmentCount = 1	#mandatory: the soma is one additional artificial segment beyond the configured receptive-field segments
 	if(useBenchmarkDefaultsEvalTestSetOptim):
 		inferenceLeakyIntegrateAndFireSomaActivationThreshold = 0.008	#default: 0.008	 #optimised for continuous connection-strength activations
 	else:
@@ -1016,7 +1017,7 @@ if(useSANI):
 	'''
 	
 	if(inferenceLeakyIntegrateAndFire):
-		arrayNumberOfSegments += 1	#reserve the final neuron-array segment for the soma activation level
+		arrayNumberOfSegments += inferenceLeakyIntegrateAndFireSomaSegmentCount	#reserve the final neuron-array segment for the soma activation level
 		arrayIndexSegmentSoma = arrayNumberOfSegments-1
 		algorithmMatrixSANImethod = "leakyIntegrateAndFire"
 		enforceSequentialActivation = False

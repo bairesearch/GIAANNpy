@@ -1161,16 +1161,19 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	def appendAuxiliaryFeatureAndColumnSegmentIndices(indicesList, valuesList, branchIndices, sourceConceptIndices, sourceAuxiliaryFeatureIndices, targetConceptIndices, targetFeatureIndices, sourceWordOrder, targetWordOrder, baseValues):
 		relativeDistance = targetWordOrder - sourceWordOrder
 		featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
+		featureDistanceLimit = arrayNumberOfSegmentsFeatureDistance
+		if(inferenceLeakyIntegrateAndFire):
+			featureDistanceLimit += inferenceLeakyIntegrateAndFireSomaSegmentCount
 		if(SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens):
-			relativeDistanceFeature = pt.clamp(relativeDistance, min=1, max=arrayNumberOfSegmentsFeatureDistance)
-			featureSegmentIndex = featureSegmentsOffset + arrayNumberOfSegmentsFeatureDistance - relativeDistanceFeature
+			relativeDistanceFeature = pt.clamp(relativeDistance, min=1, max=featureDistanceLimit)
+			featureSegmentIndex = featureSegmentsOffset + featureDistanceLimit - relativeDistanceFeature
 			featureSegmentIndex = featureSegmentIndex.clamp(min=featureSegmentsOffset, max=arrayNumberOfSegments-1).long()
 			appendAuxiliaryConnectionIndexGroup(indicesList, valuesList, branchIndices, featureSegmentIndex, sourceConceptIndices, sourceAuxiliaryFeatureIndices, targetConceptIndices, targetFeatureIndices, baseValues)
 		else:
 			relativeDistanceFeature = pt.clamp(relativeDistance, min=1)
-			validFeatureDistanceMask = relativeDistanceFeature <= arrayNumberOfSegmentsFeatureDistance
+			validFeatureDistanceMask = relativeDistanceFeature <= featureDistanceLimit
 			if(validFeatureDistanceMask.any()):
-				featureSegmentIndex = featureSegmentsOffset + arrayNumberOfSegmentsFeatureDistance - relativeDistanceFeature
+				featureSegmentIndex = featureSegmentsOffset + featureDistanceLimit - relativeDistanceFeature
 				featureSegmentIndex = featureSegmentIndex.clamp(min=featureSegmentsOffset, max=arrayNumberOfSegments-1).long()
 				appendAuxiliaryConnectionIndexGroup(indicesList, valuesList, branchIndices[validFeatureDistanceMask], featureSegmentIndex[validFeatureDistanceMask], sourceConceptIndices[validFeatureDistanceMask], sourceAuxiliaryFeatureIndices[validFeatureDistanceMask], targetConceptIndices[validFeatureDistanceMask], targetFeatureIndices[validFeatureDistanceMask], baseValues[validFeatureDistanceMask])
 		if(arrayNumberOfSegmentsColumnDistance > 0):

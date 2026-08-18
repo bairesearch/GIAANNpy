@@ -620,3 +620,4 @@ MANUAL; - update inferenceLeakyIntegrateAndFire - if(not inferenceEvaluateTestSe
 - Align LIF beam-node transitions with main inference by advancing, decaying, and bursting before propagation and resetting after outgoing activation.
 - Initialize first-token LIF eligibility from the forced seed soma burst when bits-per-byte scoring is enabled.
 - Derive last-column deactivation only after selecting the SANI layout so pure-feature LIF inference never enables a nonexistent column segment.
+- Reserve the LIF soma as an additional artificial segment while retaining the full configured hybrid feature receptive-field length.

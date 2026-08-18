@@ -1025,21 +1025,20 @@ def assignFeatureConnectionsToTargetSegmentsSparse(branchIndices, sourceConceptI
 	elif(useSANIfeaturesAndColumns):
 		relativeDistance = targetWordOrder - sourceWordOrder
 		featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
+		featureDistanceLimit = arrayNumberOfSegmentsFeatureDistance
+		if(inferenceLeakyIntegrateAndFire):
+			featureDistanceLimit += inferenceLeakyIntegrateAndFireSomaSegmentCount
 		if(SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens):
-			relativeDistanceFeature = pt.clamp(relativeDistance, min=1, max=arrayNumberOfSegmentsFeatureDistance)
-			featureSegmentIndex = featureSegmentsOffset + arrayNumberOfSegmentsFeatureDistance - relativeDistanceFeature
+			relativeDistanceFeature = pt.clamp(relativeDistance, min=1, max=featureDistanceLimit)
+			featureSegmentIndex = featureSegmentsOffset + featureDistanceLimit - relativeDistanceFeature
 			featureSegmentIndex = featureSegmentIndex.clamp(min=featureSegmentsOffset, max=arrayNumberOfSegments-1).long()
-			if(inferenceLeakyIntegrateAndFire):
-				featureSegmentIndex = pt.where(featureSegmentIndex == arrayIndexSegmentLast, pt.full_like(featureSegmentIndex, arrayIndexSegmentSoma), featureSegmentIndex+1)
 			indicesList.append(pt.stack((branchIndices, featureSegmentIndex, sourceConceptIndices, sourceFeatureIndices, targetConceptIndices, targetFeatureIndices), dim=0))
 		else:
 			relativeDistanceFeature = pt.clamp(relativeDistance, min=1)
-			validFeatureDistanceMask = relativeDistanceFeature <= arrayNumberOfSegmentsFeatureDistance
+			validFeatureDistanceMask = relativeDistanceFeature <= featureDistanceLimit
 			if(validFeatureDistanceMask.any()):
-				featureSegmentIndex = featureSegmentsOffset + arrayNumberOfSegmentsFeatureDistance - relativeDistanceFeature
+				featureSegmentIndex = featureSegmentsOffset + featureDistanceLimit - relativeDistanceFeature
 				featureSegmentIndex = featureSegmentIndex.clamp(min=featureSegmentsOffset, max=arrayNumberOfSegments-1).long()
-				if(inferenceLeakyIntegrateAndFire):
-					featureSegmentIndex = pt.where(featureSegmentIndex == arrayIndexSegmentLast, pt.full_like(featureSegmentIndex, arrayIndexSegmentSoma), featureSegmentIndex+1)
 				indicesList.append(pt.stack((branchIndices[validFeatureDistanceMask], featureSegmentIndex[validFeatureDistanceMask], sourceConceptIndices[validFeatureDistanceMask], sourceFeatureIndices[validFeatureDistanceMask], targetConceptIndices[validFeatureDistanceMask], targetFeatureIndices[validFeatureDistanceMask]), dim=0))
 		if(arrayNumberOfSegmentsColumnDistance > 0):
 			conceptDistances = pt.abs(targetConceptIndices - sourceConceptIndices)
@@ -1255,23 +1254,22 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 		wordOrderSource = wordOrderTensor.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
 		wordOrderTarget = wordOrderTensor.view(1, 1, cs, fs).expand(cs, fs, cs, fs)
 		relativeDistance = (wordOrderTarget - wordOrderSource)
+		featureDistanceLimit = arrayNumberOfSegmentsFeatureDistance
+		if(inferenceLeakyIntegrateAndFire):
+			featureDistanceLimit += inferenceLeakyIntegrateAndFireSomaSegmentCount
 		if(SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens):
-			relativeDistance = pt.clamp(relativeDistance, min=1, max=arrayNumberOfSegmentsFeatureDistance)
+			relativeDistance = pt.clamp(relativeDistance, min=1, max=featureDistanceLimit)
 			featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
-			featureSegmentIndex = featureSegmentsOffset + arrayNumberOfSegmentsFeatureDistance - relativeDistance
+			featureSegmentIndex = featureSegmentsOffset + featureDistanceLimit - relativeDistance
 			featureSegmentIndex = featureSegmentIndex.clamp(min=featureSegmentsOffset, max=arrayNumberOfSegments-1).long()
-			if(inferenceLeakyIntegrateAndFire):
-				featureSegmentIndex = pt.where(featureSegmentIndex == arrayIndexSegmentLast, pt.full_like(featureSegmentIndex, arrayIndexSegmentSoma), featureSegmentIndex+1)
 			featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
 			featureConnectionsSegmentMask.scatter_(0, featureSegmentIndex.unsqueeze(0), True)
 		else:
 			relativeDistance = pt.clamp(relativeDistance, min=1)
-			validDistanceMask = (relativeDistance <= arrayNumberOfSegmentsFeatureDistance)
+			validDistanceMask = (relativeDistance <= featureDistanceLimit)
 			featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
-			featureSegmentIndex = featureSegmentsOffset + arrayNumberOfSegmentsFeatureDistance - relativeDistance
+			featureSegmentIndex = featureSegmentsOffset + featureDistanceLimit - relativeDistance
 			featureSegmentIndex = featureSegmentIndex.clamp(min=featureSegmentsOffset, max=arrayNumberOfSegments-1).long()
-			if(inferenceLeakyIntegrateAndFire):
-				featureSegmentIndex = pt.where(featureSegmentIndex == arrayIndexSegmentLast, pt.full_like(featureSegmentIndex, arrayIndexSegmentSoma), featureSegmentIndex+1)
 			featureConnectionsSegmentMask = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=pt.bool, device=device)
 			featureConnectionsSegmentMask.scatter_(0, featureSegmentIndex.unsqueeze(0), True)
 			featureConnectionsSegmentMask = featureConnectionsSegmentMask & validDistanceMask.unsqueeze(0)
