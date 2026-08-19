@@ -652,9 +652,12 @@ def calculateFeatureConnectionsActiveTrainSpatialAxesSparseIndices(featureNeuron
 			targetWordOrder = featureNeuronsWordOrder[targetConceptIndices, targetFeatureIndices]
 			connectionMask = createFeatureWordOrderConnectionMask(sourceWordOrder, targetWordOrder, trainConnectionsIncludeSameTimeIndex)
 			selfMask = (sourceConceptIndices == targetConceptIndices) & (sourceFeatureIndices == targetFeatureIndices)
-			repeatedFeatureMask = (targetActive > 0).sum(dim=0) > 1
-			repeatedSourceMask = repeatedFeatureMask[sourceConceptIndices, sourceFeatureIndices]
-			connectionMask = (connectionMask & pt.logical_not(selfMask)) | (selfMask & repeatedSourceMask)
+			if(trainConnectionsAllowSelfTransitions):
+				connectionMask = connectionMask | selfMask
+			else:
+				repeatedFeatureMask = (targetActive > 0).sum(dim=0) > 1
+				repeatedSourceMask = repeatedFeatureMask[sourceConceptIndices, sourceFeatureIndices]
+				connectionMask = (connectionMask & pt.logical_not(selfMask)) | (selfMask & repeatedSourceMask)
 			if(connectionMask.any()):
 				sourceFeatureIndices = sourceFeatureIndices[connectionMask]
 				targetFeatureIndices = targetFeatureIndices[connectionMask]
@@ -932,9 +935,12 @@ def createFeatureConnectionsActiveTrainSparseBinaryTreeRootBranches(segmentActiv
 				else:
 					connectionMask = connectionMask & (targetColumnWordOrder >= sourceColumnWordOrder)
 			selfMask = (sourceConceptIndices == targetConceptIndices) & (sourceFeatureIndices == targetFeatureIndices)
-			repeatedFeatureMask = (segmentActive > 0).sum(dim=0) > 1
-			repeatedSourceMask = repeatedFeatureMask[sourceConceptIndices, sourceFeatureIndices]
-			connectionMask = connectionMask | (selfMask & repeatedSourceMask)
+			if(trainConnectionsAllowSelfTransitions):
+				connectionMask = connectionMask | selfMask
+			else:
+				repeatedFeatureMask = (segmentActive > 0).sum(dim=0) > 1
+				repeatedSourceMask = repeatedFeatureMask[sourceConceptIndices, sourceFeatureIndices]
+				connectionMask = connectionMask | (selfMask & repeatedSourceMask)
 			if(connectionMask.any()):
 				result = assignFeatureConnectionsToTargetSegmentsSparse(branchIndices[connectionMask], sourceConceptIndices[connectionMask], sourceFeatureIndices[connectionMask], targetConceptIndices[connectionMask], targetFeatureIndices[connectionMask], sourceWordOrder[connectionMask], targetWordOrder[connectionMask], sequenceObservedColumns)
 	else:
@@ -964,10 +970,13 @@ def createFeatureConnectionsActiveTrainSparseBranch(branchIndex, sourceIndices, 
 			else:
 				connectionMask = connectionMask & (targetColumnWordOrder >= sourceColumnWordOrder)
 		selfMask = (sourceConceptIndices == targetConceptIndices) & (sourceFeatureIndices == targetFeatureIndices)
-		connectionMask = connectionMask & pt.logical_not(selfMask)
-		if(repeatedFeatureMask is not None):
-			repeatedSourceMask = repeatedFeatureMask[sourceConceptIndices, sourceFeatureIndices]
-			connectionMask = connectionMask | (selfMask & repeatedSourceMask)
+		if(trainConnectionsAllowSelfTransitions):
+			connectionMask = connectionMask | selfMask
+		else:
+			connectionMask = connectionMask & pt.logical_not(selfMask)
+			if(repeatedFeatureMask is not None):
+				repeatedSourceMask = repeatedFeatureMask[sourceConceptIndices, sourceFeatureIndices]
+				connectionMask = connectionMask | (selfMask & repeatedSourceMask)
 		if(connectionMask.any()):
 			sourceConceptIndices = sourceConceptIndices[connectionMask]
 			sourceFeatureIndices = sourceFeatureIndices[connectionMask]
@@ -1167,6 +1176,9 @@ def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWor
 		featureNeuronsWordOrderExpanded1 = featureNeuronsWordOrder.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
 		featureNeuronsWordOrderExpanded2 = featureNeuronsWordOrder.view(1, 1, cs, fs).expand(cs, fs, cs, fs)
 		wordOrderMask = createFeatureWordOrderConnectionMask(featureNeuronsWordOrderExpanded1, featureNeuronsWordOrderExpanded2, trainConnectionsIncludeSameTimeIndex)
+		if(trainConnectionsAllowSelfTransitions):
+			selfWordOrderMask = pt.eye(cs*fs, dtype=pt.bool, device=featureConnectionsActive.device).view(cs, fs, cs, fs)
+			wordOrderMask = wordOrderMask | selfWordOrderMask
 		featureConnectionsActive = featureConnectionsActive * wordOrderMask
 	if(columnsWordOrder is not None):
 		columnsWordOrderExpanded1 = columnsWordOrder.view(cs, 1, 1, 1).expand(cs, fs, cs, fs)
@@ -1181,13 +1193,16 @@ def createFeatureConnectionsActiveTrain(featureNeuronsActive, cs, fs, columnsWor
 	csIndices2 = pt.arange(cs).view(1, 1, cs, 1).expand(cs, fs, cs, fs)
 	fsIndices1 = pt.arange(fs).view(1, fs, 1, 1).expand(cs, fs, cs, fs)
 	fsIndices2 = pt.arange(fs).view(1, 1, 1, fs).expand(cs, fs, cs, fs)
-	identityMask = (csIndices1 != csIndices2) | (fsIndices1 != fsIndices2)
-	if(multipleDendriticBranches and featureNeuronsActive.dim() == 3):
-		featureBranchCounts = (featureNeuronsActive > 0).sum(dim=0)
-		repeatedFeatureMask = featureBranchCounts > 1
-		repeatedFeatureMaskExpanded = repeatedFeatureMask.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
-		selfMask = (csIndices1 == csIndices2) & (fsIndices1 == fsIndices2)
-		identityMask = identityMask | (selfMask & repeatedFeatureMaskExpanded)
+	if(trainConnectionsAllowSelfTransitions):
+		identityMask = pt.ones_like(csIndices1, dtype=pt.bool)
+	else:
+		identityMask = (csIndices1 != csIndices2) | (fsIndices1 != fsIndices2)
+		if(multipleDendriticBranches and featureNeuronsActive.dim() == 3):
+			featureBranchCounts = (featureNeuronsActive > 0).sum(dim=0)
+			repeatedFeatureMask = featureBranchCounts > 1
+			repeatedFeatureMaskExpanded = repeatedFeatureMask.view(cs, fs, 1, 1).expand(cs, fs, cs, fs)
+			selfMask = (csIndices1 == csIndices2) & (fsIndices1 == fsIndices2)
+			identityMask = identityMask | (selfMask & repeatedFeatureMaskExpanded)
 	featureConnectionsActive = featureConnectionsActive * identityMask
 
 	if(useSANI):

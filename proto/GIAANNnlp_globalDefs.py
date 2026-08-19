@@ -81,7 +81,7 @@ elif(useTrainDuringInference):
 sentencePredictions = True 	#default: True	orig: True
 if(sentencePredictions):
 	if(useDefaultsV2):
-		skipSequenceNoDelimiterDetectedBetweenConceptTokens = False	#default: True 
+		skipSequenceNoDelimiterDetectedBetweenConceptTokens = False	#default: False	#orig: True
 	else:
 		skipSequenceNoDelimiterDetectedBetweenConceptTokens = True	#orig: True
 	if(inferenceTrainFirstSequences):
@@ -821,8 +821,10 @@ else:
 #Debug vars;
 if(useBenchmark):
 	debugPrintTrainTotalWords = True
-	if(useDefaultsV2):
+	if(tokeniserSubword):
 		debugPrintTrainTotalTokens = True		#requires tokeniserSubword
+	else:
+		debugPrintTrainTotalTokens = False
 else:	
 	debugPrintTrainTotalWords = False
 	debugPrintTrainTotalTokens = False

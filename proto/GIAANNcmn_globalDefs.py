@@ -54,7 +54,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference"
+	executionMode = "trainAndInference"	#optional: "train/"inference"/"trainAndInference"
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -325,6 +325,7 @@ else:
 	trainSparseNeuronsTensor = True		#default: True	#orig: True	#use sparse neurons tensor during training of sequence
 if(trainSparseNeuronsTensor):
 	assert trainSparseConnectionsTensor, "trainSparseNeuronsTensor requires trainSparseConnectionsTensor=True"
+trainConnectionsAllowSelfTransitions = False	#default: False	#allow same-column/feature transitions required when repeated occurrences share one neuron
 
 if(executionMode=="train" or executionMode=="trainAndInference"):
 	storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam = True	#default: False	#orig2: True	#train is faster with True	#orig1: False	#required to be False for high database sizes > ~1M training sequences	#store database feature connections and column separated feature neuron data in RAM, else dynamically load these from filesystem per sequence
