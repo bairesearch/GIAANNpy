@@ -697,7 +697,7 @@ def advanceLeakyIntegrateAndFireColumnActivationsForSelectedNextNeuron(globalFea
 def activateSelectedFeatureNeuronAfterPredictionPhase(seedPhase, globalFeatureNeuronsActivation, conceptColumnIndexNext, conceptColumnFeatureIndexNext):
 	globalFeatureNeuronsActivationResult = globalFeatureNeuronsActivation
 	if(inferenceBurstAllPredictionsOrTargetsInSequence):
-		if(not seedPhase):
+		if(inferenceLeakyIntegrateAndFire or not seedPhase):
 			if(conceptColumnIndexNext is None or conceptColumnFeatureIndexNext is None):
 				raise RuntimeError("activateSelectedFeatureNeuronAfterPredictionPhase error: selected column/feature is required")
 			globalFeatureNeuronsActivationResult = activateSeedPredictionSegments(globalFeatureNeuronsActivationResult, conceptColumnIndexNext, conceptColumnFeatureIndexNext)
@@ -974,7 +974,9 @@ def selectNextColumnFeatureSeedPhase(sequenceObservedColumns, databaseNetworkObj
 			GIAANNcmn_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected predictions available for current step")
 		if(conceptColumnIndexNext is None):
 			GIAANNcmn_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no connected activations available for next step")
-	globalFeatureNeuronsActivationResult = activateSeedPredictionSegments(globalFeatureNeuronsActivation, conceptColumnIndexNext, conceptColumnFeatureIndexNext)
+	globalFeatureNeuronsActivationResult = globalFeatureNeuronsActivation
+	if(not inferenceLeakyIntegrateAndFire):
+		globalFeatureNeuronsActivationResult = activateSeedPredictionSegments(globalFeatureNeuronsActivationResult, conceptColumnIndexNext, conceptColumnFeatureIndexNext)
 	conceptColumnIndexPred = conceptColumnIndexNext	#temporarily assign prediction from seed target for print only
 	conceptColumnFeatureIndexPred = conceptColumnFeatureIndexNext	#temporarily assign prediction from seed target for print only
 	return conceptColumnIndexPred, conceptColumnFeatureIndexPred, conceptColumnIndexNext, conceptColumnFeatureIndexNext, targetPreviousColumnIndex, targetNextColumnIndex, globalFeatureNeuronsActivationResult, True

@@ -616,12 +616,14 @@ MANUAL; - merge inferenceEvaluateTestSet with useBenchmarkDefaultsEvalTestSet
 - implement option inferenceDeactivateLastColumnSegmentUponPrediction for case inferenceLeakyIntegrateAndFire:useSANIcolumns/useSANIfeaturesAndColumns.
 MANUAL; - update inferenceLeakyIntegrateAndFire - if(not inferenceEvaluateTestSet): set inferenceDeactivateLastColumnSegmentUponPrediction
 - patch inferenceLeakyIntegrateAndFire:useSANIcolumns - record positive arrayIndexSegmentLastColumn targets as immediate last-segment eligibility keys
-- Preserve direct LIF terminal-signal eligibility while using propagated terminal-segment activations when no direct soma signal is available.
-- Canonicalize every LIF soma-target activation onto the artificial soma's branch zero before accumulation.
-- Align LIF beam-node transitions with main inference by advancing, decaying, and bursting before propagation and resetting after outgoing activation.
-- Initialize first-token LIF eligibility from the forced seed soma burst when bits-per-byte scoring is enabled.
-- Derive last-column deactivation only after selecting the SANI layout so pure-feature LIF inference never enables a nonexistent column segment.
-- Reserve the LIF soma as an additional artificial segment while retaining the full configured hybrid feature receptive-field length.
-- Honor LIF soma-decay and soma, dendritic-segment, and last-column deactivation controls independently in main and beam inference.
-- Canonicalize LIF eligibility keys as sorted unique tensors and use binary-search membership during candidate selection.
-- Require current-step direct LIF terminal-signal keys when direct connections are enforced, without substituting propagated eligibility.
+- patch processColumnInferencePrediction()/propagateLeakyIntegrateAndFireActivationsEnforceLastSegment()/mergeLeakyIntegrateAndFireCurrentSomaActivationKeys()/executeBeamNodeActivation() - Preserve direct LIF terminal-signal eligibility while using propagated terminal-segment activations when no direct soma signal is available.
+- patch applyFeatureNeuronsTargetActivationPredict()/canonicaliseLeakyIntegrateAndFireSomaBranches() - Canonicalize every LIF soma-target activation onto the artificial soma's branch zero before accumulation.
+- patch executeBeamNodeActivation() - Align LIF beam-node transitions with main inference by advancing, decaying, and bursting before propagation and resetting after outgoing activation.
+- patch initialiseLeakyIntegrateAndFireSomaActivationKeys() - Initialize first-token LIF eligibility from the forced seed soma burst when bits-per-byte scoring is enabled.
+- patch inferenceDeactivateLastColumnSegmentUponPrediction - Derive last-column deactivation only after selecting the SANI layout so pure-feature LIF inference never enables a nonexistent column segment.
+- patch inferenceLeakyIntegrateAndFireSomaSegmentCount - Reserve the LIF soma as an additional artificial segment while retaining the full configured hybrid feature receptive-field length.
+- patch inferenceDecrementActivationsSoma/inferenceDeactivateSomaUponPrediction/inferenceDeactivateSegmentsUponPrediction/inferenceDeactivateLastColumnSegmentUponPrediction - Honor LIF soma-decay and soma, dendritic-segment, and last-column deactivation controls independently in main and beam inference.
+- patch propagateLeakyIntegrateAndFireActivationsEnforceLastSegment()/mergeLeakyIntegrateAndFireCurrentSomaActivationKeys()/calculateLeakyIntegrateAndFireLastSegmentSelectionActivationDistribution() - Canonicalize LIF eligibility keys as sorted unique tensors and use binary-search membership during candidate selection.
+- patch processColumnInferencePrediction()/executeBeamNodeActivation() - Require current-step direct LIF terminal-signal keys when direct connections are enforced, without substituting propagated eligibility.
+- patch selectNextColumnFeatureSeedPhase()/activateSelectedFeatureNeuronAfterPredictionPhase() - Defer forced LIF seed bursts until after post-selection soma decay so each selected seed is burst exactly once and remains active as the next token source.
+- set inferenceLeakyIntegrateAndFire=True by default

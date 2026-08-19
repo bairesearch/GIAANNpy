@@ -54,7 +54,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "train"	#optional: "train/"inference"/"trainAndInference" 
+	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference"
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -95,7 +95,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = True	#default: False/True
+	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
@@ -122,7 +122,10 @@ else:
 		useBenchmarkDefaultsEvalTestSetOptim = True	#default: True	#orig: False	#higher test-set eval accuracy, but less robustness to hallucination
 
 
-inferenceLeakyIntegrateAndFire = False	#default: False	#orig: False
+if(useDefaultsV2):
+	inferenceLeakyIntegrateAndFire = True	#default: True	#orig: False
+else:
+	inferenceLeakyIntegrateAndFire = False
 if(inferenceLeakyIntegrateAndFire):
 	inferenceLeakyIntegrateAndFireSomaSegmentCount = 1	#mandatory: the soma is one additional artificial segment beyond the configured receptive-field segments
 	if(useBenchmarkDefaultsEvalTestSetOptim):
@@ -179,7 +182,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 50000	#5000, 200000, 1000000
+	trainMaxSequences = 5000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 50000	#5000
@@ -484,7 +487,7 @@ optimisationNormaliseSourceFeatureIndicesDisabled = False	#default: False	#orig:
 optimisationObservedColumnsWriteMetadataCheck = False	#default: False, orig: False
 optimisationArrayIndexPropertiesEfficientSerialConnections = False	#default: False #orig: True	#uses less GPU RAM
 optimisationArrayIndexPropertiesEfficientSerialNeurons = False	#default: False #orig: False
-optimisationStoreDatabaseResidentCoordinatesAsInt32 = False	#default: False	#orig: False	#~25% database size reduction in RAM (designed for storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam), approx 25% slower train time
+optimisationStoreDatabaseResidentCoordinatesAsInt32 = True	#default: False	#orig: False	#~25% database size reduction in RAM (designed for storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam), approx 25% slower train time
 if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
 	databaseResidentCoordinateDtype = pt.int32
 	databaseResidentCoordinateMinimum = 0
