@@ -77,6 +77,7 @@ if(useInference):
 	inferencePromptPreserveLineSequenceBoundaries = True	#default: True	#process every non-empty inference prompt line as exactly one independent sequence
 	if(inferencePromptPreserveLineSequenceBoundaries):
 		inferencePromptExpectedSequencesPerLine = 1
+	inferenceColumnConstraintsAllowExternalPrimeConceptTransitions = True	#default: True	#allow external prime-concept candidates at no-delimiter column transitions
 	if(useTrainDuringInference):
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#mandatory: False
 	elif(useBenchmark):

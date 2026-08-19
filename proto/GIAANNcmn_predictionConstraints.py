@@ -58,6 +58,12 @@ def constraintAllowsColumn(columnIndex, constraintState):
 
 def constraintAllowsNode(databaseNetworkObject, columnIndex, featureIndex, constraintState):
 	allowed = constraintAllowsColumn(columnIndex, constraintState)
+	if(inferenceColumnConstraintsAllowExternalPrimeConceptTransitions):
+		if(not allowed and constraintState is not None):
+			allowedSet = constraintState.get("columns")
+			constraintMode = constraintState.get("mode")
+			if(constraintMode == "internal" and allowedSet is not None and columnIndex not in allowedSet and featureIndex is not None):
+				allowed = int(featureIndex) == featureIndexPrimeConceptNeuron
 	if(allowed and constraintState is not None):
 		allowedSet = constraintState.get("columns")
 		constraintMode = constraintState.get("mode")
@@ -463,12 +469,22 @@ def applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnsIndi
 				predictedColumnsList = conceptColumnsIndicesPred.cpu().tolist()
 				constraintState = createConstraintState(allowedColumns, constraintMode)
 				if(constraintMode == "internal"):
-					indicesToKeep = [idx for idx, columnValue in enumerate(predictedColumnsList) if constraintAllowsColumn(columnValue, constraintState)]
+					if(inferenceColumnConstraintsAllowExternalPrimeConceptTransitions):
+						indicesToKeep = []
+						for idx, columnValue in enumerate(predictedColumnsList):
+							featureValue = getFirstFeatureValue(conceptColumnsFeatureIndicesPred, idx)
+							if(constraintAllowsNode(databaseNetworkObject, columnValue, featureValue, constraintState)):
+								indicesToKeep.append(idx)
+					else:
+						indicesToKeep = [idx for idx, columnValue in enumerate(predictedColumnsList) if constraintAllowsColumn(columnValue, constraintState)]
 					if(len(indicesToKeep) == 0):
-						repeatFactor = max(1, (conceptColumnsIndicesPred.shape[0] + allowedColumns.shape[0] - 1) // allowedColumns.shape[0])
-						replacementColumns = allowedColumns.repeat(repeatFactor)[:conceptColumnsIndicesPred.shape[0]]
-						conceptColumnsIndicesOut = replacementColumns
-						applyConnectedConstraint = False
+						if(inferenceColumnConstraintsAllowExternalPrimeConceptTransitions):
+							raise RuntimeError("applyColumnConstraintToPredictions: internal constraint removed all predictions; no eligible internal or external prime-concept predictions remain.")
+						else:
+							repeatFactor = max(1, (conceptColumnsIndicesPred.shape[0] + allowedColumns.shape[0] - 1) // allowedColumns.shape[0])
+							replacementColumns = allowedColumns.repeat(repeatFactor)[:conceptColumnsIndicesPred.shape[0]]
+							conceptColumnsIndicesOut = replacementColumns
+							applyConnectedConstraint = False
 					else:
 						indexTensor = pt.tensor(indicesToKeep, dtype=pt.long, device=conceptColumnsIndicesPred.device)
 						conceptColumnsIndicesOut = conceptColumnsIndicesPred.index_select(0, indexTensor)

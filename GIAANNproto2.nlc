@@ -633,3 +633,4 @@ v2m (Codex IDE GPT-5.6):
 - add proto GIAANNproto2l1m - start inference updates:
 	- add option inferencePromptPreserveLineSequenceBoundaries - process each non-empty inference prompt line as exactly one independent sequence matching the stored training boundary
 	- add option trainConnectionsAllowSelfTransitions - allow same-column/feature transitions required when repeated occurrences share one neuron
+	- add option inferenceColumnConstraintsAllowExternalPrimeConceptTransitions - allow external prime-concept candidates at no-delimiter column transitions without relabelling rejected candidates
