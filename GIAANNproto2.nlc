@@ -627,3 +627,8 @@ MANUAL; - update inferenceLeakyIntegrateAndFire - if(not inferenceEvaluateTestSe
 - patch processColumnInferencePrediction()/executeBeamNodeActivation() - Require current-step direct LIF terminal-signal keys when direct connections are enforced, without substituting propagated eligibility.
 - patch selectNextColumnFeatureSeedPhase()/activateSelectedFeatureNeuronAfterPredictionPhase() - Defer forced LIF seed bursts until after post-selection soma decay so each selected seed is burst exactly once and remains active as the next token source.
 - set inferenceLeakyIntegrateAndFire=True by default
+
+---
+v2m (Codex IDE GPT-5.6):
+- add proto GIAANNproto2l1m - start inference updates:
+	- add option inferencePromptPreserveLineSequenceBoundaries - process each non-empty inference prompt line as exactly one independent sequence matching the stored training boundary

@@ -74,6 +74,9 @@ drawNetworkDuringInference = False	#default: False
 numSeedTokensInference = 8	#default: 5, 8, 12, 16	#this is also set during train phase only so that the derived numberOfSegments always matches inference phase
 useInference = True  #mandatory: True	#enable options that support inference mode
 if(useInference):
+	inferencePromptPreserveLineSequenceBoundaries = True	#default: True	#process every non-empty inference prompt line as exactly one independent sequence
+	if(inferencePromptPreserveLineSequenceBoundaries):
+		inferencePromptExpectedSequencesPerLine = 1
 	if(useTrainDuringInference):
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#mandatory: False
 	elif(useBenchmark):

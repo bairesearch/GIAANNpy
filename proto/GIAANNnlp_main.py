@@ -114,7 +114,21 @@ def processPrompt(databaseNetworkObject, inferenceMode, sequenceCount):
 		with open(inferencePromptFile, 'r', encoding='utf-8') as file:
 			text = file.read()
 	articleIndex = 0
-	sequenceCount = processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, articleIndex)
+	if(inferencePromptPreserveLineSequenceBoundaries):
+		promptLines = [promptLine.lstrip() for promptLine in text.splitlines() if promptLine.strip()]
+		if(len(promptLines) == 0):
+			raise RuntimeError("processPrompt error: inference prompt must contain at least one non-empty line")
+		promptSequences = list(nlpSequence.pipe(promptLines))
+		if(len(promptSequences) != len(promptLines)*inferencePromptExpectedSequencesPerLine):
+			raise RuntimeError("processPrompt error: every non-empty inference prompt line must produce exactly one sequence")
+		for promptLineIndex, promptSequence in enumerate(promptSequences):
+			if(not isinstance(promptSequence, Doc)):
+				raise RuntimeError("processPrompt error: parsed inference prompt line must be a spaCy Doc; promptLineIndex = " + str(promptLineIndex))
+			if(len(promptSequence) < numSeedTokensInference+inferencePromptExpectedSequencesPerLine):
+				raise RuntimeError("processPrompt error: inference prompt line is shorter than the minimum prediction sequence length; promptLineIndex = " + str(promptLineIndex))
+		sequenceCount = processArticle(databaseNetworkObject, inferenceMode, sequenceCount, None, articleIndex, promptSequences, promptLines)
+	else:
+		sequenceCount = processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, articleIndex)
 	return sequenceCount
 
 def expandSequenceForInference(databaseNetworkObject, sequence):
@@ -167,28 +181,33 @@ def sanitiseDatasetNullCharacters(text, articleIndex):
 		raise RuntimeError("sanitiseDatasetNullCharacters error: requires datasetSanitiseNullCharacters")
 	return result
 
-def processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, articleIndex):
+def processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, articleIndex, promptSequences=None, promptSequencesRaw=None):
 	#sequences = sent_tokenize(text)
 	if(debugPrintSpacySectionTimes):
 		processArticlePart1StartTime = None
 		processArticlePart1Duration = 0.0
 		processArticlePart1StartTime = time.perf_counter()
 
-	if(ignoreNewlineCharacters):
-		text = text.replace('\n', ' ')
-	textParsed = nlpArticle(text)
-
-	if(executionMode=="inference"):
-		skipMode = False	
+	if(inferencePromptPreserveLineSequenceBoundaries and promptSequences is not None and promptSequencesRaw is not None):
+		if(not isinstance(promptSequences, list) or not isinstance(promptSequencesRaw, list) or len(promptSequences) == 0 or len(promptSequences) != len(promptSequencesRaw)):
+			raise RuntimeError("processArticle error: prompt sequence lists must be non-empty lists of equal length")
+		sequences = promptSequences
+		sequencesRaw = promptSequencesRaw
 	else:
-		if(datasetType=="textfile"):	#executionMode=="trainAndInference":
+		if(ignoreNewlineCharacters):
+			text = text.replace('\n', ' ')
+		textParsed = nlpArticle(text)
+		if(executionMode=="inference"):
 			skipMode = False
-		else:	#executionMode=="train": 
-			if(trainTestSet):
+		else:
+			if(datasetType=="textfile"):	#executionMode=="trainAndInference":
 				skipMode = False
-			else:
-				skipMode = (sequenceCount < (trainSetStartOffsetSequences-maxSentencesPerArticle))
-	sequences, sequencesRaw = generateSeqencesBatchOrSerial(textParsed, skipMode)
+			else:	#executionMode=="train":
+				if(trainTestSet):
+					skipMode = False
+				else:
+					skipMode = (sequenceCount < (trainSetStartOffsetSequences-maxSentencesPerArticle))
+		sequences, sequencesRaw = generateSeqencesBatchOrSerial(textParsed, skipMode)
 	if(inferenceMode and inferenceTrainFirstSequences and (printTrainSequenceBar or printEvalSequenceBar)):
 		promptSequenceTotal = calculateProcessArticlePromptSequenceTotal(sequenceCount, sequences)
 		GIAANNcmn_executionProgress.initialisePromptSequenceBar(printPromptSequenceBarInitialSequenceCount, promptSequenceTotal)
