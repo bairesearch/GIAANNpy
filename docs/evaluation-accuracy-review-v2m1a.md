@@ -93,17 +93,11 @@ prior sequence count, dataset identity, and configuration fingerprint are report
 
 ## Medium-impact findings
 
-### 6. Probabilistic scoring counts the supplied prefix
+### 6. Probabilistic scoring excluded the supplied prefix (resolved)
 
-The BPB path records a target probability for every seed and prediction token and
-uses the byte length of the complete raw sequence. That is internally consistent
-for full-sequence likelihood, but it is a different task from the reported top-1
-metric, which uses prediction tokens only. Results described as continuation BPB
-would therefore be incorrect.
-
-**Required correction:** name the current result full-sequence BPB. If continuation
-BPB is desired, accumulate both probability and UTF-8 byte counts over exactly the
-post-seed target span.
+The BPB path now records target probabilities only for prediction tokens and uses
+the UTF-8 byte length of the post-seed prediction span. Its numerator and
+denominator therefore measure the same continuation region as top-1 accuracy.
 
 ### 7. The test corpus is a checked-in derived prompt, not a reproducible split
 
