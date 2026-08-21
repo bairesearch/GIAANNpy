@@ -328,6 +328,30 @@ if(tokeniserSubword):
 					preprocessedToken.subwordRole = tokeniserSubwordRoleEnd
 			return
 
+	def getTokeniserSubwordSequenceByteLength(sequence):
+		result = None
+		if(not isinstance(sequence, PreprocessedSequence)):
+			raise RuntimeError("getTokeniserSubwordSequenceByteLength error: sequence must be a PreprocessedSequence")
+		if(len(sequence) <= 0):
+			raise RuntimeError("getTokeniserSubwordSequenceByteLength error: sequence must not be empty")
+		encoding = getTokeniserSubwordEncoding()
+		tokenIds = []
+		for token in sequence:
+			if(token.tokenId is None):
+				raise RuntimeError("getTokeniserSubwordSequenceByteLength error: tokenId is None")
+			if(not isinstance(token.tokenId, int) or isinstance(token.tokenId, bool)):
+				raise RuntimeError("getTokeniserSubwordSequenceByteLength error: tokenId must be an int")
+			if(token.tokenId < 0 or token.tokenId > int(encoding.max_token_value)):
+				raise RuntimeError("getTokeniserSubwordSequenceByteLength error: tokenId out of range")
+			tokenIds.append(token.tokenId)
+		sequenceBytes = encoding.decode_bytes(tokenIds)
+		if(not isinstance(sequenceBytes, bytes)):
+			raise RuntimeError("getTokeniserSubwordSequenceByteLength error: decoded sequence must be bytes")
+		result = len(sequenceBytes)
+		if(result <= 0):
+			raise RuntimeError("getTokeniserSubwordSequenceByteLength error: sequence byte length must be > 0")
+		return result
+
 	def getTokeniserSubwordSequenceText(sequence):
 		result = None
 		if(not hasattr(sequence, "text")):

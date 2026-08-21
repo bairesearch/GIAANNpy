@@ -54,7 +54,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "trainAndInference"	#optional: "train/"inference"/"trainAndInference"
+	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference"
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -74,10 +74,14 @@ drawNetworkDuringInference = False	#default: False
 numSeedTokensInference = 8	#default: 5, 8, 12, 16	#this is also set during train phase only so that the derived numberOfSegments always matches inference phase
 useInference = True  #mandatory: True	#enable options that support inference mode
 if(useInference):
-	inferencePromptPreserveLineSequenceBoundaries = True	#default: True	#process every non-empty inference prompt line as exactly one independent sequence
+	if(useDefaultsV2):
+		inferencePromptPreserveLineSequenceBoundaries = True	#default: True	#process every non-empty inference prompt line as exactly one independent sequence
+		inferenceColumnConstraintsAllowExternalPrimeConceptTransitions = True	#default: True	#allow external prime-concept candidates at no-delimiter column transitions
+	else:
+		inferencePromptPreserveLineSequenceBoundaries = False
+		inferenceColumnConstraintsAllowExternalPrimeConceptTransitions = False
 	if(inferencePromptPreserveLineSequenceBoundaries):
 		inferencePromptExpectedSequencesPerLine = 1
-	inferenceColumnConstraintsAllowExternalPrimeConceptTransitions = True	#default: True	#allow external prime-concept candidates at no-delimiter column transitions
 	if(useTrainDuringInference):
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#mandatory: False
 	elif(useBenchmark):
@@ -99,7 +103,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
+	useBenchmarkDefaultsEvalTestSet = True	#default: False/True
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
@@ -626,6 +630,7 @@ else:
 printInferenceTop1Accuracy = True	#default: True	#print inference top-1 accuracy
 printInferenceTop1AccuracyBitsPerByte = False	#dependent var
 printInferenceTop1AccuracyBitsPerByteModified = False	#dependent var
+inferenceTop1AccuracyBitsPerByteTextEncoding = "utf-8"
 if(printInferenceTop1Accuracy):
 	printInferenceTop1AccuracyBitsPerByte = False	#default: False	#print inference top-1 accuracy in BPB
 	if(printInferenceTop1AccuracyBitsPerByte):

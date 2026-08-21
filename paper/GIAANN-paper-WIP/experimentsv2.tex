@@ -1,29 +1,29 @@
 \subsection{Results (proto v2)}
 
-An additional set of accuracy measurements were taken with GIAANN Proto 2j and 2k.
+An additional set of accuracy measurements were taken with GIAANN Proto 2m.
 
 A number of changes to the default settings were introduced in GIAANN Proto 2 that affect evaluation accuracies (\texttt{useDefaultsV2}):
 
-\subsection{proto v2j settings}
+\subsection{proto v2m settings}
 \begin{itemize}
  	\item Implement option tokeniserSubword - a modern BPE/SentencePiece subword tokeniser (\texttt{o200k_base} encoding of the OpenAI \texttt{tiktoken} library \citep{openai2022tiktoken}).
     \item Implement option \texttt{SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens=False}, which affects both \texttt{useSANIfeaturesAndColumns} and \texttt{useSANIcolumns} modes.
     \item Enable option \texttt{SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=False}, which affects both \texttt{useSANIfeaturesAndColumns} and \texttt{useSANIfeatures} modes.
     \item Restore \texttt{inferenceBurstAllPredictionsOrTargetsInSequence} - patch inference to always activate the top-1 selected feature neuron (i.e. the prediction or target respectively as per \texttt{inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures}). This guarantees the selected top-1 feature is active when the next step uses it as a source.
+    \item update \texttt{inferenceEvaluateTestSetTrainMaxSequences10M}. Eval datasets contain 1000 sequences, and were extracted to support 10M training sequences. set \texttt{inferenceEvaluateTestSetTrainMaxSequences10M=True}.
+    \item set \texttt{inferenceDecrementActivations=True} and \texttt{activationDecrementPerPredictedToken=0.05}
+    \item set \texttt{inferenceActivationsType = "intf+c"} (required with inferenceDecrementActivations).
+    \item add option \texttt{inferenceSegmentTimingMultipicativeBias=True} that affects option \texttt{inferenceSegmentTiming="biased"} only. Set \texttt{inferenceSegmentTiming="biased"}.
+    \item set \texttt{SANIfeaturesAndColumnsDistribution=="matchedSegments"} (equal number of feature and column segments).
+    \item set \texttt{skipSequenceNoDelimiterDetectedBetweenConceptTokens==False}.
+    \item enable \texttt{multisentencePredictions} and \texttt{sequencesCropToMaxLength}.
+    \item set \texttt{inferenceLeakyIntegrateAndFire=True} by default
+    \item add option \texttt{inferencePromptPreserveLineSequenceBoundaries} - process each non-empty inference prompt line as exactly one independent sequence matching the stored training boundary
+    \item add option \texttt{inferenceColumnConstraintsAllowExternalPrimeConceptTransitions} - allow external prime-concept candidates at no-delimiter column transitions without relabelling rejected candidates
+
 \end{itemize}
 
-\subsection{proto v2k settings}
-\begin{itemize}
-	\item update \texttt{inferenceEvaluateTestSetTrainMaxSequences10M}. Eval datasets contain 1000 sequences, and were extracted to support 10M training sequences. set \texttt{inferenceEvaluateTestSetTrainMaxSequences10M=True}.
-	\item set \texttt{inferenceDecrementActivations=True} and \texttt{activationDecrementPerPredictedToken=0.05}
-	\item set \texttt{inferenceActivationsType = "intf+c"} (required with inferenceDecrementActivations).
-	\item add option \texttt{inferenceSegmentTimingMultipicativeBias=True} that affects option \texttt{inferenceSegmentTiming="biased"} only. Set \texttt{inferenceSegmentTiming="biased"}.
-	\item set \texttt{SANIfeaturesAndColumnsDistribution=="matchedSegments"} (equal number of feature and column segments).
-	\item set \texttt{skipSequenceNoDelimiterDetectedBetweenConceptTokens==False}.
-	\item enable \texttt{multisentencePredictions} and \texttt{sequencesCropToMaxLength}.
-\end{itemize}
-
-\Cref{fig:protov2j-oscar-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} graphs the training-set and test-set eval results with the default settings.
+\Cref{fig:protov2j-oscar-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} graphs the v2j training-set and test-set eval results. Note the v2j test-set accuracies are significantly higher than v2m due to usage of the original (v1) smaller eval datasets (\texttt{inferenceEvaluateTestSetTrainMaxSequences10M=False}).
 
  \begin{figure}[htbp]
       \centering
@@ -36,61 +36,24 @@ A number of changes to the default settings were introduced in GIAANN Proto 2 th
 
 \paragraph{Tables}
 
-\Cref{tab:protov2j-oscar-train-top1-accuracy} contains Proto v2j OSCAR-2201 Top-1 training-set accuracy for different numbers training sizes, with targets fed as input.
+\Cref{tab:protov2m-oscar-train-top1-accuracy-inferenceLeakyIntegrateAndFire} contains Proto v2m OSCAR-2201 Top-1 training-set accuracy for different numbers training sizes, with targets fed as input.
 
-\Cref{tab:protov2k-oscar-train-top1-accuracy} contains Proto v2k OSCAR-2201 Top-1 training-set accuracy for different numbers training sizes, with targets fed as input.
-
-\Cref{tab:protov2k-oscar-train-top1-accuracy-multisentencePredictions} contains Proto v2k OSCAR-2201 Top-1 training-set accuracy for different numbers training sizes, with targets fed as input, and multi-sentence predictions.
-
-\Cref{fig:protov2j-oscar-train-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} graphs the training-set eval results with the default settings.
+\Cref{fig:protov2j-oscar-train-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} graphs the v2j training-set eval results.
 
 \begin{table}[H]
 \centering
-\caption{Proto v2j OSCAR-2201 Top-1 training-set accuracy for different numbers training sizes, with targets fed as input.}
-\label{tab:protov2j-oscar-train-top1-accuracy}
+\caption{Proto v2m OSCAR-2201 Top-1 training-set accuracy for different training sizes, with targets fed as input, and multi-sentence predictions.}
+\label{tab:protov2m-oscar-train-top1-accuracy-inferenceLeakyIntegrateAndFire}
 \begin{tabular}{rrrrrrrrr}
 \toprule
-\textbf{s} & \textbf{c} & \textbf{f} & \textbf{seq} & \textbf{t-1 exact} & \textbf{param} & \textbf{db size} & \textbf{words} & \textbf{tokens} \\
-\midrule
-8 & 3 & 5 & 5,000     & 1.000 & 1.0M & 0.2GB & 0.1M & 0.1M \\
-8 & 3 & 5 & 200,000   & 0.992 & 34.0M & 3.9GB & 5.0M & 5.5M \\
-8 & 3 & 5 & 1,000,000 & 0.976 & 157.0M & 15.0GB & 24.6M & 27.1M \\
-8 & 3 & 5 & 2,000,000 & 0.961 & 296.4M & 26.2GB & 49.2M & 54.3M \\
-8 & 3 & 5 & 3,000,000 & 0.949 & 433.5M & 36.8GB & 73.8M & 81.4M \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{table}[H]
-\centering
-\caption{Proto v2k OSCAR-2201 Top-1 training-set accuracy for different training sizes, with targets fed as input.}
-\label{tab:protov2k-oscar-train-top1-accuracy}
-\begin{tabular}{rrrrrrrrrrr}
-\toprule
 \textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{t-1} & \textbf{param} & \textbf{db size} & \textbf{words} & \textbf{tokens} \\
 \midrule
-8 & 4 & 4 & 5,000     & 0.858 & 2.0M & 0.3GB & 0.1M & 0.1M \\
-8 & 4 & 4 & 200,000   & 0.844 & 74.9M & 7.4GB &	5.2M & 5.8M \\
-8 & 4 & 4 & 1,000,000 & 0.776 & 347.0M & 29.3GB & 26.0M & 28.8M \\
+8 & 4 & 4 & 5,000     & 0.970 & 6.0M & 0.7GB & 0.3M & 0.3M \\
+8 & 4 & 4 & 200,000   & 0.922 & 217.0M & 17.4GB & 11.9M & 13.2M \\
+8 & 4 & 4 & 1,000,000 & 0.878 & 1000.7M & 69.5GB & 60.0M & 66.2M  \\
 \bottomrule
 \end{tabular}
 \end{table}
-
-\begin{table}[H]
-\centering
-\caption{Proto v2k OSCAR-2201 Top-1 training-set accuracy for different training sizes, with targets fed as input, and multi-sentence predictions.}
-\label{tab:protov2k-oscar-train-top1-accuracy-multisentencePredictions}
-\begin{tabular}{rrrrrrrrrrr}
-\toprule
-\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{t-1} & \textbf{param} & \textbf{db size} & \textbf{words} & \textbf{tokens} \\
-\midrule
-8 & 4 & 4 & 5,000     & 0.777 & 5.8M & 0.7GB & 0.3M & 0.3M \\
-8 & 4 & 4 & 200,000   & 0.726 & 212.3M & 17.2GB & 11.9M & 13.2M \\
-8 & 4 & 4 & 1,000,000 & 0.645 & 979.4M & 69.9GB & 59.6M & 66.2M \\
-\bottomrule
-\end{tabular}
-\end{table}
-
 
  \begin{figure}[htbp]
       \centering
@@ -103,66 +66,24 @@ A number of changes to the default settings were introduced in GIAANN Proto 2 th
 
 \paragraph{Tables}
 
-\Cref{tab:protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} contains Proto v2j OSCAR-2201 Top-1 test-set accuracy for different inference connection strength types, training sizes, and inference activations, with segment timing none (t-1 none), and targets fed as input. The different inference connection strength types used were ``bool'' (\texttt{inferenceConnectionsStrengthBoolean=True}) and ``float'' (\texttt{inferenceConnectionsStrengthBoolean=False}). The default segment timings used during proto v2j benchmarking is ``none''. The default inference activation type used during proto v2j benchmarking is ``bool f''. The default strength type used during proto v2j benchmarking is ``float''. The table also includes the total number of trained words and tokens. 
+\Cref{tab:protov2m-oscar-test-top1-accuracy-inferenceLeakyIntegrateAndFire} contains Proto v2m OSCAR-2201 Top-1 test-set accuracy for different training sizes, with targets fed as input. The table also includes the total number of trained words and tokens.
 
-\Cref{tab:protov2k-oscar-test-top1-accuracy} contains proto v2k OSCAR-2201 Top-1 test-set accuracy for different training sizes, with targets fed as input. The default segment timings used during proto v2k benchmarking is ``biased''. The default inference activation type used during proto v2k benchmarking is ``int c+f''. The default strength type used during proto v2k benchmarking is ``float''. \texttt{inferenceActivationFunction} was also disabled during proto v2k benchmarking. The table also includes the total number of trained words and tokens. 
-
-\Cref{tab:protov2k-oscar-test-top1-accuracy-multisentencePredictions} contains proto v2k OSCAR-2201 Top-1 test-set accuracy for different training sizes, with targets fed as input, and multi-sentence predictions.
-
-\Cref{fig:protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} graphs the test-set eval results with the default settings.
+\Cref{fig:protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} graphs the v2j test-set eval results.
 
 \begin{table}[H]
 \centering
-\caption{Proto v2j OSCAR-2201 Top-1 test-set accuracy for different inference connection strength types, training sizes, and inference activations, with segment timing none (t-1 none), and targets fed as input.}
-\label{tab:protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes}
-\begin{tabular}{rrrrrrrrrrr}
-\toprule
-\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{str} & \textbf{int f+c} & \textbf{bool f} & \textbf{param} & \textbf{db size} & \textbf{words} & \textbf{tokens} \\
-\midrule
-8 & 3 & 5 & 5,000     & bool & 0.073 & 0.068 & 1.0M & 0.2GB & 0.1M & 0.1M \\
-8 & 3 & 5 & 200,000   & bool & 0.178 & 0.182 & 34.0M & 3.9GB & 5.0M & 5.5M \\
-8 & 3 & 5 & 1,000,000 & bool & 0.227 & 0.225 & 157.0M & 15.0GB & 24.6M & 27.1M \\
-8 & 3 & 5 & 2,000,000 & bool & 0.237 & 0.230 & 296.4M & 26.2GB & 49.2M & 54.3M \\
-8 & 3 & 5 & 3,000,000 & bool & 0.238 & 0.230 & 433.5M & 36.8GB & 73.8M & 81.4M \\
-8 & 3 & 5 & 5,000     & float & 0.078 & 0.074 & 1.0M & 0.2GB & 0.1M & 0.1M \\
-8 & 3 & 5 & 200,000   & float & 0.205 & 0.192 & 34.0M & 3.9GB & 5.0M & 5.5M \\
-8 & 3 & 5 & 1,000,000 & float & 0.238 & 0.237 & 157.0M & 15.0GB & 24.6M & 27.1M \\
-8 & 3 & 5 & 2,000,000 & float & 0.253 & 0.253 & 296.4M & 26.2GB & 49.2M & 54.3M \\
-8 & 3 & 5 & 3,000,000 & float & 0.256 & 0.262 & 433.5M & 36.8GB & 73.8M & 81.4M \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{table}[H]
-\centering
-\caption{Proto v2k OSCAR-2201 Top-1 test-set accuracy for different training sizes, with targets fed as input.}
-\label{tab:protov2k-oscar-test-top1-accuracy}
-\begin{tabular}{rrrrrrrrrrr}
+\caption{Proto v2m OSCAR-2201 Top-1 test-set accuracy for different training sizes, with targets fed as input.}
+\label{tab:protov2m-oscar-test-top1-accuracy-inferenceLeakyIntegrateAndFire}
+\begin{tabular}{rrrrrrrrr}
 \toprule
 \textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{t-1} & \textbf{param} & \textbf{db size} & \textbf{words} & \textbf{tokens} \\
 \midrule
-8 & 4 & 4 & 5,000     & 0.065 & 2.0M & 0.3GB & 0.1M & 0.1M \\
-8 & 4 & 4 & 200,000   & 0.167 & 74.9M & 7.4GB &	5.2M & 5.8M \\
-8 & 4 & 4 & 1,000,000 & 0.192 & 347.0M & 29.3GB & 26.0M & 28.8M \\
+8 & 4 & 4 & 5,000     & 0.083 & 6.0M & 0.7GB & 0.3M & 0.3M \\
+8 & 4 & 4 & 200,000   & 0.175 & 217.0M & 17.4GB & 11.9M & 13.2M \\
+8 & 4 & 4 & 1,000,000 & 0.207 & 1000.7M & 69.5GB & 60.0M & 66.2M \\
 \bottomrule
 \end{tabular}
 \end{table}
-
-\begin{table}[H]
-\centering
-\caption{Proto v2k OSCAR-2201 Top-1 test-set accuracy for different training sizes, with targets fed as input, and multi-sentence predictions.}
-\label{tab:protov2k-oscar-test-top1-accuracy-multisentencePredictions}
-\begin{tabular}{rrrrrrrrrrr}
-\toprule
-\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{t-1} & \textbf{param} & \textbf{db size} & \textbf{words} & \textbf{tokens} \\
-\midrule
-8 & 4 & 4 & 5,000     & 0.081 & 5.8M & 0.7GB & 0.3M & 0.3M \\
-8 & 4 & 4 & 200,000   & 0.164 & 212.3M & 17.2GB & 11.9M & 13.2M \\
-8 & 4 & 4 & 1,000,000 & 0.189 & 979.4M & 69.9GB & 59.6M & 66.2M \\
-\bottomrule
-\end{tabular}
-\end{table}
-
 
  \begin{figure}[htbp]
       \centering
@@ -176,7 +97,7 @@ A number of changes to the default settings were introduced in GIAANN Proto 2 th
 
 \subsection{Performance (proto v2)}
 
-An additional set of performance measurements were taken with GIAANN Proto 2j and 2k.
+An additional set of performance measurements were taken with GIAANN Proto 2m.
 
 A number of optimisations were introduced in GIAANN Proto 2 that affect evaluation performance:
 
@@ -196,72 +117,25 @@ A number of optimisations were introduced in GIAANN Proto 2 that affect evaluati
 
 \paragraph{Tables}
 
-\Cref{tab:protov2j-oscar-performance} contains Proto v2j OSCAR-2201 performance measurements for different execution phases (train, eval test-set) and training sizes and different training sizes, with different database feature connections active storage location for train/eval (DDR5 RAM/filesystem), with train phase feature neuron and connection sparse tensors, sparse tensor device CPU, and feature neuron sparse tensors stored independently for each column. Train times were measured cumulatively > 1M sequences.
-
-\Cref{tab:protov2k-oscar-performance} contains proto v2k OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes and different training sizes, with different database feature connections active storage location for train/eval (DDR5 RAM/filesystem), with train phase feature neuron and connection sparse tensors, sparse tensor device CPU, feature neuron sparse tensors stored independently for each column.
-
-\Cref{tab:protov2k-oscar-performance} contains proto v2k OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes and different training sizes, with different database feature connections active storage location for train/eval (DDR5 RAM/filesystem), with train phase feature neuron and connection sparse tensors, sparse tensor device CPU, feature neuron sparse tensors stored independently for each column, and multi-sentence predictions.
+\Cref{tab:protov2m-oscar-performance-inferenceLeakyIntegrateAndFire} contains proto v2m OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes and different training sizes, with different database feature connections active storage location for train/eval (DDR5 RAM/filesystem), with train phase feature neuron and connection sparse tensors, sparse tensor device CPU, feature neuron sparse tensors stored independently for each column, and multi-sentence predictions. \texttt{optimisationStoreDatabaseResidentCoordinatesAsInt32=True} was set during the 1M sequence training round to reduce RAM usage.
 
 \begin{table}[H]
 \centering
-\caption{Proto v2j OSCAR-2201 performance measurements for different execution phases (train, eval test-set) and training sizes and different training sizes, with different database feature connections active storage location for train/eval (DDR5 RAM/filesystem), with train phase feature neuron and connection sparse tensors, sparse tensor device CPU, and feature neuron sparse tensors stored independently for each column.}
-\label{tab:protov2j-oscar-performance}
-\begin{tabular}{rrrrrrrrrrrr}
+\caption{Proto v2m OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes and different training sizes, with different database feature connections active storage location for train/eval (DDR5 RAM/filesystem), with train phase feature neuron and connection sparse tensors, sparse tensor device CPU, feature neuron sparse tensors stored independently for each column, and multi-sentence predictions.}
+\label{tab:protov2m-oscar-performance-inferenceLeakyIntegrateAndFire}
+\begin{tabular}{rrrrrrrrr}
 \toprule
 \textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{phase} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{cpu ram} \\
 \midrule
-8 & 3 & 5 & 5,000       & train   & 00:00:32 & 00:00:27 & 00:00:05 & 1.4GB \\
-8 & 3 & 5 & 200,000     & train   & 00:25:09 & 00:23:31 & 00:01:37 & 5.6GB \\
-8 & 3 & 5 & 1,000,000   & train   & 02:53:06 & 02:47:08 & 00:05:57 & 18.7GB \\
-8 & 3 & 5 & 2,000,000   & train   & 08:10:49 & 07:23:41 & 00:11:10 & 31.9GB \\
-8 & 3 & 5 & 3,000,000   & train   & 18:54:29 & 16:40:48 & 00:17:03 & 44.9GB \\
-8 & 3 & 5 & 5,000       & ts eval & 00:00:02 & 00:00:02 & 00:00:00 & 1.1GB \\
-8 & 3 & 5 & 200,000     & ts eval & 00:00:04 & 00:00:04 & 00:00:00 & 1.1GB \\
-8 & 3 & 5 & 1,000,000   & ts eval & 00:00:11 & 00:00:11 & 00:00:00 & 1.1GB \\
-8 & 3 & 5 & 2,000,000   & ts eval & 00:00:16 & 00:00:16 & 00:00:00 & 1.1GB \\
-8 & 3 & 5 & 3,000,000   & ts eval & 00:00:21 & 00:00:21 & 00:00:00 & 1.1GB \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{table}[H]
-\centering
-\caption{Proto v2k OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes and different training sizes, with different database feature connections active storage location for train/eval (DDR5 RAM/filesystem), with train phase feature neuron and connection sparse tensors, sparse tensor device CPU, feature neuron sparse tensors stored independently for each column}
-\label{tab:protov2k-oscar-performance}
-\begin{tabular}{rrrrrrrrrrrr}
-\toprule
-\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{phase} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{cpu ram} \\
-\midrule
-8 & 4 & 4 & 5,000       & train   & 00:00:50 & 00:00:42 & 00:00:07 & 1.4GB \\
-8 & 4 & 4 & 200,000     & train   & 00:56:46 & 00:54:05 & 00:02:40 & 7.9GB \\
-8 & 4 & 4 & 1,000,000   & train   & 05:56:15 & 05:46:32 & 00:09:43 & 31.1GB \\
-8 & 4 & 4 & 5,000       & tr eval & 00:01:07 & 00:01:07 & 00:00:00 & 1.2GB \\
-8 & 4 & 4 & 200,000     & tr eval & 00:02:38 & 00:02:38 & 00:00:00 & 1.2GB \\
-8 & 4 & 4 & 1,000,000   & tr eval & 00:06:24 & 00:06:24 & 00:00:00 & 1.3GB \\
-8 & 4 & 4 & 5,000       & ts eval & 00:00:39 & 00:00:39 & 00:00:00 & 1.2GB \\
-8 & 4 & 4 & 200,000     & ts eval & 00:02:29 & 00:02:29 & 00:00:00 & 1.2GB \\
-8 & 4 & 4 & 1,000,000   & ts eval & 00:06:28 & 00:06:28 & 00:00:00 & 1.3GB \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{table}[H]
-\centering
-\caption{Proto v2k OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes and different training sizes, with different database feature connections active storage location for train/eval (DDR5 RAM/filesystem), with train phase feature neuron and connection sparse tensors, sparse tensor device CPU, feature neuron sparse tensors stored independently for each column, and multi-sentence predictions.}
-\label{tab:protov2k-oscar-performance-multisentencePredictions}
-\begin{tabular}{rrrrrrrrrrrr}
-\toprule
-\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{phase} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{cpu ram} \\
-\midrule
-8 & 4 & 4 & 5,000       & train   & 00:01:45 & 00:01:28 & 00:00:16 & 1.8GB \\
-8 & 4 & 4 & 200,000     & train   & 02:02:06 & 01:56:42 & 00:05:24 & 17.9GB \\
-8 & 4 & 4 & 1,000,000   & train   & - & - & - & - \\
-8 & 4 & 4 & 5,000       & tr eval & 00:02:41 & 00:02:41 & 00:00:00 & 1.3GB \\
-8 & 4 & 4 & 200,000     & tr eval & 00:14:36 & 00:14:36 & 00:00:00 & 1.3GB \\
-8 & 4 & 4 & 1,000,000   & tr eval & 00:51:26 & 00:51:26 & 00:00:00 & 1.6GB \\
-8 & 4 & 4 & 5,000       & ts eval & 00:02:34 & 00:02:34 & 00:00:00 & 1.3GB \\
-8 & 4 & 4 & 200,000     & ts eval & 00:16:35 & 00:16:35 & 00:00:00 & 1.4GB \\
-8 & 4 & 4 & 1,000,000   & ts eval & 00:51:00 & 00:51:00 & 00:00:00 & 1.7GB \\
+8 & 4 & 4 & 5,000       & train   & 00:01:41 & 00:01:25 & 00:00:16 & 1.8GB \\
+8 & 4 & 4 & 200,000     & train   & 01:55:59 & 01:50:31 & 00:05:28 & 18.5GB \\
+8 & 4 & 4 & 1,000,000   & train   & 44:34:27 & 43:14:01 & 01:20:26 & 55.3GB \\
+8 & 4 & 4 & 5,000       & tr eval & 00:02:11 & 00:02:11 & 00:00:00 & 1.3GB \\
+8 & 4 & 4 & 200,000     & tr eval & 00:08:00 & 00:08:00 & 00:00:00 & 1.3GB \\
+8 & 4 & 4 & 1,000,000   & tr eval & 00:21:02 & 00:21:02 & 00:00:00 & 1.5GB \\
+8 & 4 & 4 & 5,000       & ts eval & 00:02:10 & 00:02:10 & 00:00:00 & 1.3GB \\
+8 & 4 & 4 & 200,000     & ts eval & 00:17:14 & 00:17:14 & 00:00:00 & 1.3GB \\
+8 & 4 & 4 & 1,000,000   & ts eval & 00:49:05 & 00:49:05 & 00:00:00 & 1.6GB \\
 \bottomrule
 \end{tabular}
 \end{table}

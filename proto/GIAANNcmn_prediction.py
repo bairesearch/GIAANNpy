@@ -101,11 +101,19 @@ def addInferenceTop1AccuracyBitsPerByteProbability(targetProbability):
 			totalInferenceTop1NegativeLogProbabilitySum += -math.log(targetProbability)
 	return
 
-def addInferenceTop1AccuracyBitsPerByteBytes(sequenceRaw):
+def addInferenceTop1AccuracyBitsPerByteBytes(sequencePredict):
 	if(printInferenceTop1AccuracyBitsPerByte):
-		if(sequenceRaw is None):
-			raise RuntimeError("addInferenceTop1AccuracyBitsPerByteBytes error: sequenceRaw is None")
-		sequenceBytes = len(sequenceRaw.encode("utf-8"))
+		if(sequencePredict is None):
+			raise RuntimeError("addInferenceTop1AccuracyBitsPerByteBytes error: sequencePredict is None")
+		if(tokeniserSubword):
+			sequenceBytes = GIAANNnlp_sequenceTokens.getTokeniserSubwordSequenceByteLength(sequencePredict)
+		else:
+			if(not hasattr(sequencePredict, "text")):
+				raise RuntimeError("addInferenceTop1AccuracyBitsPerByteBytes error: sequencePredict has no text attribute")
+			sequencePredictRaw = sequencePredict.text
+			if(not isinstance(sequencePredictRaw, str)):
+				raise RuntimeError("addInferenceTop1AccuracyBitsPerByteBytes error: sequencePredict text must be a str")
+			sequenceBytes = len(sequencePredictRaw.encode(inferenceTop1AccuracyBitsPerByteTextEncoding))
 		if(sequenceBytes <= 0):
 			raise RuntimeError("addInferenceTop1AccuracyBitsPerByteBytes error: sequenceBytes must be > 0")
 		global totalInferenceTop1BitsPerByteBytes
@@ -150,9 +158,9 @@ def printInferenceTop1Accuracy(databaseNetworkObject, autoresearchExecutionTimeI
 						printInferenceTop1AccuracyAutoresearchSummary(databaseNetworkObject, "averageTop1BitsPerByte", bitsPerByte, autoresearchExecutionTimeInference, autoresearchExecutionTimeTrain)
 				else:
 					if(printInferenceTop1AccuracyBitsPerByteModified):
-						print("averageTop1BitsPerByteModified: bitsPerByte = ", bitsPerByte, ", valLoss = ", valLoss, ", averageProbability = ", averageProbabilityModified, ", inferenceTokens = ", totalInferenceTop1BitsPerByteTokens, ", inferenceBytes = ", totalInferenceTop1BitsPerByteBytes)
+						print("averageTop1BitsPerByteModified: bitsPerByte = ", bitsPerByte, ", valLoss = ", valLoss, ", averageProbability = ", averageProbabilityModified, ", predictionTokens = ", totalInferenceTop1BitsPerByteTokens, ", inferenceBytes = ", totalInferenceTop1BitsPerByteBytes)
 					else:
-						print("averageTop1BitsPerByte: bitsPerByte = ", bitsPerByte, ", valLoss = ", valLoss, ", inferenceTokens = ", totalInferenceTop1BitsPerByteTokens, ", inferenceBytes = ", totalInferenceTop1BitsPerByteBytes)
+						print("averageTop1BitsPerByte: bitsPerByte = ", bitsPerByte, ", valLoss = ", valLoss, ", predictionTokens = ", totalInferenceTop1BitsPerByteTokens, ", inferenceBytes = ", totalInferenceTop1BitsPerByteBytes)
 		elif(totalInferenceTop1Tokens <= 0 or totalInferenceTop1PredictionTokens <= 0):
 			print("printInferenceTop1Accuracy: no prediction tokens recorded; skipping accuracy")
 		else:
@@ -396,7 +404,7 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	inferenceSuccessfulPredictionMask = None
 	if(useTrainDuringInference):
 		inferenceSuccessfulPredictionMask = createInferenceSuccessfulPredictionMask(tokensSequence)
-	addInferenceTop1AccuracyBitsPerByteBytes(sequenceRaw)
+	addInferenceTop1AccuracyBitsPerByteBytes(sequencePredict)
 	conceptMask, conceptIndices, numberConcepts = GIAANNnlp_sequenceConcepts.createConceptMask(sequenceObservedColumns, tokensSequence)
 	groundedAnswerTokenIndex = None
 	if(inferenceReportGroundedAccuracy):
@@ -593,17 +601,16 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		sequenceObservedColumnsPrediction = SequenceObservedColumnsDraw(databaseNetworkObject, observedColumnsDict)
 
 	targetProbability = None
-	if(printInferenceTop1AccuracyBitsPerByte):
-		if(sequenceWordIndex == 0):
-			if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
-				targetProbability = calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap, somaActivationFromLastSegmentKeys)
-			else:
-				targetProbability = calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap)
+	if(printInferenceTop1AccuracyBitsPerByte and not seedPhase and sequenceWordIndex == 0):
+		if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+			targetProbability = calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap, somaActivationFromLastSegmentKeys)
+		else:
+			targetProbability = calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap)
 
 	#deactivate previously predicted neurons;
 	globalFeatureNeuronsActivation, conceptActivationState = deactivatePredictedNeuronActivations(globalFeatureNeuronsActivation, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, conceptColumnFeatureIndexTensorActivation, conceptColumnIndex, conceptColumnFeatureIndex, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, conceptActivationState)
 
-	if(printInferenceTop1AccuracyBitsPerByte):
+	if(printInferenceTop1AccuracyBitsPerByte and not seedPhase):
 		if(sequenceWordIndex > 0):
 			if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 				targetProbability = calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap, somaActivationFromLastSegmentKeys)
