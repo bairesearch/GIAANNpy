@@ -121,11 +121,18 @@ def processPrompt(databaseNetworkObject, inferenceMode, sequenceCount):
 		promptSequences = list(nlpSequence.pipe(promptLines))
 		if(len(promptSequences) != len(promptLines)*inferencePromptExpectedSequencesPerLine):
 			raise RuntimeError("processPrompt error: every non-empty inference prompt line must produce exactly one sequence")
+		promptSequencesFiltered = []
+		promptLinesFiltered = []
 		for promptLineIndex, promptSequence in enumerate(promptSequences):
 			if(not isinstance(promptSequence, Doc)):
 				raise RuntimeError("processPrompt error: parsed inference prompt line must be a spaCy Doc; promptLineIndex = " + str(promptLineIndex))
-			if(len(promptSequence) < numSeedTokensInference+inferencePromptExpectedSequencesPerLine):
-				raise RuntimeError("processPrompt error: inference prompt line is shorter than the minimum prediction sequence length; promptLineIndex = " + str(promptLineIndex))
+			if(len(promptSequence) >= numSeedTokensInference+inferencePromptExpectedSequencesPerLine):
+				promptSequencesFiltered.append(promptSequence)
+				promptLinesFiltered.append(promptLines[promptLineIndex])
+		promptSequences = promptSequencesFiltered
+		promptLines = promptLinesFiltered
+		if(len(promptSequences) == 0):
+			raise RuntimeError("processPrompt error: every inference prompt line is shorter than the minimum prediction sequence length")
 		sequenceCount = processArticle(databaseNetworkObject, inferenceMode, sequenceCount, None, articleIndex, promptSequences, promptLines)
 	else:
 		sequenceCount = processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, articleIndex)
