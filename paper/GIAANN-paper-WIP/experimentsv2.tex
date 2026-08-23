@@ -23,9 +23,9 @@ A number of changes to the default settings were introduced in GIAANN Proto 2 th
 
 \end{itemize}
 
-\Cref{fig:protov2j-oscar-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} graphs the v2j training-set and test-set eval results. Note the v2j test-set accuracies are significantly higher than v2m due to usage of the original (v1) smaller eval datasets (\texttt{inferenceEvaluateTestSetTrainMaxSequences10M=False}).
+\Cref{fig:protov2j-oscar-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} graphs the v2j training-set and test-set eval results. Note the v2j test-set accuracies are significantly higher than v2m due to usage of the different (smaller v1) eval datasets (\texttt{inferenceEvaluateTestSetTrainMaxSequences10M=False}).
 
- \begin{figure}[htbp]
+\begin{figure}[htbp]
       \centering
       \includegraphics[width=\linewidth]{graphs/protov2j-oscar-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes.pdf}
       \caption{GIAANN Proto 2j training-set and test-set accuracy.}
@@ -38,11 +38,13 @@ A number of changes to the default settings were introduced in GIAANN Proto 2 th
 
 \Cref{tab:protov2m-oscar-train-top1-accuracy-inferenceLeakyIntegrateAndFire} contains Proto v2m OSCAR-2201 Top-1 training-set accuracy for different numbers training sizes, with targets fed as input.
 
+\Cref{tab:protov2m-oscar-train-top1-accuracy-segmentSizes-inferenceLeakyIntegrateAndFire} contains Proto v2m OSCAR-2201 Top-1 training-set accuracy for different numbers of segments, with targets fed as input
+
 \Cref{fig:protov2j-oscar-train-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} graphs the v2j training-set eval results.
 
 \begin{table}[H]
 \centering
-\caption{Proto v2m OSCAR-2201 Top-1 training-set accuracy for different training sizes, with targets fed as input, and multi-sentence predictions.}
+\caption{Proto v2m OSCAR-2201 Top-1 training-set accuracy for different training sizes, with targets fed as input.}
 \label{tab:protov2m-oscar-train-top1-accuracy-inferenceLeakyIntegrateAndFire}
 \begin{tabular}{rrrrrrrrr}
 \toprule
@@ -55,18 +57,39 @@ A number of changes to the default settings were introduced in GIAANN Proto 2 th
 \end{tabular}
 \end{table}
 
- \begin{figure}[htbp]
+\begin{table}[H]
+\centering
+\caption{Proto v2m OSCAR-2201 Top-1 training-set accuracy for different numbers of segments, with targets fed as input.}
+\label{tab:protov2m-oscar-train-top1-accuracy-segmentSizes-inferenceLeakyIntegrateAndFire}
+\begin{tabular}{rrrrrrrrrr}
+\toprule
+\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{t-1} & \textbf{param} & \textbf{db size} & \textbf{words} & \textbf{tokens} \\
+\midrule
+8  & 4  & 4  & 200,000 & 0.922 & 217.0M & 17.4GB & 11.9M & 13.2M \\
+16 & 8  & 8  & 200,000 & 0.958 & 391.7M & 25.4GB & 12.1M & 13.4M \\
+32 & 16 & 16 & 200,000 & 0.977 & 611.4M & 36.1GB & 12.8M & 14.2M \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
       \centering
       \includegraphics[width=\linewidth]{graphs/protov2j-oscar-train-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes.pdf}
       \caption{GIAANN Proto 2j training-set accuracy.}
       \label{fig:protov2j-oscar-train-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes}
-  \end{figure}
+\end{figure}
+
+\FloatBarrier
 
 \subsubsection{Test-set Accuracy}
 
 \paragraph{Tables}
 
 \Cref{tab:protov2m-oscar-test-top1-accuracy-inferenceLeakyIntegrateAndFire} contains Proto v2m OSCAR-2201 Top-1 test-set accuracy for different training sizes, with targets fed as input. The table also includes the total number of trained words and tokens.
+
+\Cref{tab:protov2m-oscar-test-top1-accuracy-segmentSizes-inferenceLeakyIntegrateAndFire} contains Proto v2m OSCAR-2201 Top-1 test-set accuracy for different numbers of segments, with targets fed as input
+
+\Cref{tab:protov2m-oscar-test-top1-accuracy-models-inferenceLeakyIntegrateAndFire} contains Proto v2m OSCAR-2201 Top-1 test-set accuracy for different training sizes and models, with targets fed as input. \texttt{sentencePredictions=False} was set to generate similar context window sizes for the comparison.
 
 \Cref{fig:protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} graphs the v2j test-set eval results.
 
@@ -85,12 +108,43 @@ A number of changes to the default settings were introduced in GIAANN Proto 2 th
 \end{tabular}
 \end{table}
 
- \begin{figure}[htbp]
+\begin{table}[H]
+\centering
+\caption{Proto v2m OSCAR-2201 Top-1 test-set accuracy for different numbers of segments, with targets fed as input.}
+\label{tab:protov2m-oscar-test-top1-accuracy-segmentSizes-inferenceLeakyIntegrateAndFire}
+\begin{tabular}{rrrrrrrrrr}
+\toprule
+\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{t-1} & \textbf{param} & \textbf{db size} & \textbf{words} & \textbf{tokens} \\
+\midrule
+8  & 4  & 4  & 200,000 & 0.175 & 217.0M & 17.4GB & 11.9M & 13.2M \\
+16 & 8  & 8  & 200,000 & 0.176 & 391.7M & 25.4GB & 12.1M & 13.4M \\
+32 & 16 & 16 & 200,000 & 0.182 & 611.4M & 36.1GB & 12.8M & 14.2M \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Proto v2m OSCAR-2201 Top-1 test-set accuracy for different training sizes and models, with targets fed as input.}
+\label{tab:protov2m-oscar-test-top1-accuracy-models-inferenceLeakyIntegrateAndFire}
+\begin{tabular}{rrrrrrrrrr}
+\toprule
+\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{model} & \textbf{t-1} & \textbf{param} & \textbf{db size} & \textbf{words} & \textbf{tokens} \\
+\midrule
+8 & 4 & 4 & 10,000  & GIAANN & 0.156 & 71.2M & 6.0GB & 3.4M & 3.8M \\
+8 & 4 & 4 & 100,000 & GIAANN & 0.233 & 657.6M & 45.7GB & 33.3M & 37.5M \\
+- & - & - & 10,000  & RoBERTa & 0.146 & 67.3M & 257.1MB & 2.4M & 3.2M \\
+- & - & - & 100,000 & RoBERTa & 0.337 & 67.3M & 257.1MB & 24.3M & 32.9M \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
       \centering
       \includegraphics[width=\linewidth]{graphs/protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes.pdf}
       \caption{GIAANN Proto 2j test-set accuracy.}
       \label{fig:protov2j-oscar-test-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes}
-  \end{figure}
+\end{figure}
 
 \FloatBarrier
 
@@ -114,21 +168,26 @@ A number of optimisations were introduced in GIAANN Proto 2 that affect evaluati
 			- optimise \texttt{selectActivatedBranchIndex()} by using sparse \texttt{_indices()}/\texttt{_values()} and tensor \texttt{index_add_} for branch scoring, avoiding full tensor coalescing and Python dictionaries during prediction deactivation.
 \end{itemize}
 
+All proto v2 performance measurements were conducted with different database feature connections active storage location for train/eval (DDR5 RAM/filesystem), with train phase feature neuron and connection sparse tensors, sparse tensor device CPU, and feature neuron sparse tensors stored independently for each column. \texttt{optimisationStoreDatabaseResidentCoordinatesAsInt32=True} was set during all training rounds to reduce RAM usage. 
 
 \paragraph{Tables}
 
-\Cref{tab:protov2m-oscar-performance-inferenceLeakyIntegrateAndFire} contains proto v2m OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes and different training sizes, with different database feature connections active storage location for train/eval (DDR5 RAM/filesystem), with train phase feature neuron and connection sparse tensors, sparse tensor device CPU, feature neuron sparse tensors stored independently for each column, and multi-sentence predictions. \texttt{optimisationStoreDatabaseResidentCoordinatesAsInt32=True} was set during the 1M sequence training round to reduce RAM usage.
+\Cref{tab:protov2m-oscar-performance-inferenceLeakyIntegrateAndFire} contains proto v2m OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes.
+
+\Cref{tab:protov2m-oscar-performance-segmentSizes-inferenceLeakyIntegrateAndFire} contains Proto v2m OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and numbers of segments.
+
+\Cref{tab:protov2m-oscar-performance-models-inferenceLeakyIntegrateAndFire} contains Proto v2m OSCAR-2201 performance measurements for different training sizes, models and execution phases (train, eval test-set). TSBNLP was executed on device GPU.
 
 \begin{table}[H]
 \centering
-\caption{Proto v2m OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes and different training sizes, with different database feature connections active storage location for train/eval (DDR5 RAM/filesystem), with train phase feature neuron and connection sparse tensors, sparse tensor device CPU, feature neuron sparse tensors stored independently for each column, and multi-sentence predictions.}
+\caption{Proto v2m OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and training sizes.}
 \label{tab:protov2m-oscar-performance-inferenceLeakyIntegrateAndFire}
 \begin{tabular}{rrrrrrrrr}
 \toprule
 \textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{phase} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{cpu ram} \\
 \midrule
-8 & 4 & 4 & 5,000       & train   & 00:01:41 & 00:01:25 & 00:00:16 & 1.8GB \\
-8 & 4 & 4 & 200,000     & train   & 01:55:59 & 01:50:31 & 00:05:28 & 18.5GB \\
+8 & 4 & 4 & 5,000       & train   & 00:01:56 & 00:01:36 & 00:00:19 & 1.6GB \\
+8 & 4 & 4 & 200,000     & train   & 02:35:53 & 02:29:07 & 00:06:45 & 12.7GB \\
 8 & 4 & 4 & 1,000,000   & train   & 44:34:27 & 43:14:01 & 01:20:26 & 55.3GB \\
 8 & 4 & 4 & 5,000       & tr eval & 00:02:11 & 00:02:11 & 00:00:00 & 1.3GB \\
 8 & 4 & 4 & 200,000     & tr eval & 00:08:00 & 00:08:00 & 00:00:00 & 1.3GB \\
@@ -140,4 +199,43 @@ A number of optimisations were introduced in GIAANN Proto 2 that affect evaluati
 \end{tabular}
 \end{table}
 
+\begin{table}[H]
+\centering
+\caption{Proto v2m OSCAR-2201 performance measurements for different execution phases (train, eval training-set, eval test-set) and numbers of segments.}
+\label{tab:protov2m-oscar-performance-segmentSizes-inferenceLeakyIntegrateAndFire}
+\begin{tabular}{rrrrrrrrr}
+\toprule
+\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{phase} & \textbf{t tot} & \textbf{t proc} & \textbf{t w/r} & \textbf{cpu ram} \\
+\midrule
+8 & 4 & 4 & 200,000     & train   & 02:35:53 & 02:29:07 & 00:06:45 & 12.7GB \\
+16 & 8 & 8 & 200,000    & train   & 03:44:16 & 03:36:13 & 00:08:03 & 18.3GB \\
+32 & 16 & 16 & 200,000  & train   & 05:12:34 & 05:05:12 & 00:07:21 & 27.1GB \\
+8 & 4 & 4 & 200,000     & tr eval & 00:08:00 & 00:08:00 & 00:00:00 & 1.3GB \\
+16 & 8 & 8 & 200,000    & tr eval & 00:13:15 & 00:13:15 & 00:00:00 & 1.3GB \\
+32 & 16 & 16 & 200,000  & tr eval & 00:18:43 & 00:18:43 & 00:00:00 & 1.4GB \\
+8 & 4 & 4 & 200,000     & ts eval & 00:17:14 & 00:17:14 & 00:00:00 & 1.3GB \\
+16 & 8 & 8 & 200,000    & ts eval & 00:24:22 & 00:24:22 & 00:00:00 & 1.4GB \\
+32 & 8 & 8 & 200,000    & ts eval & 00:33:43 & 00:33:43 & 00:00:00 & 1.5GB \\
+\bottomrule
+\end{tabular}
+\end{table}
 
+\begin{table}[H]
+\centering
+\caption{Proto v2m OSCAR-2201 performance measurements for different training sizes, models and execution phases (train, eval test-set).}
+\label{tab:protov2m-oscar-performance-models-inferenceLeakyIntegrateAndFire}
+\begin{tabular}{rrrrrrr}
+\toprule
+\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{model} & \textbf{phase} & \textbf{t tot} \\
+\midrule
+8 & 4 & 4 & 10,000  & GIAANN  & train   & 00:26:29 \\
+8 & 4 & 4 & 100,000 & GIAANN  & train   & 10:51:45 \\
+- & - & - & 10,000  & RoBERTa & train   & 00:04:09 \\
+- & - & - & 100,000 & RoBERTa & train   & 00:40:58 \\
+8 & 4 & 4 & 10,000  & GIAANN  & ts eval & 02:05:30 \\
+8 & 4 & 4 & 100,000 & GIAANN  & ts eval & 09:28:27 \\
+- & - & - & 10,000  & RoBERTa & ts eval & 00:03:13 \\
+- & - & - & 100,000 & RoBERTa & ts eval & 00:02:59 \\
+\bottomrule
+\end{tabular}
+\end{table}

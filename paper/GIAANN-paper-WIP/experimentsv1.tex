@@ -294,13 +294,15 @@ Wikipedia sentences are typically longer than OSCAR-2201 sentences, so multiple 
 
 \paragraph{Settings}
 
-There is a tradeoff between recall/memorisation (train accuracy) and generalisation (test accuracy), and the optimum GIAANN parameters differ for both cases. Likewise, GIAANN uses word (vs subword) tokens and does not use word-vectors, which limits generalisation to words unseen in the test-set compared to contemporary gradient based models. GIAANN also relies on independent concept experts, which relates to robustness to hallucination.
+There is a tradeoff between recall/memorisation (train accuracy) and generalisation (test accuracy), and the optimum GIAANN parameters differ for both cases. 
 
-Although GIAANN is designed to support prime concept feature name independence (by detecting all columns matching a prompt), this is computationally expensive as it requires bursting matching features across the entire trained network during test time. Thus, test-set (prime) concept features must currently be present within the train-set. This limitation is strengthened by \texttt{enforceSequentialActivation} and \texttt{inferenceUseNeuronFeaturePropertiesTimeExact}.
+GIAANN proto does not use word-vectors, which limits generalisation to words unseen in the test-set compared to contemporary gradient based models. GIAANN proto v1 also uses word instead of subword tokens.
+
+Likewise, GIAANN relies on independent concept experts, which limits generalisation between concept columns. Although GIAANN is designed to support prime concept feature name independence (by detecting all columns matching a prompt), this is computationally expensive as it requires bursting matching features across the entire trained network during test time. Thus, test-set (prime) concept features must currently be present within the train-set. This limitation is strengthened by \texttt{enforceSequentialActivation} and \texttt{inferenceUseNeuronFeaturePropertiesTimeExact} in proto v1.
 
 Furthermore, the Wikipedia dataset cannot easily be used to perform a standardised NLP test-set accuracy measurement as it is divided into unique knowledgebase articles. Splitting the Wikipedia dataset into train/test portions would result in the train data being out of distribution with respect to the test data, especially when text is arranged/segmented into concepts (GIAANN).
 
-Therefore, a number of changes were introduced for test-set accuracy measurement. 1. The \texttt{enforceSequentialActivation} and \texttt{inferenceUseNeuronFeaturePropertiesTimeExact} requirements were relaxed (i.e. disabled) during test-set inference. 2. the OSCAR-2201 dataset was exclusively used for test-set accuracy measurement.
+Therefore, a number of changes were introduced for test-set accuracy measurement in GIAANN proto v1. 1. The \texttt{enforceSequentialActivation} and \texttt{inferenceUseNeuronFeaturePropertiesTimeExact} requirements were relaxed (i.e. disabled) during test-set inference. 2. the OSCAR-2201 dataset was exclusively used for test-set accuracy measurement.
 
 \paragraph{Tables}
 
