@@ -34,6 +34,8 @@ import GIAANNcmn_predictionBeamSearch
 import GIAANNnlp_sequenceConcepts
 import GIAANNcmn_predictionActivate
 import GIAANNcmn_predictionConstraints
+if(inferenceInferMissingFeatures):
+	import GIAANNcmn_predictionInferMissingFeatures
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	import GIAANNnlp_auxiliaryNeuronsSimilarWords
 if(inferenceReportGroundedAccuracy):
@@ -559,6 +561,14 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	globalFeatureNeuronsActivation = activateInitialSeedPredictionIfRequired(sequenceWordIndex, conceptColumnIndex, conceptColumnFeatureIndex, globalFeatureNeuronsActivation)
 	
 	globalFeatureNeuronsStrength = databaseNetworkObject.globalFeatureNeurons[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
+	if(inferenceInferMissingFeatures):
+		inferMissingFeature = False
+		trainedMissingFeatureSourceColumnIndices = None
+		activeMissingFeatureSourceColumns = None
+		missingFeatureSourceIsSeed = sequenceWordIndex > arrayIndexSegmentFirst and (seedPhase or wordPredictionIndex == arrayIndexSegmentFirst)
+		if(missingFeatureSourceIsSeed):
+			trainedMissingFeatureSourceColumnIndices = GIAANNcmn_predictionInferMissingFeatures.getTrainedMissingFeatureSourceColumnIndices(databaseNetworkObject, globalFeatureNeuronsStrength, conceptColumnIndex, conceptColumnFeatureIndex)
+			inferMissingFeature = trainedMissingFeatureSourceColumnIndices is not None
 	if(inferenceUseNeuronFeaturePropertiesTime and globalFeatureNeuronsTime is None):
 		raise RuntimeError("processColumnInferencePrediction error: globalFeatureNeuronsTime is None while inferenceUseNeuronFeaturePropertiesTime")
 	sequenceColumnIndex = None
@@ -573,7 +583,11 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	allowedColumnsConstraint, constraintModePrediction = calculatePredictionColumnConstraints(databaseNetworkObject, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, seedPhase)
 	
 	#set predictionEnsureConnectedToPreviousPrediction connectedColumnsConstraint/connectedColumnsFeatureMap;
-	connectedColumnsConstraint, connectedColumnsFeatureMap = calculateConnectedColumnsConstraint(databaseNetworkObject, observedColumnsDict, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, sequenceWordIndex, wordPredictionIndex, tokensSequence, seedPhase)
+	if(inferenceInferMissingFeatures and inferMissingFeature):
+		connectedColumnsConstraint = None
+		connectedColumnsFeatureMap = None
+	else:
+		connectedColumnsConstraint, connectedColumnsFeatureMap = calculateConnectedColumnsConstraint(databaseNetworkObject, observedColumnsDict, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, sequenceWordIndex, wordPredictionIndex, tokensSequence, seedPhase)
 		
 	if(sequenceWordIndex > 0):
 		#set conceptColumnIndexActivation/conceptColumnFeatureIndexActivation;
@@ -593,9 +607,22 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		activationSequenceWordIndex, activationSequenceColumnIndex = calculateActivationSequenceIndices(sequenceWordIndex, sequenceColumnIndex, conceptMask)
 		#process features (activate global neurons based on connection targets);
 		if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
-			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, somaActivationFromLastSegmentKeys = processFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
+			if(inferenceInferMissingFeatures and inferMissingFeature):
+				if(conceptColumnFeatureIndexActivation != conceptColumnFeatureIndex):
+					raise RuntimeError("processColumnInferencePrediction error: missing-feature inference requires the activation feature to equal the selected feature")
+				globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, somaActivationFromLastSegmentKeys, activeMissingFeatureSourceColumns = GIAANNcmn_predictionInferMissingFeatures.processMissingFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnFeatureIndexActivation, trainedMissingFeatureSourceColumnIndices, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
+			else:
+				globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, somaActivationFromLastSegmentKeys = processFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
 		else:
-			globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = processFeaturePredictionActivations(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
+			if(inferenceInferMissingFeatures and inferMissingFeature):
+				if(conceptColumnFeatureIndexActivation != conceptColumnFeatureIndex):
+					raise RuntimeError("processColumnInferencePrediction error: missing-feature inference requires the activation feature to equal the selected feature")
+				globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, activeMissingFeatureSourceColumns = GIAANNcmn_predictionInferMissingFeatures.processMissingFeaturePredictionActivations(databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnFeatureIndexActivation, trainedMissingFeatureSourceColumnIndices, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
+			else:
+				globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = processFeaturePredictionActivations(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
+		if(inferenceInferMissingFeatures and inferMissingFeature and len(activeMissingFeatureSourceColumns) > arrayIndexSegmentFirst):
+			missingFeatureSourceColumnIndicesTensor, missingFeatureSourceFeatureIndicesTensor = GIAANNcmn_predictionInferMissingFeatures.buildMissingFeatureSourceTensors(activeMissingFeatureSourceColumns, conceptColumnFeatureIndexActivation, conceptColumnIndexTensor.device)
+			connectedColumnsConstraint, connectedColumnsFeatureMap = calculateConnectedColumnsConstraint(databaseNetworkObject, observedColumnsDict, missingFeatureSourceColumnIndicesTensor, missingFeatureSourceFeatureIndicesTensor, sequenceWordIndex, wordPredictionIndex, tokensSequence, seedPhase)
 	else:
 		#activation targets have already been activated
 		sequenceObservedColumnsPrediction = SequenceObservedColumnsDraw(databaseNetworkObject, observedColumnsDict)
@@ -609,6 +636,11 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 
 	#deactivate previously predicted neurons;
 	globalFeatureNeuronsActivation, conceptActivationState = deactivatePredictedNeuronActivations(globalFeatureNeuronsActivation, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, conceptColumnFeatureIndexTensorActivation, conceptColumnIndex, conceptColumnFeatureIndex, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, conceptActivationState)
+	if(inferenceInferMissingFeatures and inferMissingFeature):
+		for missingFeatureSourceColumnIndex in activeMissingFeatureSourceColumns:
+			missingFeatureSourceColumnIndexTensor = pt.tensor([missingFeatureSourceColumnIndex], dtype=pt.long, device=globalFeatureNeuronsActivation.device)
+			missingFeatureSourceFeatureIndexTensor = pt.tensor([conceptColumnFeatureIndexActivation], dtype=pt.long, device=globalFeatureNeuronsActivation.device)
+			globalFeatureNeuronsActivation, conceptActivationState = deactivatePredictedNeuronActivations(globalFeatureNeuronsActivation, missingFeatureSourceColumnIndexTensor, missingFeatureSourceFeatureIndexTensor, missingFeatureSourceFeatureIndexTensor, missingFeatureSourceColumnIndex, conceptColumnFeatureIndexActivation, missingFeatureSourceColumnIndex, conceptColumnFeatureIndexActivation, conceptActivationState)
 
 	if(printInferenceTop1AccuracyBitsPerByte and not seedPhase):
 		if(sequenceWordIndex > 0):

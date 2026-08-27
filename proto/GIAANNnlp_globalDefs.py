@@ -603,6 +603,17 @@ if(inferenceReportGroundedAccuracy):
 		raise RuntimeError("inferenceReportGroundedAccuracy requires numSeedTokensInference==" + str(closedWorldGroundedPromptAnswerTokenIndex))
 
 
+#Auxiliary method #2;
+inferenceInferMissingFeatures = False	#default: False	#orig: False
+if(inferenceInferMissingFeatures):
+	inferenceInferMissingFeaturesMinimumActivation = 0.0
+	inferenceInferMissingFeaturesNormalisedActivationTotal = 1.0
+	inferenceInferMissingFeaturesNeuronTensorRank = 4
+	inferenceInferMissingFeaturesConceptDimension = 2
+	inferenceInferMissingFeaturesFeatureDimension = 3
+	inferenceInferMissingFeaturesCandidateFeatureDimension = 1
+
+
 #Auxiliary neurons;
 auxiliaryNeurons=False	#default: False	#orig: False
 if(auxiliaryNeurons):

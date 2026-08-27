@@ -638,3 +638,4 @@ v2m (Codex IDE GPT-5.6):
 MANUAL; - update paper
 - patch inferencePromptPreserveLineSequenceBoundaries to filter out undersized prompt lines.
 MANUAL; - extend inference_prompt.txt.longTrain/TestOscar2-SentencePredictionsFalse
+- implement option inferenceInferMissingFeatures - if a current feature is missing in a column during inference seed phase, find every instance of this feature in all columns, and propagate their signal jointly (use their combined activation).
