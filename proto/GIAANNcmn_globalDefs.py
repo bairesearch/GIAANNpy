@@ -103,7 +103,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
+	useBenchmarkDefaultsEvalTestSet = True	#default: False/True
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):

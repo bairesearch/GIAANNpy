@@ -172,11 +172,17 @@ def getActiveMissingFeatureSourcesLeakyIntegrateAndFire(globalFeatureNeuronsActi
 				raise RuntimeError("getActiveMissingFeatureSourcesLeakyIntegrateAndFire error: relevant soma activations must be non-negative")
 		activeMask = featureMask & (somaValues >= inferenceLeakyIntegrateAndFireSomaActivationThreshold)
 		activeColumnIndices = somaIndices[inferenceLeakyIntegrateAndFireSomaActivationConceptDimension, activeMask]
+		if(inferenceInferMissingFeaturesCandidateSourceWeighted):
+			activeSourceActivationValues = somaValues[activeMask]
 		if(activeColumnIndices.numel() > arrayIndexSegmentFirst):
 			trainedSourceColumnIndicesDevice = trainedSourceColumnIndices.to(device=activeColumnIndices.device)
-			activeColumnIndices = activeColumnIndices[pt.isin(activeColumnIndices, trainedSourceColumnIndicesDevice)]
+			trainedSourceMask = pt.isin(activeColumnIndices, trainedSourceColumnIndicesDevice)
+			activeColumnIndices = activeColumnIndices[trainedSourceMask]
+			if(inferenceInferMissingFeaturesCandidateSourceWeighted):
+				activeSourceActivationValues = activeSourceActivationValues[trainedSourceMask]
 		activeSourceColumns = activeColumnIndices.tolist()
-		activeSourceActivationValues = pt.full((activeColumnIndices.shape[0],), inferenceInferMissingFeaturesNormalisedActivationTotal, dtype=globalFeatureNeuronsActivation.dtype, device=globalFeatureNeuronsActivation.device)
+		if(not inferenceInferMissingFeaturesCandidateSourceWeighted):
+			activeSourceActivationValues = pt.full((activeColumnIndices.shape[0],), inferenceInferMissingFeaturesNormalisedActivationTotal, dtype=globalFeatureNeuronsActivation.dtype, device=globalFeatureNeuronsActivation.device)
 		activeSourceActivations = list(activeSourceActivationValues.unbind())
 		totalSourceActivation = activeSourceActivationValues.sum()
 		result = activeSourceColumns, activeSourceActivations, totalSourceActivation

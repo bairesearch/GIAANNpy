@@ -606,6 +606,7 @@ if(inferenceReportGroundedAccuracy):
 #Auxiliary method #2;
 inferenceInferMissingFeatures = False	#default: False	#orig: False
 if(inferenceInferMissingFeatures):
+	inferenceInferMissingFeaturesCandidateSourceWeighted = True	#default: True
 	inferenceInferMissingFeaturesMinimumActivation = 0.0
 	inferenceInferMissingFeaturesNormalisedActivationTotal = 1.0
 	inferenceInferMissingFeaturesNeuronTensorRank = 4
