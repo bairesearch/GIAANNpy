@@ -607,12 +607,44 @@ if(inferenceReportGroundedAccuracy):
 inferenceInferMissingFeatures = False	#default: False	#orig: False
 if(inferenceInferMissingFeatures):
 	inferenceInferMissingFeaturesCandidateSourceWeighted = True	#default: True
+	inferenceInferMissingFeaturesUpdate1SelectTopKCandidates = False	#select only the top-k most contextually active source candidates before propagation
+	inferenceInferMissingFeaturesUpdate2SourceConfidence = False	#scale joint proxy propagation continuously by winner activation and winner-to-runner-up margin
+	inferenceInferMissingFeaturesUpdate3AbsoluteSourceConfidence = True	#scale joint proxy propagation by the strongest source candidate's absolute activation
+	inferenceInferMissingFeaturesUpdate4TransformCandidateSignals = False	#apply the activation function per source candidate before probability-weighted combination
+	inferenceInferMissingFeaturesUpdate5SelectTopKConstraintSources = False	#derive prediction connectivity constraints from the top-k most active source candidates
+	inferenceInferMissingFeaturesUpdate6RetainCandidateActivations = True	#restore proxy source feature activations after propagation while retaining the complete generated target activation
+	inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections = True	#detect trained feature instances from persisted source connections when global neuron strengths are unavailable
+	inferenceInferMissingFeaturesUpdate8RequireActiveProxySignal = True	#replace observed-feature propagation only when an active proxy produces a forward signal
+	inferenceInferMissingFeaturesUpdate9UsePartialSourceActivations = True	#treat every positive candidate activation as graded missing-feature evidence instead of requiring a fired soma
+	inferenceInferMissingFeaturesUpdate10UseGlobalFeaturePredictions = True	#select context-predicted substitute features across all columns and feature identities
+	inferenceInferMissingFeaturesUpdateEnabledCount = int(inferenceInferMissingFeaturesUpdate1SelectTopKCandidates) + int(inferenceInferMissingFeaturesUpdate2SourceConfidence) + int(inferenceInferMissingFeaturesUpdate3AbsoluteSourceConfidence) + int(inferenceInferMissingFeaturesUpdate4TransformCandidateSignals) + int(inferenceInferMissingFeaturesUpdate5SelectTopKConstraintSources) + int(inferenceInferMissingFeaturesUpdate6RetainCandidateActivations)
 	inferenceInferMissingFeaturesMinimumActivation = 0.0
 	inferenceInferMissingFeaturesNormalisedActivationTotal = 1.0
+	inferenceInferMissingFeaturesConfidenceTensorRank = 0
+	inferenceInferMissingFeaturesUpdate1CandidateTopK = 1
+	inferenceInferMissingFeaturesUpdate2FullConfidenceActivation = 0.016
+	inferenceInferMissingFeaturesUpdate2FullConfidenceMarginRatio = 2.0
+	inferenceInferMissingFeaturesUpdate2RunnerUpRank = 1
+	inferenceInferMissingFeaturesUpdate3MaximumConfidence = 1.0
+	inferenceInferMissingFeaturesUpdate4SourceActivation = 1.0
+	inferenceInferMissingFeaturesUpdate5ConstraintCandidateTopK = 1
+	inferenceInferMissingFeaturesUpdate10GlobalFeaturePredictionTopK = 1
 	inferenceInferMissingFeaturesNeuronTensorRank = 4
 	inferenceInferMissingFeaturesConceptDimension = 2
 	inferenceInferMissingFeaturesFeatureDimension = 3
 	inferenceInferMissingFeaturesCandidateFeatureDimension = 1
+	if(inferenceInferMissingFeaturesUpdate10UseGlobalFeaturePredictions):
+		if(not inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections):
+			raise RuntimeError("GIAANNnlp_globalDefs error: inferenceInferMissingFeaturesUpdate10UseGlobalFeaturePredictions requires inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections")
+		if(not isinstance(inferenceInferMissingFeaturesUpdate10GlobalFeaturePredictionTopK, int) or isinstance(inferenceInferMissingFeaturesUpdate10GlobalFeaturePredictionTopK, bool) or inferenceInferMissingFeaturesUpdate10GlobalFeaturePredictionTopK <= inferenceInferMissingFeaturesMinimumActivation):
+			raise RuntimeError("GIAANNnlp_globalDefs error: inferenceInferMissingFeaturesUpdate10GlobalFeaturePredictionTopK must be a positive integer")
+	if(inferenceInferMissingFeaturesUpdate2SourceConfidence):
+		if(not isinstance(inferenceInferMissingFeaturesUpdate2FullConfidenceActivation, (int, float)) or isinstance(inferenceInferMissingFeaturesUpdate2FullConfidenceActivation, bool) or not math.isfinite(inferenceInferMissingFeaturesUpdate2FullConfidenceActivation) or inferenceInferMissingFeaturesUpdate2FullConfidenceActivation <= inferenceInferMissingFeaturesMinimumActivation):
+			raise RuntimeError("GIAANNnlp_globalDefs error: inferenceInferMissingFeaturesUpdate2FullConfidenceActivation must be a finite number > inferenceInferMissingFeaturesMinimumActivation")
+		if(not isinstance(inferenceInferMissingFeaturesUpdate2FullConfidenceMarginRatio, (int, float)) or isinstance(inferenceInferMissingFeaturesUpdate2FullConfidenceMarginRatio, bool) or not math.isfinite(inferenceInferMissingFeaturesUpdate2FullConfidenceMarginRatio) or inferenceInferMissingFeaturesUpdate2FullConfidenceMarginRatio < inferenceInferMissingFeaturesNormalisedActivationTotal):
+			raise RuntimeError("GIAANNnlp_globalDefs error: inferenceInferMissingFeaturesUpdate2FullConfidenceMarginRatio must be a finite number >= inferenceInferMissingFeaturesNormalisedActivationTotal")
+		if(not isinstance(inferenceInferMissingFeaturesUpdate2RunnerUpRank, int) or isinstance(inferenceInferMissingFeaturesUpdate2RunnerUpRank, bool) or inferenceInferMissingFeaturesUpdate2RunnerUpRank <= inferenceInferMissingFeaturesMinimumActivation):
+			raise RuntimeError("GIAANNnlp_globalDefs error: inferenceInferMissingFeaturesUpdate2RunnerUpRank must be a positive integer")
 
 
 #Auxiliary neurons;

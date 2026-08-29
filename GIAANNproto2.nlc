@@ -640,3 +640,18 @@ MANUAL; - update paper
 MANUAL; - extend inference_prompt.txt.longTrain/TestOscar2-SentencePredictionsFalse
 - implement option inferenceInferMissingFeatures - if a current feature is missing in a column during inference seed phase, find every instance of this feature in all columns, and propagate their signal jointly (use their combined activation).
 - implement option inferenceInferMissingFeaturesCandidateSourceWeighted - weight semantically similar candidates by their source activation value (and propagate them as a function of these activation values).
+- start inferenceInferMissingFeaturesUpdates;
+	- implement option inferenceInferMissingFeaturesUpdate1SelectTopKCandidates - restrict missing-feature proxy propagation to the configured top-k most contextually active source candidates.
+	- implement option inferenceInferMissingFeaturesUpdate2SourceConfidence - gate missing-feature proxy propagation using minimum strongest-source activation and winner-to-runner-up margin requirements.
+	- implement option inferenceInferMissingFeaturesUpdate3AbsoluteSourceConfidence - preserve the strongest source candidate absolute activation as the confidence gain applied to joint proxy propagation.
+	- implement option inferenceInferMissingFeaturesUpdate4TransformCandidateSignals - transform each source candidate target activation independently before combining the targets by source probability.
+	- implement option inferenceInferMissingFeaturesUpdate5SelectTopKConstraintSources - derive missing-feature prediction connectivity constraints from the configured top-k most active source candidates.
+	- implement option inferenceInferMissingFeaturesUpdate6RetainCandidateActivations - retain the real source candidate activation state after missing-feature proxy propagation.
+	- patch inferenceInferMissingFeaturesUpdate2SourceConfidence - replace hard proxy rejection with bounded continuous attenuation from winner activation and winner-to-runner-up margin, preserving all active candidates while restoring the 5,000-sequence held-out baseline.
+	- implement option inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections - determine whether an observed or proxy feature is trained from its persisted per-column outgoing-connection file instead of the unpopulated inference-time global neuron-strength tensor and exclude the structural prime-concept feature from semantic substitution.
+	- implement option inferenceInferMissingFeaturesUpdate8RequireActiveProxySignal - commit proxy-specific propagation and constraints only when an active proxy produces a nonzero forward signal.
+	- implement option inferenceInferMissingFeaturesUpdate9UsePartialSourceActivations - admit every positive LIF soma activation as graded contextual evidence instead of requiring a candidate to reach the firing threshold.
+	- implement option inferenceInferMissingFeaturesUpdate10UseGlobalFeaturePredictions - select the highest-activation trained proxy across all active columns and feature identities while carrying both source indices through propagation, connectivity constraints, and deactivation.
+	- patch inferenceInferMissingFeaturesUpdate10UseGlobalFeaturePredictions - validate its top-k setting against a missing-feature-local constant that is available while NLP global definitions are initialized.
+	- patch inferenceInferMissingFeaturesUpdate8RequireActiveProxySignal - guard baseline-constraint restoration by the parent option so the disabled execution pathway never references missing-feature-only state or child options.
+	- patch inferenceInferMissingFeaturesUpdate6RetainCandidateActivations to ensure that the pre-existing proxy source features activations are unaffected by their forward propagation.
