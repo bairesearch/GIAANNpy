@@ -52,7 +52,7 @@ if(useQuickExecution):
 	executionMode = "inference" 	#mandatory: "inference" (effective trainAndInference but uses a text datafile)
 	inferenceTrainFirstSequences = True	#trains first sequences in inference_prompt.txt, performs inference only on last sequence
 elif(useDefault):
-	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
+	executionMode = "trainAndInference"	#default: trainAndInference	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
 	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference"
 elif(useAutoresearch):
@@ -82,16 +82,16 @@ if(useInference):
 		inferenceColumnConstraintsAllowExternalPrimeConceptTransitions = False
 	if(inferencePromptPreserveLineSequenceBoundaries):
 		inferencePromptExpectedSequencesPerLine = 1
-	if(useTrainDuringInference):
-		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#mandatory: False
+	if(useQuickExecution):
+		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True
+	elif(useDefault):
+		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True		#True: activate next column features using current prediction
 	elif(useBenchmark):
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False	#orig: False	#False: use current target (default top-1 accuracy measurement)
 	elif(useAutoresearch):
 		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#default: False
-	elif(useQuickExecution):
-		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True
-	else:
-		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = True	#default: True	#orig: True		#True: activate next column features using current prediction
+	elif(useTrainDuringInference):
+		inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures = False	#mandatory: False
 	if(useDefaultsV2):
 		inferenceBurstAllPredictionsOrTargetsInSequence = True	#default: True		#burst selected top-1 prediction/target after every inference step
 	else:
@@ -122,12 +122,13 @@ else:
 useBenchmarkDefaultsEvalTestSetOptim = False	#derived var
 if(useDefaultsV2):
 	inferenceEvaluateTestSetTrainMaxSequences10M = True		#version 2 of eval datasets (1000 sequences) that supports much larger train datasets (10M sequences)	#required if performing test-set eval on database trained with > 3M sequences (based on how the original test-set was generated)
-	if(inferenceEvaluateTestSet):
-		useBenchmarkDefaultsEvalTestSetOptim = True	#default: True	#orig: False	#higher test-set eval accuracy, but less robustness to hallucination	#recommended for inferenceLeakyIntegrateAndFire
 else:
 	inferenceEvaluateTestSetTrainMaxSequences10M = False
-	if(inferenceEvaluateTestSet):
-		useBenchmarkDefaultsEvalTestSetOptim = True	#default: True	#orig: False	#higher test-set eval accuracy, but less robustness to hallucination
+if(inferenceEvaluateTestSet):
+	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+		useBenchmarkDefaultsEvalTestSetOptim = False	#default: False
+	else:
+		useBenchmarkDefaultsEvalTestSetOptim = True		#default: True	#orig: False	#higher test-set eval accuracy, but less robustness to hallucination	#recommended for inferenceLeakyIntegrateAndFire
 
 
 if(useDefaultsV2):
@@ -153,8 +154,12 @@ if(inferenceLeakyIntegrateAndFire):
 else:
 	if(inferenceEvaluateTestSet):
 		if(useDefaultsV2):
-			inferenceSegmentTiming = "biased"	#default: biased	#orig: none	#none, biased, exact, seq
-			inferenceActivationsType = "intf+c"		#default: intf+c #orig: boolf	#boolf, boolf+c, intf+c
+			if(useBenchmarkDefaultsEvalTestSetOptim):
+				inferenceSegmentTiming = "biased"	#default: biased	#orig: none	#none, biased, exact, seq
+				inferenceActivationsType = "intf+c"		#default: intf+c #orig: boolf	#boolf, boolf+c, intf+c
+			else:
+				inferenceSegmentTiming = "biased"
+				inferenceActivationsType = "intf+c"	#"boolf"	#"intf+c" is required with inferenceDecrementActivations
 		else:
 			if(useBenchmarkDefaultsEvalTestSetOptim):
 				inferenceSegmentTiming = "none"
@@ -187,7 +192,7 @@ if(useQuickExecution):
 	trainMaxSequences = 10	#N/A: auto generated from inference_prompt.txt.trainAndInference
 	databaseFolderBase = databaseFolderBaseLocal
 elif(useDefault):
-	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
+	trainMaxSequences = 200000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
 	trainMaxSequences = 5000	#5000, 200000, 1000000
@@ -996,7 +1001,7 @@ if(useSANI):
 	assert (int(useSANIcolumns) + int(useSANIfeatures) + int(useSANIfeaturesAndColumns)) == 1
 	if(useInference and inferenceLeakyIntegrateAndFire):
 		if(useSANIcolumns or useSANIfeaturesAndColumns):
-			if(inferenceEvaluateTestSet):
+			if(inferenceEvaluateTestSet and not inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 				inferenceDeactivateLastColumnSegmentUponPrediction = False
 			else:
 				inferenceDeactivateLastColumnSegmentUponPrediction = True	#default: True	#orig: False	#affects column internal recurrent referencing of features

@@ -655,3 +655,5 @@ MANUAL; - extend inference_prompt.txt.longTrain/TestOscar2-SentencePredictionsFa
 	- patch inferenceInferMissingFeaturesUpdate10UseGlobalFeaturePredictions - validate its top-k setting against a missing-feature-local constant that is available while NLP global definitions are initialized.
 	- patch inferenceInferMissingFeaturesUpdate8RequireActiveProxySignal - guard baseline-constraint restoration by the parent option so the disabled execution pathway never references missing-feature-only state or child options.
 	- patch inferenceInferMissingFeaturesUpdate6RetainCandidateActivations to ensure that the pre-existing proxy source features activations are unaffected by their forward propagation.
+- patch inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=True - enable LIF last-column deactivation during prediction-driven test-set inference and persistently exclude fired column-feature neurons from subsequent main and beam candidate selection.
+MANUAL; - inferenceEvaluateTestSet:inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures - set useBenchmarkDefaultsEvalTestSetOptim = False
