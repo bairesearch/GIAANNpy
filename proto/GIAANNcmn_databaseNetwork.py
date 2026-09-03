@@ -530,7 +530,10 @@ def prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFe
 			raise RuntimeError(f"prepareObservedColumnsForTrainSequence error: requiredSourceFeatureIndices is None for conceptIndex {conceptIndex}")
 		if(len(requiredSourceFeatureIndices) == 0):
 			raise RuntimeError(f"prepareObservedColumnsForTrainSequence error: requiredSourceFeatureIndices is empty for conceptIndex {conceptIndex}")
-		if(trainVerifyConnectionNonexistentAcrossBranches):
+		if(trainSelectMostSimilarBranch):
+			observedColumn.prepareRequiredSourceFeatureConnectionsTrain(requiredSourceFeatureIndices, deviceSparse, createMissing=False)
+			observedColumn.setTrainPreparedSourceFeatureIndices(requiredSourceFeatureIndices)
+		elif(trainVerifyConnectionNonexistentAcrossBranches):
 			observedColumn.prepareRequiredSourceFeatureConnectionsTrain(requiredSourceFeatureIndices, deviceSparse, createMissing=False)
 			observedColumn.setTrainPreparedSourceFeatureIndices(requiredSourceFeatureIndices)
 		elif(not optimisationArrayIndexPropertiesEfficientSerialConnections):

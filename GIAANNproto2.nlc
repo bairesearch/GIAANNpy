@@ -656,4 +656,21 @@ MANUAL; - extend inference_prompt.txt.longTrain/TestOscar2-SentencePredictionsFa
 	- patch inferenceInferMissingFeaturesUpdate8RequireActiveProxySignal - guard baseline-constraint restoration by the parent option so the disabled execution pathway never references missing-feature-only state or child options.
 	- patch inferenceInferMissingFeaturesUpdate6RetainCandidateActivations to ensure that the pre-existing proxy source features activations are unaffected by their forward propagation.
 - patch inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=True - enable LIF last-column deactivation during prediction-driven test-set inference and persistently exclude fired column-feature neurons from subsequent main and beam candidate selection.
-MANUAL; - inferenceEvaluateTestSet:inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures - set useBenchmarkDefaultsEvalTestSetOptim = False
+MANUAL; - inferenceEvaluateTestSet:inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures - set useBenchmarkDefaultsEvalTestSetOptim = False.
+
+---
+v2n (Codex IDE GPT-5.6):
+- start proto GIAANNproto2n1a - start multipleDendriticBranches updates:
+	- implement option trainSelectMostSimilarBranch:
+		- for every target feature during train, detect the most similar branch already trained to its planned train state:
+			- if the most similar branch is above some similarity threshold trainSelectMostSimilarBranchThreshold (e.g. if 0.5; 50% of its segments already contain prospective trained source features): 
+				- then select this branch to update.
+			- else:
+				- select a random branch in the target feature to update.
+		Implementation Notes:
+			- implementation must use fully vectorised pytorch code (no python for loops across sequence tokens, branches or segments).
+			- do not change any existing code in the codebase unrelated to specific trainSelectMostSimilarBranch==True behaviour.
+			- ensure to encapsulate all trainSelectMostSimilarBranch==True specific behaviour within context if(trainSelectMostSimilarBranch) as per AGENTS.md.
+	- implement option trainSelectMostSimilarBranchCompareFeatureSegmentsOnly - only compare the feature segments (not column segments) when selecting the closest existing branch.
+- patch LIF implementation - take the max across all branches (do not sum branch activations).
+MANUAL; - set inferenceDeactivateLastColumnSegmentUponPrediction=True by default

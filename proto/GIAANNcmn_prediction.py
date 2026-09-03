@@ -978,8 +978,8 @@ def deactivatePredictedNeuronActivations(globalFeatureNeuronsActivation, concept
 				featureIndices = pt.full_like(branchIndices, int(conceptColumnFeatureIndexTensorActivation.squeeze().item()))
 				indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnIndices, featureIndices], dim=1))
 			if(inferenceDeactivateSomaUponPrediction):
-				branchIndices = pt.tensor([inferenceLeakyIntegrateAndFireSomaBranchIndex], dtype=pt.long, device=globalFeatureNeuronsActivationResult.device)
-				segmentIndices = pt.tensor([arrayIndexSegmentSoma], dtype=pt.long, device=globalFeatureNeuronsActivationResult.device)
+				branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=globalFeatureNeuronsActivationResult.device)
+				segmentIndices = pt.full_like(branchIndices, arrayIndexSegmentSoma)
 				columnIndices = pt.full_like(branchIndices, int(conceptColumnIndexTensor.squeeze().item()))
 				featureIndices = pt.full_like(branchIndices, int(conceptColumnFeatureIndexTensorActivation.squeeze().item()))
 				indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnIndices, featureIndices], dim=1))

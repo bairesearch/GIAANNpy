@@ -704,9 +704,9 @@ def neuronActivationSparse(globalFeatureNeuronsActivation, algorithmMatrixSANIme
 		if(not hasBranchDim or globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireSegmentDimension] != arrayNumberOfSegments):
 			raise RuntimeError("neuronActivationSparse error: leaky integrate-and-fire activation tensor shape is invalid")
 		if(isSparse):
-			featureNeuronsActive = collapseSparseBranchDimension(sliceSparseTensor(globalFeatureNeuronsActivation, inferenceLeakyIntegrateAndFireSegmentDimension, arrayIndexSegmentSoma))
+			featureNeuronsActive = reduceSparseBranchMax(sliceSparseTensor(globalFeatureNeuronsActivation, inferenceLeakyIntegrateAndFireSegmentDimension, arrayIndexSegmentSoma))
 		else:
-			featureNeuronsActive = globalFeatureNeuronsActivation[:, arrayIndexSegmentSoma].sum(dim=inferenceLeakyIntegrateAndFireBranchDimension)
+			featureNeuronsActive = globalFeatureNeuronsActivation[:, arrayIndexSegmentSoma].amax(dim=inferenceLeakyIntegrateAndFireBranchDimension)
 	elif(multipleDendriticBranchesBinaryTree):
 		featureNeuronsActive = neuronActivationSparseBinaryTree(globalFeatureNeuronsActivation, algorithmMatrixSANImethod)
 	else:

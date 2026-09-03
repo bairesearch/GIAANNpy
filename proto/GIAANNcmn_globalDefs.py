@@ -103,7 +103,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = True	#default: False/True
+	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
@@ -187,12 +187,11 @@ inferenceReportTokenAccuracyConstrainByColumn = False	#default: False	#orig: Fal
 databaseFolderBaseLocal = "../"	#default: "../"
 databaseFolderBaseSSD = "/media/user/ssdpro/GIAANN/"	#default: "/media/user/ssdpro/GIAANN/"
 databaseNameBase = "database"	 #"database"	#default: "database"
-
 if(useQuickExecution):
 	trainMaxSequences = 10	#N/A: auto generated from inference_prompt.txt.trainAndInference
 	databaseFolderBase = databaseFolderBaseLocal
 elif(useDefault):
-	trainMaxSequences = 200000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
+	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
 	trainMaxSequences = 5000	#5000, 200000, 1000000
@@ -213,37 +212,68 @@ else:
 	inferenceCopyTemplateDatasets = False
 databaseFolderTemplate = databaseFolderBase + "databaseTemplate/"
 databaseFolderTemplateDatasetFileNamePattern = "*.*"
-
-
-#Train settings:
 numberEpochs = 1	#default: 1
-trainVerifyConnectionNonexistentAcrossBranches = False	#default: True	#orig: False
-if(trainVerifyConnectionNonexistentAcrossBranches):
-	trainVerifyConnectionNonexistentAcrossBranchesConnectionExistsStrengthThreshold = 0	#mandatory	#minimum preexisting connection strength that prevents training the connection on another branch
-	trainVerifyConnectionNonexistentAcrossBranchesMinimumContiguouslyConnectedFinalSegments = 1	#mandatory
-	trainVerifyConnectionNonexistentAcrossBranchesNoCandidateScore = -1	#mandatory
-	trainVerifyConnectionNonexistentAcrossBranchesSourceConnectionTensorRank = 5	#mandatory	#properties, branch, segment, target concept, target feature
-	trainVerifyConnectionNonexistentAcrossBranchesBucketConnectionTensorRank = 6	#mandatory	#properties, branch, segment, source bucket, target concept, target feature
-	trainVerifyConnectionNonexistentAcrossBranchesConnectionPropertyDimension = 0	#mandatory
-	trainVerifyConnectionNonexistentAcrossBranchesConnectionBranchDimension = 1	#mandatory
-	trainVerifyConnectionNonexistentAcrossBranchesConnectionSegmentDimension = 2	#mandatory
-	trainVerifyConnectionNonexistentAcrossBranchesSourceTargetConceptDimension = 3	#mandatory
-	trainVerifyConnectionNonexistentAcrossBranchesSourceTargetFeatureDimension = 4	#mandatory
-	trainVerifyConnectionNonexistentAcrossBranchesBucketSourceDimension = 3	#mandatory
-	trainVerifyConnectionNonexistentAcrossBranchesBucketTargetConceptDimension = 4	#mandatory
-	trainVerifyConnectionNonexistentAcrossBranchesBucketTargetFeatureDimension = 5	#mandatory
 
 
 #Dendritic branches;
-patchMultipleDendriticBranchesBurstActivationBranch = True
-patchMultipleDendriticBranchesSourceActivationBoolean = True
-patchMultipleDendriticBranchesOverflowBranch = True
 if(inferenceLeakyIntegrateAndFire):
 	multipleDendriticBranches = False	#default: False	#with inferenceLeakyIntegrateAndFire multiple dendritic branches are not required by default to support repeated column features per sequence (they only add representational capacity)
 else:
 	multipleDendriticBranches = True	#default: True	#orig: False
 if(multipleDendriticBranches):
+	trainSelectMostSimilarBranch = False	#default: True	#orig: False
+	trainVerifyConnectionNonexistentAcrossBranches = False	#default: False	#orig: False	#note this is not a stable algorithm. it can result in a scenario where: for a given trained sequence: for given target neuron in that sequence: different segments on different branches likely encode its source connections. this would prevent any given branch from ever being perfectly selected during inference (assuming the same train sequence is prompted during inference).
 	multipleDendriticBranchesBinaryTree = False	#default: False	#True: binary tree of dendritic branches, False: independent dendritic branches
+	if(trainSelectMostSimilarBranch or trainVerifyConnectionNonexistentAcrossBranches or useTrainDuringInference or multipleDendriticBranchesBinaryTree or inferenceLeakyIntegrateAndFire):
+		multipleDendriticBranchesRandom = True	#mandatory: True	#useTrainDuringInference algorithm has automatic protection against replication of same patterns across multiple branches, so it can better capitalise on randomised branch assignment
+	else:
+		multipleDendriticBranchesRandom = False	#optional	#default: False #orig: False
+	if(trainSelectMostSimilarBranch):
+		trainSelectMostSimilarBranchCompareFeatureSegmentsOnly = False	#default: True	#orig: false
+		trainSelectMostSimilarBranchThreshold = 0.5
+		trainSelectMostSimilarBranchConnectionExistsStrengthThreshold = 0
+		trainSelectMostSimilarBranchNoCandidateScore = -1.0
+		trainSelectMostSimilarBranchInvalidIndex = -1
+		trainSelectMostSimilarBranchMinimumCount = 1
+		trainSelectMostSimilarBranchMinimumThreshold = 0.0
+		trainSelectMostSimilarBranchMaximumThreshold = 1.0
+		trainSelectMostSimilarBranchMaximumConnectionActivation = 1.0
+		trainSelectMostSimilarBranchProspectiveConnectionTensorRank = 6
+		trainSelectMostSimilarBranchProspectiveConnectionBranchDimension = 0
+		trainSelectMostSimilarBranchProspectiveConnectionSegmentDimension = 1
+		trainSelectMostSimilarBranchProspectiveConnectionSourceConceptDimension = 2
+		trainSelectMostSimilarBranchProspectiveConnectionSourceFeatureDimension = 3
+		trainSelectMostSimilarBranchProspectiveConnectionTargetConceptDimension = 4
+		trainSelectMostSimilarBranchProspectiveConnectionTargetFeatureDimension = 5
+		trainSelectMostSimilarBranchExistingConnectionTensorRank = 6
+		trainSelectMostSimilarBranchExistingConnectionPropertyDimension = 0
+		trainSelectMostSimilarBranchExistingConnectionBranchDimension = 1
+		trainSelectMostSimilarBranchExistingConnectionSegmentDimension = 2
+		trainSelectMostSimilarBranchExistingConnectionSourceBucketDimension = 3
+		trainSelectMostSimilarBranchExistingConnectionTargetConceptDimension = 4
+		trainSelectMostSimilarBranchExistingConnectionTargetFeatureDimension = 5
+		if(trainVerifyConnectionNonexistentAcrossBranches):
+			raise RuntimeError("GIAANNcmn_globalDefs error: trainSelectMostSimilarBranch and trainVerifyConnectionNonexistentAcrossBranches are mutually exclusive")
+		if(multipleDendriticBranchesBinaryTree):
+			raise RuntimeError("GIAANNcmn_globalDefs error: trainSelectMostSimilarBranch does not support multipleDendriticBranchesBinaryTree")
+		if(not isinstance(trainSelectMostSimilarBranchThreshold, (int, float)) or isinstance(trainSelectMostSimilarBranchThreshold, bool) or not math.isfinite(trainSelectMostSimilarBranchThreshold)):
+			raise RuntimeError("GIAANNcmn_globalDefs error: trainSelectMostSimilarBranchThreshold must be finite and numeric")
+		if(trainSelectMostSimilarBranchThreshold < trainSelectMostSimilarBranchMinimumThreshold or trainSelectMostSimilarBranchThreshold > trainSelectMostSimilarBranchMaximumThreshold):
+			raise RuntimeError("GIAANNcmn_globalDefs error: trainSelectMostSimilarBranchThreshold must be between 0 and 1 inclusive")
+	if(trainVerifyConnectionNonexistentAcrossBranches):
+		trainVerifyConnectionNonexistentAcrossBranchesConnectionExistsStrengthThreshold = 0	#mandatory	#minimum preexisting connection strength that prevents training the connection on another branch
+		trainVerifyConnectionNonexistentAcrossBranchesMinimumContiguouslyConnectedFinalSegments = 1	#mandatory
+		trainVerifyConnectionNonexistentAcrossBranchesNoCandidateScore = -1	#mandatory
+		trainVerifyConnectionNonexistentAcrossBranchesSourceConnectionTensorRank = 5	#mandatory	#properties, branch, segment, target concept, target feature
+		trainVerifyConnectionNonexistentAcrossBranchesBucketConnectionTensorRank = 6	#mandatory	#properties, branch, segment, source bucket, target concept, target feature
+		trainVerifyConnectionNonexistentAcrossBranchesConnectionPropertyDimension = 0	#mandatory
+		trainVerifyConnectionNonexistentAcrossBranchesConnectionBranchDimension = 1	#mandatory
+		trainVerifyConnectionNonexistentAcrossBranchesConnectionSegmentDimension = 2	#mandatory
+		trainVerifyConnectionNonexistentAcrossBranchesSourceTargetConceptDimension = 3	#mandatory
+		trainVerifyConnectionNonexistentAcrossBranchesSourceTargetFeatureDimension = 4	#mandatory
+		trainVerifyConnectionNonexistentAcrossBranchesBucketSourceDimension = 3	#mandatory
+		trainVerifyConnectionNonexistentAcrossBranchesBucketTargetConceptDimension = 4	#mandatory
+		trainVerifyConnectionNonexistentAcrossBranchesBucketTargetFeatureDimension = 5	#mandatory
 	if(multipleDendriticBranchesBinaryTree):
 		multipleDendriticBranchesBinaryTreeBranchingFactor = 2	#mandatory
 		multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches = False	#derived var
@@ -258,10 +288,6 @@ if(multipleDendriticBranches):
 			if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
 				if(executionMode=="trainDuringInference" and not inferenceLeakyIntegrateAndFire):
 					assert inferenceSegmentTiming=="biased" or inferenceSegmentTiming=="none"	#requires enforceSequentialActivation==False during the inference phase of training
-	if(useTrainDuringInference or multipleDendriticBranchesBinaryTree or inferenceLeakyIntegrateAndFire):
-		multipleDendriticBranchesRandom = True	#mandatory: True	#useTrainDuringInference algorithm has automatic protection against replication of same patterns across multiple branches, so it can better capitalise on randomised branch assignment
-	else:
-		multipleDendriticBranchesRandom = False	#optional	#default: False #orig: False
 	if(multipleDendriticBranchesRandom):
 		if(multipleDendriticBranchesBinaryTree):
 			multipleDendriticBranchesNumber = multipleDendriticBranchesBinaryTreeBranchingFactor**(multipleDendriticBranchesBinaryTreeDepth-1)	#note segmentIndex==0 (ie depthIndex==multipleDendriticBranchesBinaryTreeDepth-1) has the most branches, while segmentIndex==numberOfSegments-1 (ie depthIndex==0) has one branch.
@@ -270,13 +296,15 @@ if(multipleDendriticBranches):
 	else:
 		multipleDendriticBranchesNumber = 2	#default: 2	#5, 2	#affects train+inference RAM
 else:
+	trainSelectMostSimilarBranch = False
+	trainVerifyConnectionNonexistentAcrossBranches = False
 	multipleDendriticBranchesBinaryTree = False	#mandatory: False when dendritic branches are disabled
 	multipleDendriticBranchesNumber = 1
 	multipleDendriticBranchesRandom = False
 multipleDendriticBranchesIndexLast = multipleDendriticBranchesNumber - 1
-if(trainVerifyConnectionNonexistentAcrossBranches):
-	if(not multipleDendriticBranches or not multipleDendriticBranchesRandom):
-		raise RuntimeError("GIAANNcmn_globalDefs error: trainVerifyConnectionNonexistentAcrossBranches requires multipleDendriticBranches and multipleDendriticBranchesRandom")
+patchMultipleDendriticBranchesBurstActivationBranch = True
+patchMultipleDendriticBranchesSourceActivationBoolean = True
+patchMultipleDendriticBranchesOverflowBranch = True
 
 
 #SANI;
@@ -403,6 +431,9 @@ else:
 	arrayIndexPropertiesActivation = False	#default: False	#inference only (see arrayIndexPropertiesActivationCreate)
 	arrayIndexPropertiesTime = False 	#default: False	#inference only (see arrayIndexPropertiesTimeCreate)
 	arrayIndexPropertiesPos = True	#default: True
+if(trainSelectMostSimilarBranch):
+	if(not arrayIndexPropertiesStrength):
+		raise RuntimeError("GIAANNcmn_globalDefs error: trainSelectMostSimilarBranch requires arrayIndexPropertiesStrength")
 arrayIndexPropertiesActivationCreateInference = arrayIndexPropertiesActivation or True
 arrayIndexPropertiesTimeCreateInference = arrayIndexPropertiesTime or inferenceUseNeuronFeaturePropertiesTime
 
@@ -1002,7 +1033,7 @@ if(useSANI):
 	if(useInference and inferenceLeakyIntegrateAndFire):
 		if(useSANIcolumns or useSANIfeaturesAndColumns):
 			if(inferenceEvaluateTestSet and not inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
-				inferenceDeactivateLastColumnSegmentUponPrediction = False
+				inferenceDeactivateLastColumnSegmentUponPrediction = True	#default: True	#orig: False
 			else:
 				inferenceDeactivateLastColumnSegmentUponPrediction = True	#default: True	#orig: False	#affects column internal recurrent referencing of features
 		else:

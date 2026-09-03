@@ -24,6 +24,8 @@ from GIAANNcmn_globalDefs import *
 import GIAANNcmn_debug
 import GIAANNcmn_sparseTensors
 import GIAANNcmn_inferenceDuringTrain
+if(trainSelectMostSimilarBranch):
+	import GIAANNcmn_databaseNetworkTrainSelectBranch
 import GIAANNnlp_sequenceConcepts
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	import GIAANNnlp_auxiliaryNeuronsSimilarWords
@@ -249,6 +251,20 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 	if(useSparseSequenceConnections):
 		if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections and arrayIndexPropertiesPermanence):
 			raise RuntimeError("processFeaturesActiveTrain error: trainSparseConnectionsTensor does not support trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections")
+	if(trainSelectMostSimilarBranch):
+		connectionActiveSparsePrepared = None
+		featureConnectionsActivePrepared = None
+		featureConnectionsSegmentMaskPrepared = None
+		if(useSparseSequenceConnections):
+			connectionActiveSparsePrepared = GIAANNcmn_databaseNetworkTrainSelectBranch.createTrainSelectMostSimilarBranchProspectiveConnectionsSparse(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsTargetMask)
+			connectionActiveSparsePrepared = GIAANNcmn_databaseNetworkTrainSelectBranch.selectTrainMostSimilarBranches(sequenceObservedColumns, featureNeuronsActive, connectionActiveSparsePrepared, featureNeuronsTargetMask)
+		else:
+			featureConnectionsActivePrepared, featureConnectionsSegmentMaskPrepared = GIAANNcmn_databaseNetworkTrainSelectBranch.createTrainSelectMostSimilarBranchProspectiveConnectionsDense(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsTargetMask)
+			featureConnectionsActivePrepared = GIAANNcmn_databaseNetworkTrainSelectBranch.selectTrainMostSimilarBranches(sequenceObservedColumns, featureNeuronsActive, featureConnectionsActivePrepared, featureNeuronsTargetMask)
+		if(useTrainDuringInference):
+			featureNeuronsActiveTarget = featureNeuronsActive*featureNeuronsTargetMask
+		else:
+			featureNeuronsActiveTarget = featureNeuronsActive
 	if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections and arrayIndexPropertiesPermanence):
 		featureNeuronsActiveUnion = featureNeuronsActiveTarget.amax(dim=(0, 1))
 		featureNeuronsInactiveUnion = 1 - featureNeuronsActiveUnion
@@ -275,9 +291,15 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 	if(useSparseSequenceConnections):
 		featureConnectionsActive = None
 		featureConnectionsSegmentMask = None
-		processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsTargetMask)
+		if(trainSelectMostSimilarBranch):
+			processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsTargetMask, connectionActiveSparsePrepared)
+		else:
+			processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsTargetMask)
 	else:
-		featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, useSparseSequenceConnections, featureNeuronsTargetMask)
+		if(trainSelectMostSimilarBranch):
+			featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, useSparseSequenceConnections, featureNeuronsTargetMask, featureConnectionsActivePrepared, featureConnectionsSegmentMaskPrepared)
+		else:
+			featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, useSparseSequenceConnections, featureNeuronsTargetMask)
 
 	if(trainDecreasePermanenceOfInactiveFeatureNeuronsAndConnections and arrayIndexPropertiesPermanence):
 		decreasePermanenceActive(sequenceObservedColumns, featureNeuronsActiveUnion, featureNeuronsInactiveUnion, sequenceConceptIndexMask, featureNeuronsSegmentMask, featureConnectionsSegmentMask)
@@ -313,40 +335,45 @@ def processFeaturesActiveTrainSparseNeurons(sequenceObservedColumns, featureNeur
 		setSequenceFeatureNeuronsProperty(sequenceObservedColumns, databaseNetworkObject.arrayIndexPropertiesPosIndex, posSparse)
 	return
 
-def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, useSparseSequenceConnections, featureNeuronsTargetMask=None):
+def processFeaturesActiveTrainDenseConnections(databaseNetworkObject, sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, useSparseSequenceConnections, featureNeuronsTargetMask=None, featureConnectionsActivePrepared=None, featureConnectionsSegmentMaskPrepared=None):
 
-	trainConnectionsIncludeSameTimeIndex = getTrainConnectionsIncludeSameTimeIndex(sequenceObservedColumns)
-	if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
-		featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrainSpatialAxes(featureNeuronsActive, cs, fs, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
-	elif(useSANI):
-		if(multipleDendriticBranchesBinaryTree):
-			segmentActive = featureNeuronsActive[:, arrayIndexSegmentFirst]
-			if(not pt.any(segmentActive)):
-				raise RuntimeError("processFeaturesActiveTrainDenseConnections error: binary tree root segment has no active features")
-			featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
-		else:
-			featureConnectionsActive = None
-			featureConnectionsSegmentMask = None
-			for segmentIndex in range(arrayNumberOfSegments):
-				segmentActive = featureNeuronsActive[:, segmentIndex]
-				if not pt.any(segmentActive):
-					continue
-				segmentConnectionsActive, segmentMask = createFeatureConnectionsActiveTrain(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
-				if featureConnectionsActive is None:
-					featureConnectionsActive = segmentConnectionsActive
-					featureConnectionsSegmentMask = segmentMask
-				else:
-					featureConnectionsActive = pt.maximum(featureConnectionsActive, segmentConnectionsActive)
-					featureConnectionsSegmentMask = pt.logical_or(featureConnectionsSegmentMask, segmentMask)
-			if featureConnectionsActive is None:
-				printe("processFeaturesActiveTrain() error: featureConnectionsActive is None")
-				#featureConnectionsActive = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=arrayType)
-				#featureConnectionsSegmentMask = pt.zeros_like(featureConnectionsActive, dtype=pt.bool)
+	if(trainSelectMostSimilarBranch):
+		if(featureConnectionsActivePrepared is None or featureConnectionsSegmentMaskPrepared is None):
+			raise RuntimeError("processFeaturesActiveTrainDenseConnections error: trainSelectMostSimilarBranch requires prepared connection tensors")
+		featureConnectionsActive = featureConnectionsActivePrepared
+		featureConnectionsSegmentMask = featureConnectionsSegmentMaskPrepared
 	else:
-		featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[:, arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
-
-	if(useTrainDuringInference):
-		featureConnectionsActive, featureConnectionsSegmentMask = applyTrainDuringInferenceFeatureConnectionsTargetMask(featureConnectionsActive, featureConnectionsSegmentMask, featureNeuronsTargetMask)
+		trainConnectionsIncludeSameTimeIndex = getTrainConnectionsIncludeSameTimeIndex(sequenceObservedColumns)
+		if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
+			featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrainSpatialAxes(featureNeuronsActive, cs, fs, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+		elif(useSANI):
+			if(multipleDendriticBranchesBinaryTree):
+				segmentActive = featureNeuronsActive[:, arrayIndexSegmentFirst]
+				if(not pt.any(segmentActive)):
+					raise RuntimeError("processFeaturesActiveTrainDenseConnections error: binary tree root segment has no active features")
+				featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+			else:
+				featureConnectionsActive = None
+				featureConnectionsSegmentMask = None
+				for segmentIndex in range(arrayNumberOfSegments):
+					segmentActive = featureNeuronsActive[:, segmentIndex]
+					if not pt.any(segmentActive):
+						continue
+					segmentConnectionsActive, segmentMask = createFeatureConnectionsActiveTrain(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+					if featureConnectionsActive is None:
+						featureConnectionsActive = segmentConnectionsActive
+						featureConnectionsSegmentMask = segmentMask
+					else:
+						featureConnectionsActive = pt.maximum(featureConnectionsActive, segmentConnectionsActive)
+						featureConnectionsSegmentMask = pt.logical_or(featureConnectionsSegmentMask, segmentMask)
+				if featureConnectionsActive is None:
+					printe("processFeaturesActiveTrain() error: featureConnectionsActive is None")
+					#featureConnectionsActive = pt.zeros((arrayNumberOfSegments, cs, fs, cs, fs), dtype=arrayType)
+					#featureConnectionsSegmentMask = pt.zeros_like(featureConnectionsActive, dtype=pt.bool)
+		else:
+			featureConnectionsActive, featureConnectionsSegmentMask = createFeatureConnectionsActiveTrain(featureNeuronsActive[:, arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+		if(useTrainDuringInference):
+			featureConnectionsActive, featureConnectionsSegmentMask = applyTrainDuringInferenceFeatureConnectionsTargetMask(featureConnectionsActive, featureConnectionsSegmentMask, featureNeuronsTargetMask)
 
 	featureConnectionsPos = None
 	if(arrayIndexPropertiesPos or (arrayIndexPropertiesStrength and trainConnectionStrengthPOSdependence)):
@@ -469,15 +496,20 @@ def applyTrainDuringInferenceFeatureConnectionsSparseTargetMask(connectionActive
 	result = pt.sparse_coo_tensor(filteredConnectionActiveIndices, filteredConnectionActiveValues, size=connectionActiveSparseCoalesced.size(), dtype=connectionActiveSparseCoalesced.dtype, device=connectionActiveSparseCoalesced.device).coalesce()
 	return result
 
-def processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsTargetMask=None):
+def processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsTargetMask=None, connectionActiveSparsePrepared=None):
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
-	trainConnectionsIncludeSameTimeIndex = getTrainConnectionsIncludeSameTimeIndex(sequenceObservedColumns)
-	if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
-		connectionActiveSparse = createFeatureConnectionsActiveTrainSpatialAxesSparse(featureNeuronsActive, cs, fs, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+	if(trainSelectMostSimilarBranch):
+		if(connectionActiveSparsePrepared is None):
+			raise RuntimeError("processFeaturesActiveTrainSparseConnections error: trainSelectMostSimilarBranch requires a prepared connection tensor")
+		connectionActiveSparse = connectionActiveSparsePrepared
 	else:
-		connectionActiveSparse = createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
-	if(useTrainDuringInference):
-		connectionActiveSparse = applyTrainDuringInferenceFeatureConnectionsSparseTargetMask(connectionActiveSparse, featureNeuronsTargetMask)
+		trainConnectionsIncludeSameTimeIndex = getTrainConnectionsIncludeSameTimeIndex(sequenceObservedColumns)
+		if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
+			connectionActiveSparse = createFeatureConnectionsActiveTrainSpatialAxesSparse(featureNeuronsActive, cs, fs, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+		else:
+			connectionActiveSparse = createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+		if(useTrainDuringInference):
+			connectionActiveSparse = applyTrainDuringInferenceFeatureConnectionsSparseTargetMask(connectionActiveSparse, featureNeuronsTargetMask)
 	connectionActiveIndices = connectionActiveSparse.indices()
 	connectionActiveValues = connectionActiveSparse.values()
 	if(featureNeuronsWordOrder.device != connectionActiveIndices.device):

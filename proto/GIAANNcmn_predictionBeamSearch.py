@@ -314,8 +314,8 @@ def buildBeamNodeIndices(device, columnIndex, featureIndex, branchIndex=0):
 			segmentIndices = pt.arange(arrayIndexSegmentFirst, arrayIndexSegmentSoma, dtype=pt.long, device=device).repeat(multipleDendriticBranchesNumber)
 			indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnTensor.expand(branchIndices.shape[0]), featureTensor.expand(branchIndices.shape[0])], dim=1))
 		if(inferenceDeactivateSomaUponPrediction):
-			branchIndices = pt.tensor([inferenceLeakyIntegrateAndFireSomaBranchIndex], dtype=pt.long, device=device)
-			segmentIndices = pt.tensor([arrayIndexSegmentSoma], dtype=pt.long, device=device)
+			branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=device)
+			segmentIndices = pt.full_like(branchIndices, arrayIndexSegmentSoma)
 			indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnTensor.expand(branchIndices.shape[0]), featureTensor.expand(branchIndices.shape[0])], dim=1))
 		if(inferenceDeactivateLastColumnSegmentUponPrediction and not inferenceDeactivateSegmentsUponPrediction):
 			if(not (useSANIcolumns or useSANIfeaturesAndColumns)):
