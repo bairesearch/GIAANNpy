@@ -40,9 +40,12 @@ from GIAANNcmn_globalDefs import useInference
 from GIAANNcmn_globalDefs import inferenceEvaluateTestSet
 from GIAANNcmn_globalDefs import inferenceAddNewFeatures
 #useBenchmark dependencies:
+from GIAANNcmn_globalDefs import trainSelectMostSimilarBranch
+from GIAANNcmn_globalDefs import trainVerifyConnectionNonexistentAcrossBranches
 from GIAANNcmn_globalDefs import multipleDendriticBranches
 from GIAANNcmn_globalDefs import multipleDendriticBranchesNumber
 from GIAANNcmn_globalDefs import multipleDendriticBranchesRandom
+from GIAANNcmn_globalDefs import multipleDendriticBranchesBinaryTree
 from GIAANNcmn_globalDefs import trainMaxSequences
 from GIAANNcmn_globalDefs import numSeedTokensInference
 from GIAANNcmn_globalDefs import inferenceEvaluateTestSetTrainMaxSequences10M
@@ -50,11 +53,12 @@ from GIAANNcmn_globalDefs import inferenceEvaluateTestSetTrainMaxSequences10M
 #inferenceReportGroundedAccuracy
 #auxiliaryNeurons
 from GIAANNcmn_globalDefs import useTrainDuringInference
-from GIAANNcmn_globalDefs import multipleDendriticBranchesBinaryTree
-from GIAANNcmn_globalDefs import trainVerifyConnectionNonexistentAcrossBranches
 from GIAANNcmn_globalDefs import useDefaultsV2
 from GIAANNcmn_globalDefs import useBenchmarkDefaultsEvalTestSetOptim
 from GIAANNcmn_globalDefs import inferenceLeakyIntegrateAndFire
+
+
+
 
 #Dataset Type;
 if(useQuickExecution):
@@ -777,68 +781,79 @@ if(useBenchmark):
 	#generate benchmark filename:
 	#v2 benchmarks;
 	
-	if(inferenceLeakyIntegrateAndFire):
-		benchmarkAblationText = "-inferenceLeakyIntegrateAndFire"	
-	elif(inferenceReportGroundedAccuracy):
-		benchmarkAblationText = "-inferenceReportGroundedAccuracy"
-	elif(not sentencePredictions):
-		benchmarkAblationText = "-sentencePredictionsFalse"
-	elif(auxiliaryNeurons):
-		if(auxiliaryNeuronsPOS):
-			benchmarkAblationText = "-auxiliaryNeuronsPOS"
-		elif(auxiliaryNeuronsAuto):
-			benchmarkAblationText = "-auxiliaryNeuronsAuto"
-	elif(tokeniserSubword):
-		benchmarkAblationText = ""
-		if(not useDefaultsV2):
-			if(tokeniserSubwordPOS):
-				benchmarkAblationText = "-tokeniserSubwordPOS"
-			else:
-				benchmarkAblationText = "-tokeniserSubword"
-		#if(tokeniserSubwordColumnIdentificationByFirstNounToken):
-		#	benchmarkAblationText += tokeniserSubwordColumnIdentificationByFirstNounTokensBenchmarkAblationSuffix
-		if(tokeniserSubwordColumnIdentificationByConsecutiveNounTokens):
-			benchmarkAblationText += tokeniserSubwordColumnIdentificationByConsecutiveNounTokensBenchmarkAblationSuffix
-		elif(tokeniserSubwordColumnIdentificationByLemma):
-			benchmarkAblationText += tokeniserSubwordColumnIdentificationByLemmaBenchmarkAblationSuffix
-		''' implied true;
-		if(useDedicatedFeatureListsSubword):
-			benchmarkAblationText += useDedicatedFeatureListsSubwordBenchmarkAblationSuffix
-		if(useDedicatedConceptListsSubword):
-			benchmarkAblationText += useDedicatedConceptListsSubwordBenchmarkAblationSuffix
-		'''
-		#if(multisentencePredictions):
-		#	benchmarkAblationText += "-multisentencePredictions"
-	elif(useTrainDuringInference):
-		benchmarkAblationText = "-useTrainDuringInference"
-	elif(trainVerifyConnectionNonexistentAcrossBranches):
-		if(multipleDendriticBranchesBinaryTree):
-			benchmarkAblationText = "-trainVerifyConnectionNonexistentAcrossBranches-multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches"
-		else:
-			benchmarkAblationText = "-trainVerifyConnectionNonexistentAcrossBranches"
-	elif(multipleDendriticBranchesBinaryTree):
-		benchmarkAblationText = "-multipleDendriticBranchesBinaryTree"	
-	#v1 benchmarks;
-	elif(multipleDendriticBranches and multipleDendriticBranchesRandom):
-		if(spacyPipelineOptimisations):
-			benchmarkAblationText = "-multipleDendriticBranchesRandom" + str(multipleDendriticBranchesNumber)
-		else:
-			printe("multipleDendriticBranchesRandom currently assumes spacyPipelineOptimisations")
-	elif(multisentencePredictions):
-		if(not useBenchmarkDefaults):
-			benchmarkAblationText = "-multisentencePredictions-useBenchmarkDefaultsFalse"	#orig saved benchmarks benchmarkAblationText: -multisentencePredictions
-		else:
-			benchmarkAblationText = "-multisentencePredictions"
-	elif(not useBenchmarkDefaults):
-		benchmarkAblationText = "-useBenchmarkDefaultsFalse"
-	elif(spacyPipelineOptimisations):
-		benchmarkAblationText = "-spacyPipelineOptimisations"
-	else:
-		benchmarkAblationText = ""
-
 	if(useDefaultsV2):
-		benchmarkAblationText = "-useDefaultsV2" + benchmarkAblationText
-		
+		if(inferenceLeakyIntegrateAndFire):
+			benchmarkAblationText = "-inferenceLeakyIntegrateAndFire"	
+		elif(inferenceReportGroundedAccuracy):	#older v2 tests..;
+			benchmarkAblationText = "-inferenceReportGroundedAccuracy"
+		elif(not sentencePredictions):
+			benchmarkAblationText = "-sentencePredictionsFalse"
+		elif(auxiliaryNeurons):
+			if(auxiliaryNeuronsPOS):
+				benchmarkAblationText = "-auxiliaryNeuronsPOS"
+			elif(auxiliaryNeuronsAuto):
+				benchmarkAblationText = "-auxiliaryNeuronsAuto"
+		elif(tokeniserSubword):
+			benchmarkAblationText = ""
+			if(not useDefaultsV2):
+				if(tokeniserSubwordPOS):
+					benchmarkAblationText = "-tokeniserSubwordPOS"
+				else:
+					benchmarkAblationText = "-tokeniserSubword"
+			#if(tokeniserSubwordColumnIdentificationByFirstNounToken):
+			#	benchmarkAblationText += tokeniserSubwordColumnIdentificationByFirstNounTokensBenchmarkAblationSuffix
+			if(tokeniserSubwordColumnIdentificationByConsecutiveNounTokens):
+				benchmarkAblationText += tokeniserSubwordColumnIdentificationByConsecutiveNounTokensBenchmarkAblationSuffix
+			elif(tokeniserSubwordColumnIdentificationByLemma):
+				benchmarkAblationText += tokeniserSubwordColumnIdentificationByLemmaBenchmarkAblationSuffix
+			''' implied true;
+			if(useDedicatedFeatureListsSubword):
+				benchmarkAblationText += useDedicatedFeatureListsSubwordBenchmarkAblationSuffix
+			if(useDedicatedConceptListsSubword):
+				benchmarkAblationText += useDedicatedConceptListsSubwordBenchmarkAblationSuffix
+			'''
+			#if(multisentencePredictions):
+			#	benchmarkAblationText += "-multisentencePredictions"
+		elif(useTrainDuringInference):
+			benchmarkAblationText = "-useTrainDuringInference"
+
+		if(multipleDendriticBranches):
+			if(trainSelectMostSimilarBranch):
+				benchmarkAblationText += "-trainSelectMostSimilarBranch"
+			elif(trainVerifyConnectionNonexistentAcrossBranches):
+				if(multipleDendriticBranchesBinaryTree):
+					benchmarkAblationText += "-trainVerifyConnectionNonexistentAcrossBranches-multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches"
+				else:
+					benchmarkAblationText += "-trainVerifyConnectionNonexistentAcrossBranches"
+			if(multipleDendriticBranchesBinaryTree):
+				benchmarkAblationText += "-multipleDendriticBranchesBinaryTree"	
+			elif(multipleDendriticBranchesRandom):
+				benchmarkAblationText += "-multipleDendriticBranchesRandom" + str(multipleDendriticBranchesNumber)
+			elif(multipleDendriticBranches):
+				benchmarkAblationText += "-multipleDendriticBranches"
+
+		if(useDefaultsV2):
+			benchmarkAblationText = "-useDefaultsV2" + benchmarkAblationText
+	else:
+		#v1 benchmarks;
+		if(multipleDendriticBranches and multipleDendriticBranchesRandom):
+			if(spacyPipelineOptimisations):
+				benchmarkAblationText = "-multipleDendriticBranchesRandom" + str(multipleDendriticBranchesNumber)
+			else:
+				printe("multipleDendriticBranchesRandom currently assumes spacyPipelineOptimisations")
+		elif(multisentencePredictions):
+			if(not useBenchmarkDefaults):
+				benchmarkAblationText = "-multisentencePredictions-useBenchmarkDefaultsFalse"	#orig saved benchmarks benchmarkAblationText: -multisentencePredictions
+			else:
+				benchmarkAblationText = "-multisentencePredictions"
+		elif(not useBenchmarkDefaults):
+			benchmarkAblationText = "-useBenchmarkDefaultsFalse"
+		elif(spacyPipelineOptimisations):
+			benchmarkAblationText = "-spacyPipelineOptimisations"
+		else:
+			benchmarkAblationText = ""
+
+			
 	if(datasetType=="wikipedia"):
 		databaseTypeText = ""	#or Wikipedia
 	elif(datasetType=="oscar"):

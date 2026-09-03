@@ -696,7 +696,6 @@ class SequenceObservedColumns:
 	def mapGlobalToLocalIndices(self, defaultTensor, globalTensor, columnIndex, branchTensor=None):
 		result = defaultTensor
 		columnLocalMap = None
-		conceptIndexKey = None
 		if(self.columnFeatureLocalIndices is not None):
 			if(columnIndex < len(self.columnFeatureLocalIndices)):
 				columnLocalMap = self.columnFeatureLocalIndices[columnIndex]
@@ -708,26 +707,13 @@ class SequenceObservedColumns:
 			globalList = globalCPU.tolist()
 			branchList = branchCPU.tolist() if branchCPU is not None else None
 			newList = []
-			branchMappedCount = 0
-			branchMappedNonZero = 0
-			if(multipleDendriticBranchesRandom and branchList is not None):
-				observedColumn = self.sequenceObservedColumnsDict.get(columnIndex) if trainSequenceObservedColumnsMatchSequenceWords else self.observedColumnsDict2.get(columnIndex)
-				conceptIndexKey = observedColumn.conceptIndex if observedColumn is not None else None
 			for idx, (defaultValue, globalValue) in enumerate(zip(defaultList, globalList)):
 				candidates = columnLocalMap.get(int(globalValue))
 				if(candidates and len(candidates) > 0):
-					if(branchList is not None):
-						branchMappedCount = branchMappedCount + 1
+					if(branchList is not None and not multipleDendriticBranchesRandom):
+						# Only the non-random branch index encodes a repeated occurrence rank.
 						branchIndex = int(branchList[idx])
 						candidateIndex = branchIndex if branchIndex < len(candidates) else len(candidates) - 1
-						if(multipleDendriticBranchesRandom and conceptIndexKey is not None):
-							branchOrder = GIAANNnlp_sequenceConcepts.buildDeterministicBranchOrder(conceptIndexKey, int(globalValue))
-							if(branchIndex in branchOrder):
-								candidateIndex = branchOrder.index(branchIndex)
-								if(candidateIndex >= len(candidates)):
-									candidateIndex = len(candidates) - 1
-						if(candidateIndex > 0):
-							branchMappedNonZero = branchMappedNonZero + 1
 						newList.append(int(candidates[candidateIndex]))
 					else:
 						newList.append(int(candidates[0]))

@@ -44,6 +44,33 @@ def decrementActivation(featureNeuronsActivation, activationDecrement):
 			featureNeuronsActivation = GIAANNcmn_sparseTensors.subtractValueFromSparseTensorValues(featureNeuronsActivation, activationDecrementPerPredictedSequence)
 	return featureNeuronsActivation
 
+def calculateLeakyIntegrateAndFireBranchColumnFeatureKeys(branchIndices, columnIndices, featureIndices, maxConcepts, maxFeatures):
+	result = None
+	if(inferenceLeakyIntegrateAndFire):
+		if(branchIndices is None or columnIndices is None or featureIndices is None):
+			raise RuntimeError("calculateLeakyIntegrateAndFireBranchColumnFeatureKeys error: index tensors must not be None")
+		if(branchIndices.dim() != 1 or columnIndices.dim() != 1 or featureIndices.dim() != 1 or branchIndices.shape != columnIndices.shape or branchIndices.shape != featureIndices.shape):
+			raise RuntimeError("calculateLeakyIntegrateAndFireBranchColumnFeatureKeys error: index tensors must be one-dimensional with identical shapes")
+		if(branchIndices.dtype != pt.long or columnIndices.dtype != pt.long or featureIndices.dtype != pt.long):
+			raise RuntimeError("calculateLeakyIntegrateAndFireBranchColumnFeatureKeys error: index tensors must use torch.long")
+		if(branchIndices.device != columnIndices.device or branchIndices.device != featureIndices.device):
+			raise RuntimeError("calculateLeakyIntegrateAndFireBranchColumnFeatureKeys error: index tensors must use the same device")
+		if(not isinstance(maxConcepts, int) or isinstance(maxConcepts, bool) or maxConcepts <= arrayIndexSegmentFirst or not isinstance(maxFeatures, int) or isinstance(maxFeatures, bool) or maxFeatures <= arrayIndexSegmentFirst):
+			raise RuntimeError("calculateLeakyIntegrateAndFireBranchColumnFeatureKeys error: tensor dimensions must be positive integers")
+		if(branchIndices.numel() > arrayIndexSegmentFirst):
+			if(bool(pt.any(branchIndices < arrayIndexSegmentFirst).item()) or bool(pt.any(branchIndices >= multipleDendriticBranchesNumber).item())):
+				raise RuntimeError("calculateLeakyIntegrateAndFireBranchColumnFeatureKeys error: branch index out of range")
+			if(bool(pt.any(columnIndices < arrayIndexSegmentFirst).item()) or bool(pt.any(columnIndices >= maxConcepts).item())):
+				raise RuntimeError("calculateLeakyIntegrateAndFireBranchColumnFeatureKeys error: concept index out of range")
+			if(bool(pt.any(featureIndices < arrayIndexSegmentFirst).item()) or bool(pt.any(featureIndices >= maxFeatures).item())):
+				raise RuntimeError("calculateLeakyIntegrateAndFireBranchColumnFeatureKeys error: feature index out of range")
+		if(multipleDendriticBranchesNumber*maxConcepts*maxFeatures > pt.iinfo(pt.long).max):
+			raise RuntimeError("calculateLeakyIntegrateAndFireBranchColumnFeatureKeys error: encoded key range exceeds torch.long")
+		result = (branchIndices*maxConcepts+columnIndices)*maxFeatures+featureIndices
+	else:
+		raise RuntimeError("calculateLeakyIntegrateAndFireBranchColumnFeatureKeys error: requires inferenceLeakyIntegrateAndFire")
+	return result
+
 def propagateLeakyIntegrateAndFireActivationsEnforceLastSegment(globalFeatureNeuronsActivation):
 	result = None
 	if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
@@ -52,12 +79,13 @@ def propagateLeakyIntegrateAndFireActivationsEnforceLastSegment(globalFeatureNeu
 		activationSparse = globalFeatureNeuronsActivation.coalesce()
 		activationIndices = activationSparse.indices()
 		activationValues = activationSparse.values()
+		maxConcepts = activationSparse.shape[inferenceLeakyIntegrateAndFireConceptDimension]
 		maxFeatures = activationSparse.shape[inferenceLeakyIntegrateAndFireFeatureDimension]
 		if(useSANIcolumns):
 			somaActivationFromLastSegmentKeys = pt.empty((arrayIndexSegmentFirst,), dtype=pt.long, device=activationSparse.device)
 		else:
 			lastSegmentMask = (activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentLast) & (activationValues > 0)
-			somaActivationFromLastSegmentKeys = activationIndices[inferenceLeakyIntegrateAndFireConceptDimension, lastSegmentMask].long()*int(maxFeatures)+activationIndices[inferenceLeakyIntegrateAndFireFeatureDimension, lastSegmentMask].long()
+			somaActivationFromLastSegmentKeys = calculateLeakyIntegrateAndFireBranchColumnFeatureKeys(activationIndices[inferenceLeakyIntegrateAndFireBranchDimension, lastSegmentMask].long(), activationIndices[inferenceLeakyIntegrateAndFireConceptDimension, lastSegmentMask].long(), activationIndices[inferenceLeakyIntegrateAndFireFeatureDimension, lastSegmentMask].long(), int(maxConcepts), int(maxFeatures))
 		if(somaActivationFromLastSegmentKeys.numel() > 0):
 			somaActivationFromLastSegmentKeys = pt.unique(somaActivationFromLastSegmentKeys, sorted=True)
 		globalFeatureNeuronsActivationResult = propagateLeakyIntegrateAndFireActivations(globalFeatureNeuronsActivation)
@@ -205,10 +233,19 @@ def decrementLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation)
 def calculateLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation):
 	result = None
 	if(inferenceLeakyIntegrateAndFire):
+		somaActivationByBranch = calculateLeakyIntegrateAndFireSomaActivationByBranch(globalFeatureNeuronsActivation)
+		result = GIAANNcmn_sparseTensors.reduceSparseBranchMax(somaActivationByBranch)
+	else:
+		raise RuntimeError("calculateLeakyIntegrateAndFireSomaActivation error: requires inferenceLeakyIntegrateAndFire")
+	return result
+
+def calculateLeakyIntegrateAndFireSomaActivationByBranch(globalFeatureNeuronsActivation):
+	result = None
+	if(inferenceLeakyIntegrateAndFire):
 		if(globalFeatureNeuronsActivation is None or not globalFeatureNeuronsActivation.is_sparse):
-			raise RuntimeError("calculateLeakyIntegrateAndFireSomaActivation error: globalFeatureNeuronsActivation must be sparse")
+			raise RuntimeError("calculateLeakyIntegrateAndFireSomaActivationByBranch error: globalFeatureNeuronsActivation must be sparse")
 		if(globalFeatureNeuronsActivation.dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireBranchDimension] != multipleDendriticBranchesNumber or globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireSegmentDimension] != arrayNumberOfSegments):
-			raise RuntimeError("calculateLeakyIntegrateAndFireSomaActivation error: activation tensor shape is invalid")
+			raise RuntimeError("calculateLeakyIntegrateAndFireSomaActivationByBranch error: activation tensor shape is invalid")
 		activationSparse = globalFeatureNeuronsActivation.coalesce()
 		activationIndices = activationSparse.indices()
 		activationValues = activationSparse.values()
@@ -216,15 +253,14 @@ def calculateLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation)
 		somaSignalMask = segmentIndices == arrayIndexSegmentSoma
 		if(useSANIcolumns or useSANIfeaturesAndColumns):
 			if(arrayIndexSegmentLastColumn < arrayIndexSegmentFirst or arrayIndexSegmentLastColumn >= arrayIndexSegmentSoma):
-				raise RuntimeError("calculateLeakyIntegrateAndFireSomaActivation error: last column segment index out of range")
+				raise RuntimeError("calculateLeakyIntegrateAndFireSomaActivationByBranch error: last column segment index out of range")
 			somaSignalMask = somaSignalMask | (segmentIndices == arrayIndexSegmentLastColumn)
 		somaIndices = pt.stack((activationIndices[inferenceLeakyIntegrateAndFireBranchDimension, somaSignalMask], activationIndices[inferenceLeakyIntegrateAndFireConceptDimension, somaSignalMask], activationIndices[inferenceLeakyIntegrateAndFireFeatureDimension, somaSignalMask]), dim=0)
 		somaValues = activationValues[somaSignalMask]
 		somaSize = (activationSparse.shape[inferenceLeakyIntegrateAndFireBranchDimension], activationSparse.shape[inferenceLeakyIntegrateAndFireConceptDimension], activationSparse.shape[inferenceLeakyIntegrateAndFireFeatureDimension])
-		somaActivationByBranch = pt.sparse_coo_tensor(somaIndices, somaValues, size=somaSize, dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
-		result = GIAANNcmn_sparseTensors.reduceSparseBranchMax(somaActivationByBranch)
+		result = pt.sparse_coo_tensor(somaIndices, somaValues, size=somaSize, dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
 	else:
-		raise RuntimeError("calculateLeakyIntegrateAndFireSomaActivation error: requires inferenceLeakyIntegrateAndFire")
+		raise RuntimeError("calculateLeakyIntegrateAndFireSomaActivationByBranch error: requires inferenceLeakyIntegrateAndFire")
 	return result
 
 if(inferenceSegmentActivationsBoolean):
@@ -1127,8 +1163,9 @@ def mergeLeakyIntegrateAndFireCurrentSomaActivationKeys(somaActivationFromLastSe
 		if(useSANIcolumns):
 			# Column-only LIF keeps the terminal column signal transient in the last column segment rather than storing it in the soma.
 			somaActivationMask = somaActivationMask | ((activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentLastColumn) & (activationValues > 0))
+		maxConcepts = activationSparse.shape[inferenceLeakyIntegrateAndFireConceptDimension]
 		maxFeatures = activationSparse.shape[inferenceLeakyIntegrateAndFireFeatureDimension]
-		currentSomaActivationKeys = activationIndices[inferenceLeakyIntegrateAndFireConceptDimension, somaActivationMask].long()*int(maxFeatures)+activationIndices[inferenceLeakyIntegrateAndFireFeatureDimension, somaActivationMask].long()
+		currentSomaActivationKeys = calculateLeakyIntegrateAndFireBranchColumnFeatureKeys(activationIndices[inferenceLeakyIntegrateAndFireBranchDimension, somaActivationMask].long(), activationIndices[inferenceLeakyIntegrateAndFireConceptDimension, somaActivationMask].long(), activationIndices[inferenceLeakyIntegrateAndFireFeatureDimension, somaActivationMask].long(), int(maxConcepts), int(maxFeatures))
 		if(somaActivationFromLastSegmentKeys.numel() > 0 and currentSomaActivationKeys.numel() > 0):
 			resultKeys = pt.cat((somaActivationFromLastSegmentKeys, currentSomaActivationKeys))
 		elif(somaActivationFromLastSegmentKeys.numel() > 0):

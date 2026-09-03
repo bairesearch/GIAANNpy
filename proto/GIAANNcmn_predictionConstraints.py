@@ -64,16 +64,6 @@ def constraintAllowsNode(databaseNetworkObject, columnIndex, featureIndex, const
 			constraintMode = constraintState.get("mode")
 			if(constraintMode == "internal" and allowedSet is not None and columnIndex not in allowedSet and featureIndex is not None):
 				allowed = int(featureIndex) == featureIndexPrimeConceptNeuron
-	if(allowed and constraintState is not None):
-		allowedSet = constraintState.get("columns")
-		constraintMode = constraintState.get("mode")
-		if(constraintMode == "delimiter" and allowedSet is not None and columnIndex in allowedSet):
-			if(featureIndex is None):
-				allowed = False
-			else:
-				isDeterministicDelimiter = GIAANNcmn_databaseNetwork.isFeatureIndexReferenceSetDelimiterDeterministic(databaseNetworkObject, int(featureIndex))
-				isProbabilisticDelimiter = GIAANNcmn_databaseNetwork.isFeatureIndexReferenceSetDelimiterProbabilistic(databaseNetworkObject, int(featureIndex))
-				allowed = (isDeterministicDelimiter or isProbabilisticDelimiter)
 	return allowed
 
 def filterColumnFeatureCandidatesByConstraint(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState):

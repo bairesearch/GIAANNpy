@@ -744,7 +744,10 @@ def initialiseLeakyIntegrateAndFireSomaActivationKeys(globalFeatureNeuronsActiva
 			maxFeatures = globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireFeatureDimension]
 			if(conceptColumnIndex < arrayIndexSegmentFirst or conceptColumnIndex >= maxConcepts or conceptColumnFeatureIndex < arrayIndexSegmentFirst or conceptColumnFeatureIndex >= maxFeatures):
 				raise RuntimeError("initialiseLeakyIntegrateAndFireSomaActivationKeys error: seed neuron index is out of range")
-			result = pt.as_tensor(conceptColumnIndex*int(maxFeatures)+conceptColumnFeatureIndex, dtype=pt.long, device=globalFeatureNeuronsActivation.device).reshape(-1)
+			branchIndices = pt.as_tensor(inferenceLeakyIntegrateAndFireSomaBranchIndex, dtype=pt.long, device=globalFeatureNeuronsActivation.device).reshape(-1)
+			columnIndices = pt.as_tensor(conceptColumnIndex, dtype=pt.long, device=globalFeatureNeuronsActivation.device).reshape(-1)
+			featureIndices = pt.as_tensor(conceptColumnFeatureIndex, dtype=pt.long, device=globalFeatureNeuronsActivation.device).reshape(-1)
+			result = GIAANNcmn_predictionActivate.calculateLeakyIntegrateAndFireBranchColumnFeatureKeys(branchIndices, columnIndices, featureIndices, int(maxConcepts), int(maxFeatures))
 	else:
 		raise RuntimeError("initialiseLeakyIntegrateAndFireSomaActivationKeys error: requires inferenceLeakyIntegrateAndFire enforceLastSegmentMustBeActive")
 	return result

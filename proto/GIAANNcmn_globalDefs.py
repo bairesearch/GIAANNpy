@@ -146,7 +146,10 @@ if(inferenceLeakyIntegrateAndFire):
 	inferenceLeakyIntegrateAndFireSegmentDimension = 1	#mandatory
 	inferenceLeakyIntegrateAndFireConceptDimension = 2	#mandatory
 	inferenceLeakyIntegrateAndFireFeatureDimension = 3	#mandatory
-	inferenceLeakyIntegrateAndFireSomaBranchIndex = 0	#mandatory: the single soma is stored on branch zero after branch aggregation
+	inferenceLeakyIntegrateAndFireSomaBranchIndex = 0	#mandatory: branch used for forced soma activation
+	inferenceLeakyIntegrateAndFireSomaActivationByBranchBranchDimension = 0	#mandatory
+	inferenceLeakyIntegrateAndFireSomaActivationByBranchConceptDimension = 1	#mandatory
+	inferenceLeakyIntegrateAndFireSomaActivationByBranchFeatureDimension = 2	#mandatory
 	inferenceLeakyIntegrateAndFireSomaActivationConceptDimension = 0	#mandatory
 	inferenceLeakyIntegrateAndFireSomaActivationFeatureDimension = 1	#mandatory
 	if(not isinstance(inferenceLeakyIntegrateAndFireSomaActivationThreshold, (int, float)) or isinstance(inferenceLeakyIntegrateAndFireSomaActivationThreshold, bool) or not math.isfinite(inferenceLeakyIntegrateAndFireSomaActivationThreshold) or inferenceLeakyIntegrateAndFireSomaActivationThreshold <= 0.0):

@@ -674,3 +674,9 @@ v2n (Codex IDE GPT-5.6):
 	- implement option trainSelectMostSimilarBranchCompareFeatureSegmentsOnly - only compare the feature segments (not column segments) when selecting the closest existing branch.
 - patch LIF implementation - take the max across all branches (do not sum branch activations).
 MANUAL; - set inferenceDeactivateLastColumnSegmentUponPrediction=True by default
+- patch multipleDendriticBranchesRandom so that it selects a random branch to train for each feature neuron in a train sequence.
+- patch multipleDendriticBranchesRandom so that it does not preserve distinct branches for repeated occurrences within a sequence (this is the multipleDendriticBranchesRandom=False behaviour).
+- patch multipleDendriticBranchesRandom to sample branches with replacement in selectFeatureBranchIndex and stop mapGlobalToLocalIndices from treating random branch IDs as repeat-occurrence ranks.
+- patch inferenceLeakyIntegrateAndFire gating by preserving multipleDendriticBranches identity through calculateLeakyIntegrateAndFireSomaActivationByBranch and calculateLeakyIntegrateAndFireBranchColumnFeatureKeys.
+- patch beam candidate filtering to respect inferenceColumnConstraintsAllowExternalPrimeConceptTransitions by using constraintAllowsNode in selectTopInstanceNodesByActivation and buildInstanceColumnData.
+- patch constraintAllowsNode delimiter-mode filtering to permit valid same-column continuation features after reference-set delimiters.

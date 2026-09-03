@@ -511,29 +511,20 @@ def calculateLeakyIntegrateAndFireLastSegmentSelectionActivationDistribution(dat
 			raise RuntimeError("calculateLeakyIntegrateAndFireLastSegmentSelectionActivationDistribution error: somaActivationFromLastSegmentKeys is invalid")
 		if(stateFeatures.device != somaActivationFromLastSegmentKeys.device):
 			raise RuntimeError("calculateLeakyIntegrateAndFireLastSegmentSelectionActivationDistribution error: activation tensors must use the same device")
-		stateFeaturesSomaSignal = GIAANNcmn_predictionActivate.calculateLeakyIntegrateAndFireSomaActivation(stateFeatures)
-		if(stateFeaturesSomaSignal._nnz() > 0 and somaActivationFromLastSegmentKeys.numel() > 0):
-			stateIndices = stateFeaturesSomaSignal.indices()
-			stateValues = stateFeaturesSomaSignal.values()
-			somaColumnIndices = stateIndices[inferenceLeakyIntegrateAndFireSomaActivationConceptDimension].long()
-			somaFeatureIndices = stateIndices[inferenceLeakyIntegrateAndFireSomaActivationFeatureDimension].long()
-			somaValues = stateValues
-			candidateKeys = somaColumnIndices*int(databaseNetworkObject.f)+somaFeatureIndices
+		stateFeaturesSomaSignalByBranch = GIAANNcmn_predictionActivate.calculateLeakyIntegrateAndFireSomaActivationByBranch(stateFeatures)
+		if(stateFeaturesSomaSignalByBranch._nnz() > 0 and somaActivationFromLastSegmentKeys.numel() > 0):
+			stateIndices = stateFeaturesSomaSignalByBranch.indices()
+			stateValues = stateFeaturesSomaSignalByBranch.values()
+			branchIndices = stateIndices[inferenceLeakyIntegrateAndFireSomaActivationByBranchBranchDimension].long()
+			somaColumnIndices = stateIndices[inferenceLeakyIntegrateAndFireSomaActivationByBranchConceptDimension].long()
+			somaFeatureIndices = stateIndices[inferenceLeakyIntegrateAndFireSomaActivationByBranchFeatureDimension].long()
+			candidateKeys = GIAANNcmn_predictionActivate.calculateLeakyIntegrateAndFireBranchColumnFeatureKeys(branchIndices, somaColumnIndices, somaFeatureIndices, int(stateFeatures.shape[inferenceLeakyIntegrateAndFireConceptDimension]), int(databaseNetworkObject.f))
 			eligibleMask = GIAANNcmn_predictionConstraints.buildSortedKeyMembershipMask(candidateKeys, somaActivationFromLastSegmentKeys)
-			eligibleIndices = pt.nonzero(eligibleMask, as_tuple=False).view(-1)
-			if(eligibleIndices.numel() > 0):
-				eligibleColumnIndices = somaColumnIndices.index_select(0, eligibleIndices)
-				eligibleFeatureIndices = somaFeatureIndices.index_select(0, eligibleIndices)
-				eligibleValues = somaValues.index_select(0, eligibleIndices)
-				if(multipleDendriticBranches):
-					eligibleKeys = candidateKeys.index_select(0, eligibleIndices)
-					uniqueEligibleKeys, inverseEligibleIndices = pt.unique(eligibleKeys, sorted=True, return_inverse=True)
-					maximumEligibleValues = pt.empty((uniqueEligibleKeys.shape[0],), dtype=eligibleValues.dtype, device=eligibleValues.device)
-					maximumEligibleValues.scatter_reduce_(0, inverseEligibleIndices, eligibleValues, reduce="amax", include_self=False)
-					eligibleColumnIndices = pt.div(uniqueEligibleKeys, int(databaseNetworkObject.f), rounding_mode="floor")
-					eligibleFeatureIndices = pt.remainder(uniqueEligibleKeys, int(databaseNetworkObject.f))
-					eligibleValues = maximumEligibleValues
-				result = eligibleColumnIndices, eligibleFeatureIndices, eligibleValues
+			if(bool(pt.any(eligibleMask).item())):
+				eligibleSomaSignalByBranch = pt.sparse_coo_tensor(stateIndices[:, eligibleMask], stateValues[eligibleMask], size=stateFeaturesSomaSignalByBranch.size(), dtype=stateFeaturesSomaSignalByBranch.dtype, device=stateFeaturesSomaSignalByBranch.device).coalesce()
+				eligibleSomaSignal = GIAANNcmn_sparseTensors.reduceSparseBranchMax(eligibleSomaSignalByBranch)
+				eligibleIndices = eligibleSomaSignal.indices()
+				result = eligibleIndices[inferenceLeakyIntegrateAndFireSomaActivationConceptDimension].long(), eligibleIndices[inferenceLeakyIntegrateAndFireSomaActivationFeatureDimension].long(), eligibleSomaSignal.values()
 	else:
 		raise RuntimeError("calculateLeakyIntegrateAndFireLastSegmentSelectionActivationDistribution error: requires inferenceLeakyIntegrateAndFire enforceLastSegmentMustBeActive")
 	return result
@@ -755,7 +746,7 @@ def selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationV
 		inferenceBeamInstancePreferAdjacentOverlap)
 	if(not useColumnPreferences):
 		return selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures, databaseNetworkObject, constraintState, conceptActivationState)
-	columnData = buildInstanceColumnData(columnIndices, featureIndices, activationValues, constraintState)
+	columnData = buildInstanceColumnData(columnIndices, featureIndices, activationValues, databaseNetworkObject, constraintState)
 	if(len(columnData) == 0):
 		return selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures, databaseNetworkObject, constraintState, conceptActivationState)
 	columnScores = computeInstanceColumnScores(columnData, strengthLookup, maxFeatures, activationValues.device, activationValues.dtype)
@@ -800,9 +791,9 @@ def selectTopInstanceNodesByActivation(columnIndices, featureIndices, activation
 		if(threshold > 0 and value < threshold and selectedCount > 0):
 			continue
 		columnIndex = columnIndices[activationIndex].item()
-		if(not GIAANNcmn_predictionConstraints.constraintAllowsColumn(columnIndex, constraintState)):
-			continue
 		featureIndex = featureIndices[activationIndex].item()
+		if(not GIAANNcmn_predictionConstraints.constraintAllowsNode(databaseNetworkObject, columnIndex, featureIndex, constraintState)):
+			continue
 		nodes = [(columnIndex, featureIndex)]
 		nodes, connectionValue = prepareBeamNodes(databaseNetworkObject, nodes, conceptActivationState, constraintState, strengthLookup, maxFeatures)
 		if(len(nodes) == 0):
@@ -813,20 +804,20 @@ def selectTopInstanceNodesByActivation(columnIndices, featureIndices, activation
 			break
 	if(len(candidates) == 0 and indices.shape[0] > 0):
 		columnIndex = columnIndices[indices[0]].item()
-		if(not GIAANNcmn_predictionConstraints.constraintAllowsColumn(columnIndex, constraintState)):
-			return candidates
 		featureIndex = featureIndices[indices[0]].item()
+		if(not GIAANNcmn_predictionConstraints.constraintAllowsNode(databaseNetworkObject, columnIndex, featureIndex, constraintState)):
+			return candidates
 		connectionValue = getConnectionValue(strengthLookup, columnIndex, featureIndex, maxFeatures)
 		candidates.append({"columnIndex": columnIndex, "featureIndex": featureIndex, "nodes": [(columnIndex, featureIndex)], "connectionValue": connectionValue, "activationValue": values[0].item()})
 	return candidates
 
-def buildInstanceColumnData(columnIndices, featureIndices, activationValues, constraintState=None):
+def buildInstanceColumnData(columnIndices, featureIndices, activationValues, databaseNetworkObject, constraintState=None):
 	columnData = {}
 	for idx in range(columnIndices.shape[0]):
 		columnIndex = columnIndices[idx].item()
-		if(not GIAANNcmn_predictionConstraints.constraintAllowsColumn(columnIndex, constraintState)):
-			continue
 		featureIndex = featureIndices[idx].item()
+		if(not GIAANNcmn_predictionConstraints.constraintAllowsNode(databaseNetworkObject, columnIndex, featureIndex, constraintState)):
+			continue
 		activationValue = activationValues[idx].item()
 		if(columnIndex not in columnData):
 			columnData[columnIndex] = {"features": [], "activations": []}

@@ -565,36 +565,14 @@ def getTokenDisplayText(token):
 		return token.word
 	return str(token)
 
-def buildDeterministicBranchOrder(conceptIndexKey, featureIndex):
-	seedValue = ((conceptIndexKey + 1) * 2654435761) ^ ((featureIndex + 1) * 1013904223)
-	seedValue = seedValue & 0xFFFFFFFF
-	rng = random.Random(seedValue)
-	branchOrder = list(range(multipleDendriticBranchesNumber))
-	rng.shuffle(branchOrder)
-	return branchOrder
-
-def selectFeatureBranchIndex(featureBranchCounts, branchAssignments, conceptIndexKey, featureIndex):
-	branchIndex = featureBranchCounts.get(featureIndex, 0)
-	featureBranchCounts[featureIndex] = branchIndex + 1
+def selectFeatureBranchIndex(featureBranchCounts, featureIndex):
+	branchIndex = 0
 	if(multipleDendriticBranchesRandom):
-		if(branchAssignments is None):
-			raise RuntimeError("selectFeatureBranchIndex error: branchAssignments is None while multipleDendriticBranchesRandom enabled")
-		featureBranchOrders = branchAssignments.get(conceptIndexKey)
-		if(featureBranchOrders is None):
-			featureBranchOrders = {}
-			branchAssignments[conceptIndexKey] = featureBranchOrders
-		branchOrder = featureBranchOrders.get(featureIndex)
-		if(branchOrder is None):
-			branchOrder = buildDeterministicBranchOrder(conceptIndexKey, featureIndex)
-			featureBranchOrders[featureIndex] = branchOrder
-		if(branchIndex < multipleDendriticBranchesNumber):
-			branchIndex = branchOrder[branchIndex]
-		else:
-			if(patchMultipleDendriticBranchesOverflowBranch):
-				# Saturate at the final permutation position so reverse branch mapping selects the same occurrence rank.
-				branchIndex = branchOrder[multipleDendriticBranchesIndexLast]
-			else:
-				branchIndex = multipleDendriticBranchesIndexLast
+		# Sample with replacement so repeated feature occurrences are not assigned distinct branches.
+		branchIndex = random.randrange(multipleDendriticBranchesNumber)
+	else:
+		branchIndex = featureBranchCounts.get(featureIndex, 0)
+		featureBranchCounts[featureIndex] = branchIndex + 1
 	if(branchIndex >= multipleDendriticBranchesNumber):
 		branchIndex = multipleDendriticBranchesIndexLast
 	return branchIndex
@@ -618,11 +596,8 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 	else:
 		featureNeuronsSegmentMask = pt.ones((cs, arrayNumberOfSegments), dtype=arrayType)
 	branchCounters = None
-	branchAssignments = None
 	if(multipleDendriticBranches):
 		branchCounters = {}
-		if(multipleDendriticBranchesRandom):
-			branchAssignments = {}
 	
 	conceptIndicesList = conceptIndices.tolist()
 	for i, sequenceConceptWordIndex in enumerate(conceptIndicesList):
@@ -692,7 +667,7 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 					if(j >= featureIndicesInObservedTensor.shape[0]):
 						continue
 					globalFeatureIndex = int(featureIndicesInObservedTensor[j].item())
-					branchIndex = selectFeatureBranchIndex(featureBranchCounts, branchAssignments, conceptIndexKey, globalFeatureIndex)
+					branchIndex = selectFeatureBranchIndex(featureBranchCounts, globalFeatureIndex)
 					if(multipleDendriticBranchesBinaryTree):
 						if(useTrainDuringInference):
 							if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
@@ -749,7 +724,7 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 						if(featureBranchCounts is None):
 							featureBranchCounts = {}
 							branchCounters[conceptIndexKey] = featureBranchCounts
-						branchIndex = selectFeatureBranchIndex(featureBranchCounts, branchAssignments, conceptIndexKey, sequenceFeatureIndex)
+						branchIndex = selectFeatureBranchIndex(featureBranchCounts, sequenceFeatureIndex)
 						if(multipleDendriticBranchesBinaryTree):
 							if(useTrainDuringInference):
 								if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
@@ -779,7 +754,7 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 						if(featureBranchCounts is None):
 							featureBranchCounts = {}
 							branchCounters[conceptIndexKey] = featureBranchCounts
-						branchIndex = selectFeatureBranchIndex(featureBranchCounts, branchAssignments, conceptIndexKey, sequenceFeatureIndex)
+						branchIndex = selectFeatureBranchIndex(featureBranchCounts, sequenceFeatureIndex)
 						if(multipleDendriticBranchesBinaryTree):
 							if(useTrainDuringInference):
 								if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
