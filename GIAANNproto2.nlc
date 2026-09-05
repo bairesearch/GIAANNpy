@@ -680,3 +680,18 @@ MANUAL; - set inferenceDeactivateLastColumnSegmentUponPrediction=True by default
 - patch inferenceLeakyIntegrateAndFire gating by preserving multipleDendriticBranches identity through calculateLeakyIntegrateAndFireSomaActivationByBranch and calculateLeakyIntegrateAndFireBranchColumnFeatureKeys.
 - patch beam candidate filtering to respect inferenceColumnConstraintsAllowExternalPrimeConceptTransitions by using constraintAllowsNode in selectTopInstanceNodesByActivation and buildInstanceColumnData.
 - patch constraintAllowsNode delimiter-mode filtering to permit valid same-column continuation features after reference-set delimiters.
+
+---
+v2o (Codex IDE GPT-6.0):
+- add proto GIAANNproto2o1a - start inference updates:
+	- add option inferenceReviewPatch1FilterCandidatesBeforeTopK (disabled) - filter constrained candidates before top-K selection, with no prediction changes in the tested LIF and non-LIF configurations.
+	- add option inferenceReviewPatch2PreserveSelfTransitions (disabled) - reset firing neurons before accumulating new input to preserve immediate self-transitions, with only small and mixed measured accuracy changes.
+	- add option inferenceReviewPatch3SeedBurstIndependence (disabled) - reserve the skipped seed-burst-independence review option without implementing a behaviour change.
+	- add option inferenceReviewPatch4ColumnTerminalEligibility (disabled) - include existing positive terminal-column activations in column-only LIF candidate eligibility, which reduced accuracy in the tested configuration.
+	- add option inferenceReviewPatch5BinaryTreeSomaProjection (enabled) - combine the maximum terminal-column branch signal with the binary-tree soma signal for LIF scoring.
+	- add option inferenceReviewPatch6ProbabilityCandidateExclusions (disabled) - reserve the withdrawn probability-exclusion proposal and raise an explicit error whenever the option is enabled.
+	- add option inferenceReviewPatch7AuxiliaryDirectSegment (enabled) - read LIF direct connections from the soma coordinate when generating automatic word-similarity data, requiring regeneration of existing similarity data.
+	- add option inferenceReviewPatch8ReuseObservedColumns (enabled) - reuse already loaded observed columns after checking their feature-array sizes to avoid redundant database loading.
+	- add option inferenceReviewPatch9LocalSourceActivation (enabled) - restrict soma and branch activation reductions to the requested source neuron to reduce inference lookup work.
+	- add option inferenceReviewPatch10LinearNeuronReset (enabled) - reset LIF neuron activations using vectorised neuron and segment masks across branches to avoid pairwise coordinate comparisons.
+- extract inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch and inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch.

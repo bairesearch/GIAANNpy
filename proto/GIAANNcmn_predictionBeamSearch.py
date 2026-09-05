@@ -217,6 +217,8 @@ def cloneBeamActivationState(state):
 	return clonedState
 
 def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state, columnIndex, featureIndex, sequenceWordIndex, sequenceColumnIndex):
+	if(inferenceReviewPatch2PreserveSelfTransitions):
+		reviewSourceActivationState = None
 	if(inferenceLeakyIntegrateAndFire):
 		if(useSANIcolumns or useSANIfeaturesAndColumns):
 			if(state.get("selectedColumnIndex") is None):
@@ -236,6 +238,10 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 				state["somaActivationFromLastSegmentKeys"] = somaActivationFromPropagatedLastSegmentKeys
 		else:
 			state["features"] = GIAANNcmn_predictionActivate.propagateLeakyIntegrateAndFireActivations(state["features"])
+	if(inferenceReviewPatch2PreserveSelfTransitions):
+		if(inferenceLeakyIntegrateAndFire):
+			reviewSourceActivationState = state["features"].clone()
+			state["features"] = GIAANNcmn_predictionActivate.resetReviewNeuronActivations(state["features"], columnIndex, featureIndex)
 	lemma = databaseNetworkObject.conceptColumnsList[columnIndex]
 	if(lemma in observedColumnsDict):
 		observedColumn = observedColumnsDict[lemma]
@@ -248,15 +254,30 @@ def executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, state,
 	observedColumnsDict[lemma] = observedColumn
 	featureConnections = observedColumn.prepareFeatureConnectionsForSourceFeature(featureIndex, targetDevice=state["features"].device, createMissing=False)
 	if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
-		state["features"], state["connections"], state["time"], state["somaActivationFromLastSegmentKeys"] = GIAANNcmn_predictionActivate.processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, state["features"], state["connections"], featureConnections, columnIndex, featureIndex, state["somaActivationFromLastSegmentKeys"], state.get("time"), sequenceWordIndex, sequenceColumnIndex)
+		if(inferenceReviewPatch2PreserveSelfTransitions):
+			state["features"], state["connections"], state["time"], state["somaActivationFromLastSegmentKeys"] = GIAANNcmn_predictionActivate.processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, state["features"], state["connections"], featureConnections, columnIndex, featureIndex, state["somaActivationFromLastSegmentKeys"], state.get("time"), sequenceWordIndex, sequenceColumnIndex, reviewSourceActivationState=reviewSourceActivationState)
+		else:
+			state["features"], state["connections"], state["time"], state["somaActivationFromLastSegmentKeys"] = GIAANNcmn_predictionActivate.processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, state["features"], state["connections"], featureConnections, columnIndex, featureIndex, state["somaActivationFromLastSegmentKeys"], state.get("time"), sequenceWordIndex, sequenceColumnIndex)
 	else:
-		state["features"], state["connections"], state["time"] = GIAANNcmn_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, state["features"], state["connections"], featureConnections, columnIndex, featureIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex)
+		if(inferenceReviewPatch2PreserveSelfTransitions):
+			state["features"], state["connections"], state["time"] = GIAANNcmn_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, state["features"], state["connections"], featureConnections, columnIndex, featureIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex, reviewSourceActivationState=reviewSourceActivationState)
+		else:
+			state["features"], state["connections"], state["time"] = GIAANNcmn_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, state["features"], state["connections"], featureConnections, columnIndex, featureIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex)
 	if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
-			state["features"], state["connections"], state["time"], state["somaActivationFromLastSegmentKeys"] = GIAANNnlp_auxiliaryNeuronsSimilarWords.processAuxiliaryFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumn, state["features"], state["connections"], columnIndex, featureIndex, state["somaActivationFromLastSegmentKeys"], state.get("time"), sequenceWordIndex, sequenceColumnIndex)
+			if(inferenceReviewPatch2PreserveSelfTransitions):
+				state["features"], state["connections"], state["time"], state["somaActivationFromLastSegmentKeys"] = GIAANNnlp_auxiliaryNeuronsSimilarWords.processAuxiliaryFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumn, state["features"], state["connections"], columnIndex, featureIndex, state["somaActivationFromLastSegmentKeys"], state.get("time"), sequenceWordIndex, sequenceColumnIndex, reviewSourceActivationState=reviewSourceActivationState)
+			else:
+				state["features"], state["connections"], state["time"], state["somaActivationFromLastSegmentKeys"] = GIAANNnlp_auxiliaryNeuronsSimilarWords.processAuxiliaryFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumn, state["features"], state["connections"], columnIndex, featureIndex, state["somaActivationFromLastSegmentKeys"], state.get("time"), sequenceWordIndex, sequenceColumnIndex)
 		else:
-			state["features"], state["connections"], state["time"] = GIAANNnlp_auxiliaryNeuronsSimilarWords.processAuxiliaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, state["features"], state["connections"], columnIndex, featureIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex)
-	applyBeamNodePredictionEffects(state, columnIndex, featureIndex, sequenceWordIndex)
+			if(inferenceReviewPatch2PreserveSelfTransitions):
+				state["features"], state["connections"], state["time"] = GIAANNnlp_auxiliaryNeuronsSimilarWords.processAuxiliaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, state["features"], state["connections"], columnIndex, featureIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex, reviewSourceActivationState=reviewSourceActivationState)
+			else:
+				state["features"], state["connections"], state["time"] = GIAANNnlp_auxiliaryNeuronsSimilarWords.processAuxiliaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, state["features"], state["connections"], columnIndex, featureIndex, state.get("time"), sequenceWordIndex, sequenceColumnIndex)
+	if(inferenceReviewPatch2PreserveSelfTransitions):
+		applyBeamNodePredictionEffects(state, columnIndex, featureIndex, sequenceWordIndex, activationAlreadyReset=reviewSourceActivationState is not None)
+	else:
+		applyBeamNodePredictionEffects(state, columnIndex, featureIndex, sequenceWordIndex)
 	if(predictionColumnsMustActivateConceptFeature):
 		conceptState = state.get("conceptActivations")
 		if(conceptState is None):
@@ -285,18 +306,23 @@ def activateBeamNodeLeakyIntegrateAndFireSoma(globalFeatureNeuronsActivation, co
 		raise RuntimeError("activateBeamNodeLeakyIntegrateAndFireSoma error: requires burst-enabled inferenceLeakyIntegrateAndFire")
 	return result
 
-def applyBeamNodePredictionEffects(state, columnIndex, featureIndex, sequenceWordIndex):
+def applyBeamNodePredictionEffects(state, columnIndex, featureIndex, sequenceWordIndex, activationAlreadyReset=False):
 	if(inferenceLeakyIntegrateAndFire):
 		modifyActivation = inferenceDeactivateSomaUponPrediction or inferenceDeactivateSegmentsUponPrediction or inferenceDeactivateLastColumnSegmentUponPrediction
 	else:
 		modifyActivation = inferenceDeactivateNeuronsUponPrediction
 	if(modifyActivation):
-		branchIndex = 0
-		if(multipleDendriticBranches):
-			branchIndex = GIAANNcmn_predictionActivate.selectActivatedBranchIndex(state["features"], columnIndex, featureIndex)
-		indicesToUpdate = buildBeamNodeIndices(state["features"].device, columnIndex, featureIndex, branchIndex)
-		modifier = 0
-		state["features"] = GIAANNcmn_sparseTensors.modifySparseTensor(state["features"], indicesToUpdate, modifier, multiply=False)
+		if(inferenceReviewPatch2PreserveSelfTransitions and activationAlreadyReset):
+			pass
+		elif(inferenceReviewPatch10LinearNeuronReset and inferenceLeakyIntegrateAndFire):
+			state["features"] = GIAANNcmn_predictionActivate.resetReviewNeuronActivations(state["features"], columnIndex, featureIndex)
+		else:
+			branchIndex = 0
+			if(multipleDendriticBranches):
+				branchIndex = GIAANNcmn_predictionActivate.selectActivatedBranchIndex(state["features"], columnIndex, featureIndex)
+			indicesToUpdate = buildBeamNodeIndices(state["features"].device, columnIndex, featureIndex, branchIndex)
+			modifier = 0
+			state["features"] = GIAANNcmn_sparseTensors.modifySparseTensor(state["features"], indicesToUpdate, modifier, multiply=False)
 	if(inferenceLeakyIntegrateAndFire):
 		if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures and inferenceDeactivateSomaUponPrediction):
 			if(state.get("deactivatedNeurons") is None):
@@ -781,6 +807,8 @@ def selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationV
 	return candidates
 
 def selectTopInstanceNodesByActivation(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, maxFeatures, databaseNetworkObject, constraintState=None, conceptActivationState=None):
+	if(inferenceReviewPatch1FilterCandidatesBeforeTopK):
+		columnIndices, featureIndices, activationValues = filterReviewCandidatesBeforeTopK(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState, candidateLimit)
 	selectionCount = min(candidateLimit, activationValues.shape[0])
 	values, indices = pt.topk(activationValues, selectionCount)
 	candidates = []
@@ -792,7 +820,11 @@ def selectTopInstanceNodesByActivation(columnIndices, featureIndices, activation
 			continue
 		columnIndex = columnIndices[activationIndex].item()
 		featureIndex = featureIndices[activationIndex].item()
-		if(not GIAANNcmn_predictionConstraints.constraintAllowsNode(databaseNetworkObject, columnIndex, featureIndex, constraintState)):
+		if(inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch):
+			constraintAllowsCandidate = GIAANNcmn_predictionConstraints.constraintAllowsNode(databaseNetworkObject, columnIndex, featureIndex, constraintState)
+		else:
+			constraintAllowsCandidate = GIAANNcmn_predictionConstraints.constraintAllowsColumn(columnIndex, constraintState)
+		if(not constraintAllowsCandidate):
 			continue
 		nodes = [(columnIndex, featureIndex)]
 		nodes, connectionValue = prepareBeamNodes(databaseNetworkObject, nodes, conceptActivationState, constraintState, strengthLookup, maxFeatures)
@@ -805,18 +837,42 @@ def selectTopInstanceNodesByActivation(columnIndices, featureIndices, activation
 	if(len(candidates) == 0 and indices.shape[0] > 0):
 		columnIndex = columnIndices[indices[0]].item()
 		featureIndex = featureIndices[indices[0]].item()
-		if(not GIAANNcmn_predictionConstraints.constraintAllowsNode(databaseNetworkObject, columnIndex, featureIndex, constraintState)):
+		if(inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch):
+			constraintAllowsCandidate = GIAANNcmn_predictionConstraints.constraintAllowsNode(databaseNetworkObject, columnIndex, featureIndex, constraintState)
+		else:
+			constraintAllowsCandidate = GIAANNcmn_predictionConstraints.constraintAllowsColumn(columnIndex, constraintState)
+		if(not constraintAllowsCandidate):
 			return candidates
 		connectionValue = getConnectionValue(strengthLookup, columnIndex, featureIndex, maxFeatures)
 		candidates.append({"columnIndex": columnIndex, "featureIndex": featureIndex, "nodes": [(columnIndex, featureIndex)], "connectionValue": connectionValue, "activationValue": values[0].item()})
 	return candidates
+
+def filterReviewCandidatesBeforeTopK(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState, candidateLimit):
+	if(inferenceReviewPatch1FilterCandidatesBeforeTopK):
+		if(not isinstance(candidateLimit, int) or isinstance(candidateLimit, bool) or candidateLimit <= arrayIndexSegmentFirst):
+			raise RuntimeError(inferenceReviewPatchInvalidCandidateLimit)
+		allowedCandidates = []
+		for columnIndex, featureIndex in zip(columnIndices.tolist(), featureIndices.tolist()):
+			allowed = GIAANNcmn_predictionConstraints.constraintAllowsNode(databaseNetworkObject, columnIndex, featureIndex, constraintState)
+			if(not inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch):
+				allowed = allowed and GIAANNcmn_predictionConstraints.constraintAllowsColumn(columnIndex, constraintState)
+			allowedCandidates.append(allowed)
+		allowedMask = pt.tensor(allowedCandidates, dtype=pt.bool, device=activationValues.device)
+		columnIndices = columnIndices[allowedMask]
+		featureIndices = featureIndices[allowedMask]
+		activationValues = activationValues[allowedMask]
+	return columnIndices, featureIndices, activationValues
 
 def buildInstanceColumnData(columnIndices, featureIndices, activationValues, databaseNetworkObject, constraintState=None):
 	columnData = {}
 	for idx in range(columnIndices.shape[0]):
 		columnIndex = columnIndices[idx].item()
 		featureIndex = featureIndices[idx].item()
-		if(not GIAANNcmn_predictionConstraints.constraintAllowsNode(databaseNetworkObject, columnIndex, featureIndex, constraintState)):
+		if(inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch):
+			constraintAllowsCandidate = GIAANNcmn_predictionConstraints.constraintAllowsNode(databaseNetworkObject, columnIndex, featureIndex, constraintState)
+		else:
+			constraintAllowsCandidate = GIAANNcmn_predictionConstraints.constraintAllowsColumn(columnIndex, constraintState)
+		if(not constraintAllowsCandidate):
 			continue
 		activationValue = activationValues[idx].item()
 		if(columnIndex not in columnData):

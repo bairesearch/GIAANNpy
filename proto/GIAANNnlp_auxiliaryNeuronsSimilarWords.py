@@ -99,13 +99,16 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 				applyAuxiliaryConnectionPropertyUpdates(sequenceObservedColumns, connectionIndices, permanenceValues, sequenceObservedColumns.databaseNetworkObject.arrayIndexPropertiesPermanenceIndex)
 		return
 
-	def processAuxiliaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None):
+	def processAuxiliaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None, reviewSourceActivationState=None):
 		import GIAANNcmn_predictionActivate
 		globalFeatureNeuronsActivationResult = globalFeatureNeuronsActivation
 		globalFeatureConnectionsActivationResult = globalFeatureConnectionsActivation
 		globalFeatureNeuronsTimeResult = globalFeatureNeuronsTime
 		connectionDevice = globalFeatureNeuronsActivationResult.device
-		sourceActivation = GIAANNcmn_predictionActivate.calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivationResult, sourceColumnIndex, sourceFeatureIndex)
+		if(inferenceReviewPatch2PreserveSelfTransitions and reviewSourceActivationState is not None):
+			sourceActivation = GIAANNcmn_predictionActivate.calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, reviewSourceActivationState, sourceColumnIndex, sourceFeatureIndex)
+		else:
+			sourceActivation = GIAANNcmn_predictionActivate.calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivationResult, sourceColumnIndex, sourceFeatureIndex)
 		sourceActivationValue = collapseSourceActivationForAuxiliaryInput(sourceActivation)
 		if(float(sourceActivationValue.item()) > auxiliaryNeuronsSimilarWordsMinimumSimilarity):
 			if(len(getPrimeAuxiliaryFeaturePrefixes()) > 0 and int(sourceFeatureIndex) == featureIndexPrimeConceptNeuron):
@@ -115,7 +118,7 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		result = globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult
 		return result
 
-	def processAuxiliaryFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sourceColumnIndex, sourceFeatureIndex, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None):
+	def processAuxiliaryFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sourceColumnIndex, sourceFeatureIndex, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None, reviewSourceActivationState=None):
 		result = None
 		if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 			import GIAANNcmn_predictionActivate
@@ -123,7 +126,10 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			globalFeatureConnectionsActivationResult = globalFeatureConnectionsActivation
 			globalFeatureNeuronsTimeResult = globalFeatureNeuronsTime
 			connectionDevice = globalFeatureNeuronsActivationResult.device
-			sourceActivation = GIAANNcmn_predictionActivate.calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivationResult, sourceColumnIndex, sourceFeatureIndex)
+			if(inferenceReviewPatch2PreserveSelfTransitions and reviewSourceActivationState is not None):
+				sourceActivation = GIAANNcmn_predictionActivate.calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, reviewSourceActivationState, sourceColumnIndex, sourceFeatureIndex)
+			else:
+				sourceActivation = GIAANNcmn_predictionActivate.calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivationResult, sourceColumnIndex, sourceFeatureIndex)
 			sourceActivationValue = collapseSourceActivationForAuxiliaryInput(sourceActivation)
 			if(float(sourceActivationValue.item()) > auxiliaryNeuronsSimilarWordsMinimumSimilarity):
 				if(len(getPrimeAuxiliaryFeaturePrefixes()) > 0 and int(sourceFeatureIndex) == featureIndexPrimeConceptNeuron):

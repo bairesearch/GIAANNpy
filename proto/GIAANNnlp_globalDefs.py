@@ -507,7 +507,10 @@ else:
 
 
 #Closed world grounded dataset constants;
-closedWorldGroundedDatasetGenerated = False
+if(useDefaultsV2):
+	closedWorldGroundedDatasetGenerated = False	#default: False	#orig: False
+else:
+	closedWorldGroundedDatasetGenerated = False
 if(inferenceReportGroundedAccuracy):
 	inferenceReportGroundedAccuracyMod1_labelBalancedDataset = True
 	inferenceReportGroundedAccuracyMod2_majorityClassBaseline = True
@@ -607,8 +610,13 @@ if(inferenceReportGroundedAccuracy):
 		raise RuntimeError("inferenceReportGroundedAccuracy requires numSeedTokensInference==" + str(closedWorldGroundedPromptAnswerTokenIndex))
 
 
-#Auxiliary method #2;
-inferenceInferMissingFeatures = False	#default: False	#orig: False
+#Auxiliary neurons;
+if(useDefaultsV2):
+	inferenceInferMissingFeatures = False	#default: False	#orig: False	#Auxiliary method #2;
+	auxiliaryNeurons=False	#default: False	#orig: False
+else:
+	inferenceInferMissingFeatures = False
+	auxiliaryNeurons = False
 if(inferenceInferMissingFeatures):
 	inferenceInferMissingFeaturesCandidateSourceWeighted = True	#default: True
 	inferenceInferMissingFeaturesUpdate1SelectTopKCandidates = False	#select only the top-k most contextually active source candidates before propagation
@@ -649,10 +657,6 @@ if(inferenceInferMissingFeatures):
 			raise RuntimeError("GIAANNnlp_globalDefs error: inferenceInferMissingFeaturesUpdate2FullConfidenceMarginRatio must be a finite number >= inferenceInferMissingFeaturesNormalisedActivationTotal")
 		if(not isinstance(inferenceInferMissingFeaturesUpdate2RunnerUpRank, int) or isinstance(inferenceInferMissingFeaturesUpdate2RunnerUpRank, bool) or inferenceInferMissingFeaturesUpdate2RunnerUpRank <= inferenceInferMissingFeaturesMinimumActivation):
 			raise RuntimeError("GIAANNnlp_globalDefs error: inferenceInferMissingFeaturesUpdate2RunnerUpRank must be a positive integer")
-
-
-#Auxiliary neurons;
-auxiliaryNeurons=False	#default: False	#orig: False
 if(auxiliaryNeurons):
 	auxiliaryNeuronsPOS = False	#default: False	#deterministic parent-lemma/POS/subword-role auxiliary source features
 	auxiliaryNeuronsAuto = True	#default: True	#orig: False
@@ -829,14 +833,12 @@ if(useBenchmark):
 				benchmarkAblationText += "-multipleDendriticBranchesBinaryTree"	
 			elif(multipleDendriticBranchesRandom):
 				benchmarkAblationText += "-multipleDendriticBranchesRandom" + str(multipleDendriticBranchesNumber)
-			elif(multipleDendriticBranches):
-				benchmarkAblationText += "-multipleDendriticBranches"
 
 		if(useDefaultsV2):
 			benchmarkAblationText = "-useDefaultsV2" + benchmarkAblationText
 	else:
 		#v1 benchmarks;
-		if(multipleDendriticBranches and multipleDendriticBranchesRandom):
+		if(multipleDendriticBranchesRandom):
 			if(spacyPipelineOptimisations):
 				benchmarkAblationText = "-multipleDendriticBranchesRandom" + str(multipleDendriticBranchesNumber)
 			else:

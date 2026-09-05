@@ -599,6 +599,8 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	else:
 		connectedColumnsConstraint, connectedColumnsFeatureMap = calculateConnectedColumnsConstraint(databaseNetworkObject, observedColumnsDict, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, sequenceWordIndex, wordPredictionIndex, tokensSequence, seedPhase)
 		
+	if(inferenceReviewPatch2PreserveSelfTransitions):
+		reviewSourceActivationState = None
 	if(sequenceWordIndex > 0):
 		#set conceptColumnIndexActivation/conceptColumnFeatureIndexActivation;
 		conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, conceptColumnIndexTensorActivation, conceptColumnFeatureIndexTensorActivation = calculateConceptActivationTarget(conceptColumnIndex, conceptColumnFeatureIndex, conceptActivationState)
@@ -613,6 +615,10 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 				somaActivationFromLastSegmentKeys = somaActivationFromPropagatedLastSegmentKeys
 		else:
 			globalFeatureNeuronsActivation = decrementGlobalFeatureActivationsForPrediction(globalFeatureNeuronsActivation)
+		if(inferenceReviewPatch2PreserveSelfTransitions):
+			if(inferenceLeakyIntegrateAndFire and not (inferenceInferMissingFeatures and inferMissingFeature)):
+				reviewSourceActivationState = globalFeatureNeuronsActivation.clone()
+				globalFeatureNeuronsActivation = GIAANNcmn_predictionActivate.resetReviewNeuronActivations(globalFeatureNeuronsActivation, int(conceptColumnIndex), int(conceptColumnFeatureIndexActivation))
 		#set activationSequenceWordIndex/activationSequenceColumnIndex;
 		activationSequenceWordIndex, activationSequenceColumnIndex = calculateActivationSequenceIndices(sequenceWordIndex, sequenceColumnIndex, conceptMask)
 		#process features (activate global neurons based on connection targets);
@@ -622,22 +628,34 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 					raise RuntimeError("processColumnInferencePrediction error: missing-feature inference requires the activation feature to equal the selected feature")
 				globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, somaActivationFromLastSegmentKeys, activeMissingFeatureSourceColumns, activeMissingFeatureSourceFeatures, activeMissingFeatureConstraintSourceColumns, activeMissingFeatureConstraintSourceFeatures, missingFeaturePropagationApplied = GIAANNcmn_predictionInferMissingFeatures.processMissingFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnFeatureIndexActivation, trainedMissingFeatureSourceColumnIndices, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
 				if(inferenceInferMissingFeaturesUpdate8RequireActiveProxySignal and not missingFeaturePropagationApplied):
-					globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, somaActivationFromLastSegmentKeys = processFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
+					if(inferenceReviewPatch2PreserveSelfTransitions):
+						globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, somaActivationFromLastSegmentKeys = processFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex, reviewSourceActivationState=reviewSourceActivationState)
+					else:
+						globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, somaActivationFromLastSegmentKeys = processFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
 					inferMissingFeature = False
 					missingFeatureObservedPropagationRestored = True
 			else:
-				globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, somaActivationFromLastSegmentKeys = processFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
+				if(inferenceReviewPatch2PreserveSelfTransitions):
+					globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, somaActivationFromLastSegmentKeys = processFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex, reviewSourceActivationState=reviewSourceActivationState)
+				else:
+					globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, somaActivationFromLastSegmentKeys = processFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
 		else:
 			if(inferenceInferMissingFeatures and inferMissingFeature):
 				if(conceptColumnFeatureIndexActivation != conceptColumnFeatureIndex):
 					raise RuntimeError("processColumnInferencePrediction error: missing-feature inference requires the activation feature to equal the selected feature")
 				globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, activeMissingFeatureSourceColumns, activeMissingFeatureSourceFeatures, activeMissingFeatureConstraintSourceColumns, activeMissingFeatureConstraintSourceFeatures, missingFeaturePropagationApplied = GIAANNcmn_predictionInferMissingFeatures.processMissingFeaturePredictionActivations(databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnFeatureIndexActivation, trainedMissingFeatureSourceColumnIndices, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
 				if(inferenceInferMissingFeaturesUpdate8RequireActiveProxySignal and not missingFeaturePropagationApplied):
-					globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = processFeaturePredictionActivations(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
+					if(inferenceReviewPatch2PreserveSelfTransitions):
+						globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = processFeaturePredictionActivations(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex, reviewSourceActivationState=reviewSourceActivationState)
+					else:
+						globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = processFeaturePredictionActivations(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
 					inferMissingFeature = False
 					missingFeatureObservedPropagationRestored = True
 			else:
-				globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = processFeaturePredictionActivations(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
+				if(inferenceReviewPatch2PreserveSelfTransitions):
+					globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = processFeaturePredictionActivations(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex, reviewSourceActivationState=reviewSourceActivationState)
+				else:
+					globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime = processFeaturePredictionActivations(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex)
 		if(inferenceInferMissingFeatures and inferenceInferMissingFeaturesUpdate8RequireActiveProxySignal and missingFeatureObservedPropagationRestored):
 			connectedColumnsConstraint, connectedColumnsFeatureMap = calculateConnectedColumnsConstraint(databaseNetworkObject, observedColumnsDict, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, sequenceWordIndex, wordPredictionIndex, tokensSequence, seedPhase)
 		if(inferenceInferMissingFeatures and inferMissingFeature and len(activeMissingFeatureConstraintSourceColumns) > arrayIndexSegmentFirst):
@@ -655,7 +673,10 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 			targetProbability = calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap)
 
 	#deactivate previously predicted neurons;
-	globalFeatureNeuronsActivation, conceptActivationState = deactivatePredictedNeuronActivations(globalFeatureNeuronsActivation, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, conceptColumnFeatureIndexTensorActivation, conceptColumnIndex, conceptColumnFeatureIndex, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, conceptActivationState)
+	if(inferenceReviewPatch2PreserveSelfTransitions):
+		globalFeatureNeuronsActivation, conceptActivationState = deactivatePredictedNeuronActivations(globalFeatureNeuronsActivation, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, conceptColumnFeatureIndexTensorActivation, conceptColumnIndex, conceptColumnFeatureIndex, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, conceptActivationState, activationAlreadyReset=reviewSourceActivationState is not None)
+	else:
+		globalFeatureNeuronsActivation, conceptActivationState = deactivatePredictedNeuronActivations(globalFeatureNeuronsActivation, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, conceptColumnFeatureIndexTensorActivation, conceptColumnIndex, conceptColumnFeatureIndex, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, conceptActivationState)
 	if(inferenceLeakyIntegrateAndFire):
 		if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures and inferenceDeactivateSomaUponPrediction):
 			if(deactivatedNeuronState is None):
@@ -891,7 +912,14 @@ def createSequenceObservedColumnsPrediction(databaseNetworkObject, observedColum
 		observedColumnsSequenceCandidateIndexDict = {}
 		lemma = databaseNetworkObject.conceptColumnsList[int(conceptColumnIndex)]
 		# Load observed column from disk or create new one
-		observedColumn = GIAANNcmn_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, int(conceptColumnIndex), lemma, sequenceWordIndex, deviceLoadColumnInference, deviceLoadColumnInferenceCopy)
+		if(inferenceReviewPatch8ReuseObservedColumns):
+			if(lemma in observedColumnsDict and not deviceLoadColumnInferenceCopy):
+				observedColumn = observedColumnsDict[lemma]
+				observedColumn.ensureObservedColumnFeatureArraysFeatures(databaseNetworkObject.f)
+			else:
+				observedColumn = GIAANNcmn_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, int(conceptColumnIndex), lemma, sequenceWordIndex, deviceLoadColumnInference, deviceLoadColumnInferenceCopy)
+		else:
+			observedColumn = GIAANNcmn_databaseNetwork.loadOrCreateObservedColumn(databaseNetworkObject, int(conceptColumnIndex), lemma, sequenceWordIndex, deviceLoadColumnInference, deviceLoadColumnInferenceCopy)
 		observedColumnsDict[lemma] = observedColumn
 		observedColumnsSequenceCandidateIndexDict[0] = observedColumn
 		sequenceObservedColumnsPrediction = SequenceObservedColumnsInferencePrediction(databaseNetworkObject, observedColumnsDict, observedColumnsSequenceCandidateIndexDict)
@@ -921,7 +949,7 @@ def calculateActivationSequenceIndices(sequenceWordIndex, sequenceColumnIndex, c
 			activationSequenceColumnIndex = GIAANNcmn_predictionActivate.calculateSequenceColumnIndex(conceptMask, activationSequenceWordIndex)
 	return activationSequenceWordIndex, activationSequenceColumnIndex
 
-def processFeaturePredictionActivations(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex):
+def processFeaturePredictionActivations(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex, reviewSourceActivationState=None):
 	#process features (activate global neurons based on connection targets);
 	globalFeatureNeuronsActivationResult = globalFeatureNeuronsActivation
 	globalFeatureConnectionsActivationResult = globalFeatureConnectionsActivation
@@ -932,15 +960,24 @@ def processFeaturePredictionActivations(databaseNetworkObject, observedColumnsDi
 		observedColumn = loadObservedColumnInference(databaseNetworkObject, observedColumnsDict, sourceConceptIndexValue, sequenceWordIndex)
 		connectionDevice = globalFeatureNeuronsActivationResult.device
 		featureConnections = observedColumn.prepareFeatureConnectionsForSourceFeature(int(conceptColumnFeatureIndexActivation), targetDevice=connectionDevice, createMissing=False)
-		globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = GIAANNcmn_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, featureConnections, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex)
+		if(inferenceReviewPatch2PreserveSelfTransitions):
+			globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = GIAANNcmn_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, featureConnections, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex, reviewSourceActivationState=reviewSourceActivationState)
+		else:
+			globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = GIAANNcmn_predictionActivate.processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, featureConnections, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex)
 	else:
-		globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = GIAANNcmn_predictionActivate.processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, sequenceObservedColumnsPrediction, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex)
+		if(inferenceReviewPatch2PreserveSelfTransitions):
+			globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = GIAANNcmn_predictionActivate.processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, sequenceObservedColumnsPrediction, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex, reviewSourceActivationState=reviewSourceActivationState)
+		else:
+			globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = GIAANNcmn_predictionActivate.processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, sequenceObservedColumnsPrediction, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex)
 		observedColumn = sequenceObservedColumnsPrediction.observedColumnsSequenceWordIndexDict[0]
 	if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-		globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = GIAANNnlp_auxiliaryNeuronsSimilarWords.processAuxiliaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex)
+		if(inferenceReviewPatch2PreserveSelfTransitions):
+			globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = GIAANNnlp_auxiliaryNeuronsSimilarWords.processAuxiliaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex, reviewSourceActivationState=reviewSourceActivationState)
+		else:
+			globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult = GIAANNnlp_auxiliaryNeuronsSimilarWords.processAuxiliaryFeaturePredictionActivations(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex)
 	return globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult
 
-def processFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex):
+def processFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumnsDict, sequenceObservedColumnsPrediction, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, activationSequenceWordIndex, activationSequenceColumnIndex, sequenceWordIndex, reviewSourceActivationState=None):
 	result = None
 	if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 		globalFeatureNeuronsActivationResult = globalFeatureNeuronsActivation
@@ -952,18 +989,27 @@ def processFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject,
 			observedColumn = loadObservedColumnInference(databaseNetworkObject, observedColumnsDict, sourceConceptIndexValue, sequenceWordIndex)
 			connectionDevice = globalFeatureNeuronsActivationResult.device
 			featureConnections = observedColumn.prepareFeatureConnectionsForSourceFeature(int(conceptColumnFeatureIndexActivation), targetDevice=connectionDevice, createMissing=False)
-			globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult, somaActivationFromLastSegmentKeys = GIAANNcmn_predictionActivate.processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, featureConnections, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex)
+			if(inferenceReviewPatch2PreserveSelfTransitions):
+				globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult, somaActivationFromLastSegmentKeys = GIAANNcmn_predictionActivate.processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, featureConnections, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex, reviewSourceActivationState=reviewSourceActivationState)
+			else:
+				globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult, somaActivationFromLastSegmentKeys = GIAANNcmn_predictionActivate.processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, featureConnections, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex)
 		else:
-			globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult, somaActivationFromLastSegmentKeys = GIAANNcmn_predictionActivate.processFeaturesActivePredictSingleEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, sequenceObservedColumnsPrediction, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex)
+			if(inferenceReviewPatch2PreserveSelfTransitions):
+				globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult, somaActivationFromLastSegmentKeys = GIAANNcmn_predictionActivate.processFeaturesActivePredictSingleEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, sequenceObservedColumnsPrediction, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex, reviewSourceActivationState=reviewSourceActivationState)
+			else:
+				globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult, somaActivationFromLastSegmentKeys = GIAANNcmn_predictionActivate.processFeaturesActivePredictSingleEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, sequenceObservedColumnsPrediction, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex)
 			observedColumn = sequenceObservedColumnsPrediction.observedColumnsSequenceWordIndexDict[0]
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-			globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult, somaActivationFromLastSegmentKeys = GIAANNnlp_auxiliaryNeuronsSimilarWords.processAuxiliaryFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex)
+			if(inferenceReviewPatch2PreserveSelfTransitions):
+				globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult, somaActivationFromLastSegmentKeys = GIAANNnlp_auxiliaryNeuronsSimilarWords.processAuxiliaryFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex, reviewSourceActivationState=reviewSourceActivationState)
+			else:
+				globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult, somaActivationFromLastSegmentKeys = GIAANNnlp_auxiliaryNeuronsSimilarWords.processAuxiliaryFeaturePredictionActivationsEnforceLastSegment(databaseNetworkObject, observedColumn, globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTimeResult, activationSequenceWordIndex, activationSequenceColumnIndex)
 		result = globalFeatureNeuronsActivationResult, globalFeatureConnectionsActivationResult, globalFeatureNeuronsTimeResult, somaActivationFromLastSegmentKeys
 	else:
 		raise RuntimeError("processFeaturePredictionActivationsEnforceLastSegment error: requires inferenceLeakyIntegrateAndFire enforceLastSegmentMustBeActive")
 	return result
 
-def deactivatePredictedNeuronActivations(globalFeatureNeuronsActivation, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, conceptColumnFeatureIndexTensorActivation, conceptColumnIndex, conceptColumnFeatureIndex, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, conceptActivationState):
+def deactivatePredictedNeuronActivations(globalFeatureNeuronsActivation, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, conceptColumnFeatureIndexTensorActivation, conceptColumnIndex, conceptColumnFeatureIndex, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation, conceptActivationState, activationAlreadyReset=False):
 	#deactivate previously predicted neurons;
 	globalFeatureNeuronsActivationResult = globalFeatureNeuronsActivation
 	conceptActivationStateResult = conceptActivationState
@@ -972,51 +1018,56 @@ def deactivatePredictedNeuronActivations(globalFeatureNeuronsActivation, concept
 	else:
 		modifyActivation = inferenceDeactivateNeuronsUponPrediction
 	if(modifyActivation):
-		if(inferenceLeakyIntegrateAndFire):
-			indicesToUpdateList = []
-			if(inferenceDeactivateSegmentsUponPrediction):
-				branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=globalFeatureNeuronsActivationResult.device).repeat_interleave(arrayIndexSegmentSoma)
-				segmentIndices = pt.arange(arrayIndexSegmentFirst, arrayIndexSegmentSoma, dtype=pt.long, device=globalFeatureNeuronsActivationResult.device).repeat(multipleDendriticBranchesNumber)
-				columnIndices = pt.full_like(branchIndices, int(conceptColumnIndexTensor.squeeze().item()))
-				featureIndices = pt.full_like(branchIndices, int(conceptColumnFeatureIndexTensorActivation.squeeze().item()))
-				indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnIndices, featureIndices], dim=1))
-			if(inferenceDeactivateSomaUponPrediction):
-				branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=globalFeatureNeuronsActivationResult.device)
-				segmentIndices = pt.full_like(branchIndices, arrayIndexSegmentSoma)
-				columnIndices = pt.full_like(branchIndices, int(conceptColumnIndexTensor.squeeze().item()))
-				featureIndices = pt.full_like(branchIndices, int(conceptColumnFeatureIndexTensorActivation.squeeze().item()))
-				indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnIndices, featureIndices], dim=1))
-			if(inferenceDeactivateLastColumnSegmentUponPrediction and not inferenceDeactivateSegmentsUponPrediction):
-				if(not (useSANIcolumns or useSANIfeaturesAndColumns)):
-					raise RuntimeError("deactivatePredictedNeuronActivations error: inferenceDeactivateLastColumnSegmentUponPrediction requires LIF column segments")
-				branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=globalFeatureNeuronsActivationResult.device)
-				segmentIndices = pt.full_like(branchIndices, arrayIndexSegmentLastColumn)
-				columnIndices = pt.full_like(branchIndices, int(conceptColumnIndexTensor.squeeze().item()))
-				featureIndices = pt.full_like(branchIndices, int(conceptColumnFeatureIndexTensorActivation.squeeze().item()))
-				indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnIndices, featureIndices], dim=1))
-			indicesToUpdate = pt.cat(indicesToUpdateList, dim=0)
+		if(inferenceReviewPatch2PreserveSelfTransitions and activationAlreadyReset):
+			pass
+		elif(inferenceReviewPatch10LinearNeuronReset and inferenceLeakyIntegrateAndFire):
+			globalFeatureNeuronsActivationResult = GIAANNcmn_predictionActivate.resetReviewNeuronActivations(globalFeatureNeuronsActivationResult, int(conceptColumnIndexTensor.squeeze().item()), int(conceptColumnFeatureIndexTensorActivation.squeeze().item()))
 		else:
-			branchIndex = 0
-			if(multipleDendriticBranches):
-				branchIndex = GIAANNcmn_predictionActivate.selectActivatedBranchIndex(globalFeatureNeuronsActivationResult, int(conceptColumnIndex), int(conceptColumnFeatureIndex))
-			branchTensor = pt.tensor(branchIndex, device=conceptColumnIndexTensor.device)
-			if(useSANI):
-				if(multipleDendriticBranchesBinaryTree):
-					segmentIndices = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=conceptColumnIndexTensor.device)
-					branchIndices = pt.full_like(segmentIndices, branchIndex)
-					branchDivisors = pt.pow(pt.full_like(segmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor), segmentIndices)
-					binaryTreeBranchIndices = pt.div(branchIndices, branchDivisors, rounding_mode="floor")
-					indicesToUpdate = pt.stack([binaryTreeBranchIndices, segmentIndices, conceptColumnIndexTensor.squeeze().expand(arrayNumberOfSegments), conceptColumnFeatureIndexTensorActivation.squeeze().expand(arrayNumberOfSegments)], dim=1)
-				else:
-					indicesToUpdateList = []
-					for segmentIndex in range(arrayNumberOfSegments):
-						indexToUpdate = pt.stack([branchTensor, pt.tensor(segmentIndex, device=conceptColumnIndexTensor.device), conceptColumnIndexTensor.squeeze(), conceptColumnFeatureIndexTensorActivation.squeeze()], dim=0)
-						indicesToUpdateList.append(indexToUpdate)
-					indicesToUpdate = pt.stack(indicesToUpdateList, dim=0)
+			if(inferenceLeakyIntegrateAndFire):
+				indicesToUpdateList = []
+				if(inferenceDeactivateSegmentsUponPrediction):
+					branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=globalFeatureNeuronsActivationResult.device).repeat_interleave(arrayIndexSegmentSoma)
+					segmentIndices = pt.arange(arrayIndexSegmentFirst, arrayIndexSegmentSoma, dtype=pt.long, device=globalFeatureNeuronsActivationResult.device).repeat(multipleDendriticBranchesNumber)
+					columnIndices = pt.full_like(branchIndices, int(conceptColumnIndexTensor.squeeze().item()))
+					featureIndices = pt.full_like(branchIndices, int(conceptColumnFeatureIndexTensorActivation.squeeze().item()))
+					indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnIndices, featureIndices], dim=1))
+				if(inferenceDeactivateSomaUponPrediction):
+					branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=globalFeatureNeuronsActivationResult.device)
+					segmentIndices = pt.full_like(branchIndices, arrayIndexSegmentSoma)
+					columnIndices = pt.full_like(branchIndices, int(conceptColumnIndexTensor.squeeze().item()))
+					featureIndices = pt.full_like(branchIndices, int(conceptColumnFeatureIndexTensorActivation.squeeze().item()))
+					indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnIndices, featureIndices], dim=1))
+				if(inferenceDeactivateLastColumnSegmentUponPrediction and not inferenceDeactivateSegmentsUponPrediction):
+					if(not (useSANIcolumns or useSANIfeaturesAndColumns)):
+						raise RuntimeError("deactivatePredictedNeuronActivations error: inferenceDeactivateLastColumnSegmentUponPrediction requires LIF column segments")
+					branchIndices = pt.arange(multipleDendriticBranchesNumber, dtype=pt.long, device=globalFeatureNeuronsActivationResult.device)
+					segmentIndices = pt.full_like(branchIndices, arrayIndexSegmentLastColumn)
+					columnIndices = pt.full_like(branchIndices, int(conceptColumnIndexTensor.squeeze().item()))
+					featureIndices = pt.full_like(branchIndices, int(conceptColumnFeatureIndexTensorActivation.squeeze().item()))
+					indicesToUpdateList.append(pt.stack([branchIndices, segmentIndices, columnIndices, featureIndices], dim=1))
+				indicesToUpdate = pt.cat(indicesToUpdateList, dim=0)
 			else:
-				indicesToUpdate = pt.stack([branchTensor, pt.tensor(arrayIndexSegmentFirst, device=conceptColumnIndexTensor.device), conceptColumnIndexTensor.squeeze(), conceptColumnFeatureIndexTensorActivation.squeeze()], dim=0)
-		modifier = 0
-		globalFeatureNeuronsActivationResult = GIAANNcmn_sparseTensors.modifySparseTensor(globalFeatureNeuronsActivationResult, indicesToUpdate, modifier, multiply=False)
+				branchIndex = 0
+				if(multipleDendriticBranches):
+					branchIndex = GIAANNcmn_predictionActivate.selectActivatedBranchIndex(globalFeatureNeuronsActivationResult, int(conceptColumnIndex), int(conceptColumnFeatureIndex))
+				branchTensor = pt.tensor(branchIndex, device=conceptColumnIndexTensor.device)
+				if(useSANI):
+					if(multipleDendriticBranchesBinaryTree):
+						segmentIndices = pt.arange(arrayNumberOfSegments, dtype=pt.long, device=conceptColumnIndexTensor.device)
+						branchIndices = pt.full_like(segmentIndices, branchIndex)
+						branchDivisors = pt.pow(pt.full_like(segmentIndices, multipleDendriticBranchesBinaryTreeBranchingFactor), segmentIndices)
+						binaryTreeBranchIndices = pt.div(branchIndices, branchDivisors, rounding_mode="floor")
+						indicesToUpdate = pt.stack([binaryTreeBranchIndices, segmentIndices, conceptColumnIndexTensor.squeeze().expand(arrayNumberOfSegments), conceptColumnFeatureIndexTensorActivation.squeeze().expand(arrayNumberOfSegments)], dim=1)
+					else:
+						indicesToUpdateList = []
+						for segmentIndex in range(arrayNumberOfSegments):
+							indexToUpdate = pt.stack([branchTensor, pt.tensor(segmentIndex, device=conceptColumnIndexTensor.device), conceptColumnIndexTensor.squeeze(), conceptColumnFeatureIndexTensorActivation.squeeze()], dim=0)
+							indicesToUpdateList.append(indexToUpdate)
+						indicesToUpdate = pt.stack(indicesToUpdateList, dim=0)
+				else:
+					indicesToUpdate = pt.stack([branchTensor, pt.tensor(arrayIndexSegmentFirst, device=conceptColumnIndexTensor.device), conceptColumnIndexTensor.squeeze(), conceptColumnFeatureIndexTensorActivation.squeeze()], dim=0)
+			modifier = 0
+			globalFeatureNeuronsActivationResult = GIAANNcmn_sparseTensors.modifySparseTensor(globalFeatureNeuronsActivationResult, indicesToUpdate, modifier, multiply=False)
 		if(predictionColumnsMustActivateConceptFeature):
 			conceptActivationStateResult = updateConceptActivationState(conceptActivationStateResult, conceptColumnIndexActivation, conceptColumnFeatureIndexActivation)
 	return globalFeatureNeuronsActivationResult, conceptActivationStateResult

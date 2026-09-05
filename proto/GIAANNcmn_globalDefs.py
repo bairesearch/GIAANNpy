@@ -103,7 +103,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
+	useBenchmarkDefaultsEvalTestSet = True	#default: False/True
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
@@ -1211,7 +1211,50 @@ if(drawEfficient):
 	if(drawEfficientGrid == drawEfficientCompact):
 		printe("drawEfficient configuration error: exactly one of drawEfficientGrid or drawEfficientCompact must be True")
 	drawEfficientDrawDeadNeurons = True	#default: True	#draw empty columns with no connected neurons
-	
+
+#inference patches;
+if(useDefaultsV2):
+	#Independent LIF review options; enable only after accuracy verification.
+	inferenceReviewPatch1FilterCandidatesBeforeTopK = False	#tentative
+	inferenceReviewPatch2PreserveSelfTransitions = False	#tentative
+	inferenceReviewPatch3SeedBurstIndependence = False	#reserved: issue 3 explicitly excluded from this review
+	inferenceReviewPatch4ColumnTerminalEligibility = False
+	inferenceReviewPatch5BinaryTreeSomaProjection = True	#5000-sequence tree eval: training +0.008413; test +0.000188
+	inferenceReviewPatch6ProbabilityCandidateExclusions = False	#withdrawn: prediction-driven BPB is explicitly unsupported
+	inferenceReviewPatch7AuxiliaryDirectSegment = True	#small test gain (+0.001667), training decrease (-0.000360)
+	inferenceReviewPatch8ReuseObservedColumns = True
+	inferenceReviewPatch9LocalSourceActivation = True
+	inferenceReviewPatch10LinearNeuronReset = True
+	inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch = True	#default: True #orig: False
+	inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch = True	#default: True #orig: False
+else:
+	#Independent LIF review options; enable only after accuracy verification.
+	inferenceReviewPatch1FilterCandidatesBeforeTopK = False
+	inferenceReviewPatch2PreserveSelfTransitions = False
+	inferenceReviewPatch3SeedBurstIndependence = False	#reserved: issue 3 explicitly excluded from this review
+	inferenceReviewPatch4ColumnTerminalEligibility = False
+	inferenceReviewPatch5BinaryTreeSomaProjection = False
+	inferenceReviewPatch6ProbabilityCandidateExclusions = False	#withdrawn: prediction-driven BPB is explicitly unsupported
+	inferenceReviewPatch7AuxiliaryDirectSegment = False
+	inferenceReviewPatch8ReuseObservedColumns = False
+	inferenceReviewPatch9LocalSourceActivation = False
+	inferenceReviewPatch10LinearNeuronReset = False
+	inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch = False
+	inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch = False
+
+inferenceReviewPatchSparseCoordinateDimension = 0
+inferenceReviewPatchSparseEntryDimension = 1
+inferenceReviewPatchVectorDimension = 0
+inferenceReviewPatchInvalidTreeProjection = "LIF review tree projection requires binary-tree hybrid segments"
+inferenceReviewPatchResetDisabled = "LIF review reset requires patch 2 or patch 10"
+inferenceReviewPatchInvalidDirectSegment = " error: direct segment index out of range"
+inferenceReviewPatchInvalidResetState = "LIF review reset requires a valid sparse activation tensor and an in-range neuron"
+inferenceReviewPatchInvalidResetSegments = "LIF review last-column reset requires column segments"
+inferenceReviewPatchInvalidCandidateLimit = "LIF review candidate limit must be a positive integer"
+
+inferenceReviewPatch6WithdrawnReason = "Review finding 6 was withdrawn: BPB explicitly requires teacher-forced inference; keep inferenceReviewPatch6ProbabilityCandidateExclusions=False"
+if(inferenceReviewPatch6ProbabilityCandidateExclusions):
+	raise RuntimeError(inferenceReviewPatch6WithdrawnReason)
 
 #printConfiguration;
 if(printConfiguration): 

@@ -83,6 +83,9 @@ def propagateLeakyIntegrateAndFireActivationsEnforceLastSegment(globalFeatureNeu
 		maxFeatures = activationSparse.shape[inferenceLeakyIntegrateAndFireFeatureDimension]
 		if(useSANIcolumns):
 			somaActivationFromLastSegmentKeys = pt.empty((arrayIndexSegmentFirst,), dtype=pt.long, device=activationSparse.device)
+			if(inferenceReviewPatch4ColumnTerminalEligibility):
+				lastSegmentMask = (activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentLastColumn) & (activationValues > arrayIndexSegmentFirst)
+				somaActivationFromLastSegmentKeys = calculateLeakyIntegrateAndFireBranchColumnFeatureKeys(activationIndices[inferenceLeakyIntegrateAndFireBranchDimension, lastSegmentMask].long(), activationIndices[inferenceLeakyIntegrateAndFireConceptDimension, lastSegmentMask].long(), activationIndices[inferenceLeakyIntegrateAndFireFeatureDimension, lastSegmentMask].long(), int(maxConcepts), int(maxFeatures))
 		else:
 			lastSegmentMask = (activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentLast) & (activationValues > 0)
 			somaActivationFromLastSegmentKeys = calculateLeakyIntegrateAndFireBranchColumnFeatureKeys(activationIndices[inferenceLeakyIntegrateAndFireBranchDimension, lastSegmentMask].long(), activationIndices[inferenceLeakyIntegrateAndFireConceptDimension, lastSegmentMask].long(), activationIndices[inferenceLeakyIntegrateAndFireFeatureDimension, lastSegmentMask].long(), int(maxConcepts), int(maxFeatures))
@@ -230,6 +233,34 @@ def decrementLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation)
 		raise RuntimeError("decrementLeakyIntegrateAndFireSomaActivation error: requires inferenceLeakyIntegrateAndFire")
 	return result
 
+def resetReviewNeuronActivations(activation, columnIndex, featureIndex):
+	result = activation
+	if(inferenceReviewPatch2PreserveSelfTransitions or inferenceReviewPatch10LinearNeuronReset):
+		if(not inferenceLeakyIntegrateAndFire or activation is None or not activation.is_sparse or activation.dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank):
+			raise RuntimeError(inferenceReviewPatchInvalidResetState)
+		if(columnIndex < arrayIndexSegmentFirst or columnIndex >= activation.shape[inferenceLeakyIntegrateAndFireConceptDimension] or featureIndex < arrayIndexSegmentFirst or featureIndex >= activation.shape[inferenceLeakyIntegrateAndFireFeatureDimension]):
+			raise RuntimeError(inferenceReviewPatchInvalidResetState)
+		if(activation.shape[inferenceLeakyIntegrateAndFireBranchDimension] != multipleDendriticBranchesNumber or activation.shape[inferenceLeakyIntegrateAndFireSegmentDimension] != arrayNumberOfSegments):
+			raise RuntimeError(inferenceReviewPatchInvalidResetState)
+		activation = activation.coalesce()
+		indices = activation.indices()
+		segments = indices[inferenceLeakyIntegrateAndFireSegmentDimension]
+		resetMask = pt.zeros_like(segments, dtype=pt.bool)
+		if(inferenceDeactivateSegmentsUponPrediction):
+			resetMask |= segments < arrayIndexSegmentSoma
+		if(inferenceDeactivateSomaUponPrediction):
+			resetMask |= segments == arrayIndexSegmentSoma
+		if(inferenceDeactivateLastColumnSegmentUponPrediction):
+			if(not (useSANIcolumns or useSANIfeaturesAndColumns)):
+				raise RuntimeError(inferenceReviewPatchInvalidResetSegments)
+			resetMask |= segments == arrayIndexSegmentLastColumn
+		resetMask &= (indices[inferenceLeakyIntegrateAndFireConceptDimension] == columnIndex) & (indices[inferenceLeakyIntegrateAndFireFeatureDimension] == featureIndex)
+		activation.values()[resetMask] = arrayIndexSegmentFirst
+		result = activation
+	else:
+		raise RuntimeError(inferenceReviewPatchResetDisabled)
+	return result
+
 def calculateLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation):
 	result = None
 	if(inferenceLeakyIntegrateAndFire):
@@ -258,10 +289,26 @@ def calculateLeakyIntegrateAndFireSomaActivationByBranch(globalFeatureNeuronsAct
 		somaIndices = pt.stack((activationIndices[inferenceLeakyIntegrateAndFireBranchDimension, somaSignalMask], activationIndices[inferenceLeakyIntegrateAndFireConceptDimension, somaSignalMask], activationIndices[inferenceLeakyIntegrateAndFireFeatureDimension, somaSignalMask]), dim=0)
 		somaValues = activationValues[somaSignalMask]
 		somaSize = (activationSparse.shape[inferenceLeakyIntegrateAndFireBranchDimension], activationSparse.shape[inferenceLeakyIntegrateAndFireConceptDimension], activationSparse.shape[inferenceLeakyIntegrateAndFireFeatureDimension])
+		if(inferenceReviewPatch5BinaryTreeSomaProjection):
+			if(multipleDendriticBranchesBinaryTree and useSANIfeaturesAndColumns):
+				somaIndices, somaValues = projectReviewTreeColumnSignals(somaIndices, somaValues, segmentIndices[somaSignalMask], somaSize)
 		result = pt.sparse_coo_tensor(somaIndices, somaValues, size=somaSize, dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
 	else:
 		raise RuntimeError("calculateLeakyIntegrateAndFireSomaActivationByBranch error: requires inferenceLeakyIntegrateAndFire")
 	return result
+
+def projectReviewTreeColumnSignals(somaIndices, somaValues, signalSegments, somaSize):
+	if(inferenceReviewPatch5BinaryTreeSomaProjection):
+		if(not (inferenceLeakyIntegrateAndFire and multipleDendriticBranchesBinaryTree and useSANIfeaturesAndColumns)):
+			raise RuntimeError(inferenceReviewPatchInvalidTreeProjection)
+		columnSignalMask = signalSegments == arrayIndexSegmentLastColumn
+		columnSignals = pt.sparse_coo_tensor(somaIndices[:, columnSignalMask], somaValues[columnSignalMask], size=somaSize, dtype=somaValues.dtype, device=somaValues.device).coalesce()
+		columnMaximum = GIAANNcmn_sparseTensors.reduceSparseBranchMax(columnSignals).coalesce()
+		columnBranches = pt.full_like(columnMaximum.indices()[inferenceLeakyIntegrateAndFireSomaActivationConceptDimension], inferenceLeakyIntegrateAndFireSomaBranchIndex)
+		columnIndices = pt.cat((columnBranches.unsqueeze(inferenceReviewPatchSparseCoordinateDimension), columnMaximum.indices()), dim=inferenceReviewPatchVectorDimension)
+		somaIndices = pt.cat((somaIndices[:, pt.logical_not(columnSignalMask)], columnIndices), dim=inferenceReviewPatchSparseEntryDimension)
+		somaValues = pt.cat((somaValues[pt.logical_not(columnSignalMask)], columnMaximum.values()), dim=inferenceReviewPatchVectorDimension)
+	return somaIndices, somaValues
 
 if(inferenceSegmentActivationsBoolean):
 	def applySegmentActivationsBooleanFeatureSegmentsOnly(globalFeatureNeuronsActivation):
@@ -867,16 +914,19 @@ def updateTimeValuesFromActivation(globalFeatureNeuronsTime, featureNeuronsTarge
 
 
 #first dim cs1 restricted to a single token
-def processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None):
+def processFeaturesActivePredictSingle(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None, reviewSourceActivationState=None):
 	if(0 not in sequenceObservedColumnsPrediction.observedColumnsSequenceWordIndexDict):
 		raise RuntimeError("processFeaturesActivePredictSingle error: missing observed column sequence index 0")
 	observedColumn = sequenceObservedColumnsPrediction.observedColumnsSequenceWordIndexDict[0]
 	connectionDevice = globalFeatureNeuronsActivation.device
 	featureConnections = observedColumn.prepareFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=connectionDevice, createMissing=False)
-	result = processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
+	if(inferenceReviewPatch2PreserveSelfTransitions):
+		result = processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex, reviewSourceActivationState=reviewSourceActivationState)
+	else:
+		result = processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
 	return result
 
-def processFeaturesActivePredictSingleEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, sourceColumnIndex, sourceFeatureIndex, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None):
+def processFeaturesActivePredictSingleEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, sequenceObservedColumnsPrediction, sourceColumnIndex, sourceFeatureIndex, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None, reviewSourceActivationState=None):
 	result = None
 	if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 		if(0 not in sequenceObservedColumnsPrediction.observedColumnsSequenceWordIndexDict):
@@ -884,7 +934,10 @@ def processFeaturesActivePredictSingleEnforceLastSegment(databaseNetworkObject, 
 		observedColumn = sequenceObservedColumnsPrediction.observedColumnsSequenceWordIndexDict[0]
 		connectionDevice = globalFeatureNeuronsActivation.device
 		featureConnections = observedColumn.prepareFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=connectionDevice, createMissing=False)
-		result = processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
+		if(inferenceReviewPatch2PreserveSelfTransitions):
+			result = processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex, reviewSourceActivationState=reviewSourceActivationState)
+		else:
+			result = processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
 	else:
 		raise RuntimeError("processFeaturesActivePredictSingleEnforceLastSegment error: requires inferenceLeakyIntegrateAndFire enforceLastSegmentMustBeActive")
 	return result
@@ -906,7 +959,14 @@ def calculateFeatureNeuronSourceActivationPredictLeakyIntegrateAndFire(globalFea
 		sourceFeatureIndex = int(sourceFeatureIndex)
 		if(sourceColumnIndex < arrayIndexSegmentFirst or sourceColumnIndex >= globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireConceptDimension] or sourceFeatureIndex < arrayIndexSegmentFirst or sourceFeatureIndex >= globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireFeatureDimension]):
 			raise RuntimeError("calculateFeatureNeuronSourceActivationPredictLeakyIntegrateAndFire error: source neuron index out of range")
-		somaActivation = calculateLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation)
+		if(inferenceReviewPatch9LocalSourceActivation):
+			sourceSparse = globalFeatureNeuronsActivation.coalesce()
+			sourceIndices = sourceSparse.indices()
+			sourceMask = (sourceIndices[inferenceLeakyIntegrateAndFireConceptDimension] == sourceColumnIndex) & (sourceIndices[inferenceLeakyIntegrateAndFireFeatureDimension] == sourceFeatureIndex)
+			sourceSparse = pt.sparse_coo_tensor(sourceIndices[:, sourceMask], sourceSparse.values()[sourceMask], size=sourceSparse.size(), dtype=sourceSparse.dtype, device=sourceSparse.device).coalesce()
+			somaActivation = calculateLeakyIntegrateAndFireSomaActivation(sourceSparse)
+		else:
+			somaActivation = calculateLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation)
 		somaActivation = somaActivation.coalesce()
 		somaIndices = somaActivation.indices()
 		somaValues = somaActivation.values()
@@ -1080,8 +1140,11 @@ def processFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFe
 	result = applyFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureNeuronsTargetActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
 	return result
 
-def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None, sourceActivationMultiplier=None):
-	featureNeuronsActive = calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex)
+def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None, sourceActivationMultiplier=None, reviewSourceActivationState=None):
+	if(inferenceReviewPatch2PreserveSelfTransitions and reviewSourceActivationState is not None):
+		featureNeuronsActive = calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, reviewSourceActivationState, sourceColumnIndex, sourceFeatureIndex)
+	else:
+		featureNeuronsActive = calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex)
 
 	#target neuron activation dependence on connection strength;
 	featureConnectionsStrengthStored = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
@@ -1112,10 +1175,13 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 	result = processFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureNeuronsTargetActivation, globalFeatureNeuronsTime, sequenceWordIndex, sequenceColumnIndex)
 	return result
 
-def processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None, sourceActivationMultiplier=None):
+def processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureConnections, sourceColumnIndex, sourceFeatureIndex, somaActivationFromLastSegmentKeys, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None, sourceActivationMultiplier=None, reviewSourceActivationState=None):
 	result = None
 	if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
-		featureNeuronsActive = calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex)
+		if(inferenceReviewPatch2PreserveSelfTransitions and reviewSourceActivationState is not None):
+			featureNeuronsActive = calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, reviewSourceActivationState, sourceColumnIndex, sourceFeatureIndex)
+		else:
+			featureNeuronsActive = calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex)
 		featureConnectionsStrengthStored = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 		featureConnectionsStrength = featureConnectionsStrengthStored
 		if(inferenceConnectionStrengthPOSdependence):

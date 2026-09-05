@@ -1166,12 +1166,22 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 		connectionStrength = connectionTensor[databaseNetworkObject.arrayIndexPropertiesStrengthIndex].coalesce()
 		if(connectionStrength.dim() != 4):
 			raise RuntimeError(functionName + " error: connection strength tensor rank mismatch")
-		if(connectionStrength.size(1) <= arrayIndexSegmentLast):
-			raise RuntimeError(functionName + " error: direct segment index out of range")
+		if(inferenceReviewPatch7AuxiliaryDirectSegment and inferenceLeakyIntegrateAndFire):
+			directSegmentIndex = arrayIndexSegmentLast
+			if(useSANIfeatures or useSANIfeaturesAndColumns):
+				directSegmentIndex = arrayIndexSegmentSoma
+			if(connectionStrength.size(inferenceLeakyIntegrateAndFireSegmentDimension) <= directSegmentIndex):
+				raise RuntimeError(functionName + inferenceReviewPatchInvalidDirectSegment)
+		else:
+			if(connectionStrength.size(1) <= arrayIndexSegmentLast):
+				raise RuntimeError(functionName + " error: direct segment index out of range")
 		if(connectionStrength._nnz() > 0):
 			indices = connectionStrength.indices()
 			values = connectionStrength.values()
-			directConnectionMask = indices[1] == arrayIndexSegmentLast
+			if(inferenceReviewPatch7AuxiliaryDirectSegment and inferenceLeakyIntegrateAndFire):
+				directConnectionMask = indices[inferenceLeakyIntegrateAndFireSegmentDimension] == directSegmentIndex
+			else:
+				directConnectionMask = indices[1] == arrayIndexSegmentLast
 			if(bool(directConnectionMask.any().item())):
 				result = pt.sparse_coo_tensor(indices[:, directConnectionMask], values[directConnectionMask], size=connectionStrength.size(), dtype=arrayType, device=connectionStrength.device).coalesce()
 			else:
