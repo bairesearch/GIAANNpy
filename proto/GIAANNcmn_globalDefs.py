@@ -1214,7 +1214,10 @@ if(drawEfficient):
 
 #inference patches;
 if(useDefaultsV2):
-	#Independent LIF review options; enable only after accuracy verification.
+	inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch = True	#default: True #orig: False
+	inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch = True	#default: True #orig: False
+
+	#First LIF performance review options;.
 	inferenceReviewPatch1FilterCandidatesBeforeTopK = False	#tentative
 	inferenceReviewPatch2PreserveSelfTransitions = False	#tentative
 	inferenceReviewPatch3SeedBurstIndependence = False	#reserved: issue 3 explicitly excluded from this review
@@ -1225,10 +1228,29 @@ if(useDefaultsV2):
 	inferenceReviewPatch8ReuseObservedColumns = True
 	inferenceReviewPatch9LocalSourceActivation = True
 	inferenceReviewPatch10LinearNeuronReset = True
-	inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch = True	#default: True #orig: False
-	inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch = True	#default: True #orig: False
+	
+	inferenceReviewPatchSparseCoordinateDimension = 0
+	inferenceReviewPatchSparseEntryDimension = 1
+	inferenceReviewPatchVectorDimension = 0
+	inferenceReviewPatchInvalidTreeProjection = "LIF review tree projection requires binary-tree hybrid segments"
+	inferenceReviewPatchResetDisabled = "LIF review reset requires patch 2 or patch 10"
+	inferenceReviewPatchInvalidDirectSegment = " error: direct segment index out of range"
+	inferenceReviewPatchInvalidResetState = "LIF review reset requires a valid sparse activation tensor and an in-range neuron"
+	inferenceReviewPatchInvalidResetSegments = "LIF review last-column reset requires column segments"
+	inferenceReviewPatchInvalidCandidateLimit = "LIF review candidate limit must be a positive integer"
+
+	inferenceReviewPatch6WithdrawnReason = "Review finding 6 was withdrawn: BPB explicitly requires teacher-forced inference; keep inferenceReviewPatch6ProbabilityCandidateExclusions=False"
+	if(inferenceReviewPatch6ProbabilityCandidateExclusions):
+		raise RuntimeError(inferenceReviewPatch6WithdrawnReason)
+
+	#Second LIF performance review options; 
+	inferenceReviewPatch11ProspectiveColumnScoring = True	#5000/20000-sequence train accuracy: +0.008265/+0.017822; test: +0.000250/-0.000229
+	inferenceReviewPatch12RetainContextWithoutOutgoingSource = True	#5000/20000-sequence test accuracy: +0.012984/+0.014818; retain arriving context only for an empty source connectivity lookup
+	inferenceReviewPatchInvalidProspectiveColumn = "LIF prospective column scoring requires an in-range integer selected column"
 else:
-	#Independent LIF review options; enable only after accuracy verification.
+	inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch = False
+	inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch = False
+	
 	inferenceReviewPatch1FilterCandidatesBeforeTopK = False
 	inferenceReviewPatch2PreserveSelfTransitions = False
 	inferenceReviewPatch3SeedBurstIndependence = False	#reserved: issue 3 explicitly excluded from this review
@@ -1239,22 +1261,11 @@ else:
 	inferenceReviewPatch8ReuseObservedColumns = False
 	inferenceReviewPatch9LocalSourceActivation = False
 	inferenceReviewPatch10LinearNeuronReset = False
-	inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch = False
-	inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch = False
+	
+	inferenceReviewPatch11ProspectiveColumnScoring = False
+	inferenceReviewPatch12RetainContextWithoutOutgoingSource = False
+	
 
-inferenceReviewPatchSparseCoordinateDimension = 0
-inferenceReviewPatchSparseEntryDimension = 1
-inferenceReviewPatchVectorDimension = 0
-inferenceReviewPatchInvalidTreeProjection = "LIF review tree projection requires binary-tree hybrid segments"
-inferenceReviewPatchResetDisabled = "LIF review reset requires patch 2 or patch 10"
-inferenceReviewPatchInvalidDirectSegment = " error: direct segment index out of range"
-inferenceReviewPatchInvalidResetState = "LIF review reset requires a valid sparse activation tensor and an in-range neuron"
-inferenceReviewPatchInvalidResetSegments = "LIF review last-column reset requires column segments"
-inferenceReviewPatchInvalidCandidateLimit = "LIF review candidate limit must be a positive integer"
-
-inferenceReviewPatch6WithdrawnReason = "Review finding 6 was withdrawn: BPB explicitly requires teacher-forced inference; keep inferenceReviewPatch6ProbabilityCandidateExclusions=False"
-if(inferenceReviewPatch6ProbabilityCandidateExclusions):
-	raise RuntimeError(inferenceReviewPatch6WithdrawnReason)
 
 #printConfiguration;
 if(printConfiguration): 

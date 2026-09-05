@@ -254,7 +254,7 @@ def getInferenceCandidateWord(databaseNetworkObject, columnIndex, featureIndex):
 		candidateWord = databaseNetworkObject.conceptFeaturesList[featureIndex]
 	return candidateWord
 
-def calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap, somaActivationFromLastSegmentKeys=None):
+def calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap, somaActivationFromLastSegmentKeys=None, selectedColumnIndex=None):
 	targetProbability = 0.0
 	sequenceColumnIndex = None
 	if(globalFeatureNeuronsActivation is None):
@@ -265,7 +265,9 @@ def calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeur
 		if(useSANIcolumns or useSANIfeaturesAndColumns):
 			sequenceColumnIndex = GIAANNcmn_predictionActivate.calculateSequenceColumnIndex(conceptMask, sequenceWordIndex)
 	constraintState = GIAANNcmn_predictionConstraints.createConstraintState(allowedColumnsConstraint, constraintModePrediction)
-	if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+	if(inferenceReviewPatch11ProspectiveColumnScoring):
+		columnIndices, featureIndices, activationValues = GIAANNcmn_predictionBeamSearch.calculateSelectionActivationDistribution(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, constraintState, connectedColumnsConstraint, connectedColumnsFeatureMap, sequenceWordIndex, sequenceColumnIndex, True, somaActivationFromLastSegmentKeys, selectedColumnIndex=selectedColumnIndex)
+	elif(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 		columnIndices, featureIndices, activationValues = GIAANNcmn_predictionBeamSearch.calculateSelectionActivationDistribution(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, constraintState, connectedColumnsConstraint, connectedColumnsFeatureMap, sequenceWordIndex, sequenceColumnIndex, True, somaActivationFromLastSegmentKeys)
 	else:
 		columnIndices, featureIndices, activationValues = GIAANNcmn_predictionBeamSearch.calculateSelectionActivationDistribution(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, constraintState, connectedColumnsConstraint, connectedColumnsFeatureMap, sequenceWordIndex, sequenceColumnIndex, True)
@@ -613,6 +615,10 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 				somaActivationFromLastSegmentKeys = pt.empty((arrayIndexSegmentFirst,), dtype=pt.long, device=globalFeatureNeuronsActivation.device)
 			else:
 				somaActivationFromLastSegmentKeys = somaActivationFromPropagatedLastSegmentKeys
+			if(inferenceReviewPatch12RetainContextWithoutOutgoingSource):
+				if(connectedColumnsConstraint is not None and connectedColumnsConstraint.numel() == arrayIndexSegmentFirst):
+					#Retain only context arriving at the soma on this step; do not admit stale soma activity.
+					somaActivationFromLastSegmentKeys = somaActivationFromPropagatedLastSegmentKeys
 		else:
 			globalFeatureNeuronsActivation = decrementGlobalFeatureActivationsForPrediction(globalFeatureNeuronsActivation)
 		if(inferenceReviewPatch2PreserveSelfTransitions):
@@ -667,7 +673,9 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 
 	targetProbability = None
 	if(printInferenceTop1AccuracyBitsPerByte and not seedPhase and sequenceWordIndex == 0):
-		if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+		if(inferenceReviewPatch11ProspectiveColumnScoring):
+			targetProbability = calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap, somaActivationFromLastSegmentKeys, selectedColumnIndex=int(conceptColumnIndex))
+		elif(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 			targetProbability = calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap, somaActivationFromLastSegmentKeys)
 		else:
 			targetProbability = calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap)
@@ -693,7 +701,9 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 
 	if(printInferenceTop1AccuracyBitsPerByte and not seedPhase):
 		if(sequenceWordIndex > 0):
-			if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+			if(inferenceReviewPatch11ProspectiveColumnScoring):
+				targetProbability = calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap, somaActivationFromLastSegmentKeys, selectedColumnIndex=int(conceptColumnIndex))
+			elif(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 				targetProbability = calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap, somaActivationFromLastSegmentKeys)
 			else:
 				targetProbability = calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap)
@@ -890,7 +900,10 @@ def calculateConnectedColumnsConstraint(databaseNetworkObject, observedColumnsDi
 		#limit prediction candidates to columns directly connected to previously predicted nodes
 		connectedColumnsConstraint, connectedColumnsFeatureMap = GIAANNcmn_predictionConstraints.buildConnectedColumnsLookupFromPrediction(databaseNetworkObject, observedColumnsDict, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor)
 	if(predictionEnsureConnectedToPreviousPrediction and (inferenceSeedNetwork and sequenceWordIndex > 0) and connectedColumnsConstraint is not None and connectedColumnsConstraint.numel() == 0 and inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
-		GIAANNcmn_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "previous prediction has no outgoing connections")
+		if(inferenceReviewPatch12RetainContextWithoutOutgoingSource and inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+			pass	#The selection stage still raises if no eligible context candidate remains.
+		else:
+			GIAANNcmn_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "previous prediction has no outgoing connections")
 	return connectedColumnsConstraint, connectedColumnsFeatureMap
 
 def calculateConceptActivationTarget(conceptColumnIndex, conceptColumnFeatureIndex, conceptActivationState):
@@ -1126,7 +1139,9 @@ def selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetw
 			conceptColumnFeatureIndexPred = int(targetFeatureIndex)
 	else:
 		try:
-			if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+			if(inferenceReviewPatch11ProspectiveColumnScoring):
+				conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex = GIAANNcmn_predictionBeamSearch.beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap, somaActivationFromLastSegmentKeys, deactivatedNeuronState, selectedColumnIndex=selectedColumnIndex)
+			elif(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 				conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex = GIAANNcmn_predictionBeamSearch.beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap, somaActivationFromLastSegmentKeys, deactivatedNeuronState)
 			else:
 				conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex = GIAANNcmn_predictionBeamSearch.beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap, None, deactivatedNeuronState)

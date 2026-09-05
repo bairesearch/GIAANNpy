@@ -630,10 +630,10 @@ MANUAL; - update inferenceLeakyIntegrateAndFire - if(not inferenceEvaluateTestSe
 
 ---
 v2m (Codex IDE GPT-5.6):
-- add proto GIAANNproto2m1a - start inference updates:
-	- add option inferencePromptPreserveLineSequenceBoundaries - process each non-empty inference prompt line as exactly one independent sequence matching the stored training boundary
-	- add option trainConnectionsAllowSelfTransitions - allow same-column/feature transitions required when repeated occurrences share one neuron
-	- add option inferenceColumnConstraintsAllowExternalPrimeConceptTransitions - allow external prime-concept candidates at no-delimiter column transitions without relabelling rejected candidates
+- add proto GIAANNproto2m1a - start inference/auxiliary updates:
+	- add option inferencePromptPreserveLineSequenceBoundaries (enabled) - process each non-empty inference prompt line as exactly one independent sequence matching the stored training boundary
+	- add option trainConnectionsAllowSelfTransitions (disabled)  - allow same-column/feature transitions required when repeated occurrences share one neuron
+	- add option inferenceColumnConstraintsAllowExternalPrimeConceptTransitions (enabled) - allow external prime-concept candidates at no-delimiter column transitions without relabelling rejected candidates
 - patch BPB to score prediction span
 MANUAL; - update paper
 - patch inferencePromptPreserveLineSequenceBoundaries to filter out undersized prompt lines.
@@ -641,17 +641,17 @@ MANUAL; - extend inference_prompt.txt.longTrain/TestOscar2-SentencePredictionsFa
 - implement option inferenceInferMissingFeatures - if a current feature is missing in a column during inference seed phase, find every instance of this feature in all columns, and propagate their signal jointly (use their combined activation).
 - implement option inferenceInferMissingFeaturesCandidateSourceWeighted - weight semantically similar candidates by their source activation value (and propagate them as a function of these activation values).
 - start inferenceInferMissingFeaturesUpdates;
-	- implement option inferenceInferMissingFeaturesUpdate1SelectTopKCandidates - restrict missing-feature proxy propagation to the configured top-k most contextually active source candidates.
-	- implement option inferenceInferMissingFeaturesUpdate2SourceConfidence - gate missing-feature proxy propagation using minimum strongest-source activation and winner-to-runner-up margin requirements.
-	- implement option inferenceInferMissingFeaturesUpdate3AbsoluteSourceConfidence - preserve the strongest source candidate absolute activation as the confidence gain applied to joint proxy propagation.
-	- implement option inferenceInferMissingFeaturesUpdate4TransformCandidateSignals - transform each source candidate target activation independently before combining the targets by source probability.
-	- implement option inferenceInferMissingFeaturesUpdate5SelectTopKConstraintSources - derive missing-feature prediction connectivity constraints from the configured top-k most active source candidates.
-	- implement option inferenceInferMissingFeaturesUpdate6RetainCandidateActivations - retain the real source candidate activation state after missing-feature proxy propagation.
+	- implement option inferenceInferMissingFeaturesUpdate1SelectTopKCandidates (disabled) - restrict missing-feature proxy propagation to the configured top-k most contextually active source candidates.
+	- implement option inferenceInferMissingFeaturesUpdate2SourceConfidence (disabled) - gate missing-feature proxy propagation using minimum strongest-source activation and winner-to-runner-up margin requirements.
+	- implement option inferenceInferMissingFeaturesUpdate3AbsoluteSourceConfidence (enabled) - preserve the strongest source candidate absolute activation as the confidence gain applied to joint proxy propagation.
+	- implement option inferenceInferMissingFeaturesUpdate4TransformCandidateSignals (disabled) - transform each source candidate target activation independently before combining the targets by source probability.
+	- implement option inferenceInferMissingFeaturesUpdate5SelectTopKConstraintSources (disabled) - derive missing-feature prediction connectivity constraints from the configured top-k most active source candidates.
+	- implement option inferenceInferMissingFeaturesUpdate6RetainCandidateActivations (enabled) - retain the real source candidate activation state after missing-feature proxy propagation.
 	- patch inferenceInferMissingFeaturesUpdate2SourceConfidence - replace hard proxy rejection with bounded continuous attenuation from winner activation and winner-to-runner-up margin, preserving all active candidates while restoring the 5,000-sequence held-out baseline.
-	- implement option inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections - determine whether an observed or proxy feature is trained from its persisted per-column outgoing-connection file instead of the unpopulated inference-time global neuron-strength tensor and exclude the structural prime-concept feature from semantic substitution.
-	- implement option inferenceInferMissingFeaturesUpdate8RequireActiveProxySignal - commit proxy-specific propagation and constraints only when an active proxy produces a nonzero forward signal.
-	- implement option inferenceInferMissingFeaturesUpdate9UsePartialSourceActivations - admit every positive LIF soma activation as graded contextual evidence instead of requiring a candidate to reach the firing threshold.
-	- implement option inferenceInferMissingFeaturesUpdate10UseGlobalFeaturePredictions - select the highest-activation trained proxy across all active columns and feature identities while carrying both source indices through propagation, connectivity constraints, and deactivation.
+	- implement option inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections (enabled) - determine whether an observed or proxy feature is trained from its persisted per-column outgoing-connection file instead of the unpopulated inference-time global neuron-strength tensor and exclude the structural prime-concept feature from semantic substitution.
+	- implement option inferenceInferMissingFeaturesUpdate8RequireActiveProxySignal (enabled) - commit proxy-specific propagation and constraints only when an active proxy produces a nonzero forward signal.
+	- implement option inferenceInferMissingFeaturesUpdate9UsePartialSourceActivations (enabled) - admit every positive LIF soma activation as graded contextual evidence instead of requiring a candidate to reach the firing threshold.
+	- implement option inferenceInferMissingFeaturesUpdate10UseGlobalFeaturePredictions (enabled) - select the highest-activation trained proxy across all active columns and feature identities while carrying both source indices through propagation, connectivity constraints, and deactivation.
 	- patch inferenceInferMissingFeaturesUpdate10UseGlobalFeaturePredictions - validate its top-k setting against a missing-feature-local constant that is available while NLP global definitions are initialized.
 	- patch inferenceInferMissingFeaturesUpdate8RequireActiveProxySignal - guard baseline-constraint restoration by the parent option so the disabled execution pathway never references missing-feature-only state or child options.
 	- patch inferenceInferMissingFeaturesUpdate6RetainCandidateActivations to ensure that the pre-existing proxy source features activations are unaffected by their forward propagation.
@@ -683,7 +683,7 @@ MANUAL; - set inferenceDeactivateLastColumnSegmentUponPrediction=True by default
 
 ---
 v2o (Codex IDE GPT-6.0):
-- add proto GIAANNproto2o1a - start inference updates:
+- add proto GIAANNproto2o1a - start LIF inference updates:
 	- add option inferenceReviewPatch1FilterCandidatesBeforeTopK (disabled) - filter constrained candidates before top-K selection, with no prediction changes in the tested LIF and non-LIF configurations.
 	- add option inferenceReviewPatch2PreserveSelfTransitions (disabled) - reset firing neurons before accumulating new input to preserve immediate self-transitions, with only small and mixed measured accuracy changes.
 	- add option inferenceReviewPatch3SeedBurstIndependence (disabled) - reserve the skipped seed-burst-independence review option without implementing a behaviour change.
@@ -694,4 +694,6 @@ v2o (Codex IDE GPT-6.0):
 	- add option inferenceReviewPatch8ReuseObservedColumns (enabled) - reuse already loaded observed columns after checking their feature-array sizes to avoid redundant database loading.
 	- add option inferenceReviewPatch9LocalSourceActivation (enabled) - restrict soma and branch activation reductions to the requested source neuron to reduce inference lookup work.
 	- add option inferenceReviewPatch10LinearNeuronReset (enabled) - reset LIF neuron activations using vectorised neuron and segment masks across branches to avoid pairwise coordinate comparisons.
-- extract inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch and inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch.
+- extract inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch (enabled) and inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch (enabled).
+- add option inferenceReviewPatch11ProspectiveColumnScoring (enabled) - score external-column LIF candidates using their prospective column-transition activations while preserving current-column scores and the live activation state.
+- add option inferenceReviewPatch12RetainContextWithoutOutgoingSource (enabled) - retain newly arriving LIF context when the source connectivity lookup is empty and filter valid context candidates before top-K selection.
