@@ -54,7 +54,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "trainAndInference"	#default: trainAndInference	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference"
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -103,7 +103,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = True	#default: False/True
+	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):

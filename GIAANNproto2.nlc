@@ -697,3 +697,4 @@ v2o (Codex IDE GPT-6.0):
 - extract inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch (enabled) and inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch (enabled).
 - add option inferenceReviewPatch11ProspectiveColumnScoring (enabled) - score external-column LIF candidates using their prospective column-transition activations while preserving current-column scores and the live activation state.
 - add option inferenceReviewPatch12RetainContextWithoutOutgoingSource (enabled) - retain newly arriving LIF context when the source connectivity lookup is empty and filter valid context candidates before top-K selection.
+MANUAL; - update paper

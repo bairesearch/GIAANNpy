@@ -36,7 +36,7 @@ This addresses the plasticity-stability dilemma in a structural way: knowledge i
 
 \subsection{Limitations}
 
-While inherently more robust to hallucination, the prediction performance of GIAANN is measured to be lower than that of a Transformer. GIAANN proto v2 produced an OSCAR-2201 subword token top-1 test accuracy $\approx 0.23$ after 100,000 sequences comprising 38M tokens (\Cref{tab:protov2m-oscar-test-top1-accuracy-models-inferenceLeakyIntegrateAndFire}), compared to a 6-layer 512-token context RoBERTa Causal Transformer Language Model \citep{liu2019roberta} accuracy of $\approx 0.34$ after 100,000 sequences comprising 33M tokens \citep{bairesearch2022TSBNLP}.
+While inherently more robust to hallucination, the prediction performance of GIAANN is measured to be lower than that of a Transformer. GIAANN proto v2 produced an OSCAR-2201 subword token top-1 test accuracy $\approx 0.25$ after 100,000 sequences comprising 38M tokens (\Cref{tab:protov2o-oscar-test-top1-accuracy-models-inferenceLeakyIntegrateAndFire}), compared to a 6-layer 512-token context RoBERTa Causal Transformer Language Model \citep{liu2019roberta} accuracy of $\approx 0.32$ after 100,000 sequences comprising 33M tokens \citep{bairesearch2022TSBNLP}.
 
 It is important to note that while GIAANN draws on biology, it is not a direct simulation of the brain but rather a brain-inspired algorithm.
 Consequently, some differences exist: for instance, real cortical columns may not each hold a distinct ontology of a concept---the brain’s columns may be more sensorily grounded whereas GIAANN’s may be more abstract and conceptual. 
