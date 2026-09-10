@@ -698,3 +698,5 @@ v2o (Codex IDE GPT-6.0):
 - add option inferenceReviewPatch11ProspectiveColumnScoring (enabled) - score external-column LIF candidates using their prospective column-transition activations while preserving current-column scores and the live activation state.
 - add option inferenceReviewPatch12RetainContextWithoutOutgoingSource (enabled) - retain newly arriving LIF context when the source connectivity lookup is empty and filter valid context candidates before top-K selection.
 MANUAL; - update paper
+- add option inferenceReviewPatch13poolTransitionsFromSimilarFeatures (disabled) - if source neuron has no outgoing connections, pool transitions from features of same f index in different columns.
+MANUAL; disable inferenceReviewPatch12RetainContextWithoutOutgoingSource

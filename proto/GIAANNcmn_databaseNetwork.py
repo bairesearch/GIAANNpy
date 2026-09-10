@@ -65,6 +65,9 @@ class DatabaseNetworkClass():
 			GIAANNnlp_auxiliaryNeuronsSimilarWords.initialiseDatabaseNetworkAuxiliary(self, auxiliarySimilarFeaturesDict, auxiliarySimilarFeaturesList, auxiliarySimilarFeatureWordWeightsByParentWord, auxiliarySimilarLoadExistingDatabase)
 		self.setArrayIndexProperties(inferenceMode)
 		self.inferenceMode = inferenceMode
+		if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
+			self.inferenceReviewPatch13SourceIndex = None
+			self.inferenceReviewPatch13Predictions = {}
 
 	def setArrayIndexProperties(self, inferenceMode):
 		if(inferenceMode):

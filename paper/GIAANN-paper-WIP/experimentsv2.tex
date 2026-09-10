@@ -23,6 +23,8 @@ A number of changes to the default settings were introduced in GIAANN Proto 2 th
 
 \end{itemize}
 
+The v2o reported results also use the non-default setting \texttt{inferenceReviewPatch12RetainContextWithoutOutgoingSource}, which breaks the strict direct connectivity requirement during inference (\texttt{enforceDirectConnectionsSANI}), facilitating the estimation of transitions without previously seeing them (and likewise therefore hallucination).
+
 \Cref{fig:protov2o-oscar-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} graphs the v2o training-set and test-set eval results. Note the test-set accuracies are dependent on the eval test-set dataset and context window size. Proto v2 uses larger eval datasets of approximately 1000 sequences (\texttt{inferenceEvaluateTestSetTrainMaxSequences10M=True}).
 
 \begin{figure}[htbp]

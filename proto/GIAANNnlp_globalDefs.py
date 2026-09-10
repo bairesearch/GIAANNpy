@@ -790,8 +790,6 @@ if(useBenchmark):
 			benchmarkAblationText = "-inferenceLeakyIntegrateAndFire"	
 		elif(inferenceReportGroundedAccuracy):	#older v2 tests..;
 			benchmarkAblationText = "-inferenceReportGroundedAccuracy"
-		elif(not sentencePredictions):
-			benchmarkAblationText = "-sentencePredictionsFalse"
 		elif(auxiliaryNeurons):
 			if(auxiliaryNeuronsPOS):
 				benchmarkAblationText = "-auxiliaryNeuronsPOS"
@@ -821,6 +819,9 @@ if(useBenchmark):
 		elif(useTrainDuringInference):
 			benchmarkAblationText = "-useTrainDuringInference"
 
+		if(not sentencePredictions):
+			benchmarkAblationText += "-sentencePredictionsFalse"
+			
 		if(multipleDendriticBranches):
 			if(trainSelectMostSimilarBranch):
 				benchmarkAblationText += "-trainSelectMostSimilarBranch"

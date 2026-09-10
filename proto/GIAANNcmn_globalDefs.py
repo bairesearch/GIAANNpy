@@ -54,7 +54,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "trainAndInference"	#default: trainAndInference	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
+	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference"
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -103,7 +103,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
+	useBenchmarkDefaultsEvalTestSet = True	#default: False/True
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
@@ -197,7 +197,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 5000	#5000, 200000, 1000000
+	trainMaxSequences = 10000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 50000	#5000
@@ -1218,16 +1218,16 @@ if(useDefaultsV2):
 	inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch = True	#default: True #orig: False
 
 	#First LIF performance review options;.
-	inferenceReviewPatch1FilterCandidatesBeforeTopK = False	#tentative
-	inferenceReviewPatch2PreserveSelfTransitions = False	#tentative
-	inferenceReviewPatch3SeedBurstIndependence = False	#reserved: issue 3 explicitly excluded from this review
-	inferenceReviewPatch4ColumnTerminalEligibility = False
-	inferenceReviewPatch5BinaryTreeSomaProjection = True	#5000-sequence tree eval: training +0.008413; test +0.000188
+	inferenceReviewPatch1FilterCandidatesBeforeTopK = False	#default: False	 #tentative
+	inferenceReviewPatch2PreserveSelfTransitions = False	#default: False	#tentative
+	inferenceReviewPatch3SeedBurstIndependence = False	#default: False	#reserved: issue 3 explicitly excluded from this review
+	inferenceReviewPatch4ColumnTerminalEligibility = False	#default: False
+	inferenceReviewPatch5BinaryTreeSomaProjection = True	#default: True	#5000-sequence tree eval: training +0.008413; test +0.000188
 	inferenceReviewPatch6ProbabilityCandidateExclusions = False	#withdrawn: prediction-driven BPB is explicitly unsupported
-	inferenceReviewPatch7AuxiliaryDirectSegment = True	#small test gain (+0.001667), training decrease (-0.000360)
-	inferenceReviewPatch8ReuseObservedColumns = True
-	inferenceReviewPatch9LocalSourceActivation = True
-	inferenceReviewPatch10LinearNeuronReset = True
+	inferenceReviewPatch7AuxiliaryDirectSegment = True	#default: True	#small test gain (+0.001667), training decrease (-0.000360)
+	inferenceReviewPatch8ReuseObservedColumns = True	#default: True
+	inferenceReviewPatch9LocalSourceActivation = True	#default: True
+	inferenceReviewPatch10LinearNeuronReset = True	#default: True
 	
 	inferenceReviewPatchSparseCoordinateDimension = 0
 	inferenceReviewPatchSparseEntryDimension = 1
@@ -1244,9 +1244,28 @@ if(useDefaultsV2):
 		raise RuntimeError(inferenceReviewPatch6WithdrawnReason)
 
 	#Second LIF performance review options; 
-	inferenceReviewPatch11ProspectiveColumnScoring = True	#5000/20000-sequence train accuracy: +0.008265/+0.017822; test: +0.000250/-0.000229
-	inferenceReviewPatch12RetainContextWithoutOutgoingSource = True	#5000/20000-sequence test accuracy: +0.012984/+0.014818; retain arriving context only for an empty source connectivity lookup
+	inferenceReviewPatch11ProspectiveColumnScoring = True	#default: True #5000/20000-sequence train accuracy: +0.008265/+0.017822; test: +0.000250/-0.000229
+	inferenceReviewPatch12RetainContextWithoutOutgoingSource = False	#default: False #5000/20000-sequence test accuracy: +0.012984/+0.014818; retain arriving context only for an empty source connectivity lookup	#allows predictions from other neurons when the current source has no outgoing connections, bypassing the direct-connection requirement from that source	#this improves test-set accuracy but enables hallicination
 	inferenceReviewPatchInvalidProspectiveColumn = "LIF prospective column scoring requires an in-range integer selected column"
+
+	#Third LIF performance review options;
+	inferenceReviewPatch13poolTransitionsFromSimilarFeatures = False	#default: False #pool immediate trained transitions by token identity when the source has no outgoing connections; permits continuations learned in other columns	#this improves test-set accuracy but enables hallicination
+	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
+		inferenceReviewPatch13ConnectivityRank = 1
+		inferenceReviewPatch13ConnectionTensorRank = 5
+		inferenceReviewPatch13PropertyDimension = 0
+		inferenceReviewPatch13BranchDimension = 1
+		inferenceReviewPatch13SegmentDimension = 2
+		inferenceReviewPatch13ColumnDimension = 3
+		inferenceReviewPatch13FeatureDimension = 4
+		inferenceReviewPatch13MinimumStrength = 0.0
+		inferenceReviewPatch13SourceIndexTypeCode = "q"
+		inferenceReviewPatch13PoolDevice = pt.device("cpu")
+		inferenceReviewPatch13InvalidConfiguration = "Patch 13 requires static LIF inference with source connectivity constraints, single-step selection, and BPB disabled; train-during-inference and missing-feature proxy inference are unsupported"
+		inferenceReviewPatch13InvalidDatabase = "Patch 13 requires an inference database with valid token dictionaries and connection storage"
+		inferenceReviewPatch13InvalidNeuron = "Patch 13 requires in-range integer column and feature indices"
+		inferenceReviewPatch13InvalidConnections = "Patch 13 requires sparse source connections with matching property, branch and segment dimensions, valid target dimensions, and finite non-negative direct strengths"
+		inferenceReviewPatch13InvalidConnectivity = "Patch 13 requires a one-dimensional source connectivity lookup"
 else:
 	inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch = False
 	inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch = False
@@ -1264,6 +1283,7 @@ else:
 	
 	inferenceReviewPatch11ProspectiveColumnScoring = False
 	inferenceReviewPatch12RetainContextWithoutOutgoingSource = False
+	inferenceReviewPatch13poolTransitionsFromSimilarFeatures = False
 	
 
 
