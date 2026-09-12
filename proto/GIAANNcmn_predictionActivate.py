@@ -1247,6 +1247,8 @@ def mergeLeakyIntegrateAndFireCurrentSomaActivationKeys(somaActivationFromLastSe
 
 def calculateFeatureNeuronsTargetActivationPredict(featureConnectionsStrength, featureNeuronsActive):
 	result = None
+	if(inferenceReviewPatch14NormaliseConnectionInputs):
+		featureConnectionsStrength = normaliseReviewSourceConnectionInputs(featureConnectionsStrength)
 	if(featureConnectionsStrength.is_sparse):
 		if(featureNeuronsActive.dim() == 0):
 			branchCount = featureConnectionsStrength.size(0)
@@ -1259,6 +1261,39 @@ def calculateFeatureNeuronsTargetActivationPredict(featureConnectionsStrength, f
 			result = featureConnectionsStrength * featureNeuronsActive
 		else:
 			result = featureConnectionsStrength * featureNeuronsActive.view(-1, 1, 1, 1)
+	return result
+
+def normaliseReviewSourceConnectionInputs(featureConnectionsStrength):
+	if(inferenceReviewPatch14NormaliseConnectionInputs):
+		if(not isinstance(featureConnectionsStrength, pt.Tensor) or not featureConnectionsStrength.is_sparse or not featureConnectionsStrength.is_floating_point()):
+			raise RuntimeError(inferenceReviewPatch14InvalidConnections)
+		if(featureConnectionsStrength.dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or featureConnectionsStrength.sparse_dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or featureConnectionsStrength.size(inferenceLeakyIntegrateAndFireBranchDimension) != multipleDendriticBranchesNumber or featureConnectionsStrength.size(inferenceLeakyIntegrateAndFireSegmentDimension) != arrayNumberOfSegments or min(featureConnectionsStrength.size()) <= inferenceReviewPatch14MinimumStrength):
+			raise RuntimeError(inferenceReviewPatch14InvalidConnections)
+		connectionIndices = featureConnectionsStrength._indices()
+		connectionShape = pt.tensor(featureConnectionsStrength.size(), dtype=connectionIndices.dtype, device=connectionIndices.device).unsqueeze(inferenceReviewPatch14EntryDimension)
+		if((connectionIndices < inferenceReviewPatch14MinimumStrength).any() or (connectionIndices >= connectionShape).any() or not pt.isfinite(featureConnectionsStrength._values()).all() or (featureConnectionsStrength._values() < inferenceReviewPatch14MinimumStrength).any()):
+			raise RuntimeError(inferenceReviewPatch14InvalidConnections)
+		connectionsSparse = featureConnectionsStrength.coalesce()
+		connectionIndices = connectionsSparse.indices()
+		connectionValues = connectionsSparse.values().clone()
+		if(not pt.isfinite(connectionValues).all()):
+			raise RuntimeError(inferenceReviewPatch14InvalidConnections)
+		# This tensor belongs to one exact source neuron; only its outgoing targets share a segment maximum.
+		segmentIndices = connectionIndices[inferenceLeakyIntegrateAndFireSegmentDimension]
+		segmentMaxima = pt.zeros((arrayNumberOfSegments,), dtype=connectionValues.dtype, device=connectionValues.device)
+		segmentMaxima.scatter_reduce_(inferenceReviewPatch14VectorDimension, segmentIndices, connectionValues, reduce=inferenceReviewPatch14MaximumReduction)
+		positiveConnections = connectionValues > inferenceReviewPatch14MinimumStrength
+		# Empty and zero-only segments emit no input; never divide their weights by zero.
+		connectionValues[positiveConnections] *= inferenceReviewPatch14ReferenceStrength / segmentMaxima[segmentIndices[positiveConnections]]
+		if(useSANIcolumns or useSANIfeaturesAndColumns):
+			columnConnections = segmentIndices <= arrayIndexSegmentLastColumn
+			connectionValues[columnConnections] *= inferenceReviewPatch14ColumnInputGain
+		if(not pt.isfinite(connectionValues).all() or (connectionValues[positiveConnections] <= inferenceReviewPatch14MinimumStrength).any()):
+			raise RuntimeError(inferenceReviewPatch14InvalidNormalisedStrength)
+		# Preserve the stored weights and coordinates; source activation and the existing sigmoid follow this transformation.
+		result = pt.sparse_coo_tensor(connectionIndices, connectionValues, size=connectionsSparse.size(), dtype=connectionsSparse.dtype, device=connectionsSparse.device).coalesce()
+	else:
+		raise RuntimeError(inferenceReviewPatch14InvalidConfiguration)
 	return result
 
 def selectActivatedBranchIndex(globalFeatureNeuronsActivation, columnIndex, featureIndex):

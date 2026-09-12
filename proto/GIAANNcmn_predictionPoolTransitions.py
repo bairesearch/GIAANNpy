@@ -18,6 +18,7 @@ import torch as pt
 
 from GIAANNcmn_globalDefs import *
 import GIAANNcmn_databaseNetworkFiles
+import GIAANNcmn_predictionConstraints
 
 
 def selectPooledTransition(databaseNetworkObject, sourceColumnIndex, sourceFeatureIndex, connectedColumnsConstraint):
@@ -37,10 +38,25 @@ def selectPooledTransition(databaseNetworkObject, sourceColumnIndex, sourceFeatu
 	return result
 
 
+def calculatePooledTransitionConnectedColumnsConstraint(databaseNetworkObject, observedColumnsDict, sourceColumnIndex, sourceFeatureIndex, connectedColumnsConstraint, sequenceWordIndex, seedPhase):
+	result = None
+	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
+		result = connectedColumnsConstraint
+		if(not predictionEnsureConnectedToPreviousPrediction):
+			if(not isinstance(sequenceWordIndex, Integral) or isinstance(sequenceWordIndex, bool) or sequenceWordIndex < arrayIndexSegmentFirst):
+				raise RuntimeError(inferenceReviewPatch13InvalidSequenceIndex)
+			getPooledTransitionToken(databaseNetworkObject, sourceColumnIndex, sourceFeatureIndex)
+			result = None
+			if(inferenceSeedNetwork and sequenceWordIndex > arrayIndexSegmentFirst and not (seedPhase and enforceDirectConnectionsIgnoreSeed)):
+				# Use the original lookup semantics before propagation so patches 12 and 13 observe the same source connectivity.
+				result, _ = GIAANNcmn_predictionConstraints.buildConnectedColumnsLookup(databaseNetworkObject, observedColumnsDict, [(sourceColumnIndex, sourceFeatureIndex)], inferenceReviewPatch13PoolDevice, pt.long)
+	return result
+
+
 def validatePooledTransitionConfiguration(databaseNetworkObject):
 	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
 		#The cache represents a static trained graph; beam search and BPB need their own pooled distributions.
-		if(not inferenceLeakyIntegrateAndFire or not predictionEnsureConnectedToPreviousPrediction or inferenceBeamSearch or printInferenceTop1AccuracyBitsPerByte or useTrainDuringInference or inferenceInferMissingFeatures):
+		if(not inferenceLeakyIntegrateAndFire or inferenceBeamSearch or printInferenceTop1AccuracyBitsPerByte or useTrainDuringInference or inferenceInferMissingFeatures):
 			raise RuntimeError(inferenceReviewPatch13InvalidConfiguration)
 		if(databaseNetworkObject is None or not databaseNetworkObject.inferenceMode or len(databaseNetworkObject.conceptColumnsList) != databaseNetworkObject.c or len(databaseNetworkObject.conceptFeaturesList) != databaseNetworkObject.f or databaseNetworkObject.arrayIndexPropertiesStrengthIndex is None):
 			raise RuntimeError(inferenceReviewPatch13InvalidDatabase)

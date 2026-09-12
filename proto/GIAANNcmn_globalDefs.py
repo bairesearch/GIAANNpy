@@ -197,7 +197,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 10000	#5000, 200000, 1000000
+	trainMaxSequences = 5000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 50000	#5000
@@ -1245,11 +1245,17 @@ if(useDefaultsV2):
 
 	#Second LIF performance review options; 
 	inferenceReviewPatch11ProspectiveColumnScoring = True	#default: True #5000/20000-sequence train accuracy: +0.008265/+0.017822; test: +0.000250/-0.000229
-	inferenceReviewPatch12RetainContextWithoutOutgoingSource = False	#default: False #5000/20000-sequence test accuracy: +0.012984/+0.014818; retain arriving context only for an empty source connectivity lookup	#allows predictions from other neurons when the current source has no outgoing connections, bypassing the direct-connection requirement from that source	#this improves test-set accuracy but enables hallicination
+	if(predictionEnsureConnectedToPreviousPrediction):	#enforceDirectConnections
+		inferenceReviewPatch12RetainContextWithoutOutgoingSource = False
+	else:
+		inferenceReviewPatch12RetainContextWithoutOutgoingSource = True	#5000/20000-sequence test accuracy: +0.012984/+0.014818; retain arriving context only for an empty source connectivity lookup	#allows predictions from other neurons when the current source has no outgoing connections, bypassing the direct-connection requirement from that source	#this improves test-set accuracy but enables hallicination	
 	inferenceReviewPatchInvalidProspectiveColumn = "LIF prospective column scoring requires an in-range integer selected column"
 
 	#Third LIF performance review options;
-	inferenceReviewPatch13poolTransitionsFromSimilarFeatures = False	#default: False #pool immediate trained transitions by token identity when the source has no outgoing connections; permits continuations learned in other columns	#this improves test-set accuracy but enables hallicination
+	if(predictionEnsureConnectedToPreviousPrediction):	#enforceDirectConnections
+		inferenceReviewPatch13poolTransitionsFromSimilarFeatures = False
+	else:
+		inferenceReviewPatch13poolTransitionsFromSimilarFeatures = True	 #pool immediate trained transitions by token identity when the source has no outgoing connections; permits continuations learned in other columns	#this improves test-set accuracy but enables hallicination
 	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
 		inferenceReviewPatch13ConnectivityRank = 1
 		inferenceReviewPatch13ConnectionTensorRank = 5
@@ -1261,15 +1267,34 @@ if(useDefaultsV2):
 		inferenceReviewPatch13MinimumStrength = 0.0
 		inferenceReviewPatch13SourceIndexTypeCode = "q"
 		inferenceReviewPatch13PoolDevice = pt.device("cpu")
-		inferenceReviewPatch13InvalidConfiguration = "Patch 13 requires static LIF inference with source connectivity constraints, single-step selection, and BPB disabled; train-during-inference and missing-feature proxy inference are unsupported"
+		inferenceReviewPatch13InvalidConfiguration = "Patch 13 requires static LIF inference, single-step selection, and BPB disabled; train-during-inference and missing-feature proxy inference are unsupported"
 		inferenceReviewPatch13InvalidDatabase = "Patch 13 requires an inference database with valid token dictionaries and connection storage"
 		inferenceReviewPatch13InvalidNeuron = "Patch 13 requires in-range integer column and feature indices"
 		inferenceReviewPatch13InvalidConnections = "Patch 13 requires sparse source connections with matching property, branch and segment dimensions, valid target dimensions, and finite non-negative direct strengths"
 		inferenceReviewPatch13InvalidConnectivity = "Patch 13 requires a one-dimensional source connectivity lookup"
+		inferenceReviewPatch13InvalidSequenceIndex = "Patch 13 requires a non-negative integer sequence word index"
+		
+	#Fourth LIF performance review option;
+	inferenceReviewPatch14NormaliseConnectionInputs = True	#default: True #normalise each exact source neuron's outgoing weights per target segment; preserves direct connectivity
+	inferenceReviewPatch14InvalidConfiguration = "Patch 14 requires the option enabled with LIF and finite positive reference strength and column input gain"
+	if(inferenceReviewPatch14NormaliseConnectionInputs):
+		inferenceReviewPatch14ReferenceStrength = 5.0	#maximum normalised outgoing strength per source/segment before column gain
+		inferenceReviewPatch14ColumnInputGain = 0.5	#column segments have maximum input strength 2.5; feature segments and the soma retain 5.0
+		inferenceReviewPatch14MinimumStrength = 0.0
+		inferenceReviewPatch14VectorDimension = 0
+		inferenceReviewPatch14EntryDimension = 1
+		inferenceReviewPatch14MaximumReduction = "amax"
+		inferenceReviewPatch14InvalidConnections = "Patch 14 requires sparse floating-point source strengths with valid branch/segment/target coordinates and finite non-negative values"
+		inferenceReviewPatch14InvalidNormalisedStrength = "Patch 14 normalised strengths must be finite and preserve positive connections"
+		if(not inferenceLeakyIntegrateAndFire):
+			raise RuntimeError(inferenceReviewPatch14InvalidConfiguration)
+		for inferenceReviewPatch14Scale in (inferenceReviewPatch14ReferenceStrength, inferenceReviewPatch14ColumnInputGain):
+			if(not isinstance(inferenceReviewPatch14Scale, (int, float)) or isinstance(inferenceReviewPatch14Scale, bool) or not math.isfinite(inferenceReviewPatch14Scale) or inferenceReviewPatch14Scale <= inferenceReviewPatch14MinimumStrength):
+				raise RuntimeError(inferenceReviewPatch14InvalidConfiguration)
+
 else:
 	inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch = False
 	inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch = False
-	
 	inferenceReviewPatch1FilterCandidatesBeforeTopK = False
 	inferenceReviewPatch2PreserveSelfTransitions = False
 	inferenceReviewPatch3SeedBurstIndependence = False	#reserved: issue 3 explicitly excluded from this review
@@ -1280,13 +1305,11 @@ else:
 	inferenceReviewPatch8ReuseObservedColumns = False
 	inferenceReviewPatch9LocalSourceActivation = False
 	inferenceReviewPatch10LinearNeuronReset = False
-	
 	inferenceReviewPatch11ProspectiveColumnScoring = False
 	inferenceReviewPatch12RetainContextWithoutOutgoingSource = False
 	inferenceReviewPatch13poolTransitionsFromSimilarFeatures = False
+	inferenceReviewPatch14NormaliseConnectionInputs = False
 	
-
-
 #printConfiguration;
 if(printConfiguration): 
 	print("***** printConfiguration: ***** ")
@@ -1426,6 +1449,7 @@ if(printConfiguration):
 	print("#Immediate (direct) connections;")
 	print("enforceDirectConnections:", enforceDirectConnections)
 	print("enforceDirectConnectionsSANI:", enforceDirectConnectionsSANI)
+	print("predictionEnsureConnectedToPreviousPrediction:", predictionEnsureConnectedToPreviousPrediction)
 	print("")
 	print("#Concept column delimiters:")
 	print("pretrainConceptColumnsDelimitByPOSenforce:", pretrainConceptColumnsDelimitByPOSenforce)
@@ -1488,6 +1512,7 @@ if(printConfiguration):
 		print("enforceSequentialActivation: ", enforceSequentialActivation)
 	print("")
 	print("#Auxiliary neurons;")
+	print("inferenceInferMissingFeatures:", inferenceInferMissingFeatures)
 	print("auxiliaryNeurons:", auxiliaryNeurons)
 	if(auxiliaryNeurons):
 		print("auxiliaryNeuronsPOS:", auxiliaryNeuronsPOS)

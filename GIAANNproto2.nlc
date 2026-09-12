@@ -696,7 +696,10 @@ v2o (Codex IDE GPT-6.0):
 	- add option inferenceReviewPatch10LinearNeuronReset (enabled) - reset LIF neuron activations using vectorised neuron and segment masks across branches to avoid pairwise coordinate comparisons.
 - extract inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch (enabled) and inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch (enabled).
 - add option inferenceReviewPatch11ProspectiveColumnScoring (enabled) - score external-column LIF candidates using their prospective column-transition activations while preserving current-column scores and the live activation state.
-- add option inferenceReviewPatch12RetainContextWithoutOutgoingSource (enabled) - retain newly arriving LIF context when the source connectivity lookup is empty and filter valid context candidates before top-K selection.
+- add option inferenceReviewPatch12RetainContextWithoutOutgoingSource (disabled) - retain newly arriving LIF context when the source connectivity lookup is empty and filter valid context candidates before top-K selection.
 MANUAL; - update paper
 - add option inferenceReviewPatch13poolTransitionsFromSimilarFeatures (disabled) - if source neuron has no outgoing connections, pool transitions from features of same f index in different columns.
 MANUAL; disable inferenceReviewPatch12RetainContextWithoutOutgoingSource
+- add option inferenceReviewPatch14NormaliseConnectionInputs - normalise each exact source neuron outgoing weights per target segment; preserves direct connectivity
+- update inferenceReviewPatch12RetainContextWithoutOutgoingSource/inferenceReviewPatch13poolTransitionsFromSimilarFeatures to not require predictionEnsureConnectedToPreviousPrediction, and make them dependent on predictionEnsureConnectedToPreviousPrediction=False.
+

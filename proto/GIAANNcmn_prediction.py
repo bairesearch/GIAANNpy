@@ -604,6 +604,8 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		connectedColumnsFeatureMap = None
 	else:
 		connectedColumnsConstraint, connectedColumnsFeatureMap = calculateConnectedColumnsConstraint(databaseNetworkObject, observedColumnsDict, conceptColumnIndexTensor, conceptColumnFeatureIndexTensor, sequenceWordIndex, wordPredictionIndex, tokensSequence, seedPhase)
+	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
+		pooledConnectedColumnsConstraint = GIAANNcmn_predictionPoolTransitions.calculatePooledTransitionConnectedColumnsConstraint(databaseNetworkObject, observedColumnsDict, conceptColumnIndex, conceptColumnFeatureIndex, connectedColumnsConstraint, sequenceWordIndex, seedPhase)
 		
 	if(inferenceReviewPatch2PreserveSelfTransitions):
 		reviewSourceActivationState = None
@@ -623,6 +625,9 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 				if(connectedColumnsConstraint is not None and connectedColumnsConstraint.numel() == arrayIndexSegmentFirst):
 					#Retain only context arriving at the soma on this step; do not admit stale soma activity.
 					somaActivationFromLastSegmentKeys = somaActivationFromPropagatedLastSegmentKeys
+				if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures and not predictionEnsureConnectedToPreviousPrediction):
+					if(pooledConnectedColumnsConstraint is not None and pooledConnectedColumnsConstraint.numel() == arrayIndexSegmentFirst):
+						somaActivationFromLastSegmentKeys = somaActivationFromPropagatedLastSegmentKeys
 		else:
 			globalFeatureNeuronsActivation = decrementGlobalFeatureActivationsForPrediction(globalFeatureNeuronsActivation)
 		if(inferenceReviewPatch2PreserveSelfTransitions):
@@ -720,7 +725,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	else:	
 		#predictionPhase;
 		if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
-			conceptColumnIndexPred, conceptColumnFeatureIndexPred, conceptColumnIndexNext, conceptColumnFeatureIndexNext, targetPreviousColumnIndex, targetNextColumnIndex, predictionCandidatesAvailable = selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap, somaActivationFromLastSegmentKeys if algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive" else None, conceptColumnIndex, deactivatedNeuronState, sourceColumnIndex=conceptColumnIndex, sourceFeatureIndex=conceptColumnFeatureIndex)
+			conceptColumnIndexPred, conceptColumnFeatureIndexPred, conceptColumnIndexNext, conceptColumnFeatureIndexNext, targetPreviousColumnIndex, targetNextColumnIndex, predictionCandidatesAvailable = selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap, somaActivationFromLastSegmentKeys if algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive" else None, conceptColumnIndex, deactivatedNeuronState, sourceColumnIndex=conceptColumnIndex, sourceFeatureIndex=conceptColumnFeatureIndex, pooledConnectedColumnsConstraint=pooledConnectedColumnsConstraint)
 		elif(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 			if(useSANIcolumns or useSANIfeaturesAndColumns):
 				conceptColumnIndexPred, conceptColumnFeatureIndexPred, conceptColumnIndexNext, conceptColumnFeatureIndexNext, targetPreviousColumnIndex, targetNextColumnIndex, predictionCandidatesAvailable = selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap, somaActivationFromLastSegmentKeys, conceptColumnIndex, deactivatedNeuronState)
@@ -1123,11 +1128,15 @@ def selectNextColumnFeatureSeedPhase(sequenceObservedColumns, databaseNetworkObj
 	conceptColumnFeatureIndexPred = conceptColumnFeatureIndexNext	#temporarily assign prediction from seed target for print only
 	return conceptColumnIndexPred, conceptColumnFeatureIndexPred, conceptColumnIndexNext, conceptColumnFeatureIndexNext, targetPreviousColumnIndex, targetNextColumnIndex, globalFeatureNeuronsActivationResult, True
 
-def selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap, somaActivationFromLastSegmentKeys=None, selectedColumnIndex=None, deactivatedNeuronState=None, sourceColumnIndex=None, sourceFeatureIndex=None):
+def selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, conceptActivationState, connectedColumnsConstraint, connectedColumnsFeatureMap, somaActivationFromLastSegmentKeys=None, selectedColumnIndex=None, deactivatedNeuronState=None, sourceColumnIndex=None, sourceFeatureIndex=None, pooledConnectedColumnsConstraint=None):
 	#predictionPhase;
 	predictionCandidatesAvailable = True
 	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
-		pooledPrediction = GIAANNcmn_predictionPoolTransitions.selectPooledTransition(databaseNetworkObject, sourceColumnIndex, sourceFeatureIndex, connectedColumnsConstraint)
+		pooledPrediction = GIAANNcmn_predictionPoolTransitions.selectPooledTransition(databaseNetworkObject, sourceColumnIndex, sourceFeatureIndex, pooledConnectedColumnsConstraint)
+		if(inferenceReviewPatch12RetainContextWithoutOutgoingSource and not predictionEnsureConnectedToPreviousPrediction):
+			if(pooledConnectedColumnsConstraint is not None and pooledConnectedColumnsConstraint.numel() == arrayIndexSegmentFirst):
+				# Let patch 12 apply its existing empty-source selection rules when pooling has no continuation.
+				connectedColumnsConstraint = pooledConnectedColumnsConstraint
 	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures and pooledPrediction is not None):
 		conceptColumnIndexPred, conceptColumnFeatureIndexPred = pooledPrediction
 		targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNcmn_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
