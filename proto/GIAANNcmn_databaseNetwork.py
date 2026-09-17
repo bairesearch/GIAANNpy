@@ -68,6 +68,10 @@ class DatabaseNetworkClass():
 		if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
 			self.inferenceReviewPatch13SourceIndex = None
 			self.inferenceReviewPatch13Predictions = {}
+		if(inferenceReviewPatch15TokenTransitionPrior):
+			self.inferenceLIFTokenPriorSource = None
+			self.inferenceLIFTokenPriorSourceIndex = None
+			self.inferenceLIFTokenPriorCache = {}
 
 	def setArrayIndexProperties(self, inferenceMode):
 		if(inferenceMode):

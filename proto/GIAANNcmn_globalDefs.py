@@ -54,7 +54,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "trainAndInference"	#default: trainAndInference	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference"
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -209,11 +209,8 @@ elif(useDrawNetworkIndependently):
 elif(useTrainDuringInference):
 	trainMaxSequences = 5000	#slow execution	#5000, 200000
 	databaseFolderBase = databaseFolderBaseSSD
-if(databaseFolderBase==databaseFolderBaseSSD):
-	inferenceCopyTemplateDatasets = True	#default: True	#copy template dataset files into databaseFolder at inference startup
-else:
-	inferenceCopyTemplateDatasets = False
-databaseFolderTemplate = databaseFolderBase + "databaseTemplate/"
+inferenceCopyTemplateDatasets = True	#default: True	#copy template dataset files into databaseFolder at startup for all execution modes and database locations
+databaseFolderTemplate = databaseFolderBaseLocal + "databaseTemplate/"
 databaseFolderTemplateDatasetFileNamePattern = "*.*"
 numberEpochs = 1	#default: 1
 
@@ -1292,6 +1289,69 @@ if(useDefaultsV2):
 			if(not isinstance(inferenceReviewPatch14Scale, (int, float)) or isinstance(inferenceReviewPatch14Scale, bool) or not math.isfinite(inferenceReviewPatch14Scale) or inferenceReviewPatch14Scale <= inferenceReviewPatch14MinimumStrength):
 				raise RuntimeError(inferenceReviewPatch14InvalidConfiguration)
 
+	#Fifth LIF performance review option;
+	inferenceReviewPatch15boundedPrior = False	#default: False #master switch for patch 15: column-scoring computation optimisation and bounded token-transition prior
+	if(inferenceReviewPatch15boundedPrior):
+		inferenceReviewPatch15OptimiseColumnSelection = True	#computation optimisation: avoid copying unused segments; retain the original floating-point reduction order by default for trees	#speeds up prospective column scoring by computing only the required soma and terminal-column signals, avoiding full activation-tensor copying and propagation while preserving the scoring calculation.
+		if(inferenceReviewPatch15OptimiseColumnSelection):
+			inferenceLIFOptimiseColumnSelectionStep = 1
+			inferenceLIFOptimiseColumnSelectionRoundingMode = "floor"
+			inferenceLIFOptimiseColumnSelectionInvalidState = "LIF terminal projection requires a valid non-negative sparse LIF state, column segments, and an in-range selected column"
+		#The prior needs LIF soma/direct-transition evidence and strict candidate connectivity; benchmark settings are not dependencies.
+		#The current loader caches frozen weights; beam hypotheses and proxies for different source tokens need separate source tracking.
+		inferenceReviewPatch15TokenTransitionPrior = True	#The bounded prior multiplies each directly connected, firing-eligible candidates LIF activation by a factor between 0.5 and 1.0 derived from learned token-transition strengths, favouring well-supported transitions while preserving any LIF winner whose activation exceeds twice that of every competitor.
+		if(inferenceReviewPatch15TokenTransitionPrior):
+			inferenceLIFTokenPriorExponent = 0.25
+			inferenceLIFTokenPriorMinimumGain = 0.5
+			inferenceLIFTokenPriorMaximumGain = 1.0
+			inferenceLIFTokenPriorMinimumStrength = 0.0
+			inferenceLIFTokenPriorMaximumExponent = 1.0
+			inferenceLIFTokenPriorSingleCandidateCount = 1
+			inferenceLIFTokenPriorCandidateRank = 1
+			inferenceLIFTokenPriorConnectionRank = 5
+			inferenceLIFTokenPriorEntryDimension = 1
+			inferenceLIFTokenPriorPropertyDimension = 0
+			inferenceLIFTokenPriorBranchDimension = 1
+			inferenceLIFTokenPriorSegmentDimension = 2
+			inferenceLIFTokenPriorColumnDimension = 3
+			inferenceLIFTokenPriorFeatureDimension = 4
+			inferenceLIFTokenPriorSourceIndexTypeCode = "Q"
+			inferenceLIFTokenPriorLoadDevice = "cpu"
+			inferenceLIFTokenPriorInvalidConfiguration = "LIF token priors require LIF with strict previous-prediction connectivity and direct SANI connections, no beam search, no global-feature missing-source proxies or similar-token auxiliary propagation, no training within the inference database, a finite exponent within (0, 1], and a minimum gain within [0, 1]"
+			inferenceLIFTokenPriorInvalidDatabase = "LIF token priors require an initialised inference database and source neuron"
+			inferenceLIFTokenPriorInvalidNeuron = "LIF token prior neuron indices must be in-range integers"
+			inferenceLIFTokenPriorInvalidCandidates = "LIF token priors require matching candidate vectors with finite positive activations"
+			inferenceLIFTokenPriorInvalidConnections = "LIF token priors require valid sparse trained source connections with finite non-negative direct strengths"
+			inferenceLIFTokenPriorMissingEvidence = "A directly connected LIF candidate must have positive trained token-transition evidence"
+		if(inferenceReviewPatch15OptimiseColumnSelection):
+			if(not(inferenceLeakyIntegrateAndFire and inferenceReviewPatch11ProspectiveColumnScoring and not multipleDendriticBranchesBinaryTree)):
+				raise RuntimeError(inferenceLIFOptimiseColumnSelectionInvalidState)
+		if(inferenceReviewPatch15TokenTransitionPrior):
+			if(not inferenceLeakyIntegrateAndFire or not predictionEnsureConnectedToPreviousPrediction or not enforceDirectConnectionsSANI or inferenceBeamSearch or (inferenceInferMissingFeatures and inferenceInferMissingFeaturesUpdate10UseGlobalFeaturePredictions) or (auxiliaryNeurons and auxiliaryNeuronsSimilar) or useTrainDuringInference or inferenceTrainFirstSequences or not isinstance(inferenceLIFTokenPriorExponent, (int, float)) or isinstance(inferenceLIFTokenPriorExponent, bool) or not math.isfinite(inferenceLIFTokenPriorExponent) or inferenceLIFTokenPriorExponent <= inferenceLIFTokenPriorMinimumStrength or inferenceLIFTokenPriorExponent > inferenceLIFTokenPriorMaximumExponent or not isinstance(inferenceLIFTokenPriorMinimumGain, (int, float)) or isinstance(inferenceLIFTokenPriorMinimumGain, bool) or not math.isfinite(inferenceLIFTokenPriorMinimumGain) or inferenceLIFTokenPriorMinimumGain < inferenceLIFTokenPriorMinimumStrength or inferenceLIFTokenPriorMinimumGain > inferenceLIFTokenPriorMaximumGain):
+				raise RuntimeError(inferenceLIFTokenPriorInvalidConfiguration)
+	else:
+		inferenceReviewPatch15OptimiseColumnSelection = False
+		inferenceReviewPatch15TokenTransitionPrior = False
+
+	#Sixth LIF performance review option;
+	inferenceReviewPatch16TokenAggregation = False	#default: False #sum eligible neuron scores by output token, then retain the strongest neuron for the winning token
+	if(inferenceReviewPatch16TokenAggregation):
+		inferenceLIFTokenAggregationVectorDimension = 0
+		inferenceLIFTokenAggregationCandidateRank = 1
+		inferenceLIFTokenAggregationSelectionCount = 1
+		inferenceLIFTokenAggregationMinimumActivation = 0.0
+		inferenceLIFTokenAggregationExcludedActivation = -1.0
+		inferenceLIFTokenAggregationRequiredSANICondition = "enforceLastSegmentMustBeActive"
+		inferenceLIFTokenAggregationConfigurationLabel = "inferenceReviewPatch16TokenAggregation:"
+		inferenceLIFTokenAggregationInvalidConfiguration = "Patch 16 requires LIF single-step inference with strict previous-prediction connectivity and current-step direct SANI eligibility"
+		inferenceLIFTokenAggregationInvalidCandidateLimit = "Patch 16 requires an integer candidate limit of exactly one"
+		inferenceLIFTokenAggregationInvalidDatabase = "Patch 16 requires an inference database with valid column and feature dictionaries"
+		inferenceLIFTokenAggregationInvalidCandidates = "Patch 16 requires matching candidate vectors with in-range integer neuron indices and finite positive activations"
+		inferenceLIFTokenAggregationInvalidToken = "Patch 16 requires each prime concept token to have a valid feature dictionary index"
+		inferenceLIFTokenAggregationInvalidTotals = "Patch 16 token activation totals must remain finite and positive"
+		if(useInference):
+			if(not predictionEnsureConnectedToPreviousPrediction or not enforceDirectConnectionsSANI or inferenceBeamSearch or algorithmMatrixSANIenforceRequirement != inferenceLIFTokenAggregationRequiredSANICondition):
+				raise RuntimeError(inferenceLIFTokenAggregationInvalidConfiguration)
 else:
 	inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch = False
 	inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch = False
@@ -1309,6 +1369,11 @@ else:
 	inferenceReviewPatch12RetainContextWithoutOutgoingSource = False
 	inferenceReviewPatch13poolTransitionsFromSimilarFeatures = False
 	inferenceReviewPatch14NormaliseConnectionInputs = False
+	inferenceReviewPatch15boundedPrior = False
+	inferenceReviewPatch15OptimiseColumnSelection = False
+	inferenceReviewPatch15TokenTransitionPrior = False
+	inferenceReviewPatch16TokenAggregation = False
+
 	
 #printConfiguration;
 if(printConfiguration): 
@@ -1357,6 +1422,14 @@ if(printConfiguration):
 	print("inferenceLeakyIntegrateAndFire:", inferenceLeakyIntegrateAndFire)
 	if(inferenceLeakyIntegrateAndFire):
 		print("inferenceLeakyIntegrateAndFireSomaActivationThreshold:", inferenceLeakyIntegrateAndFireSomaActivationThreshold)
+		if(inferenceReviewPatch15OptimiseColumnSelection):
+			print("inferenceReviewPatch15OptimiseColumnSelection:", inferenceReviewPatch15OptimiseColumnSelection)
+		if(inferenceReviewPatch15TokenTransitionPrior):
+			print("inferenceReviewPatch15TokenTransitionPrior:", inferenceReviewPatch15TokenTransitionPrior)
+			print("inferenceLIFTokenPriorExponent:", inferenceLIFTokenPriorExponent)
+			print("inferenceLIFTokenPriorMinimumGain:", inferenceLIFTokenPriorMinimumGain)
+		if(inferenceReviewPatch16TokenAggregation):
+			print(inferenceLIFTokenAggregationConfigurationLabel, inferenceReviewPatch16TokenAggregation)
 		if(useInference):
 			print("inferenceDecrementActivationsSomaPerPredictedToken:", inferenceDecrementActivationsSomaPerPredictedToken)
 			print("inferenceDecrementActivationsLastColumnSegment:", inferenceDecrementActivationsLastColumnSegment)

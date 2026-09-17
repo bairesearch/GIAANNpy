@@ -553,6 +553,8 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	predictionCandidatesAvailable = True
 	if(conceptColumnIndex is None or conceptColumnFeatureIndex is None):
 		raise RuntimeError("processColumnInferencePrediction error: expected single concept/feature prediction pair")
+	if(inferenceReviewPatch15TokenTransitionPrior):
+		databaseNetworkObject.inferenceLIFTokenPriorSource = (int(conceptColumnIndex), int(conceptColumnFeatureIndex))
 	if(globalFeatureNeuronsActivation is None):
 		raise RuntimeError("processColumnInferencePrediction error: globalFeatureNeuronsActivation is None")
 	conceptColumnIndexTensor = pt.tensor([int(conceptColumnIndex)], dtype=pt.long)

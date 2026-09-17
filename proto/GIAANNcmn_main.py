@@ -23,6 +23,11 @@ datasetsLibrary4plus=False: pip install "datasets<4" "fsspec==2024.6.1" "gcsfs==
 pip install spacy
 python -m spacy download en_core_web_sm [spacyModelName]
 pip install nltk
+python -c "import nltk; nltk.download('wordnet')"
+python -c "import nltk; nltk.download('treebank'); nltk.download('conll2000')"
+pip install tiktoken
+hf auth login
+
 
 ## modality OR (dev only):
 pip install opencv-python

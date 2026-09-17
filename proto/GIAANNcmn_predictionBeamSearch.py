@@ -21,6 +21,10 @@ import torch as pt
 import time
 
 from GIAANNcmn_globalDefs import *
+if(inferenceReviewPatch15TokenTransitionPrior):
+	import GIAANNcmn_predictionTokenPrior
+if(inferenceReviewPatch16TokenAggregation):
+	import GIAANNcmn_predictionTokenAggregation
 import GIAANNcmn_debug
 import GIAANNcmn_databaseNetwork
 import GIAANNcmn_sparseTensors
@@ -444,6 +448,9 @@ def filterCandidatesByLeakyIntegrateAndFireSomaActivationThreshold(columnIndices
 	return filteredColumnIndices, filteredFeatureIndices, filteredActivationValues
 
 def selectBeamCandidates(stateFeatures, stateTime, strengthLookup, candidateLimit, databaseNetworkObject, constraintState=None, conceptActivationState=None, connectedColumnsTensor=None, connectedColumnsFeatures=None, sequenceWordIndex=None, sequenceColumnIndex=None, somaActivationFromLastSegmentKeys=None, deactivatedNeuronState=None, selectedColumnIndex=None):
+	if(inferenceReviewPatch16TokenAggregation):
+		if(not isinstance(candidateLimit, int) or isinstance(candidateLimit, bool) or candidateLimit != inferenceLIFTokenAggregationSelectionCount):
+			raise RuntimeError(inferenceLIFTokenAggregationInvalidCandidateLimit)
 	candidateLimit = max(1, candidateLimit)
 	debugTimeStart = None
 	debugTimeLast = None
@@ -458,6 +465,9 @@ def selectBeamCandidates(stateFeatures, stateTime, strengthLookup, candidateLimi
 		if(inferenceLeakyIntegrateAndFire):
 			if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures and inferenceDeactivateSomaUponPrediction):
 				columnIndices, featureIndices, activationValues = filterCandidatesByDeactivatedNeuronState(databaseNetworkObject, columnIndices, featureIndices, activationValues, deactivatedNeuronState)
+		if(inferenceReviewPatch16TokenAggregation):
+			if(columnIndices is not None):
+				columnIndices, featureIndices, activationValues = GIAANNcmn_predictionTokenAggregation.selectLIFTokenAggregationCandidate(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
 		if(columnIndices is not None):
 			candidates = selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, databaseNetworkObject.f, databaseNetworkObject, constraintState, conceptActivationState)
 	return candidates
@@ -545,23 +555,65 @@ def calculateSelectionActivationDistribution(databaseNetworkObject, stateFeature
 			columnIndices, featureIndices, activationValues = GIAANNcmn_predictionConstraints.filterColumnFeatureCandidatesByConnectedColumns(columnIndices, featureIndices, activationValues, connectedColumnsTensor, connectedColumnsFeatures)
 		if(columnIndices is not None and applyConstraintFilter):
 			columnIndices, featureIndices, activationValues = GIAANNcmn_predictionConstraints.filterColumnFeatureCandidatesByConstraint(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
+		if(inferenceReviewPatch15TokenTransitionPrior and columnIndices is not None):
+			columnIndices, featureIndices, activationValues = GIAANNcmn_predictionTokenPrior.scoreLIFCandidatesWithTokenPrior(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
 	return columnIndices, featureIndices, activationValues
 
 def createReviewProspectiveColumnSelectionState(stateFeatures, selectedColumnIndex):
 	result = stateFeatures
 	if(inferenceReviewPatch11ProspectiveColumnScoring):
-		#Use the real column transition, including its decay and tree-branch mapping, only for candidate scoring.
-		advancedState = GIAANNcmn_predictionActivate.advanceLeakyIntegrateAndFireColumnActivations(stateFeatures)
-		if(not isinstance(selectedColumnIndex, int) or isinstance(selectedColumnIndex, bool) or selectedColumnIndex < arrayIndexSegmentFirst or selectedColumnIndex >= stateFeatures.shape[inferenceLeakyIntegrateAndFireConceptDimension]):
-			raise RuntimeError(inferenceReviewPatchInvalidProspectiveColumn)
+		if(inferenceReviewPatch15OptimiseColumnSelection):
+			result = projectLIFProspectiveTerminalSignals(stateFeatures, selectedColumnIndex)
+		else:
+			#Use the real column transition, including its decay and tree-branch mapping, only for candidate scoring.
+			advancedState = GIAANNcmn_predictionActivate.advanceLeakyIntegrateAndFireColumnActivations(stateFeatures)
+			if(not isinstance(selectedColumnIndex, int) or isinstance(selectedColumnIndex, bool) or selectedColumnIndex < arrayIndexSegmentFirst or selectedColumnIndex >= stateFeatures.shape[inferenceLeakyIntegrateAndFireConceptDimension]):
+				raise RuntimeError(inferenceReviewPatchInvalidProspectiveColumn)
+			originalState = stateFeatures.coalesce()
+			originalIndices = originalState.indices()
+			advancedIndices = advancedState.indices()
+			currentColumnMask = originalIndices[inferenceLeakyIntegrateAndFireConceptDimension] == selectedColumnIndex
+			externalColumnMask = advancedIndices[inferenceLeakyIntegrateAndFireConceptDimension] != selectedColumnIndex
+			selectionIndices = pt.cat((originalIndices[:, currentColumnMask], advancedIndices[:, externalColumnMask]), dim=inferenceReviewPatchSparseEntryDimension)
+			selectionValues = pt.cat((originalState.values()[currentColumnMask], advancedState.values()[externalColumnMask]), dim=inferenceReviewPatchVectorDimension)
+			result = pt.sparse_coo_tensor(selectionIndices, selectionValues, size=stateFeatures.size(), dtype=stateFeatures.dtype, device=stateFeatures.device).coalesce()
+	return result
+
+def projectLIFProspectiveTerminalSignals(stateFeatures, selectedColumnIndex):
+	result = None
+	if(inferenceReviewPatch15OptimiseColumnSelection):
+		if(not inferenceLeakyIntegrateAndFire or not (useSANIcolumns or useSANIfeaturesAndColumns) or not isinstance(stateFeatures, pt.Tensor) or not stateFeatures.is_sparse or not stateFeatures.is_floating_point() or stateFeatures.sparse_dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or stateFeatures.dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or stateFeatures.shape[inferenceLeakyIntegrateAndFireBranchDimension] != multipleDendriticBranchesNumber or stateFeatures.shape[inferenceLeakyIntegrateAndFireSegmentDimension] != arrayNumberOfSegments):
+			raise RuntimeError(inferenceLIFOptimiseColumnSelectionInvalidState)
+		if(not isinstance(selectedColumnIndex, int) or isinstance(selectedColumnIndex, bool) or selectedColumnIndex < arrayIndexSegmentFirst or selectedColumnIndex >= stateFeatures.shape[inferenceLeakyIntegrateAndFireConceptDimension] or arrayIndexSegmentLastColumn < arrayIndexSegmentFirst or arrayIndexSegmentLastColumn >= arrayIndexSegmentSoma):
+			raise RuntimeError(inferenceLIFOptimiseColumnSelectionInvalidState)
 		originalState = stateFeatures.coalesce()
-		originalIndices = originalState.indices()
-		advancedIndices = advancedState.indices()
-		currentColumnMask = originalIndices[inferenceLeakyIntegrateAndFireConceptDimension] == selectedColumnIndex
-		externalColumnMask = advancedIndices[inferenceLeakyIntegrateAndFireConceptDimension] != selectedColumnIndex
-		selectionIndices = pt.cat((originalIndices[:, currentColumnMask], advancedIndices[:, externalColumnMask]), dim=inferenceReviewPatchSparseEntryDimension)
-		selectionValues = pt.cat((originalState.values()[currentColumnMask], advancedState.values()[externalColumnMask]), dim=inferenceReviewPatchVectorDimension)
-		result = pt.sparse_coo_tensor(selectionIndices, selectionValues, size=stateFeatures.size(), dtype=stateFeatures.dtype, device=stateFeatures.device).coalesce()
+		indices = originalState.indices()
+		values = originalState.values()
+		if(not pt.isfinite(values).all() or (values < arrayIndexSegmentFirst).any()):
+			raise RuntimeError(inferenceLIFOptimiseColumnSelectionInvalidState)
+		segments = indices[inferenceLeakyIntegrateAndFireSegmentDimension]
+		externalColumns = indices[inferenceLeakyIntegrateAndFireConceptDimension] != selectedColumnIndex
+		incomingMask = (segments == arrayIndexSegmentLastColumn-inferenceLIFOptimiseColumnSelectionStep) & externalColumns
+		terminalMask = segments == arrayIndexSegmentLastColumn
+		somaMask = segments == arrayIndexSegmentSoma
+		incomingIndices = indices[:, incomingMask].clone()
+		incomingIndices[inferenceLeakyIntegrateAndFireSegmentDimension] += inferenceLIFOptimiseColumnSelectionStep
+		if(multipleDendriticBranchesBinaryTree):
+			incomingIndices[inferenceLeakyIntegrateAndFireBranchDimension] = pt.div(incomingIndices[inferenceLeakyIntegrateAndFireBranchDimension], multipleDendriticBranchesBinaryTreeBranchingFactor, rounding_mode=inferenceLIFOptimiseColumnSelectionRoundingMode)
+		terminalValues = values[terminalMask].clone()
+		if(inferenceDecrementActivationsLastColumnSegment):
+			externalTerminalMask = externalColumns[terminalMask]
+			if(inferenceDecrementActivationsLastColumnSegmentNonlinear):
+				terminalValues[externalTerminalMask] *= inferenceLIFOptimiseColumnSelectionStep-inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn
+			else:
+				terminalValues[externalTerminalMask] = pt.clamp(terminalValues[externalTerminalMask]-inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn, min=arrayIndexSegmentFirst)
+		#Only these signals can reach candidate scoring on this step; the live state remains unchanged.
+		selectionIndices = pt.cat((incomingIndices, indices[:, terminalMask], indices[:, somaMask]), dim=inferenceReviewPatchSparseEntryDimension)
+		selectionValues = pt.cat((values[incomingMask], terminalValues, values[somaMask]), dim=inferenceReviewPatchVectorDimension)
+		positiveMask = selectionValues > arrayIndexSegmentFirst
+		result = pt.sparse_coo_tensor(selectionIndices[:, positiveMask], selectionValues[positiveMask], size=originalState.size(), dtype=originalState.dtype, device=originalState.device).coalesce()
+	else:
+		raise RuntimeError(inferenceLIFOptimiseColumnSelectionInvalidState)
 	return result
 
 def calculateLeakyIntegrateAndFireLastSegmentSelectionActivationDistribution(databaseNetworkObject, stateFeatures, somaActivationFromLastSegmentKeys):
