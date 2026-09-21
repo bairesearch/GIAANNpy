@@ -763,7 +763,8 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 					registerAutoSubwordSecondaryFeatureWeights(databaseNetworkObject, records, deviceSparse)
 			else:
 				registerAutoConnectionPropagationWeights(databaseNetworkObject, records, deviceDense)
-		writeAutoAuxiliaryFeatureDataset(databaseNetworkObject, subwordSimilarity, primeConceptFeatures)
+		if(not debugDisableDatabaseFileWrite):
+			writeAutoAuxiliaryFeatureDataset(databaseNetworkObject, subwordSimilarity, primeConceptFeatures)
 		return
 
 	def buildAutoAuxiliaryFeatureRecords(databaseNetworkObject, subwordSimilarity, primeConceptFeatures):

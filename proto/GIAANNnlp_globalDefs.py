@@ -82,7 +82,10 @@ elif(useTrainDuringInference):
 
 
 #Multisentence predictions;
-sentencePredictions = True 	#default: True	orig: True
+if(useDefaultsV2 and not useQuickExecution):
+	sentencePredictions = False 	#default: False	orig: True
+else:
+	sentencePredictions = True	#default: True	orig: True
 if(sentencePredictions):
 	if(useDefaultsV2):
 		skipSequenceNoDelimiterDetectedBetweenConceptTokens = False	#default: False	#orig: True
@@ -397,7 +400,11 @@ if(useInference):
 				else:
 					if(inferenceEvaluateTestSetTrainMaxSequences10M):
 						if(inferenceEvaluateTestSet):
-							inferencePromptFileName = 'inference_prompt.txt.longTestOscar2-SentencePredictionsFalse'
+							inferenceFast = False	#temp
+							if(inferenceFast):
+								inferencePromptFileName = 'inference_prompt.txt.longTestOscar1-SentencePredictionsFalse'
+							else:
+								inferencePromptFileName = 'inference_prompt.txt.longTestOscar2-SentencePredictionsFalse'
 							#inferencePromptFileName = 'inference_prompt.txt.longTestOscar'	#optionally keep same for direct comparison
 						else:
 							inferencePromptFileName = 'inference_prompt.txt.longTrainOscar2-SentencePredictionsFalse'

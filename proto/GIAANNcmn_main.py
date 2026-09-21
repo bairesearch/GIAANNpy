@@ -263,7 +263,7 @@ def executeMode(inferenceMode):
 			GIAANNnlp_main.trainAutoAuxiliaryNeuronsEnd(databaseNetworkObject)
 
 	if(not inferenceMode or inferenceTrainFirstSequences):
-		if(useSaveData):
+		if(useSaveData and not debugDisableDatabaseFileWrite):
 			if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 				if(debugPrintRamMaxUsagePhaseLocal):
 					GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("saveAllObservedColumnsToDisk")

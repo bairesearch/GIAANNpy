@@ -707,3 +707,19 @@ MANUAL; disable inferenceReviewPatch12RetainContextWithoutOutgoingSource
 - add option inferenceReviewPatch16TokenAggregation (disabled) - token aggregation sums the prediction scores of all eligible, directly connected neurons representing the same token, then selects the token with the highest combined score.
 - set inferenceCopyTemplateDatasets, and rename database folder to databaseTemplate
 
+---
+v2p (Codex IDE GPT-6.0):
+- add proto GIAANNproto2p1a - start train parallelisation updates:
+	- add option optimiseParallelisation1 (enabled) - merge RAM-resident training connection updates across source neurons using parallel native CPU kernels while preserving sparse COO storage and additive update results.
+	- add option optimiseParallelisation2a (enabled) - construct temporal training connections directly in sorted unique sparse COO order using parallel CPU kernels to avoid repeated segment expansion, intermediate duplicates and sorting.
+	- add option optimiseParallelisation2b (~enabled) - map connection deltas to database coordinates and group updates by source neuron using a native parallel CPU pass while retaining the original PyTorch duplicate-reduction order.
+	- add option optimiseParallelisation2c (~enabled) - split large source-tensor merges into bounded chunks and dynamically distribute those chunks among CPU workers to balance uneven source sizes.
+	- add option optimiseParallelisation2d (~enabled) - locate update coordinates with binary search, bulk-copy unchanged spans and reuse unchanged coordinate storage while allocating fresh updated values.
+	- add option optimiseParallelisation2e (enabled) - merge neuron strength updates directly into stored column tensors to avoid repeatedly gathering, sorting and scattering historical neuron data.
+	- add option optimiseParallelisation2f (enabled) - vectorise training feature-activation masks and prepare POS values once per used token while preserving the existing tokenisation pathway.
+	- add option optimiseParallelisation3a (enabled) - match subword byte spans to parent tokens using an advancing cursor while preserving maximum-overlap selection, earliest ties, whitespace handling and UTF-8 boundaries.
+	- add option optimiseParallelisation3b (enabled) - prepare articles in bounded CPU worker processes with explicit training and worker core budgets while consuming results and applying learning updates in the original sequence order.
+	- add option optimiseParallelisation3c (enabled) - prepare RAM-resident connection sources in one bulk pass that combines index normalisation, missing-source initialisation and tensor dimension checks while preserving stored values and source bookkeeping.
+	- add option optimiseParallelisation3d (enabled) - reuse sequence tokens and concept boundaries during training while preserving token-to-column assignments and omitting inference-only maps and unrequested display strings.
+- add option debugDisableDatabaseFileWrite
+- useDefaultsV2: set sentencePredictions=False by default

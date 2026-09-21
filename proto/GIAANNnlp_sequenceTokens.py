@@ -286,6 +286,8 @@ if(tokeniserSubword):
 		if(len(tokenIds) == 0):
 			raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: no subword token ids generated")
 		byteIndex = 0
+		if(optimiseParallelisation3a):
+			parentSpanIndex = 0
 		for tokenId in tokenIds:
 			tokenBytes = getTokeniserSubwordTokenBytes(encoding, tokenId)
 			subwordStartByte = byteIndex
@@ -294,7 +296,10 @@ if(tokeniserSubword):
 				raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: subword byte span exceeds sequence byte length")
 			if(tokenBytes != sequenceBytes[subwordStartByte:subwordEndByte]):
 				raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: subword token bytes do not match sequence bytes")
-			parentToken, parentTokenIndex = getTokeniserSubwordParentToken(parentTokenSpans, subwordStartByte, subwordEndByte)
+			if(optimiseParallelisation3a):
+				parentToken, parentTokenIndex, parentSpanIndex = getTokeniserSubwordParentTokenOrdered(parentTokenSpans, subwordStartByte, subwordEndByte, parentSpanIndex)
+			else:
+				parentToken, parentTokenIndex = getTokeniserSubwordParentToken(parentTokenSpans, subwordStartByte, subwordEndByte)
 			subwordText = decodeTokeniserSubwordTokenBytes(tokenBytes)
 			subwordPos, subwordTag = detectTokeniserSubwordPOS(parentToken, subwordText)
 			if(auxiliaryNeurons and auxiliaryNeuronsPOS):
@@ -419,6 +424,32 @@ if(tokeniserSubword):
 				result = nextToken
 			else:
 				result = (parentTokenSpans[-1][2], parentTokenSpans[-1][3])
+		return result
+
+	def getTokeniserSubwordParentTokenOrdered(parentTokenSpans, subwordStartByte, subwordEndByte, parentSpanIndex):
+		result = None
+		if(optimiseParallelisation3a):
+			if(any(not isinstance(value, int) or isinstance(value, bool) for value in (subwordStartByte, subwordEndByte, parentSpanIndex))):
+				raise RuntimeError("getTokeniserSubwordParentTokenOrdered requires integer byte offsets and cursor")
+			if(subwordStartByte < 0 or subwordEndByte <= subwordStartByte or not parentTokenSpans or parentSpanIndex < 0 or parentSpanIndex > len(parentTokenSpans)):
+				raise RuntimeError("getTokeniserSubwordParentTokenOrdered invalid byte span or cursor")
+			if(parentSpanIndex > 0 and parentTokenSpans[parentSpanIndex-1][1] > subwordStartByte):
+				raise RuntimeError("getTokeniserSubwordParentTokenOrdered cursor would skip an overlapping parent")
+			while(parentSpanIndex < len(parentTokenSpans) and parentTokenSpans[parentSpanIndex][1] <= subwordStartByte):
+				parentSpanIndex += 1
+			bestIndex = None
+			bestOverlap = 0
+			candidateIndex = parentSpanIndex
+			while(candidateIndex < len(parentTokenSpans) and parentTokenSpans[candidateIndex][0] < subwordEndByte):
+				parentStartByte, parentEndByte, parentToken, parentTokenIndex = parentTokenSpans[candidateIndex]
+				overlap = min(parentEndByte, subwordEndByte) - max(parentStartByte, subwordStartByte)
+				if(overlap > bestOverlap):
+					bestOverlap = overlap
+					bestIndex = candidateIndex
+				candidateIndex += 1
+			if(bestIndex is None):
+				bestIndex = min(parentSpanIndex, len(parentTokenSpans)-1)
+			result = (parentTokenSpans[bestIndex][2], parentTokenSpans[bestIndex][3], parentSpanIndex)
 		return result
 
 	def encodeTokeniserSubwordText(text):

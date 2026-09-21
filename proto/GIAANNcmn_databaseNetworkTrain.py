@@ -24,6 +24,8 @@ from GIAANNcmn_globalDefs import *
 import GIAANNcmn_debug
 import GIAANNcmn_sparseTensors
 import GIAANNcmn_inferenceDuringTrain
+if(optimiseParallelisation2a):
+	import GIAANNcmn_cpuParallelisation2
 if(trainSelectMostSimilarBranch):
 	import GIAANNcmn_databaseNetworkTrainSelectBranch
 import GIAANNnlp_sequenceConcepts
@@ -35,7 +37,10 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens, 
 	trainConceptWordsStartTime = None
 	if(debugPrintTrainSectionTimes):
 		trainConceptWordsStartTime = time.perf_counter()
-	result = GIAANNnlp_sequenceConcepts.processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens)
+	if(optimiseParallelisation3d and useModalityNLP and sequenceObservedColumns.parallelisation3TrainMetadata):
+		result = sequenceObservedColumns.getTrainConceptMetadata(sequence, tokens)
+	else:
+		result = GIAANNnlp_sequenceConcepts.processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens)
 	if(printSequenceConceptAssignment):
 		print(f"Processing sequenceCount: {sequenceIndex}, {sequenceObservedColumns.sentenceWithConceptAssignment}")	
 		if(printSequenceConceptAssignmentByLine):
@@ -856,40 +861,43 @@ def getImageAxesCentralFieldCoordinates(sequenceObservedColumns):
 	return result
 
 def createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns):
-	connectionTargetSize = (multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs, cs, fs)
-	connectionDevice = featureNeuronsActive.device
-	combinedIndices = pt.empty((len(connectionTargetSize), 0), dtype=pt.long, device=connectionDevice)
-	combinedValues = pt.empty((0,), dtype=arrayType, device=connectionDevice)
-	indicesList = []
-	if(useSANI):
-		if(multipleDendriticBranchesBinaryTree):
-			segmentActive = featureNeuronsActive[:, arrayIndexSegmentFirst]
-			if(not pt.any(segmentActive)):
-				raise RuntimeError("createFeatureConnectionsActiveTrainSparse error: binary tree root segment has no active features")
-			segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+	if(optimiseParallelisation2a):
+		result = GIAANNcmn_cpuParallelisation2.createTemporalConnections(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+	else:
+		connectionTargetSize = (multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs, cs, fs)
+		connectionDevice = featureNeuronsActive.device
+		combinedIndices = pt.empty((len(connectionTargetSize), 0), dtype=pt.long, device=connectionDevice)
+		combinedValues = pt.empty((0,), dtype=arrayType, device=connectionDevice)
+		indicesList = []
+		if(useSANI):
+			if(multipleDendriticBranchesBinaryTree):
+				segmentActive = featureNeuronsActive[:, arrayIndexSegmentFirst]
+				if(not pt.any(segmentActive)):
+					raise RuntimeError("createFeatureConnectionsActiveTrainSparse error: binary tree root segment has no active features")
+				segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+				if(segmentConnectionIndices.numel() > 0):
+					indicesList.append(segmentConnectionIndices)
+			else:
+				for segmentIndex in range(arrayNumberOfSegments):
+					segmentActive = featureNeuronsActive[:, segmentIndex]
+					if(pt.any(segmentActive)):
+						segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
+						if(segmentConnectionIndices.numel() > 0):
+							indicesList.append(segmentConnectionIndices)
+		else:
+			segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(featureNeuronsActive[:, arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
 			if(segmentConnectionIndices.numel() > 0):
 				indicesList.append(segmentConnectionIndices)
-		else:
-			for segmentIndex in range(arrayNumberOfSegments):
-				segmentActive = featureNeuronsActive[:, segmentIndex]
-				if(pt.any(segmentActive)):
-					segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
-					if(segmentConnectionIndices.numel() > 0):
-						indicesList.append(segmentConnectionIndices)
-	else:
-		segmentConnectionIndices = createFeatureConnectionsActiveTrainSparseSegment(featureNeuronsActive[:, arrayIndexSegmentLast], cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
-		if(segmentConnectionIndices.numel() > 0):
-			indicesList.append(segmentConnectionIndices)
-	if(len(indicesList) > 0):
-		combinedIndices = pt.cat(indicesList, dim=1)
-		if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
-			combinedIndices = collapseFeatureConnectionsSpatialAxesSparseIndices(combinedIndices, cs)
-		if(multipleDendriticBranchesBinaryTree):
-			combinedIndices = calculateFeatureConnectionsBinaryTreeBranchIndicesFromRootBranches(combinedIndices, connectionTargetSize)
-		combinedValues = pt.ones((combinedIndices.shape[1],), dtype=arrayType, device=connectionDevice)
-	result = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=connectionTargetSize, dtype=arrayType, device=connectionDevice).coalesce()
-	if(result._nnz() > 0):
-		result.values().clamp_(max=1.0)
+		if(len(indicesList) > 0):
+			combinedIndices = pt.cat(indicesList, dim=1)
+			if(getTrainConnectionsUseSpatialAxes(sequenceObservedColumns)):
+				combinedIndices = collapseFeatureConnectionsSpatialAxesSparseIndices(combinedIndices, cs)
+			if(multipleDendriticBranchesBinaryTree):
+				combinedIndices = calculateFeatureConnectionsBinaryTreeBranchIndicesFromRootBranches(combinedIndices, connectionTargetSize)
+			combinedValues = pt.ones((combinedIndices.shape[1],), dtype=arrayType, device=connectionDevice)
+		result = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=connectionTargetSize, dtype=arrayType, device=connectionDevice).coalesce()
+		if(result._nnz() > 0):
+			result.values().clamp_(max=1.0)
 	return result
 
 def createFeatureConnectionsActiveTrainSparseSegment(segmentActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns):

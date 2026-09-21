@@ -23,6 +23,8 @@ import torch as pt
 from GIAANNcmn_globalDefs import *
 import GIAANNcmn_databaseNetwork
 import GIAANNnlp_sequenceTokens
+if(optimiseParallelisation2f):
+	import GIAANNcmn_cpuParallelisation2
 
 
 def isTokenConceptColumnCandidate(token, tokens, tokenIndex):
@@ -130,16 +132,23 @@ def validateTokenConceptSequenceContext(tokens, tokenIndex):
 		raise RuntimeError("validateTokenConceptSequenceContext error: tokenIndex out of range")
 	return
 
-def firstPass(databaseNetworkObject, sequence, allowNewFeatures):
+def firstPass(databaseNetworkObject, sequence, allowNewFeatures, sequenceTokens=None):
 	newConceptsAdded = False
 	conceptsFound = False
 	conceptMask = []
 	tokens = None
-	if(tokeniserSubword):
-		tokens = GIAANNnlp_sequenceTokens.getTokens(sequence)
+	if(optimiseParallelisation3d and sequenceTokens is not None):
+		if(len(sequenceTokens) != len(sequence)):
+			raise RuntimeError("optimiseParallelisation3d firstPass token length mismatch")
+		tokens = sequenceTokens
+	else:
+		if(tokeniserSubword):
+			tokens = GIAANNnlp_sequenceTokens.getTokens(sequence)
 	
 	for tokenIndex, preprocessedToken in enumerate(sequence):
-		if(tokeniserSubword):
+		if(optimiseParallelisation3d and sequenceTokens is not None):
+			token = tokens[tokenIndex]
+		elif(tokeniserSubword):
 			token = tokens[tokenIndex]
 		else:
 			token = GIAANNnlp_sequenceTokens.convertPreprocessedTokenToSequenceToken(preprocessedToken)
@@ -539,7 +548,9 @@ def buildSequenceConceptAssignment(sequenceObservedColumns, sequence, tokens, co
 	sequenceObservedColumns.tokenConceptColumnIndexList = tokenConceptColumnIndexList
 	conceptColumnsList = sequenceObservedColumns.databaseNetworkObject.conceptColumnsList
 	
-	if(printSequenceConceptAssignmentByLine):
+	if(optimiseParallelisation3d and getattr(sequenceObservedColumns, "parallelisation3TrainMetadata", False) and not printSequenceConceptAssignment):
+		sentenceWithConceptAssignment = None
+	elif(printSequenceConceptAssignmentByLine):
 		sentenceWithConceptAssignment = ""
 		currentColumnIndex = tokenConceptColumnIndexList[tokenIndex]
 		for tokenIndex, token in enumerate(sequence):
@@ -578,201 +589,205 @@ def selectFeatureBranchIndex(featureBranchCounts, featureIndex):
 	return branchIndex
 	
 def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices):
-	numberConceptsInSequence = conceptIndices.shape[0]
-	
-	cs = sequenceObservedColumns.cs
-	fs = sequenceObservedColumns.fs
-	featureNeuronsActive = pt.zeros((multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs), dtype=arrayType)
-	featureNeuronsWordOrder = pt.arange(fs).unsqueeze(0).repeat(cs, 1)
-	pt.zeros((cs, fs), dtype=pt.long)
-	columnsWordOrder = pt.zeros((cs), dtype=pt.long)
-	featureNeuronsPos = pt.zeros((cs, fs), dtype=arrayType)
-	if(trainSequenceObservedColumnsMatchSequenceWords):
-		sequenceConceptIndexMask = pt.ones((cs, fs), dtype=arrayType)
+	if(optimiseParallelisation2f):
+		featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask = GIAANNcmn_cpuParallelisation2.prepareTrainingFeatureNeurons(sequenceObservedColumns, tokens, conceptIndices, startIndices, endIndices)
+		featureNeuronsSegmentMask = featureNeuronsSegmentMask.swapdims(0, 1)
 	else:
-		sequenceConceptIndexMask = None
-	if(useSANI):
-		featureNeuronsSegmentMask = pt.zeros((cs, arrayNumberOfSegments), dtype=arrayType)	#note this mask is for permanence updates (it assumes that the network has been constructed with forward column connections only)
-	else:
-		featureNeuronsSegmentMask = pt.ones((cs, arrayNumberOfSegments), dtype=arrayType)
-	branchCounters = None
-	if(multipleDendriticBranches):
-		branchCounters = {}
-	
-	conceptIndicesList = conceptIndices.tolist()
-	for i, sequenceConceptWordIndex in enumerate(conceptIndicesList):
+		numberConceptsInSequence = conceptIndices.shape[0]
+
+		cs = sequenceObservedColumns.cs
+		fs = sequenceObservedColumns.fs
+		featureNeuronsActive = pt.zeros((multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs), dtype=arrayType)
+		featureNeuronsWordOrder = pt.arange(fs).unsqueeze(0).repeat(cs, 1)
+		pt.zeros((cs, fs), dtype=pt.long)
+		columnsWordOrder = pt.zeros((cs), dtype=pt.long)
+		featureNeuronsPos = pt.zeros((cs, fs), dtype=arrayType)
 		if(trainSequenceObservedColumnsMatchSequenceWords):
-			sequenceConceptIndex = i
+			sequenceConceptIndexMask = pt.ones((cs, fs), dtype=arrayType)
 		else:
-			conceptLemma = getTokenConceptName(sequenceObservedColumns.databaseNetworkObject, tokens[sequenceConceptWordIndex], tokens, sequenceConceptWordIndex)
-			sequenceConceptIndex = sequenceObservedColumns.conceptNameToIndex[conceptLemma] 
-				
+			sequenceConceptIndexMask = None
 		if(useSANI):
-			# When useSANIcolumns is True (original behaviour), assign segment indices based on
-			# the concept/column position in the sequence (sequenceConceptIndex).
-			#
-			# When useSANIfeatures is True (legacy !useSANIcolumns behaviour), assign segment
-			# indices based on the underlying feature/word position in the sentence
-			# (sequenceConceptWordIndex), so that feature proximity is captured by the
-			# sequential segments.
-			#
-			# When useSANIfeaturesAndColumns is enabled, apply column-distance segments first,
-			# then add feature-distance segments based on sequenceConceptWordIndex.
-			segmentMask = pt.zeros(arrayNumberOfSegments, dtype=arrayType)
-			if(useSANIcolumns):
-				positionIndex = sequenceConceptIndex
-				numberOfSegments = min(arrayNumberOfSegments, positionIndex+1)
-				segmentMask[:numberOfSegments] = 1
-				activeSequentialSegments = pt.arange(0, numberOfSegments, 1)
-			elif(useSANIfeatures):
-				# sequenceConceptWordIndex is the absolute token index of this concept's word
-				# in the original sequence; this gives "feature-position-based" segments.
-				positionIndex = sequenceConceptWordIndex
-				numberOfSegments = min(arrayNumberOfSegments, positionIndex+1)
-				segmentMask[:numberOfSegments] = 1
-				activeSequentialSegments = pt.arange(0, numberOfSegments, 1)
-			elif(useSANIfeaturesAndColumns):
-				# Assign concept/column-distance segments first, then feature-distance segments.
-				# Note: when useSANIfeaturesAndColumnsInternal is enabled, include the internal
-				# column segment (sequenceConceptIndex==0) in the concept segment budget.
-				if(useSANIfeaturesAndColumnsInternal):
-					columnSegments = min(arrayNumberOfSegmentsColumnDistance, sequenceConceptIndex+1)
-				else:
-					# External columns only: exclude the internal column from column-distance segments.
-					columnSegments = min(arrayNumberOfSegmentsColumnDistance, max(sequenceConceptIndex, 0))
-				featureSegments = min(arrayNumberOfSegmentsFeatureDistance, sequenceConceptWordIndex+1)
-				if(columnSegments > 0):
-					segmentMask[:columnSegments] = 1
-				featureSegmentStart = arrayNumberOfSegmentsColumnDistance
-				featureSegmentEnd = min(arrayNumberOfSegments, featureSegmentStart + featureSegments)
-				if(featureSegmentEnd > featureSegmentStart):
-					segmentMask[featureSegmentStart:featureSegmentEnd] = 1
-				activeSequentialSegments = pt.nonzero(segmentMask > 0, as_tuple=False).view(-1)
-			featureNeuronsSegmentMask[sequenceConceptIndex, :] = segmentMask
-		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly and trainSequenceObservedColumnsMatchSequenceWords):
-			branchIndex = 0
-			if(multipleDendriticBranches):
-				observedColumn = sequenceObservedColumns.observedColumnsSequenceWordIndexDict.get(sequenceConceptWordIndex)
-				if(observedColumn is None):
-					raise RuntimeError("processFeatures error: missing observedColumn for sequence concept word index")
-				conceptIndexKey = observedColumn.conceptIndex
-				featureBranchCounts = branchCounters.get(conceptIndexKey)
-				if(featureBranchCounts is None):
-					featureBranchCounts = {}
-					branchCounters[conceptIndexKey] = featureBranchCounts
-				startIndexValue = int(startIndices[sequenceConceptIndex].item())
-				endIndexValue = int(endIndices[sequenceConceptIndex].item())
-				featureIndicesInObservedTensor = sequenceObservedColumns.featureIndicesInObservedTensor
-				for j in range(startIndexValue, endIndexValue):
-					if(j >= featureIndicesInObservedTensor.shape[0]):
-						continue
-					globalFeatureIndex = int(featureIndicesInObservedTensor[j].item())
-					branchIndex = selectFeatureBranchIndex(featureBranchCounts, globalFeatureIndex)
-					if(multipleDendriticBranchesBinaryTree):
-						if(useTrainDuringInference):
-							if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
-								branchIndex = selectFeatureBinaryTreeBranchIndexFromInference(sequenceObservedColumns.databaseNetworkObject, conceptIndexKey, globalFeatureIndex, branchIndex)
-						if(trainVerifyConnectionNonexistentAcrossBranches):
-							if(multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches):
-								branchIndex = selectFeatureBinaryTreeBranchIndexFromConnections(sequenceObservedColumns, conceptIndexKey, globalFeatureIndex, branchIndex)
-					if(useSANI):
-						if(multipleDendriticBranchesBinaryTree):
-							binaryTreeBranchIndices = calculateFeatureBinaryTreeBranchIndices(branchIndex, activeSequentialSegments)
-							featureNeuronsActive[binaryTreeBranchIndices, activeSequentialSegments, sequenceConceptIndex, j] = 1
-						else:
-							featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, j] = 1
-					else:
-						featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, j] = 1
-					featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, tokens[j].pos)
-					featureNeuronsPos[sequenceConceptIndex, j] = featurePos
-					featureNeuronsWordOrder[sequenceConceptIndex, j] = j
-			else:
-				if(useSANI):
-					featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, startIndices[sequenceConceptIndex]:endIndices[sequenceConceptIndex]] = 1
-				else:
-					featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, startIndices[sequenceConceptIndex]:endIndices[sequenceConceptIndex]] = 1
-			columnsWordOrder[sequenceConceptIndex] = sequenceConceptIndex
-			sequenceConceptIndexMask[:, sequenceConceptWordIndex] = 0
-			sequenceConceptIndexMask[sequenceConceptIndex, sequenceConceptWordIndex] = 1
-			if(not multipleDendriticBranches):
-				for j in range(startIndices[sequenceConceptIndex], endIndices[sequenceConceptIndex]):
-					featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, tokens[j].pos)
-					featureNeuronsPos[sequenceConceptIndex, j] = featurePos
-					featureNeuronsWordOrder[sequenceConceptIndex, j] = j
+			featureNeuronsSegmentMask = pt.zeros((cs, arrayNumberOfSegments), dtype=arrayType)	#note this mask is for permanence updates (it assumes that the network has been constructed with forward column connections only)
 		else:
-			for j in range(startIndices[i], endIndices[i]):
-				featureWord = tokens[j].word	#redundant: .lower()
-				featureLemma = tokens[j].lemma
-				featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, tokens[j].pos)
-				if(j in sequenceObservedColumns.columnsIndexSequenceWordIndexDict):
-					sequenceConceptWordIndex = j
-					columnsWordOrder[sequenceConceptIndex] = sequenceConceptIndex
-					if(useDedicatedConceptNames2):
-						sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[variablePrimeConceptFeatureNeuronName]
+			featureNeuronsSegmentMask = pt.ones((cs, arrayNumberOfSegments), dtype=arrayType)
+		branchCounters = None
+		if(multipleDendriticBranches):
+			branchCounters = {}
+
+		conceptIndicesList = conceptIndices.tolist()
+		for i, sequenceConceptWordIndex in enumerate(conceptIndicesList):
+			if(trainSequenceObservedColumnsMatchSequenceWords):
+				sequenceConceptIndex = i
+			else:
+				conceptLemma = getTokenConceptName(sequenceObservedColumns.databaseNetworkObject, tokens[sequenceConceptWordIndex], tokens, sequenceConceptWordIndex)
+				sequenceConceptIndex = sequenceObservedColumns.conceptNameToIndex[conceptLemma]
+
+			if(useSANI):
+				# When useSANIcolumns is True (original behaviour), assign segment indices based on
+				# the concept/column position in the sequence (sequenceConceptIndex).
+				#
+				# When useSANIfeatures is True (legacy !useSANIcolumns behaviour), assign segment
+				# indices based on the underlying feature/word position in the sentence
+				# (sequenceConceptWordIndex), so that feature proximity is captured by the
+				# sequential segments.
+				#
+				# When useSANIfeaturesAndColumns is enabled, apply column-distance segments first,
+				# then add feature-distance segments based on sequenceConceptWordIndex.
+				segmentMask = pt.zeros(arrayNumberOfSegments, dtype=arrayType)
+				if(useSANIcolumns):
+					positionIndex = sequenceConceptIndex
+					numberOfSegments = min(arrayNumberOfSegments, positionIndex+1)
+					segmentMask[:numberOfSegments] = 1
+					activeSequentialSegments = pt.arange(0, numberOfSegments, 1)
+				elif(useSANIfeatures):
+					# sequenceConceptWordIndex is the absolute token index of this concept's word
+					# in the original sequence; this gives "feature-position-based" segments.
+					positionIndex = sequenceConceptWordIndex
+					numberOfSegments = min(arrayNumberOfSegments, positionIndex+1)
+					segmentMask[:numberOfSegments] = 1
+					activeSequentialSegments = pt.arange(0, numberOfSegments, 1)
+				elif(useSANIfeaturesAndColumns):
+					# Assign concept/column-distance segments first, then feature-distance segments.
+					# Note: when useSANIfeaturesAndColumnsInternal is enabled, include the internal
+					# column segment (sequenceConceptIndex==0) in the concept segment budget.
+					if(useSANIfeaturesAndColumnsInternal):
+						columnSegments = min(arrayNumberOfSegmentsColumnDistance, sequenceConceptIndex+1)
 					else:
-						if(tokeniserSubword and useDedicatedFeatureListsSubword):
-							sequenceFeatureIndex = getTokenFeatureIndex(sequenceObservedColumns.databaseNetworkObject, tokens[j])
-						else:
-							sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[featureLemma]
-					branchIndex = 0
-					if(multipleDendriticBranches):
-						observedColumn = sequenceObservedColumns.observedColumnsSequenceWordIndexDict.get(sequenceConceptWordIndex)
-						if(observedColumn is None):
-							raise RuntimeError("processFeatures error: missing observedColumn for sequence concept word index")
-						conceptIndexKey = observedColumn.conceptIndex
-						featureBranchCounts = branchCounters.get(conceptIndexKey)
-						if(featureBranchCounts is None):
-							featureBranchCounts = {}
-							branchCounters[conceptIndexKey] = featureBranchCounts
-						branchIndex = selectFeatureBranchIndex(featureBranchCounts, sequenceFeatureIndex)
+						# External columns only: exclude the internal column from column-distance segments.
+						columnSegments = min(arrayNumberOfSegmentsColumnDistance, max(sequenceConceptIndex, 0))
+					featureSegments = min(arrayNumberOfSegmentsFeatureDistance, sequenceConceptWordIndex+1)
+					if(columnSegments > 0):
+						segmentMask[:columnSegments] = 1
+					featureSegmentStart = arrayNumberOfSegmentsColumnDistance
+					featureSegmentEnd = min(arrayNumberOfSegments, featureSegmentStart + featureSegments)
+					if(featureSegmentEnd > featureSegmentStart):
+						segmentMask[featureSegmentStart:featureSegmentEnd] = 1
+					activeSequentialSegments = pt.nonzero(segmentMask > 0, as_tuple=False).view(-1)
+				featureNeuronsSegmentMask[sequenceConceptIndex, :] = segmentMask
+			if(trainSequenceObservedColumnsUseSequenceFeaturesOnly and trainSequenceObservedColumnsMatchSequenceWords):
+				branchIndex = 0
+				if(multipleDendriticBranches):
+					observedColumn = sequenceObservedColumns.observedColumnsSequenceWordIndexDict.get(sequenceConceptWordIndex)
+					if(observedColumn is None):
+						raise RuntimeError("processFeatures error: missing observedColumn for sequence concept word index")
+					conceptIndexKey = observedColumn.conceptIndex
+					featureBranchCounts = branchCounters.get(conceptIndexKey)
+					if(featureBranchCounts is None):
+						featureBranchCounts = {}
+						branchCounters[conceptIndexKey] = featureBranchCounts
+					startIndexValue = int(startIndices[sequenceConceptIndex].item())
+					endIndexValue = int(endIndices[sequenceConceptIndex].item())
+					featureIndicesInObservedTensor = sequenceObservedColumns.featureIndicesInObservedTensor
+					for j in range(startIndexValue, endIndexValue):
+						if(j >= featureIndicesInObservedTensor.shape[0]):
+							continue
+						globalFeatureIndex = int(featureIndicesInObservedTensor[j].item())
+						branchIndex = selectFeatureBranchIndex(featureBranchCounts, globalFeatureIndex)
 						if(multipleDendriticBranchesBinaryTree):
 							if(useTrainDuringInference):
 								if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
-									branchIndex = selectFeatureBinaryTreeBranchIndexFromInference(sequenceObservedColumns.databaseNetworkObject, conceptIndexKey, sequenceFeatureIndex, branchIndex)
+									branchIndex = selectFeatureBinaryTreeBranchIndexFromInference(sequenceObservedColumns.databaseNetworkObject, conceptIndexKey, globalFeatureIndex, branchIndex)
 							if(trainVerifyConnectionNonexistentAcrossBranches):
 								if(multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches):
-									branchIndex = selectFeatureBinaryTreeBranchIndexFromConnections(sequenceObservedColumns, conceptIndexKey, sequenceFeatureIndex, branchIndex)
-					if(useSANI):
-						if(multipleDendriticBranchesBinaryTree):
-							binaryTreeBranchIndices = calculateFeatureBinaryTreeBranchIndices(branchIndex, activeSequentialSegments)
-							featureNeuronsActive[binaryTreeBranchIndices, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
+									branchIndex = selectFeatureBinaryTreeBranchIndexFromConnections(sequenceObservedColumns, conceptIndexKey, globalFeatureIndex, branchIndex)
+						if(useSANI):
+							if(multipleDendriticBranchesBinaryTree):
+								binaryTreeBranchIndices = calculateFeatureBinaryTreeBranchIndices(branchIndex, activeSequentialSegments)
+								featureNeuronsActive[binaryTreeBranchIndices, activeSequentialSegments, sequenceConceptIndex, j] = 1
+							else:
+								featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, j] = 1
 						else:
-							featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
-					else:
-						featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, sequenceFeatureIndex] = 1
+							featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, j] = 1
+						featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, tokens[j].pos)
+						featureNeuronsPos[sequenceConceptIndex, j] = featurePos
+						featureNeuronsWordOrder[sequenceConceptIndex, j] = j
 				else:
-					sequenceFeatureIndex = getTokenFeatureIndexIfKnown(sequenceObservedColumns.databaseNetworkObject, tokens[j])
-					if(sequenceFeatureIndex is None):
-						continue
-					branchIndex = 0
-					if(multipleDendriticBranches):
-						observedColumn = sequenceObservedColumns.observedColumnsSequenceWordIndexDict.get(sequenceConceptWordIndex)
-						if(observedColumn is None):
-							raise RuntimeError("processFeatures error: missing observedColumn for sequence concept word index")
-						conceptIndexKey = observedColumn.conceptIndex
-						featureBranchCounts = branchCounters.get(conceptIndexKey)
-						if(featureBranchCounts is None):
-							featureBranchCounts = {}
-							branchCounters[conceptIndexKey] = featureBranchCounts
-						branchIndex = selectFeatureBranchIndex(featureBranchCounts, sequenceFeatureIndex)
-						if(multipleDendriticBranchesBinaryTree):
-							if(useTrainDuringInference):
-								if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
-									branchIndex = selectFeatureBinaryTreeBranchIndexFromInference(sequenceObservedColumns.databaseNetworkObject, conceptIndexKey, sequenceFeatureIndex, branchIndex)
-							if(trainVerifyConnectionNonexistentAcrossBranches):
-								if(multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches):
-									branchIndex = selectFeatureBinaryTreeBranchIndexFromConnections(sequenceObservedColumns, conceptIndexKey, sequenceFeatureIndex, branchIndex)
 					if(useSANI):
-						if(multipleDendriticBranchesBinaryTree):
-							binaryTreeBranchIndices = calculateFeatureBinaryTreeBranchIndices(branchIndex, activeSequentialSegments)
-							featureNeuronsActive[binaryTreeBranchIndices, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
-						else:
-							featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
+						featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, startIndices[sequenceConceptIndex]:endIndices[sequenceConceptIndex]] = 1
 					else:
-						featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, sequenceFeatureIndex] = 1
-				featureNeuronsWordOrder[sequenceConceptIndex, sequenceFeatureIndex] = j
-				featureNeuronsPos[sequenceConceptIndex, sequenceFeatureIndex] = featurePos
-	
+						featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, startIndices[sequenceConceptIndex]:endIndices[sequenceConceptIndex]] = 1
+				columnsWordOrder[sequenceConceptIndex] = sequenceConceptIndex
+				sequenceConceptIndexMask[:, sequenceConceptWordIndex] = 0
+				sequenceConceptIndexMask[sequenceConceptIndex, sequenceConceptWordIndex] = 1
+				if(not multipleDendriticBranches):
+					for j in range(startIndices[sequenceConceptIndex], endIndices[sequenceConceptIndex]):
+						featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, tokens[j].pos)
+						featureNeuronsPos[sequenceConceptIndex, j] = featurePos
+						featureNeuronsWordOrder[sequenceConceptIndex, j] = j
+			else:
+				for j in range(startIndices[i], endIndices[i]):
+					featureWord = tokens[j].word	#redundant: .lower()
+					featureLemma = tokens[j].lemma
+					featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, tokens[j].pos)
+					if(j in sequenceObservedColumns.columnsIndexSequenceWordIndexDict):
+						sequenceConceptWordIndex = j
+						columnsWordOrder[sequenceConceptIndex] = sequenceConceptIndex
+						if(useDedicatedConceptNames2):
+							sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[variablePrimeConceptFeatureNeuronName]
+						else:
+							if(tokeniserSubword and useDedicatedFeatureListsSubword):
+								sequenceFeatureIndex = getTokenFeatureIndex(sequenceObservedColumns.databaseNetworkObject, tokens[j])
+							else:
+								sequenceFeatureIndex = sequenceObservedColumns.featureWordToIndex[featureLemma]
+						branchIndex = 0
+						if(multipleDendriticBranches):
+							observedColumn = sequenceObservedColumns.observedColumnsSequenceWordIndexDict.get(sequenceConceptWordIndex)
+							if(observedColumn is None):
+								raise RuntimeError("processFeatures error: missing observedColumn for sequence concept word index")
+							conceptIndexKey = observedColumn.conceptIndex
+							featureBranchCounts = branchCounters.get(conceptIndexKey)
+							if(featureBranchCounts is None):
+								featureBranchCounts = {}
+								branchCounters[conceptIndexKey] = featureBranchCounts
+							branchIndex = selectFeatureBranchIndex(featureBranchCounts, sequenceFeatureIndex)
+							if(multipleDendriticBranchesBinaryTree):
+								if(useTrainDuringInference):
+									if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
+										branchIndex = selectFeatureBinaryTreeBranchIndexFromInference(sequenceObservedColumns.databaseNetworkObject, conceptIndexKey, sequenceFeatureIndex, branchIndex)
+								if(trainVerifyConnectionNonexistentAcrossBranches):
+									if(multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches):
+										branchIndex = selectFeatureBinaryTreeBranchIndexFromConnections(sequenceObservedColumns, conceptIndexKey, sequenceFeatureIndex, branchIndex)
+						if(useSANI):
+							if(multipleDendriticBranchesBinaryTree):
+								binaryTreeBranchIndices = calculateFeatureBinaryTreeBranchIndices(branchIndex, activeSequentialSegments)
+								featureNeuronsActive[binaryTreeBranchIndices, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
+							else:
+								featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
+						else:
+							featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, sequenceFeatureIndex] = 1
+					else:
+						sequenceFeatureIndex = getTokenFeatureIndexIfKnown(sequenceObservedColumns.databaseNetworkObject, tokens[j])
+						if(sequenceFeatureIndex is None):
+							continue
+						branchIndex = 0
+						if(multipleDendriticBranches):
+							observedColumn = sequenceObservedColumns.observedColumnsSequenceWordIndexDict.get(sequenceConceptWordIndex)
+							if(observedColumn is None):
+								raise RuntimeError("processFeatures error: missing observedColumn for sequence concept word index")
+							conceptIndexKey = observedColumn.conceptIndex
+							featureBranchCounts = branchCounters.get(conceptIndexKey)
+							if(featureBranchCounts is None):
+								featureBranchCounts = {}
+								branchCounters[conceptIndexKey] = featureBranchCounts
+							branchIndex = selectFeatureBranchIndex(featureBranchCounts, sequenceFeatureIndex)
+							if(multipleDendriticBranchesBinaryTree):
+								if(useTrainDuringInference):
+									if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
+										branchIndex = selectFeatureBinaryTreeBranchIndexFromInference(sequenceObservedColumns.databaseNetworkObject, conceptIndexKey, sequenceFeatureIndex, branchIndex)
+								if(trainVerifyConnectionNonexistentAcrossBranches):
+									if(multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches):
+										branchIndex = selectFeatureBinaryTreeBranchIndexFromConnections(sequenceObservedColumns, conceptIndexKey, sequenceFeatureIndex, branchIndex)
+						if(useSANI):
+							if(multipleDendriticBranchesBinaryTree):
+								binaryTreeBranchIndices = calculateFeatureBinaryTreeBranchIndices(branchIndex, activeSequentialSegments)
+								featureNeuronsActive[binaryTreeBranchIndices, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
+							else:
+								featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, sequenceFeatureIndex] = 1
+						else:
+							featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, sequenceFeatureIndex] = 1
+					featureNeuronsWordOrder[sequenceConceptIndex, sequenceFeatureIndex] = j
+					featureNeuronsPos[sequenceConceptIndex, sequenceFeatureIndex] = featurePos
+
 	featureNeuronsSegmentMask = featureNeuronsSegmentMask.swapdims(0, 1)	#swap from dims [c, s] to [s, c] (in line with featureNeuronsActive)
 	#print("featureNeuronsSegmentMask = ", featureNeuronsSegmentMask)	
 	if(debugDrawNeuronActivations):

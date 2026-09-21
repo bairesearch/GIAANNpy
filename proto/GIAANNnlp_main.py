@@ -158,20 +158,24 @@ def processDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset)
 	if(printTrainSequenceBar and trainMode):
 		GIAANNcmn_executionProgress.initialiseTrainSequenceBar(sequenceCount)
 
-	for articleIndex, datasetEntry in enumerate(dataset):
-		if(debugPrintSpacySectionTimes):
-			getDatasetEntryTextStartTime = None
-			getDatasetEntryTextDuration = 0.0
-			getDatasetEntryTextStartTime = time.perf_counter()
-		text = GIAANNnlp_datasets.getDatasetEntryText(datasetEntry, articleIndex)
-		if(datasetSanitiseNullCharacters):
-			text = sanitiseDatasetNullCharacters(text, articleIndex)
-		if(debugPrintSpacySectionTimes):
-			getDatasetEntryTextDuration = time.perf_counter() - getDatasetEntryTextStartTime
-			print(f"debugPrintSpacySectionTimes: articleIndex={articleIndex} sequenceCount={sequenceCount} sequenceCount={sequenceCount} datasetEntryTextSeconds={getDatasetEntryTextDuration:.6f}")
-		sequenceCount = processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, articleIndex)
-		if(sequenceCount >= trainMaxSequences and inferenceMode==False):
-			break
+	if(optimiseParallelisation3b and trainMode):
+		import GIAANNnlp_parallelisation3
+		sequenceCount = GIAANNnlp_parallelisation3.processDatasetPrefetched(databaseNetworkObject, sequenceCount, dataset)
+	else:
+		for articleIndex, datasetEntry in enumerate(dataset):
+			if(debugPrintSpacySectionTimes):
+				getDatasetEntryTextStartTime = None
+				getDatasetEntryTextDuration = 0.0
+				getDatasetEntryTextStartTime = time.perf_counter()
+			text = GIAANNnlp_datasets.getDatasetEntryText(datasetEntry, articleIndex)
+			if(datasetSanitiseNullCharacters):
+				text = sanitiseDatasetNullCharacters(text, articleIndex)
+			if(debugPrintSpacySectionTimes):
+				getDatasetEntryTextDuration = time.perf_counter() - getDatasetEntryTextStartTime
+				print(f"debugPrintSpacySectionTimes: articleIndex={articleIndex} sequenceCount={sequenceCount} sequenceCount={sequenceCount} datasetEntryTextSeconds={getDatasetEntryTextDuration:.6f}")
+			sequenceCount = processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, articleIndex)
+			if(sequenceCount >= trainMaxSequences and inferenceMode==False):
+				break
 	return sequenceCount
 
 def sanitiseDatasetNullCharacters(text, articleIndex):
@@ -578,7 +582,11 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 	if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
 		GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("firstPass")
 	
-	conceptsFound, conceptMask = GIAANNnlp_sequenceConcepts.firstPass(databaseNetworkObject, sequence, allowNewFeatures)
+	if(optimiseParallelisation3d and trainMode):
+		tokens = GIAANNnlp_sequenceTokens.getTokens(sequence)
+		conceptsFound, conceptMask = GIAANNnlp_sequenceConcepts.firstPass(databaseNetworkObject, sequence, allowNewFeatures, tokens)
+	else:
+		conceptsFound, conceptMask = GIAANNnlp_sequenceConcepts.firstPass(databaseNetworkObject, sequence, allowNewFeatures)
 	
 	if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
 		GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("firstPass")
@@ -590,7 +598,8 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		if(debugPrintTrainSectionTimes and trainMode):
 			getTokensStartTime = time.perf_counter()
 		
-		tokens = GIAANNnlp_sequenceTokens.getTokens(sequence)
+		if(not optimiseParallelisation3d or not trainMode):
+			tokens = GIAANNnlp_sequenceTokens.getTokens(sequence)
 		if(inferenceMode and useTrainDuringInference and inferenceSuccessfulPredictionMask is None):
 			inferenceSuccessfulPredictionMask = GIAANNcmn_prediction.createInferenceSuccessfulPredictionMask(tokens)
 		

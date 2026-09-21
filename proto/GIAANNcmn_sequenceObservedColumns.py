@@ -26,6 +26,10 @@ import GIAANNcmn_sparseTensors
 import GIAANNnlp_sequenceConcepts
 if(optimisationUseCUDAObservedColumnUpdateKernel):
 	import GIAANNcmn_cudaObservedColumnUpdate
+if(optimiseParallelisation1):
+	import GIAANNcmn_cpuObservedColumnUpdate
+if(optimiseParallelisation2e):
+	import GIAANNcmn_cpuParallelisation2
 if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 	import GIAANNnlp_auxiliaryNeuronsAuto
 
@@ -177,6 +181,8 @@ class SequenceObservedColumns:
 		#note cs may be slightly longer than number of unique columns in the sequence, if there are multiple instances of the same concept/noun lemma in the sequence
 	
 		self.databaseNetworkObject = databaseNetworkObject
+		if(optimiseParallelisation3d):
+			self.parallelisation3TrainMetadata = not inferenceMode
 		self.observedColumnsDict = observedColumnsDict	# key: lemma, value: ObservedColumn
 		self.observedColumnsSequenceWordIndexDict = observedColumnsSequenceWordIndexDict	# key: sequence word index, value: ObservedColumn
 		self.noDelimiterDetectedBetweenConceptTokens = False
@@ -253,7 +259,10 @@ class SequenceObservedColumns:
 			self.columnStartIndicesTensor = None
 			self.columnEndIndicesTensor = None
 			self.columnFeatureLocalIndices = None
-			self.computeColumnLocalFeatureMaps(tokens)
+			if(optimiseParallelisation3d and not inferenceMode):
+				self.prepareTrainConceptMetadata(tokens)
+			else:
+				self.computeColumnLocalFeatureMaps(tokens)
 
 			# Initialize arrays
 			if(trainSparseNeuronsTensor and not inferenceMode):
@@ -285,6 +294,26 @@ class SequenceObservedColumns:
 				GIAANNnlp_sequenceConcepts.processConceptWords(self, 0, tokens, tokens)
 			self.featureNeurons = None
 			self.featureConnections = None
+
+	def prepareTrainConceptMetadata(self, tokens):
+		if(optimiseParallelisation3d):
+			if(not self.parallelisation3TrainMetadata or tokens is not self.tokens or not trainSequenceObservedColumnsMatchSequenceWords):
+				raise RuntimeError("optimiseParallelisation3d requires sequence-local training tokens and matching sequence columns")
+			self.parallelisation3ConceptResult = GIAANNnlp_sequenceConcepts.processConceptWords(self, 0, tokens, tokens)
+			if(self.parallelisation3ConceptResult is not None):
+				conceptIndices, self.columnStartIndicesTensor, self.columnEndIndicesTensor = self.parallelisation3ConceptResult
+		return
+
+	def getTrainConceptMetadata(self, sequence, tokens):
+		result = None
+		if(optimiseParallelisation3d):
+			if(not self.parallelisation3TrainMetadata or tokens is not self.tokens or len(sequence) != len(tokens) or not hasattr(self, "parallelisation3ConceptResult")):
+				raise RuntimeError("optimiseParallelisation3d training metadata does not belong to this sequence")
+			result = self.parallelisation3ConceptResult
+			if(printSequenceConceptAssignment and result is not None):
+				conceptIndices, startIndices, endIndices = result
+				self.sentenceWithConceptAssignment = GIAANNnlp_sequenceConcepts.buildSequenceConceptAssignment(self, sequence, tokens, conceptIndices, startIndices, endIndices)
+		return result
 
 	def identifyObservedColumnFeatureWords(self, tokens, observedColumn):
 		if(trainSequenceObservedColumnsUseSequenceFeaturesOnly):
@@ -1248,120 +1277,126 @@ class SequenceObservedColumns:
 			GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal(updateObservedColumnsEfficientFeatureNeuronsPhaseLabel)
 
 		#A: update feature neurons;
-		if(optimisationArrayIndexPropertiesEfficientSerialNeurons):
-			featureRanges, featureIndicesSorted, featureValuesSorted = self.buildSparseColumnRanges(featureIndices, featureValues, 2)
-			
-			globalFeatureNeurons = None
-			globalFeatureNeuronUpdates = None
-			if(storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode):
-				globalFeatureNeurons = self.databaseNetworkObject.globalFeatureNeurons
-				if(optimisationCombineSparseUpdatesPerSequence):
-					globalFeatureNeuronUpdates = []
-			
-			for cIdx, observedColumn in sequenceObservedColumnsDict.items():
-				conceptIndex = observedColumn.conceptIndex
-
-				#A: update feature neurons;
-				if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
-					featureTargetSparse = observedColumn.featureNeurons
-					featureTargetSize = featureTargetSparse.size()
-				else:
-					featureTargetSparse = globalFeatureNeurons
-					featureTargetSize = globalFeatureNeurons.size()
-				featureRange = featureRanges.get(cIdx)
-				if(featureRange is not None):
-					start, end = featureRange
-					featureUpdateIndices = featureIndicesSorted[:, start:end]
-					featureUpdateValues = featureValuesSorted[start:end]
-					featureUpdates = self.buildFeaturePropertyUpdateSparse(featureUpdateIndices, featureUpdateValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, featureTargetSize, insertConceptIndex=None if not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode) else conceptIndex)
-					if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
-						featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
-					else:
-						if(optimisationCombineSparseUpdatesPerSequence):
-							globalFeatureNeuronUpdates.append(featureUpdates)
-						else:
-							featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
-				if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
-					observedColumn.featureNeurons = featureTargetSparse
-				else:
-					if(not optimisationCombineSparseUpdatesPerSequence):
-						globalFeatureNeurons = featureTargetSparse
-
-			if(storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode):
-				if(optimisationCombineSparseUpdatesPerSequence):
-					if(globalFeatureNeuronUpdates is None):
-						raise RuntimeError("updateObservedColumnsEfficient error: globalFeatureNeuronUpdates is None while optimisationCombineSparseUpdatesPerSequence")
-					if(len(globalFeatureNeuronUpdates) > 0):
-						combinedFeatureUpdates = self.combineSparseUpdatesList(globalFeatureNeuronUpdates, globalFeatureNeurons.size())
-						globalFeatureNeurons = self.addSparseUpdateNonNegative(globalFeatureNeurons, combinedFeatureUpdates)
-				self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
+		if(optimiseParallelisation2e):
+			GIAANNcmn_cpuParallelisation2.updateFeatureNeurons(self, observedColumnsByConceptIndex, featureIndices, featureValues, featureIndicesObservedFeatureDevice, conceptIndicesFeatureTensor)
 		else:
-			if(featureIndices.numel() > 0):
-				if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
-					featureConceptIndicesUnique = pt.unique(conceptIndicesFeatureTensor[featureIndices[2]], sorted=True)
-					featureTargetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, featureConceptIndicesUnique.shape[0], databaseNetworkObject.f)
-					featureTargetSparse = self.gatherFeatureNeuronConceptBucketTensor(observedColumnsByConceptIndex, featureConceptIndicesUnique, featureDevice)
-					featureUpdates = self.buildFeaturePropertyUpdateSparseBatched(featureIndices, featureValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, conceptIndicesFeatureTensor, featureTargetSize, featureConceptIndicesUnique)
-					featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
-					self.scatterFeatureNeuronConceptBucketTensor(observedColumnsByConceptIndex, featureConceptIndicesUnique, featureTargetSparse)
-				else:
+			if(optimisationArrayIndexPropertiesEfficientSerialNeurons):
+				featureRanges, featureIndicesSorted, featureValuesSorted = self.buildSparseColumnRanges(featureIndices, featureValues, 2)
+
+				globalFeatureNeurons = None
+				globalFeatureNeuronUpdates = None
+				if(storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode):
 					globalFeatureNeurons = self.databaseNetworkObject.globalFeatureNeurons
-					featureUpdates = self.buildFeaturePropertyUpdateSparseBatched(featureIndices, featureValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, conceptIndicesFeatureTensor, globalFeatureNeurons.size())
-					globalFeatureNeurons = self.addSparseUpdateNonNegative(globalFeatureNeurons, featureUpdates)
+					if(optimisationCombineSparseUpdatesPerSequence):
+						globalFeatureNeuronUpdates = []
+
+				for cIdx, observedColumn in sequenceObservedColumnsDict.items():
+					conceptIndex = observedColumn.conceptIndex
+
+					#A: update feature neurons;
+					if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
+						featureTargetSparse = observedColumn.featureNeurons
+						featureTargetSize = featureTargetSparse.size()
+					else:
+						featureTargetSparse = globalFeatureNeurons
+						featureTargetSize = globalFeatureNeurons.size()
+					featureRange = featureRanges.get(cIdx)
+					if(featureRange is not None):
+						start, end = featureRange
+						featureUpdateIndices = featureIndicesSorted[:, start:end]
+						featureUpdateValues = featureValuesSorted[start:end]
+						featureUpdates = self.buildFeaturePropertyUpdateSparse(featureUpdateIndices, featureUpdateValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, featureTargetSize, insertConceptIndex=None if not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode) else conceptIndex)
+						if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
+							featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
+						else:
+							if(optimisationCombineSparseUpdatesPerSequence):
+								globalFeatureNeuronUpdates.append(featureUpdates)
+							else:
+								featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
+					if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
+						observedColumn.featureNeurons = featureTargetSparse
+					else:
+						if(not optimisationCombineSparseUpdatesPerSequence):
+							globalFeatureNeurons = featureTargetSparse
+
+				if(storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode):
+					if(optimisationCombineSparseUpdatesPerSequence):
+						if(globalFeatureNeuronUpdates is None):
+							raise RuntimeError("updateObservedColumnsEfficient error: globalFeatureNeuronUpdates is None while optimisationCombineSparseUpdatesPerSequence")
+						if(len(globalFeatureNeuronUpdates) > 0):
+							combinedFeatureUpdates = self.combineSparseUpdatesList(globalFeatureNeuronUpdates, globalFeatureNeurons.size())
+							globalFeatureNeurons = self.addSparseUpdateNonNegative(globalFeatureNeurons, combinedFeatureUpdates)
 					self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
+			else:
+				if(featureIndices.numel() > 0):
+					if(not (storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode)):
+						featureConceptIndicesUnique = pt.unique(conceptIndicesFeatureTensor[featureIndices[2]], sorted=True)
+						featureTargetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, featureConceptIndicesUnique.shape[0], databaseNetworkObject.f)
+						featureTargetSparse = self.gatherFeatureNeuronConceptBucketTensor(observedColumnsByConceptIndex, featureConceptIndicesUnique, featureDevice)
+						featureUpdates = self.buildFeaturePropertyUpdateSparseBatched(featureIndices, featureValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, conceptIndicesFeatureTensor, featureTargetSize, featureConceptIndicesUnique)
+						featureTargetSparse = self.addSparseUpdateNonNegative(featureTargetSparse, featureUpdates)
+						self.scatterFeatureNeuronConceptBucketTensor(observedColumnsByConceptIndex, featureConceptIndicesUnique, featureTargetSparse)
+					else:
+						globalFeatureNeurons = self.databaseNetworkObject.globalFeatureNeurons
+						featureUpdates = self.buildFeaturePropertyUpdateSparseBatched(featureIndices, featureValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedFeatureDevice, conceptIndicesFeatureTensor, globalFeatureNeurons.size())
+						globalFeatureNeurons = self.addSparseUpdateNonNegative(globalFeatureNeurons, featureUpdates)
+						self.databaseNetworkObject.globalFeatureNeurons = globalFeatureNeurons
 		if(updateObservedColumnsEfficientFeatureNeuronsPhaseLabel is not None):
 			GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocalGrouped(updateObservedColumnsEfficientFeatureNeuronsPhaseLabel, updateObservedColumnsEfficientAggregatePhaseLabel)
 			GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal(updateObservedColumnsEfficientFeatureConnectionsPhaseLabel)
 
 		#B: update feature connections;
-		if(optimisationArrayIndexPropertiesEfficientSerialConnections):
-			connectionStorageDevice = self.getConnectionSerialStorageDevice()
-
-			connectionRanges, connectionIndicesSorted, connectionValuesSorted = self.buildSparseColumnRanges(connectionIndices, connectionValues, 2)
-
-			for cIdx, observedColumn in sequenceObservedColumnsDict.items():
-				connectionRange = connectionRanges.get(cIdx)
-				if(connectionRange is not None):
-					connectionTargetSize = observedColumn.getFeatureConnectionsTargetSize()
-					connectionTargetsBySourceFeature = {}
-					start, end = connectionRange
-					connectionUpdateIndices = connectionIndicesSorted[:, start:end]
-					connectionUpdateValues = connectionValuesSorted[start:end]
-					self.applyConnectionSourceFeaturePropertyUpdates(connectionTargetsBySourceFeature, observedColumn, connectionUpdateIndices, connectionUpdateValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor, connectionTargetSize, connectionDevice, connectionStorageDevice)
-					updatedSourceFeatureIndices = sorted(connectionTargetsBySourceFeature.keys())
-					for sourceFeatureIndex in updatedSourceFeatureIndices:
-						observedColumn.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, connectionTargetsBySourceFeature[sourceFeatureIndex])
-					if(len(updatedSourceFeatureIndices) > 0):
-						combinedUpdatedSourceFeatureIndices = sorted(set(observedColumn.getTrainPreparedSourceFeatureIndices() + updatedSourceFeatureIndices))
-						observedColumn.setTrainPreparedSourceFeatureIndices(combinedUpdatedSourceFeatureIndices)
+		if(optimiseParallelisation1):
+			GIAANNcmn_cpuObservedColumnUpdate.updateConnectionSources(self, observedColumnsByConceptIndex, connectionIndices, connectionValues, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor)
 		else:
-			if(connectionIndices.numel() > 0):
-				connectionSourceCombinedKeys = self.buildConnectionSourceCombinedKeys(connectionIndices, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor)
-			if(connectionSourceCombinedKeys is not None and connectionSourceCombinedKeys.numel() > 0):
-				connectionSourceCombinedKeysUnique = pt.unique(connectionSourceCombinedKeys, sorted=True)
-				connectionTargetConceptIndicesUnique = None
-				connectionTargetSequenceBucketLookup = None
-				if(useDedicatedConceptListsSubword):
-					connectionTargetSequenceConceptIndicesUnique = pt.unique(connectionIndices[4], sorted=True)
-					connectionTargetConceptIndicesUnique = pt.unique(conceptIndicesConnectionTensor[connectionTargetSequenceConceptIndicesUnique], sorted=True)
-					connectionTargetSequenceBucketLookup = self.buildConnectionTargetSequenceBucketLookup(connectionTargetSequenceConceptIndicesUnique, connectionTargetConceptIndicesUnique, conceptIndicesConnectionTensor, connectionDevice)
-					connectionTargetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, connectionSourceCombinedKeysUnique.shape[0], connectionTargetConceptIndicesUnique.shape[0], databaseNetworkObject.f)
-					connectionTargetSparse = self.gatherConnectionSourceTargetBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionTargetConceptIndicesUnique, connectionDevice)
-				else:
-					connectionTargetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, connectionSourceCombinedKeysUnique.shape[0], databaseNetworkObject.c, databaseNetworkObject.f)
-					connectionTargetSparse = self.gatherConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionDevice)
+			if(optimisationArrayIndexPropertiesEfficientSerialConnections):
+				connectionStorageDevice = self.getConnectionSerialStorageDevice()
+
+				connectionRanges, connectionIndicesSorted, connectionValuesSorted = self.buildSparseColumnRanges(connectionIndices, connectionValues, 2)
+
+				for cIdx, observedColumn in sequenceObservedColumnsDict.items():
+					connectionRange = connectionRanges.get(cIdx)
+					if(connectionRange is not None):
+						connectionTargetSize = observedColumn.getFeatureConnectionsTargetSize()
+						connectionTargetsBySourceFeature = {}
+						start, end = connectionRange
+						connectionUpdateIndices = connectionIndicesSorted[:, start:end]
+						connectionUpdateValues = connectionValuesSorted[start:end]
+						self.applyConnectionSourceFeaturePropertyUpdates(connectionTargetsBySourceFeature, observedColumn, connectionUpdateIndices, connectionUpdateValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor, connectionTargetSize, connectionDevice, connectionStorageDevice)
+						updatedSourceFeatureIndices = sorted(connectionTargetsBySourceFeature.keys())
+						for sourceFeatureIndex in updatedSourceFeatureIndices:
+							observedColumn.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, connectionTargetsBySourceFeature[sourceFeatureIndex])
+						if(len(updatedSourceFeatureIndices) > 0):
+							combinedUpdatedSourceFeatureIndices = sorted(set(observedColumn.getTrainPreparedSourceFeatureIndices() + updatedSourceFeatureIndices))
+							observedColumn.setTrainPreparedSourceFeatureIndices(combinedUpdatedSourceFeatureIndices)
+			else:
 				if(connectionIndices.numel() > 0):
-					connectionUpdates = self.buildConnectionSourceBucketUpdateSparse(connectionIndices, connectionValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor, connectionSourceCombinedKeysUnique, connectionTargetSize, connectionTargetConceptIndicesUnique, connectionTargetSequenceBucketLookup)
-					if(trainVerifyConnectionNonexistentAcrossBranches):
-						connectionUpdates = filterTrainVerifyConnectionNonexistentAcrossBranchesUpdates(connectionTargetSparse, connectionUpdates, databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
-					connectionTargetSparse = self.addSparseUpdateNonNegative(connectionTargetSparse, connectionUpdates)
-					if(inferenceDuringTrainAdjustSynapseStrength):
-						if(inferenceDuringTrainAdjustSynapseStrengthDecrementInference):
-							connectionTargetSparse = self.clampAndPruneConnectionStrengthSparse(connectionTargetSparse)
-				if(useDedicatedConceptListsSubword):
-					self.scatterConnectionSourceTargetBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionTargetConceptIndicesUnique, connectionTargetSparse)
-				else:
-					self.scatterConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionTargetSparse)
+					connectionSourceCombinedKeys = self.buildConnectionSourceCombinedKeys(connectionIndices, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor)
+				if(connectionSourceCombinedKeys is not None and connectionSourceCombinedKeys.numel() > 0):
+					connectionSourceCombinedKeysUnique = pt.unique(connectionSourceCombinedKeys, sorted=True)
+					connectionTargetConceptIndicesUnique = None
+					connectionTargetSequenceBucketLookup = None
+					if(useDedicatedConceptListsSubword):
+						connectionTargetSequenceConceptIndicesUnique = pt.unique(connectionIndices[4], sorted=True)
+						connectionTargetConceptIndicesUnique = pt.unique(conceptIndicesConnectionTensor[connectionTargetSequenceConceptIndicesUnique], sorted=True)
+						connectionTargetSequenceBucketLookup = self.buildConnectionTargetSequenceBucketLookup(connectionTargetSequenceConceptIndicesUnique, connectionTargetConceptIndicesUnique, conceptIndicesConnectionTensor, connectionDevice)
+						connectionTargetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, connectionSourceCombinedKeysUnique.shape[0], connectionTargetConceptIndicesUnique.shape[0], databaseNetworkObject.f)
+						connectionTargetSparse = self.gatherConnectionSourceTargetBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionTargetConceptIndicesUnique, connectionDevice)
+					else:
+						connectionTargetSize = (databaseNetworkObject.arrayNumberOfProperties, multipleDendriticBranchesNumber, arrayNumberOfSegments, connectionSourceCombinedKeysUnique.shape[0], databaseNetworkObject.c, databaseNetworkObject.f)
+						connectionTargetSparse = self.gatherConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionDevice)
+					if(connectionIndices.numel() > 0):
+						connectionUpdates = self.buildConnectionSourceBucketUpdateSparse(connectionIndices, connectionValues, databaseNetworkObject.arrayIndexPropertiesStrengthIndex, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor, connectionSourceCombinedKeysUnique, connectionTargetSize, connectionTargetConceptIndicesUnique, connectionTargetSequenceBucketLookup)
+						if(trainVerifyConnectionNonexistentAcrossBranches):
+							connectionUpdates = filterTrainVerifyConnectionNonexistentAcrossBranchesUpdates(connectionTargetSparse, connectionUpdates, databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
+						connectionTargetSparse = self.addSparseUpdateNonNegative(connectionTargetSparse, connectionUpdates)
+						if(inferenceDuringTrainAdjustSynapseStrength):
+							if(inferenceDuringTrainAdjustSynapseStrengthDecrementInference):
+								connectionTargetSparse = self.clampAndPruneConnectionStrengthSparse(connectionTargetSparse)
+					if(useDedicatedConceptListsSubword):
+						self.scatterConnectionSourceTargetBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionTargetConceptIndicesUnique, connectionTargetSparse)
+					else:
+						self.scatterConnectionSourceBucketTensor(observedColumnsByConceptIndex, connectionSourceCombinedKeysUnique, connectionTargetSparse)
 		if(updateObservedColumnsEfficientFeatureConnectionsPhaseLabel is not None):
 			GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocalGrouped(updateObservedColumnsEfficientFeatureConnectionsPhaseLabel, updateObservedColumnsEfficientAggregatePhaseLabel)
 			
