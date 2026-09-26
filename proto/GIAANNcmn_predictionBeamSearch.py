@@ -30,6 +30,8 @@ import GIAANNcmn_databaseNetwork
 import GIAANNcmn_sparseTensors
 import GIAANNcmn_predictionActivate
 import GIAANNcmn_predictionConstraints
+if(optimiseInferenceCandidateLookup):
+	import GIAANNcmn_predictionSparse
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	import GIAANNnlp_auxiliaryNeuronsSimilarWords
 
@@ -516,9 +518,14 @@ def calculateSelectionActivationDistribution(databaseNetworkObject, stateFeature
 	activationValues = None
 	stateFeaturesSelection = stateFeatures
 	requiredSegmentKeys = None
+	if(optimiseInferenceCandidateLookup):
+		stateFeaturesSelection = GIAANNcmn_predictionSparse.selectInferenceCandidateActivationState(stateFeatures, somaActivationFromLastSegmentKeys)
 	if(inferenceReviewPatch11ProspectiveColumnScoring):
 		if(inferenceLeakyIntegrateAndFire and (useSANIcolumns or useSANIfeaturesAndColumns)):
-			stateFeaturesSelection = createReviewProspectiveColumnSelectionState(stateFeatures, selectedColumnIndex)
+			if(optimiseInferenceCandidateLookup):
+				stateFeaturesSelection = createReviewProspectiveColumnSelectionState(stateFeaturesSelection, selectedColumnIndex)
+			else:
+				stateFeaturesSelection = createReviewProspectiveColumnSelectionState(stateFeatures, selectedColumnIndex)
 	if(inferenceReviewPatch12RetainContextWithoutOutgoingSource):
 		if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 			if(connectedColumnsTensor is not None and connectedColumnsTensor.numel() == arrayIndexSegmentFirst):

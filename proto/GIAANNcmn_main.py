@@ -18,6 +18,8 @@ pip install matplotlib
 pip install tqdm
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 datasetsLibrary4plus=False: pip install "datasets<4" "fsspec==2024.6.1" "gcsfs==2024.6.1"
+pip install ninja
+sudo apt install -y build-essential
 
 ## modality NLP:
 pip install spacy
@@ -27,7 +29,6 @@ python -c "import nltk; nltk.download('wordnet')"
 python -c "import nltk; nltk.download('treebank'); nltk.download('conll2000')"
 pip install tiktoken
 hf auth login
-
 
 ## modality OR (dev only):
 pip install opencv-python
@@ -252,6 +253,7 @@ def executeMode(inferenceMode):
 			GIAANNnlp_groundedEval.printInferenceGroundedAccuracy(databaseNetworkObject)
 
 	if(not inferenceMode and useModalityNLP and debugPrintTrainTotalWords): print("debugPrintTrainTotalWords: totalTrainWords = ", GIAANNcmn_debug.totalTrainWords)
+	if(not inferenceMode and useModalityNLP and debugPrintTrainTotalWhitespaceWords): print(debugPrintTrainTotalWhitespaceWordsLabel, GIAANNcmn_debug.totalTrainWhitespaceWords)
 	if(not inferenceMode and useModalityNLP and debugPrintTrainTotalTokens): print("debugPrintTrainTotalTokens: totalTrainTokens = ", GIAANNcmn_debug.totalTrainTokens)
 	if(debugPrintSpacySectionTimes):
 		processArticlePart1averageTime = processArticlePart1totalTime/processArticlePart1count

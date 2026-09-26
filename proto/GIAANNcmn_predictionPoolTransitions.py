@@ -6,10 +6,17 @@ Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch
 # License:
 MIT License
 
+# Installation:
+see GIAANNcmn_main.py
+
+# Usage:
+see GIAANNcmn_main.py
+
 # Description:
 Pool immediate trained transitions across representations of the same token.
 
 """
+
 
 from array import array
 from numbers import Integral

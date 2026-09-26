@@ -167,7 +167,7 @@ class ObservedColumnConnectionBase:
 		return
 
 	def prepareRequiredSourceFeatureConnectionsTrain(self, requiredSourceFeatureIndices, targetDevice, createMissing=False):
-		if(optimiseParallelisation3c):
+		if(optimiseTrainParallelisation3c):
 			self.prepareRequiredSourceFeatureConnectionsBulk(requiredSourceFeatureIndices, targetDevice)
 		else:
 			if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam and useGPUdatabase != useGPUsparse):
@@ -177,12 +177,12 @@ class ObservedColumnConnectionBase:
 		return
 
 	def prepareRequiredSourceFeatureConnectionsBulk(self, requiredSourceFeatureIndices, targetDevice):
-		if(optimiseParallelisation3c):
+		if(optimiseTrainParallelisation3c):
 			if(not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam or not self.databaseNetworkObject.observedColumnsRAMLoaded or not self.isDatabaseResidentConnectionStorage() or self.databaseNetworkObject.inferenceMode or optimisationStoreDatabaseResidentCoordinatesAsInt32):
-				raise RuntimeError("optimiseParallelisation3c requires loaded, unpacked RAM-resident training connections")
+				raise RuntimeError("optimiseTrainParallelisation3c requires loaded, unpacked RAM-resident training connections")
 			resolvedTargetDevice = pt.device(targetDevice if targetDevice is not None else self.getDefaultConnectionTargetDevice())
 			if(resolvedTargetDevice.type != "cpu" or pt.device(deviceDatabase).type != "cpu"):
-				raise RuntimeError("optimiseParallelisation3c requires CPU source tensors")
+				raise RuntimeError("optimiseTrainParallelisation3c requires CPU source tensors")
 			sourceIndices = self.normaliseSourceFeatureIndices(requiredSourceFeatureIndices)
 			targetSize = self.getFeatureConnectionsTargetSize()
 			for sourceIndex in sourceIndices:
@@ -193,13 +193,13 @@ class ObservedColumnConnectionBase:
 					self.featureConnectionsBySourceFeature[sourceIndex] = tensor
 				else:
 					if(not pt.is_tensor(tensor) or tensor.layout != pt.sparse_coo or tensor.dim() != parallelisation3SourceTensorRank or tensor.device.type != "cpu"):
-						raise RuntimeError("optimiseParallelisation3c requires rank-five CPU sparse COO source tensors")
+						raise RuntimeError("optimiseTrainParallelisation3c requires rank-five CPU sparse COO source tensors")
 					shape = tuple(tensor.shape)
 					if(shape[:parallelisation3SourceConceptDimension] != targetSize[:parallelisation3SourceConceptDimension]):
-						raise RuntimeError("optimiseParallelisation3c source property/branch/segment dimensions do not match the database")
+						raise RuntimeError("optimiseTrainParallelisation3c source property/branch/segment dimensions do not match the database")
 					if(shape[parallelisation3SourceConceptDimension] < targetSize[parallelisation3SourceConceptDimension] or shape[parallelisation3SourceFeatureDimension] < targetSize[parallelisation3SourceFeatureDimension]):
 						expandedSize = shape[:parallelisation3SourceConceptDimension] + (max(shape[parallelisation3SourceConceptDimension], targetSize[parallelisation3SourceConceptDimension]), max(shape[parallelisation3SourceFeatureDimension], targetSize[parallelisation3SourceFeatureDimension]))
-						self.featureConnectionsBySourceFeature[sourceIndex] = GIAANNcmn_databaseNetworkFiles.expandSparseTensorSize(tensor, expandedSize, "optimiseParallelisation3c")
+						self.featureConnectionsBySourceFeature[sourceIndex] = GIAANNcmn_databaseNetworkFiles.expandSparseTensorSize(tensor, expandedSize, "optimiseTrainParallelisation3c")
 			self.loadedSourceFeatureIndices.update(sourceIndices)
 		return
 	

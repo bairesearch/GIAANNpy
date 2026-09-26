@@ -122,33 +122,71 @@ def propagateLeakyIntegrateAndFireActivations(globalFeatureNeuronsActivation):
 				raise RuntimeError("propagateLeakyIntegrateAndFireActivations error: segment index out of range")
 			if(bool(pt.any(branchIndices < arrayIndexSegmentFirst).item()) or bool(pt.any(branchIndices >= multipleDendriticBranchesNumber).item())):
 				raise RuntimeError("propagateLeakyIntegrateAndFireActivations error: branch index out of range")
-		dendriticMask = activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] < arrayIndexSegmentSoma
-		somaMask = activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
-		stationaryColumnIndices = pt.empty((activationIndices.shape[0], arrayIndexSegmentFirst), dtype=activationIndices.dtype, device=activationIndices.device)
-		stationaryColumnValues = pt.empty((arrayIndexSegmentFirst,), dtype=activationValues.dtype, device=activationValues.device)
-		propagatedDendriticMask = dendriticMask
-		if(useSANIcolumns or useSANIfeaturesAndColumns):
-			if(arrayIndexSegmentLastColumn < arrayIndexSegmentFirst or arrayIndexSegmentLastColumn >= arrayIndexSegmentSoma):
-				raise RuntimeError("propagateLeakyIntegrateAndFireActivations error: last column segment index out of range")
-			columnMask = dendriticMask & (activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] <= arrayIndexSegmentLastColumn)
-			propagatedDendriticMask = dendriticMask & pt.logical_not(columnMask)
-			stationaryColumnIndices = activationIndices[:, columnMask]
-			stationaryColumnValues = activationValues[columnMask]
-		propagatedIndices = activationIndices[:, propagatedDendriticMask].clone()
-		propagatedValues = activationValues[propagatedDendriticMask]
-		if(propagatedIndices.shape[1] > 0):
-			propagatedIndices[inferenceLeakyIntegrateAndFireSegmentDimension] += 1
-			propagatedToSomaMask = propagatedIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
-			if(multipleDendriticBranchesBinaryTree):
-				propagatedWithinDendritesMask = pt.logical_not(propagatedToSomaMask)
-				propagatedIndices[inferenceLeakyIntegrateAndFireBranchDimension, propagatedWithinDendritesMask] = pt.div(propagatedIndices[inferenceLeakyIntegrateAndFireBranchDimension, propagatedWithinDendritesMask], multipleDendriticBranchesBinaryTreeBranchingFactor, rounding_mode="floor")
-		somaIndices = activationIndices[:, somaMask].clone()
-		somaValues = activationValues[somaMask]
-		resultIndices = pt.cat((stationaryColumnIndices, propagatedIndices, somaIndices), dim=1)
-		resultValues = pt.cat((stationaryColumnValues, propagatedValues, somaValues), dim=0)
-		result = pt.sparse_coo_tensor(resultIndices, resultValues, size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
+		if(optimiseInferenceSparsePropagation):
+			result = propagateOrderedLeakyIntegrateAndFireActivations(activationSparse)
+		else:
+			dendriticMask = activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] < arrayIndexSegmentSoma
+			somaMask = activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
+			stationaryColumnIndices = pt.empty((activationIndices.shape[0], arrayIndexSegmentFirst), dtype=activationIndices.dtype, device=activationIndices.device)
+			stationaryColumnValues = pt.empty((arrayIndexSegmentFirst,), dtype=activationValues.dtype, device=activationValues.device)
+			propagatedDendriticMask = dendriticMask
+			if(useSANIcolumns or useSANIfeaturesAndColumns):
+				if(arrayIndexSegmentLastColumn < arrayIndexSegmentFirst or arrayIndexSegmentLastColumn >= arrayIndexSegmentSoma):
+					raise RuntimeError("propagateLeakyIntegrateAndFireActivations error: last column segment index out of range")
+				columnMask = dendriticMask & (activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] <= arrayIndexSegmentLastColumn)
+				propagatedDendriticMask = dendriticMask & pt.logical_not(columnMask)
+				stationaryColumnIndices = activationIndices[:, columnMask]
+				stationaryColumnValues = activationValues[columnMask]
+			propagatedIndices = activationIndices[:, propagatedDendriticMask].clone()
+			propagatedValues = activationValues[propagatedDendriticMask]
+			if(propagatedIndices.shape[1] > 0):
+				propagatedIndices[inferenceLeakyIntegrateAndFireSegmentDimension] += 1
+				propagatedToSomaMask = propagatedIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
+				if(multipleDendriticBranchesBinaryTree):
+					propagatedWithinDendritesMask = pt.logical_not(propagatedToSomaMask)
+					propagatedIndices[inferenceLeakyIntegrateAndFireBranchDimension, propagatedWithinDendritesMask] = pt.div(propagatedIndices[inferenceLeakyIntegrateAndFireBranchDimension, propagatedWithinDendritesMask], multipleDendriticBranchesBinaryTreeBranchingFactor, rounding_mode="floor")
+			somaIndices = activationIndices[:, somaMask].clone()
+			somaValues = activationValues[somaMask]
+			resultIndices = pt.cat((stationaryColumnIndices, propagatedIndices, somaIndices), dim=1)
+			resultValues = pt.cat((stationaryColumnValues, propagatedValues, somaValues), dim=0)
+			result = pt.sparse_coo_tensor(resultIndices, resultValues, size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
 	else:
 		raise RuntimeError("propagateLeakyIntegrateAndFireActivations error: requires inferenceLeakyIntegrateAndFire")
+	return result
+
+def propagateOrderedLeakyIntegrateAndFireActivations(activationSparse):
+	result = None
+	if(optimiseInferenceSparsePropagation):
+		if(not inferenceLeakyIntegrateAndFire or multipleDendriticBranchesBinaryTree or multipleDendriticBranchesNumber <= arrayIndexSegmentFirst or not isinstance(activationSparse, pt.Tensor) or not activationSparse.is_sparse or not activationSparse.is_coalesced() or activationSparse.dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or activationSparse.sparse_dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or activationSparse.shape[inferenceLeakyIntegrateAndFireBranchDimension] != multipleDendriticBranchesNumber or activationSparse.shape[inferenceLeakyIntegrateAndFireSegmentDimension] != arrayNumberOfSegments):
+			raise RuntimeError(inferenceSparsePropagationInvalidState)
+		indices = activationSparse.indices()
+		values = activationSparse.values()
+		if(useSANIcolumns or useSANIfeaturesAndColumns):
+			if(arrayIndexSegmentLastColumn < arrayIndexSegmentFirst or arrayIndexSegmentLastColumn >= arrayIndexSegmentSoma):
+				raise RuntimeError(inferenceSparsePropagationInvalidState)
+		#Each branch's stationary columns, moving feature segments and soma form contiguous ordered ranges.
+		branchBoundaries = pt.searchsorted(indices[inferenceLeakyIntegrateAndFireBranchDimension].contiguous(), pt.arange(multipleDendriticBranchesNumber+inferenceSparsePropagationStep, dtype=pt.long, device=activationSparse.device)).tolist()
+		resultIndices = []
+		resultValues = []
+		for branchIndex in range(multipleDendriticBranchesNumber):
+			branchStart = branchBoundaries[branchIndex]
+			branchEnd = branchBoundaries[branchIndex+inferenceSparsePropagationStep]
+			segments = indices[inferenceLeakyIntegrateAndFireSegmentDimension, branchStart:branchEnd].contiguous()
+			stationaryEnd = branchStart
+			if(useSANIcolumns or useSANIfeaturesAndColumns):
+				stationaryEnd += int(pt.searchsorted(segments, arrayIndexSegmentLastColumn, right=True).item())
+			somaStart = branchStart+int(pt.searchsorted(segments, arrayIndexSegmentSoma).item())
+			movingIndices = indices[:, stationaryEnd:somaStart].clone()
+			movingIndices[inferenceLeakyIntegrateAndFireSegmentDimension] += inferenceSparsePropagationStep
+			moving = pt.sparse_coo_tensor(movingIndices, values[stationaryEnd:somaStart], size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device, is_coalesced=True)
+			soma = pt.sparse_coo_tensor(indices[:, somaStart:branchEnd], values[somaStart:branchEnd], size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device, is_coalesced=True)
+			advanced = (moving+soma).coalesce()
+			#Stationary columns need only a bulk copy, not a sparse merge or coordinate masks on every token.
+			resultIndices.extend((indices[:, branchStart:stationaryEnd], advanced.indices()))
+			resultValues.extend((values[branchStart:stationaryEnd], advanced.values()))
+		result = pt.sparse_coo_tensor(pt.cat(resultIndices, dim=inferenceSparsePropagationEntryDimension), pt.cat(resultValues, dim=inferenceSparsePropagationVectorDimension), size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device, is_coalesced=True)
+	else:
+		raise RuntimeError(inferenceSparsePropagationInvalidState)
 	return result
 
 def advanceLeakyIntegrateAndFireColumnActivations(globalFeatureNeuronsActivation):
@@ -168,31 +206,86 @@ def advanceLeakyIntegrateAndFireColumnActivations(globalFeatureNeuronsActivation
 				raise RuntimeError("advanceLeakyIntegrateAndFireColumnActivations error: activation values must be finite")
 			if(bool(pt.any(activationValues < 0).item())):
 				raise RuntimeError("advanceLeakyIntegrateAndFireColumnActivations error: activation values must be non-negative")
-		segmentIndices = activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension]
-		precedingColumnMask = segmentIndices < arrayIndexSegmentLastColumn
-		lastColumnMask = segmentIndices == arrayIndexSegmentLastColumn
-		remainingMask = segmentIndices > arrayIndexSegmentLastColumn
-		advancedColumnIndices = activationIndices[:, precedingColumnMask].clone()
-		advancedColumnValues = activationValues[precedingColumnMask]
-		if(advancedColumnIndices.shape[1] > 0):
-			advancedColumnIndices[inferenceLeakyIntegrateAndFireSegmentDimension] += 1
-			if(multipleDendriticBranchesBinaryTree):
-				advancedColumnIndices[inferenceLeakyIntegrateAndFireBranchDimension] = pt.div(advancedColumnIndices[inferenceLeakyIntegrateAndFireBranchDimension], multipleDendriticBranchesBinaryTreeBranchingFactor, rounding_mode="floor")
-		lastColumnIndices = activationIndices[:, lastColumnMask]
-		lastColumnValues = activationValues[lastColumnMask]
-		if(inferenceDecrementActivationsLastColumnSegment):
-			if(inferenceDecrementActivationsLastColumnSegmentNonlinear):
-				lastColumnValues = lastColumnValues*(1.0-inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn)
-			else:
-				lastColumnValues = pt.clamp(lastColumnValues-inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn, min=0.0)
-		remainingIndices = activationIndices[:, remainingMask]
-		remainingValues = activationValues[remainingMask]
-		resultIndices = pt.cat((advancedColumnIndices, lastColumnIndices, remainingIndices), dim=1)
-		resultValues = pt.cat((advancedColumnValues, lastColumnValues, remainingValues), dim=0)
-		positiveMask = resultValues > 0
-		result = pt.sparse_coo_tensor(resultIndices[:, positiveMask], resultValues[positiveMask], size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
+		if(optimiseInferenceSparseColumnAdvance):
+			result = advanceOrderedLeakyIntegrateAndFireColumnActivations(activationSparse)
+		else:
+			segmentIndices = activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension]
+			precedingColumnMask = segmentIndices < arrayIndexSegmentLastColumn
+			lastColumnMask = segmentIndices == arrayIndexSegmentLastColumn
+			remainingMask = segmentIndices > arrayIndexSegmentLastColumn
+			advancedColumnIndices = activationIndices[:, precedingColumnMask].clone()
+			advancedColumnValues = activationValues[precedingColumnMask]
+			if(advancedColumnIndices.shape[1] > 0):
+				advancedColumnIndices[inferenceLeakyIntegrateAndFireSegmentDimension] += 1
+				if(multipleDendriticBranchesBinaryTree):
+					advancedColumnIndices[inferenceLeakyIntegrateAndFireBranchDimension] = pt.div(advancedColumnIndices[inferenceLeakyIntegrateAndFireBranchDimension], multipleDendriticBranchesBinaryTreeBranchingFactor, rounding_mode="floor")
+			lastColumnIndices = activationIndices[:, lastColumnMask]
+			lastColumnValues = activationValues[lastColumnMask]
+			if(inferenceDecrementActivationsLastColumnSegment):
+				if(inferenceDecrementActivationsLastColumnSegmentNonlinear):
+					lastColumnValues = lastColumnValues*(1.0-inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn)
+				else:
+					lastColumnValues = pt.clamp(lastColumnValues-inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn, min=0.0)
+			remainingIndices = activationIndices[:, remainingMask]
+			remainingValues = activationValues[remainingMask]
+			resultIndices = pt.cat((advancedColumnIndices, lastColumnIndices, remainingIndices), dim=1)
+			resultValues = pt.cat((advancedColumnValues, lastColumnValues, remainingValues), dim=0)
+			positiveMask = resultValues > 0
+			result = pt.sparse_coo_tensor(resultIndices[:, positiveMask], resultValues[positiveMask], size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
 	else:
 		raise RuntimeError("advanceLeakyIntegrateAndFireColumnActivations error: requires inferenceLeakyIntegrateAndFire with column segments")
+	return result
+
+def advanceOrderedLeakyIntegrateAndFireColumnActivations(activationSparse):
+	result = None
+	if(optimiseInferenceSparseColumnAdvance):
+		if(not inferenceLeakyIntegrateAndFire or multipleDendriticBranchesBinaryTree or not (useSANIcolumns or useSANIfeaturesAndColumns) or multipleDendriticBranchesNumber <= arrayIndexSegmentFirst or not isinstance(activationSparse, pt.Tensor) or not activationSparse.is_sparse or not activationSparse.is_floating_point() or not activationSparse.is_coalesced() or activationSparse.dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or activationSparse.sparse_dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or activationSparse.shape[inferenceLeakyIntegrateAndFireBranchDimension] != multipleDendriticBranchesNumber or activationSparse.shape[inferenceLeakyIntegrateAndFireSegmentDimension] != arrayNumberOfSegments):
+			raise RuntimeError(inferenceSparseColumnAdvanceInvalidState)
+		if(arrayIndexSegmentLastColumn < arrayIndexSegmentFirst or arrayIndexSegmentLastColumn >= arrayIndexSegmentSoma or arrayIndexSegmentSoma >= arrayNumberOfSegments):
+			raise RuntimeError(inferenceSparseColumnAdvanceInvalidState)
+		if(inferenceDecrementActivationsLastColumnSegment):
+			if(not isinstance(inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn, (int, float)) or isinstance(inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn, bool) or not math.isfinite(inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn) or inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn < inferenceSparseColumnAdvanceZero or inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn > inferenceSparseColumnAdvanceUnit):
+				raise RuntimeError(inferenceSparseColumnAdvanceInvalidDecay)
+		indices = activationSparse.indices()
+		values = activationSparse.values()
+		branches = indices[inferenceLeakyIntegrateAndFireBranchDimension]
+		if(branches.numel() > arrayIndexSegmentFirst):
+			if(int(branches[arrayIndexSegmentFirst].item()) < arrayIndexSegmentFirst or int(branches[-inferenceSparseColumnAdvanceStep].item()) >= multipleDendriticBranchesNumber):
+				raise RuntimeError(inferenceSparseColumnAdvanceInvalidState)
+		branchBoundaries = pt.searchsorted(branches.contiguous(), pt.arange(multipleDendriticBranchesNumber+inferenceSparseColumnAdvanceStep, dtype=pt.long, device=activationSparse.device)).tolist()
+		resultIndices = []
+		resultValues = []
+		for branchIndex in range(multipleDendriticBranchesNumber):
+			branchStart = branchBoundaries[branchIndex]
+			branchEnd = branchBoundaries[branchIndex+inferenceSparseColumnAdvanceStep]
+			segments = indices[inferenceLeakyIntegrateAndFireSegmentDimension, branchStart:branchEnd].contiguous()
+			if(segments.numel() > arrayIndexSegmentFirst):
+				if(int(segments[arrayIndexSegmentFirst].item()) < arrayIndexSegmentFirst or int(segments[-inferenceSparseColumnAdvanceStep].item()) >= arrayNumberOfSegments):
+					raise RuntimeError(inferenceSparseColumnAdvanceInvalidState)
+			incomingStart = branchStart+int(pt.searchsorted(segments, arrayIndexSegmentLastColumn-inferenceSparseColumnAdvanceStep).item())
+			terminalStart = branchStart+int(pt.searchsorted(segments, arrayIndexSegmentLastColumn).item())
+			terminalEnd = branchStart+int(pt.searchsorted(segments, arrayIndexSegmentLastColumn, right=True).item())
+			advancedIndices = indices[:, branchStart:terminalStart].clone()
+			advancedIndices[inferenceLeakyIntegrateAndFireSegmentDimension] += inferenceSparseColumnAdvanceStep
+			incomingOffset = incomingStart-branchStart
+			terminalValues = values[terminalStart:terminalEnd]
+			if(inferenceDecrementActivationsLastColumnSegment):
+				if(inferenceDecrementActivationsLastColumnSegmentNonlinear):
+					terminalValues = terminalValues*(inferenceSparseColumnAdvanceUnit-inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn)
+				else:
+					terminalValues = pt.clamp(terminalValues-inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn, min=inferenceSparseColumnAdvanceZero)
+			#Only incoming and retained terminal entries can collide; earlier columns and feature/soma ranges remain ordered.
+			incoming = pt.sparse_coo_tensor(advancedIndices[:, incomingOffset:], values[incomingStart:terminalStart], size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device, is_coalesced=True)
+			terminal = pt.sparse_coo_tensor(indices[:, terminalStart:terminalEnd], terminalValues, size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device, is_coalesced=True)
+			mergedTerminal = (incoming+terminal).coalesce()
+			resultIndices.extend((advancedIndices[:, :incomingOffset], mergedTerminal.indices(), indices[:, terminalEnd:branchEnd]))
+			resultValues.extend((values[branchStart:incomingStart], mergedTerminal.values(), values[terminalEnd:branchEnd]))
+		combinedIndices = pt.cat(resultIndices, dim=inferenceSparseColumnAdvanceEntryDimension)
+		combinedValues = pt.cat(resultValues, dim=inferenceSparseColumnAdvanceVectorDimension)
+		positiveMask = combinedValues > inferenceSparseColumnAdvanceZero
+		result = pt.sparse_coo_tensor(combinedIndices[:, positiveMask], combinedValues[positiveMask], size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device, is_coalesced=True)
+	else:
+		raise RuntimeError(inferenceSparseColumnAdvanceInvalidState)
 	return result
 
 def decrementLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation):
@@ -212,23 +305,32 @@ def decrementLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation)
 				raise RuntimeError("decrementLeakyIntegrateAndFireSomaActivation error: activation values must be finite")
 			if(bool(pt.any(activationValues < 0).item())):
 				raise RuntimeError("decrementLeakyIntegrateAndFireSomaActivation error: activation values must be non-negative")
-		somaMask = activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
-		dendriticIndices = activationIndices[:, pt.logical_not(somaMask)]
-		dendriticValues = activationValues[pt.logical_not(somaMask)]
-		somaIndices = activationIndices[:, somaMask]
-		somaValues = activationValues[somaMask]
-		combinedIndices = pt.cat((dendriticIndices, somaIndices), dim=1)
-		combinedValues = pt.cat((dendriticValues, somaValues), dim=0)
-		combinedActivation = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
-		combinedIndices = combinedActivation.indices()
-		combinedValues = combinedActivation.values().clone()
+		if(optimiseInferenceSparseSomaDecay):
+			combinedActivation = activationSparse
+			combinedIndices = activationIndices
+			combinedValues = activationValues.clone()
+		else:
+			somaMask = activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
+			dendriticIndices = activationIndices[:, pt.logical_not(somaMask)]
+			dendriticValues = activationValues[pt.logical_not(somaMask)]
+			somaIndices = activationIndices[:, somaMask]
+			somaValues = activationValues[somaMask]
+			combinedIndices = pt.cat((dendriticIndices, somaIndices), dim=1)
+			combinedValues = pt.cat((dendriticValues, somaValues), dim=0)
+			combinedActivation = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
+			combinedIndices = combinedActivation.indices()
+			combinedValues = combinedActivation.values().clone()
 		decrementMask = combinedIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
 		if(inferenceDecrementActivationsSomaNonlinear):
 			combinedValues[decrementMask] = combinedValues[decrementMask] * (1.0-inferenceDecrementActivationsSomaPerPredictedToken)
 		else:
 			combinedValues[decrementMask] = pt.clamp(combinedValues[decrementMask]-inferenceDecrementActivationsSomaPerPredictedToken, min=0.0)
 		positiveMask = combinedValues > 0
-		result = pt.sparse_coo_tensor(combinedIndices[:, positiveMask], combinedValues[positiveMask], size=combinedActivation.size(), dtype=combinedActivation.dtype, device=combinedActivation.device).coalesce()
+		if(optimiseInferenceSparseSomaDecay):
+			#Changing values and retaining an ordered subset cannot introduce duplicate or unsorted coordinates.
+			result = pt.sparse_coo_tensor(combinedIndices[:, positiveMask], combinedValues[positiveMask], size=combinedActivation.size(), dtype=combinedActivation.dtype, device=combinedActivation.device, is_coalesced=True)
+		else:
+			result = pt.sparse_coo_tensor(combinedIndices[:, positiveMask], combinedValues[positiveMask], size=combinedActivation.size(), dtype=combinedActivation.dtype, device=combinedActivation.device).coalesce()
 	else:
 		raise RuntimeError("decrementLeakyIntegrateAndFireSomaActivation error: requires inferenceLeakyIntegrateAndFire")
 	return result

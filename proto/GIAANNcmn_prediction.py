@@ -34,6 +34,8 @@ import GIAANNcmn_predictionBeamSearch
 import GIAANNnlp_sequenceConcepts
 import GIAANNcmn_predictionActivate
 import GIAANNcmn_predictionConstraints
+if(optimiseInferenceSparseBurst):
+	import GIAANNcmn_predictionSparse
 if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
 	import GIAANNcmn_predictionPoolTransitions
 if(inferenceInferMissingFeatures):
@@ -399,6 +401,20 @@ if not drawSequenceObservedColumns:
 			self.observedColumnsDict = observedColumnsDict
 
 def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequence, sequenceSeed, sequencePredict, numSeedTokens, sequenceRaw):
+	if(optimiseInferenceCPUthreads and not useGPUdense and not useGPUsparse):
+		if(not isinstance(inferenceCPUthreads, int) or isinstance(inferenceCPUthreads, bool) or inferenceCPUthreads < inferenceCPUthreadsMinimum):
+			raise RuntimeError(inferenceCPUthreadsInvalid)
+		originalThreads = pt.get_num_threads()
+		try:
+			pt.set_num_threads(min(originalThreads, inferenceCPUthreads))
+			result = processConceptWordsInferenceSequence(sequenceObservedColumns, sequenceIndex, sequence, sequenceSeed, sequencePredict, numSeedTokens, sequenceRaw)
+		finally:
+			pt.set_num_threads(originalThreads)
+	else:
+		result = processConceptWordsInferenceSequence(sequenceObservedColumns, sequenceIndex, sequence, sequenceSeed, sequencePredict, numSeedTokens, sequenceRaw)
+	return result
+
+def processConceptWordsInferenceSequence(sequenceObservedColumns, sequenceIndex, sequence, sequenceSeed, sequencePredict, numSeedTokens, sequenceRaw):
 	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
 		GIAANNcmn_predictionPoolTransitions.validatePooledTransitionConfiguration(sequenceObservedColumns.databaseNetworkObject)
 	if(printHeaderDuringInferencePredict):
@@ -864,8 +880,11 @@ def activateSeedPredictionSegments(globalFeatureNeuronsActivation, conceptColumn
 	if(inferenceLeakyIntegrateAndFire):
 		burstActivation = max(j1, inferenceLeakyIntegrateAndFireSomaActivationThreshold)
 	updateValues = pt.full((segmentIndices.shape[0],), burstActivation, dtype=globalFeatureNeuronsActivation.dtype, device=globalFeatureNeuronsActivation.device)
-	updateTensor = pt.sparse_coo_tensor(updateIndices, updateValues, size=globalFeatureNeuronsActivation.size(), dtype=globalFeatureNeuronsActivation.dtype, device=globalFeatureNeuronsActivation.device)
-	globalFeatureNeuronsActivationResult = (globalFeatureNeuronsActivation.coalesce() + updateTensor).coalesce()
+	if(optimiseInferenceSparseBurst):
+		globalFeatureNeuronsActivationResult = GIAANNcmn_predictionSparse.addInferenceSparseSingleActivation(globalFeatureNeuronsActivation, updateIndices, updateValues)
+	else:
+		updateTensor = pt.sparse_coo_tensor(updateIndices, updateValues, size=globalFeatureNeuronsActivation.size(), dtype=globalFeatureNeuronsActivation.dtype, device=globalFeatureNeuronsActivation.device)
+		globalFeatureNeuronsActivationResult = (globalFeatureNeuronsActivation.coalesce() + updateTensor).coalesce()
 	return globalFeatureNeuronsActivationResult
 
 

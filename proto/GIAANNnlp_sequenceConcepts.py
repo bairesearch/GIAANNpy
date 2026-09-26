@@ -23,7 +23,7 @@ import torch as pt
 from GIAANNcmn_globalDefs import *
 import GIAANNcmn_databaseNetwork
 import GIAANNnlp_sequenceTokens
-if(optimiseParallelisation2f):
+if(optimiseTrainParallelisation2f):
 	import GIAANNcmn_cpuParallelisation2
 
 
@@ -137,16 +137,16 @@ def firstPass(databaseNetworkObject, sequence, allowNewFeatures, sequenceTokens=
 	conceptsFound = False
 	conceptMask = []
 	tokens = None
-	if(optimiseParallelisation3d and sequenceTokens is not None):
+	if(optimiseTrainParallelisation3d and sequenceTokens is not None):
 		if(len(sequenceTokens) != len(sequence)):
-			raise RuntimeError("optimiseParallelisation3d firstPass token length mismatch")
+			raise RuntimeError("optimiseTrainParallelisation3d firstPass token length mismatch")
 		tokens = sequenceTokens
 	else:
 		if(tokeniserSubword):
 			tokens = GIAANNnlp_sequenceTokens.getTokens(sequence)
 	
 	for tokenIndex, preprocessedToken in enumerate(sequence):
-		if(optimiseParallelisation3d and sequenceTokens is not None):
+		if(optimiseTrainParallelisation3d and sequenceTokens is not None):
 			token = tokens[tokenIndex]
 		elif(tokeniserSubword):
 			token = tokens[tokenIndex]
@@ -548,7 +548,7 @@ def buildSequenceConceptAssignment(sequenceObservedColumns, sequence, tokens, co
 	sequenceObservedColumns.tokenConceptColumnIndexList = tokenConceptColumnIndexList
 	conceptColumnsList = sequenceObservedColumns.databaseNetworkObject.conceptColumnsList
 	
-	if(optimiseParallelisation3d and getattr(sequenceObservedColumns, "parallelisation3TrainMetadata", False) and not printSequenceConceptAssignment):
+	if(optimiseTrainParallelisation3d and getattr(sequenceObservedColumns, "parallelisation3TrainMetadata", False) and not printSequenceConceptAssignment):
 		sentenceWithConceptAssignment = None
 	elif(printSequenceConceptAssignmentByLine):
 		sentenceWithConceptAssignment = ""
@@ -589,7 +589,7 @@ def selectFeatureBranchIndex(featureBranchCounts, featureIndex):
 	return branchIndex
 	
 def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices):
-	if(optimiseParallelisation2f):
+	if(optimiseTrainParallelisation2f):
 		featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask = GIAANNcmn_cpuParallelisation2.prepareTrainingFeatureNeurons(sequenceObservedColumns, tokens, conceptIndices, startIndices, endIndices)
 		featureNeuronsSegmentMask = featureNeuronsSegmentMask.swapdims(0, 1)
 	else:

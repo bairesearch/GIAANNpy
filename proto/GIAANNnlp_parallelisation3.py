@@ -2,12 +2,13 @@
 
 from GIAANNcmn_globalDefs import *
 
-if(optimiseParallelisation3b):
+if(optimiseTrainParallelisation3b):
 	import os
 	import sys
 	import time
 	import pickle
 	import socket
+	import select
 	import struct
 	import subprocess
 	import traceback
@@ -19,7 +20,7 @@ if(optimiseParallelisation3b):
 
 def processDatasetPrefetched(databaseNetworkObject, sequenceCount, dataset):
 	result = None
-	if(optimiseParallelisation3b):
+	if(optimiseTrainParallelisation3b):
 		import GIAANNnlp_main as nlp
 		validatePrefetchConfiguration(sequenceCount)
 		with ArticlePreparationPool() as pool:
@@ -54,32 +55,32 @@ def processDatasetPrefetched(databaseNetworkObject, sequenceCount, dataset):
 
 
 def validatePrefetchConfiguration(sequenceCount):
-	if(optimiseParallelisation3b):
+	if(optimiseTrainParallelisation3b):
 		if(not useModalityNLP or sentencePredictions or not tokeniserSubword or executionMode not in ("train", "trainAndInference") or trainSetStartOffsetSequences != 0):
-			raise RuntimeError("optimiseParallelisation3b requires NLP subword training, sentencePredictions=False and trainSetStartOffsetSequences=0")
+			raise RuntimeError("optimiseTrainParallelisation3b requires NLP subword training, sentencePredictions=False and trainSetStartOffsetSequences=0")
 		if(useGPUdense or useGPUsparse or useGPUdatabase or not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
-			raise RuntimeError("optimiseParallelisation3b requires CPU training with RAM-resident connections")
+			raise RuntimeError("optimiseTrainParallelisation3b requires CPU training with RAM-resident connections")
 		if(not hasattr(os, "sched_getaffinity") or not hasattr(os, "sched_setaffinity")):
-			raise RuntimeError("optimiseParallelisation3b requires CPU affinity support")
+			raise RuntimeError("optimiseTrainParallelisation3b requires CPU affinity support")
 		for value in (parallelisation3WorkerCount, parallelisation3TrainingThreads, parallelisation3PrefetchArticles, parallelisation3WorkerThreads, parallelisation3WorkerTimeoutSeconds, parallelisation3MaximumMessageBytes):
 			if(not isinstance(value, int) or isinstance(value, bool) or value <= 0):
-				raise RuntimeError("optimiseParallelisation3b worker, thread, queue, timeout and message limits must be positive integers")
+				raise RuntimeError("optimiseTrainParallelisation3b worker, thread, queue, timeout and message limits must be positive integers")
 		if(parallelisation3WorkerThreads != 1 or parallelisation3PrefetchArticles < parallelisation3WorkerCount):
-			raise RuntimeError("optimiseParallelisation3b requires one thread per worker and at least one queued article per worker")
+			raise RuntimeError("optimiseTrainParallelisation3b requires one thread per worker and at least one queued article per worker")
 		if(parallelisation3TrainingThreads + parallelisation3WorkerCount > len(os.sched_getaffinity(0))):
-			raise RuntimeError("optimiseParallelisation3b training and worker budgets exceed the available CPU affinity")
+			raise RuntimeError("optimiseTrainParallelisation3b training and worker budgets exceed the available CPU affinity")
 		if(not isinstance(sequenceCount, int) or isinstance(sequenceCount, bool) or sequenceCount < 0 or sequenceCount >= trainMaxSequences):
-			raise RuntimeError("optimiseParallelisation3b sequenceCount must be within the training range")
+			raise RuntimeError("optimiseTrainParallelisation3b sequenceCount must be within the training range")
 	return
 
 
 def consumePreparedArticle(nlp, databaseNetworkObject, sequenceCount, articleIndex, prepared):
-	if(optimiseParallelisation3b):
+	if(optimiseTrainParallelisation3b):
 		for sequenceIndex, sequence, sequenceRaw, sequenceWordLength, accepted, error in prepared:
 			if(sequenceCount >= trainMaxSequences):
 				break
 			if(error is not None):
-				raise RuntimeError("optimiseParallelisation3b sequence preparation failed: " + error)
+				raise RuntimeError("optimiseTrainParallelisation3b sequence preparation failed: " + error)
 			if(accepted):
 				nlp.processSequence(databaseNetworkObject, False, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw, sequenceWordLength=sequenceWordLength)
 			else:
@@ -90,7 +91,7 @@ def consumePreparedArticle(nlp, databaseNetworkObject, sequenceCount, articleInd
 
 class ArticlePreparationPool:
 	def __init__(self):
-		if(optimiseParallelisation3b):
+		if(optimiseTrainParallelisation3b):
 			self.processes = []
 			self.connections = []
 			self.available = Queue()
@@ -106,7 +107,7 @@ class ArticlePreparationPool:
 			self.workerIdentities = []
 
 	def __enter__(self):
-		if(optimiseParallelisation3b):
+		if(optimiseTrainParallelisation3b):
 			try:
 				self.start()
 			except BaseException:
@@ -115,12 +116,12 @@ class ArticlePreparationPool:
 		return self
 
 	def __exit__(self, exceptionType, exception, exceptionTraceback):
-		if(optimiseParallelisation3b):
+		if(optimiseTrainParallelisation3b):
 			self.close(exceptionType is None)
 		return False
 
 	def start(self):
-		if(optimiseParallelisation3b):
+		if(optimiseTrainParallelisation3b):
 			start = time.perf_counter()
 			trainingCPUs = self.availableCPUs[:parallelisation3TrainingThreads]
 			workerCPUs = self.availableCPUs[parallelisation3TrainingThreads:parallelisation3TrainingThreads+parallelisation3WorkerCount]
@@ -139,8 +140,8 @@ class ArticlePreparationPool:
 					childConnection.close()
 			for index, connection in enumerate(self.connections):
 				message = receiveMessage(connection)
-				if(message[0] != parallelisation3WorkerReady or message[1] != self.processes[index].pid or message[2] != [workerCPUs[index]] or message[3] != (optimiseParallelisation3a, optimiseParallelisation3b, optimiseParallelisation3c, optimiseParallelisation3d)):
-					raise RuntimeError("optimiseParallelisation3b worker configuration/identity mismatch: " + repr(message))
+				if(message[0] != parallelisation3WorkerReady or message[1] != self.processes[index].pid or message[2] != [workerCPUs[index]] or message[3] != (optimiseTrainParallelisation3a, optimiseTrainParallelisation3b, optimiseTrainParallelisation3c, optimiseTrainParallelisation3d)):
+					raise RuntimeError("optimiseTrainParallelisation3b worker configuration/identity mismatch: " + repr(message))
 				self.workerIdentities.append(message[1:])
 				self.available.put(index)
 			self.executor = ThreadPoolExecutor(max_workers=parallelisation3WorkerCount)
@@ -149,7 +150,7 @@ class ArticlePreparationPool:
 
 	def prepare(self, articleIndex, entry):
 		result = None
-		if(optimiseParallelisation3b):
+		if(optimiseTrainParallelisation3b):
 			import GIAANNnlp_main as nlp
 			text = nlp.GIAANNnlp_datasets.getDatasetEntryText(entry, articleIndex)
 			if(datasetSanitiseNullCharacters):
@@ -159,9 +160,9 @@ class ArticlePreparationPool:
 				sendMessage(self.connections[index], (articleIndex, text))
 				message = receiveMessage(self.connections[index])
 				if(message[0] == parallelisation3WorkerError):
-					raise RuntimeError("optimiseParallelisation3b article preparation failed: " + message[1])
+					raise RuntimeError("optimiseTrainParallelisation3b article preparation failed: " + message[1])
 				if(message[0] != parallelisation3WorkerResult or message[1] != articleIndex):
-					raise RuntimeError("optimiseParallelisation3b worker article order/protocol mismatch")
+					raise RuntimeError("optimiseTrainParallelisation3b worker article order/protocol mismatch")
 				result = (message[2], message[3])
 			finally:
 				self.available.put(index)
@@ -169,12 +170,12 @@ class ArticlePreparationPool:
 
 	def statistics(self):
 		result = None
-		if(optimiseParallelisation3b):
+		if(optimiseTrainParallelisation3b):
 			result = {"workers":parallelisation3WorkerCount,"training_threads":parallelisation3TrainingThreads,"maximum_pending_articles":self.maximumPendingArticles,"articles_consumed":self.articleCount,"worker_cpu_s_consumed":self.workerCPUSeconds,"worker_wall_s_consumed":self.workerWallSeconds,"startup_s":self.startupSeconds,"worker_identities":self.workerIdentities}
 		return result
 
 	def close(self, requireSuccess):
-		if(optimiseParallelisation3b):
+		if(optimiseTrainParallelisation3b):
 			failures = []
 			try:
 				if(self.executor is not None):
@@ -200,14 +201,14 @@ class ArticlePreparationPool:
 					thread = int(path.name)
 					os.sched_setaffinity(thread, self.originalAffinities.get(thread, self.availableCPUs))
 			if(failures and requireSuccess):
-				raise RuntimeError("optimiseParallelisation3b worker shutdown failed: " + repr(failures))
+				raise RuntimeError("optimiseTrainParallelisation3b worker shutdown failed: " + repr(failures))
 		return
 
 
 def runWorker(connectionDescriptor, cpu):
-	if(optimiseParallelisation3b):
+	if(optimiseTrainParallelisation3b):
 		if(not isinstance(connectionDescriptor, int) or connectionDescriptor < 0 or not isinstance(cpu, int) or cpu < 0):
-			raise RuntimeError("optimiseParallelisation3b invalid worker descriptor or CPU")
+			raise RuntimeError("optimiseTrainParallelisation3b invalid worker descriptor or CPU")
 		setCurrentProcessAffinity([cpu])
 		pt.set_num_threads(parallelisation3WorkerThreads)
 		pt.set_num_interop_threads(parallelisation3WorkerThreads)
@@ -216,9 +217,9 @@ def runWorker(connectionDescriptor, cpu):
 			import GIAANNnlp_main as nlp
 			nlp.loadPOSdatabase()
 			nlp.GIAANNnlp_sequenceTokens.getTokeniserSubwordEncoding()
-			sendMessage(connection, (parallelisation3WorkerReady, os.getpid(), sorted(os.sched_getaffinity(0)), (optimiseParallelisation3a, optimiseParallelisation3b, optimiseParallelisation3c, optimiseParallelisation3d)))
+			sendMessage(connection, (parallelisation3WorkerReady, os.getpid(), sorted(os.sched_getaffinity(0)), (optimiseTrainParallelisation3a, optimiseTrainParallelisation3b, optimiseTrainParallelisation3c, optimiseTrainParallelisation3d)))
 			while(True):
-				message = receiveMessage(connection)
+				message = receiveWorkerCommand(connection)
 				if(message == parallelisation3WorkerStop):
 					break
 				articleIndex, text = message
@@ -241,7 +242,7 @@ def runWorker(connectionDescriptor, cpu):
 
 def prepareArticle(nlp, text):
 	result = None
-	if(optimiseParallelisation3b):
+	if(optimiseTrainParallelisation3b):
 		if(ignoreNewlineCharacters):
 			text = text.replace('\n', ' ')
 		sequences, rawSequences = nlp.generateSeqencesBatchOrSerial(nlp.nlpArticle(text), False)
@@ -262,50 +263,63 @@ def prepareArticle(nlp, text):
 
 
 def setCurrentProcessAffinity(cpus):
-	if(optimiseParallelisation3b):
+	if(optimiseTrainParallelisation3b):
 		if(not cpus or any(not isinstance(cpu, int) or isinstance(cpu, bool) or cpu < 0 for cpu in cpus)):
-			raise RuntimeError("optimiseParallelisation3b CPU list must contain non-negative integers")
+			raise RuntimeError("optimiseTrainParallelisation3b CPU list must contain non-negative integers")
 		for path in Path("/proc/self/task").iterdir():
 			os.sched_setaffinity(int(path.name), cpus)
 	return
 
 
 def sendMessage(connection, value):
-	if(optimiseParallelisation3b):
+	if(optimiseTrainParallelisation3b):
 		payload = pickle.dumps(value, protocol=parallelisation3PickleProtocol)
 		if(len(payload) > parallelisation3MaximumMessageBytes):
-			raise RuntimeError("optimiseParallelisation3b message exceeds parallelisation3MaximumMessageBytes")
+			raise RuntimeError("optimiseTrainParallelisation3b message exceeds parallelisation3MaximumMessageBytes")
 		connection.settimeout(parallelisation3WorkerTimeoutSeconds)
 		connection.sendall(struct.pack(parallelisation3MessageHeaderFormat, len(payload)))
 		connection.sendall(payload)
 	return
 
 
+def receiveWorkerCommand(connection):
+	result = None
+	if(optimiseTrainParallelisation3b):
+		# Training may leave workers idle indefinitely; start the transfer deadline only when a command arrives.
+		connection.settimeout(None)
+		poller = select.poll()
+		poller.register(connection, select.POLLIN)
+		poller.poll()
+		# Peer closure also wakes the poll and must fail explicitly in receiveMessage.
+		result = receiveMessage(connection)
+	return result
+
+
 def receiveMessage(connection):
 	result = None
-	if(optimiseParallelisation3b):
+	if(optimiseTrainParallelisation3b):
 		deadline = time.monotonic()+parallelisation3WorkerTimeoutSeconds
 		header = receiveBytes(connection, struct.calcsize(parallelisation3MessageHeaderFormat), deadline)
 		size = struct.unpack(parallelisation3MessageHeaderFormat, header)[0]
 		if(size <= 0 or size > parallelisation3MaximumMessageBytes):
-			raise RuntimeError("optimiseParallelisation3b invalid message size")
+			raise RuntimeError("optimiseTrainParallelisation3b invalid message size")
 		result = pickle.loads(receiveBytes(connection, size, deadline))
 	return result
 
 
 def receiveBytes(connection, count, deadline):
 	result = None
-	if(optimiseParallelisation3b):
+	if(optimiseTrainParallelisation3b):
 		chunks = []
 		remaining = count
 		while(remaining):
 			timeout = deadline-time.monotonic()
 			if(timeout <= 0):
-				raise TimeoutError("optimiseParallelisation3b worker message timed out")
+				raise TimeoutError("optimiseTrainParallelisation3b worker message timed out")
 			connection.settimeout(timeout)
 			chunk = connection.recv(remaining)
 			if(not chunk):
-				raise RuntimeError("optimiseParallelisation3b worker connection closed before the complete result")
+				raise RuntimeError("optimiseTrainParallelisation3b worker connection closed before the complete result")
 			chunks.append(chunk)
 			remaining -= len(chunk)
 		result = b"".join(chunks)

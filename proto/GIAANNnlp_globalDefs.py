@@ -399,15 +399,18 @@ if(useInference):
 								inferencePromptFileName = 'inference_prompt.txt.longTrainOscar-useBenchmarkDefaultsFalse'
 				else:
 					if(inferenceEvaluateTestSetTrainMaxSequences10M):
-						if(inferenceEvaluateTestSet):
-							inferenceFast = False	#temp
-							if(inferenceFast):
+						debugInferenceFast = False	#temp	#fast inference (low sequence count) for debug
+						if(debugInferenceFast):
+							if(inferenceEvaluateTestSet):
 								inferencePromptFileName = 'inference_prompt.txt.longTestOscar1-SentencePredictionsFalse'
 							else:
-								inferencePromptFileName = 'inference_prompt.txt.longTestOscar2-SentencePredictionsFalse'
-							#inferencePromptFileName = 'inference_prompt.txt.longTestOscar'	#optionally keep same for direct comparison
+								inferencePromptFileName = 'inference_prompt.txt.longTrainOscar1-SentencePredictionsFalse'
 						else:
-							inferencePromptFileName = 'inference_prompt.txt.longTrainOscar2-SentencePredictionsFalse'
+							if(inferenceEvaluateTestSet):
+								inferencePromptFileName = 'inference_prompt.txt.longTestOscar2-SentencePredictionsFalse'
+								#inferencePromptFileName = 'inference_prompt.txt.longTestOscar'	#optionally keep same for direct comparison
+							else:
+								inferencePromptFileName = 'inference_prompt.txt.longTrainOscar2-SentencePredictionsFalse'
 					else:
 						printe("!sentencePredictions requires inferenceEvaluateTestSetTrainMaxSequences10M")
 			else:
@@ -890,13 +893,18 @@ else:
 #Debug vars;
 if(useBenchmark):
 	debugPrintTrainTotalWords = True
+	debugPrintTrainTotalWhitespaceWords = True
 	if(tokeniserSubword):
 		debugPrintTrainTotalTokens = True		#requires tokeniserSubword
 	else:
 		debugPrintTrainTotalTokens = False
 else:	
 	debugPrintTrainTotalWords = False
+	debugPrintTrainTotalWhitespaceWords = False
 	debugPrintTrainTotalTokens = False
+if(debugPrintTrainTotalWhitespaceWords):
+	debugPrintTrainTotalWhitespaceWordsPattern = r"\S+"
+	debugPrintTrainTotalWhitespaceWordsLabel = "debugPrintTrainTotalWhitespaceWords: totalTrainWhitespaceWords = "
 debugPrintTrainTotalSkip = False	#default: False	#skip actual training (count words/tokens only)
 if(debugPrintTrainTotalTokens):
 	if(not tokeniserSubword):

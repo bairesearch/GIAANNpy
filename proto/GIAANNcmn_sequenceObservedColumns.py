@@ -26,9 +26,9 @@ import GIAANNcmn_sparseTensors
 import GIAANNnlp_sequenceConcepts
 if(optimisationUseCUDAObservedColumnUpdateKernel):
 	import GIAANNcmn_cudaObservedColumnUpdate
-if(optimiseParallelisation1):
+if(optimiseTrainParallelisation1):
 	import GIAANNcmn_cpuObservedColumnUpdate
-if(optimiseParallelisation2e):
+if(optimiseTrainParallelisation2e):
 	import GIAANNcmn_cpuParallelisation2
 if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 	import GIAANNnlp_auxiliaryNeuronsAuto
@@ -181,7 +181,7 @@ class SequenceObservedColumns:
 		#note cs may be slightly longer than number of unique columns in the sequence, if there are multiple instances of the same concept/noun lemma in the sequence
 	
 		self.databaseNetworkObject = databaseNetworkObject
-		if(optimiseParallelisation3d):
+		if(optimiseTrainParallelisation3d):
 			self.parallelisation3TrainMetadata = not inferenceMode
 		self.observedColumnsDict = observedColumnsDict	# key: lemma, value: ObservedColumn
 		self.observedColumnsSequenceWordIndexDict = observedColumnsSequenceWordIndexDict	# key: sequence word index, value: ObservedColumn
@@ -259,7 +259,7 @@ class SequenceObservedColumns:
 			self.columnStartIndicesTensor = None
 			self.columnEndIndicesTensor = None
 			self.columnFeatureLocalIndices = None
-			if(optimiseParallelisation3d and not inferenceMode):
+			if(optimiseTrainParallelisation3d and not inferenceMode):
 				self.prepareTrainConceptMetadata(tokens)
 			else:
 				self.computeColumnLocalFeatureMaps(tokens)
@@ -296,9 +296,9 @@ class SequenceObservedColumns:
 			self.featureConnections = None
 
 	def prepareTrainConceptMetadata(self, tokens):
-		if(optimiseParallelisation3d):
+		if(optimiseTrainParallelisation3d):
 			if(not self.parallelisation3TrainMetadata or tokens is not self.tokens or not trainSequenceObservedColumnsMatchSequenceWords):
-				raise RuntimeError("optimiseParallelisation3d requires sequence-local training tokens and matching sequence columns")
+				raise RuntimeError("optimiseTrainParallelisation3d requires sequence-local training tokens and matching sequence columns")
 			self.parallelisation3ConceptResult = GIAANNnlp_sequenceConcepts.processConceptWords(self, 0, tokens, tokens)
 			if(self.parallelisation3ConceptResult is not None):
 				conceptIndices, self.columnStartIndicesTensor, self.columnEndIndicesTensor = self.parallelisation3ConceptResult
@@ -306,9 +306,9 @@ class SequenceObservedColumns:
 
 	def getTrainConceptMetadata(self, sequence, tokens):
 		result = None
-		if(optimiseParallelisation3d):
+		if(optimiseTrainParallelisation3d):
 			if(not self.parallelisation3TrainMetadata or tokens is not self.tokens or len(sequence) != len(tokens) or not hasattr(self, "parallelisation3ConceptResult")):
-				raise RuntimeError("optimiseParallelisation3d training metadata does not belong to this sequence")
+				raise RuntimeError("optimiseTrainParallelisation3d training metadata does not belong to this sequence")
 			result = self.parallelisation3ConceptResult
 			if(printSequenceConceptAssignment and result is not None):
 				conceptIndices, startIndices, endIndices = result
@@ -1277,7 +1277,7 @@ class SequenceObservedColumns:
 			GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal(updateObservedColumnsEfficientFeatureNeuronsPhaseLabel)
 
 		#A: update feature neurons;
-		if(optimiseParallelisation2e):
+		if(optimiseTrainParallelisation2e):
 			GIAANNcmn_cpuParallelisation2.updateFeatureNeurons(self, observedColumnsByConceptIndex, featureIndices, featureValues, featureIndicesObservedFeatureDevice, conceptIndicesFeatureTensor)
 		else:
 			if(optimisationArrayIndexPropertiesEfficientSerialNeurons):
@@ -1346,7 +1346,7 @@ class SequenceObservedColumns:
 			GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal(updateObservedColumnsEfficientFeatureConnectionsPhaseLabel)
 
 		#B: update feature connections;
-		if(optimiseParallelisation1):
+		if(optimiseTrainParallelisation1):
 			GIAANNcmn_cpuObservedColumnUpdate.updateConnectionSources(self, observedColumnsByConceptIndex, connectionIndices, connectionValues, featureIndicesObservedConnectionDevice, conceptIndicesConnectionTensor)
 		else:
 			if(optimisationArrayIndexPropertiesEfficientSerialConnections):

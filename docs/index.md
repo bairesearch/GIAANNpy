@@ -23,6 +23,8 @@ pip install networkx
 pip install matplotlib
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 datasetsLibrary4plus=False: pip install "datasets<4" "fsspec==2024.6.1" "gcsfs==2024.6.1"
+pip install ninja
+sudo apt install -y build-essential
 ```
 
 ### modality NLP

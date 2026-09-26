@@ -24,7 +24,7 @@ from GIAANNcmn_globalDefs import *
 import GIAANNcmn_debug
 import GIAANNcmn_sparseTensors
 import GIAANNcmn_inferenceDuringTrain
-if(optimiseParallelisation2a):
+if(optimiseTrainParallelisation2a):
 	import GIAANNcmn_cpuParallelisation2
 if(trainSelectMostSimilarBranch):
 	import GIAANNcmn_databaseNetworkTrainSelectBranch
@@ -37,7 +37,7 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens, 
 	trainConceptWordsStartTime = None
 	if(debugPrintTrainSectionTimes):
 		trainConceptWordsStartTime = time.perf_counter()
-	if(optimiseParallelisation3d and useModalityNLP and sequenceObservedColumns.parallelisation3TrainMetadata):
+	if(optimiseTrainParallelisation3d and useModalityNLP and sequenceObservedColumns.parallelisation3TrainMetadata):
 		result = sequenceObservedColumns.getTrainConceptMetadata(sequence, tokens)
 	else:
 		result = GIAANNnlp_sequenceConcepts.processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens)
@@ -861,7 +861,7 @@ def getImageAxesCentralFieldCoordinates(sequenceObservedColumns):
 	return result
 
 def createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns):
-	if(optimiseParallelisation2a):
+	if(optimiseTrainParallelisation2a):
 		result = GIAANNcmn_cpuParallelisation2.createTemporalConnections(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
 	else:
 		connectionTargetSize = (multipleDendriticBranchesNumber, arrayNumberOfSegments, cs, fs, cs, fs)

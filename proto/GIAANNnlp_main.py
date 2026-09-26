@@ -27,6 +27,9 @@ from spacy.tokens import Doc
 pt.set_grad_enabled(False)
 
 from GIAANNcmn_globalDefs import *
+if(debugPrintTrainTotalWhitespaceWords):
+	import re
+	debugPrintTrainTotalWhitespaceWordsRegex = re.compile(debugPrintTrainTotalWhitespaceWordsPattern)
 import GIAANNcmn_debug
 import GIAANNcmn_sparseTensors
 import GIAANNcmn_databaseNetwork
@@ -158,7 +161,7 @@ def processDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset)
 	if(printTrainSequenceBar and trainMode):
 		GIAANNcmn_executionProgress.initialiseTrainSequenceBar(sequenceCount)
 
-	if(optimiseParallelisation3b and trainMode):
+	if(optimiseTrainParallelisation3b and trainMode):
 		import GIAANNnlp_parallelisation3
 		sequenceCount = GIAANNnlp_parallelisation3.processDatasetPrefetched(databaseNetworkObject, sequenceCount, dataset)
 	else:
@@ -527,13 +530,18 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		preprocessSequenceStartTime = time.perf_counter()
 
 	if(debugPrintTrainTotalWords and trainMode): 
+		if(tokeniserSubword):
+			sequenceWordLength = len(nlpSequence.make_doc(sequence.text))
 		if(not isinstance(sequenceWordLength, int) or isinstance(sequenceWordLength, bool) or sequenceWordLength <= 0):
 			raise RuntimeError("processSequence error: debugPrintTrainTotalWords requires sequenceWordLength to be an int > 0")
 		GIAANNcmn_debug.totalTrainWords += sequenceWordLength
+	if(debugPrintTrainTotalWhitespaceWords and trainMode):
+		GIAANNcmn_debug.totalTrainWhitespaceWords += len(debugPrintTrainTotalWhitespaceWordsRegex.findall(sequence.text))
 	sequence = GIAANNnlp_sequenceTokens.preprocessSequence(sequence)
 	if(debugPrintTrainTotalTokens and trainMode): 
 		GIAANNcmn_debug.totalTrainTokens += len(sequence)
 	if(debugPrintTrainTotalSkip and trainMode): 
+		updateExecutionProgressForSkippedSequence(inferenceMode, sequenceCount)
 		return inferenceSuccessfulPredictionMask
 	
 	if(debugPrintTrainSectionTimes and trainMode):
@@ -582,7 +590,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 	if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
 		GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("firstPass")
 	
-	if(optimiseParallelisation3d and trainMode):
+	if(optimiseTrainParallelisation3d and trainMode):
 		tokens = GIAANNnlp_sequenceTokens.getTokens(sequence)
 		conceptsFound, conceptMask = GIAANNnlp_sequenceConcepts.firstPass(databaseNetworkObject, sequence, allowNewFeatures, tokens)
 	else:
@@ -598,7 +606,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		if(debugPrintTrainSectionTimes and trainMode):
 			getTokensStartTime = time.perf_counter()
 		
-		if(not optimiseParallelisation3d or not trainMode):
+		if(not optimiseTrainParallelisation3d or not trainMode):
 			tokens = GIAANNnlp_sequenceTokens.getTokens(sequence)
 		if(inferenceMode and useTrainDuringInference and inferenceSuccessfulPredictionMask is None):
 			inferenceSuccessfulPredictionMask = GIAANNcmn_prediction.createInferenceSuccessfulPredictionMask(tokens)

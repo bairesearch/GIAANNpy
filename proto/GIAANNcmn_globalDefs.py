@@ -197,7 +197,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 10000	#5000, 200000, 1000000
+	trainMaxSequences = 10000	#10000, 100000, 400000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 50000	#5000
@@ -387,14 +387,6 @@ if(not storeDatabaseGlobalFeatureNeuronsInRam):
 		inferenceStartGenerateGlobalFeatureNeuronsTensor = False	#default: False	#orig: False	#generates and saves a globalFeatureNeurons at the start of inference after being trained with storeDatabaseGlobalFeatureNeuronsInRam=False (with individual column featureNeurons tensors)
 
 
-#Optimisations;
-inferenceOnlyRetainPredictedTargetObservedColumn = False	#default: False	#orig: False	#load/evict one observed column per prediction step	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
-inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch = False	#default: False	#orig: False	#True: retain only current beam-search target(s); False: retain all beam-search targets	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
-trainStoreFeatureMapsGlobally = True	#default: True	#orig: False	#True: avoid per-column persistence of global feature index maps; False: preserve legacy per-column map persistence
-if not trainStoreFeatureMapsGlobally:
-	assert not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam
-
-
 #Inference segment activation times;
 if(useInference):
 	if(inferenceLeakyIntegrateAndFire):
@@ -517,6 +509,70 @@ if(useInference):
 	inferenceSeedNetwork = True	#default: True
 		
 
+#Inference optimisations;
+inferenceOnlyRetainPredictedTargetObservedColumn = False	#default: False	#orig: False	#load/evict one observed column per prediction step	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
+inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch = False	#default: False	#orig: False	#True: retain only current beam-search target(s); False: retain all beam-search targets	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
+if(useDefaultsV2):
+	optimiseInferenceCPUthreads = False	#default: False	#orig: False	#limit CPU intra-op threading during each inference sequence; restore the caller's thread count afterwards
+	if(optimiseInferenceCPUthreads):
+		inferenceCPUthreads = 8	#CPU intra-op thread ceiling for long-context inference; preserve any lower caller limit
+		inferenceCPUthreadsMinimum = 1
+		inferenceCPUthreadsInvalid = "inferenceCPUthreads must be a positive integer"
+	optimiseInferenceSparseSomaDecay = True	#default: True	#orig: False	#preserve sorted sparse coordinates during soma decay instead of sorting the entire activation state twice
+	if(inferenceLeakyIntegrateAndFire and not multipleDendriticBranchesBinaryTree):
+		optimiseInferenceCandidateLookup = True	#default: True	#orig: False	#score only eligible neurons' soma and terminal-column signals; retain the complete live activation state
+		optimiseInferenceSparsePropagation = True	#default: True	#orig: False	#copy stationary column ranges and merge only moving feature segments with the soma instead of sorting the complete state
+		optimiseInferenceSparseColumnAdvance = False	#default: False	#orig: False	#advance ordered column ranges and merge only terminal-column collisions; measured column savings have not established a consistent total inference speedup
+		if(optimiseInferenceCandidateLookup):
+			inferenceCandidateLookupZero = 0
+			inferenceCandidateLookupStep = 1
+			inferenceCandidateLookupVectorDimension = 0
+			inferenceCandidateLookupEntryDimension = 1
+			inferenceCandidateLookupRoundingMode = "floor"
+			inferenceCandidateLookupRequiredCondition = "enforceLastSegmentMustBeActive"
+			inferenceCandidateLookupInvalidConfiguration = "Candidate activation lookup requires non-tree LIF inference with last-segment eligibility"
+			inferenceCandidateLookupInvalidState = "Candidate activation lookup requires a finite non-negative sparse COO activation state with valid LIF dimensions and coordinates"
+			inferenceCandidateLookupInvalidKeys = "Candidate activation lookup requires sorted in-range int64 eligibility keys on the activation device"
+			inferenceCandidateLookupKeyOverflow = "Candidate activation lookup coordinates exceed the int64 key range"
+		if(optimiseInferenceSparsePropagation):
+			inferenceSparsePropagationStep = 1
+			inferenceSparsePropagationEntryDimension = 1
+			inferenceSparsePropagationVectorDimension = 0
+			inferenceSparsePropagationInvalidState = "Ordered propagation requires enabled non-tree LIF inference and a coalesced activation state with valid segment dimensions"
+		inferenceSparseColumnAdvanceInvalidState = "Ordered column advancement requires enabled non-tree LIF column segments and a valid coalesced sparse activation state"
+		if(optimiseInferenceSparseColumnAdvance):
+			inferenceSparseColumnAdvanceStep = 1
+			inferenceSparseColumnAdvanceUnit = 1.0
+			inferenceSparseColumnAdvanceZero = 0.0
+			inferenceSparseColumnAdvanceEntryDimension = 1
+			inferenceSparseColumnAdvanceVectorDimension = 0
+			inferenceSparseColumnAdvanceInvalidDecay = "Ordered column advancement requires a finite last-column decay rate within [0, 1]"
+			inferenceSparseColumnAdvanceOptionName = "optimiseInferenceSparseColumnAdvance:"
+	else:
+		optimiseInferenceCandidateLookup = False
+		optimiseInferenceSparsePropagation = False
+		optimiseInferenceSparseColumnAdvance = False
+	if(inferenceLeakyIntegrateAndFire and not useGPUdense and not useGPUsparse):
+		optimiseInferenceSparseBurst = True	#default: True	#orig: False	#locate and update one burst coordinate without a full-state sparse merge
+	else:
+		optimiseInferenceSparseBurst = False
+	inferenceSparseBurstInvalidState = "Sparse burst lookup requires enabled LIF inference and a floating-point rank-four CPU sparse COO activation state"
+	if(optimiseInferenceSparseBurst):
+		inferenceSparseBurstZero = 0
+		inferenceSparseBurstSingleEntry = 1
+		inferenceSparseBurstEntryDimension = 1
+		inferenceSparseBurstVectorDimension = 0
+		inferenceSparseBurstDeviceType = "cpu"
+		inferenceSparseBurstInvalidUpdate = "Sparse burst lookup requires one finite non-negative activation and one valid int64 coordinate on the activation device"
+else:
+	optimiseInferenceCPUthreads = False
+	optimiseInferenceSparseSomaDecay = False
+	optimiseInferenceCandidateLookup = False
+	optimiseInferenceSparsePropagation = False
+	optimiseInferenceSparseColumnAdvance = False
+	optimiseInferenceSparseBurst = False
+
+
 #Train optimisations;
 trainSequenceObservedColumnsUseSequenceFeaturesOnly = True	#default:True	#optional	#sequence observed columns arrays only store sequence features.	#will affect which network changes can be visualised
 #trainSequenceObservedColumnsUseSequenceFeaturesOnly can be upgraded so only a limited amount of data is ever loaded to GPU during train (it currently temporarily masks entire feature arrays in GPU during transfer phase)
@@ -543,8 +599,8 @@ if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
 	if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam and useGPUdatabase):
 		raise RuntimeError("GIAANNcmn_globalDefs error: optimisationStoreDatabaseResidentCoordinatesAsInt32 requires CPU database storage")
 if(useDefaultsV2 and executionMode=="train" and storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):	
-	optimiseParallelisation1 = True	#default: True	#orig: False	#opt-in: parallel CPU merges of RAM-resident training connection updates only
-	if(optimiseParallelisation1):
+	optimiseTrainParallelisation1 = True	#default: True	#orig: False	#opt-in: parallel CPU merges of RAM-resident training connection updates only
+	if(optimiseTrainParallelisation1):
 		assert arrayIndexPropertiesEfficient==True and arrayIndexPropertiesStrength==True and optimisationArrayIndexPropertiesEfficientSerialConnections==False and optimisationUseCUDAObservedColumnUpdateKernel==False and trainVerifyConnectionNonexistentAcrossBranches==False and useTrainDuringInference==False
 		parallelisation1ExtensionName = "giaann_cpu_connection_update"
 		parallelisation1ExtensionSource = "GIAANNcmn_cpuConnectionUpdate.cpp"
@@ -553,20 +609,20 @@ if(useDefaultsV2 and executionMode=="train" and storeDatabaseFeatureConnectionsA
 		parallelisation1SourceTensorRank = 5
 		parallelisation1SourceBucketDimension = 3
 		parallelisation1MergeGrainSize = 1
-	optimiseParallelisation2a = True	#default: True	#orig: False	#opt-in: construct temporal training connections directly in canonical sparse order
-	optimiseParallelisation2b = True	#default: True?	#orig: False	#opt-in: fuse connection-delta coordinate mapping and source-bucket lookup on CPU
-	optimiseParallelisation2c = True	#default: True?	#orig: False	#opt-in: split large source merges into bounded parallel tasks
-	optimiseParallelisation2d = True	#default: True?	#orig: False	#opt-in: search new coordinates and bulk-copy unchanged spans; share unchanged COO indices
-	optimiseParallelisation2e = True	#default: True	#orig: False	#opt-in: merge stored neuron updates by column without gathering historical tensors
-	optimiseParallelisation2f = True	#default: True	#orig: False	#opt-in: vectorise training feature-activation preparation for a single dendritic branch
-	if(optimiseParallelisation2a or optimiseParallelisation2b or optimiseParallelisation2c or optimiseParallelisation2d or optimiseParallelisation2e or optimiseParallelisation2f):
-		assert optimisationStoreDatabaseResidentCoordinatesAsInt32==False
-		if(optimiseParallelisation2a):
-			assert trainSparseConnectionsTensor and multipleDendriticBranchesBinaryTree==False and trainSelectMostSimilarBranch==False
-		if(optimiseParallelisation2e):
+	optimiseTrainParallelisation2a = True	#default: True	#orig: False	#opt-in: construct temporal training connections directly in canonical sparse order
+	optimiseTrainParallelisation2b = True	#default: True?	#orig: False	#opt-in: fuse connection-delta coordinate mapping and source-bucket lookup on CPU
+	optimiseTrainParallelisation2c = True	#default: True?	#orig: False	#opt-in: split large source merges into bounded parallel tasks
+	optimiseTrainParallelisation2d = True	#default: True?	#orig: False	#opt-in: search new coordinates and bulk-copy unchanged spans; share unchanged COO indices
+	optimiseTrainParallelisation2e = True	#default: True	#orig: False	#opt-in: merge stored neuron updates by column without gathering historical tensors
+	optimiseTrainParallelisation2f = True	#default: True	#orig: False	#opt-in: vectorise training feature-activation preparation for a single dendritic branch
+	if(optimiseTrainParallelisation2a or optimiseTrainParallelisation2b or optimiseTrainParallelisation2c or optimiseTrainParallelisation2d or optimiseTrainParallelisation2e or optimiseTrainParallelisation2f):
+		assert optimiseTrainParallelisation1 and optimisationStoreDatabaseResidentCoordinatesAsInt32==False
+		if(optimiseTrainParallelisation2a):
+			assert trainSparseConnectionsTensor and multipleDendriticBranchesBinaryTree==False and trainSelectMostSimilarBranch==False and modalityName == "NLP"
+		if(optimiseTrainParallelisation2e):
 			assert storeDatabaseGlobalFeatureNeuronsInRam==False and optimisationArrayIndexPropertiesEfficientSerialNeurons==False
-		if(optimiseParallelisation2f):
-			assert multipleDendriticBranches==False and trainSequenceObservedColumnsUseSequenceFeaturesOnly==True and trainSequenceObservedColumnsMatchSequenceWords==True
+		if(optimiseTrainParallelisation2f):
+			assert multipleDendriticBranches==False and trainSequenceObservedColumnsUseSequenceFeaturesOnly==True and trainSequenceObservedColumnsMatchSequenceWords==True and modalityName == "NLP"
 		parallelisation2ExtensionName = "giaann_cpu_parallelisation2"
 		parallelisation2ExtensionSource = "GIAANNcmn_cpuParallelisation2.cpp"
 		parallelisation2CompilerFlags = ["-O3", "-fopenmp"]
@@ -580,17 +636,17 @@ if(useDefaultsV2 and executionMode=="train" and storeDatabaseFeatureConnectionsA
 		parallelisation2TemporalModeColumns = 1
 		parallelisation2TemporalModeFeatures = 2
 		parallelisation2TemporalModeCombined = 3
-	optimiseParallelisation3a = True	#default: True	#orig: False	#opt-in: ordered byte-span matching for subword parent tokens
+	optimiseTrainParallelisation3a = True	#default: True	#orig: False	#opt-in: ordered byte-span matching for subword parent tokens
 	if(not sentencePredictions):
-		optimiseParallelisation3b = True	#default: True	#orig: False	#opt-in: bounded ordered article preparation in separate CPU processes
+		optimiseTrainParallelisation3b = True	#default: True	#orig: False	#opt-in: bounded ordered article preparation in separate CPU processes
 	else:
-		optimiseParallelisation3b = False
-	optimiseParallelisation3c = True	#default: True	#orig: False	#opt-in: bulk preparation of CPU RAM-resident source tensors
-	optimiseParallelisation3d = True	#default: True	#orig: False	#opt-in: reuse training sequence tokens and concept boundaries; omit inference-only maps
-	if(optimiseParallelisation3a or optimiseParallelisation3b or optimiseParallelisation3c or optimiseParallelisation3d):
-		if(optimiseParallelisation3a):
+		optimiseTrainParallelisation3b = False
+	optimiseTrainParallelisation3c = True	#default: True	#orig: False	#opt-in: bulk preparation of CPU RAM-resident source tensors
+	optimiseTrainParallelisation3d = True	#default: True	#orig: False	#opt-in: reuse training sequence tokens and concept boundaries; omit inference-only maps
+	if(optimiseTrainParallelisation3a or optimiseTrainParallelisation3b or optimiseTrainParallelisation3c or optimiseTrainParallelisation3d):
+		if(optimiseTrainParallelisation3a):
 			assert tokeniserSubword==True
-		if(optimiseParallelisation3b):
+		if(optimiseTrainParallelisation3b):
 			assert sentencePredictions==False and trainSetStartOffsetSequences==0 and useGPUdense==False and useGPUsparse==False and useGPUdatabase==False
 			parallelisation3WorkerCount = 2
 			parallelisation3TrainingThreads = 2
@@ -602,35 +658,38 @@ if(useDefaultsV2 and executionMode=="train" and storeDatabaseFeatureConnectionsA
 			parallelisation3WorkerError = "error"
 			parallelisation3WorkerStop = "stop"
 			parallelisation3PickleProtocol = 5
-			parallelisation3WorkerTimeoutSeconds = 300
+			parallelisation3WorkerTimeoutSeconds = 300	#active transfers and parent waits only; no worker idle timeout
 			parallelisation3MessageHeaderFormat = "!Q"
 			parallelisation3MaximumMessageBytes = 256 * 1024 ** 2
 			parallelisation3ThreadEnvironmentVariables = ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "BLIS_NUM_THREADS")
-		if(optimiseParallelisation3c):
+		if(optimiseTrainParallelisation3c):
 			assert optimisationStoreDatabaseResidentCoordinatesAsInt32==False
 			parallelisation3SourceTensorRank = 5
 			parallelisation3SourceConceptDimension = 3
 			parallelisation3SourceFeatureDimension = 4
-		if(optimiseParallelisation3d):
+		if(optimiseTrainParallelisation3d):
 			assert trainSequenceObservedColumnsMatchSequenceWords
 else:
-	optimiseParallelisation1 = False
-	optimiseParallelisation2a = False
-	optimiseParallelisation2b = False
-	optimiseParallelisation2c = False
-	optimiseParallelisation2d = False
-	optimiseParallelisation2e = False
-	optimiseParallelisation2f = False
+	optimiseTrainParallelisation1 = False
+	optimiseTrainParallelisation2a = False
+	optimiseTrainParallelisation2b = False
+	optimiseTrainParallelisation2c = False
+	optimiseTrainParallelisation2d = False
+	optimiseTrainParallelisation2e = False
+	optimiseTrainParallelisation2f = False
 	if(useDefaultsV2):
-		optimiseParallelisation3a = False
+		optimiseTrainParallelisation3a = False
 	else:	#executionMode != "train" or storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam=False
-		optimiseParallelisation3a = True
-		if(optimiseParallelisation3a):
+		optimiseTrainParallelisation3a = True
+		if(optimiseTrainParallelisation3a):
 			assert tokeniserSubword==True
-	optimiseParallelisation3b = False
-	optimiseParallelisation3c = False
-	optimiseParallelisation3d = False
-	
+	optimiseTrainParallelisation3b = False
+	optimiseTrainParallelisation3c = False
+	optimiseTrainParallelisation3d = False
+trainStoreFeatureMapsGlobally = True	#default: True	#orig: False	#True: avoid per-column persistence of global feature index maps; False: preserve legacy per-column map persistence
+if not trainStoreFeatureMapsGlobally:
+	assert not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam
+		
 
 #Draw;
 drawSegments = False and useSANI	#optional
@@ -1256,31 +1315,19 @@ else:
 deviceLoadColumnInference = deviceSparse if (storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam and useGPUdatabase != useGPUsparse) else None
 deviceLoadColumnInferenceCopy = storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam and useGPUdatabase != useGPUsparse
 
-if(optimiseParallelisation1):
+if(optimiseTrainParallelisation1):
 	if(not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam or deviceDatabase.type != "cpu" or deviceSparse.type != "cpu"):
-		raise RuntimeError("optimiseParallelisation1 requires RAM-resident connections and CPU database/sparse devices")
+		raise RuntimeError("optimiseTrainParallelisation1 requires RAM-resident connections and CPU database/sparse devices")
 	if(not arrayIndexPropertiesEfficient or not arrayIndexPropertiesStrength or arrayType != pt.float32):
-		raise RuntimeError("optimiseParallelisation1 requires efficient strength properties and float32 tensors")
-	if(optimisationArrayIndexPropertiesEfficientSerialConnections or optimisationUseCUDAObservedColumnUpdateKernel):
-		raise RuntimeError("optimiseParallelisation1 requires the batched CPU connection update pathway")
-	if(trainVerifyConnectionNonexistentAcrossBranches or useTrainDuringInference):
-		raise RuntimeError("optimiseParallelisation1 does not support cross-branch exclusion or training during inference")
-if(optimiseParallelisation2a or optimiseParallelisation2b or optimiseParallelisation2c or optimiseParallelisation2d or optimiseParallelisation2e or optimiseParallelisation2f):
-	if(not optimiseParallelisation1 or executionMode != "train"):
-		raise RuntimeError("optimiseParallelisation2 options require optimiseParallelisation1 and training mode")
-	if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
-		raise RuntimeError("optimiseParallelisation2 options require ordinary CPU sparse COO storage")
-if(optimiseParallelisation2a):
-	if(not trainSparseConnectionsTensor or deviceDense.type != "cpu" or multipleDendriticBranchesBinaryTree or trainSelectMostSimilarBranch or modalityName != "NLP"):
-		raise RuntimeError("optimiseParallelisation2a requires CPU sparse NLP training without binary-tree or prospective branch selection")
+		raise RuntimeError("optimiseTrainParallelisation1 requires efficient strength properties and float32 tensors")
+if(optimiseTrainParallelisation2a):
+	if(deviceDense.type != "cpu"):
+		raise RuntimeError("optimiseTrainParallelisation2a requires CPU")
 	if(arrayNumberOfSegments > parallelisation2MaximumSegments):
-		raise RuntimeError("optimiseParallelisation2a exceeds the configured activation-mask segment limit")
-if(optimiseParallelisation2e):
-	if(storeDatabaseGlobalFeatureNeuronsInRam or optimisationArrayIndexPropertiesEfficientSerialNeurons):
-		raise RuntimeError("optimiseParallelisation2e requires column-local RAM neurons and batched neuron updates")
-if(optimiseParallelisation2f):
-	if(multipleDendriticBranches or not trainSequenceObservedColumnsUseSequenceFeaturesOnly or not trainSequenceObservedColumnsMatchSequenceWords or modalityName != "NLP" or deviceDense.type != "cpu"):
-		raise RuntimeError("optimiseParallelisation2f requires single-branch CPU NLP training with sequence-local feature and concept positions")
+		raise RuntimeError("optimiseTrainParallelisation2a exceeds the configured activation-mask segment limit")
+if(optimiseTrainParallelisation2f):
+	if(deviceDense.type != "cpu"):
+		raise RuntimeError("optimiseTrainParallelisation2f requires CPU")
 
 
 
@@ -1623,6 +1670,19 @@ if(printConfiguration):
 	print("inferenceOnlyRetainPredictedTargetObservedColumn:", inferenceOnlyRetainPredictedTargetObservedColumn)
 	print("inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch:", inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch)
 	print("trainStoreFeatureMapsGlobally:", trainStoreFeatureMapsGlobally)
+	if(optimiseInferenceCPUthreads):
+		print("optimiseInferenceCPUthreads:", optimiseInferenceCPUthreads)
+		print("inferenceCPUthreads:", inferenceCPUthreads)
+	if(optimiseInferenceSparseSomaDecay):
+		print("optimiseInferenceSparseSomaDecay:", optimiseInferenceSparseSomaDecay)
+	if(optimiseInferenceCandidateLookup):
+		print("optimiseInferenceCandidateLookup:", optimiseInferenceCandidateLookup)
+	if(optimiseInferenceSparsePropagation):
+		print("optimiseInferenceSparsePropagation:", optimiseInferenceSparsePropagation)
+	if(optimiseInferenceSparseColumnAdvance):
+		print(inferenceSparseColumnAdvanceOptionName, optimiseInferenceSparseColumnAdvance)
+	if(optimiseInferenceSparseBurst):
+		print("optimiseInferenceSparseBurst:", optimiseInferenceSparseBurst)
 	print("")
 	print("#Segment activation time;")
 	print("inferenceUseNeuronFeaturePropertiesTime:", inferenceUseNeuronFeaturePropertiesTime)
@@ -1662,17 +1722,17 @@ if(printConfiguration):
 		print("inferenceSourceActivationsBoolean:", inferenceSourceActivationsBoolean)
 	print("")
 	print("#Train optimisations;")
-	#print("optimiseParallelisation1:", optimiseParallelisation1)
-	#print("optimiseParallelisation2a:", optimiseParallelisation2a)
-	#print("optimiseParallelisation2b:", optimiseParallelisation2b)
-	#print("optimiseParallelisation2c:", optimiseParallelisation2c)
-	#print("optimiseParallelisation2d:", optimiseParallelisation2d)
-	#print("optimiseParallelisation2e:", optimiseParallelisation2e)
-	#print("optimiseParallelisation2f:", optimiseParallelisation2f)
-	#print("optimiseParallelisation3a:", optimiseParallelisation3a)
-	#print("optimiseParallelisation3b:", optimiseParallelisation3b)
-	#print("optimiseParallelisation3c:", optimiseParallelisation3c)
-	#print("optimiseParallelisation3d:", optimiseParallelisation3d)
+	#print("optimiseTrainParallelisation1:", optimiseTrainParallelisation1)
+	#print("optimiseTrainParallelisation2a:", optimiseTrainParallelisation2a)
+	#print("optimiseTrainParallelisation2b:", optimiseTrainParallelisation2b)
+	#print("optimiseTrainParallelisation2c:", optimiseTrainParallelisation2c)
+	#print("optimiseTrainParallelisation2d:", optimiseTrainParallelisation2d)
+	#print("optimiseTrainParallelisation2e:", optimiseTrainParallelisation2e)
+	#print("optimiseTrainParallelisation2f:", optimiseTrainParallelisation2f)
+	#print("optimiseTrainParallelisation3a:", optimiseTrainParallelisation3a)
+	#print("optimiseTrainParallelisation3b:", optimiseTrainParallelisation3b)
+	#print("optimiseTrainParallelisation3c:", optimiseTrainParallelisation3c)
+	#print("optimiseTrainParallelisation3d:", optimiseTrainParallelisation3d)
 	print("trainSequenceObservedColumnsUseSequenceFeaturesOnly:", trainSequenceObservedColumnsUseSequenceFeaturesOnly)
 	print("trainSequenceObservedColumnsMatchSequenceWords:", trainSequenceObservedColumnsMatchSequenceWords)
 	print("optimisationCombineSparseUpdatesPerSequence:", optimisationCombineSparseUpdatesPerSequence)

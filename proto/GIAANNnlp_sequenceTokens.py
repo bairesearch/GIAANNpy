@@ -286,7 +286,7 @@ if(tokeniserSubword):
 		if(len(tokenIds) == 0):
 			raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: no subword token ids generated")
 		byteIndex = 0
-		if(optimiseParallelisation3a):
+		if(optimiseTrainParallelisation3a):
 			parentSpanIndex = 0
 		for tokenId in tokenIds:
 			tokenBytes = getTokeniserSubwordTokenBytes(encoding, tokenId)
@@ -296,7 +296,7 @@ if(tokeniserSubword):
 				raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: subword byte span exceeds sequence byte length")
 			if(tokenBytes != sequenceBytes[subwordStartByte:subwordEndByte]):
 				raise RuntimeError("createTokeniserSubwordPreprocessedTokens error: subword token bytes do not match sequence bytes")
-			if(optimiseParallelisation3a):
+			if(optimiseTrainParallelisation3a):
 				parentToken, parentTokenIndex, parentSpanIndex = getTokeniserSubwordParentTokenOrdered(parentTokenSpans, subwordStartByte, subwordEndByte, parentSpanIndex)
 			else:
 				parentToken, parentTokenIndex = getTokeniserSubwordParentToken(parentTokenSpans, subwordStartByte, subwordEndByte)
@@ -428,7 +428,7 @@ if(tokeniserSubword):
 
 	def getTokeniserSubwordParentTokenOrdered(parentTokenSpans, subwordStartByte, subwordEndByte, parentSpanIndex):
 		result = None
-		if(optimiseParallelisation3a):
+		if(optimiseTrainParallelisation3a):
 			if(any(not isinstance(value, int) or isinstance(value, bool) for value in (subwordStartByte, subwordEndByte, parentSpanIndex))):
 				raise RuntimeError("getTokeniserSubwordParentTokenOrdered requires integer byte offsets and cursor")
 			if(subwordStartByte < 0 or subwordEndByte <= subwordStartByte or not parentTokenSpans or parentSpanIndex < 0 or parentSpanIndex > len(parentTokenSpans)):
