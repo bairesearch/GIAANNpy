@@ -61,7 +61,7 @@ def selectLIFTokenAggregationCandidate(databaseNetworkObject, columnIndices, fea
 
 def validateLIFTokenAggregationCandidates(databaseNetworkObject, columnIndices, featureIndices, activationValues):
 	if(inferenceReviewPatch16TokenAggregation):
-		if(not inferenceLeakyIntegrateAndFire or not predictionEnsureConnectedToPreviousPrediction or not enforceDirectConnectionsSANI or inferenceBeamSearch or algorithmMatrixSANIenforceRequirement != inferenceLIFTokenAggregationRequiredSANICondition):
+		if(not inferenceLeakyIntegrateAndFire or not enforceDirectConnectionsSANI or inferenceBeamSearch or algorithmMatrixSANIenforceRequirement != inferenceLIFTokenAggregationRequiredSANICondition or (not predictionEnsureConnectedToPreviousPrediction and not (inferenceReviewPatch12RetainContextWithoutOutgoingSource and inferenceReviewPatch13poolTransitionsFromSimilarFeatures))):
 			raise RuntimeError(inferenceLIFTokenAggregationInvalidConfiguration)
 		if(databaseNetworkObject is None or not databaseNetworkObject.inferenceMode or len(databaseNetworkObject.conceptColumnsList) != databaseNetworkObject.c or len(databaseNetworkObject.conceptFeaturesList) != databaseNetworkObject.f or not isinstance(databaseNetworkObject.conceptFeaturesDict, dict)):
 			raise RuntimeError(inferenceLIFTokenAggregationInvalidDatabase)

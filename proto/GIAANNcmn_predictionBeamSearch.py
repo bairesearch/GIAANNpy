@@ -468,7 +468,8 @@ def selectBeamCandidates(stateFeatures, stateTime, strengthLookup, candidateLimi
 			if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures and inferenceDeactivateSomaUponPrediction):
 				columnIndices, featureIndices, activationValues = filterCandidatesByDeactivatedNeuronState(databaseNetworkObject, columnIndices, featureIndices, activationValues, deactivatedNeuronState)
 		if(inferenceReviewPatch16TokenAggregation):
-			if(columnIndices is not None):
+			#Indirect empty-source steps retain patch 13 pooling or patch 12 context selection; aggregate directly eligible candidates.
+			if(columnIndices is not None and (predictionEnsureConnectedToPreviousPrediction or connectedColumnsTensor is None or connectedColumnsTensor.numel() > arrayIndexSegmentFirst)):
 				columnIndices, featureIndices, activationValues = GIAANNcmn_predictionTokenAggregation.selectLIFTokenAggregationCandidate(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
 		if(columnIndices is not None):
 			candidates = selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, databaseNetworkObject.f, databaseNetworkObject, constraintState, conceptActivationState)

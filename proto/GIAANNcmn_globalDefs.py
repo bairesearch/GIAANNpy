@@ -197,7 +197,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 10000	#10000, 100000, 400000	#5000, 200000, 1000000
+	trainMaxSequences = 400000	#10000, 100000, 400000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 50000	#5000
@@ -995,8 +995,13 @@ if(useInference):
 		inferenceEvaluateTrainSetDeactivateActivationsSoma = True	#default:True #orig: False	#deactivate soma activations every token (enforce exact timings) - under development (not high performance)
 		if(inferenceEvaluateTestSet or not inferenceEvaluateTrainSetDeactivateActivationsSoma):
 			if(useBenchmarkDefaultsEvalTestSetOptim):
-				inferenceDecrementActivationsSomaPerPredictedToken = 0.75	#default: 0.75
-				inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn = 0.75	#CHECKTHIS - unoptimised
+				inferenceReviewPatch17segmentTimingOptimisation = True
+				if(inferenceReviewPatch17segmentTimingOptimisation):
+					inferenceDecrementActivationsSomaPerPredictedToken = 1.0	#default: 1.0
+					inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn = 1.0	#default: 1.0
+				else:
+					inferenceDecrementActivationsSomaPerPredictedToken = 0.75	#orig: 0.75
+					inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn = 0.75	#orig: 0.75
 			else:
 				inferenceDecrementActivationsSomaPerPredictedToken = 0.50	#orig: 0.50
 				inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn = 0.50	#orig: 0.50
@@ -1499,7 +1504,10 @@ if(useDefaultsV2):
 		inferenceReviewPatch15TokenTransitionPrior = False
 
 	#Sixth LIF performance review option;
-	inferenceReviewPatch16TokenAggregation = False	#default: False #sum eligible neuron scores by output token, then retain the strongest neuron for the winning token
+	if(predictionEnsureConnectedToPreviousPrediction):
+		inferenceReviewPatch16TokenAggregation = False	#default: False	#optional (technically independent of predictionEnsureConnectedToPreviousPrediction)
+	else:
+		inferenceReviewPatch16TokenAggregation = True	#default: True #sum eligible neuron scores by output token, then retain the strongest neuron for the winning token
 	if(inferenceReviewPatch16TokenAggregation):
 		inferenceLIFTokenAggregationVectorDimension = 0
 		inferenceLIFTokenAggregationCandidateRank = 1
@@ -1508,14 +1516,14 @@ if(useDefaultsV2):
 		inferenceLIFTokenAggregationExcludedActivation = -1.0
 		inferenceLIFTokenAggregationRequiredSANICondition = "enforceLastSegmentMustBeActive"
 		inferenceLIFTokenAggregationConfigurationLabel = "inferenceReviewPatch16TokenAggregation:"
-		inferenceLIFTokenAggregationInvalidConfiguration = "Patch 16 requires LIF single-step inference with strict previous-prediction connectivity and current-step direct SANI eligibility"
+		inferenceLIFTokenAggregationInvalidConfiguration = "Patch 16 requires LIF single-step inference with current-step direct SANI eligibility; indirect mode also requires patches 12 and 13 to identify and preserve empty-source selection"
 		inferenceLIFTokenAggregationInvalidCandidateLimit = "Patch 16 requires an integer candidate limit of exactly one"
 		inferenceLIFTokenAggregationInvalidDatabase = "Patch 16 requires an inference database with valid column and feature dictionaries"
 		inferenceLIFTokenAggregationInvalidCandidates = "Patch 16 requires matching candidate vectors with in-range integer neuron indices and finite positive activations"
 		inferenceLIFTokenAggregationInvalidToken = "Patch 16 requires each prime concept token to have a valid feature dictionary index"
 		inferenceLIFTokenAggregationInvalidTotals = "Patch 16 token activation totals must remain finite and positive"
 		if(useInference):
-			if(not predictionEnsureConnectedToPreviousPrediction or not enforceDirectConnectionsSANI or inferenceBeamSearch or algorithmMatrixSANIenforceRequirement != inferenceLIFTokenAggregationRequiredSANICondition):
+			if(not inferenceLeakyIntegrateAndFire or not enforceDirectConnectionsSANI or inferenceBeamSearch or algorithmMatrixSANIenforceRequirement != inferenceLIFTokenAggregationRequiredSANICondition or (not predictionEnsureConnectedToPreviousPrediction and not (inferenceReviewPatch12RetainContextWithoutOutgoingSource and inferenceReviewPatch13poolTransitionsFromSimilarFeatures))):
 				raise RuntimeError(inferenceLIFTokenAggregationInvalidConfiguration)
 else:
 	inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch = False

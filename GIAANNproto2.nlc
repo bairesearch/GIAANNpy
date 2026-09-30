@@ -629,7 +629,7 @@ MANUAL; - update inferenceLeakyIntegrateAndFire - if(not inferenceEvaluateTestSe
 - set inferenceLeakyIntegrateAndFire=True by default
 
 ---
-v2m (Codex IDE GPT-5.6):
+v2m (Codex App GPT-5.6):
 - add proto GIAANNproto2m1a - start inference/auxiliary updates:
 	- add option inferencePromptPreserveLineSequenceBoundaries (enabled) - process each non-empty inference prompt line as exactly one independent sequence matching the stored training boundary
 	- add option trainConnectionsAllowSelfTransitions (disabled)  - allow same-column/feature transitions required when repeated occurrences share one neuron
@@ -659,7 +659,7 @@ MANUAL; - extend inference_prompt.txt.longTrain/TestOscar2-SentencePredictionsFa
 MANUAL; - inferenceEvaluateTestSet:inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures - set useBenchmarkDefaultsEvalTestSetOptim = False.
 
 ---
-v2n (Codex IDE GPT-5.6):
+v2n (Codex App GPT-5.6):
 - start proto GIAANNproto2n1a - start multipleDendriticBranches updates:
 	- implement option trainSelectMostSimilarBranch:
 		- for every target feature during train, detect the most similar branch already trained to its planned train state:
@@ -682,7 +682,7 @@ MANUAL; - set inferenceDeactivateLastColumnSegmentUponPrediction=True by default
 - patch constraintAllowsNode delimiter-mode filtering to permit valid same-column continuation features after reference-set delimiters.
 
 ---
-v2o (Codex IDE GPT-6.0):
+v2o (Codex App GPT-6.0):
 - add proto GIAANNproto2o1a - start LIF inference updates:
 	- add option inferenceReviewPatch1FilterCandidatesBeforeTopK (disabled) - filter constrained candidates before top-K selection, with no prediction changes in the tested LIF and non-LIF configurations.
 	- add option inferenceReviewPatch2PreserveSelfTransitions (disabled) - reset firing neurons before accumulating new input to preserve immediate self-transitions, with only small and mixed measured accuracy changes.
@@ -708,7 +708,7 @@ MANUAL; disable inferenceReviewPatch12RetainContextWithoutOutgoingSource
 - set inferenceCopyTemplateDatasets, and rename database folder to databaseTemplate
 
 ---
-v2p (Codex IDE GPT-6.0):
+v2p (Codex App GPT-6.0):
 - add proto GIAANNproto2p1a - start train parallelisation updates:
 	- add option optimiseTrainParallelisation1 (enabled) - merge RAM-resident training connection updates across source neurons using parallel native CPU kernels while preserving sparse COO storage and additive update results.
 	- add option optimiseTrainParallelisation2a (enabled) - construct temporal training connections directly in sorted unique sparse COO order using parallel CPU kernels to avoid repeated segment expansion, intermediate duplicates and sorting.
@@ -733,3 +733,9 @@ v2p (Codex IDE GPT-6.0):
 - add option optimiseInferenceSparsePropagation (enabled) - copy stationary column ranges directly and merge only moving feature segments with retained soma entries during non-tree LIF propagation, preserving coordinate order and activation results without full-state sorting.
 - add option optimiseInferenceSparseBurst (enabled) - locate a single CPU LIF burst coordinate by binary search and update or insert it in sorted order to avoid full-state sparse addition while preserving activation results.
 - add option optimiseInferenceSparseColumnAdvance (disabled) - advance ordered sparse column ranges and merge only terminal-column collisions, avoiding full-state sorting.
+
+---
+v2q (Codex App GPT-6.0):
+- add proto GIAANNproto2q1a - start LIF inference updates:
+	- add option inferenceReviewPatch17segmentTimingOptimisation (enabled) - segment timing optimisation for inferenceDecrementActivationsSomaPerPredictedToken/inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn
+	- set predictionEnsureConnectedToPreviousPrediction==False:inferenceReviewPatch16TokenAggregation=True
