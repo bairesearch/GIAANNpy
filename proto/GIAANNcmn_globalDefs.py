@@ -103,7 +103,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = True	#default: False/True
+	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
@@ -197,7 +197,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 400000	#10000, 100000, 400000	#5000, 200000, 1000000
+	trainMaxSequences = 100000	#10000, 100000, 400000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 50000	#5000
@@ -209,6 +209,11 @@ elif(useDrawNetworkIndependently):
 elif(useTrainDuringInference):
 	trainMaxSequences = 5000	#slow execution	#5000, 200000
 	databaseFolderBase = databaseFolderBaseSSD
+if(executionMode == "inference" and not useQuickExecution):
+	inferenceRequireExistingDatabase = True	#inference requires a pre-existing trained database folder
+else:
+	inferenceRequireExistingDatabase = False
+inferenceRequireExistingDatabaseError = "prepareDatabaseFilesStartup error: inference requires existing trained databaseFolder = "
 inferenceCopyTemplateDatasets = True	#default: True	#copy template dataset files into databaseFolder at startup for all execution modes and database locations
 databaseFolderTemplate = databaseFolderBaseLocal + "databaseTemplate/"
 databaseFolderTemplateDatasetFileNamePattern = "*.*"
@@ -1379,7 +1384,26 @@ if(drawEfficient):
 		printe("drawEfficient configuration error: exactly one of drawEfficientGrid or drawEfficientCompact must be True")
 	drawEfficientDrawDeadNeurons = True	#default: True	#draw empty columns with no connected neurons
 
+#Training column-segment timing; enable only for fresh training, not continuation of an occurrence-timed checkpoint.
+patchTrainColumnStepsRepeatedColumns = True	#default: False	#opt-in: count database column-ID changes; adjacent repeated occurrences take zero column steps
+patchTrainColumnStepsDimension = 0
+patchTrainColumnStepsRank = 1
+patchTrainColumnStepsFirst = 0
+patchTrainColumnStepsIncrement = 1
+patchTrainColumnStepsConfigurationLabel = "patchTrainColumnStepsRepeatedColumns:"
+patchTrainColumnStepsInvalid = "patchTrainColumnStepsRepeatedColumns requires LIF NLP sequence-occurrence columns with valid database column indices"
+patchTrainColumnStepsInvalidOccurrences = "patchTrainColumnStepsRepeatedColumns requires matching int64 source/target occurrence vectors within the sequence column range"
+if(patchTrainColumnStepsRepeatedColumns):
+	if(not useModalityNLP or not inferenceLeakyIntegrateAndFire or not trainSequenceObservedColumnsMatchSequenceWords):
+		raise RuntimeError(patchTrainColumnStepsInvalid)
+
 #inference patches;
+if(inferenceColumnConstraintsAllowExternalPrimeConceptTransitions):
+	patchInferenceUseNextTokenTargets = False	#not required
+else:
+	patchInferenceUseNextTokenTargets = False	#optional	#orig: False	#teacher-forced propagation uses the exact target neuron without prediction-only column constraints
+patchInferenceUseNextTokenTargetsMinimumIndex = 0
+patchInferenceUseNextTokenTargetsInvalidTarget = "patchInferenceUseNextTokenTargets requires target column and feature indices within the database dimensions"
 if(useDefaultsV2):
 	inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch = True	#default: True #orig: False
 	inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch = True	#default: True #orig: False
@@ -1743,6 +1767,8 @@ if(printConfiguration):
 	#print("optimiseTrainParallelisation3d:", optimiseTrainParallelisation3d)
 	print("trainSequenceObservedColumnsUseSequenceFeaturesOnly:", trainSequenceObservedColumnsUseSequenceFeaturesOnly)
 	print("trainSequenceObservedColumnsMatchSequenceWords:", trainSequenceObservedColumnsMatchSequenceWords)
+	if(patchTrainColumnStepsRepeatedColumns):
+		print(patchTrainColumnStepsConfigurationLabel, patchTrainColumnStepsRepeatedColumns)
 	print("optimisationCombineSparseUpdatesPerSequence:", optimisationCombineSparseUpdatesPerSequence)
 	print("optimisationUseCUDAObservedColumnUpdateKernel:", optimisationUseCUDAObservedColumnUpdateKernel)
 	print("optimisationGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize:", optimisationGetTrainRequiredSourceFeatureIndicesByObservedColumnVectorize)

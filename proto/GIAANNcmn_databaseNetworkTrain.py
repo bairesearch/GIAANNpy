@@ -24,6 +24,8 @@ from GIAANNcmn_globalDefs import *
 import GIAANNcmn_debug
 import GIAANNcmn_sparseTensors
 import GIAANNcmn_inferenceDuringTrain
+if(patchTrainColumnStepsRepeatedColumns):
+	import GIAANNcmn_trainColumnSteps
 if(optimiseTrainParallelisation2a):
 	import GIAANNcmn_cpuParallelisation2
 if(trainSelectMostSimilarBranch):
@@ -1039,6 +1041,8 @@ def assignFeatureConnectionsToTargetSegmentsSparse(branchIndices, sourceConceptI
 			indicesList.append(pt.stack((branchIndices, connectionsSegmentIndex, sourceConceptIndices, sourceFeatureIndices, targetConceptIndices, targetFeatureIndices), dim=0))
 	elif(useSANIcolumns):
 		conceptDistances = pt.abs(targetConceptIndices - sourceConceptIndices)
+		if(patchTrainColumnStepsRepeatedColumns):
+			conceptDistances = GIAANNcmn_trainColumnSteps.calculateColumnDistances(sequenceObservedColumns, sourceConceptIndices, targetConceptIndices)
 		if(inferenceLeakyIntegrateAndFire):
 			connectionsSegmentIndex = arrayIndexSegmentLastColumn - conceptDistances
 		else:
@@ -1091,6 +1095,8 @@ def assignFeatureConnectionsToTargetSegmentsSparse(branchIndices, sourceConceptI
 				indicesList.append(pt.stack((branchIndices[validFeatureDistanceMask], featureSegmentIndex[validFeatureDistanceMask], sourceConceptIndices[validFeatureDistanceMask], sourceFeatureIndices[validFeatureDistanceMask], targetConceptIndices[validFeatureDistanceMask], targetFeatureIndices[validFeatureDistanceMask]), dim=0))
 		if(arrayNumberOfSegmentsColumnDistance > 0):
 			conceptDistances = pt.abs(targetConceptIndices - sourceConceptIndices)
+			if(patchTrainColumnStepsRepeatedColumns):
+				conceptDistances = GIAANNcmn_trainColumnSteps.calculateColumnDistances(sequenceObservedColumns, sourceConceptIndices, targetConceptIndices)
 			if(useSANIfeaturesAndColumnsInternal):
 				columnSegmentIndex = arrayNumberOfSegmentsColumnDistance - conceptDistances - 1
 			else:
@@ -1264,6 +1270,8 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 	elif(useSANIcolumns):
 		device = featureConnectionsActive.device
 		conceptNeuronsConceptOrder1d = pt.arange(cs, device=device)
+		if(patchTrainColumnStepsRepeatedColumns):
+			conceptNeuronsConceptOrder1d = GIAANNcmn_trainColumnSteps.calculateColumnSteps(sequenceObservedColumns, device)
 		conceptNeuronsDistances = pt.abs(conceptNeuronsConceptOrder1d.unsqueeze(1) - conceptNeuronsConceptOrder1d).reshape(cs, cs)
 		if(inferenceLeakyIntegrateAndFire):
 			connectionsSegmentIndex = arrayIndexSegmentLastColumn-conceptNeuronsDistances
@@ -1330,6 +1338,8 @@ def assignFeatureConnectionsToTargetSegments(featureConnectionsActive, cs, fs, f
 			featureConnectionsSegmentMask = featureConnectionsSegmentMask & validDistanceMask.unsqueeze(0)
 
 		conceptNeuronsConceptOrder1d = pt.arange(cs, device=device)
+		if(patchTrainColumnStepsRepeatedColumns):
+			conceptNeuronsConceptOrder1d = GIAANNcmn_trainColumnSteps.calculateColumnSteps(sequenceObservedColumns, device)
 		conceptNeuronsDistances = pt.abs(conceptNeuronsConceptOrder1d.unsqueeze(1) - conceptNeuronsConceptOrder1d).reshape(cs, cs)
 		conceptNeuronsDistances = conceptNeuronsDistances.view(cs, 1, cs, 1).expand(cs, fs, cs, fs)
 		if(arrayNumberOfSegmentsColumnDistance > 0):

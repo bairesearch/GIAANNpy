@@ -21,6 +21,8 @@ import os
 import torch as pt
 
 from GIAANNcmn_globalDefs import *
+if(patchTrainColumnStepsRepeatedColumns):
+	import GIAANNcmn_trainColumnSteps
 import GIAANNcmn_databaseNetworkFiles
 import GIAANNcmn_sparseTensors
 
@@ -757,7 +759,10 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 					if(trainConnectionStrengthNormaliseWrtContextLength):
 						connectionDistances = pt.abs(targetWordOrder - sourceWordOrderPair).to(baseValues.dtype)
 						baseValues = baseValues * (auxiliaryNeuronsSimilarWordsConnectionProximityMultiplier/pt.pow(connectionDistances + trainConnectionStrengthProximityDistanceOffset, trainConnectionStrengthProximityExponent))
-					appendAuxiliaryConnectionSegmentIndices(indicesList, valuesList, branchIndices, sourceConceptIndicesPair, sourceAuxiliaryFeatureIndicesPair, targetConceptIndices, targetFeatureIndices, sourceWordOrderPair, targetWordOrder, baseValues)
+					if(patchTrainColumnStepsRepeatedColumns):
+						appendAuxiliaryConnectionSegmentIndices(indicesList, valuesList, branchIndices, sourceConceptIndicesPair, sourceAuxiliaryFeatureIndicesPair, targetConceptIndices, targetFeatureIndices, sourceWordOrderPair, targetWordOrder, baseValues, sequenceObservedColumns)
+					else:
+						appendAuxiliaryConnectionSegmentIndices(indicesList, valuesList, branchIndices, sourceConceptIndicesPair, sourceAuxiliaryFeatureIndicesPair, targetConceptIndices, targetFeatureIndices, sourceWordOrderPair, targetWordOrder, baseValues)
 		if(len(indicesList) > 0):
 			combinedIndices = pt.cat(indicesList, dim=1)
 			combinedValues = pt.cat(valuesList, dim=0)
@@ -1136,10 +1141,12 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 		result.sort()
 		return result
 
-	def appendAuxiliaryConnectionSegmentIndices(indicesList, valuesList, branchIndices, sourceConceptIndices, sourceAuxiliaryFeatureIndices, targetConceptIndices, targetFeatureIndices, sourceWordOrder, targetWordOrder, baseValues):
+	def appendAuxiliaryConnectionSegmentIndices(indicesList, valuesList, branchIndices, sourceConceptIndices, sourceAuxiliaryFeatureIndices, targetConceptIndices, targetFeatureIndices, sourceWordOrder, targetWordOrder, baseValues, sequenceObservedColumns=None):
 		if(sourceConceptIndices.numel() > 0):
 			if(useSANIcolumns):
 				conceptDistances = pt.abs(targetConceptIndices - sourceConceptIndices)
+				if(patchTrainColumnStepsRepeatedColumns):
+					conceptDistances = GIAANNcmn_trainColumnSteps.calculateColumnDistances(sequenceObservedColumns, sourceConceptIndices, targetConceptIndices)
 				connectionsSegmentIndex = arrayNumberOfSegments - conceptDistances - 1
 				connectionsSegmentIndex = pt.clamp(connectionsSegmentIndex, min=0, max=arrayNumberOfSegments-1).long()
 				appendAuxiliaryConnectionIndexGroup(indicesList, valuesList, branchIndices, connectionsSegmentIndex, sourceConceptIndices, sourceAuxiliaryFeatureIndices, targetConceptIndices, targetFeatureIndices, baseValues)
@@ -1158,13 +1165,16 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 						connectionsSegmentIndex = connectionsSegmentIndex.clamp(min=0, max=arrayNumberOfSegments-1).long()
 						appendAuxiliaryConnectionIndexGroup(indicesList, valuesList, branchIndices[validDistanceMask], connectionsSegmentIndex[validDistanceMask], sourceConceptIndices[validDistanceMask], sourceAuxiliaryFeatureIndices[validDistanceMask], targetConceptIndices[validDistanceMask], targetFeatureIndices[validDistanceMask], baseValues[validDistanceMask])
 			elif(useSANIfeaturesAndColumns):
-				appendAuxiliaryFeatureAndColumnSegmentIndices(indicesList, valuesList, branchIndices, sourceConceptIndices, sourceAuxiliaryFeatureIndices, targetConceptIndices, targetFeatureIndices, sourceWordOrder, targetWordOrder, baseValues)
+				if(patchTrainColumnStepsRepeatedColumns):
+					appendAuxiliaryFeatureAndColumnSegmentIndices(indicesList, valuesList, branchIndices, sourceConceptIndices, sourceAuxiliaryFeatureIndices, targetConceptIndices, targetFeatureIndices, sourceWordOrder, targetWordOrder, baseValues, sequenceObservedColumns)
+				else:
+					appendAuxiliaryFeatureAndColumnSegmentIndices(indicesList, valuesList, branchIndices, sourceConceptIndices, sourceAuxiliaryFeatureIndices, targetConceptIndices, targetFeatureIndices, sourceWordOrder, targetWordOrder, baseValues)
 			else:
 				connectionsSegmentIndex = pt.zeros((branchIndices.shape[0],), dtype=pt.long, device=branchIndices.device)
 				appendAuxiliaryConnectionIndexGroup(indicesList, valuesList, branchIndices, connectionsSegmentIndex, sourceConceptIndices, sourceAuxiliaryFeatureIndices, targetConceptIndices, targetFeatureIndices, baseValues)
 		return
 
-	def appendAuxiliaryFeatureAndColumnSegmentIndices(indicesList, valuesList, branchIndices, sourceConceptIndices, sourceAuxiliaryFeatureIndices, targetConceptIndices, targetFeatureIndices, sourceWordOrder, targetWordOrder, baseValues):
+	def appendAuxiliaryFeatureAndColumnSegmentIndices(indicesList, valuesList, branchIndices, sourceConceptIndices, sourceAuxiliaryFeatureIndices, targetConceptIndices, targetFeatureIndices, sourceWordOrder, targetWordOrder, baseValues, sequenceObservedColumns=None):
 		relativeDistance = targetWordOrder - sourceWordOrder
 		featureSegmentsOffset = arrayNumberOfSegmentsColumnDistance
 		featureDistanceLimit = arrayNumberOfSegmentsFeatureDistance
@@ -1184,6 +1194,8 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 				appendAuxiliaryConnectionIndexGroup(indicesList, valuesList, branchIndices[validFeatureDistanceMask], featureSegmentIndex[validFeatureDistanceMask], sourceConceptIndices[validFeatureDistanceMask], sourceAuxiliaryFeatureIndices[validFeatureDistanceMask], targetConceptIndices[validFeatureDistanceMask], targetFeatureIndices[validFeatureDistanceMask], baseValues[validFeatureDistanceMask])
 		if(arrayNumberOfSegmentsColumnDistance > 0):
 			conceptDistances = pt.abs(targetConceptIndices - sourceConceptIndices)
+			if(patchTrainColumnStepsRepeatedColumns):
+				conceptDistances = GIAANNcmn_trainColumnSteps.calculateColumnDistances(sequenceObservedColumns, sourceConceptIndices, targetConceptIndices)
 			if(useSANIfeaturesAndColumnsInternal):
 				columnSegmentIndex = arrayNumberOfSegmentsColumnDistance - conceptDistances - 1
 			else:

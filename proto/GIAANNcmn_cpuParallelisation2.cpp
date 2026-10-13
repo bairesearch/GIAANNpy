@@ -8,13 +8,15 @@
 #include <functional>
 #include <cstdint>
 #include <limits>
+#include <optional>
+#include <string>
 #include <vector>
 
 #ifndef INTRA_OP_PARALLEL
 #error "CPU training kernels require the PyTorch intra-op parallel backend"
 #endif
 
-at::Tensor createTemporalConnections(bool optimiseParallelisation2a, const at::Tensor& active, const at::Tensor& columns, const at::Tensor& words, int64_t cs, int64_t fs, bool includeSameTime, bool allowSelf, bool nextWordOnly, bool nextColumnOnly, bool useSANI, int64_t lastInputSegment, int64_t mode, int64_t columnsMode, int64_t featuresMode, int64_t combinedMode, int64_t columnSegments, int64_t featureSegments, bool internalColumns, bool linkFirstColumn, bool linkFirstFeature, int64_t lastColumnSegment, int64_t maximumSegments, int64_t grainSize)
+at::Tensor createTemporalConnections(bool optimiseParallelisation2a, const at::Tensor& active, const at::Tensor& columns, const at::Tensor& words, int64_t cs, int64_t fs, bool includeSameTime, bool allowSelf, bool nextWordOnly, bool nextColumnOnly, bool useSANI, int64_t lastInputSegment, int64_t mode, int64_t columnsMode, int64_t featuresMode, int64_t combinedMode, int64_t columnSegments, int64_t featureSegments, bool internalColumns, bool linkFirstColumn, bool linkFirstFeature, int64_t lastColumnSegment, int64_t maximumSegments, int64_t grainSize, bool patchTrainColumnStepsRepeatedColumns, const std::optional<at::Tensor>& columnSteps, const std::string& patchTrainColumnStepsInvalid)
 {
 	at::Tensor result;
 	TORCH_CHECK(optimiseParallelisation2a, "Temporal construction requires optimiseParallelisation2a");
@@ -33,6 +35,15 @@ at::Tensor createTemporalConnections(bool optimiseParallelisation2a, const at::T
 		TORCH_CHECK(cs <= std::numeric_limits<int64_t>::max() / fs, "Temporal neuron count overflows int64");
 		const int64_t neurons = cs * fs;
 		TORCH_CHECK(branches <= std::numeric_limits<int64_t>::max() / neurons, "Temporal branch allocation overflows int64");
+		const int64_t* columnStepData = nullptr;
+		if(patchTrainColumnStepsRepeatedColumns)
+		{
+			TORCH_CHECK(columnSteps.has_value() && columnSteps->defined(), patchTrainColumnStepsInvalid);
+			TORCH_CHECK(columnSteps->device().is_cpu() && columnSteps->layout() == at::kStrided && columnSteps->scalar_type() == at::kLong && columnSteps->dim() == 1 && columnSteps->numel() == cs && columnSteps->is_contiguous(), patchTrainColumnStepsInvalid);
+			columnStepData = columnSteps->const_data_ptr<int64_t>();
+			TORCH_CHECK(columnStepData[0] == 0, patchTrainColumnStepsInvalid);
+			for(int64_t concept = 1; concept < cs; ++concept) TORCH_CHECK(columnStepData[concept] >= columnStepData[concept - 1] && columnStepData[concept] <= columnStepData[concept - 1] + 1, patchTrainColumnStepsInvalid);
+		}
 		auto activation = active.accessor<float, 4>();
 		auto columnOrder = columns.accessor<int64_t, 1>();
 		auto wordOrder = words.accessor<int64_t, 2>();
@@ -107,7 +118,11 @@ at::Tensor createTemporalConnections(bool optimiseParallelisation2a, const at::T
 			if(permitted)
 			{
 				const int64_t distance = std::max<int64_t>(1, targetWord - sourceWord);
-				const int64_t conceptDistance = std::abs(targetConcept - sourceConcept);
+				int64_t conceptDistance = std::abs(targetConcept - sourceConcept);
+				if(patchTrainColumnStepsRepeatedColumns)
+				{
+					conceptDistance = std::abs(columnStepData[targetConcept] - columnStepData[sourceConcept]);
+				}
 				if(!useSANI)
 				{
 					selected = segment == 0;
@@ -522,7 +537,7 @@ void parallelMergeTasks(bool optimiseParallelisation2c, int64_t taskCount, int64
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, module)
 {
-	module.def("createTemporalConnections", &createTemporalConnections, pybind11::call_guard<pybind11::gil_scoped_release>());
+	module.def("createTemporalConnections", &createTemporalConnections, pybind11::arg("optimiseParallelisation2a"), pybind11::arg("active"), pybind11::arg("columns"), pybind11::arg("words"), pybind11::arg("cs"), pybind11::arg("fs"), pybind11::arg("includeSameTime"), pybind11::arg("allowSelf"), pybind11::arg("nextWordOnly"), pybind11::arg("nextColumnOnly"), pybind11::arg("useSANI"), pybind11::arg("lastInputSegment"), pybind11::arg("mode"), pybind11::arg("columnsMode"), pybind11::arg("featuresMode"), pybind11::arg("combinedMode"), pybind11::arg("columnSegments"), pybind11::arg("featureSegments"), pybind11::arg("internalColumns"), pybind11::arg("linkFirstColumn"), pybind11::arg("linkFirstFeature"), pybind11::arg("lastColumnSegment"), pybind11::arg("maximumSegments"), pybind11::arg("grainSize"), pybind11::arg("patchTrainColumnStepsRepeatedColumns") = false, pybind11::arg("columnSteps") = pybind11::none(), pybind11::arg("patchTrainColumnStepsInvalid") = std::string(), pybind11::call_guard<pybind11::gil_scoped_release>());
 	module.def("prepareConnectionUpdates", &prepareConnectionUpdates, pybind11::call_guard<pybind11::gil_scoped_release>());
 	module.def("mergeSparseSources", &mergeSparseSources, pybind11::call_guard<pybind11::gil_scoped_release>());
 }

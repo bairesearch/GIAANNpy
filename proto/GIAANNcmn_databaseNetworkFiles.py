@@ -29,6 +29,9 @@ import GIAANNcmn_count
 
 
 def prepareDatabaseFilesStartup():
+	if(inferenceRequireExistingDatabase):
+		if(not os.path.isdir(databaseFolder)):
+			raise RuntimeError(inferenceRequireExistingDatabaseError + databaseFolder)
 	if(useDrawNetworkIndependently):
 		if(not os.path.isdir(databaseFolder)):
 			raise RuntimeError("prepareDatabaseFilesStartup error: useDrawNetworkIndependently requires existing databaseFolder = " + databaseFolder)

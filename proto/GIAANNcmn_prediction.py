@@ -1202,18 +1202,23 @@ def selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetw
 		targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNcmn_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 		conceptColumnIndexNext = int(targetPreviousColumnIndex)
 		conceptColumnFeatureIndexNext = int(targetFeatureIndex)
-		conceptColumnIndexNextTensor = pt.tensor([conceptColumnIndexNext], dtype=pt.long)
-		conceptColumnFeatureIndexNextTensor = pt.tensor([conceptColumnFeatureIndexNext], dtype=pt.long)
-		constraintModeTarget = constraintModePrediction
-		if(constraintModeTarget == "delimiter"):
-			constraintModeTarget = None
-		conceptColumnIndexNextTensor, conceptColumnFeatureIndexNextTensor = GIAANNcmn_predictionConstraints.applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnIndexNextTensor, conceptColumnFeatureIndexNextTensor, allowedColumnsConstraint, constraintModeTarget, None, None)
-		if(conceptColumnIndexNextTensor is None or conceptColumnFeatureIndexNextTensor is None or conceptColumnIndexNextTensor.numel() == 0 or conceptColumnFeatureIndexNextTensor.numel() == 0):
-			GIAANNcmn_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no prediction candidates available")
-		if(conceptColumnIndexNextTensor.numel() != 1 or conceptColumnFeatureIndexNextTensor.numel() != 1):
-			raise RuntimeError("processColumnInferencePrediction error: multiple prediction candidates not supported")
-		conceptColumnIndexNext = int(conceptColumnIndexNextTensor.squeeze().item())
-		conceptColumnFeatureIndexNext = int(conceptColumnFeatureIndexNextTensor.squeeze().item())
+		if(patchInferenceUseNextTokenTargets):
+			#Prediction selection is complete. The observed target must be propagated in its assigned column even when it violates prediction constraints.
+			if(conceptColumnIndexNext < patchInferenceUseNextTokenTargetsMinimumIndex or conceptColumnIndexNext >= databaseNetworkObject.c or conceptColumnFeatureIndexNext < patchInferenceUseNextTokenTargetsMinimumIndex or conceptColumnFeatureIndexNext >= databaseNetworkObject.f):
+				raise RuntimeError(patchInferenceUseNextTokenTargetsInvalidTarget)
+		else:
+			conceptColumnIndexNextTensor = pt.tensor([conceptColumnIndexNext], dtype=pt.long)
+			conceptColumnFeatureIndexNextTensor = pt.tensor([conceptColumnFeatureIndexNext], dtype=pt.long)
+			constraintModeTarget = constraintModePrediction
+			if(constraintModeTarget == "delimiter"):
+				constraintModeTarget = None
+			conceptColumnIndexNextTensor, conceptColumnFeatureIndexNextTensor = GIAANNcmn_predictionConstraints.applyColumnConstraintToPredictions(databaseNetworkObject, conceptColumnIndexNextTensor, conceptColumnFeatureIndexNextTensor, allowedColumnsConstraint, constraintModeTarget, None, None)
+			if(conceptColumnIndexNextTensor is None or conceptColumnFeatureIndexNextTensor is None or conceptColumnIndexNextTensor.numel() == 0 or conceptColumnFeatureIndexNextTensor.numel() == 0):
+				GIAANNcmn_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no prediction candidates available")
+			if(conceptColumnIndexNextTensor.numel() != 1 or conceptColumnFeatureIndexNextTensor.numel() != 1):
+				raise RuntimeError("processColumnInferencePrediction error: multiple prediction candidates not supported")
+			conceptColumnIndexNext = int(conceptColumnIndexNextTensor.squeeze().item())
+			conceptColumnFeatureIndexNext = int(conceptColumnFeatureIndexNextTensor.squeeze().item())
 		#connected predictions constraint is not applied in target-driven activation
 	return conceptColumnIndexPred, conceptColumnFeatureIndexPred, conceptColumnIndexNext, conceptColumnFeatureIndexNext, targetPreviousColumnIndex, targetNextColumnIndex, predictionCandidatesAvailable
 

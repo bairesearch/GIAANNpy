@@ -739,3 +739,7 @@ v2q (Codex App GPT-6.0):
 - add proto GIAANNproto2q1a - start LIF inference updates:
 	- add option inferenceReviewPatch17segmentTimingOptimisation (enabled) - segment timing optimisation for inferenceDecrementActivationsSomaPerPredictedToken/inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn
 	- set predictionEnsureConnectedToPreviousPrediction==False:inferenceReviewPatch16TokenAggregation=True
+- add option patchInferenceUseNextTokenTargets (disabled) - popagate the exact target column and feature during target-driven inference without applying prediction-only column constraints (designed for inferenceColumnConstraintsAllowExternalPrimeConceptTransitions=False).
+- add patchTrainColumnStepsRepeatedColumns (enabled) - align training column-segment distances with LIF column transitions while preserving distinct token occurrences and feature timing.
+- add option inferenceRequireExistingDatabase (enabled) - patch inference (executionMode = "inference") - hard fail if the trained database folder does not already exist.
+

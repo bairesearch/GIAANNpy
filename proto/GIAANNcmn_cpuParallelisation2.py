@@ -1,6 +1,8 @@
 """Independently selectable CPU training optimisations layered on optimiseTrainParallelisation1."""
 
 from GIAANNcmn_globalDefs import *
+if(patchTrainColumnStepsRepeatedColumns):
+	import GIAANNcmn_trainColumnSteps
 
 if(optimiseTrainParallelisation2a or optimiseTrainParallelisation2b or optimiseTrainParallelisation2c or optimiseTrainParallelisation2d or optimiseTrainParallelisation2e or optimiseTrainParallelisation2f):
 	import os
@@ -41,7 +43,11 @@ def createTemporalConnections(featureNeuronsActive, cs, fs, columnsWordOrder, fe
 					featureSegments += inferenceLeakyIntegrateAndFireSomaSegmentCount
 				internalColumns = useSANIfeaturesAndColumnsInternal
 		extension = getParallelisation2Extension()
-		result = extension.createTemporalConnections(optimiseTrainParallelisation2a, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, cs, fs, includeSameTime, trainConnectionsAllowSelfTransitions, debugConnectNodesToNextNodesInSequenceOnly, debugConnectColumnsToNextColumnsInSequenceOnly, useSANI, arrayIndexSegmentLast, mode, parallelisation2TemporalModeColumns, parallelisation2TemporalModeFeatures, parallelisation2TemporalModeCombined, columnSegments, featureSegments, internalColumns, linkFirstColumn, linkFirstFeature, lastColumnSegment, parallelisation2MaximumSegments, parallelisation2KernelGrainSize)
+		if(patchTrainColumnStepsRepeatedColumns):
+			columnSteps = GIAANNcmn_trainColumnSteps.calculateColumnSteps(sequenceObservedColumns, columnsWordOrder.device)
+			result = extension.createTemporalConnections(optimiseTrainParallelisation2a, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, cs, fs, includeSameTime, trainConnectionsAllowSelfTransitions, debugConnectNodesToNextNodesInSequenceOnly, debugConnectColumnsToNextColumnsInSequenceOnly, useSANI, arrayIndexSegmentLast, mode, parallelisation2TemporalModeColumns, parallelisation2TemporalModeFeatures, parallelisation2TemporalModeCombined, columnSegments, featureSegments, internalColumns, linkFirstColumn, linkFirstFeature, lastColumnSegment, parallelisation2MaximumSegments, parallelisation2KernelGrainSize, patchTrainColumnStepsRepeatedColumns, columnSteps, patchTrainColumnStepsInvalid)
+		else:
+			result = extension.createTemporalConnections(optimiseTrainParallelisation2a, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, cs, fs, includeSameTime, trainConnectionsAllowSelfTransitions, debugConnectNodesToNextNodesInSequenceOnly, debugConnectColumnsToNextColumnsInSequenceOnly, useSANI, arrayIndexSegmentLast, mode, parallelisation2TemporalModeColumns, parallelisation2TemporalModeFeatures, parallelisation2TemporalModeCombined, columnSegments, featureSegments, internalColumns, linkFirstColumn, linkFirstFeature, lastColumnSegment, parallelisation2MaximumSegments, parallelisation2KernelGrainSize)
 	return result
 
 
