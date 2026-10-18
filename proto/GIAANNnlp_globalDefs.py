@@ -56,6 +56,7 @@ from GIAANNcmn_globalDefs import useTrainDuringInference
 from GIAANNcmn_globalDefs import useDefaultsV2
 from GIAANNcmn_globalDefs import useBenchmarkDefaultsEvalTestSetOptim
 from GIAANNcmn_globalDefs import inferenceLeakyIntegrateAndFire
+from GIAANNcmn_globalDefs import inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures
 
 
 
@@ -621,13 +622,21 @@ if(inferenceReportGroundedAccuracy):
 
 
 #Auxiliary neurons;
+inferenceInferMissingFeaturesSemanticDisabledError = "Semantic missing-feature inference helper called while its feature is disabled"
 if(useDefaultsV2):
-	inferenceInferMissingFeatures = False	#default: False	#orig: False	#Auxiliary method #2;
-	auxiliaryNeurons=False	#default: False	#orig: False
+	inferenceInferMissingFeatures = True	#default: True	#orig: False	#Auxiliary method #2;
+	auxiliaryNeurons = False	#default: False	#orig: False
 else:
 	inferenceInferMissingFeatures = False
 	auxiliaryNeurons = False
 if(inferenceInferMissingFeatures):
+	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+		inferenceInferMissingFeaturesAllObservedTokens = False	#requires teacher-forced inference
+		inferenceInferMissingFeaturesSemantic = False	#requires teacher-forced inference
+	else:
+		inferenceInferMissingFeaturesAllObservedTokens = True	#default: True	#orig: False #opt-in: extend proxy inference beyond the initial seed during teacher-forced evaluation
+		inferenceInferMissingFeaturesSemantic = True	#default: True	#orig: False	#opt-in: condition proxy selection on the observed token identity and transfer donor-column roles
+	inferenceInferMissingFeaturesAllObservedTokensInvalidConfiguration = "inferenceInferMissingFeaturesAllObservedTokens requires teacher-forced inference"
 	inferenceInferMissingFeaturesCandidateSourceWeighted = True	#default: True
 	inferenceInferMissingFeaturesUpdate1SelectTopKCandidates = False	#select only the top-k most contextually active source candidates before propagation
 	inferenceInferMissingFeaturesUpdate2SourceConfidence = False	#scale joint proxy propagation continuously by winner activation and winner-to-runner-up margin
@@ -655,6 +664,39 @@ if(inferenceInferMissingFeatures):
 	inferenceInferMissingFeaturesConceptDimension = 2
 	inferenceInferMissingFeaturesFeatureDimension = 3
 	inferenceInferMissingFeaturesCandidateFeatureDimension = 1
+	if(inferenceInferMissingFeaturesSemantic):
+		inferenceInferMissingFeaturesSemanticContextColumns = True	#default: True	#orig: False	#use contextual column evidence for an observed token even when its exact neuron has no soma activity
+		inferenceInferMissingFeaturesSemanticPrePropagationContext = False	#rank donors using the context that predicted the observed source, before the next LIF timing step
+		inferenceInferMissingFeaturesSemanticWordVectors = False	#external pretrained semantic evidence; evaluate separately from checkpoint-only transfer
+		inferenceInferMissingFeaturesSemanticProjectColumns = True	#map a donor's within-column targets into the observed source column
+		inferenceInferMissingFeaturesSemanticObservedBurst = True	#the observed token is known, so contextual activation ranks donors rather than attenuating its existence
+		inferenceInferMissingFeaturesSemanticPreferPooledTransitions = False	#retain indirect mode's pooled prediction while adding semantic donor context for subsequent steps
+		inferenceInferMissingFeaturesSemanticSupplementTrainedSources = False	#experimental interpolation of exact trained sources with contextual donors
+		inferenceInferMissingFeaturesSemanticSupplementWeight = 0.1
+		inferenceInferMissingFeaturesSemanticTopK = 4
+		inferenceInferMissingFeaturesSemanticContextTopK = 32
+		inferenceInferMissingFeaturesSemanticVectorTopK = 128
+		inferenceInferMissingFeaturesSemanticGain = 1.0
+		inferenceInferMissingFeaturesSemanticVectorThreshold = 0.6
+		inferenceInferMissingFeaturesSemanticVectorExponent = 4.0
+		inferenceInferMissingFeaturesSemanticVectorModel = "en_core_web_md"
+		inferenceInferMissingFeaturesSemanticMaximumReduction = "amax"
+		inferenceInferMissingFeaturesSemanticSourceColumnField = 0
+		inferenceInferMissingFeaturesSemanticSourceFeatureField = 1
+		inferenceInferMissingFeaturesSemanticSourceScoreField = 2
+		inferenceInferMissingFeaturesSemanticDictionaryKeyField = 0
+		inferenceInferMissingFeaturesSemanticDictionaryValueField = 1
+		inferenceInferMissingFeaturesSemanticInvalidConfiguration = "Semantic missing-feature inference requires static teacher-forced NLP LIF inference, persisted source connections, positive integer candidate limits, finite gain in (0, 1], vector threshold in (0, 1], and positive vector exponent"
+		inferenceInferMissingFeaturesSemanticInvalidLegacyOptions = "Semantic missing-feature inference uses its own candidate selection and confidence; disable legacy selection updates 1, 2 and 5, and retain updates 6 and 8"
+		inferenceInferMissingFeaturesSemanticInvalidState = "Semantic missing-feature inference requires an observed source and finite non-negative sparse activations with valid neuron coordinates"
+		for inferenceInferMissingFeaturesSemanticLimit in (inferenceInferMissingFeaturesSemanticTopK, inferenceInferMissingFeaturesSemanticContextTopK, inferenceInferMissingFeaturesSemanticVectorTopK):
+			if(not isinstance(inferenceInferMissingFeaturesSemanticLimit, int) or isinstance(inferenceInferMissingFeaturesSemanticLimit, bool) or inferenceInferMissingFeaturesSemanticLimit <= inferenceInferMissingFeaturesMinimumActivation):
+				raise RuntimeError(inferenceInferMissingFeaturesSemanticInvalidConfiguration)
+		for inferenceInferMissingFeaturesSemanticUnitValue in (inferenceInferMissingFeaturesSemanticGain, inferenceInferMissingFeaturesSemanticVectorThreshold, inferenceInferMissingFeaturesSemanticSupplementWeight):
+			if(not isinstance(inferenceInferMissingFeaturesSemanticUnitValue, (int, float)) or isinstance(inferenceInferMissingFeaturesSemanticUnitValue, bool) or not math.isfinite(inferenceInferMissingFeaturesSemanticUnitValue) or inferenceInferMissingFeaturesSemanticUnitValue <= inferenceInferMissingFeaturesMinimumActivation or inferenceInferMissingFeaturesSemanticUnitValue > inferenceInferMissingFeaturesNormalisedActivationTotal):
+				raise RuntimeError(inferenceInferMissingFeaturesSemanticInvalidConfiguration)
+		if(not isinstance(inferenceInferMissingFeaturesSemanticVectorExponent, (int, float)) or isinstance(inferenceInferMissingFeaturesSemanticVectorExponent, bool) or not math.isfinite(inferenceInferMissingFeaturesSemanticVectorExponent) or inferenceInferMissingFeaturesSemanticVectorExponent <= inferenceInferMissingFeaturesMinimumActivation):
+			raise RuntimeError(inferenceInferMissingFeaturesSemanticInvalidConfiguration)
 	if(inferenceInferMissingFeaturesUpdate10UseGlobalFeaturePredictions):
 		if(not inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections):
 			raise RuntimeError("GIAANNnlp_globalDefs error: inferenceInferMissingFeaturesUpdate10UseGlobalFeaturePredictions requires inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections")

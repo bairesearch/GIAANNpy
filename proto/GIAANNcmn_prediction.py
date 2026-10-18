@@ -598,9 +598,15 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		activeMissingFeatureConstraintSourceFeatures = None
 		missingFeatureObservedPropagationRestored = False
 		missingFeatureSourceIsSeed = sequenceWordIndex > arrayIndexSegmentFirst and (seedPhase or wordPredictionIndex == arrayIndexSegmentFirst)
+		if(inferenceInferMissingFeaturesAllObservedTokens):
+			if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+				raise RuntimeError(inferenceInferMissingFeaturesAllObservedTokensInvalidConfiguration)
+			missingFeatureSourceIsSeed = sequenceWordIndex > arrayIndexSegmentFirst
 		if(missingFeatureSourceIsSeed):
 			trainedMissingFeatureSourceColumnIndices = GIAANNcmn_predictionInferMissingFeatures.getTrainedMissingFeatureSourceColumnIndices(databaseNetworkObject, globalFeatureNeuronsStrength, conceptColumnIndex, conceptColumnFeatureIndex)
 			inferMissingFeature = trainedMissingFeatureSourceColumnIndices is not None
+			if(inferenceInferMissingFeaturesSemantic and inferenceInferMissingFeaturesSemanticPrePropagationContext and inferMissingFeature):
+				databaseNetworkObject.inferenceSemanticCandidateState = globalFeatureNeuronsActivation.clone()
 			if(inferenceInferMissingFeaturesUpdate8RequireActiveProxySignal and not inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections and inferMissingFeature and trainedMissingFeatureSourceColumnIndices.numel() == arrayIndexSegmentFirst):
 				inferMissingFeature = False
 	if(inferenceUseNeuronFeaturePropertiesTime and globalFeatureNeuronsTime is None):
@@ -694,6 +700,11 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		if(inferenceInferMissingFeatures and inferMissingFeature and len(activeMissingFeatureConstraintSourceColumns) > arrayIndexSegmentFirst):
 			missingFeatureSourceColumnIndicesTensor, missingFeatureSourceFeatureIndicesTensor = GIAANNcmn_predictionInferMissingFeatures.buildMissingFeatureSourceTensors(activeMissingFeatureConstraintSourceColumns, activeMissingFeatureConstraintSourceFeatures, conceptColumnIndexTensor.device)
 			connectedColumnsConstraint, connectedColumnsFeatureMap = calculateConnectedColumnsConstraint(databaseNetworkObject, observedColumnsDict, missingFeatureSourceColumnIndicesTensor, missingFeatureSourceFeatureIndicesTensor, sequenceWordIndex, wordPredictionIndex, tokensSequence, seedPhase)
+			if(inferenceInferMissingFeaturesSemantic and inferenceInferMissingFeaturesSemanticProjectColumns and connectedColumnsConstraint is not None):
+				connectedColumnsConstraint, connectedColumnsFeatureMap = GIAANNcmn_predictionInferMissingFeatures.GIAANNnlp_predictionSemantic.buildSemanticDonorConstraints(databaseNetworkObject, observedColumnsDict, activeMissingFeatureConstraintSourceColumns, activeMissingFeatureConstraintSourceFeatures, connectedColumnsConstraint)
+			if(inferenceInferMissingFeaturesSemantic and inferenceReviewPatch13poolTransitionsFromSimilarFeatures and not inferenceInferMissingFeaturesSemanticPreferPooledTransitions):
+				# A contextual donor signal takes precedence over the unconditional pooled-token prediction.
+				pooledConnectedColumnsConstraint = None
 	else:
 		#activation targets have already been activated
 		sequenceObservedColumnsPrediction = SequenceObservedColumnsDraw(databaseNetworkObject, observedColumnsDict)

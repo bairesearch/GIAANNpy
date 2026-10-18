@@ -103,7 +103,7 @@ if(useQuickExecution):
 elif(useDefault):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useBenchmark):
-	useBenchmarkDefaultsEvalTestSet = False	#default: False/True
+	useBenchmarkDefaultsEvalTestSet = True	#default: False/True
 elif(useAutoresearch):
 	useBenchmarkDefaultsEvalTestSet = True	#default: True: eval test-set
 elif(useDrawNetworkIndependently):
@@ -197,7 +197,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 100000	#10000, 100000, 400000	#5000, 200000, 1000000
+	trainMaxSequences = 400000	#10000, 100000, 400000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 50000	#5000
@@ -1385,7 +1385,7 @@ if(drawEfficient):
 	drawEfficientDrawDeadNeurons = True	#default: True	#draw empty columns with no connected neurons
 
 #Training column-segment timing; enable only for fresh training, not continuation of an occurrence-timed checkpoint.
-patchTrainColumnStepsRepeatedColumns = True	#default: False	#opt-in: count database column-ID changes; adjacent repeated occurrences take zero column steps
+patchTrainColumnStepsRepeatedColumns = False	#default: False	#opt-in: count database column-ID changes; adjacent repeated occurrences take zero column steps
 patchTrainColumnStepsDimension = 0
 patchTrainColumnStepsRank = 1
 patchTrainColumnStepsFirst = 0

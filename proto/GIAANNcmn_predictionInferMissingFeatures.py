@@ -26,6 +26,8 @@ import GIAANNcmn_databaseNetwork
 import GIAANNcmn_databaseNetworkFiles
 import GIAANNcmn_inferenceDuringTrain
 import GIAANNcmn_predictionActivate
+if(inferenceInferMissingFeatures and inferenceInferMissingFeaturesSemantic):
+	import GIAANNnlp_predictionSemantic
 
 def getTrainedMissingFeatureSourceColumnIndices(databaseNetworkObject, globalFeatureNeuronsStrength, sourceColumnIndex, sourceFeatureIndex):
 	result = None
@@ -40,6 +42,8 @@ def getTrainedMissingFeatureSourceColumnIndices(databaseNetworkObject, globalFea
 			raise RuntimeError("getTrainedMissingFeatureSourceColumnIndices error: sourceColumnIndex is out of range")
 		if(sourceFeatureIndex < arrayIndexSegmentFirst or sourceFeatureIndex >= databaseNetworkObject.f):
 			raise RuntimeError("getTrainedMissingFeatureSourceColumnIndices error: sourceFeatureIndex is out of range")
+		if(inferenceInferMissingFeaturesSemantic):
+			GIAANNnlp_predictionSemantic.setSemanticObservedSource(databaseNetworkObject, sourceColumnIndex, sourceFeatureIndex)
 		if(inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections):
 			if(not inferenceLeakyIntegrateAndFire):
 				raise RuntimeError("getTrainedMissingFeatureSourceColumnIndices error: persisted source connection discovery requires inferenceLeakyIntegrateAndFire")
@@ -72,7 +76,11 @@ def getTrainedMissingFeatureSourceColumnIndices(databaseNetworkObject, globalFea
 				trainedColumnMask = (featureStrength > inferenceInferMissingFeaturesMinimumActivation).reshape(-1, featureStrength.shape[-1]).any(dim=arrayIndexSegmentFirst)
 				trainedColumnIndices = pt.nonzero(trainedColumnMask, as_tuple=False).reshape(-1)
 			currentFeatureIsTrained = bool(pt.any(trainedColumnIndices == sourceColumnIndex).item())
-		if(currentFeatureIsTrained or (inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections and sourceFeatureIndex == featureIndexPrimeConceptNeuron)):
+		inferFromTrainedSource = False
+		if(inferenceInferMissingFeaturesSemantic):
+			databaseNetworkObject.inferenceSemanticObservedSourceTrained = currentFeatureIsTrained
+			inferFromTrainedSource = inferenceInferMissingFeaturesSemanticSupplementTrainedSources
+		if((currentFeatureIsTrained and not inferFromTrainedSource) or (inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections and sourceFeatureIndex == featureIndexPrimeConceptNeuron and not inferenceInferMissingFeaturesSemantic)):
 			result = None
 		else:
 			if(sourceFeatureIndex == featureIndexPrimeConceptNeuron):
@@ -226,7 +234,13 @@ def getActiveMissingFeatureSources(databaseNetworkObject, globalFeatureNeuronsAc
 		if(inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections and not inferenceLeakyIntegrateAndFire):
 			raise RuntimeError("getActiveMissingFeatureSources error: persisted source connection discovery requires inferenceLeakyIntegrateAndFire")
 		if(inferenceLeakyIntegrateAndFire):
-			activeSourceColumns, activeSourceFeatureIndices, activeSourceActivations, activeSourceScores, totalSourceActivation, sourceConfidence = getActiveMissingFeatureSourcesLeakyIntegrateAndFire(globalFeatureNeuronsActivation, sourceFeatureIndex, trainedSourceColumnIndices)
+			if(inferenceInferMissingFeaturesSemantic):
+				semanticCandidateState = globalFeatureNeuronsActivation
+				if(inferenceInferMissingFeaturesSemanticPrePropagationContext):
+					semanticCandidateState = databaseNetworkObject.inferenceSemanticCandidateState
+				activeSourceColumns, activeSourceFeatureIndices, activeSourceActivations, activeSourceScores, totalSourceActivation, sourceConfidence = GIAANNnlp_predictionSemantic.getSemanticMissingFeatureSources(databaseNetworkObject, semanticCandidateState)
+			else:
+				activeSourceColumns, activeSourceFeatureIndices, activeSourceActivations, activeSourceScores, totalSourceActivation, sourceConfidence = getActiveMissingFeatureSourcesLeakyIntegrateAndFire(globalFeatureNeuronsActivation, sourceFeatureIndex, trainedSourceColumnIndices)
 		else:
 			activeSourceColumns = []
 			activeSourceFeatureIndices = []
@@ -395,6 +409,8 @@ def calculateCombinedMissingFeatureTargetActivation(databaseNetworkObject, obser
 		absoluteSourceConfidence = inferenceInferMissingFeaturesNormalisedActivationTotal
 		if(inferenceInferMissingFeaturesUpdate3AbsoluteSourceConfidence):
 			absoluteSourceConfidence = min(max(float(sourceActivation.item()) for sourceActivation in activeSourceActivations), inferenceInferMissingFeaturesUpdate3MaximumConfidence)
+		if(inferenceInferMissingFeaturesSemantic and inferenceInferMissingFeaturesSemanticObservedBurst):
+			absoluteSourceConfidence = inferenceInferMissingFeaturesSemanticGain
 		if(inferenceInferMissingFeaturesUpdate2SourceConfidence):
 			if(not isinstance(sourceConfidence, pt.Tensor) or sourceConfidence.dim() != inferenceInferMissingFeaturesConfidenceTensorRank or not bool(pt.isfinite(sourceConfidence).item()) or not bool((sourceConfidence > inferenceInferMissingFeaturesMinimumActivation).item()) or not bool((sourceConfidence <= inferenceInferMissingFeaturesNormalisedActivationTotal).item())):
 				raise RuntimeError("calculateCombinedMissingFeatureTargetActivation error: source confidence must be a finite scalar within (minimum activation, normalised activation total]")
@@ -416,6 +432,8 @@ def calculateCombinedMissingFeatureTargetActivation(databaseNetworkObject, obser
 				featureNeuronsTargetActivation = featureNeuronsTargetActivation * candidateProbability
 			else:
 				featureNeuronsTargetActivation = calculateMissingFeatureTargetActivation(databaseNetworkObject, featureConnections, sourceColumnIndex, sourceFeatureIndex, sourceActivation, normalisationMultiplier)
+			if(inferenceInferMissingFeaturesSemantic and inferenceInferMissingFeaturesSemanticProjectColumns):
+				featureNeuronsTargetActivation = GIAANNnlp_predictionSemantic.projectSemanticDonorTargets(databaseNetworkObject, featureNeuronsTargetActivation, sourceColumnIndex)
 			if(combinedTargetActivation is None):
 				combinedTargetActivation = featureNeuronsTargetActivation
 			else:

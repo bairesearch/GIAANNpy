@@ -65,6 +65,11 @@ class DatabaseNetworkClass():
 			GIAANNnlp_auxiliaryNeuronsSimilarWords.initialiseDatabaseNetworkAuxiliary(self, auxiliarySimilarFeaturesDict, auxiliarySimilarFeaturesList, auxiliarySimilarFeatureWordWeightsByParentWord, auxiliarySimilarLoadExistingDatabase)
 		self.setArrayIndexProperties(inferenceMode)
 		self.inferenceMode = inferenceMode
+		if(inferenceInferMissingFeatures and inferenceInferMissingFeaturesSemantic):
+			self.inferenceSemanticObservedSource = None
+			self.inferenceSemanticObservedSourceTrained = False
+			self.inferenceSemanticVectorVocabulary = None
+			self.inferenceSemanticCandidateState = None
 		if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
 			self.inferenceReviewPatch13SourceIndex = None
 			self.inferenceReviewPatch13Predictions = {}

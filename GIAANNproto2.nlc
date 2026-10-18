@@ -742,4 +742,7 @@ v2q (Codex App GPT-6.0):
 - add option patchInferenceUseNextTokenTargets (disabled) - popagate the exact target column and feature during target-driven inference without applying prediction-only column constraints (designed for inferenceColumnConstraintsAllowExternalPrimeConceptTransitions=False).
 - add patchTrainColumnStepsRepeatedColumns (enabled) - align training column-segment distances with LIF column transitions while preserving distinct token occurrences and feature timing.
 - add option inferenceRequireExistingDatabase (enabled) - patch inference (executionMode = "inference") - hard fail if the trained database folder does not already exist.
-
+- add option inferenceInferMissingFeaturesAllObservedTokens (enabled) - extend missing-feature inference beyond seed tokens to all observed source tokens during teacher-forced evaluation.
+- add option inferenceInferMissingFeaturesSemantic (enabled) - add token-aware contextual donor selection and project donor activation targets into the observed token column to improve missing-feature inference.
+- add option inferenceInferMissingFeaturesSemanticContextColumns (enabled) - Use contextual column activity to select donor neurons for the observed token even when those neurons have no soma activation.
+- set inferenceInferMissingFeatures=True by default

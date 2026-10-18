@@ -63,7 +63,7 @@ def calculatePooledTransitionConnectedColumnsConstraint(databaseNetworkObject, o
 def validatePooledTransitionConfiguration(databaseNetworkObject):
 	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
 		#The cache represents a static trained graph; beam search and BPB need their own pooled distributions.
-		if(not inferenceLeakyIntegrateAndFire or inferenceBeamSearch or printInferenceTop1AccuracyBitsPerByte or useTrainDuringInference or inferenceInferMissingFeatures):
+		if(not inferenceLeakyIntegrateAndFire or inferenceBeamSearch or printInferenceTop1AccuracyBitsPerByte or useTrainDuringInference or (inferenceInferMissingFeatures and not inferenceInferMissingFeaturesSemantic)):
 			raise RuntimeError(inferenceReviewPatch13InvalidConfiguration)
 		if(databaseNetworkObject is None or not databaseNetworkObject.inferenceMode or len(databaseNetworkObject.conceptColumnsList) != databaseNetworkObject.c or len(databaseNetworkObject.conceptFeaturesList) != databaseNetworkObject.f or databaseNetworkObject.arrayIndexPropertiesStrengthIndex is None):
 			raise RuntimeError(inferenceReviewPatch13InvalidDatabase)
