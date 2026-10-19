@@ -316,6 +316,24 @@ patchMultipleDendriticBranchesOverflowBranch = True
 useSANI = True	#default: True	#orig: False	#sequentially activated neuronal input
 
 
+#Immediate (direct) connections;
+enforceDirectConnections = True	#default: True	#orig: False	#prediction requires a direct connection from previous prediction as observed during training (ie adjacent tokens)
+if(enforceDirectConnections):
+	enforceDirectConnectionsSANI = True	#default: True #orig: False	#enforce activation of first segment (direct feature connection)
+	enforceDirectConnectionsIgnoreSeed = True	#default: True #orig: False
+else:
+	enforceDirectConnectionsSANI = False
+	enforceDirectConnectionsIgnoreSeed = False
+if(enforceDirectConnectionsSANI):
+	useSANI = True	#sequentially activated neuronal input (divide dendrites into segments)	#override
+	enforceDirectConnectionsSANIminimal = False	#default: False	#orig: True	#deprecated
+else:
+	enforceDirectConnectionsSANIminimal = False
+minimumPredictionActivationThreshold = 0.0	#explicit threshold application not required (for verification only)
+predictionEnsureConnectedToPreviousPrediction = True	#default: True	#ensure every new prediction connects to previous node (requirement is independent of enforceDirectConnections)
+predictionEnsureConnectedToPreviousPredictionStrict = False	#default: False #orig: True	#True: predictions must flow from features and column of same name as currently selected token, False: predictions must flow from features of the same name as the currently selected token.
+
+
 #modality global defs;
 if(modalityName=="NLP"):
 	from GIAANNnlp_globalDefs import *
@@ -433,23 +451,6 @@ if(trainSelectMostSimilarBranch):
 		raise RuntimeError("GIAANNcmn_globalDefs error: trainSelectMostSimilarBranch requires arrayIndexPropertiesStrength")
 arrayIndexPropertiesActivationCreateInference = arrayIndexPropertiesActivation or True
 arrayIndexPropertiesTimeCreateInference = arrayIndexPropertiesTime or inferenceUseNeuronFeaturePropertiesTime
-
-
-#Immediate (direct) connections;
-enforceDirectConnections = True	#default: True	#orig: False	#prediction requires a direct connection from previous prediction as observed during training (ie adjacent tokens)
-if(enforceDirectConnections):
-	enforceDirectConnectionsSANI = True	#default: True #orig: False	#enforce activation of first segment (direct feature connection)
-	enforceDirectConnectionsIgnoreSeed = True	#default: True #orig: False
-else:
-	enforceDirectConnectionsSANI = False
-	enforceDirectConnectionsIgnoreSeed = False
-if(enforceDirectConnectionsSANI):
-	useSANI = True	#sequentially activated neuronal input (divide dendrites into segments)	#override
-	enforceDirectConnectionsSANIminimal = False	#default: False	#orig: True	#deprecated
-else:
-	enforceDirectConnectionsSANIminimal = False
-minimumPredictionActivationThreshold = 0.0	#explicit threshold application not required (for verification only)
-predictionEnsureConnectedToPreviousPrediction = True	#default: True	#ensure every new prediction connects to previous node (requirement is independent of enforceDirectConnections)
 
 
 #Beam search;

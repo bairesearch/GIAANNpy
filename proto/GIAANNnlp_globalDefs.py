@@ -57,7 +57,7 @@ from GIAANNcmn_globalDefs import useDefaultsV2
 from GIAANNcmn_globalDefs import useBenchmarkDefaultsEvalTestSetOptim
 from GIAANNcmn_globalDefs import inferenceLeakyIntegrateAndFire
 from GIAANNcmn_globalDefs import inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures
-
+from GIAANNcmn_globalDefs import predictionEnsureConnectedToPreviousPredictionStrict
 
 
 
@@ -624,7 +624,10 @@ if(inferenceReportGroundedAccuracy):
 #Auxiliary neurons;
 inferenceInferMissingFeaturesSemanticDisabledError = "Semantic missing-feature inference helper called while its feature is disabled"
 if(useDefaultsV2):
-	inferenceInferMissingFeatures = True	#default: True	#orig: False	#Auxiliary method #2;
+	if(predictionEnsureConnectedToPreviousPredictionStrict):
+		inferenceInferMissingFeatures = False
+	else:
+		inferenceInferMissingFeatures = True	#default: True	#orig: False	#Auxiliary method #2	#this breaks a strict interpretation of predictionEnsureConnectedToPreviousPrediction=True
 	auxiliaryNeurons = False	#default: False	#orig: False
 else:
 	inferenceInferMissingFeatures = False
@@ -642,7 +645,10 @@ if(inferenceInferMissingFeatures):
 	inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections = True	#detect trained feature instances from persisted source connections when global neuron strengths are unavailable
 	inferenceInferMissingFeaturesUpdate8RequireActiveProxySignal = True	#replace observed-feature propagation only when an active proxy produces a forward signal
 	inferenceInferMissingFeaturesUpdate9UsePartialSourceActivations = True	#treat every positive candidate activation as graded missing-feature evidence instead of requiring a fired soma
-	inferenceInferMissingFeaturesUpdate10UseGlobalFeaturePredictions = True	#select context-predicted substitute features across all columns and feature identities
+	if(inferenceInferMissingFeaturesSemantic):
+		inferenceInferMissingFeaturesUpdate10UseGlobalFeaturePredictions = False	#this only weakly breaks requirement predictionEnsureConnectedToPreviousPrediction=True, as guessed predictions flow from features of the same name as the currently selected token
+	else:
+		inferenceInferMissingFeaturesUpdate10UseGlobalFeaturePredictions = True	#select context-predicted substitute features across all columns and feature identities	#this strongly breaks requirement predictionEnsureConnectedToPreviousPrediction=True, as guessed predictions flow from features of any name (not the same as the currently selected token)
 	inferenceInferMissingFeaturesUpdateEnabledCount = int(inferenceInferMissingFeaturesUpdate1SelectTopKCandidates) + int(inferenceInferMissingFeaturesUpdate2SourceConfidence) + int(inferenceInferMissingFeaturesUpdate3AbsoluteSourceConfidence) + int(inferenceInferMissingFeaturesUpdate4TransformCandidateSignals) + int(inferenceInferMissingFeaturesUpdate5SelectTopKConstraintSources) + int(inferenceInferMissingFeaturesUpdate6RetainCandidateActivations)
 	inferenceInferMissingFeaturesMinimumActivation = 0.0
 	inferenceInferMissingFeaturesNormalisedActivationTotal = 1.0
@@ -662,7 +668,7 @@ if(inferenceInferMissingFeatures):
 	if(inferenceInferMissingFeaturesSemantic):
 		inferenceInferMissingFeaturesSemanticContextColumns = True	#default: True	#orig: False	#use contextual column evidence for the selected source token even when its exact neuron has no soma activity
 		inferenceInferMissingFeaturesSemanticPrePropagationContext = False	#rank donors using the context that selected the source, before the next LIF timing step
-		inferenceInferMissingFeaturesSemanticWordVectors = False	#external pretrained semantic evidence; evaluate separately from checkpoint-only transfer
+		inferenceInferMissingFeaturesSemanticWordVectors = False	#external pretrained semantic evidence; evaluate separately from checkpoint-only transfer	#this strongly breaks requirement predictionEnsureConnectedToPreviousPrediction=True, as guessed predictions flow from features of any name (not the same as the currently selected token)
 		inferenceInferMissingFeaturesSemanticProjectColumns = True	#map a donor's within-column targets into the selected source column
 		inferenceInferMissingFeaturesSemanticObservedBurst = True	#the source token has already been selected (seed, target, or prediction); contextual activation ranks donors rather than attenuating its input burst
 		inferenceInferMissingFeaturesSemanticPreferPooledTransitions = False	#retain indirect mode's pooled prediction while adding semantic donor context for subsequent steps
