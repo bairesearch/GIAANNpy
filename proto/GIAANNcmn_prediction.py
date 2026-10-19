@@ -599,8 +599,7 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		missingFeatureObservedPropagationRestored = False
 		missingFeatureSourceIsSeed = sequenceWordIndex > arrayIndexSegmentFirst and (seedPhase or wordPredictionIndex == arrayIndexSegmentFirst)
 		if(inferenceInferMissingFeaturesAllObservedTokens):
-			if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
-				raise RuntimeError(inferenceInferMissingFeaturesAllObservedTokensInvalidConfiguration)
+			#The incoming source pair is the previous selected prediction or target; never substitute a target token here.
 			missingFeatureSourceIsSeed = sequenceWordIndex > arrayIndexSegmentFirst
 		if(missingFeatureSourceIsSeed):
 			trainedMissingFeatureSourceColumnIndices = GIAANNcmn_predictionInferMissingFeatures.getTrainedMissingFeatureSourceColumnIndices(databaseNetworkObject, globalFeatureNeuronsStrength, conceptColumnIndex, conceptColumnFeatureIndex)

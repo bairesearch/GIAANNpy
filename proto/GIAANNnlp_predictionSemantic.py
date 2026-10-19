@@ -1,4 +1,4 @@
-"""Observed-token-conditioned auxiliary propagation using a frozen trained database."""
+"""Selected-token-conditioned auxiliary propagation using a frozen trained database."""
 
 import os
 import math
@@ -13,6 +13,7 @@ import GIAANNcmn_predictionConstraints
 
 def setSemanticObservedSource(databaseNetworkObject, sourceColumnIndex, sourceFeatureIndex):
 	if(inferenceInferMissingFeatures and inferenceInferMissingFeaturesSemantic):
+		#The caller supplies the selected source, including generated tokens during prediction-driven inference.
 		validateSemanticConfiguration(databaseNetworkObject)
 		if(not isinstance(sourceColumnIndex, Integral) or isinstance(sourceColumnIndex, bool) or not isinstance(sourceFeatureIndex, Integral) or isinstance(sourceFeatureIndex, bool) or sourceColumnIndex < arrayIndexSegmentFirst or sourceColumnIndex >= databaseNetworkObject.c or sourceFeatureIndex < arrayIndexSegmentFirst or sourceFeatureIndex >= databaseNetworkObject.f):
 			raise RuntimeError(inferenceInferMissingFeaturesSemanticInvalidState)
@@ -179,7 +180,7 @@ def semanticSourceConnectionsExist(databaseNetworkObject, columnIndex, featureIn
 
 def validateSemanticConfiguration(databaseNetworkObject):
 	if(inferenceInferMissingFeatures and inferenceInferMissingFeaturesSemantic):
-		if(not useModalityNLP or not inferenceLeakyIntegrateAndFire or not inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections or inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures or useTrainDuringInference or inferenceBeamSearch or databaseNetworkObject is None or not databaseNetworkObject.inferenceMode or (inferenceInferMissingFeaturesSemanticSupplementTrainedSources and (not inferenceInferMissingFeaturesSemanticObservedBurst or inferenceInferMissingFeaturesSemanticSupplementWeight >= inferenceInferMissingFeaturesNormalisedActivationTotal))):
+		if(not useModalityNLP or not inferenceLeakyIntegrateAndFire or not inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections or useTrainDuringInference or inferenceBeamSearch or databaseNetworkObject is None or not databaseNetworkObject.inferenceMode or (inferenceInferMissingFeaturesSemanticSupplementTrainedSources and (not inferenceInferMissingFeaturesSemanticObservedBurst or inferenceInferMissingFeaturesSemanticSupplementWeight >= inferenceInferMissingFeaturesNormalisedActivationTotal))):
 			raise RuntimeError(inferenceInferMissingFeaturesSemanticInvalidConfiguration)
 		if(inferenceInferMissingFeaturesUpdate1SelectTopKCandidates or inferenceInferMissingFeaturesUpdate2SourceConfidence or inferenceInferMissingFeaturesUpdate5SelectTopKConstraintSources or not inferenceInferMissingFeaturesUpdate6RetainCandidateActivations or not inferenceInferMissingFeaturesUpdate8RequireActiveProxySignal):
 			raise RuntimeError(inferenceInferMissingFeaturesSemanticInvalidLegacyOptions)

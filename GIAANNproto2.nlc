@@ -746,3 +746,4 @@ v2q (Codex App GPT-6.0):
 - add option inferenceInferMissingFeaturesSemantic (enabled) - add token-aware contextual donor selection and project donor activation targets into the observed token column to improve missing-feature inference.
 - add option inferenceInferMissingFeaturesSemanticContextColumns (enabled) - Use contextual column activity to select donor neurons for the observed token even when those neurons have no soma activation.
 - set inferenceInferMissingFeatures=True by default
+- upgrade inferenceInferMissingFeaturesAllObservedTokens/inferenceInferMissingFeaturesSemantic to support inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=True.

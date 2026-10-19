@@ -630,13 +630,8 @@ else:
 	inferenceInferMissingFeatures = False
 	auxiliaryNeurons = False
 if(inferenceInferMissingFeatures):
-	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
-		inferenceInferMissingFeaturesAllObservedTokens = False	#requires teacher-forced inference
-		inferenceInferMissingFeaturesSemantic = False	#requires teacher-forced inference
-	else:
-		inferenceInferMissingFeaturesAllObservedTokens = True	#default: True	#orig: False #opt-in: extend proxy inference beyond the initial seed during teacher-forced evaluation
-		inferenceInferMissingFeaturesSemantic = True	#default: True	#orig: False	#opt-in: condition proxy selection on the observed token identity and transfer donor-column roles
-	inferenceInferMissingFeaturesAllObservedTokensInvalidConfiguration = "inferenceInferMissingFeaturesAllObservedTokens requires teacher-forced inference"
+	inferenceInferMissingFeaturesAllObservedTokens = True	#default: True	#orig: False	#extend proxy inference to every selected source: seed tokens, teacher-forced targets, or generated predictions
+	inferenceInferMissingFeaturesSemantic = True	#default: True	#orig: False	#condition proxy selection on the selected source token identity and transfer donor-column roles
 	inferenceInferMissingFeaturesCandidateSourceWeighted = True	#default: True
 	inferenceInferMissingFeaturesUpdate1SelectTopKCandidates = False	#select only the top-k most contextually active source candidates before propagation
 	inferenceInferMissingFeaturesUpdate2SourceConfidence = False	#scale joint proxy propagation continuously by winner activation and winner-to-runner-up margin
@@ -665,11 +660,11 @@ if(inferenceInferMissingFeatures):
 	inferenceInferMissingFeaturesFeatureDimension = 3
 	inferenceInferMissingFeaturesCandidateFeatureDimension = 1
 	if(inferenceInferMissingFeaturesSemantic):
-		inferenceInferMissingFeaturesSemanticContextColumns = True	#default: True	#orig: False	#use contextual column evidence for an observed token even when its exact neuron has no soma activity
-		inferenceInferMissingFeaturesSemanticPrePropagationContext = False	#rank donors using the context that predicted the observed source, before the next LIF timing step
+		inferenceInferMissingFeaturesSemanticContextColumns = True	#default: True	#orig: False	#use contextual column evidence for the selected source token even when its exact neuron has no soma activity
+		inferenceInferMissingFeaturesSemanticPrePropagationContext = False	#rank donors using the context that selected the source, before the next LIF timing step
 		inferenceInferMissingFeaturesSemanticWordVectors = False	#external pretrained semantic evidence; evaluate separately from checkpoint-only transfer
-		inferenceInferMissingFeaturesSemanticProjectColumns = True	#map a donor's within-column targets into the observed source column
-		inferenceInferMissingFeaturesSemanticObservedBurst = True	#the observed token is known, so contextual activation ranks donors rather than attenuating its existence
+		inferenceInferMissingFeaturesSemanticProjectColumns = True	#map a donor's within-column targets into the selected source column
+		inferenceInferMissingFeaturesSemanticObservedBurst = True	#the source token has already been selected (seed, target, or prediction); contextual activation ranks donors rather than attenuating its input burst
 		inferenceInferMissingFeaturesSemanticPreferPooledTransitions = False	#retain indirect mode's pooled prediction while adding semantic donor context for subsequent steps
 		inferenceInferMissingFeaturesSemanticSupplementTrainedSources = False	#experimental interpolation of exact trained sources with contextual donors
 		inferenceInferMissingFeaturesSemanticSupplementWeight = 0.1
@@ -686,9 +681,9 @@ if(inferenceInferMissingFeatures):
 		inferenceInferMissingFeaturesSemanticSourceScoreField = 2
 		inferenceInferMissingFeaturesSemanticDictionaryKeyField = 0
 		inferenceInferMissingFeaturesSemanticDictionaryValueField = 1
-		inferenceInferMissingFeaturesSemanticInvalidConfiguration = "Semantic missing-feature inference requires static teacher-forced NLP LIF inference, persisted source connections, positive integer candidate limits, finite gain in (0, 1], vector threshold in (0, 1], and positive vector exponent"
+		inferenceInferMissingFeaturesSemanticInvalidConfiguration = "Semantic missing-feature inference requires static NLP LIF inference without beam search, persisted source connections, positive integer candidate limits, finite gain in (0, 1], vector threshold in (0, 1], and positive vector exponent"
 		inferenceInferMissingFeaturesSemanticInvalidLegacyOptions = "Semantic missing-feature inference uses its own candidate selection and confidence; disable legacy selection updates 1, 2 and 5, and retain updates 6 and 8"
-		inferenceInferMissingFeaturesSemanticInvalidState = "Semantic missing-feature inference requires an observed source and finite non-negative sparse activations with valid neuron coordinates"
+		inferenceInferMissingFeaturesSemanticInvalidState = "Semantic missing-feature inference requires a selected source and finite non-negative sparse activations with valid neuron coordinates"
 		for inferenceInferMissingFeaturesSemanticLimit in (inferenceInferMissingFeaturesSemanticTopK, inferenceInferMissingFeaturesSemanticContextTopK, inferenceInferMissingFeaturesSemanticVectorTopK):
 			if(not isinstance(inferenceInferMissingFeaturesSemanticLimit, int) or isinstance(inferenceInferMissingFeaturesSemanticLimit, bool) or inferenceInferMissingFeaturesSemanticLimit <= inferenceInferMissingFeaturesMinimumActivation):
 				raise RuntimeError(inferenceInferMissingFeaturesSemanticInvalidConfiguration)
