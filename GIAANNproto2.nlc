@@ -748,3 +748,4 @@ v2q (Codex App GPT-6.0):
 - set inferenceInferMissingFeatures=True by default
 - upgrade inferenceInferMissingFeaturesAllObservedTokens/inferenceInferMissingFeaturesSemantic to support inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=True.
 MANUAL; - extract !predictionEnsureConnectedToPreviousPredictionStrict:inferenceInferMissingFeatures
+MANUAL; - set !predictionEnsureConnectedToPreviousPrediction:!predictionEnsureConnectedToPreviousPredictionStrict:inferenceInferMissingFeaturesSemanticPreferPooledTransitions=True.

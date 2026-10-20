@@ -57,7 +57,7 @@ from GIAANNcmn_globalDefs import useDefaultsV2
 from GIAANNcmn_globalDefs import useBenchmarkDefaultsEvalTestSetOptim
 from GIAANNcmn_globalDefs import inferenceLeakyIntegrateAndFire
 from GIAANNcmn_globalDefs import inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures
-from GIAANNcmn_globalDefs import predictionEnsureConnectedToPreviousPredictionStrict
+from GIAANNcmn_globalDefs import predictionEnsureConnectedToPreviousPredictionStrict, predictionEnsureConnectedToPreviousPrediction
 
 
 
@@ -671,7 +671,10 @@ if(inferenceInferMissingFeatures):
 		inferenceInferMissingFeaturesSemanticWordVectors = False	#external pretrained semantic evidence; evaluate separately from checkpoint-only transfer	#this strongly breaks requirement predictionEnsureConnectedToPreviousPrediction=True, as guessed predictions flow from features of any name (not the same as the currently selected token)
 		inferenceInferMissingFeaturesSemanticProjectColumns = True	#map a donor's within-column targets into the selected source column
 		inferenceInferMissingFeaturesSemanticObservedBurst = True	#the source token has already been selected (seed, target, or prediction); contextual activation ranks donors rather than attenuating its input burst
-		inferenceInferMissingFeaturesSemanticPreferPooledTransitions = False	#retain indirect mode's pooled prediction while adding semantic donor context for subsequent steps
+		if(predictionEnsureConnectedToPreviousPrediction):
+			inferenceInferMissingFeaturesSemanticPreferPooledTransitions = False	
+		else:
+			inferenceInferMissingFeaturesSemanticPreferPooledTransitions = True	#retain indirect mode's pooled prediction while adding semantic donor context for subsequent steps
 		inferenceInferMissingFeaturesSemanticSupplementTrainedSources = False	#experimental interpolation of exact trained sources with contextual donors
 		inferenceInferMissingFeaturesSemanticSupplementWeight = 0.1
 		inferenceInferMissingFeaturesSemanticTopK = 4
