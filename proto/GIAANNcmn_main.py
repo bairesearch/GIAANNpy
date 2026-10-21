@@ -114,6 +114,14 @@ if(debugPrintSpacySectionTimes):
 	processArticlePart2count = 0
 
 def main():
+	if(optimisationInferenceChunks):
+		import GIAANNcmn_inferenceChunks
+		GIAANNcmn_inferenceChunks.executeInferenceChunks()
+	else:
+		mainStandard()
+	return
+
+def mainStandard():
 	GIAANNcmn_databaseNetworkFiles.prepareDatabaseFilesStartup()
 	
 	if(printRamMaxUsage or useAutoresearch):

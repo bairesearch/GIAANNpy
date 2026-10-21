@@ -1,4 +1,25 @@
-"""Fresh-interpreter entry point for the optional CPU article workers."""
+"""GIAANNnlp_parallelisation3Worker.py
+
+# Author:
+Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch.com.au)
+
+# License:
+MIT License
+
+# Installation:
+see GIAANNcmn_main.py
+
+# Usage:
+see GIAANNcmn_main.py
+
+# Description:
+GIA ANN NLP parallelisation 3 Worker
+
+Fresh-interpreter entry point for the optional CPU article workers.
+
+"""
+
+
 
 import contextlib
 import sys

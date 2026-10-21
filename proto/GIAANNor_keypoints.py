@@ -13,7 +13,7 @@ see GIAANNcmn_main.py
 see GIAANNcmn_main.py
 
 # Description:
-GIA ANN or keypoints
+GIA ANN OR keypoints
 
 """
 

@@ -749,3 +749,6 @@ v2q (Codex App GPT-6.0):
 - upgrade inferenceInferMissingFeaturesAllObservedTokens/inferenceInferMissingFeaturesSemantic to support inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=True.
 MANUAL; - extract !predictionEnsureConnectedToPreviousPredictionStrict:inferenceInferMissingFeatures
 MANUAL; - set !predictionEnsureConnectedToPreviousPrediction:!predictionEnsureConnectedToPreviousPredictionStrict:inferenceInferMissingFeaturesSemanticPreferPooledTransitions=True.
+- add option optimisationInferenceChunks to evaluate sequence chunks in fresh processes with one compute thread and aggregate accuracy counts.
+- add option optimisationInferenceWorkers to execute inference chunks concurrently with a configurable worker limit.
+- add generalisedBenchmarkTool to benchmark configurations defined by file and line edits using isolated code snapshots, configurable parallel workers, and aggregated inference accuracy.

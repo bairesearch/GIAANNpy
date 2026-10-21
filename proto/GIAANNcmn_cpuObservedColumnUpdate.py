@@ -1,4 +1,24 @@
-"""Opt-in CPU merges for RAM-resident training connections; neuron updates are unchanged."""
+"""GIAANNcmn_cpuObservedColumnUpdate.py
+
+# Author:
+Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch.com.au)
+
+# License:
+MIT License
+
+# Installation:
+see GIAANNcmn_main.py
+
+# Usage:
+see GIAANNcmn_main.py
+
+# Description:
+GIA ANN common cpu Observed Column Update
+
+Opt-in CPU merges for RAM-resident training connections; neuron updates are unchanged.
+
+"""
+
 
 from GIAANNcmn_globalDefs import *
 

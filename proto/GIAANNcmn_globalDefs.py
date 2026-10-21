@@ -64,6 +64,11 @@ elif(useTrainDuringInference):
 else:
 	raise RuntimeError("execution mode undefined")
 
+if(executionMode == "inference"):
+	useGeneralisedBenchmarkTool = False	#default: False	#orig: False	#optional: see generalisedBenchmarkTool
+else:
+	useGeneralisedBenchmarkTool = False	#not supported
+
 
 #Primary Draw settings:
 drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
@@ -516,6 +521,104 @@ if(useInference):
 		
 
 #Inference optimisations;
+if(useGeneralisedBenchmarkTool):
+	optimisationInferenceChunks = False	#generalisedBenchmarkTool already has this option
+	optimisationInferenceWorkers = False	#generalisedBenchmarkTool already has this option
+else:
+	if(executionMode == "inference"):
+		optimisationInferenceChunks = True	#default: True	#orig: False #opt-in: evaluate independent prompt lines in fresh CPU processes; preserve the normal inference path when disabled
+		optimisationInferenceWorkers = True	#default: True	#orig: False	#opt-in: schedule multiple chunks concurrently; requires optimisationInferenceChunks
+	else:
+		optimisationInferenceChunks = False	#not supported
+		optimisationInferenceWorkers = False	#not supported
+inferenceChunksErrorDisabled = "Inference chunk helper requires optimisationInferenceChunks=True"
+if(optimisationInferenceChunks):
+	inferenceChunksSequenceCount = 25	#maximum independent prompt sequences per fresh process
+	inferenceChunksOutputDirectory = None	#None: retain run snapshots, logs and counts in a new system temporary directory; otherwise use this existing directory
+	inferenceChunksWorkerThreads = 1	#one Torch/BLAS compute thread per process
+if(optimisationInferenceWorkers):
+	inferenceWorkersCount = 12	#maximum concurrent chunk processes for this inference run
+if(optimisationInferenceChunks or optimisationInferenceWorkers):
+	inferenceChunksZero = 0
+	inferenceChunksOne = 1
+	inferenceChunksJSONIndent = 2
+	inferenceChunksPollSeconds = 0.2
+	inferenceChunksStopSeconds = 10
+	inferenceChunksEncoding = "utf-8"
+	inferenceChunksNewline = "\n"
+	inferenceChunksTemporaryPrefix = "giaann-inference-"
+	inferenceChunksSourceDirectory = "source"
+	inferenceChunksJobsDirectory = "jobs"
+	inferenceChunksWorkerFilename = "GIAANNcmn_inferenceChunkWorker.py"
+	inferenceChunksConfigFilename = "job.json"
+	inferenceChunksManifestFilename = "manifest.json"
+	inferenceChunksResultFilename = "result.json"
+	inferenceChunksSummaryFilename = "summary.json"
+	inferenceChunksPromptFilename = "prompt.txt"
+	inferenceChunksLogFilename = "worker.log"
+	inferenceChunksCacheDirectory = "cache"
+	inferenceChunksTemporaryExtension = ".tmp"
+	inferenceChunksJobNameFormat = "chunk{:05d}"
+	inferenceChunksIgnorePatterns = ("__pycache__", "*.pyc", ".git")
+	inferenceChunksCommonModule = "GIAANNcmn_globalDefs"
+	inferenceChunksNLPModule = "GIAANNnlp_globalDefs"
+	inferenceChunksOptionLabel = "optimisationInferenceChunks:"
+	inferenceChunksSizeLabel = "inferenceChunksSequenceCount:"
+	inferenceWorkersOptionLabel = "optimisationInferenceWorkers:"
+	inferenceWorkersCountLabel = "inferenceWorkersCount:"
+	inferenceChunksMetricNames = ("totalInferenceTop1Matches", "totalInferenceTop1Tokens", "totalInferenceTop1PredictionMatches", "totalInferenceTop1PredictionTokens")
+	inferenceChunksDebugMetricNames = ("totalInferenceTokensSeed", "totalInferenceTokensPrediction", "totalInferenceTokensAll")
+	inferenceChunksMatchesMetric = inferenceChunksMetricNames[inferenceChunksZero]
+	inferenceChunksTokensMetric = inferenceChunksMetricNames[inferenceChunksOne]
+	inferenceChunksPredictionMatchesMetric = "totalInferenceTop1PredictionMatches"
+	inferenceChunksPredictionTokensMetric = "totalInferenceTop1PredictionTokens"
+	inferenceChunksSequenceIndexArgument = 4
+	inferenceChunksWorkerArgumentCount = 2
+	inferenceChunksGlobPattern = "*"
+	inferenceChunksEnvironment = {"OMP_NUM_THREADS": str(inferenceChunksOne), "MKL_NUM_THREADS": str(inferenceChunksOne), "OPENBLAS_NUM_THREADS": str(inferenceChunksOne), "NUMEXPR_NUM_THREADS": str(inferenceChunksOne), "BLIS_NUM_THREADS": str(inferenceChunksOne), "PYTHONDONTWRITEBYTECODE": str(inferenceChunksOne), "PYTHONUNBUFFERED": str(inferenceChunksOne), "CUDA_VISIBLE_DEVICES": ""}
+	inferenceChunksPythonPathEnvironment = "PYTHONPATH"
+	inferenceChunksMatplotlibEnvironment = "MPLCONFIGDIR"
+	inferenceChunksOperationalOverrides = {"inferenceCopyTemplateDatasets": False, "debugDisableDatabaseFileWrite": True}
+	inferenceChunksPromptSetting = "inferencePromptFile"
+	inferenceChunksStatusRunning = "running"
+	inferenceChunksStatusComplete = "complete"
+	inferenceChunksStatusFailed = "failed"
+	inferenceChunksStatusInterrupted = "interrupted"
+	inferenceChunksPlatform = "posix"
+	inferenceChunksAuditOpenEvent = "open"
+	inferenceChunksAuditOpenFlagsIndex = 2
+	inferenceChunksAuditSourceDirectoryIndex = 2
+	inferenceChunksAuditTargetDirectoryIndex = 3
+	inferenceChunksAuditSinglePathEvents = {"os.remove": 1, "os.rmdir": 1, "os.mkdir": 2, "os.chmod": 2, "os.utime": 3, "os.truncate": None}
+	inferenceChunksAuditTwoPathEvents = ("os.rename", "os.link")
+	inferenceChunksAuditSymlinkEvent = "os.symlink"
+	inferenceChunksAuditProcDescriptors = "/proc/self/fd"
+	inferenceChunksErrorJob = "Invalid inference chunk job specification"
+	inferenceChunksErrorWorkers = "optimisationInferenceWorkers requires optimisationInferenceChunks=True and a positive integer inferenceWorkersCount"
+	inferenceChunksErrorParameters = "inferenceChunksSequenceCount must be a positive integer; inferenceChunksWorkerThreads must equal one"
+	inferenceChunksErrorConfiguration = "Inference chunks require static CPU NLP inference, an existing database, independent prompt lines, one epoch, zero sequence offset and top-1 accuracy; training, drawing, grounded evaluation, BPB and autoresearch are unsupported"
+	inferenceChunksErrorDatabase = "Inference chunks require existing trained database files: "
+	inferenceChunksErrorPrompt = "Inference chunks require a nonempty prompt with at least one sequence long enough for prediction: "
+	inferenceChunksErrorOutput = "Inference chunk output must be outside the source repository and trained database"
+	inferenceChunksErrorSource = "Inference chunk source snapshot contains a symbolic link: "
+	inferenceChunksErrorChanged = "Inference chunk configuration differs from the frozen parent configuration"
+	inferenceChunksErrorResult = "Invalid or inconsistent inference chunk result: "
+	inferenceChunksErrorWorker = "Inference chunk process failed; inspect "
+	inferenceChunksErrorWrite = "Inference chunk attempted to modify a protected input: "
+	inferenceChunksErrorCoverage = "Inference chunks must cover the selected prompt exactly once"
+	inferenceChunksRunLabel = "Inference chunks run:"
+	inferenceChunksSettingsLabel = "Inference chunks (sequences per chunk, concurrent processes):"
+	inferenceChunksProgressLabel = "Inference chunks completed:"
+	inferenceChunksTimeLabel = "Inference chunks elapsed wall time (seconds):"
+	if(executionMode != "inference" or useTrainDuringInference or inferenceTrainFirstSequences or useDrawNetworkIndependently):
+		raise RuntimeError(inferenceChunksErrorConfiguration)
+if(optimisationInferenceChunks):
+	if(type(inferenceChunksSequenceCount) is not int or inferenceChunksSequenceCount <= inferenceChunksZero or type(inferenceChunksWorkerThreads) is not int or inferenceChunksWorkerThreads != inferenceChunksOne):
+		raise ValueError(inferenceChunksErrorParameters)
+if(optimisationInferenceWorkers):
+	if(not optimisationInferenceChunks or type(inferenceWorkersCount) is not int or inferenceWorkersCount <= inferenceChunksZero):
+		raise ValueError(inferenceChunksErrorWorkers)
+
 inferenceOnlyRetainPredictedTargetObservedColumn = False	#default: False	#orig: False	#load/evict one observed column per prediction step	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
 inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch = False	#default: False	#orig: False	#True: retain only current beam-search target(s); False: retain all beam-search targets	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
 if(useDefaultsV2):
@@ -1700,6 +1803,12 @@ if(printConfiguration):
 	print("spacyPipelineOptimisations:", spacyPipelineOptimisations)
 	print("")
 	print("#Optimisations;")
+	if(optimisationInferenceChunks):
+		print(inferenceChunksOptionLabel, optimisationInferenceChunks)
+		print(inferenceChunksSizeLabel, inferenceChunksSequenceCount)
+	if(optimisationInferenceWorkers):
+		print(inferenceWorkersOptionLabel, optimisationInferenceWorkers)
+		print(inferenceWorkersCountLabel, inferenceWorkersCount)
 	print("inferenceOnlyRetainPredictedTargetObservedColumn:", inferenceOnlyRetainPredictedTargetObservedColumn)
 	print("inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch:", inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch)
 	print("trainStoreFeatureMapsGlobally:", trainStoreFeatureMapsGlobally)

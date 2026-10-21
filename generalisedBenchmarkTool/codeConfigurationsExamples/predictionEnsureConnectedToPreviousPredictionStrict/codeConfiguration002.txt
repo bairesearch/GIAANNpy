@@ -1,0 +1,1 @@
+proto/GIAANNcmn_globalDefs.py:line339:predictionEnsureConnectedToPreviousPredictionStrict = False
