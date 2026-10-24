@@ -20,6 +20,8 @@ GIA ANN common Prediction Activate
 import torch as pt
 
 from GIAANNcmn_globalDefs import *
+if(inferenceContextLikelihood):
+	import GIAANNcmn_predictionContextLikelihood
 import GIAANNcmn_sparseTensors
 import GIAANNcmn_inferenceDuringTrain
 
@@ -1285,6 +1287,8 @@ def processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, global
 		else:
 			featureNeuronsActive = calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex)
 		featureConnectionsStrengthStored = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
+		if(inferenceContextLikelihood):
+			GIAANNcmn_predictionContextLikelihood.recordContextLikelihoodSource(databaseNetworkObject, featureConnectionsStrengthStored, sequenceWordIndex)
 		featureConnectionsStrength = featureConnectionsStrengthStored
 		if(inferenceConnectionStrengthPOSdependence):
 			featureConnectionsPos = featureConnections[databaseNetworkObject.arrayIndexPropertiesPosIndex]

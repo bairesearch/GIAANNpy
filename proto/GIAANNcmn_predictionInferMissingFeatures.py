@@ -22,6 +22,8 @@ import os
 import torch as pt
 
 from GIAANNcmn_globalDefs import *
+if(inferenceContextLikelihood):
+	import GIAANNcmn_predictionContextLikelihood
 import GIAANNcmn_databaseNetwork
 import GIAANNcmn_databaseNetworkFiles
 import GIAANNcmn_inferenceDuringTrain
@@ -419,9 +421,13 @@ def calculateCombinedMissingFeatureTargetActivation(databaseNetworkObject, obser
 		if(not math.isfinite(normalisationMultiplier) or normalisationMultiplier <= inferenceInferMissingFeaturesMinimumActivation):
 			raise RuntimeError("calculateCombinedMissingFeatureTargetActivation error: normalisation multiplier must be finite and positive")
 		combinedTargetActivation = None
+		if(inferenceContextLikelihood):
+			contextLikelihoodSources = []
 		for sourceColumnIndex, sourceFeatureIndex, sourceActivation in zip(activeSourceColumns, activeSourceFeatureIndices, activeSourceActivations):
 			observedColumn = loadMissingFeatureSourceObservedColumn(databaseNetworkObject, observedColumnsDict, sourceColumnIndex, sourceFeatureIndex, sequenceWordIndex)
 			featureConnections = observedColumn.prepareFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=globalFeatureNeuronsActivation.device, createMissing=False)
+			if(inferenceContextLikelihood):
+				contextLikelihoodSources.append((sourceColumnIndex, sourceFeatureIndex, float(sourceActivation.item()) / float(totalSourceActivation.item()), featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]))
 			if(inferenceInferMissingFeaturesUpdate4TransformCandidateSignals):
 				candidateSourceActivation = pt.full((), inferenceInferMissingFeaturesUpdate4SourceActivation, dtype=sourceActivation.dtype, device=sourceActivation.device)
 				featureNeuronsTargetActivation = calculateMissingFeatureTargetActivation(databaseNetworkObject, featureConnections, sourceColumnIndex, sourceFeatureIndex, candidateSourceActivation, inferenceInferMissingFeaturesNormalisedActivationTotal)
@@ -450,6 +456,8 @@ def calculateCombinedMissingFeatureTargetActivation(databaseNetworkObject, obser
 		if(bool(pt.any(combinedTargetValues < inferenceInferMissingFeaturesMinimumActivation).item())):
 			raise RuntimeError("calculateCombinedMissingFeatureTargetActivation error: combined target activation must be non-negative")
 		if(combinedTargetValues.numel() > arrayIndexSegmentFirst and bool(pt.any(combinedTargetValues > inferenceInferMissingFeaturesMinimumActivation).item())):
+			if(inferenceContextLikelihood):
+				GIAANNcmn_predictionContextLikelihood.recordContextLikelihoodProxySources(databaseNetworkObject, contextLikelihoodSources, sequenceWordIndex)
 			result = combinedTargetActivation, inferenceInferMissingFeaturesUpdate4TransformCandidateSignals
 	else:
 		raise RuntimeError("calculateCombinedMissingFeatureTargetActivation error: inferenceInferMissingFeatures is disabled")

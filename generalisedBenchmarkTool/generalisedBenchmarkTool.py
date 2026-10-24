@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
-"""Prepare isolated source configurations and schedule resumable inference jobs."""
+"""Run isolated configurations sequentially, delegating inference parallelism to proto."""
 import argparse
 import csv
 from datetime import datetime, timezone
 import fcntl
 import math
-import json
 import os
 from pathlib import Path
 import shutil
 import signal
 import subprocess
-import sys
-import time
 from generalisedBenchmarkTool_globalDefs import *
-from generalisedBenchmarkToolFiles import fileHashes, hashBytes, prepareConfiguration, readJSON, snapshotRepository, verifyHashes, writeJSON
+from generalisedBenchmarkToolFiles import applyExecutionSettings, fileHashes, prepareConfiguration, readJSON, snapshotRepository, verifyHashes, writeJSON
 
 
 def main():
@@ -23,9 +20,9 @@ def main():
 		if(args.resume is None):
 			run = prepareRun(args)
 		else:
-			if(any(value is not None for value in (args.repository, args.configurations, args.runsDirectory, args.python, args.numConfigurations, args.sequencesPerJob, args.maxSequences))):
+			if(any(value is not None for value in (args.repository, args.configurations, args.runsDirectory, args.python, args.numConfigurations, args.numWorkers, args.sequencesPerJob, args.maxSequences))):
 				raise ValueError(benchmarkErrorResume)
-			run = Path(args.resume).resolve()
+			run = args.resume.resolve()
 		manifest = readJSON(run / benchmarkManifestFilename)
 		validateRun(run, manifest)
 		if(not args.prepareOnly):
@@ -34,17 +31,16 @@ def main():
 					fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
 				except BlockingIOError as error:
 					raise RuntimeError(benchmarkErrorLock) from error
-				runJobs(run, manifest, args.numWorkers, lock.fileno())
+				runConfigurations(run, manifest, lock.fileno())
 	else:
 		raise RuntimeError(benchmarkErrorDisabled)
 	return
 
 
 def parseArguments():
-	args = None
 	if(generalisedBenchmarkTool):
 		parser = argparse.ArgumentParser(description=benchmarkDescription)
-		argumentTypes = {benchmarkArgumentPositive: positiveInteger, benchmarkArgumentNonnegative: nonnegativeInteger, benchmarkArgumentPath: Path}
+		argumentTypes = {benchmarkArgumentPositive: positiveInteger, benchmarkArgumentPath: Path}
 		for flag, definition in benchmarkArguments:
 			options = dict(definition)
 			if(benchmarkArgumentKindKey in options):
@@ -55,13 +51,12 @@ def parseArguments():
 
 
 def prepareRun(args):
-	run = None
 	if(generalisedBenchmarkTool):
 		repository = (args.repository or benchmarkRepository).resolve()
 		configurations = (args.configurations or benchmarkDirectory / benchmarkConfigurationsDirectory).resolve()
-		runsDirectory = (args.runsDirectory or benchmarkDirectory / benchmarkRunsDirectory).resolve()
+		runsDirectory = (args.runsDirectory or benchmarkRunsDirectory).resolve()
 		python = (args.python or benchmarkPython).resolve()
-		if(runsDirectory.is_relative_to(repository) or runsDirectory.is_relative_to(configurations)):
+		if(repository.is_relative_to(runsDirectory) or configurations.is_relative_to(runsDirectory) or runsDirectory.is_relative_to(configurations) or runsDirectory.is_relative_to(repository / benchmarkProtoDirectory) or (runsDirectory.is_relative_to(repository) and benchmarkForbiddenParts.intersection(runsDirectory.relative_to(repository).parts))):
 			raise ValueError(benchmarkErrorLocation)
 		if(not python.is_file() or not os.access(python, os.X_OK)):
 			raise ValueError(benchmarkErrorPath + str(python))
@@ -78,46 +73,35 @@ def prepareRun(args):
 		engine.mkdir()
 		for filename in benchmarkEngineFilenames:
 			shutil.copy2(benchmarkDirectory / filename, engine / filename)
-		snapshotRepository(repository, run / benchmarkSnapshotDirectory)
+		snapshotRepository(repository, run / benchmarkSnapshotDirectory, (runsDirectory, benchmarkRunsDirectory, repository / benchmarkRepositoryRunsPath))
 		entries = []
 		for configuration in files:
 			directory = run / benchmarkConfigurationsDirectory / configuration.stem
+			output = run / benchmarkOutputDirectory / configuration.stem
+			output.mkdir(parents=True)
 			prepareConfiguration(run / benchmarkSnapshotDirectory, configuration, directory)
-			request = dict(configuration=configuration.stem, repository=str(repository), configuration_directory=str(directory), max_sequences=args.maxSequences, sequences_per_job=benchmarkDefaultSequencesPerJob if args.sequencesPerJob is None else args.sequencesPerJob)
-			writeJSON(directory / benchmarkJobFilename, request)
-			entries.append(dict(name=configuration.stem, directory=str(directory)))
-		jobs = []
-		for entry in entries:
-			directory = Path(entry['directory'])
-			logPath = directory / benchmarkPrepareLogFilename
-			with logPath.open('w', encoding=benchmarkEncoding) as log:
-				completed = subprocess.run([str(python), str(engine / benchmarkWorkerFilename), benchmarkPrepareMode, str(directory / benchmarkJobFilename)], env=workerEnvironment(), stdout=log, stderr=subprocess.STDOUT, check=False)
-			if(completed.returncode != benchmarkExitSuccess):
-				raise RuntimeError(benchmarkErrorWorker + str(logPath))
+			entry = dict(name=configuration.stem, repository=str(repository), directory=str(directory), output=str(output), native_directory=str(output / benchmarkNativeDirectory), max_sequences=args.maxSequences, num_workers=args.numWorkers, sequences_per_job=args.sequencesPerJob)
+			writeJSON(directory / benchmarkSpecificationFilename, entry)
+			configurationProcess(run, str(python), entry, benchmarkPrepareMode, output / benchmarkPrepareLogFilename)
+			overrides = dict(benchmarkRuntimeOverrides)
+			overrides[benchmarkPromptSetting] = str(directory / benchmarkPromptFilename)
+			overrides[benchmarkNativeOutputSetting] = entry['native_directory']
+			if(args.numWorkers is not None):
+				overrides[benchmarkWorkerCountSetting] = args.numWorkers
+			if(args.sequencesPerJob is not None):
+				overrides[benchmarkChunkSizeSetting] = args.sequencesPerJob
+			applyExecutionSettings(directory / benchmarkSnapshotDirectory, overrides)
 			plan = readJSON(directory / benchmarkPlanFilename)
-			jobs.extend(prepareJobs(run, directory, plan, len(jobs)))
+			plan['runtime_overrides'] = overrides
+			writeJSON(directory / benchmarkPlanFilename, plan)
+			configurationProcess(run, str(python), entry, benchmarkValidateMode, output / benchmarkValidateLogFilename)
 			entry['hashes'] = fileHashes(directory)
-		manifest = dict(schema=benchmarkSchemaVersion, prepared=True, created=datetime.now(timezone.utc).isoformat(), repository=str(repository), python=str(python), engine_hashes=fileHashes(engine), source_hashes=fileHashes(run / benchmarkSnapshotDirectory), configurations=entries, jobs=jobs)
+			entries.append(entry)
+		manifest = dict(schema=benchmarkSchemaVersion, prepared=True, created=datetime.now(timezone.utc).isoformat(), repository=str(repository), python=str(python), engine_hashes=fileHashes(engine), source_hashes=fileHashes(run / benchmarkSnapshotDirectory), configurations=entries)
 		writeJSON(run / benchmarkManifestFilename, manifest)
 		writeSummary(run, manifest, benchmarkStatusPrepared, {})
 		print(benchmarkMessagePrepared + str(run), flush=True)
 	return run
-
-
-def prepareJobs(run, directory, plan, offset):
-	jobs = []
-	if(generalisedBenchmarkTool):
-		count = plan['selected_prompt_lines']
-		size = plan['sequences_per_job'] or count
-		for start in range(benchmarkZero, count, size):
-			identifier = benchmarkJobNameFormat.format(offset + len(jobs) + benchmarkOne)
-			jobDirectory = run / benchmarkJobsDirectory / identifier
-			jobDirectory.mkdir(parents=True)
-			jobFile = jobDirectory / benchmarkJobFilename
-			job = dict(id=identifier, configuration=plan['configuration'], configuration_directory=str(directory), repository=plan['repository'], output=str(jobDirectory / benchmarkOutputDirectory), job_file=str(jobFile), start=start, stop=min(start+size, count), sliced=plan['sequences_per_job'] > benchmarkZero or plan['max_sequences'] is not None, max_sequences=plan['max_sequences'], sequences_per_job=plan['sequences_per_job'])
-			writeJSON(jobFile, job)
-			jobs.append(dict(id=identifier, configuration=plan['configuration'], file=str(jobFile), sha256=hashBytes(jobFile.read_bytes())))
-	return jobs
 
 
 def validateRun(run, manifest):
@@ -130,101 +114,104 @@ def validateRun(run, manifest):
 		verifyHashes(run / benchmarkSnapshotDirectory, manifest['source_hashes'])
 		for configuration in manifest['configurations']:
 			verifyHashes(Path(configuration['directory']), configuration['hashes'])
-		for entry in manifest['jobs']:
-			if(hashBytes(Path(entry['file']).read_bytes()) != entry['sha256']):
-				raise RuntimeError(benchmarkErrorChanged + entry['file'])
 	return
 
 
-def runJobs(run, manifest, numWorkers, lockDescriptor):
+def runConfigurations(run, manifest, lockDescriptor):
 	if(generalisedBenchmarkTool):
-		active = {}
 		completed = {}
-		pending = []
-		for entry in manifest['jobs']:
-			job = readJSON(entry['file'])
-			resultPath = Path(job['output']) / benchmarkResultFilename
-			if(resultPath.exists()):
-				completed[entry['id']] = validatedResult(entry, job)
-			else:
-				pending.append(entry)
-		pending.sort(key=lambda entry: (readJSON(entry['file'])['start'], entry['configuration']))
-		oldHandler = signal.signal(signal.SIGTERM, interrupt)
+		previousSignal = signal.signal(signal.SIGTERM, interrupt)
 		try:
-			while(pending or active):
-				while(pending and len(active) < numWorkers):
-					entry = pending.pop(benchmarkZero)
-					job = readJSON(entry['file'])
-					output = Path(job['output'])
-					if(output.exists()):
-						history = output.parent / benchmarkHistoryDirectory
-						history.mkdir(exist_ok=True)
+			for entry in manifest['configurations']:
+				output = Path(entry['output'])
+				if((output / benchmarkResultFilename).is_file()):
+					completed[entry['name']] = validatedResult(entry)
+			for entry in manifest['configurations']:
+				if(entry['name'] not in completed):
+					output = Path(entry['output'])
+					if(Path(entry['native_directory']).exists()):
+						checkInactiveConfiguration(entry)
+						history = run / benchmarkHistoryDirectory / entry['name']
+						history.mkdir(parents=True, exist_ok=True)
 						output.rename(history / datetime.now(timezone.utc).strftime(benchmarkDateFormat))
-					output.mkdir()
-					log = (output / benchmarkLogFilename).open('w', encoding=benchmarkEncoding)
-					try:
-						process = subprocess.Popen([manifest['python'], str(run / benchmarkEngineDirectory / benchmarkWorkerFilename), benchmarkRunMode, entry['file']], env=workerEnvironment(), stdout=log, stderr=subprocess.STDOUT, start_new_session=True, pass_fds=(lockDescriptor,))
-					except BaseException:
-						log.close()
-						raise
-					active[entry['id']] = (process, log, entry, job)
-					print(benchmarkMessageStarted + entry['id'] + ' ' + entry['configuration'], flush=True)
-				writeSummary(run, manifest, benchmarkStatusRunning, completed, active)
-				time.sleep(benchmarkPollSeconds)
-				for identifier, (process, log, entry, job) in list(active.items()):
-					if(process.poll() is not None):
-						log.close()
-						del active[identifier]
-						if(process.returncode != benchmarkExitSuccess):
-							raise RuntimeError(benchmarkErrorWorker + str(Path(job['output']) / benchmarkLogFilename) + ' (exit ' + str(process.returncode) + ')')
-						completed[identifier] = validatedResult(entry, job)
-						print(benchmarkMessageFinished + identifier + ' ' + str(len(completed)) + '/' + str(len(manifest['jobs'])), flush=True)
+					Path(entry['native_directory']).mkdir(parents=True)
+					writeSummary(run, manifest, benchmarkStatusRunning, completed, entry['name'])
+					print(benchmarkMessageStarted + entry['name'] + ' ' + str(output / benchmarkLogFilename), flush=True)
+					configurationProcess(run, manifest['python'], entry, benchmarkRunMode, output / benchmarkLogFilename, lockDescriptor)
+					completed[entry['name']] = validatedResult(entry)
+					print(benchmarkMessageFinished + entry['name'] + ' ' + str(len(completed)) + '/' + str(len(manifest['configurations'])), flush=True)
+					writeSummary(run, manifest, benchmarkStatusRunning, completed)
 			writeSummary(run, manifest, benchmarkStatusComplete, completed)
 			print(benchmarkMessageComplete + str(run), flush=True)
 		except BaseException as error:
-			stopWorkers(active)
 			state = benchmarkStatusInterrupted if isinstance(error, KeyboardInterrupt) else benchmarkStatusFailed
-			writeSummary(run, manifest, state, completed, {}, str(error))
-			print(benchmarkMessageResume + str(benchmarkDirectory / benchmarkDriverFilename) + ' -numWorkers ' + str(numWorkers) + ' -resume ' + str(run), flush=True)
+			writeSummary(run, manifest, state, completed, error=str(error))
+			print(benchmarkMessageResume + str(benchmarkDirectory / benchmarkDriverFilename) + ' -resume ' + str(run), flush=True)
 			raise
 		finally:
-			signal.signal(signal.SIGTERM, oldHandler)
+			signal.signal(signal.SIGTERM, previousSignal)
 	return
 
 
-def stopWorkers(active):
+def configurationProcess(run, python, entry, mode, logPath, lockDescriptor=None):
 	if(generalisedBenchmarkTool):
-		for process, log, entry, job in active.values():
-			if(process.poll() is None):
-				os.killpg(process.pid, signal.SIGTERM)
-		deadline = time.monotonic() + benchmarkStopGraceSeconds
-		for process, log, entry, job in active.values():
+		environment = dict(os.environ)
+		environment.pop(benchmarkPythonPathEnvironmentKey, None)
+		environment.update(benchmarkEnvironment)
+		environment[benchmarkMatplotlibEnvironmentKey] = str(Path(entry['output']) / benchmarkRuntimeCacheDirectory)
+		descriptors = () if lockDescriptor is None else (lockDescriptor,)
+		with logPath.open(benchmarkLogMode, encoding=benchmarkEncoding) as log:
+			process = subprocess.Popen([python, str(run / benchmarkEngineDirectory / benchmarkConfigurationRunnerFilename), mode, str(Path(entry['directory']) / benchmarkSpecificationFilename)], env=environment, stdout=log, stderr=subprocess.STDOUT, start_new_session=True, pass_fds=descriptors)
 			try:
-				process.wait(timeout=max(benchmarkZero, deadline - time.monotonic()))
-			except subprocess.TimeoutExpired:
-				os.killpg(process.pid, signal.SIGKILL)
-				process.wait()
-			log.close()
+				code = process.wait()
+			except BaseException:
+				if(process.poll() is None):
+					process.terminate()
+				try:
+					process.wait(timeout=benchmarkStopGraceSeconds)
+				except subprocess.TimeoutExpired as error:
+					raise RuntimeError(benchmarkErrorCleanup + str(process.pid)) from error
+				raise
+		if(code != benchmarkExitSuccess):
+			raise RuntimeError(benchmarkErrorProcess + str(logPath))
 	return
 
 
-def validatedResult(entry, job):
-	result = None
+def checkInactiveConfiguration(entry):
 	if(generalisedBenchmarkTool):
-		path = Path(job['output']) / benchmarkResultFilename
+		for path in Path(entry['native_directory']).glob(benchmarkFileGlob + '/' + benchmarkSummaryFilename):
+			summary = readJSON(path)
+			for pid in summary['active_workers'].values():
+				try:
+					os.kill(pid, benchmarkZero)
+				except ProcessLookupError:
+					pass	#This recorded worker has already exited.
+				else:
+					raise RuntimeError(benchmarkErrorActive + str(pid))
+	return
+
+
+def validatedResult(entry):
+	if(generalisedBenchmarkTool):
+		path = Path(entry['output']) / benchmarkResultFilename
 		result = readJSON(path)
-		for key in ('matches', 'tokens', 'sequences'):
-			if(type(result[key]) is not int or result[key] < benchmarkZero):
+		plan = readJSON(Path(entry['directory']) / benchmarkPlanFilename)
+		if(result['configuration'] != entry['name'] or any(result[key] != plan[key] for key in ('database', 'prompt_sha256', 'selected_prompt_sha256', 'sampled'))):
+			raise RuntimeError(benchmarkErrorResult + str(path))
+		for name in ('matches', 'tokens', 'sequences', 'peak_worker_rss_kib'):
+			if(type(result[name]) is not int or result[name] < benchmarkZero):
 				raise RuntimeError(benchmarkErrorResult + str(path))
-		if(result['tokens'] <= benchmarkZero or result['sequences'] <= benchmarkZero or not benchmarkZero <= result['matches'] <= result['tokens'] or result['accuracy'] != result['matches']/result['tokens'] or result['job_sha256'] != entry['sha256'] or result['job_id'] != entry['id'] or result['configuration'] != entry['configuration']):
+		if(result['tokens'] <= benchmarkZero or result['sequences'] <= benchmarkZero or result['peak_worker_rss_kib'] <= benchmarkZero or not benchmarkZero <= result['matches'] <= result['tokens'] or result['accuracy'] != result['matches']/result['tokens']):
 			raise RuntimeError(benchmarkErrorResult + str(path))
-		if(not math.isfinite(result['elapsed']) or result['elapsed'] < benchmarkZero or result['rss_kib'] <= benchmarkZero):
+		for name in ('elapsed_wall_seconds', 'elapsed_worker_seconds'):
+			if(type(result[name]) not in (int, float) or not math.isfinite(result[name]) or result[name] < benchmarkZero):
+				raise RuntimeError(benchmarkErrorResult + str(path))
+		nativeRun = Path(result['native_run'])
+		if(nativeRun.parent != Path(entry['native_directory'])):
 			raise RuntimeError(benchmarkErrorResult + str(path))
-		plan = readJSON(Path(job['configuration_directory']) / benchmarkPlanFilename)
-		if(any(result[key] != plan[key] for key in ('database', 'prompt_sha256', 'sampled')) or any(result[key] != job[key] for key in ('start', 'stop'))):
-			raise RuntimeError(benchmarkErrorResult + str(path))
-		rows = [json.loads(line) for line in (Path(job['output']) / benchmarkSequencesFilename).read_text(encoding=benchmarkEncoding).splitlines()]
-		if(len(rows) != result['sequences'] or sum(row['matches'] for row in rows) != result['matches'] or sum(row['tokens'] for row in rows) != result['tokens']):
+		verifyHashes(nativeRun, result['native_hashes'])
+		native = readJSON(nativeRun / benchmarkSummaryFilename)
+		if(native['status'] != benchmarkStatusComplete or native['sequences'] != result['sequences'] or native['metrics'] != result['metrics'] or native['prediction_accuracy'] != result['accuracy'] or native['inference_accuracy'] != result['inference_accuracy'] or result['metrics'][benchmarkNativePredictionTokens] != result['tokens'] or result['metrics'][benchmarkNativePredictionMatches] != result['matches']):
 			raise RuntimeError(benchmarkErrorResult + str(path))
 	return result
 
@@ -232,16 +219,16 @@ def validatedResult(entry, job):
 def writeSummary(run, manifest, state, completed, active=None, error=None):
 	if(generalisedBenchmarkTool):
 		rows = []
-		for configuration in manifest['configurations']:
-			name = configuration['name']
-			entries = [entry for entry in manifest['jobs'] if entry['configuration'] == name]
-			results = [completed[entry['id']] for entry in entries if entry['id'] in completed]
-			plan = readJSON(Path(configuration['directory']) / benchmarkPlanFilename)
-			tokens = sum(result['tokens'] for result in results)
-			matches = sum(result['matches'] for result in results)
-			status = benchmarkStatusComplete if len(results) == len(entries) else state
-			rows.append(dict(configuration=name, status=status, completed_jobs=len(results), total_jobs=len(entries), sequences=sum(result['sequences'] for result in results), matches=matches, tokens=tokens, accuracy_percent=benchmarkPercent*matches/tokens if tokens else None, elapsed_worker_seconds=sum(result['elapsed'] for result in results), peak_worker_rss_kib=max((result['rss_kib'] for result in results), default=benchmarkZero), sampled=plan['sampled'], database=plan['database'], prompt_sha256=plan['prompt_sha256']))
-		writeJSON(run / benchmarkSummaryFilename, dict(status=state, updated=datetime.now(timezone.utc).isoformat(), completed_jobs=len(completed), total_jobs=len(manifest['jobs']), active_jobs={identifier:process.pid for identifier,(process,log,entry,job) in (active or {}).items()}, error=error, configurations=rows))
+		for entry in manifest['configurations']:
+			plan = readJSON(Path(entry['directory']) / benchmarkPlanFilename)
+			result = completed.get(entry['name'])
+			row = dict.fromkeys(benchmarkCSVFields)
+			row.update(configuration=entry['name'], status=benchmarkStatusComplete if result is not None else state, sampled=plan['sampled'], database=plan['database'], prompt_sha256=plan['prompt_sha256'])
+			if(result is not None):
+				row.update({name:result[name] for name in ('sequences', 'matches', 'tokens', 'elapsed_wall_seconds', 'elapsed_worker_seconds', 'peak_worker_rss_kib', 'native_run')})
+				row.update(accuracy_percent=benchmarkPercent*result['accuracy'], inference_accuracy_percent=benchmarkPercent*result['inference_accuracy'])
+			rows.append(row)
+		writeJSON(run / benchmarkSummaryFilename, dict(status=state, updated=datetime.now(timezone.utc).isoformat(), completed_configurations=len(completed), total_configurations=len(manifest['configurations']), active_configuration=active, error=error, configurations=rows))
 		temporary = run / (benchmarkSummaryCSVFilename + benchmarkTemporaryExtension)
 		with temporary.open('w', encoding=benchmarkEncoding, newline='') as stream:
 			writer = csv.DictWriter(stream, fieldnames=benchmarkCSVFields)
@@ -251,28 +238,11 @@ def writeSummary(run, manifest, state, completed, active=None, error=None):
 	return
 
 
-def workerEnvironment():
-	result = None
-	if(generalisedBenchmarkTool):
-		result = dict(os.environ)
-		result.pop('PYTHONPATH', None)
-		result.update(benchmarkEnvironment)
-	return result
-
-
 def positiveInteger(value):
-	result = int(value)
 	if(generalisedBenchmarkTool):
+		result = int(value)
 		if(result <= benchmarkZero):
 			raise argparse.ArgumentTypeError(benchmarkErrorPositive)
-	return result
-
-
-def nonnegativeInteger(value):
-	result = int(value)
-	if(generalisedBenchmarkTool):
-		if(result < benchmarkZero):
-			raise argparse.ArgumentTypeError(benchmarkErrorNonnegative)
 	return result
 
 

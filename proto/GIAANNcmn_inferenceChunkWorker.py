@@ -114,7 +114,7 @@ class InferenceChunkSequenceRecorder:
 		return result
 
 
-def installInferenceChunkWriteProtection(protected):
+def installInferenceChunkWriteProtection(protected, writable=()):
 	if(optimisationInferenceChunks):
 		def audit(event, arguments):
 			if(optimisationInferenceChunks):
@@ -136,7 +136,7 @@ def installInferenceChunkWriteProtection(protected):
 						if(not resolved.is_absolute() and isinstance(descriptor, int) and descriptor >= inferenceChunksZero):
 							resolved = Path(inferenceChunksAuditProcDescriptors) / str(descriptor) / resolved
 						resolved = resolved.resolve()
-						if(any(resolved.is_relative_to(root) for root in protected)):
+						if(any(resolved.is_relative_to(root) for root in protected) and not any(resolved.is_relative_to(root) for root in writable)):
 							raise RuntimeError(inferenceChunksErrorWrite + str(resolved))
 			return
 		sys.addaudithook(audit)

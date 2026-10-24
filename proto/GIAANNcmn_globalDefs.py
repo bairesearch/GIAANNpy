@@ -64,11 +64,6 @@ elif(useTrainDuringInference):
 else:
 	raise RuntimeError("execution mode undefined")
 
-if(executionMode == "inference"):
-	useGeneralisedBenchmarkTool = False	#default: False	#orig: False	#optional: see generalisedBenchmarkTool
-else:
-	useGeneralisedBenchmarkTool = False	#not supported
-
 
 #Primary Draw settings:
 drawNetworkDuringTrain = False	#default: False  	#network drawing for prototype (not suitable for fast training)
@@ -335,8 +330,8 @@ if(enforceDirectConnectionsSANI):
 else:
 	enforceDirectConnectionsSANIminimal = False
 minimumPredictionActivationThreshold = 0.0	#explicit threshold application not required (for verification only)
-predictionEnsureConnectedToPreviousPrediction = True	#default: True	#ensure every new prediction connects to previous node (requirement is independent of enforceDirectConnections)
-predictionEnsureConnectedToPreviousPredictionStrict = False	#default: False #orig: True	#True: predictions must flow from features and column of same name as currently selected token, False: predictions must flow from features of the same name as the currently selected token.
+predictionEnsureConnectedToPreviousPrediction = False	#default: True	#ensure every new prediction connects to previous node (requirement is independent of enforceDirectConnections)
+predictionEnsureConnectedToPreviousPredictionStrict = True	#default: False #orig: True	#True: predictions must flow from features and column of same name as currently selected token, False: predictions must flow from features of the same name as the currently selected token.
 
 
 #modality global defs;
@@ -521,23 +516,20 @@ if(useInference):
 		
 
 #Inference optimisations;
-if(useGeneralisedBenchmarkTool):
-	optimisationInferenceChunks = False	#generalisedBenchmarkTool already has this option
-	optimisationInferenceWorkers = False	#generalisedBenchmarkTool already has this option
+# generalisedBenchmarkTool delegates to these native inference options.
+if(executionMode == "inference" and not inferenceTrainFirstSequences):
+	optimisationInferenceChunks = True	#default: True	#orig: False #opt-in: evaluate independent prompt lines in fresh CPU processes; preserve the normal inference path when disabled
+	optimisationInferenceWorkers = True	#default: True	#orig: False	#opt-in: schedule multiple chunks concurrently; requires optimisationInferenceChunks
 else:
-	if(executionMode == "inference"):
-		optimisationInferenceChunks = True	#default: True	#orig: False #opt-in: evaluate independent prompt lines in fresh CPU processes; preserve the normal inference path when disabled
-		optimisationInferenceWorkers = True	#default: True	#orig: False	#opt-in: schedule multiple chunks concurrently; requires optimisationInferenceChunks
-	else:
-		optimisationInferenceChunks = False	#not supported
-		optimisationInferenceWorkers = False	#not supported
+	optimisationInferenceChunks = False	#not supported
+	optimisationInferenceWorkers = False	#not supported
 inferenceChunksErrorDisabled = "Inference chunk helper requires optimisationInferenceChunks=True"
 if(optimisationInferenceChunks):
 	inferenceChunksSequenceCount = 25	#maximum independent prompt sequences per fresh process
 	inferenceChunksOutputDirectory = None	#None: retain run snapshots, logs and counts in a new system temporary directory; otherwise use this existing directory
 	inferenceChunksWorkerThreads = 1	#one Torch/BLAS compute thread per process
 if(optimisationInferenceWorkers):
-	inferenceWorkersCount = 12	#maximum concurrent chunk processes for this inference run
+	inferenceWorkersCount = 8	#default: 12	#maximum concurrent chunk processes for this inference run
 if(optimisationInferenceChunks or optimisationInferenceWorkers):
 	inferenceChunksZero = 0
 	inferenceChunksOne = 1
@@ -1489,7 +1481,7 @@ if(drawEfficient):
 	drawEfficientDrawDeadNeurons = True	#default: True	#draw empty columns with no connected neurons
 
 #Training column-segment timing; enable only for fresh training, not continuation of an occurrence-timed checkpoint.
-patchTrainColumnStepsRepeatedColumns = False	#default: False	#opt-in: count database column-ID changes; adjacent repeated occurrences take zero column steps
+patchTrainColumnStepsRepeatedColumns = False	#default: False	#FUTURE: True (requires retrain)	#opt-in: count database column-ID changes; adjacent repeated occurrences take zero column steps
 patchTrainColumnStepsDimension = 0
 patchTrainColumnStepsRank = 1
 patchTrainColumnStepsFirst = 0
@@ -1502,6 +1494,48 @@ if(patchTrainColumnStepsRepeatedColumns):
 		raise RuntimeError(patchTrainColumnStepsInvalid)
 
 #inference patches;
+if(useBenchmark and executionMode == "inference" and useDefaultsV2 and inferenceLeakyIntegrateAndFire and useBenchmarkDefaultsEvalTestSetOptim and not inferenceBeamSearch):
+	inferenceContextLikelihood = True	#default: True	#orig: False	#combine the configured source evidence with smoothed contextual likelihoods before LIF candidate selection
+else:
+	inferenceContextLikelihood = False
+if(inferenceContextLikelihood):
+	inferenceContextLikelihoodZero = 0
+	inferenceContextLikelihoodOne = 1
+	inferenceContextLikelihoodPriorWeight = 0.5
+	inferenceContextLikelihoodContextWeight = 0.125
+	inferenceContextLikelihoodSmoothing = 1.0
+	inferenceContextLikelihoodFrequencyCacheColumns = 512
+	inferenceContextLikelihoodConnectionRank = 4
+	inferenceContextLikelihoodNeuronRank = 4
+	inferenceContextLikelihoodBranchDimension = 0
+	inferenceContextLikelihoodSegmentDimension = 1
+	inferenceContextLikelihoodColumnDimension = 2
+	inferenceContextLikelihoodFeatureDimension = 3
+	inferenceContextLikelihoodPropertyDimension = 0
+	inferenceContextLikelihoodNeuronFeatureDimension = 3
+	inferenceContextLikelihoodDevice = "cpu"
+	inferenceContextLikelihoodMaximumReduction = "amax"
+	inferenceContextLikelihoodRequiredSANI = "enforceLastSegmentMustBeActive"
+	inferenceContextLikelihoodExecutionMode = "inference"
+	inferenceContextLikelihoodHistoryAttribute = "contextLikelihoodHistory"
+	inferenceContextLikelihoodFrequenciesAttribute = "contextLikelihoodFrequencies"
+	inferenceContextLikelihoodConfigurationLabel = "inferenceContextLikelihood:"
+	inferenceContextLikelihoodInvalidConfiguration = "Context likelihood requires static single-branch CPU NLP LIF inference, continuous proximity-weighted connections, exact feature distances, token aggregation, and no beam search, auxiliary sources, other priors, or BPB"
+	inferenceContextLikelihoodInvalidState = "Context likelihood requires an initialised inference database and consecutive source steps within one fixed vocabulary"
+	inferenceContextLikelihoodInvalidConnections = "Context likelihood requires valid finite non-negative sparse source strengths with the configured branch and segment layout"
+	inferenceContextLikelihoodInvalidEvidence = "Context likelihood requires positive trained candidate frequencies, including configured donor representations, and immediate source evidence when previous-prediction connectivity is required"
+	inferenceContextLikelihoodInvalidProxies = "Context likelihood proxy evidence requires unique valid source neurons with finite positive mixture weights summing to one"
+	inferenceContextLikelihoodProxyWeightTolerance = 1e-6
+	inferenceContextLikelihoodInvalidParameters = "Context likelihood weights must be finite and within [0, 1], smoothing must be finite and positive, and the frequency cache limit must be a positive integer"
+if(inferenceContextLikelihood):
+	if(executionMode != inferenceContextLikelihoodExecutionMode or not useDefaultsV2 or not useModalityNLP or not inferenceLeakyIntegrateAndFire or not useSANIfeaturesAndColumns or multipleDendriticBranches or not enforceDirectConnectionsSANI or inferenceBeamSearch or (predictionEnsureConnectedToPreviousPredictionStrict and inferenceInferMissingFeatures) or auxiliaryNeurons or useTrainDuringInference or inferenceTrainFirstSequences or inferenceConnectionsStrengthBoolean or not trainConnectionStrengthNormaliseWrtContextLength or trainConnectionStrengthIncreaseColumnInternal or trainConnectionStrengthPOSdependence or trainConnectionStrengthLimitMax or trainConnectionStrengthLimitTanh or inferenceConnectionStrengthPOSdependence or SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens or algorithmMatrixSANIenforceRequirement != inferenceContextLikelihoodRequiredSANI or useGPUdense or useGPUsparse or printInferenceTop1AccuracyBitsPerByte):
+		raise RuntimeError(inferenceContextLikelihoodInvalidConfiguration)
+	inferenceContextLikelihoodHistoryLength = arrayNumberOfSegmentsFeatureDistance + inferenceLeakyIntegrateAndFireSomaSegmentCount
+	for inferenceContextLikelihoodWeight in (inferenceContextLikelihoodPriorWeight, inferenceContextLikelihoodContextWeight):
+		if(type(inferenceContextLikelihoodWeight) not in (int, float) or not math.isfinite(inferenceContextLikelihoodWeight) or not inferenceContextLikelihoodZero <= inferenceContextLikelihoodWeight <= inferenceContextLikelihoodOne):
+			raise ValueError(inferenceContextLikelihoodInvalidParameters)
+	if(type(inferenceContextLikelihoodSmoothing) not in (int, float) or not math.isfinite(inferenceContextLikelihoodSmoothing) or inferenceContextLikelihoodSmoothing <= inferenceContextLikelihoodZero or type(inferenceContextLikelihoodFrequencyCacheColumns) is not int or inferenceContextLikelihoodFrequencyCacheColumns <= inferenceContextLikelihoodZero):
+		raise ValueError(inferenceContextLikelihoodInvalidParameters)
 if(inferenceColumnConstraintsAllowExternalPrimeConceptTransitions):
 	patchInferenceUseNextTokenTargets = False	#not required
 else:
@@ -1635,7 +1669,12 @@ if(useDefaultsV2):
 	if(predictionEnsureConnectedToPreviousPrediction):
 		inferenceReviewPatch16TokenAggregation = False	#default: False	#optional (technically independent of predictionEnsureConnectedToPreviousPrediction)
 	else:
-		inferenceReviewPatch16TokenAggregation = True	#default: True #sum eligible neuron scores by output token, then retain the strongest neuron for the winning token
+		if(useBenchmarkDefaultsEvalTestSet):
+			inferenceReviewPatch16TokenAggregation = True	#default: True #sum eligible neuron scores by output token, then retain the strongest neuron for the winning token
+		else:
+			inferenceReviewPatch16TokenAggregation = False
+	if(inferenceContextLikelihood):
+		inferenceReviewPatch16TokenAggregation = True
 	if(inferenceReviewPatch16TokenAggregation):
 		inferenceLIFTokenAggregationVectorDimension = 0
 		inferenceLIFTokenAggregationCandidateRank = 1
@@ -1675,9 +1714,14 @@ else:
 	inferenceReviewPatch15TokenTransitionPrior = False
 	inferenceReviewPatch16TokenAggregation = False
 
+if(inferenceContextLikelihood):
+	if(inferenceReviewPatch15TokenTransitionPrior or not inferenceReviewPatch16TokenAggregation):
+		raise RuntimeError(inferenceContextLikelihoodInvalidConfiguration)
 	
 #printConfiguration;
 if(printConfiguration): 
+	if(inferenceContextLikelihood):
+		print(inferenceContextLikelihoodConfigurationLabel, inferenceContextLikelihood)
 	print("***** printConfiguration: ***** ")
 	print("")
 	print("#Modality selection;")

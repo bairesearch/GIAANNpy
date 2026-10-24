@@ -22,6 +22,8 @@ import time
 import math
 
 from GIAANNcmn_globalDefs import *
+if(inferenceContextLikelihood):
+	import GIAANNcmn_predictionContextLikelihood
 import GIAANNcmn_debug
 import GIAANNcmn_count
 import GIAANNcmn_databaseNetwork
@@ -415,6 +417,8 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	return result
 
 def processConceptWordsInferenceSequence(sequenceObservedColumns, sequenceIndex, sequence, sequenceSeed, sequencePredict, numSeedTokens, sequenceRaw):
+	if(inferenceContextLikelihood):
+		GIAANNcmn_predictionContextLikelihood.initialiseContextLikelihoodSequence(sequenceObservedColumns.databaseNetworkObject)
 	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
 		GIAANNcmn_predictionPoolTransitions.validatePooledTransitionConfiguration(sequenceObservedColumns.databaseNetworkObject)
 	if(printHeaderDuringInferencePredict):
@@ -567,6 +571,8 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	debugTimeStart = None
 	debugTimeLast = None
 	predictionCandidatesAvailable = True
+	if(inferenceContextLikelihood):
+		GIAANNcmn_predictionContextLikelihood.prepareContextLikelihoodStep(databaseNetworkObject, sequenceWordIndex)
 	if(conceptColumnIndex is None or conceptColumnFeatureIndex is None):
 		raise RuntimeError("processColumnInferencePrediction error: expected single concept/feature prediction pair")
 	if(inferenceReviewPatch15TokenTransitionPrior):

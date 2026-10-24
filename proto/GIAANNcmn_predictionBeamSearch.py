@@ -21,6 +21,8 @@ import torch as pt
 import time
 
 from GIAANNcmn_globalDefs import *
+if(inferenceContextLikelihood):
+	import GIAANNcmn_predictionContextLikelihood
 if(inferenceReviewPatch15TokenTransitionPrior):
 	import GIAANNcmn_predictionTokenPrior
 if(inferenceReviewPatch16TokenAggregation):
@@ -469,6 +471,8 @@ def selectBeamCandidates(stateFeatures, stateTime, strengthLookup, candidateLimi
 				columnIndices, featureIndices, activationValues = filterCandidatesByDeactivatedNeuronState(databaseNetworkObject, columnIndices, featureIndices, activationValues, deactivatedNeuronState)
 		if(inferenceReviewPatch16TokenAggregation):
 			#Indirect empty-source steps retain patch 13 pooling or patch 12 context selection; aggregate directly eligible candidates.
+			if(inferenceContextLikelihood and columnIndices is not None):
+				columnIndices, featureIndices, activationValues = GIAANNcmn_predictionContextLikelihood.scoreContextLikelihoodCandidates(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
 			if(columnIndices is not None and (predictionEnsureConnectedToPreviousPrediction or connectedColumnsTensor is None or connectedColumnsTensor.numel() > arrayIndexSegmentFirst)):
 				columnIndices, featureIndices, activationValues = GIAANNcmn_predictionTokenAggregation.selectLIFTokenAggregationCandidate(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
 		if(columnIndices is not None):

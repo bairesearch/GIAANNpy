@@ -630,7 +630,7 @@ MANUAL; - update inferenceLeakyIntegrateAndFire - if(not inferenceEvaluateTestSe
 
 ---
 v2m (Codex App GPT-5.6):
-- add proto GIAANNproto2m1a - start inference/auxiliary updates:
+- add proto GIAANNproto2m1a - start inferenceInferMissingFeatures:
 	- add option inferencePromptPreserveLineSequenceBoundaries (enabled) - process each non-empty inference prompt line as exactly one independent sequence matching the stored training boundary
 	- add option trainConnectionsAllowSelfTransitions (disabled)  - allow same-column/feature transitions required when repeated occurrences share one neuron
 	- add option inferenceColumnConstraintsAllowExternalPrimeConceptTransitions (enabled) - allow external prime-concept candidates at no-delimiter column transitions without relabelling rejected candidates
@@ -683,7 +683,7 @@ MANUAL; - set inferenceDeactivateLastColumnSegmentUponPrediction=True by default
 
 ---
 v2o (Codex App GPT-6.0):
-- add proto GIAANNproto2o1a - start LIF inference updates:
+- add proto GIAANNproto2o1a - start LIF inferenceReviewPatch* updates:
 	- add option inferenceReviewPatch1FilterCandidatesBeforeTopK (disabled) - filter constrained candidates before top-K selection, with no prediction changes in the tested LIF and non-LIF configurations.
 	- add option inferenceReviewPatch2PreserveSelfTransitions (disabled) - reset firing neurons before accumulating new input to preserve immediate self-transitions, with only small and mixed measured accuracy changes.
 	- add option inferenceReviewPatch3SeedBurstIndependence (disabled) - reserve the skipped seed-burst-independence review option without implementing a behaviour change.
@@ -709,7 +709,7 @@ MANUAL; disable inferenceReviewPatch12RetainContextWithoutOutgoingSource
 
 ---
 v2p (Codex App GPT-6.0):
-- add proto GIAANNproto2p1a - start train parallelisation updates:
+- add proto GIAANNproto2p1a - start train/inference optimisation updates (optimiseTrainParallelisation/optimiseInference*):
 	- add option optimiseTrainParallelisation1 (enabled) - merge RAM-resident training connection updates across source neurons using parallel native CPU kernels while preserving sparse COO storage and additive update results.
 	- add option optimiseTrainParallelisation2a (enabled) - construct temporal training connections directly in sorted unique sparse COO order using parallel CPU kernels to avoid repeated segment expansion, intermediate duplicates and sorting.
 	- add option optimiseTrainParallelisation2b (~enabled) - map connection deltas to database coordinates and group updates by source neuron using a native parallel CPU pass while retaining the original PyTorch duplicate-reduction order.
@@ -736,19 +736,22 @@ v2p (Codex App GPT-6.0):
 
 ---
 v2q (Codex App GPT-6.0):
-- add proto GIAANNproto2q1a - start LIF inference updates:
+- add proto GIAANNproto2q1a - start inference optimisation updates (inferenceInferMissingFeatures+optimisationInferenceChunks):
 	- add option inferenceReviewPatch17segmentTimingOptimisation (enabled) - segment timing optimisation for inferenceDecrementActivationsSomaPerPredictedToken/inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn
 	- set predictionEnsureConnectedToPreviousPrediction==False:inferenceReviewPatch16TokenAggregation=True
 - add option patchInferenceUseNextTokenTargets (disabled) - popagate the exact target column and feature during target-driven inference without applying prediction-only column constraints (designed for inferenceColumnConstraintsAllowExternalPrimeConceptTransitions=False).
-- add patchTrainColumnStepsRepeatedColumns (enabled) - align training column-segment distances with LIF column transitions while preserving distinct token occurrences and feature timing.
+- add patchTrainColumnStepsRepeatedColumns (disabled) - align training column-segment distances with LIF column transitions while preserving distinct token occurrences and feature timing.
 - add option inferenceRequireExistingDatabase (enabled) - patch inference (executionMode = "inference") - hard fail if the trained database folder does not already exist.
 - add option inferenceInferMissingFeaturesAllObservedTokens (enabled) - extend missing-feature inference beyond seed tokens to all observed source tokens during teacher-forced evaluation.
 - add option inferenceInferMissingFeaturesSemantic (enabled) - add token-aware contextual donor selection and project donor activation targets into the observed token column to improve missing-feature inference.
 - add option inferenceInferMissingFeaturesSemanticContextColumns (enabled) - Use contextual column activity to select donor neurons for the observed token even when those neurons have no soma activation.
 - set inferenceInferMissingFeatures=True by default
 - upgrade inferenceInferMissingFeaturesAllObservedTokens/inferenceInferMissingFeaturesSemantic to support inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=True.
-MANUAL; - extract !predictionEnsureConnectedToPreviousPredictionStrict:inferenceInferMissingFeatures
+MANUAL; - set !predictionEnsureConnectedToPreviousPredictionStrict:inferenceInferMissingFeatures
 MANUAL; - set !predictionEnsureConnectedToPreviousPrediction:!predictionEnsureConnectedToPreviousPredictionStrict:inferenceInferMissingFeaturesSemanticPreferPooledTransitions=True.
 - add option optimisationInferenceChunks to evaluate sequence chunks in fresh processes with one compute thread and aggregate accuracy counts.
 - add option optimisationInferenceWorkers to execute inference chunks concurrently with a configurable worker limit.
 - add generalisedBenchmarkTool to benchmark configurations defined by file and line edits using isolated code snapshots, configurable parallel workers, and aggregated inference accuracy.
+- add option inferenceContextLikelihood (enabled) - score LIF predictions using smoothed contextual evidence and trained frequency priors, with support for independent connectivity and strictness constraints.
+- upgrade generalisedBenchmarkTool to remove its own chunk+worker code (GIAANN code has its own optimisationInferenceChunks+optimisationInferenceWorkers support).
+MANUAL; - set !predictionEnsureConnectedToPreviousPrediction:useBenchmarkDefaultsEvalTestSet:inferenceReviewPatch16TokenAggregation=True.

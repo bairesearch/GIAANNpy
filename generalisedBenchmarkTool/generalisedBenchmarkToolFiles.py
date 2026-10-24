@@ -1,5 +1,6 @@
 """Immutable source snapshots, line replacement and result serialization."""
 import difflib
+import ast
 import hashlib
 import json
 import os
@@ -37,6 +38,28 @@ def prepareConfiguration(snapshot, configuration, destination):
 		validatePython(destination / benchmarkSnapshotDirectory)
 		(destination / benchmarkDiffFilename).write_text(''.join(diff), encoding=benchmarkEncoding)
 		writeJSON(destination / benchmarkEditsFilename, edits)
+	return
+
+
+def applyExecutionSettings(source, overrides):
+	if(generalisedBenchmarkTool):
+		path = source / benchmarkProtoDirectory / (benchmarkCommonModule + benchmarkPythonExtension)
+		original = path.read_text(encoding=benchmarkEncoding)
+		lines = original.splitlines(keepends=True)
+		tree = ast.parse(original)
+		for name, value in overrides.items():
+			assignments = [node for node in ast.walk(tree) if isinstance(node, ast.Assign) and len(node.targets) == benchmarkOne and isinstance(node.targets[benchmarkZero], ast.Name) and node.targets[benchmarkZero].id == name]
+			if(len(assignments) != benchmarkOne or assignments[benchmarkZero].lineno != assignments[benchmarkZero].end_lineno):
+				raise ValueError(benchmarkErrorSetting + name)
+			node = assignments[benchmarkZero]
+			index = node.lineno - benchmarkOne
+			line = lines[index].encode(benchmarkEncoding)
+			lines[index] = (line[:node.value.col_offset] + repr(value).encode(benchmarkEncoding) + line[node.value.end_col_offset:]).decode(benchmarkEncoding)
+		updated = ''.join(lines)
+		compile(updated, str(path), 'exec')
+		path.write_text(updated, encoding=benchmarkEncoding)
+		diff = ''.join(difflib.unified_diff(original.splitlines(keepends=True), updated.splitlines(keepends=True), fromfile=str(path.relative_to(source)), tofile=str(path.relative_to(source))))
+		(source.parent / benchmarkExecutionDiffFilename).write_text(diff, encoding=benchmarkEncoding)
 	return
 
 
@@ -82,12 +105,13 @@ def decodeIndentation(replacement):
 	return result
 
 
-def snapshotRepository(repository, destination):
+def snapshotRepository(repository, destination, excludedDirectories=()):
 	if(generalisedBenchmarkTool):
+		excluded = tuple(path.resolve() for path in excludedDirectories)
 		listing = subprocess.run([*benchmarkGitSnapshotCommand, str(repository), *benchmarkGitSnapshotArguments], check=True, capture_output=True).stdout
 		destination.mkdir(parents=True)
 		for relative in sorted(set(os.fsdecode(listing).split(benchmarkNul))):
-			if(relative and not benchmarkForbiddenParts.intersection(Path(relative).parts)):
+			if(relative and not benchmarkForbiddenParts.intersection(Path(relative).parts) and not any((repository / relative).is_relative_to(root) for root in excluded)):
 				candidate = repository / relative
 				if(candidate.exists() or candidate.is_symlink()):
 					path = validateSourcePath(repository, relative)

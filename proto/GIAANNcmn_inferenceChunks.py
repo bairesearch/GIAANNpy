@@ -250,7 +250,7 @@ def writeInferenceChunkSummary(run, jobs, results, active, state, started, error
 		metrics = {name:sum(result["metrics"][name] for result in results) for name in inferenceChunksMetricNames}
 		predictionTokens = metrics[inferenceChunksPredictionTokensMetric]
 		tokens = metrics[inferenceChunksTokensMetric]
-		summary = dict(status=state, completed_chunks=len(results), total_chunks=len(jobs), active_workers={index:process.pid for index,(process,log,job) in active.items()}, metrics=metrics, prediction_accuracy=metrics[inferenceChunksPredictionMatchesMetric]/predictionTokens if predictionTokens else None, inference_accuracy=metrics[inferenceChunksMatchesMetric]/tokens if tokens else None, elapsed_wall_seconds=time.perf_counter()-started, elapsed_worker_seconds=sum(result["elapsed"] for result in results), peak_worker_rss_kib=max((result["rss_kib"] for result in results), default=inferenceChunksZero), error=error)
+		summary = dict(status=state, completed_chunks=len(results), total_chunks=len(jobs), sequences=sum(len(result["sequences"]) for result in results), active_workers={index:process.pid for index,(process,log,job) in active.items()}, metrics=metrics, prediction_accuracy=metrics[inferenceChunksPredictionMatchesMetric]/predictionTokens if predictionTokens else None, inference_accuracy=metrics[inferenceChunksMatchesMetric]/tokens if tokens else None, elapsed_wall_seconds=time.perf_counter()-started, elapsed_worker_seconds=sum(result["elapsed"] for result in results), peak_worker_rss_kib=max((result["rss_kib"] for result in results), default=inferenceChunksZero), error=error)
 		writeInferenceChunkJSON(run / inferenceChunksSummaryFilename, summary)
 	else:
 		raise RuntimeError(inferenceChunksErrorDisabled)
