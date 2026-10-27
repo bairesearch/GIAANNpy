@@ -27,6 +27,8 @@ import sys
 
 #Execution mode selection;
 from GIAANNcmn_globalDefs import useQuickExecution
+from GIAANNcmn_globalDefs import executionMode
+from GIAANNcmn_globalDefs import inferenceGraphEvidenceUpgrade
 from GIAANNcmn_globalDefs import useBenchmark
 from GIAANNcmn_globalDefs import useAutoresearch
 from GIAANNcmn_globalDefs import useDrawNetworkIndependently
@@ -632,6 +634,7 @@ if(useDefaultsV2):
 else:
 	inferenceInferMissingFeatures = False
 	auxiliaryNeurons = False
+inferenceInferMissingFeaturesSemanticAdaptiveSupplement = False
 if(inferenceInferMissingFeatures):
 	inferenceInferMissingFeaturesAllObservedTokens = True	#default: True	#orig: False	#extend proxy inference to every selected source: seed tokens, teacher-forced targets, or generated predictions
 	inferenceInferMissingFeaturesSemantic = True	#default: True	#orig: False	#condition proxy selection on the selected source token identity and transfer donor-column roles
@@ -676,6 +679,11 @@ if(inferenceInferMissingFeatures):
 		else:
 			inferenceInferMissingFeaturesSemanticPreferPooledTransitions = True	#retain indirect mode's pooled prediction while adding semantic donor context for subsequent steps
 		inferenceInferMissingFeaturesSemanticSupplementTrainedSources = False	#experimental interpolation of exact trained sources with contextual donors
+		if(inferenceGraphEvidenceUpgrade):
+			if(executionMode == "inference" and inferenceLeakyIntegrateAndFire and not inferenceTrainFirstSequences):
+				inferenceInferMissingFeaturesSemanticAdaptiveSupplement = True	#share same-token source evidence according to the observed neuron's training support
+			if(inferenceInferMissingFeaturesSemanticAdaptiveSupplement):
+				inferenceInferMissingFeaturesSemanticSupplementTrainedSources = True
 		inferenceInferMissingFeaturesSemanticSupplementWeight = 0.1
 		inferenceInferMissingFeaturesSemanticTopK = 4
 		inferenceInferMissingFeaturesSemanticContextTopK = 32
@@ -701,6 +709,29 @@ if(inferenceInferMissingFeatures):
 				raise RuntimeError(inferenceInferMissingFeaturesSemanticInvalidConfiguration)
 		if(not isinstance(inferenceInferMissingFeaturesSemanticVectorExponent, (int, float)) or isinstance(inferenceInferMissingFeaturesSemanticVectorExponent, bool) or not math.isfinite(inferenceInferMissingFeaturesSemanticVectorExponent) or inferenceInferMissingFeaturesSemanticVectorExponent <= inferenceInferMissingFeaturesMinimumActivation):
 			raise RuntimeError(inferenceInferMissingFeaturesSemanticInvalidConfiguration)
+	if(inferenceInferMissingFeaturesSemanticAdaptiveSupplement):
+		inferenceInferMissingFeaturesSemanticAdaptiveSupplementSparseSources = True
+		inferenceSemanticSourceEvidenceMaximumObservations = 32.0
+		inferenceSemanticSourceEvidencePriorMass = 4.0
+		inferenceSemanticSourceEvidenceCacheColumns = 512
+		inferenceSemanticSourceEvidenceZero = 0
+		inferenceSemanticSourceEvidenceOne = 1
+		inferenceSemanticSourceEvidenceNeuronRank = 4
+		inferenceSemanticSourceEvidencePropertyDimension = 0
+		inferenceSemanticSourceEvidenceFeatureDimension = 3
+		inferenceSemanticSourceEvidenceVectorDimension = 0
+		inferenceSemanticSourceEvidenceMaximumReduction = "amax"
+		inferenceSemanticSourceEvidenceDevice = "cpu"
+		inferenceSemanticSourceEvidenceCacheAttribute = "semanticSourceEvidenceFrequencies"
+		inferenceSemanticSourceEvidenceConfigurationLabel = "inferenceInferMissingFeaturesSemanticAdaptiveSupplement:"
+		inferenceSemanticSourceEvidenceInvalidConfiguration = "Adaptive source evidence requires non-strict static single-branch semantic LIF inference with observed source bursts, positive finite support limits and prior mass, and a positive frequency cache size"
+		inferenceSemanticSourceEvidenceInvalidState = "Adaptive source evidence requires an initialised inference database"
+		inferenceSemanticSourceEvidenceInvalidNeuron = "Adaptive source evidence requires in-range integer source neuron coordinates"
+		inferenceSemanticSourceEvidenceMissingObservations = "A trained source neuron must have a positive finite persisted observation count"
+		inferenceSemanticSourceEvidenceInvalidFrequencies = "Adaptive source evidence requires valid finite non-negative sparse neuron frequencies"
+		inferenceSemanticSourceEvidenceInvalidWeight = "Adaptive source interpolation weight must be finite and strictly between zero and one"
+		if(not inferenceInferMissingFeaturesSemantic or not inferenceInferMissingFeaturesSemanticSupplementTrainedSources or not inferenceInferMissingFeaturesSemanticObservedBurst or predictionEnsureConnectedToPreviousPredictionStrict or useTrainDuringInference or inferenceTrainFirstSequences or not inferenceLeakyIntegrateAndFire or type(inferenceSemanticSourceEvidenceMaximumObservations) not in (int, float) or not math.isfinite(inferenceSemanticSourceEvidenceMaximumObservations) or inferenceSemanticSourceEvidenceMaximumObservations <= inferenceSemanticSourceEvidenceZero or type(inferenceSemanticSourceEvidencePriorMass) not in (int, float) or not math.isfinite(inferenceSemanticSourceEvidencePriorMass) or inferenceSemanticSourceEvidencePriorMass <= inferenceSemanticSourceEvidenceZero or type(inferenceSemanticSourceEvidenceCacheColumns) is not int or inferenceSemanticSourceEvidenceCacheColumns <= inferenceSemanticSourceEvidenceZero):
+			raise RuntimeError(inferenceSemanticSourceEvidenceInvalidConfiguration)
 	if(inferenceInferMissingFeaturesUpdate10UseGlobalFeaturePredictions):
 		if(not inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections):
 			raise RuntimeError("GIAANNnlp_globalDefs error: inferenceInferMissingFeaturesUpdate10UseGlobalFeaturePredictions requires inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections")

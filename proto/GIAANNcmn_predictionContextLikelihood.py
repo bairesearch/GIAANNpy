@@ -27,6 +27,8 @@ import torch as pt
 from GIAANNcmn_globalDefs import *
 import GIAANNcmn_databaseNetworkFiles
 import GIAANNcmn_predictionConstraints
+if(inferenceColumnLikelihood):
+	import GIAANNcmn_predictionColumnLikelihood
 
 
 def initialiseContextLikelihoodSequence(databaseNetworkObject):
@@ -37,6 +39,8 @@ def initialiseContextLikelihoodSequence(databaseNetworkObject):
 		databaseNetworkObject.contextLikelihoodColumnOrigins = {}
 		databaseNetworkObject.contextLikelihoodPosition = -inferenceContextLikelihoodOne
 		databaseNetworkObject.contextLikelihoodShape = (databaseNetworkObject.c, databaseNetworkObject.f)
+		if(inferenceColumnLikelihood):
+			GIAANNcmn_predictionColumnLikelihood.initialiseColumnLikelihoodSequence(databaseNetworkObject)
 		if(not hasattr(databaseNetworkObject, inferenceContextLikelihoodFrequenciesAttribute)):
 			databaseNetworkObject.contextLikelihoodFrequencies = OrderedDict()
 	return
@@ -106,6 +110,8 @@ def recordContextLikelihoodSource(databaseNetworkObject, connections, sequenceWo
 		if(not pt.isfinite(counts).all() or (counts <= inferenceContextLikelihoodZero).any()):
 			raise RuntimeError(inferenceContextLikelihoodInvalidConnections)
 		databaseNetworkObject.contextLikelihoodHistory[-inferenceContextLikelihoodOne] = keys, counts
+		if(inferenceColumnLikelihood):
+			GIAANNcmn_predictionColumnLikelihood.recordColumnLikelihoodSource(databaseNetworkObject, connections, sequenceWordIndex)
 	return
 
 
@@ -128,8 +134,12 @@ def scoreContextLikelihoodCandidates(databaseNetworkObject, columnIndices, featu
 			contextCounts = counts[inferenceContextLikelihoodOne:]
 			contextProbabilities = (contextCounts + pseudoCounts) / (contextCounts.sum(dim=inferenceContextLikelihoodOne, keepdim=True) + inferenceContextLikelihoodSmoothing)
 			logScores += inferenceContextLikelihoodContextWeight * (contextProbabilities / baseProbabilities).log().sum(dim=inferenceContextLikelihoodZero)
+			if(inferenceColumnLikelihood):
+				logScores += inferenceColumnLikelihoodWeight * GIAANNcmn_predictionColumnLikelihood.calculateColumnLikelihoodEvidence(databaseNetworkObject, columnIndices, featureIndices, baseProbabilities)
 			# The shared scale cancels in token aggregation; keep the live LIF state untouched.
 			scores = (logScores - logScores.max()).exp()
+			if(inferenceLikelihoodCalibration):
+				scores = scores.pow(inferenceLikelihoodCalibrationExponent)
 			if(not pt.isfinite(scores).all() or (scores <= inferenceContextLikelihoodZero).any()):
 				raise RuntimeError(inferenceContextLikelihoodInvalidEvidence)
 			result = columnIndices, featureIndices, scores

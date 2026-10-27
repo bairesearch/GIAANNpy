@@ -330,11 +330,16 @@ if(enforceDirectConnectionsSANI):
 else:
 	enforceDirectConnectionsSANIminimal = False
 minimumPredictionActivationThreshold = 0.0	#explicit threshold application not required (for verification only)
-predictionEnsureConnectedToPreviousPrediction = False	#default: True	#ensure every new prediction connects to previous node (requirement is independent of enforceDirectConnections)
+predictionEnsureConnectedToPreviousPrediction = True	#default: True	#ensure every new prediction connects to previous node (requirement is independent of enforceDirectConnections)
 predictionEnsureConnectedToPreviousPredictionStrict = True	#default: False #orig: True	#True: predictions must flow from features and column of same name as currently selected token, False: predictions must flow from features of the same name as the currently selected token.
 
 
+#Inference graph evidence upgrade;
+inferenceGraphEvidenceUpgrade = False	#default: False	#enable adaptive source evidence sharing; False retains the existing context-likelihood scorer and source behaviour
+
+
 #modality global defs;
+inferenceInferMissingFeaturesSemanticAdaptiveSupplement = False
 if(modalityName=="NLP"):
 	from GIAANNnlp_globalDefs import *
 elif(modalityName=="OR"):
@@ -516,101 +521,6 @@ if(useInference):
 		
 
 #Inference optimisations;
-# generalisedBenchmarkTool delegates to these native inference options.
-if(executionMode == "inference" and not inferenceTrainFirstSequences):
-	optimisationInferenceChunks = True	#default: True	#orig: False #opt-in: evaluate independent prompt lines in fresh CPU processes; preserve the normal inference path when disabled
-	optimisationInferenceWorkers = True	#default: True	#orig: False	#opt-in: schedule multiple chunks concurrently; requires optimisationInferenceChunks
-else:
-	optimisationInferenceChunks = False	#not supported
-	optimisationInferenceWorkers = False	#not supported
-inferenceChunksErrorDisabled = "Inference chunk helper requires optimisationInferenceChunks=True"
-if(optimisationInferenceChunks):
-	inferenceChunksSequenceCount = 25	#maximum independent prompt sequences per fresh process
-	inferenceChunksOutputDirectory = None	#None: retain run snapshots, logs and counts in a new system temporary directory; otherwise use this existing directory
-	inferenceChunksWorkerThreads = 1	#one Torch/BLAS compute thread per process
-if(optimisationInferenceWorkers):
-	inferenceWorkersCount = 8	#default: 12	#maximum concurrent chunk processes for this inference run
-if(optimisationInferenceChunks or optimisationInferenceWorkers):
-	inferenceChunksZero = 0
-	inferenceChunksOne = 1
-	inferenceChunksJSONIndent = 2
-	inferenceChunksPollSeconds = 0.2
-	inferenceChunksStopSeconds = 10
-	inferenceChunksEncoding = "utf-8"
-	inferenceChunksNewline = "\n"
-	inferenceChunksTemporaryPrefix = "giaann-inference-"
-	inferenceChunksSourceDirectory = "source"
-	inferenceChunksJobsDirectory = "jobs"
-	inferenceChunksWorkerFilename = "GIAANNcmn_inferenceChunkWorker.py"
-	inferenceChunksConfigFilename = "job.json"
-	inferenceChunksManifestFilename = "manifest.json"
-	inferenceChunksResultFilename = "result.json"
-	inferenceChunksSummaryFilename = "summary.json"
-	inferenceChunksPromptFilename = "prompt.txt"
-	inferenceChunksLogFilename = "worker.log"
-	inferenceChunksCacheDirectory = "cache"
-	inferenceChunksTemporaryExtension = ".tmp"
-	inferenceChunksJobNameFormat = "chunk{:05d}"
-	inferenceChunksIgnorePatterns = ("__pycache__", "*.pyc", ".git")
-	inferenceChunksCommonModule = "GIAANNcmn_globalDefs"
-	inferenceChunksNLPModule = "GIAANNnlp_globalDefs"
-	inferenceChunksOptionLabel = "optimisationInferenceChunks:"
-	inferenceChunksSizeLabel = "inferenceChunksSequenceCount:"
-	inferenceWorkersOptionLabel = "optimisationInferenceWorkers:"
-	inferenceWorkersCountLabel = "inferenceWorkersCount:"
-	inferenceChunksMetricNames = ("totalInferenceTop1Matches", "totalInferenceTop1Tokens", "totalInferenceTop1PredictionMatches", "totalInferenceTop1PredictionTokens")
-	inferenceChunksDebugMetricNames = ("totalInferenceTokensSeed", "totalInferenceTokensPrediction", "totalInferenceTokensAll")
-	inferenceChunksMatchesMetric = inferenceChunksMetricNames[inferenceChunksZero]
-	inferenceChunksTokensMetric = inferenceChunksMetricNames[inferenceChunksOne]
-	inferenceChunksPredictionMatchesMetric = "totalInferenceTop1PredictionMatches"
-	inferenceChunksPredictionTokensMetric = "totalInferenceTop1PredictionTokens"
-	inferenceChunksSequenceIndexArgument = 4
-	inferenceChunksWorkerArgumentCount = 2
-	inferenceChunksGlobPattern = "*"
-	inferenceChunksEnvironment = {"OMP_NUM_THREADS": str(inferenceChunksOne), "MKL_NUM_THREADS": str(inferenceChunksOne), "OPENBLAS_NUM_THREADS": str(inferenceChunksOne), "NUMEXPR_NUM_THREADS": str(inferenceChunksOne), "BLIS_NUM_THREADS": str(inferenceChunksOne), "PYTHONDONTWRITEBYTECODE": str(inferenceChunksOne), "PYTHONUNBUFFERED": str(inferenceChunksOne), "CUDA_VISIBLE_DEVICES": ""}
-	inferenceChunksPythonPathEnvironment = "PYTHONPATH"
-	inferenceChunksMatplotlibEnvironment = "MPLCONFIGDIR"
-	inferenceChunksOperationalOverrides = {"inferenceCopyTemplateDatasets": False, "debugDisableDatabaseFileWrite": True}
-	inferenceChunksPromptSetting = "inferencePromptFile"
-	inferenceChunksStatusRunning = "running"
-	inferenceChunksStatusComplete = "complete"
-	inferenceChunksStatusFailed = "failed"
-	inferenceChunksStatusInterrupted = "interrupted"
-	inferenceChunksPlatform = "posix"
-	inferenceChunksAuditOpenEvent = "open"
-	inferenceChunksAuditOpenFlagsIndex = 2
-	inferenceChunksAuditSourceDirectoryIndex = 2
-	inferenceChunksAuditTargetDirectoryIndex = 3
-	inferenceChunksAuditSinglePathEvents = {"os.remove": 1, "os.rmdir": 1, "os.mkdir": 2, "os.chmod": 2, "os.utime": 3, "os.truncate": None}
-	inferenceChunksAuditTwoPathEvents = ("os.rename", "os.link")
-	inferenceChunksAuditSymlinkEvent = "os.symlink"
-	inferenceChunksAuditProcDescriptors = "/proc/self/fd"
-	inferenceChunksErrorJob = "Invalid inference chunk job specification"
-	inferenceChunksErrorWorkers = "optimisationInferenceWorkers requires optimisationInferenceChunks=True and a positive integer inferenceWorkersCount"
-	inferenceChunksErrorParameters = "inferenceChunksSequenceCount must be a positive integer; inferenceChunksWorkerThreads must equal one"
-	inferenceChunksErrorConfiguration = "Inference chunks require static CPU NLP inference, an existing database, independent prompt lines, one epoch, zero sequence offset and top-1 accuracy; training, drawing, grounded evaluation, BPB and autoresearch are unsupported"
-	inferenceChunksErrorDatabase = "Inference chunks require existing trained database files: "
-	inferenceChunksErrorPrompt = "Inference chunks require a nonempty prompt with at least one sequence long enough for prediction: "
-	inferenceChunksErrorOutput = "Inference chunk output must be outside the source repository and trained database"
-	inferenceChunksErrorSource = "Inference chunk source snapshot contains a symbolic link: "
-	inferenceChunksErrorChanged = "Inference chunk configuration differs from the frozen parent configuration"
-	inferenceChunksErrorResult = "Invalid or inconsistent inference chunk result: "
-	inferenceChunksErrorWorker = "Inference chunk process failed; inspect "
-	inferenceChunksErrorWrite = "Inference chunk attempted to modify a protected input: "
-	inferenceChunksErrorCoverage = "Inference chunks must cover the selected prompt exactly once"
-	inferenceChunksRunLabel = "Inference chunks run:"
-	inferenceChunksSettingsLabel = "Inference chunks (sequences per chunk, concurrent processes):"
-	inferenceChunksProgressLabel = "Inference chunks completed:"
-	inferenceChunksTimeLabel = "Inference chunks elapsed wall time (seconds):"
-	if(executionMode != "inference" or useTrainDuringInference or inferenceTrainFirstSequences or useDrawNetworkIndependently):
-		raise RuntimeError(inferenceChunksErrorConfiguration)
-if(optimisationInferenceChunks):
-	if(type(inferenceChunksSequenceCount) is not int or inferenceChunksSequenceCount <= inferenceChunksZero or type(inferenceChunksWorkerThreads) is not int or inferenceChunksWorkerThreads != inferenceChunksOne):
-		raise ValueError(inferenceChunksErrorParameters)
-if(optimisationInferenceWorkers):
-	if(not optimisationInferenceChunks or type(inferenceWorkersCount) is not int or inferenceWorkersCount <= inferenceChunksZero):
-		raise ValueError(inferenceChunksErrorWorkers)
-
 inferenceOnlyRetainPredictedTargetObservedColumn = False	#default: False	#orig: False	#load/evict one observed column per prediction step	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
 inferenceOnlyRetainPredictedTargetObservedColumnBeamSearch = False	#default: False	#orig: False	#True: retain only current beam-search target(s); False: retain all beam-search targets	#the majority of inference memory is the sparse global activation tensors (not the observed column connections)
 if(useDefaultsV2):
@@ -1481,7 +1391,7 @@ if(drawEfficient):
 	drawEfficientDrawDeadNeurons = True	#default: True	#draw empty columns with no connected neurons
 
 #Training column-segment timing; enable only for fresh training, not continuation of an occurrence-timed checkpoint.
-patchTrainColumnStepsRepeatedColumns = False	#default: False	#FUTURE: True (requires retrain)	#opt-in: count database column-ID changes; adjacent repeated occurrences take zero column steps
+patchTrainColumnStepsRepeatedColumns = True	#default: False	#FUTURE: True (requires retrain)	#opt-in: count database column-ID changes; adjacent repeated occurrences take zero column steps
 patchTrainColumnStepsDimension = 0
 patchTrainColumnStepsRank = 1
 patchTrainColumnStepsFirst = 0
@@ -1493,8 +1403,180 @@ if(patchTrainColumnStepsRepeatedColumns):
 	if(not useModalityNLP or not inferenceLeakyIntegrateAndFire or not trainSequenceObservedColumnsMatchSequenceWords):
 		raise RuntimeError(patchTrainColumnStepsInvalid)
 
+
+#Optional joint sequence-context memory. Build it during fresh training or replay the exact training prefix before enabling inference.
+if(useBenchmark and not useQuickExecution and useModalityNLP and useDefaultsV2 and inferenceLeakyIntegrateAndFire and not inferenceBeamSearch):
+	useSequenceContext = False	#default: False #non-standard NLP LIF benchmark
+	#sequenceContextRebuildIndexes = False
+	sequenceContextMinimumLength = 3
+	sequenceContextMaximumLength = 8
+	sequenceContextInitialSmoothing = 16.0
+	sequenceContextSmoothingDecay = 0.5
+	sequenceContextMinimumSmoothing = 0.25
+	sequenceContextZero = 0
+	sequenceContextOne = 1
+	sequenceContextBits = 18
+	sequenceContextKeyBits = 64
+	sequenceContextPositionBits = 32
+	sequenceContextSchema = 1
+	sequenceContextPickleProtocol = 4
+	sequenceContextHashChunkBytes = 1048576
+	sequenceContextFolder = databaseFolder + "sequenceContext/"
+	sequenceContextTokensFile = "tokens.u32"
+	sequenceContextBoundariesFile = "boundaries.npy"
+	sequenceContextKeysFile = "keys.npy"
+	sequenceContextOffsetsFile = "offsets.npy"
+	sequenceContextPositionsFile = "positions.npy"
+	sequenceContextMetadataFile = "metadata.json"
+	sequenceContextTokenDtype = "<u4"
+	sequenceContextKeyDtype = "<u8"
+	sequenceContextFloatDtype = "float64"
+	sequenceContextReadMode = "r"
+	sequenceContextWriteMode = "xb"
+	sequenceContextReadBinaryMode = "rb"
+	sequenceContextAppendMode = "ab"
+	sequenceContextTextWriteMode = "x"
+	sequenceContextEncoding = "utf-8"
+	sequenceContextStableSort = "stable"
+	sequenceContextSearchRight = "right"
+	sequenceContextSchemaField = "schema"
+	sequenceContextVocabularyField = "vocabulary_sha256"
+	sequenceContextFeaturesField = "features"
+	sequenceContextProcessedField = "processed_sequences"
+	sequenceContextTrainedField = "trained_sequences"
+	sequenceContextTokensField = "tokens"
+	sequenceContextMinimumField = "minimum_length"
+	sequenceContextBitsField = "key_bits"
+	sequenceContextFilesField = "files_sha256"
+	sequenceContextModelAttribute = "sequenceContextModel"
+	sequenceContextHistoryAttribute = "sequenceContextHistory"
+	sequenceContextTrainingAttribute = "sequenceContextTrainingBoundaries"
+	sequenceContextModes = ("train", "inference", "trainAndInference")
+	sequenceContextTrainMode = "train"
+	sequenceContextInferenceMode = "inference"
+	sequenceContextConfigurationLabel = "useSequenceContext:"
+	sequenceContextInvalidConfiguration = "Sequence context requires static CPU LIF NLP, fixed BPE features and first-noun-token columns, single-step token aggregation, one fresh training epoch, and no auxiliary neurons, training during inference, or BPB"
+	sequenceContextInvalidParameters = "Sequence context requires valid context lengths, positive finite smoothing, decay in (0, 1], and a packed key fitting uint64"
+	sequenceContextInvalidState = "Sequence context requires an initialised matching database, consecutive causal source steps, and valid fixed-vocabulary token indices"
+	sequenceContextInvalidTraining = "Sequence context training requires a fresh output folder, successful nonempty training sequences in increasing order, and fewer than 2**32 tokens"
+	sequenceContextInvalidModel = "Sequence context model is incomplete, corrupt, or incompatible with this checkpoint, vocabulary, or configured context index"
+	sequenceContextInvalidCandidates = "Sequence context requires legal candidate vectors with finite positive activation values"
+	sequenceContextInvalidIndex = "Sequence context index requires valid increasing sequence boundaries and fixed-vocabulary tokens"
+	if(not useModalityNLP or not useDefaultsV2 or not inferenceLeakyIntegrateAndFire or not tokeniserSubword or not useDedicatedFeatureListsSubword or not tokeniserSubwordColumnIdentificationByFirstNounToken or inferenceBeamSearch or multipleDendriticBranches or auxiliaryNeurons or useTrainDuringInference or inferenceTrainFirstSequences or useGPUdense or useGPUsparse or printInferenceTop1AccuracyBitsPerByte or executionMode not in sequenceContextModes or numberEpochs != sequenceContextOne or trainSetStartOffsetSequences != sequenceContextZero):
+		raise RuntimeError(sequenceContextInvalidConfiguration)
+	if(type(sequenceContextMinimumLength) is not int or type(sequenceContextMaximumLength) is not int or type(sequenceContextBits) is not int or not sequenceContextOne <= sequenceContextMinimumLength <= sequenceContextMaximumLength or sequenceContextBits <= sequenceContextZero or sequenceContextBits * sequenceContextMinimumLength > sequenceContextKeyBits):
+		raise ValueError(sequenceContextInvalidParameters)
+	for sequenceContextParameter in (sequenceContextInitialSmoothing, sequenceContextSmoothingDecay, sequenceContextMinimumSmoothing):
+		if(type(sequenceContextParameter) not in (int, float) or not math.isfinite(sequenceContextParameter) or sequenceContextParameter <= sequenceContextZero):
+			raise ValueError(sequenceContextInvalidParameters)
+	if(sequenceContextSmoothingDecay > sequenceContextOne or sequenceContextMinimumSmoothing > sequenceContextInitialSmoothing):
+		raise ValueError(sequenceContextInvalidParameters)
+else:
+	useSequenceContext = False
+
+
+#Inference optimisations workers/chunks;
+# generalisedBenchmarkTool delegates to these native inference options.
+if(executionMode == "inference" and not inferenceTrainFirstSequences):
+	optimisationInferenceChunks = True	#default: True	#orig: False #opt-in: evaluate independent prompt lines in fresh CPU processes; preserve the normal inference path when disabled
+	optimisationInferenceWorkers = True	#default: True	#orig: False	#opt-in: schedule multiple chunks concurrently; requires optimisationInferenceChunks
+else:
+	optimisationInferenceChunks = False	#not supported
+	optimisationInferenceWorkers = False	#not supported
+inferenceChunksErrorDisabled = "Inference chunk helper requires optimisationInferenceChunks=True"
+if(optimisationInferenceChunks):
+	inferenceChunksSequenceCount = 25	#maximum independent prompt sequences per fresh process
+	inferenceChunksOutputDirectory = None	#None: retain run snapshots, logs and counts in a new system temporary directory; otherwise use this existing directory
+	inferenceChunksWorkerThreads = 1	#one Torch/BLAS compute thread per process
+if(optimisationInferenceWorkers):
+	if(useSequenceContext):
+		inferenceWorkersCount = 2
+	else:
+		inferenceWorkersCount = 4	#default: 4	#orig: 8	#limit concurrent inference processes to balance memory use and throughput	#with 400k training samples, inferenceContextLikelihood=True/False: 4/8
+if(optimisationInferenceChunks or optimisationInferenceWorkers):
+	inferenceChunksZero = 0
+	inferenceChunksOne = 1
+	inferenceChunksJSONIndent = 2
+	inferenceChunksPollSeconds = 0.2
+	inferenceChunksStopSeconds = 10
+	inferenceChunksEncoding = "utf-8"
+	inferenceChunksNewline = "\n"
+	inferenceChunksTemporaryPrefix = "giaann-inference-"
+	inferenceChunksSourceDirectory = "source"
+	inferenceChunksJobsDirectory = "jobs"
+	inferenceChunksWorkerFilename = "GIAANNcmn_inferenceChunkWorker.py"
+	inferenceChunksConfigFilename = "job.json"
+	inferenceChunksManifestFilename = "manifest.json"
+	inferenceChunksResultFilename = "result.json"
+	inferenceChunksSummaryFilename = "summary.json"
+	inferenceChunksPromptFilename = "prompt.txt"
+	inferenceChunksLogFilename = "worker.log"
+	inferenceChunksCacheDirectory = "cache"
+	inferenceChunksTemporaryExtension = ".tmp"
+	inferenceChunksJobNameFormat = "chunk{:05d}"
+	inferenceChunksIgnorePatterns = ("__pycache__", "*.pyc", ".git")
+	inferenceChunksCommonModule = "GIAANNcmn_globalDefs"
+	inferenceChunksNLPModule = "GIAANNnlp_globalDefs"
+	inferenceChunksOptionLabel = "optimisationInferenceChunks:"
+	inferenceChunksSizeLabel = "inferenceChunksSequenceCount:"
+	inferenceWorkersOptionLabel = "optimisationInferenceWorkers:"
+	inferenceWorkersCountLabel = "inferenceWorkersCount:"
+	inferenceChunksMetricNames = ("totalInferenceTop1Matches", "totalInferenceTop1Tokens", "totalInferenceTop1PredictionMatches", "totalInferenceTop1PredictionTokens")
+	inferenceChunksDebugMetricNames = ("totalInferenceTokensSeed", "totalInferenceTokensPrediction", "totalInferenceTokensAll")
+	inferenceChunksMatchesMetric = inferenceChunksMetricNames[inferenceChunksZero]
+	inferenceChunksTokensMetric = inferenceChunksMetricNames[inferenceChunksOne]
+	inferenceChunksPredictionMatchesMetric = "totalInferenceTop1PredictionMatches"
+	inferenceChunksPredictionTokensMetric = "totalInferenceTop1PredictionTokens"
+	inferenceChunksSequenceIndexArgument = 4
+	inferenceChunksWorkerArgumentCount = 2
+	inferenceChunksGlobPattern = "*"
+	inferenceChunksEnvironment = {"OMP_NUM_THREADS": str(inferenceChunksOne), "MKL_NUM_THREADS": str(inferenceChunksOne), "OPENBLAS_NUM_THREADS": str(inferenceChunksOne), "NUMEXPR_NUM_THREADS": str(inferenceChunksOne), "BLIS_NUM_THREADS": str(inferenceChunksOne), "PYTHONDONTWRITEBYTECODE": str(inferenceChunksOne), "PYTHONUNBUFFERED": str(inferenceChunksOne), "CUDA_VISIBLE_DEVICES": ""}
+	inferenceChunksPythonPathEnvironment = "PYTHONPATH"
+	inferenceChunksMatplotlibEnvironment = "MPLCONFIGDIR"
+	inferenceChunksOperationalOverrides = {"inferenceCopyTemplateDatasets": False, "debugDisableDatabaseFileWrite": True}
+	inferenceChunksPromptSetting = "inferencePromptFile"
+	inferenceChunksStatusRunning = "running"
+	inferenceChunksStatusComplete = "complete"
+	inferenceChunksStatusFailed = "failed"
+	inferenceChunksStatusInterrupted = "interrupted"
+	inferenceChunksPlatform = "posix"
+	inferenceChunksAuditOpenEvent = "open"
+	inferenceChunksAuditOpenFlagsIndex = 2
+	inferenceChunksAuditSourceDirectoryIndex = 2
+	inferenceChunksAuditTargetDirectoryIndex = 3
+	inferenceChunksAuditSinglePathEvents = {"os.remove": 1, "os.rmdir": 1, "os.mkdir": 2, "os.chmod": 2, "os.utime": 3, "os.truncate": None}
+	inferenceChunksAuditTwoPathEvents = ("os.rename", "os.link")
+	inferenceChunksAuditSymlinkEvent = "os.symlink"
+	inferenceChunksAuditProcDescriptors = "/proc/self/fd"
+	inferenceChunksErrorJob = "Invalid inference chunk job specification"
+	inferenceChunksErrorWorkers = "optimisationInferenceWorkers requires optimisationInferenceChunks=True and a positive integer inferenceWorkersCount"
+	inferenceChunksErrorParameters = "inferenceChunksSequenceCount must be a positive integer; inferenceChunksWorkerThreads must equal one"
+	inferenceChunksErrorConfiguration = "Inference chunks require static CPU NLP inference, an existing database, independent prompt lines, one epoch, zero sequence offset and top-1 accuracy; training, drawing, grounded evaluation, BPB and autoresearch are unsupported"
+	inferenceChunksErrorDatabase = "Inference chunks require existing trained database files: "
+	inferenceChunksErrorPrompt = "Inference chunks require a nonempty prompt with at least one sequence long enough for prediction: "
+	inferenceChunksErrorOutput = "Inference chunk output must be outside the source repository and trained database"
+	inferenceChunksErrorSource = "Inference chunk source snapshot contains a symbolic link: "
+	inferenceChunksErrorChanged = "Inference chunk configuration differs from the frozen parent configuration"
+	inferenceChunksErrorResult = "Invalid or inconsistent inference chunk result: "
+	inferenceChunksErrorWorker = "Inference chunk process failed; inspect "
+	inferenceChunksErrorWrite = "Inference chunk attempted to modify a protected input: "
+	inferenceChunksErrorCoverage = "Inference chunks must cover the selected prompt exactly once"
+	inferenceChunksRunLabel = "Inference chunks run:"
+	inferenceChunksSettingsLabel = "Inference chunks (sequences per chunk, concurrent processes):"
+	inferenceChunksProgressLabel = "Inference chunks completed:"
+	inferenceChunksTimeLabel = "Inference chunks elapsed wall time (seconds):"
+	if(executionMode != "inference" or useTrainDuringInference or inferenceTrainFirstSequences or useDrawNetworkIndependently):
+		raise RuntimeError(inferenceChunksErrorConfiguration)
+if(optimisationInferenceChunks):
+	if(type(inferenceChunksSequenceCount) is not int or inferenceChunksSequenceCount <= inferenceChunksZero or type(inferenceChunksWorkerThreads) is not int or inferenceChunksWorkerThreads != inferenceChunksOne):
+		raise ValueError(inferenceChunksErrorParameters)
+if(optimisationInferenceWorkers):
+	if(not optimisationInferenceChunks or type(inferenceWorkersCount) is not int or inferenceWorkersCount <= inferenceChunksZero):
+		raise ValueError(inferenceChunksErrorWorkers)
+		
+		
 #inference patches;
-if(useBenchmark and executionMode == "inference" and useDefaultsV2 and inferenceLeakyIntegrateAndFire and useBenchmarkDefaultsEvalTestSetOptim and not inferenceBeamSearch):
+if(useBenchmark and executionMode == "inference" and useDefaultsV2 and useModalityNLP and inferenceLeakyIntegrateAndFire and useBenchmarkDefaultsEvalTestSetOptim and not inferenceBeamSearch):
 	inferenceContextLikelihood = True	#default: True	#orig: False	#combine the configured source evidence with smoothed contextual likelihoods before LIF candidate selection
 else:
 	inferenceContextLikelihood = False
@@ -1527,7 +1609,7 @@ if(inferenceContextLikelihood):
 	inferenceContextLikelihoodInvalidProxies = "Context likelihood proxy evidence requires unique valid source neurons with finite positive mixture weights summing to one"
 	inferenceContextLikelihoodProxyWeightTolerance = 1e-6
 	inferenceContextLikelihoodInvalidParameters = "Context likelihood weights must be finite and within [0, 1], smoothing must be finite and positive, and the frequency cache limit must be a positive integer"
-if(inferenceContextLikelihood):
+
 	if(executionMode != inferenceContextLikelihoodExecutionMode or not useDefaultsV2 or not useModalityNLP or not inferenceLeakyIntegrateAndFire or not useSANIfeaturesAndColumns or multipleDendriticBranches or not enforceDirectConnectionsSANI or inferenceBeamSearch or (predictionEnsureConnectedToPreviousPredictionStrict and inferenceInferMissingFeatures) or auxiliaryNeurons or useTrainDuringInference or inferenceTrainFirstSequences or inferenceConnectionsStrengthBoolean or not trainConnectionStrengthNormaliseWrtContextLength or trainConnectionStrengthIncreaseColumnInternal or trainConnectionStrengthPOSdependence or trainConnectionStrengthLimitMax or trainConnectionStrengthLimitTanh or inferenceConnectionStrengthPOSdependence or SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens or algorithmMatrixSANIenforceRequirement != inferenceContextLikelihoodRequiredSANI or useGPUdense or useGPUsparse or printInferenceTop1AccuracyBitsPerByte):
 		raise RuntimeError(inferenceContextLikelihoodInvalidConfiguration)
 	inferenceContextLikelihoodHistoryLength = arrayNumberOfSegmentsFeatureDistance + inferenceLeakyIntegrateAndFireSomaSegmentCount
@@ -1536,6 +1618,46 @@ if(inferenceContextLikelihood):
 			raise ValueError(inferenceContextLikelihoodInvalidParameters)
 	if(type(inferenceContextLikelihoodSmoothing) not in (int, float) or not math.isfinite(inferenceContextLikelihoodSmoothing) or inferenceContextLikelihoodSmoothing <= inferenceContextLikelihoodZero or type(inferenceContextLikelihoodFrequencyCacheColumns) is not int or inferenceContextLikelihoodFrequencyCacheColumns <= inferenceContextLikelihoodZero):
 		raise ValueError(inferenceContextLikelihoodInvalidParameters)
+	
+	if(not inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+		inferenceColumnLikelihood = True	#default: True	#read trained column evidence beyond the local feature window
+		inferenceLikelihoodCalibration = True	#default: True	#square-root calibration before token aggregation
+		inferenceLikelihoodCalibrationInvalidConfiguration = "Likelihood calibration requires the local context likelihood scorer"
+		if(inferenceLikelihoodCalibration):
+			inferenceLikelihoodCalibrationExponent = 0.5
+			inferenceLikelihoodCalibrationMinimumExponent = 0.0
+			inferenceLikelihoodCalibrationMaximumExponent = 1.0
+			inferenceLikelihoodCalibrationInvalidExponent = "Likelihood calibration exponent must be finite and within (0, 1]"
+			inferenceLikelihoodCalibrationConfigurationLabel = "inferenceLikelihoodCalibration:"
+			inferenceLikelihoodCalibrationExponentLabel = "inferenceLikelihoodCalibrationExponent:"
+		inferenceColumnLikelihoodInvalidConfiguration = "Column likelihood requires the local context likelihood and hybrid LIF segments"
+		if(inferenceColumnLikelihood):
+			inferenceColumnLikelihoodZero = 0
+			inferenceColumnLikelihoodOne = 1
+			inferenceColumnLikelihoodEpochField = 0
+			inferenceColumnLikelihoodWeight = 0.125
+			inferenceColumnLikelihoodInvalidState = "Column likelihood requires consecutive observed-source positions and valid column evidence"
+			inferenceColumnLikelihoodInvalidEvidence = "Column likelihood evidence must be finite and non-negative"
+			inferenceColumnLikelihoodInvalidWeight = "Column likelihood weight must be finite and within [0, 1]"
+			inferenceColumnLikelihoodConfigurationLabel = "inferenceColumnLikelihood:"
+			inferenceColumnLikelihoodWeightLabel = "inferenceColumnLikelihoodWeight:"
+		if(inferenceLikelihoodCalibration):
+			if(not inferenceContextLikelihood):
+				raise RuntimeError(inferenceLikelihoodCalibrationInvalidConfiguration)
+			if(type(inferenceLikelihoodCalibrationExponent) not in (int, float) or not math.isfinite(inferenceLikelihoodCalibrationExponent) or not inferenceLikelihoodCalibrationMinimumExponent < inferenceLikelihoodCalibrationExponent <= inferenceLikelihoodCalibrationMaximumExponent):
+				raise ValueError(inferenceLikelihoodCalibrationInvalidExponent)
+		if(inferenceColumnLikelihood):
+			if(not inferenceContextLikelihood or not useSANIfeaturesAndColumns or arrayNumberOfSegmentsColumnDistance <= inferenceColumnLikelihoodZero or multipleDendriticBranches):
+				raise RuntimeError(inferenceColumnLikelihoodInvalidConfiguration)
+			if(type(inferenceColumnLikelihoodWeight) not in (int, float) or not math.isfinite(inferenceColumnLikelihoodWeight) or not inferenceColumnLikelihoodZero <= inferenceColumnLikelihoodWeight <= inferenceColumnLikelihoodOne):
+				raise ValueError(inferenceColumnLikelihoodInvalidWeight)
+	else:
+		inferenceColumnLikelihood = False
+		inferenceLikelihoodCalibration = False
+else:
+	inferenceColumnLikelihood = False
+	inferenceLikelihoodCalibration = False
+	
 if(inferenceColumnConstraintsAllowExternalPrimeConceptTransitions):
 	patchInferenceUseNextTokenTargets = False	#not required
 else:
@@ -1673,7 +1795,7 @@ if(useDefaultsV2):
 			inferenceReviewPatch16TokenAggregation = True	#default: True #sum eligible neuron scores by output token, then retain the strongest neuron for the winning token
 		else:
 			inferenceReviewPatch16TokenAggregation = False
-	if(inferenceContextLikelihood):
+	if(inferenceContextLikelihood or useSequenceContext):
 		inferenceReviewPatch16TokenAggregation = True
 	if(inferenceReviewPatch16TokenAggregation):
 		inferenceLIFTokenAggregationVectorDimension = 0
@@ -1718,10 +1840,28 @@ if(inferenceContextLikelihood):
 	if(inferenceReviewPatch15TokenTransitionPrior or not inferenceReviewPatch16TokenAggregation):
 		raise RuntimeError(inferenceContextLikelihoodInvalidConfiguration)
 	
+if(useSequenceContext):
+	if(not inferenceReviewPatch16TokenAggregation or (executionMode != sequenceContextInferenceMode and (not useSaveData or debugDisableDatabaseFileWrite))):
+		raise RuntimeError(sequenceContextInvalidConfiguration)
+
+if(inferenceInferMissingFeaturesSemanticAdaptiveSupplement):
+	if(inferenceBeamSearch or multipleDendriticBranches):
+		raise RuntimeError(inferenceSemanticSourceEvidenceInvalidConfiguration)
+
 #printConfiguration;
 if(printConfiguration): 
+	if(inferenceInferMissingFeaturesSemanticAdaptiveSupplement):
+		print(inferenceSemanticSourceEvidenceConfigurationLabel, inferenceInferMissingFeaturesSemanticAdaptiveSupplement)
+	if(useSequenceContext):
+		print(sequenceContextConfigurationLabel, useSequenceContext)
 	if(inferenceContextLikelihood):
 		print(inferenceContextLikelihoodConfigurationLabel, inferenceContextLikelihood)
+		if(inferenceColumnLikelihood):
+			print(inferenceColumnLikelihoodConfigurationLabel, inferenceColumnLikelihood)
+			print(inferenceColumnLikelihoodWeightLabel, inferenceColumnLikelihoodWeight)
+		if(inferenceLikelihoodCalibration):
+			print(inferenceLikelihoodCalibrationConfigurationLabel, inferenceLikelihoodCalibration)
+			print(inferenceLikelihoodCalibrationExponentLabel, inferenceLikelihoodCalibrationExponent)
 	print("***** printConfiguration: ***** ")
 	print("")
 	print("#Modality selection;")

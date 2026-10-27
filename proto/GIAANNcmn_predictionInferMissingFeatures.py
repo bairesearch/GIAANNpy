@@ -30,6 +30,8 @@ import GIAANNcmn_inferenceDuringTrain
 import GIAANNcmn_predictionActivate
 if(inferenceInferMissingFeatures and inferenceInferMissingFeaturesSemantic):
 	import GIAANNnlp_predictionSemantic
+if(inferenceInferMissingFeaturesSemanticAdaptiveSupplement):
+	import GIAANNnlp_predictionSourceEvidence
 
 def getTrainedMissingFeatureSourceColumnIndices(databaseNetworkObject, globalFeatureNeuronsStrength, sourceColumnIndex, sourceFeatureIndex):
 	result = None
@@ -82,6 +84,8 @@ def getTrainedMissingFeatureSourceColumnIndices(databaseNetworkObject, globalFea
 		if(inferenceInferMissingFeaturesSemantic):
 			databaseNetworkObject.inferenceSemanticObservedSourceTrained = currentFeatureIsTrained
 			inferFromTrainedSource = inferenceInferMissingFeaturesSemanticSupplementTrainedSources
+			if(inferenceInferMissingFeaturesSemanticAdaptiveSupplement and currentFeatureIsTrained):
+				inferFromTrainedSource = GIAANNnlp_predictionSourceEvidence.shouldSupplementTrainedSemanticSource(databaseNetworkObject, sourceColumnIndex, sourceFeatureIndex)
 		if((currentFeatureIsTrained and not inferFromTrainedSource) or (inferenceInferMissingFeaturesUpdate7UsePersistedSourceConnections and sourceFeatureIndex == featureIndexPrimeConceptNeuron and not inferenceInferMissingFeaturesSemantic)):
 			result = None
 		else:

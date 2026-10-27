@@ -29,6 +29,8 @@ from GIAANNcmn_globalDefs import *
 import GIAANNcmn_databaseNetworkFiles
 import GIAANNcmn_predictionActivate
 import GIAANNcmn_predictionConstraints
+if(inferenceInferMissingFeaturesSemanticAdaptiveSupplement):
+	import GIAANNnlp_predictionSourceEvidence
 
 
 def setSemanticObservedSource(databaseNetworkObject, sourceColumnIndex, sourceFeatureIndex):
@@ -97,8 +99,13 @@ def getSemanticMissingFeatureSources(databaseNetworkObject, globalFeatureNeurons
 			donorTotal = sum(candidate[inferenceInferMissingFeaturesSemanticSourceScoreField] for candidate in trainedCandidates)
 			observedWeight = inferenceInferMissingFeaturesNormalisedActivationTotal
 			if(donorTotal > inferenceInferMissingFeaturesMinimumActivation):
-				trainedCandidates = [(columnIndex, featureIndex, score * inferenceInferMissingFeaturesSemanticSupplementWeight / donorTotal) for columnIndex, featureIndex, score in trainedCandidates]
-				observedWeight -= inferenceInferMissingFeaturesSemanticSupplementWeight
+				if(inferenceInferMissingFeaturesSemanticAdaptiveSupplement):
+					supplementWeight = GIAANNnlp_predictionSourceEvidence.calculateSemanticSupplementWeight(databaseNetworkObject, sourceColumnIndex, sourceFeatureIndex)
+					trainedCandidates = [(columnIndex, featureIndex, score * supplementWeight / donorTotal) for columnIndex, featureIndex, score in trainedCandidates]
+					observedWeight -= supplementWeight
+				else:
+					trainedCandidates = [(columnIndex, featureIndex, score * inferenceInferMissingFeaturesSemanticSupplementWeight / donorTotal) for columnIndex, featureIndex, score in trainedCandidates]
+					observedWeight -= inferenceInferMissingFeaturesSemanticSupplementWeight
 			trainedCandidates.insert(arrayIndexSegmentFirst, (sourceColumnIndex, sourceFeatureIndex, observedWeight))
 		columns = [candidate[inferenceInferMissingFeaturesSemanticSourceColumnField] for candidate in trainedCandidates]
 		features = [candidate[inferenceInferMissingFeaturesSemanticSourceFeatureField] for candidate in trainedCandidates]

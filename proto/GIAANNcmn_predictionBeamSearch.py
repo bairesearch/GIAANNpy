@@ -21,6 +21,8 @@ import torch as pt
 import time
 
 from GIAANNcmn_globalDefs import *
+if(useSequenceContext):
+	import GIAANNcmn_predictionSequenceContext
 if(inferenceContextLikelihood):
 	import GIAANNcmn_predictionContextLikelihood
 if(inferenceReviewPatch15TokenTransitionPrior):
@@ -474,7 +476,10 @@ def selectBeamCandidates(stateFeatures, stateTime, strengthLookup, candidateLimi
 			if(inferenceContextLikelihood and columnIndices is not None):
 				columnIndices, featureIndices, activationValues = GIAANNcmn_predictionContextLikelihood.scoreContextLikelihoodCandidates(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
 			if(columnIndices is not None and (predictionEnsureConnectedToPreviousPrediction or connectedColumnsTensor is None or connectedColumnsTensor.numel() > arrayIndexSegmentFirst)):
-				columnIndices, featureIndices, activationValues = GIAANNcmn_predictionTokenAggregation.selectLIFTokenAggregationCandidate(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
+				if(useSequenceContext):
+					columnIndices, featureIndices, activationValues = GIAANNcmn_predictionSequenceContext.scoreSequenceContextCandidates(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
+				if(columnIndices is not None):
+					columnIndices, featureIndices, activationValues = GIAANNcmn_predictionTokenAggregation.selectLIFTokenAggregationCandidate(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
 		if(columnIndices is not None):
 			candidates = selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, databaseNetworkObject.f, databaseNetworkObject, constraintState, conceptActivationState)
 	return candidates

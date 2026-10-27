@@ -736,7 +736,7 @@ v2p (Codex App GPT-6.0):
 
 ---
 v2q (Codex App GPT-6.0):
-- add proto GIAANNproto2q1a - start inference optimisation updates (inferenceInferMissingFeatures+optimisationInferenceChunks):
+- add proto GIAANNproto2q1a - start inference optimisation updates (inferenceInferMissingFeatures+optimisationInferenceChunks/Workers+inferenceContextLikelihood):
 	- add option inferenceReviewPatch17segmentTimingOptimisation (enabled) - segment timing optimisation for inferenceDecrementActivationsSomaPerPredictedToken/inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn
 	- set predictionEnsureConnectedToPreviousPrediction==False:inferenceReviewPatch16TokenAggregation=True
 - add option patchInferenceUseNextTokenTargets (disabled) - popagate the exact target column and feature during target-driven inference without applying prediction-only column constraints (designed for inferenceColumnConstraintsAllowExternalPrimeConceptTransitions=False).
@@ -755,3 +755,12 @@ MANUAL; - set !predictionEnsureConnectedToPreviousPrediction:!predictionEnsureCo
 - add option inferenceContextLikelihood (enabled) - score LIF predictions using smoothed contextual evidence and trained frequency priors, with support for independent connectivity and strictness constraints.
 - upgrade generalisedBenchmarkTool to remove its own chunk+worker code (GIAANN code has its own optimisationInferenceChunks+optimisationInferenceWorkers support).
 MANUAL; - set !predictionEnsureConnectedToPreviousPrediction:useBenchmarkDefaultsEvalTestSet:inferenceReviewPatch16TokenAggregation=True.
+
+---
+v2r (Codex App GPT-6.0):
+- add proto GIAANNproto2r1a - start inference optimisation updates (inferenceContextLikelihood):
+	- add option useSequenceContext (disabled) - record training token sequences and rerank eligible GIAANN predictions using smoothed 3-8-token context matches.
+	- add option inferenceGraphEvidenceUpgrade (disabled) - adaptively share same-token source evidence for sparsely trained neurons during direct and indirect LIF inference.
+	- add option inferenceContextLikelihood:inferenceColumnLikelihood (enabled) - adds evidence from existing trained column-segment connections beyond the local five-token context window. Its weight is inferenceColumnLikelihoodWeight = 0.125.
+	- add option inferenceContextLikelihood:inferenceLikelihoodCalibration (enabled) - takes the square root of neuron scores before the existing aggregation by output token. This softens score differences. Its exponent is inferenceLikelihoodCalibrationExponent = 0.5.
+

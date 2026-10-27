@@ -16,3 +16,5 @@
 - When responding to prompt requests in point form, always enumerate your responses so the programmer can reference them systematically.
 - Never use any magic numbers or text (all constants must be defined in the associated global defs file).
 - Never update the requirement specification (the ".nlc" Natural Language Code file).
+- Store review experiments in a task-specific subfolder of `/media/user/ssdpro/GIAANN/experiments/`, outside this Git repository.
+- Store review results in a task-specific subfolder of `/media/user/large/source/ANNpython/GIAANNpy/codexReviews/`, outside this Git repository.

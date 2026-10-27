@@ -27,6 +27,8 @@ from spacy.tokens import Doc
 pt.set_grad_enabled(False)
 
 from GIAANNcmn_globalDefs import *
+if(useSequenceContext):
+	import GIAANNcmn_sequenceContext
 if(debugPrintTrainTotalWhitespaceWords):
 	import re
 	debugPrintTrainTotalWhitespaceWordsRegex = re.compile(debugPrintTrainTotalWhitespaceWordsPattern)
@@ -698,6 +700,8 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 				GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("trainConceptWords")
 			
 			if(trained):
+				if(useSequenceContext):
+					GIAANNcmn_sequenceContext.recordSequenceContextTraining(databaseNetworkObject, tokens, sequenceCount)
 				# Update observed columns from sequence observed columns
 				updateObservedColumnsWrapperStartTime = None
 				

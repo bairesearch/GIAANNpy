@@ -24,6 +24,8 @@ import GIAANNcmn_debug
 import GIAANNcmn_databaseNetworkFiles
 from GIAANNcmn_databaseNetworkObservedColumn import ObservedColumn, ObservedColumnConnectionBase, ObservedColumnProxy, ObservedColumnStub
 import GIAANNcmn_sparseTensors
+if(inferenceInferMissingFeaturesSemanticAdaptiveSupplement):
+	import GIAANNnlp_predictionSourceEvidence
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	import GIAANNnlp_auxiliaryNeuronsSimilarWords
 if(auxiliaryNeurons and auxiliaryNeuronsAuto):
@@ -65,6 +67,8 @@ class DatabaseNetworkClass():
 			GIAANNnlp_auxiliaryNeuronsSimilarWords.initialiseDatabaseNetworkAuxiliary(self, auxiliarySimilarFeaturesDict, auxiliarySimilarFeaturesList, auxiliarySimilarFeatureWordWeightsByParentWord, auxiliarySimilarLoadExistingDatabase)
 		self.setArrayIndexProperties(inferenceMode)
 		self.inferenceMode = inferenceMode
+		if(inferenceInferMissingFeaturesSemanticAdaptiveSupplement):
+			GIAANNnlp_predictionSourceEvidence.initialiseSemanticSourceEvidence(self)
 		if(inferenceInferMissingFeatures and inferenceInferMissingFeaturesSemantic):
 			self.inferenceSemanticObservedSource = None
 			self.inferenceSemanticObservedSourceTrained = False

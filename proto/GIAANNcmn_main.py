@@ -55,6 +55,8 @@ import spacy
 pt.set_grad_enabled(False)
 
 from GIAANNcmn_globalDefs import *
+if(useSequenceContext):
+	import GIAANNcmn_sequenceContext
 import GIAANNcmn_debug
 import GIAANNcmn_count
 import GIAANNcmn_databaseNetwork
@@ -223,6 +225,10 @@ def executeMode(inferenceMode):
 		if(printTimeDatabaseLoadSaveTimes):
 			countPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime = countPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime + (time.perf_counter() - countPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamStartTime)
 		
+	if(useSequenceContext):
+		if(not inferenceMode):
+			GIAANNcmn_sequenceContext.initialiseSequenceContextTraining(databaseNetworkObject)
+
 	for epochIndex in range(numberEpochs):
 		#print("\nepochIndex = ", epochIndex)
 		# Start processing the dataset
@@ -290,6 +296,10 @@ def executeMode(inferenceMode):
 			if(debugPrintRamMaxUsagePhaseLocal):
 				GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("saveData(final)")
 			#only required if trainMaxSequences%saveGlobalFeatureNeuronsRate != 0
+
+	if(useSequenceContext):
+		if(not inferenceMode):
+			GIAANNcmn_sequenceContext.finaliseSequenceContextTraining(databaseNetworkObject, sequenceCount)
 
 	if(printTimeDatabaseLoadSaveTimes):
 		countPrintTimeDatabaseLoadSaveTimesProgramExecutionEndTime = time.perf_counter()
