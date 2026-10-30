@@ -28,6 +28,8 @@ if(optimiseTrainParallelisation1):
 	_cpuConnectionUpdateExtension = None
 if(optimiseTrainParallelisation2a or optimiseTrainParallelisation2b or optimiseTrainParallelisation2c or optimiseTrainParallelisation2d or optimiseTrainParallelisation2e):
 	import GIAANNcmn_cpuParallelisation2
+if(optimiseTrainConnectionOverlay):
+	import GIAANNcmn_trainConnectionOverlay
 
 
 def updateConnectionSources(sequenceObservedColumns, observedColumnsByConceptIndex, connectionIndices, connectionValues, featureIndicesInObserved, conceptIndicesTensor):
@@ -49,11 +51,15 @@ def updateConnectionSources(sequenceObservedColumns, observedColumnsByConceptInd
 				conceptIndex, sourceFeatureIndex = divmod(sourceKey, database.f)
 				observedColumn = observedColumnsByConceptIndex[conceptIndex]
 				sourceReferences.append((observedColumn, sourceFeatureIndex))
-				existingSources.append(observedColumn.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=updates.device, createMissing=False).coalesce())
-			updatedSources = mergeConnectionSources(existingSources, updates, sourceSize)
-			# Finish the entire native batch before publishing any updated connection tensor.
-			for (observedColumn, sourceFeatureIndex), updatedSource in zip(sourceReferences, updatedSources):
-				observedColumn.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, updatedSource)
+				if(not optimiseTrainConnectionOverlay):
+					existingSources.append(observedColumn.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=updates.device, createMissing=False).coalesce())
+			if(optimiseTrainConnectionOverlay):
+				GIAANNcmn_trainConnectionOverlay.updateConnectionSources(sourceReferences, updates, sourceSize)
+			else:
+				updatedSources = mergeConnectionSources(existingSources, updates, sourceSize)
+				# Finish the entire native batch before publishing any updated connection tensor.
+				for (observedColumn, sourceFeatureIndex), updatedSource in zip(sourceReferences, updatedSources):
+					observedColumn.setFeatureConnectionsForSourceFeature(sourceFeatureIndex, updatedSource)
 	return
 
 

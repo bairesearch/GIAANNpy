@@ -54,7 +54,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "trainAndInference"	#default: trainAndInference	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference"
+	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -197,7 +197,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 400000	#10000, 100000, 400000	#5000, 200000, 1000000
+	trainMaxSequences = 100000	#10000, 100000, 400000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 50000	#5000
@@ -599,7 +599,7 @@ optimisationNormaliseSourceFeatureIndicesDisabled = False	#default: False	#orig:
 optimisationObservedColumnsWriteMetadataCheck = False	#default: False, orig: False
 optimisationArrayIndexPropertiesEfficientSerialConnections = False	#default: False #orig: True	#uses less GPU RAM
 optimisationArrayIndexPropertiesEfficientSerialNeurons = False	#default: False #orig: False
-optimisationStoreDatabaseResidentCoordinatesAsInt32 = False	#default: False	#orig: False	#~25% database size reduction in RAM (designed for storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam), approx 25% slower train time
+optimisationStoreDatabaseResidentCoordinatesAsInt32 = True	#default: False	#orig: False	#~25% database size reduction in RAM (designed for storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam), approx 25% slower train time
 if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
 	databaseResidentCoordinateDtype = pt.int32
 	databaseResidentCoordinateMinimum = 0
@@ -607,6 +607,20 @@ if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
 	databaseResidentCoordinateDimensionSizeMaximum = databaseResidentCoordinateMaximum + 1
 	databaseResidentPackedIndicesFieldName = "indices"
 	databaseResidentPackedValuesFieldName = "values"
+	databaseResidentPackedZero = 0
+	databaseResidentPackedOne = 1
+	databaseResidentPackedRecordRank = 2
+	databaseResidentPackedArrayRank = 1
+	databaseResidentPackedDeviceType = "cpu"
+	databaseResidentPackedSourceRank = 5
+	databaseResidentPackedConceptDimension = 3
+	databaseResidentPackedFeatureDimension = 4
+	databaseResidentPackedExtensionName = "giaann_cpu_packed_sequence_batch"
+	databaseResidentPackedExtensionSource = "GIAANNcmn_cpuPackedSequenceBatch.cpp"
+	databaseResidentPackedCompilerFlags = ["-O3", "-fopenmp"]
+	databaseResidentPackedLinkerFlags = ["-fopenmp"]
+	databaseResidentPackedInvalidInput = "Invalid packed training storage: expected canonical finite float32 values, in-range int32 coordinates, contiguous packed records, int64 update keys and matching positive shapes"
+	databaseResidentPackedInvalidConfiguration = "Packed training requires CPU RAM-resident connections and a loaded training database"
 	if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam and useGPUdatabase):
 		raise RuntimeError("GIAANNcmn_globalDefs error: optimisationStoreDatabaseResidentCoordinatesAsInt32 requires CPU database storage")
 if(useDefaultsV2 and executionMode=="train" and storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):	
@@ -627,7 +641,10 @@ if(useDefaultsV2 and executionMode=="train" and storeDatabaseFeatureConnectionsA
 	optimiseTrainParallelisation2e = True	#default: True	#orig: False	#opt-in: merge stored neuron updates by column without gathering historical tensors
 	optimiseTrainParallelisation2f = True	#default: True	#orig: False	#opt-in: vectorise training feature-activation preparation for a single dendritic branch
 	if(optimiseTrainParallelisation2a or optimiseTrainParallelisation2b or optimiseTrainParallelisation2c or optimiseTrainParallelisation2d or optimiseTrainParallelisation2e or optimiseTrainParallelisation2f):
-		assert optimiseTrainParallelisation1 and optimisationStoreDatabaseResidentCoordinatesAsInt32==False
+		if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
+			assert optimiseTrainParallelisation1
+		else:
+			assert optimiseTrainParallelisation1 and optimisationStoreDatabaseResidentCoordinatesAsInt32==False
 		if(optimiseTrainParallelisation2a):
 			assert trainSparseConnectionsTensor and multipleDendriticBranchesBinaryTree==False and trainSelectMostSimilarBranch==False and modalityName == "NLP"
 		if(optimiseTrainParallelisation2e):
@@ -674,7 +691,11 @@ if(useDefaultsV2 and executionMode=="train" and storeDatabaseFeatureConnectionsA
 			parallelisation3MaximumMessageBytes = 256 * 1024 ** 2
 			parallelisation3ThreadEnvironmentVariables = ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "BLIS_NUM_THREADS")
 		if(optimiseTrainParallelisation3c):
-			assert optimisationStoreDatabaseResidentCoordinatesAsInt32==False
+			if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
+				if(not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam or useGPUdatabase or useGPUsparse):
+					raise RuntimeError(databaseResidentPackedInvalidConfiguration)
+			else:
+				assert optimisationStoreDatabaseResidentCoordinatesAsInt32==False
 			parallelisation3SourceTensorRank = 5
 			parallelisation3SourceConceptDimension = 3
 			parallelisation3SourceFeatureDimension = 4
@@ -697,6 +718,110 @@ else:
 	optimiseTrainParallelisation3b = False
 	optimiseTrainParallelisation3c = False
 	optimiseTrainParallelisation3d = False
+
+optimiseTrainConnectionOverlay = False	#default: False	#CPU RAM training: update touched coordinates without repeatedly copying historical connections
+if(optimiseTrainConnectionOverlay):
+	trainConnectionOverlayExtensionName = "giaann_cpu_connection_overlay"
+	trainConnectionOverlayExtensionSource = "GIAANNcmn_cpuConnectionOverlay.cpp"
+	trainConnectionOverlayCompilerFlags = ["-O3", "-fopenmp"]
+	trainConnectionOverlayLinkerFlags = ["-fopenmp"]
+	trainConnectionOverlayMinimumEntries = 4096
+	trainConnectionOverlayCompactionFraction = 0.25
+	trainConnectionOverlayGrainSize = 1
+	trainConnectionOverlayMaterialiseBatchSize = 256
+	trainConnectionOverlayInvalidConfiguration = "optimiseTrainConnectionOverlay requires fixed-vocabulary NLP strength-only CPU RAM training with optimisations 1, 2b and 3c, without branch verification/selection, auxiliary neurons or train-during-inference"
+	trainConnectionOverlayInvalidInput = "Invalid training connection overlay input: expected canonical finite float32 CPU sparse COO, unique sources, in-range coordinates and non-shrinking shapes"
+	if(executionMode != "train" or not optimiseTrainParallelisation1 or not optimiseTrainParallelisation2b or not optimiseTrainParallelisation3c or not arrayIndexPropertiesEfficient or optimisationStoreDatabaseResidentCoordinatesAsInt32 or trainSelectMostSimilarBranch or trainVerifyConnectionNonexistentAcrossBranches or auxiliaryNeurons or useTrainDuringInference or not useModalityNLP or not useDedicatedConceptListsSubword or not useDedicatedFeatureListsSubword):
+		raise RuntimeError(trainConnectionOverlayInvalidConfiguration)
+	if(type(trainConnectionOverlayMinimumEntries) is not int or trainConnectionOverlayMinimumEntries <= 0 or type(trainConnectionOverlayCompactionFraction) not in (int, float) or not math.isfinite(trainConnectionOverlayCompactionFraction) or trainConnectionOverlayCompactionFraction <= 0 or type(trainConnectionOverlayGrainSize) is not int or trainConnectionOverlayGrainSize <= 0 or type(trainConnectionOverlayMaterialiseBatchSize) is not int or trainConnectionOverlayMaterialiseBatchSize <= 0):
+		raise ValueError(trainConnectionOverlayInvalidInput)
+
+if(executionMode == "train"):
+	optimiseTrainSequenceBatch = True	#default: True	#orig: False	#ordered CPU RAM training batches and one-pass temporal pair construction
+else:
+	optimiseTrainSequenceBatch = False
+if(optimiseTrainSequenceBatch):
+	trainSequenceBatchSize = 1024	#maximum trained sequences per commit; final partial batches are always committed
+	trainSequenceBatchMaxPendingEntries = 32 * 1024 * 1024	#combined connection/neuron delta entries; reject a single sequence exceeding this bound
+	trainSequenceBatchExtensionName = "giaann_cpu_sequence_batch"
+	trainSequenceBatchExtensionSource = "GIAANNcmn_cpuSequenceBatch.cpp"
+	trainSequenceBatchCompilerFlags = ["-O3", "-fopenmp"]
+	trainSequenceBatchLinkerFlags = ["-fopenmp"]
+	trainSequenceBatchZero = 0
+	trainSequenceBatchOne = 1
+	trainSequenceBatchBucketDimension = 3
+	trainSequenceBatchNeuronConceptDimension = 2
+	trainSequenceBatchNeuronFeatureDimensions = (3,)
+	trainSequenceBatchConnectionFeatureDimensions = (3, 5)
+	trainSequenceBatchGrainSize = 1
+	trainSequenceBatchUpdateMode = "default"
+	trainSequenceBatchDeviceType = "cpu"
+	trainSequenceBatchExecutionMode = "train"
+	trainSequenceBatchPrepareTiming = "trainSequenceBatch:prepare"
+	trainSequenceBatchCommitTiming = "trainSequenceBatch:commit"
+	trainSequenceBatchInvalidConfiguration = "optimiseTrainSequenceBatch requires fixed-vocabulary, single-branch, strength-only NLP CPU RAM training with optimisations 1, 2a, 2b, 2e and 3c; overlay, branch selection/verification, auxiliary learning, sequence context, drawing and train-during-inference are unsupported"
+	trainSequenceBatchInvalidInput = "Invalid training sequence batch: expected canonical float32 CPU COO tensors, sorted unique source keys, valid coordinates and fixed positive dimensions"
+	trainSequenceBatchInvalidLimit = "Training sequence batch size and entry limit must be positive integers; a sequence must fit the entry limit"
+	trainSequenceBatchInvalidState = "Training sequence batch requires one healthy RAM-resident training database, one caller thread, and consistent column identities and dimensions"
+	trainSequenceBatchFailed = "Training sequence batch commit failed; database access and further training are prohibited"
+	optimiseTrainFusedSequenceUpdates = True	#default: True	#orig: False	#construct mapped sparse neuron/connection packets directly; requires optimiseTrainSequenceBatch
+	optimiseTrainConceptMetadata = True	#default: True	#orig: False	#construct concept boundaries using index lists instead of scalar tensor operations
+	optimiseTrainDeferredSourcePreparation = True	#default: True	#orig: False	#prepare the union of sources once per commit; requires fused sequence updates
+	optimiseTrainLargeBatches = True	#default: True	#orig: False	#larger sequence/entry limits; trades RAM and commit latency for throughput
+	optimiseTrainPreparationWorkers = True	#default: True	#orig: False	#two training threads and six NLP processes; requires at least eight available CPUs
+	optimiseTrainCommitThreads = True	#default: True	#orig: False	#temporarily use the allocated NLP cores for sparse commits
+	optimiseTrainLightweightWorkers = True	#default: True	#orig: False	#share minimal article preparation without importing the training network in workers
+	optimiseTrainWorkerExit = True	#default: True	#orig: False	#exit successful isolated preparation workers after protocol/socket cleanup
+	if(optimiseTrainFusedSequenceUpdates or optimiseTrainConceptMetadata or optimiseTrainDeferredSourcePreparation or optimiseTrainLargeBatches or optimiseTrainPreparationWorkers or optimiseTrainCommitThreads or optimiseTrainLightweightWorkers or optimiseTrainWorkerExit):
+		trainOptimisationsInvalidConfiguration = "Second-stage training optimisations require optimiseTrainSequenceBatch and their documented configuration dependencies"
+		if(not optimiseTrainSequenceBatch):
+			raise RuntimeError(trainOptimisationsInvalidConfiguration)
+	if(optimiseTrainFusedSequenceUpdates):
+		trainFusedExtensionName = "giaann_cpu_fused_sequence"
+		trainFusedExtensionSource = "GIAANNcmn_cpuFusedSequence.cpp"
+		trainFusedSourceRank = 5
+		trainFusedConnectionRank = 6
+		trainFusedPropertyDimension = 0
+		trainFusedBranchDimension = 1
+		trainFusedSegmentDimension = 2
+		trainFusedBucketDimension = 3
+		trainFusedTargetConceptDimension = 4
+		trainFusedTargetFeatureDimension = 5
+		trainFusedInvalidInput = "Invalid fused sequence update: expected CPU int64 ordered nonoverlapping concept intervals containing their concepts, valid fixed-vocabulary maps, finite float32 proximity weights and combined SANI segments"
+	if(optimiseTrainConceptMetadata):
+		trainConceptMetadataInvalidInput = "Invalid training concept metadata: expected sorted unique in-range concept positions and complete delimiter lists"
+	if(optimiseTrainDeferredSourcePreparation):
+		trainDeferredPreparationInvalidInput = "Invalid deferred source preparation: expected nonempty in-range integer source sets, resident columns and consistent database/column identities"
+	if(optimiseTrainLargeBatches):
+		trainLargeBatchSize = 4096
+		trainLargeBatchMaxPendingEntries = 64 * 1024 * 1024
+		trainSequenceBatchSize = trainLargeBatchSize
+		trainSequenceBatchMaxPendingEntries = trainLargeBatchMaxPendingEntries
+	if(optimiseTrainPreparationWorkers):
+		trainPreparationWorkerCount = 6
+		trainPreparationTrainingThreads = 2
+		trainPreparationPrefetchArticles = 24
+		parallelisation3WorkerCount = trainPreparationWorkerCount
+		parallelisation3TrainingThreads = trainPreparationTrainingThreads
+		parallelisation3PrefetchArticles = trainPreparationPrefetchArticles
+	if(optimiseTrainCommitThreads):
+		trainCommitThreadDirectory = "/proc/self/task"
+		trainCommitThreadsInvalidState = "Training commit threads require the owner thread, a complete positive CPU budget, and an unbound or matching preparation pool"
+	if(optimiseTrainLightweightWorkers):
+		trainLightweightWorkerDisabledComponents = ["ner", "parser"]
+		trainLightweightWorkerInvalidInput = "Invalid lightweight article preparation: expected positive sequence limits and sentencePredictions=False"
+	if(optimiseTrainWorkerExit):
+		trainWorkerExitSuccessCode = 0
+else:
+	optimiseTrainFusedSequenceUpdates = False
+	optimiseTrainConceptMetadata = False
+	optimiseTrainDeferredSourcePreparation = False
+	optimiseTrainLargeBatches = False
+	optimiseTrainPreparationWorkers = False
+	optimiseTrainCommitThreads = False
+	optimiseTrainLightweightWorkers = False
+	optimiseTrainWorkerExit = False
+
 trainStoreFeatureMapsGlobally = True	#default: True	#orig: False	#True: avoid per-column persistence of global feature index maps; False: preserve legacy per-column map persistence
 if not trainStoreFeatureMapsGlobally:
 	assert not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam
@@ -1391,7 +1516,7 @@ if(drawEfficient):
 	drawEfficientDrawDeadNeurons = True	#default: True	#draw empty columns with no connected neurons
 
 #Training column-segment timing; enable only for fresh training, not continuation of an occurrence-timed checkpoint.
-patchTrainColumnStepsRepeatedColumns = True	#default: False	#FUTURE: True (requires retrain)	#opt-in: count database column-ID changes; adjacent repeated occurrences take zero column steps
+patchTrainColumnStepsRepeatedColumns = True	#default: True	#orig: False	#opt-in: count database column-ID changes; adjacent repeated occurrences take zero column steps
 patchTrainColumnStepsDimension = 0
 patchTrainColumnStepsRank = 1
 patchTrainColumnStepsFirst = 0
@@ -1492,7 +1617,7 @@ if(optimisationInferenceWorkers):
 	if(useSequenceContext):
 		inferenceWorkersCount = 2
 	else:
-		inferenceWorkersCount = 4	#default: 4	#orig: 8	#limit concurrent inference processes to balance memory use and throughput	#with 400k training samples, inferenceContextLikelihood=True/False: 4/8
+		inferenceWorkersCount = 8	#default: 4	#orig: 8	#limit concurrent inference processes to balance memory use and throughput	#with 400k training samples, inferenceContextLikelihood=True/False: 4/8
 if(optimisationInferenceChunks or optimisationInferenceWorkers):
 	inferenceChunksZero = 0
 	inferenceChunksOne = 1
@@ -1576,8 +1701,20 @@ if(optimisationInferenceWorkers):
 		
 		
 #inference patches;
+inferenceFeatureSegmentWeighting = False	#default: False	#optional fixed gain on feature-distance inputs, including immediate feature-to-soma input
+inferenceFeatureSegmentWeight = 2.0	#single benchmark candidate: feature input gain relative to unchanged column inputs
+inferenceFeatureSegmentWeightMinimum = 1.0
+inferenceFeatureSegmentWeightZero = 0
+inferenceFeatureSegmentWeightInvalidConfiguration = "Feature segment weighting requires inference-only hybrid feature/column LIF segments"
+inferenceFeatureSegmentWeightInvalidParameter = "Feature segment weight must be a finite number >= 1"
+inferenceFeatureSegmentWeightInvalidActivation = "Feature segment weighting requires finite non-negative floating-point sparse LIF activation with the configured segment layout"
+if(inferenceFeatureSegmentWeighting):
+	if(executionMode != "inference" or not inferenceLeakyIntegrateAndFire or not useSANIfeaturesAndColumns or useTrainDuringInference or inferenceTrainFirstSequences or arrayNumberOfSegmentsColumnDistance <= inferenceFeatureSegmentWeightZero or arrayNumberOfSegmentsFeatureDistance <= inferenceFeatureSegmentWeightZero):
+		raise RuntimeError(inferenceFeatureSegmentWeightInvalidConfiguration)
+	if(type(inferenceFeatureSegmentWeight) not in (int, float) or not math.isfinite(inferenceFeatureSegmentWeight) or inferenceFeatureSegmentWeight < inferenceFeatureSegmentWeightMinimum):
+		raise ValueError(inferenceFeatureSegmentWeightInvalidParameter)
 if(useBenchmark and executionMode == "inference" and useDefaultsV2 and useModalityNLP and inferenceLeakyIntegrateAndFire and useBenchmarkDefaultsEvalTestSetOptim and not inferenceBeamSearch):
-	inferenceContextLikelihood = True	#default: True	#orig: False	#combine the configured source evidence with smoothed contextual likelihoods before LIF candidate selection
+	inferenceContextLikelihood = False	#default: True	#orig: False	#combine the configured source evidence with smoothed contextual likelihoods before LIF candidate selection
 else:
 	inferenceContextLikelihood = False
 if(inferenceContextLikelihood):
@@ -1848,8 +1985,42 @@ if(inferenceInferMissingFeaturesSemanticAdaptiveSupplement):
 	if(inferenceBeamSearch or multipleDendriticBranches):
 		raise RuntimeError(inferenceSemanticSourceEvidenceInvalidConfiguration)
 
+if(optimiseTrainSequenceBatch):
+	if(executionMode != trainSequenceBatchExecutionMode or not useModalityNLP or not useDedicatedConceptListsSubword or not useDedicatedFeatureListsSubword or not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam or storeDatabaseGlobalFeatureNeuronsInRam or not trainStoreFeatureMapsGlobally or not arrayIndexPropertiesEfficient or not arrayIndexPropertiesStrength or arrayNumberOfPropertiesTrain != trainSequenceBatchOne or arrayType != pt.float32):
+		raise RuntimeError(trainSequenceBatchInvalidConfiguration)
+	if(not optimiseTrainParallelisation1 or not optimiseTrainParallelisation2a or not optimiseTrainParallelisation2b or not optimiseTrainParallelisation2e or not optimiseTrainParallelisation3c or not trainSparseConnectionsTensor or not trainSparseNeuronsTensor or not trainSequenceObservedColumnsUseSequenceFeaturesOnly or not trainSequenceObservedColumnsMatchSequenceWords):
+		raise RuntimeError(trainSequenceBatchInvalidConfiguration)
+	if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
+		if(deviceDatabase.type != trainSequenceBatchDeviceType or deviceSparse.type != trainSequenceBatchDeviceType or deviceDense.type != trainSequenceBatchDeviceType or optimiseTrainConnectionOverlay or multipleDendriticBranches or trainSelectMostSimilarBranch or trainVerifyConnectionNonexistentAcrossBranches or auxiliaryNeurons or useTrainDuringInference or useSequenceContext or drawNetworkDuringTrain or debugReloadGlobalFeatureNeuronsEverySequence):
+			raise RuntimeError(trainSequenceBatchInvalidConfiguration)
+	else:
+		if(deviceDatabase.type != trainSequenceBatchDeviceType or deviceSparse.type != trainSequenceBatchDeviceType or deviceDense.type != trainSequenceBatchDeviceType or optimisationStoreDatabaseResidentCoordinatesAsInt32 or optimiseTrainConnectionOverlay or multipleDendriticBranches or trainSelectMostSimilarBranch or trainVerifyConnectionNonexistentAcrossBranches or auxiliaryNeurons or useTrainDuringInference or useSequenceContext or drawNetworkDuringTrain or debugReloadGlobalFeatureNeuronsEverySequence):
+			raise RuntimeError(trainSequenceBatchInvalidConfiguration)
+	for trainSequenceBatchLimit in (trainSequenceBatchSize, trainSequenceBatchMaxPendingEntries, trainSequenceBatchGrainSize):
+		if(type(trainSequenceBatchLimit) is not int or trainSequenceBatchLimit < trainSequenceBatchOne):
+			raise ValueError(trainSequenceBatchInvalidLimit)
+
+if(optimiseTrainFusedSequenceUpdates):
+	if(not useSANI or not useSANIfeaturesAndColumns or not useSANIfeaturesAndColumnsInternal or arrayNumberOfSegmentsColumnDistance < trainSequenceBatchOne or arrayNumberOfSegmentsFeatureDistance < trainSequenceBatchOne or trainConnectionStrengthIncreaseColumnInternal or trainConnectionStrengthPOSdependence or trainConnectionStrengthLimitMax or trainConnectionStrengthLimitTanh or SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens or SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens or not conceptColumnsDelimitByPOS):
+		raise RuntimeError(trainOptimisationsInvalidConfiguration)
+if(optimiseTrainConceptMetadata):
+	if(not usePOS or not conceptColumnsDelimitByPOS or not tokeniserSubword or not useDedicatedFeatureListsSubword or not detectReferenceSetDelimitersBetweenNouns or debugTerminateOnConceptColumnsDelimitByPOSwarning or debugTerminateOnConceptColumnsDelimitByPOSerror):
+		raise RuntimeError(trainOptimisationsInvalidConfiguration)
+if(optimiseTrainDeferredSourcePreparation):
+	if(not optimiseTrainFusedSequenceUpdates or optimisationArrayIndexPropertiesEfficientSerialConnections):
+		raise RuntimeError(trainOptimisationsInvalidConfiguration)
+if(optimiseTrainPreparationWorkers or optimiseTrainCommitThreads or optimiseTrainLightweightWorkers or optimiseTrainWorkerExit):
+	if(not optimiseTrainParallelisation3b):
+		raise RuntimeError(trainOptimisationsInvalidConfiguration)
+if(optimiseTrainLightweightWorkers):
+	if(sentencePredictions or useDrawNetworkIndependently or not spacyPipelineOptimisations or not spacyPipelineSingleParse or not spacyPipelineMinimalComponents or spacyPipelineBatchSequences or spacyPipelineLightweightSentenceSegmentation):
+		raise RuntimeError(trainOptimisationsInvalidConfiguration)
+
 #printConfiguration;
 if(printConfiguration): 
+	if(inferenceFeatureSegmentWeighting):
+		print("inferenceFeatureSegmentWeighting:", inferenceFeatureSegmentWeighting)
+		print("inferenceFeatureSegmentWeight:", inferenceFeatureSegmentWeight)
 	if(inferenceInferMissingFeaturesSemanticAdaptiveSupplement):
 		print(inferenceSemanticSourceEvidenceConfigurationLabel, inferenceInferMissingFeaturesSemanticAdaptiveSupplement)
 	if(useSequenceContext):

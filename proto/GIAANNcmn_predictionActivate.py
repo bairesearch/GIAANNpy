@@ -1196,6 +1196,27 @@ def transformFeatureNeuronsTargetActivationPredict(featureNeuronsTargetActivatio
 		#print("featureNeuronsTargetActivation = ", featureNeuronsTargetActivation)
 	else:
 		result = featureNeuronsTargetActivation*j1
+	if(inferenceFeatureSegmentWeighting):
+		result = weightInferenceFeatureSegmentInputs(result)
+	return result
+
+def weightInferenceFeatureSegmentInputs(activation):
+	if(inferenceFeatureSegmentWeighting):
+		if(not isinstance(activation, pt.Tensor) or not activation.is_sparse or not activation.is_floating_point() or activation.dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or activation.sparse_dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or activation.size(inferenceLeakyIntegrateAndFireSegmentDimension) != arrayNumberOfSegments):
+			raise RuntimeError(inferenceFeatureSegmentWeightInvalidActivation)
+		activation = activation.coalesce()
+		indices = activation.indices()
+		values = activation.values().clone()
+		if(not pt.isfinite(values).all() or (values < inferenceFeatureSegmentWeightZero).any()):
+			raise RuntimeError(inferenceFeatureSegmentWeightInvalidActivation)
+		# Immediate feature evidence targets the artificial soma; weight it with the other feature-distance inputs.
+		featureMask = indices[inferenceLeakyIntegrateAndFireSegmentDimension] >= arrayNumberOfSegmentsColumnDistance
+		values[featureMask] *= inferenceFeatureSegmentWeight
+		if(not pt.isfinite(values).all()):
+			raise RuntimeError(inferenceFeatureSegmentWeightInvalidActivation)
+		result = pt.sparse_coo_tensor(indices, values, size=activation.size(), dtype=activation.dtype, device=activation.device, is_coalesced=True)
+	else:
+		raise RuntimeError(inferenceFeatureSegmentWeightInvalidConfiguration)
 	return result
 
 def applyFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, featureNeuronsTargetActivation, globalFeatureNeuronsTime=None, sequenceWordIndex=None, sequenceColumnIndex=None, applySegmentActivations=True):

@@ -763,4 +763,17 @@ v2r (Codex App GPT-6.0):
 	- add option inferenceGraphEvidenceUpgrade (disabled) - adaptively share same-token source evidence for sparsely trained neurons during direct and indirect LIF inference.
 	- add option inferenceContextLikelihood:inferenceColumnLikelihood (enabled) - adds evidence from existing trained column-segment connections beyond the local five-token context window. Its weight is inferenceColumnLikelihoodWeight = 0.125.
 	- add option inferenceContextLikelihood:inferenceLikelihoodCalibration (enabled) - takes the square root of neuron scores before the existing aggregation by output token. This softens score differences. Its exponent is inferenceLikelihoodCalibrationExponent = 0.5.
+- add option inferenceFeatureSegmentWeight (disabled).
+- add option optimiseTrainConnectionOverlay (disabled) - accelerate CPU training with the database in RAM by caching updated connection values per source neuron, preserving sequence-ordered float32 additions and deferring full sparse COO merges until reads, saves, or periodic compaction. 
+- add option optimiseTrainSequenceBatch (enabled) to batch sparse updates in sequence order and construct temporal connections in one pass.
+- add option optimiseTrainFusedSequenceUpdates (enabled) to generate mapped sparse neuron and connection updates directly without intermediate activation tensors.
+- add option optimiseTrainConceptMetadata (enabled) to construct concept boundaries using index lists instead of repeated scalar tensor operations.
+- add option optimiseTrainDeferredSourcePreparation (enabled) to prepare the union of required source connections once per batch while preserving read and save consistency.
+- add option optimiseTrainLargeBatches (enabled) to increase sequence and pending entry limits and amortize sparse merge costs across larger batches.
+- add option optimiseTrainPreparationWorkers (enabled) to allocate two training threads, six NLP workers and a queue of 24 prefetched articles.
+- add option optimiseTrainCommitThreads (enabled) to temporarily borrow allocated NLP worker cores during sparse commits and restore thread counts and affinities afterward.
+- add option optimiseTrainLightweightWorkers (enabled) to share minimal article preparation code without importing the training network into NLP workers.
+- add option optimiseTrainWorkerExit (enabled) to exit successfully completed preparation workers after socket cleanup and output flushing, avoiding interpreter teardown overhead.
+- enable patchTrainColumnStepsRepeatedColumns.
+- update paper implementation/algorithm tex.
 

@@ -1,6 +1,6 @@
 \section{Algorithm}
 
-The GIA ANN prototype is a concept--feature neural database that learns from text sequences and predicts next tokens by activating connected features. It treats nouns as concept columns, and every other token as a feature neuron within those columns. The algorithm is designed for online, unbatched learning, and stores most of its state in sparse tensors for scalability.
+The GIAANN proto v2 language pathway learns a persistent concept--feature network from token sequences and predicts subsequent tokens through its trained connections. Noun-related tokens identify concept columns; each column contains a prime-concept neuron and context-dependent feature neurons. Tokens may be words or subwords, and the dictionaries may grow dynamically or be initialised from a fixed tokenizer vocabulary. Training accumulates neuron and connection statistics in sequence order without backpropagation. Inference maintains a separate activation state, using leaky integrate-and-fire (LIF) dynamics or the supported non-LIF SANI rules. Feature switches and numerical parameters are defined in the common and modality-specific global definitions.
 
 \begin{center}
 \includesvg[width=\linewidth]{demo/GIAANNproto1cAllColumnsTrainSequenceIndex005}
@@ -10,13 +10,14 @@ The GIA ANN prototype is a concept--feature neural database that learns from tex
 \end{center}
 
 \subsection{Core Data Structures}
+Let $C$ and $F$ denote the numbers of global concept columns and feature identities, $B$ the branch count, $S$ the segment count, and $P$ the number of stored properties. A neuron identity is the pair $u=(c,f)$; the same feature identity in different columns denotes different neurons.
 \begin{itemize}
-	\item \textbf{Concept columns:} a dynamic dictionary mapping concept lemmas to column indices ($c$). Each column has a prime concept neuron at a fixed feature index.
-	\item \textbf{Feature dictionary:} a dynamic dictionary mapping feature words to feature indices ($f$). Features are words (not lemmas) and are shared across columns.
-	\item \textbf{Observed columns:} per-sequence objects that hold the sparse feature neuron tensors and feature connection tensors for each concept column seen in the sequence.
-	\item \textbf{SequenceObservedColumns:} a per-sequence view that stacks the observed columns into dense or sparse tensors of shape (properties$\times$branches$\times$segments$\times$columns$\times$features), plus a matching feature--connection tensor.
-	\item \textbf{Properties:} strength, permanence, activation, time, POS, and optional minimum word distance. Which properties exist is controlled by configuration.
-	\item \textbf{SANI segments:} each dendritic branch is segmented to encode sequential ordering. Segment indices are assigned by column distance, feature distance, or both.
+	\item \textbf{Concept and feature dictionaries:} map concept names and feature tokens to global indices. Each column's prime-concept neuron uses the reserved \texttt{featureIndexPrimeConceptNeuron}; its output identity comes from the column name. Other neurons use the shared feature dictionary.
+	\item \textbf{Neuron tensors:} global neuron properties have shape $P\times B\times S\times C\times F$. Training can instead retain separate $P\times B\times S\times F$ tensors in each column. Runtime activation has shape $B\times S\times C\times F$.
+	\item \textbf{Connection tensors:} outgoing connections are stored separately for each source neuron $u$. Its tensor has shape $P\times B\times S\times C\times F$, where the branch, segment, column, and feature coordinates describe the target. Only required source tensors need to be loaded.
+	\item \textbf{Observed columns:} represent persistent per-concept data, loaded on demand or retained in RAM. \texttt{SequenceObservedColumns} provides local occurrence-to-global mappings and dense or sparse sequence tensors. Repeated column and feature occurrences can occupy distinct local positions before their updates are merged into shared database neurons.
+	\item \textbf{Properties:} the efficient training layout stores strength. Permanence and POS are optional; inference adds activation and, for applicable non-LIF timing modes, time properties. Training and inference property indices are mapped explicitly when data is loaded.
+	\item \textbf{Branches and segments:} SANI segments encode token distance, column distance, or both. LIF adds a soma coordinate beyond the dendritic segments. Multiple independent branches or a binary tree are optional; the current LIF configuration uses a single branch.
 \end{itemize}
 
 \begin{center}
@@ -28,57 +29,114 @@ The GIA ANN prototype is a concept--feature neural database that learns from tex
 
 \subsection{Preprocessing and Column Segmentation}
 \begin{enumerate}
-	\item \textbf{Sequence construction:} text is parsed with spaCy; sequences are either single sentences or multi-sentence bundles. Empty or too-short sequences are skipped.
-	\item \textbf{Token normalisation:} tokens are lowercased, lemmatised, and optionally preprocessed to combine consecutive nouns or hyphenated noun phrases.
-	\item \textbf{Concept detection:} nouns are detected via POS rules (or the full POS dictionary); these lemmas define concept columns.
-	\item \textbf{Delimiter detection:} reference set delimiters are detected by POS, tag, or word lists. Deterministic delimiters take priority over probabilistic ones.
-	\item \textbf{Column assignment:} tokens are assigned to concept columns by choosing the rightmost delimiter between adjacent concept tokens. If no delimiter exists, the sequence is skipped (training) or inference is aborted (prediction).
+	\item \textbf{Sequence construction:} spaCy prepares single sentences, multisentence bundles, or cropped article sequences according to the configuration. Word, subword, and optional pre-tokenisation byte limits bound processing. Inference can preserve each non-empty prompt line as an independent sequence and requires enough tokens for the seed and prediction phases.
+	\item \textbf{Token representation:} word-based processing uses lowercased surface words, lemmas, and POS/tags, with optional noun-phrase combination. Subword processing tokenises the sequence text with tiktoken and aligns UTF-8 byte spans to spaCy parent tokens to obtain linguistic metadata while preserving tokenizer identities.
+	\item \textbf{Concept detection:} word-based columns use noun lemmas. In subword mode, the first token of a consecutive noun-token span marks a concept occurrence. Its column is identified by the first noun token, the complete span, or the parent-lemma span. The first-token mode uses dedicated tokenizer concept indices; the span-based modes use dynamic concept dictionaries. Remaining tokens in a noun span can be ordinary features.
+	\item \textbf{Delimiter detection:} POS, tag, and word rules identify deterministic reference-set delimiters and context-dependent probabilistic delimiters between concepts. The dedicated-subword pathway maintains sequence-specific delimiter flags as well as accumulated feature metadata.
+	\item \textbf{Column assignment:} between adjacent concept occurrences, choose the rightmost deterministic delimiter, or the rightmost probabilistic delimiter if none is deterministic. The delimiter belongs to the preceding span and the next span begins after it. With missing-delimiter skipping disabled, the boundary is immediately before the next concept; with it enabled, the sequence is marked for skipping or configured error handling. Initial and final spans cover the sequence edges, and sequences without detected concepts do not enter the network update.
 \end{enumerate}
+
+\subsection{Connection Segments and Branches}
+The combined NLP layout represents both recent token order and concept-column context. For the hybrid LIF configuration, let $S_C$ be \texttt{arrayNumberOfSegmentsColumnDistance}, $S_F$ be \texttt{arrayNumberOfSegmentsFeatureDistance}, and $s_{\mathrm{soma}}=S_C+S_F$. Column segments occupy indices $0,\ldots,S_C-1$, feature segments occupy $S_C,\ldots,s_{\mathrm{soma}}-1$, and the final coordinate stores soma activation.
+
+For an allowed source occurrence at token position $i$ and target occurrence at $j>i$, the exact feature-distance assignment is
+\[
+	s_{\mathrm{feature}}=s_{\mathrm{soma}}-(j-i)+1, \qquad 1\leq j-i\leq S_F+1.
+\]
+Thus an adjacent-token connection targets the soma directly, while more distant inputs require propagation through feature segments. When internal columns are included, the column-distance assignment is
+\[
+	s_{\mathrm{column}}=S_C-1-d_C, \qquad 0\leq d_C<S_C.
+\]
+Here $d_C$ is the distance between concept occurrences in sequence order, rather than the difference between global dictionary indices. The optional \texttt{patchTrainColumnStepsRepeatedColumns} instead counts changes of global column identity. A source--target pair may contribute to both segment groups. Out-of-range connections are omitted unless the corresponding first-segment option folds more distant context into the earliest segment. Feature-only, column-only, and non-LIF configurations derive their own segment layouts.
+
+Connections are assigned to the target neuron's branch. Optional branch policies use occurrence counts, random sampling with replacement, or similarity to an existing trained pattern. Similarity-based selection averages the fraction of matching prospective sources over non-empty target segments, optionally comparing only feature segments; it selects a best branch above the configured threshold, with random tie-breaking, or a random branch otherwise. Binary-tree configurations map branch identities towards their parents as signals approach the soma.
 
 \subsection{Training Algorithm}
 \begin{enumerate}
-	\item \textbf{First pass (concept growth):} scan the sequence and add new concept lemmas to the concept column dictionary. If $c$ grows, resize global feature tensors.
-	\item \textbf{Feature discovery:} scan the sequence for non-concept tokens and add new feature words to the feature dictionary. If $f$ grows, expand all feature tensors.
-	\item \textbf{Observed column loading:} for each concept in the sequence, load or create its observed column object and refresh its arrays to the current $c$ and $f$.
-	\item \textbf{Column segmentation:} compute per-concept token spans and build a token-to-column assignment list.
-	\item \textbf{Feature activation tensor:} for each concept instance, mark active feature neurons inside the column span. Assign dendritic branches (optionally randomized) and SANI segments based on column or feature distance.
-	\item \textbf{Connection activation tensor:} create directed connections between active features, enforcing forward word order and column order. Optionally enforce direct connections (adjacent tokens only).
-	\item \textbf{Update rule:}
-	\begin{itemize}
-		\item Strength is incremented for active features and connections (with optional normalisation and POS-dependent scaling).
-		\item Permanence is incremented for active features/connections and can be decremented for inactive ones.
-		\item Activation traces and time properties are reset or updated as configured.
-		\item POS and minimum word distance properties are recorded for active items.
-	\end{itemize}
-	\item \textbf{Commit:} merge sequence tensors back into observed columns, save updated columns and dictionaries to disk, and optionally draw the network.
+	\item \textbf{Resolve vocabulary:} discover new concepts/features where dynamic growth is enabled, or resolve the predefined tokenizer indices. Update delimiter metadata and expand affected tensor shapes as required.
+	\item \textbf{Prepare the sequence view:} load or create the observed columns, construct concept spans and local occurrence mappings, and prepare only the source-feature connection tensors needed for this sequence.
+	\item \textbf{Mark active neurons:} construct branch/segment activation masks, token-order metadata, and optional POS values for the prime-concept and ordinary features in each span. Repeated local occurrences retain their own token positions.
+	\item \textbf{Construct connection updates:} form allowed source--target occurrence pairs, enforce forward token order and non-decreasing column order, and apply configured self-transition/repetition rules. Assign each pair to the selected target branch and applicable distance segments. Longer-range training connections are retained within the configured segment windows; inference direct-connectivity requirements are separate from this construction.
+	\item \textbf{Accumulate properties:} increment active neuron strengths and connection strengths. Optional modifiers apply proximity weighting, internal-column gains, POS scaling, or strength limits. Optional permanence is incremented for active entries; inactive-permanence decay requires its supported dense path. Stored activation/time properties are reset during ordinary training, and POS values are recorded when enabled.
+	\item \textbf{Commit:} map local updates to global coordinates, combine duplicate contributions, and merge them into the persistent sparse tensors. Disk-backed training saves incrementally; RAM-resident training defers column writes to its save phase. Optional sequence-context memory records the trained token sequence and its boundary.
 \end{enumerate}
 
-\subsection{Inference Algorithm (Seed + Prediction)}
+With proximity weighting enabled, a permitted occurrence pair contributes, before additional optional modifiers,
+\[
+	\Delta W^{u_i}_{b,s,u_j}=M_{i,j,b,s}\frac{\kappa}{(|j-i|+\delta)^\alpha}.
+\]
+Here $W$ denotes connection strength, $M$ denotes the branch/segment and training-target mask, and $\kappa$, $\delta$, and $\alpha$ are the configured proximity scale, distance offset, and exponent. Without this weighting, the contribution is the masked connection activation. Contributions from repeated occurrences accumulate when mapped to the same database coordinate.
+
+In \texttt{trainDuringInference} mode, a teacher-forced inference pass precedes learning. The training mask excludes seed tokens and correctly predicted targets, updating the remaining target neurons and their incoming connections. Optional synaptic adjustment also decrements connections activated during inference according to the configured rule.
+
+\subsection{Inference Algorithm (Seed and Prediction)}
+Inference loads trained strengths and creates transient sparse activation state. Independent prompt sequences reset this state. Controlled vocabulary expansion can add missing dictionary entries and empty structure without applying training strength updates. The seed phase forces observed tokens; subsequent steps either feed the selected prediction back into the network or feed the observed target back for teacher-forced evaluation.
+
+For the LIF pathway, each step after the initial seed burst proceeds as follows.
 \begin{enumerate}
-	\item \textbf{Seed phase:} use the same prediction pipeline as normal inference, but force the selected feature to be the target token. This seeds the activation state.
-	\item \textbf{Activation state:} use global sparse activation tensors (and optional connection tensors) as the working state for predictions.
-	\item \textbf{Sequential gating (SANI):} apply sequential activation rules so a segment can only fire if the previous segment is active.
-	\item \textbf{Delimiter constraints:} if the current active node is a reference-set delimiter, constrain the next prediction to delimiter-compatible nodes or external columns.
-	\item \textbf{Time-based biasing:} optionally adjust segment activations based on last activation time relative to the expected segment index.
-	\item \textbf{Candidate selection:}
-	\begin{itemize}
-		\item If beam search is enabled, expand beams to a fixed depth and width, scoring by activation and connection strength.
-		\item Otherwise, select the single best node from the current activation map.
-	\end{itemize}
-	\item \textbf{State update:} activate the chosen node, update activation traces and time properties, and propagate its outgoing connections to update the next step.
-	\item \textbf{Evaluation:} optionally compare predictions to the target token and log mismatches.
+	\item \textbf{Establish the source and constraints:} use the previously selected seed, target, or prediction as the source. Derive delimiter-dependent column constraints and, when enabled, source-connectivity restrictions. Optional donor inference operates on this selected source identity.
+	\item \textbf{Advance feature signals:} move existing feature-segment activity one position towards the soma, accumulating arriving signals with retained soma activity. Column segments remain stationary during this token advance.
+	\item \textbf{Propagate source input:} ordinary LIF propagation thresholds the source's soma/terminal-column signal to a firing indicator, optionally normalises outgoing weights by source and target segment, scales them by the firing indicator, applies the configured activation transform, and adds the resulting input to target segments. Segment and soma activation values remain continuous.
+	\item \textbf{Reset the used source:} clear its configured soma and terminal-column activity, with optional broader segment reset. Prediction-driven LIF inference also records fired column/feature pairs for exclusion from later candidate selection. An optional reset-order variant clears the source before new input is accumulated to preserve immediate self-transitions.
+	\item \textbf{Determine eligibility and score:} track branch-specific current-step soma arrivals. With direct SANI enforcement, eligibility requires positive immediate-source input at the soma coordinate; without it, propagation from the last feature segment can establish eligibility. Apply the soma threshold, connectivity, column, and deactivation constraints. Optional prospective column scoring evaluates external-column candidates after a hypothetical column advance while retaining the current-column scores and the unchanged live state.
+	\item \textbf{Select and evaluate:} choose the next eligible neuron using single-step scoring, optional token aggregation/reranking, or compatible beam search. Compare its output identity with the target separately from choosing the next source. Seed tokens are forced, teacher-forced inference selects the observed target as the next source, and prediction-driven inference selects the prediction.
+	\item \textbf{Prepare the next step:} when the selected source column changes, advance column-segment signals and decay retained terminal-column activity. Apply configured soma decay per token, then burst the selected token when enabled. Its outgoing connections are processed on the following step.
 \end{enumerate}
+
+For hybrid LIF with independent branches, the base candidate score is
+\[
+	q_t(v)=\max_{b\in\mathcal{E}_t(v)}\left[\widetilde A_t(b,s_{\mathrm{soma}},v)+\widetilde A_t(b,S_C-1,v)\right],
+\]
+where $\mathcal{E}_t(v)$ contains the eligible branches of neuron $v$, and $\widetilde A_t$ is the activation state used for scoring, including prospective column advancement when enabled. Candidates without an eligible branch are excluded, and the score must meet \texttt{inferenceLeakyIntegrateAndFireSomaActivationThreshold}. Branch signals are maximised rather than summed. Binary-tree configurations use their configured branch projection when combining terminal-column and soma signals.
+
+Optional source-input normalisation rescales positive outgoing weights by the maximum for each exact source and target segment, with a separate column-input gain; it preserves stored strengths and connection coordinates. Optional feature-segment weighting applies a gain to feature and immediate soma inputs after the activation transform. Multiplicative decay retains a fraction $1-\lambda$ of the affected activity; the alternative subtractive rule clamps the decremented activity at zero. Soma and terminal-column decay rates are configured separately.
+
+\subsection{Column and Connectivity Constraints}
+Ordinary continuation generally remains in the current column. Deterministic reference-set delimiters permit transitions between columns, probabilistic delimiters can relax the column constraint, and configured rules allow external prime-concept transitions or same-column continuations. Seed handling can relax generation constraints to admit observed context.
+
+\texttt{predictionEnsureConnectedToPreviousPrediction} controls source-connectivity filtering independently of activation scoring. With direct SANI enforcement in LIF mode, current-step immediate-input eligibility supplies the direct feature-transition condition, while the connectivity lookup constrains reachable columns. Strict source identity disables missing-feature substitution; relaxed configurations can use trained representations of the selected token in other columns. Disabling connectivity enforcement permits additional configured indirect-context and pooled-transition paths. These choices change which predictions are admissible and are distinct from changing their scores.
+
+\subsection{Optional Source Sharing and Prediction Scoring}
+\begin{itemize}
+	\item \textbf{Missing-feature inference:} when the selected source lacks trained outgoing connections, configured proxy selection uses trained donor neurons and contextual activation. Persisted per-source files can establish whether a source is trained. Donors may be weighted by activation and confidence, and proxy-specific state and constraints can require a nonzero forward signal. Donor activations can be preserved after propagation.
+	\item \textbf{Token-conditioned donors:} semantic source inference selects donors representing the observed or generated token, using neuron or column context, and can project within-donor-column targets into the selected source column. Word-vector similarity and support-dependent supplementation of sparsely trained sources are separate optional extensions.
+	\item \textbf{Indirect continuations:} compatible configurations can pool immediate transitions from other neurons representing the same token when the selected source has no outgoing connectivity. Context-retention options can admit signals arriving at the soma on that step; they do not make all stale soma activity eligible.
+	\item \textbf{Auxiliary neurons:} optional parent-word, lemma, POS, subword-role, and learned similarity features provide additional trained propagation paths, with their own connection storage and activation weights.
+	\item \textbf{Context likelihood:} an optional scorer combines LIF activity, immediate-source evidence, trained frequency priors, and smoothed likelihood ratios from recent feature-distance connections. Column likelihood can add trained column-segment evidence beyond this local window. Compatible teacher-forced configurations can apply power calibration before token aggregation. These scorers alter candidate scores without changing live activations.
+	\item \textbf{Token prior and sequence memory:} a bounded token-transition prior can multiply eligible scores in compatible connectivity-constrained configurations. Separately configured sequence-context memory uses recorded training sequences to rerank candidates from smoothed context matches, requiring a matching vocabulary and corpus index.
+\end{itemize}
+
+When token aggregation is enabled, all eligible neurons representing the same output token contribute to its score:
+\[
+	Q_t(w)=\sum_{\substack{v\in\mathcal{V}_t\\\tau(v)=w}}r_t(v), \qquad \hat w_t=\arg\max_w Q_t(w).
+\]
+Here $\mathcal{V}_t$ is the filtered candidate set, $\tau(v)$ is the output token identity, and $r_t(v)$ is the base or optionally reranked score. The strongest individual neuron representing $\hat w_t$ supplies the predicted column/feature identity. Without aggregation, selection ranks individual candidates. The optional scorers and source-sharing methods are subject to explicit compatibility checks; they are not all enabled together.
+
+\subsection{Non-LIF SANI Inference}
+The non-LIF pathway retains segment activation and optional last-activation-time tensors instead of advancing signals into a separate soma. Configured sequential gating can require a preceding segment to be active. Exact timing requires the expected token or column interval; biased timing modifies scores according to timing error, while untimed and sequential-only modes omit that timing penalty. Candidate scoring reduces the permitted segment/branch activity and applies the configured last-segment or all-segment requirements, followed by column/connectivity constraints and selection. These rules are alternatives to the LIF dynamics above.
 
 \subsection{Beam Search (Optional)}
 \begin{itemize}
-	\item Each beam holds a cloned activation state (feature activations, optional connection activations, and time properties).
-	\item Candidate nodes are filtered by constraint mode, connected-column constraints, and activation thresholds.
-	\item Beam scoring can use activation gain, connection strength, or both. The final prediction is the first action of the highest-scoring beam.
+	\item Each hypothesis tracks cloned feature activity, optional timing state, concept state, and LIF eligibility, column, and deactivation state, and simulates the same configured propagation and reset rules.
+	\item Expansion respects the applicable activation thresholds, segment eligibility, column/connectivity constraints, and deactivated-neuron exclusions. Beam width and lookahead depth bound the search.
+	\item Path scoring uses the configured activation, strength, and optional activation-gain terms. The next prediction is the first action of the highest-scoring retained path. Scorers restricted to single-step inference are rejected when combined with beam search.
+\end{itemize}
+
+\subsection{Evaluation and Empty Candidate Sets}
+\begin{itemize}
+	\item Prediction-only top-1 accuracy excludes forced seed tokens; seed-inclusive accuracy is reported separately. Matching uses the configured token/concept identity rules and can additionally require a column match.
+	\item If candidate selection produces no valid prediction, the configured policy raises an error or signals a sequence stop. Teacher-forced inference can catch the stop at selection, record an incorrect prediction, and continue from the observed target. When a sequence terminates early, remaining prediction tokens are counted as unsuccessful.
+	\item Bits-per-byte evaluation is available only in compatible teacher-forced configurations that evaluate every token. Closed-world grounded evaluation separately distinguishes justified answers, correct but ungrounded answers, grounded falsehoods, ungrounded hallucinations, and abstentions.
+	\item Independent prompt lines can be evaluated in fresh worker processes. Correct-prediction and token counts are summed before computing accuracy, so unequal chunk sizes do not bias the aggregate.
 \end{itemize}
 
 \subsection{Persistence and Visualisation}
 \begin{itemize}
-	\item Each observed column is stored on disk with its sparse tensors and feature mappings.
-	\item Global feature neuron tensors and concept/feature dictionaries are saved at configurable intervals.
-	\item The visualiser renders concept columns, feature nodes, and connections with colour schemes for segments, branches, POS types, or delimiters.
+	\item Each persisted column has metadata, a neuron tensor when stored by column, and outgoing sparse tensors partitioned by source feature. Feature maps can be shared globally; optional global neuron tensors can be assembled from column data.
+	\item Persistence validates storage formats and dimensions, maps training properties to inference properties, and expands affected shapes as vocabulary grows. Inference can require an existing trained database rather than initialise an empty one.
+	\item Vectorised and native CPU/CUDA update paths, ordered article preparation, and optional connection overlays reduce data movement and sparse-merge work while retaining the configured sequence-ordered learning rule.
+	\item Network visualisation displays concept columns, neurons, and connections using segment, branch, POS, delimiter, or activation colours. Standalone drawing can load a saved database independently of training or inference.
 \end{itemize}
+
+\subsection{Experimental Visual Encoding}
+The experimental object-recognition pathway shares the database and training machinery. Image or video snapshots are sampled, mapped to spatial columns, and represented by selected receptive-field filter responses. Saccade order, spatial distance, or axis-based encodings determine connection segments instead of NLP token/column distances. The current visual pathway constructs and trains these representations; the next-token inference and evaluation procedure above describes the language pathway.

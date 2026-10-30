@@ -27,6 +27,8 @@ from spacy.tokens import Doc
 pt.set_grad_enabled(False)
 
 from GIAANNcmn_globalDefs import *
+if(optimiseTrainSequenceBatch):
+	import GIAANNcmn_trainSequenceBatch
 if(useSequenceContext):
 	import GIAANNcmn_sequenceContext
 if(debugPrintTrainTotalWhitespaceWords):
@@ -141,6 +143,8 @@ def processPrompt(databaseNetworkObject, inferenceMode, sequenceCount):
 		sequenceCount = processArticle(databaseNetworkObject, inferenceMode, sequenceCount, None, articleIndex, promptSequences, promptLines)
 	else:
 		sequenceCount = processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, articleIndex)
+	if(optimiseTrainSequenceBatch):
+		GIAANNcmn_trainSequenceBatch.flushDatabase(databaseNetworkObject)
 	return sequenceCount
 
 def expandSequenceForInference(databaseNetworkObject, sequence):
@@ -181,6 +185,8 @@ def processDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset)
 			sequenceCount = processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, articleIndex)
 			if(sequenceCount >= trainMaxSequences and inferenceMode==False):
 				break
+	if(optimiseTrainSequenceBatch):
+		GIAANNcmn_trainSequenceBatch.flushDatabase(databaseNetworkObject)
 	return sequenceCount
 
 def sanitiseDatasetNullCharacters(text, articleIndex):
@@ -301,22 +307,26 @@ def processArticle(databaseNetworkObject, inferenceMode, sequenceCount, text, ar
 	return sequenceCount
 
 def enforceSequenceLengthTokenLimits(sequence, sequenceRaw):
-	resultSequence = sequence
-	resultSequenceRaw = sequenceRaw
-	resultSequenceAccepted = True
-	if(tokeniserSubword):
-		if(not isinstance(maxSequenceLengthTokens, int) or isinstance(maxSequenceLengthTokens, bool) or maxSequenceLengthTokens <= 0):
-			raise RuntimeError("enforceSequenceLengthTokenLimits error: maxSequenceLengthTokens must be an int > 0")
-		if(tokenisationEnforcePrecharacterByteLimit):
-			resultSequenceAccepted = GIAANNnlp_sequenceTokens.isTokeniserSubwordSequenceWithinPrecharacterByteLimit(resultSequence)
-		if(resultSequenceAccepted):
-			resultSequence = GIAANNnlp_sequenceTokens.preprocessSequence(resultSequence)
-			if(len(resultSequence) > maxSequenceLengthTokens):
-				if(sequencesCropToMaxLength):
-					resultSequence = GIAANNnlp_sequenceTokens.cropTokeniserSubwordSequence(resultSequence, maxSequenceLengthTokens)
-					resultSequenceRaw = resultSequence.text
-				else:
-					resultSequenceAccepted = False
+	if(optimiseTrainLightweightWorkers):
+		import GIAANNnlp_trainPreparation
+		resultSequence, resultSequenceRaw, resultSequenceAccepted = GIAANNnlp_trainPreparation.enforceSequenceLengthTokenLimits(sequence, sequenceRaw)
+	else:
+		resultSequence = sequence
+		resultSequenceRaw = sequenceRaw
+		resultSequenceAccepted = True
+		if(tokeniserSubword):
+			if(not isinstance(maxSequenceLengthTokens, int) or isinstance(maxSequenceLengthTokens, bool) or maxSequenceLengthTokens <= 0):
+				raise RuntimeError("enforceSequenceLengthTokenLimits error: maxSequenceLengthTokens must be an int > 0")
+			if(tokenisationEnforcePrecharacterByteLimit):
+				resultSequenceAccepted = GIAANNnlp_sequenceTokens.isTokeniserSubwordSequenceWithinPrecharacterByteLimit(resultSequence)
+			if(resultSequenceAccepted):
+				resultSequence = GIAANNnlp_sequenceTokens.preprocessSequence(resultSequence)
+				if(len(resultSequence) > maxSequenceLengthTokens):
+					if(sequencesCropToMaxLength):
+						resultSequence = GIAANNnlp_sequenceTokens.cropTokeniserSubwordSequence(resultSequence, maxSequenceLengthTokens)
+						resultSequenceRaw = resultSequence.text
+					else:
+						resultSequenceAccepted = False
 	return resultSequence, resultSequenceRaw, resultSequenceAccepted
 
 def updateExecutionProgressForSkippedSequence(inferenceMode, sequenceCount):
@@ -380,99 +390,103 @@ def calculateProcessArticleEvalSequenceTotal(sequenceCount, sequences):
 	return result
 
 def generateSeqencesBatchOrSerial(textParsed, skipMode):
-	minSequenceLength = numSeedTokensInference + 1
-	sequences = []
-	sequencesRaw = []
-	sequencesText = []
-	if(sentencePredictions):
-		sentences = list(textParsed.sents)
-		if(multisentencePredictions):
-			for i in range(0, len(sentences), numSentencesPerSequence):
-				startIndex = sentences[i].start
-				endIndex = sentences[min(i + numSentencesPerSequence, len(sentences)) - 1].end
-				span = textParsed[startIndex:endIndex]
-				sequenceText = span.text
-				if(not sequenceText.strip()):
-					continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
-				sequenceText = sequenceText.lstrip()
-				if(spacyPipelineSingleParse or skipMode):
-					sequenceParsed = span.as_doc()
-				elif(spacyPipelineMultisentenceParseSentencesIndividually):
-					sequenceSentences = sentences[i:min(i + numSentencesPerSequence, len(sentences))]
-					sequenceParsed = parseMultisentenceSequenceSentencesIndividually(sequenceSentences, sequenceText)
-				else:
-					sequenceParsed = None
-				if(sequenceParsed is not None):
-					if(len(sequenceParsed) == 0):
-						continue
-					if(len(sequenceParsed) < minSequenceLength):
-						continue
-					sequences.append(sequenceParsed)
-					sequencesRaw.append(sequenceText)
-				elif(spacyPipelineBatchSequences):
-					sequencesText.append(sequenceText)
-				else:
-					sequenceParsed = nlpSequence(sequenceText)
-					if(len(sequenceParsed) == 0):
-						continue
-					if(len(sequenceParsed) < minSequenceLength):
-						continue
-					sequences.append(sequenceParsed)
-					sequencesRaw.append(sequenceText)
-		else:
-			for sentence in sentences:
-				sequenceText = sentence.text
-				if(not sequenceText.strip()):
-					continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
-				sequenceText = sequenceText.lstrip()
-				if(not spacyPipelineBatchSequences):
+	if(optimiseTrainLightweightWorkers):
+		import GIAANNnlp_trainPreparation
+		sequences, sequencesRaw = GIAANNnlp_trainPreparation.generateSeqencesBatchOrSerial(textParsed, skipMode)
+	else:
+		minSequenceLength = numSeedTokensInference + 1
+		sequences = []
+		sequencesRaw = []
+		sequencesText = []
+		if(sentencePredictions):
+			sentences = list(textParsed.sents)
+			if(multisentencePredictions):
+				for i in range(0, len(sentences), numSentencesPerSequence):
+					startIndex = sentences[i].start
+					endIndex = sentences[min(i + numSentencesPerSequence, len(sentences)) - 1].end
+					span = textParsed[startIndex:endIndex]
+					sequenceText = span.text
+					if(not sequenceText.strip()):
+						continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
+					sequenceText = sequenceText.lstrip()
 					if(spacyPipelineSingleParse or skipMode):
-						sequenceParsed = sentence.as_doc()
+						sequenceParsed = span.as_doc()
+					elif(spacyPipelineMultisentenceParseSentencesIndividually):
+						sequenceSentences = sentences[i:min(i + numSentencesPerSequence, len(sentences))]
+						sequenceParsed = parseMultisentenceSequenceSentencesIndividually(sequenceSentences, sequenceText)
+					else:
+						sequenceParsed = None
+					if(sequenceParsed is not None):
+						if(len(sequenceParsed) == 0):
+							continue
+						if(len(sequenceParsed) < minSequenceLength):
+							continue
+						sequences.append(sequenceParsed)
+						sequencesRaw.append(sequenceText)
+					elif(spacyPipelineBatchSequences):
+						sequencesText.append(sequenceText)
 					else:
 						sequenceParsed = nlpSequence(sequenceText)
-					if(len(sequenceParsed) == 0):
-						continue
-					if(len(sequenceParsed) < minSequenceLength):
-						continue
+						if(len(sequenceParsed) == 0):
+							continue
+						if(len(sequenceParsed) < minSequenceLength):
+							continue
+						sequences.append(sequenceParsed)
+						sequencesRaw.append(sequenceText)
+			else:
+				for sentence in sentences:
+					sequenceText = sentence.text
+					if(not sequenceText.strip()):
+						continue	#avoid whitespace-only sequences (spaCy transformer shape mismatch)
+					sequenceText = sequenceText.lstrip()
+					if(not spacyPipelineBatchSequences):
+						if(spacyPipelineSingleParse or skipMode):
+							sequenceParsed = sentence.as_doc()
+						else:
+							sequenceParsed = nlpSequence(sequenceText)
+						if(len(sequenceParsed) == 0):
+							continue
+						if(len(sequenceParsed) < minSequenceLength):
+							continue
+						sequences.append(sequenceParsed)
+						sequencesRaw.append(sequenceText)
+					else:
+						sequencesText.append(sequenceText)
+		else:
+			startIndex = 0
+			endIndex = len(textParsed)
+			sequenceEndIndex = None
+			sequenceStartIndex = None
+			sequenceParsed = None
+			sequenceText = None
+			if(maxSequenceLength < minSequenceLength):
+				raise RuntimeError("generateSeqencesBatchOrSerial error: maxSequenceLength must be >= minSequenceLength")
+			while(startIndex < endIndex and textParsed[startIndex].is_space):
+				startIndex += 1
+			while(endIndex > startIndex and textParsed[endIndex-1].is_space):
+				endIndex -= 1
+			while(startIndex < endIndex):
+				sequenceStartIndex = startIndex
+				sequenceEndIndex = min(startIndex+maxSequenceLength, endIndex)
+				while(sequenceStartIndex < sequenceEndIndex and textParsed[sequenceStartIndex].is_space):
+					sequenceStartIndex += 1
+				while(sequenceEndIndex > sequenceStartIndex and textParsed[sequenceEndIndex-1].is_space):
+					sequenceEndIndex -= 1
+				if(sequenceStartIndex < sequenceEndIndex):
+					sequenceParsed = textParsed[sequenceStartIndex:sequenceEndIndex]
+					sequenceText = sequenceParsed.text
+				if(sequenceStartIndex < sequenceEndIndex and len(sequenceParsed) >= minSequenceLength):
 					sequences.append(sequenceParsed)
 					sequencesRaw.append(sequenceText)
-				else:
-					sequencesText.append(sequenceText)
-	else:
-		startIndex = 0
-		endIndex = len(textParsed)
-		sequenceEndIndex = None
-		sequenceStartIndex = None
-		sequenceParsed = None
-		sequenceText = None
-		if(maxSequenceLength < minSequenceLength):
-			raise RuntimeError("generateSeqencesBatchOrSerial error: maxSequenceLength must be >= minSequenceLength")
-		while(startIndex < endIndex and textParsed[startIndex].is_space):
-			startIndex += 1
-		while(endIndex > startIndex and textParsed[endIndex-1].is_space):
-			endIndex -= 1
-		while(startIndex < endIndex):
-			sequenceStartIndex = startIndex
-			sequenceEndIndex = min(startIndex+maxSequenceLength, endIndex)
-			while(sequenceStartIndex < sequenceEndIndex and textParsed[sequenceStartIndex].is_space):
-				sequenceStartIndex += 1
-			while(sequenceEndIndex > sequenceStartIndex and textParsed[sequenceEndIndex-1].is_space):
-				sequenceEndIndex -= 1
-			if(sequenceStartIndex < sequenceEndIndex):
-				sequenceParsed = textParsed[sequenceStartIndex:sequenceEndIndex]
-				sequenceText = sequenceParsed.text
-			if(sequenceStartIndex < sequenceEndIndex and len(sequenceParsed) >= minSequenceLength):
+				startIndex += maxSequenceLength
+		if(spacyPipelineBatchSequences):
+			for sequenceIndex, sequenceParsed in enumerate(nlpSequence.pipe(sequencesText)):
+				if(len(sequenceParsed) == 0):
+					continue
+				if(len(sequenceParsed) < minSequenceLength):
+					continue
 				sequences.append(sequenceParsed)
-				sequencesRaw.append(sequenceText)
-			startIndex += maxSequenceLength
-	if(spacyPipelineBatchSequences):
-		for sequenceIndex, sequenceParsed in enumerate(nlpSequence.pipe(sequencesText)):
-			if(len(sequenceParsed) == 0):
-				continue
-			if(len(sequenceParsed) < minSequenceLength):
-				continue
-			sequences.append(sequenceParsed)
-			sequencesRaw.append(sequencesText[sequenceIndex])
+				sequencesRaw.append(sequencesText[sequenceIndex])
 	return sequences, sequencesRaw
 
 def parseMultisentenceSequenceSentencesIndividually(sequenceSentences, sequenceText):

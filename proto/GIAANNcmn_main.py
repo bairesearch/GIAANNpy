@@ -55,6 +55,8 @@ import spacy
 pt.set_grad_enabled(False)
 
 from GIAANNcmn_globalDefs import *
+if(optimiseTrainSequenceBatch):
+	import GIAANNcmn_trainSequenceBatch
 if(useSequenceContext):
 	import GIAANNcmn_sequenceContext
 import GIAANNcmn_debug
@@ -253,6 +255,8 @@ def executeMode(inferenceMode):
 				sequenceCount = GIAANNor_main.processPrompt(databaseNetworkObject, inferenceMode, sequenceCount)
 			else:
 				sequenceCount = GIAANNor_main.processDataset(databaseNetworkObject, inferenceMode, sequenceCount, dataset)
+		if(optimiseTrainSequenceBatch):
+			GIAANNcmn_trainSequenceBatch.flushDatabase(databaseNetworkObject)
 		if(printTrainSequenceBar or printEvalSequenceBar):
 			GIAANNcmn_executionProgress.closeTrainSequenceBar()
 

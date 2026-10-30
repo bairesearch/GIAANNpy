@@ -34,3 +34,9 @@ if(__name__ == "__main__"):
 			if(len(sys.argv) != 3):
 				raise RuntimeError("Article worker requires its private socket descriptor and CPU index")
 			GIAANNnlp_parallelisation3.runWorker(int(sys.argv[1]), int(sys.argv[2]))
+			if(defs.optimiseTrainWorkerExit):
+				# runWorker returned successfully and its socket is closed. Only this isolated read-only worker exits.
+				import os
+				sys.stdout.flush()
+				sys.stderr.flush()
+				os._exit(defs.trainWorkerExitSuccessCode)

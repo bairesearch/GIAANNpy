@@ -21,6 +21,8 @@ import torch as pt
 import time
 
 from GIAANNcmn_globalDefs import *
+if(optimiseTrainSequenceBatch):
+	import GIAANNcmn_trainSequenceBatch
 import GIAANNcmn_debug
 import GIAANNcmn_sparseTensors
 import GIAANNnlp_sequenceConcepts
@@ -951,15 +953,18 @@ class SequenceObservedColumns:
 			GIAANNnlp_auxiliaryNeuronsAuto.updateReverseFeatureConnectionsFromSequence(self, sequenceObservedColumnsDict)
 
 	def updateObservedColumns(self, sequenceObservedColumnsDict, inference, mode):
-		if(arrayIndexPropertiesEfficient and not inference):
-			updateObservedColumnsEfficientStartTime = None
-			if(debugPrintTrainSectionTimes):
-				updateObservedColumnsEfficientStartTime = time.perf_counter()
-			self.updateObservedColumnsEfficient(sequenceObservedColumnsDict, mode)
-			if(debugPrintTrainSectionTimes):
-				GIAANNcmn_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient", time.perf_counter() - updateObservedColumnsEfficientStartTime)
+		if(optimiseTrainSequenceBatch):
+			GIAANNcmn_trainSequenceBatch.queueSequence(self, sequenceObservedColumnsDict, inference, mode)
 		else:
-			self.updateObservedColumnsVerbose(sequenceObservedColumnsDict, mode)
+			if(arrayIndexPropertiesEfficient and not inference):
+				updateObservedColumnsEfficientStartTime = None
+				if(debugPrintTrainSectionTimes):
+					updateObservedColumnsEfficientStartTime = time.perf_counter()
+				self.updateObservedColumnsEfficient(sequenceObservedColumnsDict, mode)
+				if(debugPrintTrainSectionTimes):
+					GIAANNcmn_debug.debugTrainSectionTimesAdd(self.databaseNetworkObject, "updateObservedColumnsEfficient", time.perf_counter() - updateObservedColumnsEfficientStartTime)
+			else:
+				self.updateObservedColumnsVerbose(sequenceObservedColumnsDict, mode)
 	
 	def updateObservedColumnsVerbose(self, sequenceObservedColumnsDict, mode):
 		databaseNetworkObject = self.databaseNetworkObject

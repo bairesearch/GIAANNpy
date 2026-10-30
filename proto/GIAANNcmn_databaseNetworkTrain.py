@@ -50,18 +50,23 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens, 
 	trainActive = False
 	if(result is not None):
 		conceptIndices, startIndices, endIndices = result
-		featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask = GIAANNnlp_sequenceConcepts.processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices)
-		trainActive = True
-		featureNeuronsTargetMask = None
-		if(useTrainDuringInference):
-			featureNeuronsTargetMask = createTrainDuringInferenceFeatureNeuronsTargetMask(tokens, inferenceSuccessfulPredictionMask, featureNeuronsWordOrder, featureNeuronsActive)
-			trainActive = bool(pt.any(featureNeuronsActive*featureNeuronsTargetMask).item())
-		if(trainActive):
-			featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex, featureNeuronsTargetMask)
-			if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
-				if(useTrainDuringInference):
-					featureNeuronsActive = featureNeuronsActive*featureNeuronsTargetMask
-				GIAANNnlp_auxiliaryNeuronsSimilarWords.trainAuxiliaryFeatureConnections(sequenceObservedColumns, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, conceptIndices, startIndices, endIndices)
+		if(optimiseTrainFusedSequenceUpdates):
+			import GIAANNcmn_trainFusedSequence
+			sequenceObservedColumns.trainFusedSequencePacket = GIAANNcmn_trainFusedSequence.prepare(sequenceObservedColumns, conceptIndices, startIndices, endIndices)
+			trainActive = True
+		else:
+			featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask = GIAANNnlp_sequenceConcepts.processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, conceptIndices, startIndices, endIndices)
+			trainActive = True
+			featureNeuronsTargetMask = None
+			if(useTrainDuringInference):
+				featureNeuronsTargetMask = createTrainDuringInferenceFeatureNeuronsTargetMask(tokens, inferenceSuccessfulPredictionMask, featureNeuronsWordOrder, featureNeuronsActive)
+				trainActive = bool(pt.any(featureNeuronsActive*featureNeuronsTargetMask).item())
+			if(trainActive):
+				featureConnectionsActive, featureConnectionsSegmentMask = processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs, fs, sequenceConceptIndexMask, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsSegmentMask, sequenceIndex, featureNeuronsTargetMask)
+				if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
+					if(useTrainDuringInference):
+						featureNeuronsActive = featureNeuronsActive*featureNeuronsTargetMask
+					GIAANNnlp_auxiliaryNeuronsSimilarWords.trainAuxiliaryFeatureConnections(sequenceObservedColumns, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, conceptIndices, startIndices, endIndices)
 	if(debugPrintTrainSectionTimes):
 		GIAANNcmn_debug.debugTrainSectionTimesAdd(sequenceObservedColumns.databaseNetworkObject, "trainConceptWords", time.perf_counter() - trainConceptWordsStartTime)
 

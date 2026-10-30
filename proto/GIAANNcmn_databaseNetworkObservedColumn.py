@@ -21,10 +21,15 @@ import torch as pt
 import time
 
 from GIAANNcmn_globalDefs import *
+if(optimiseTrainSequenceBatch):
+	import GIAANNcmn_trainSequenceBatch
 if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
 	import numpy as np
+	import GIAANNcmn_databasePacked
 import GIAANNcmn_debug
 import GIAANNcmn_databaseNetworkFiles
+if(optimiseTrainConnectionOverlay):
+	import GIAANNcmn_trainConnectionOverlay
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 	import GIAANNnlp_auxiliaryNeuronsSimilarWords
 if(auxiliaryNeurons and auxiliaryNeuronsAuto):
@@ -178,29 +183,32 @@ class ObservedColumnConnectionBase:
 
 	def prepareRequiredSourceFeatureConnectionsBulk(self, requiredSourceFeatureIndices, targetDevice):
 		if(optimiseTrainParallelisation3c):
-			if(not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam or not self.databaseNetworkObject.observedColumnsRAMLoaded or not self.isDatabaseResidentConnectionStorage() or self.databaseNetworkObject.inferenceMode or optimisationStoreDatabaseResidentCoordinatesAsInt32):
-				raise RuntimeError("optimiseTrainParallelisation3c requires loaded, unpacked RAM-resident training connections")
-			resolvedTargetDevice = pt.device(targetDevice if targetDevice is not None else self.getDefaultConnectionTargetDevice())
-			if(resolvedTargetDevice.type != "cpu" or pt.device(deviceDatabase).type != "cpu"):
-				raise RuntimeError("optimiseTrainParallelisation3c requires CPU source tensors")
-			sourceIndices = self.normaliseSourceFeatureIndices(requiredSourceFeatureIndices)
-			targetSize = self.getFeatureConnectionsTargetSize()
-			for sourceIndex in sourceIndices:
-				tensor = self.featureConnectionsBySourceFeature.get(sourceIndex)
-				if(tensor is None):
-					# Preserve the existing RAM path: every requested absent source receives its own empty tensor.
-					tensor = self.initialiseFeatureConnections(self.databaseNetworkObject.c, self.databaseNetworkObject.f, resolvedTargetDevice)
-					self.featureConnectionsBySourceFeature[sourceIndex] = tensor
-				else:
-					if(not pt.is_tensor(tensor) or tensor.layout != pt.sparse_coo or tensor.dim() != parallelisation3SourceTensorRank or tensor.device.type != "cpu"):
-						raise RuntimeError("optimiseTrainParallelisation3c requires rank-five CPU sparse COO source tensors")
-					shape = tuple(tensor.shape)
-					if(shape[:parallelisation3SourceConceptDimension] != targetSize[:parallelisation3SourceConceptDimension]):
-						raise RuntimeError("optimiseTrainParallelisation3c source property/branch/segment dimensions do not match the database")
-					if(shape[parallelisation3SourceConceptDimension] < targetSize[parallelisation3SourceConceptDimension] or shape[parallelisation3SourceFeatureDimension] < targetSize[parallelisation3SourceFeatureDimension]):
-						expandedSize = shape[:parallelisation3SourceConceptDimension] + (max(shape[parallelisation3SourceConceptDimension], targetSize[parallelisation3SourceConceptDimension]), max(shape[parallelisation3SourceFeatureDimension], targetSize[parallelisation3SourceFeatureDimension]))
-						self.featureConnectionsBySourceFeature[sourceIndex] = GIAANNcmn_databaseNetworkFiles.expandSparseTensorSize(tensor, expandedSize, "optimiseTrainParallelisation3c")
-			self.loadedSourceFeatureIndices.update(sourceIndices)
+			if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
+				GIAANNcmn_databasePacked.prepareSources(self, requiredSourceFeatureIndices, targetDevice)
+			else:
+				if(not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam or not self.databaseNetworkObject.observedColumnsRAMLoaded or not self.isDatabaseResidentConnectionStorage() or self.databaseNetworkObject.inferenceMode or optimisationStoreDatabaseResidentCoordinatesAsInt32):
+					raise RuntimeError("optimiseTrainParallelisation3c requires loaded, unpacked RAM-resident training connections")
+				resolvedTargetDevice = pt.device(targetDevice if targetDevice is not None else self.getDefaultConnectionTargetDevice())
+				if(resolvedTargetDevice.type != "cpu" or pt.device(deviceDatabase).type != "cpu"):
+					raise RuntimeError("optimiseTrainParallelisation3c requires CPU source tensors")
+				sourceIndices = self.normaliseSourceFeatureIndices(requiredSourceFeatureIndices)
+				targetSize = self.getFeatureConnectionsTargetSize()
+				for sourceIndex in sourceIndices:
+					tensor = self.featureConnectionsBySourceFeature.get(sourceIndex)
+					if(tensor is None):
+						# Preserve the existing RAM path: every requested absent source receives its own empty tensor.
+						tensor = self.initialiseFeatureConnections(self.databaseNetworkObject.c, self.databaseNetworkObject.f, resolvedTargetDevice)
+						self.featureConnectionsBySourceFeature[sourceIndex] = tensor
+					else:
+						if(not pt.is_tensor(tensor) or tensor.layout != pt.sparse_coo or tensor.dim() != parallelisation3SourceTensorRank or tensor.device.type != "cpu"):
+							raise RuntimeError("optimiseTrainParallelisation3c requires rank-five CPU sparse COO source tensors")
+						shape = tuple(tensor.shape)
+						if(shape[:parallelisation3SourceConceptDimension] != targetSize[:parallelisation3SourceConceptDimension]):
+							raise RuntimeError("optimiseTrainParallelisation3c source property/branch/segment dimensions do not match the database")
+						if(shape[parallelisation3SourceConceptDimension] < targetSize[parallelisation3SourceConceptDimension] or shape[parallelisation3SourceFeatureDimension] < targetSize[parallelisation3SourceFeatureDimension]):
+							expandedSize = shape[:parallelisation3SourceConceptDimension] + (max(shape[parallelisation3SourceConceptDimension], targetSize[parallelisation3SourceConceptDimension]), max(shape[parallelisation3SourceFeatureDimension], targetSize[parallelisation3SourceFeatureDimension]))
+							self.featureConnectionsBySourceFeature[sourceIndex] = GIAANNcmn_databaseNetworkFiles.expandSparseTensorSize(tensor, expandedSize, "optimiseTrainParallelisation3c")
+				self.loadedSourceFeatureIndices.update(sourceIndices)
 		return
 	
 	def prepareRequiredSourceFeatureConnections(self, requiredSourceFeatureIndices, targetDevice, createMissing=False):
@@ -241,12 +249,16 @@ class ObservedColumnConnectionBase:
 		return
 
 	def getTrainPreparedSourceFeatureIndices(self):
+		if(optimiseTrainDeferredSourcePreparation):
+			GIAANNcmn_trainSequenceBatch.flushDatabase(self.databaseNetworkObject)
 		if(not hasattr(self, "trainPreparedSourceFeatureIndices")):
 			raise RuntimeError(f"{self.getObservedColumnErrorName()}.getTrainPreparedSourceFeatureIndices error: trainPreparedSourceFeatureIndices missing")
 		result = sorted(self.trainPreparedSourceFeatureIndices)
 		return result
 
 	def hasTrainPreparedSourceFeatureIndices(self):
+		if(optimiseTrainDeferredSourcePreparation):
+			GIAANNcmn_trainSequenceBatch.flushDatabase(self.databaseNetworkObject)
 		if(not hasattr(self, "trainPreparedSourceFeatureIndices")):
 			raise RuntimeError(f"{self.getObservedColumnErrorName()}.hasTrainPreparedSourceFeatureIndices error: trainPreparedSourceFeatureIndices missing")
 		result = len(self.trainPreparedSourceFeatureIndices) > 0
@@ -373,6 +385,8 @@ class ObservedColumnConnectionBase:
 		return
 
 	def setFeatureConnectionsForSourceFeature(self, sourceFeatureIndex, tensor):
+		if(optimiseTrainSequenceBatch):
+			GIAANNcmn_trainSequenceBatch.flushDatabase(self.databaseNetworkObject)
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
 			debugSectionName = GIAANNcmn_debug.getSourceFeatureConnectionsDebugSectionName(self.databaseNetworkObject, "setFeatureConnectionsForSourceFeature")
 			debugSectionStartTime = None
@@ -391,6 +405,8 @@ class ObservedColumnConnectionBase:
 			raise RuntimeError(f"{errorName}.setFeatureConnectionsForSourceFeature error: tensor size {tuple(tensor.size())} does not match expected size {tuple(expectedSize)}")
 		if(not tensor.is_coalesced()):
 			tensor = tensor.coalesce()
+		if(optimiseTrainConnectionOverlay):
+			GIAANNcmn_trainConnectionOverlay.discardSource(self, normalisedSourceFeatureIndex)
 		if(optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage()):
 			self.featureConnectionsBySourceFeature[normalisedSourceFeatureIndex] = PackedDatabaseResidentFeatureConnections(tensor)
 		else:
@@ -402,8 +418,12 @@ class ObservedColumnConnectionBase:
 		return
 
 	def unloadLoadedSourceFeatureConnections(self, sourceFeatureIndices=None):
+		if(optimiseTrainSequenceBatch):
+			GIAANNcmn_trainSequenceBatch.flushDatabase(self.databaseNetworkObject)
 		indicesToUnload = self.normaliseSourceFeatureIndices(sourceFeatureIndices) if sourceFeatureIndices is not None else sorted(self.loadedSourceFeatureIndices)
 		for sourceFeatureIndex in indicesToUnload:
+			if(optimiseTrainConnectionOverlay):
+				GIAANNcmn_trainConnectionOverlay.discardSource(self, sourceFeatureIndex)
 			if(sourceFeatureIndex in self.featureConnectionsBySourceFeature):
 				del self.featureConnectionsBySourceFeature[sourceFeatureIndex]
 			if(sourceFeatureIndex in self.loadedSourceFeatureIndices):
@@ -411,6 +431,8 @@ class ObservedColumnConnectionBase:
 		return
 
 	def materialiseFeatureConnections(self, loadAllStored=False, targetDevice=None):
+		if(optimiseTrainSequenceBatch):
+			GIAANNcmn_trainSequenceBatch.flushDatabase(self.databaseNetworkObject)
 		resolvedTargetDevice = targetDevice if targetDevice is not None else self.getDefaultConnectionTargetDevice()
 		sourceFeatureIndices = sorted(self.featureConnectionsBySourceFeature.keys())
 		if(loadAllStored):
@@ -516,6 +538,8 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		return result
 
 	def getFeatureConnectionsForSourceFeature(self, sourceFeatureIndex, targetDevice=None, createMissing=False, ensureCurrentSizeOnLoad=False):
+		if(optimiseTrainSequenceBatch):
+			GIAANNcmn_trainSequenceBatch.flushDatabase(self.databaseNetworkObject)
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
 			debugSectionName = GIAANNcmn_debug.getSourceFeatureConnectionsDebugSectionName(self.databaseNetworkObject, "getFeatureConnectionsForSourceFeature")
 			debugSectionStartTime = None
@@ -523,6 +547,8 @@ class ObservedColumn(ObservedColumnConnectionBase):
 				debugSectionStartTime = time.perf_counter()
 		normalisedSourceFeatureIndex = self.normaliseSourceFeatureIndex(sourceFeatureIndex)
 		resolvedTargetDevice = targetDevice if targetDevice is not None else self.getDefaultConnectionTargetDevice()
+		if(optimiseTrainConnectionOverlay):
+			GIAANNcmn_trainConnectionOverlay.materialiseSource(self, normalisedSourceFeatureIndex)
 		result = self.featureConnectionsBySourceFeature.get(normalisedSourceFeatureIndex)
 		if(result is None):
 			if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam and self.databaseNetworkObject.observedColumnsRAMLoaded):
@@ -557,6 +583,8 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		return result
 
 	def saveLoadedSourceFeatureConnectionsToDisk(self, sourceFeatureIndices=None):
+		if(optimiseTrainSequenceBatch):
+			GIAANNcmn_trainSequenceBatch.flushDatabase(self.databaseNetworkObject)
 		if(sourceFeatureIndices is None):
 			if(optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage()):
 				resolvedSourceFeatureIndices = sorted(self.featureConnectionsBySourceFeature.keys())
@@ -570,6 +598,8 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		for sourceFeatureIndex in resolvedSourceFeatureIndices:
 			if(sourceFeatureIndex not in self.featureConnectionsBySourceFeature):
 				raise RuntimeError(f"saveLoadedSourceFeatureConnectionsToDisk error: missing loaded source feature tensor {sourceFeatureIndex}")
+			if(optimiseTrainConnectionOverlay):
+				GIAANNcmn_trainConnectionOverlay.materialiseSource(self, sourceFeatureIndex)
 			sourceTensor = self.featureConnectionsBySourceFeature[sourceFeatureIndex]
 			if(optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage()):
 				if(not isinstance(sourceTensor, PackedDatabaseResidentFeatureConnections)):
@@ -614,6 +644,8 @@ class ObservedColumnProxy(ObservedColumnConnectionBase):
 	Observed column proxy with copied tensors and shared feature maps.
 	"""
 	def __init__(self, databaseNetworkObject, observedColumn, lemma, i, targetDevice):
+		if(optimiseTrainSequenceBatch):
+			GIAANNcmn_trainSequenceBatch.flushDatabase(databaseNetworkObject)
 		self.databaseNetworkObject = databaseNetworkObject
 		self.conceptIndex = observedColumn.conceptIndex
 		self.conceptName = lemma
@@ -642,6 +674,8 @@ class ObservedColumnProxy(ObservedColumnConnectionBase):
 		return result
 
 	def getFeatureConnectionsForSourceFeature(self, sourceFeatureIndex, targetDevice=None, createMissing=False, ensureCurrentSizeOnLoad=False):
+		if(optimiseTrainSequenceBatch):
+			GIAANNcmn_trainSequenceBatch.flushDatabase(self.databaseNetworkObject)
 		normalisedSourceFeatureIndex = self.normaliseSourceFeatureIndex(sourceFeatureIndex)
 		resolvedTargetDevice = targetDevice if targetDevice is not None else self.proxyTargetDevice
 		result = self.featureConnectionsBySourceFeature.get(normalisedSourceFeatureIndex)

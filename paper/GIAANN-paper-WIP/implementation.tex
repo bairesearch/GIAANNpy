@@ -1,107 +1,201 @@
 \section{Implementation}
 
-The section describes the implementation of GIAANN proto v1.
+This section describes the current GIAANN proto v2 implementation in \texttt{proto/}. Shared configuration, database, training, and inference code uses the \texttt{GIAANNcmn\_} prefix; language-specific processing uses \texttt{GIAANNnlp\_}; and the experimental object-recognition pathway uses \texttt{GIAANNor\_}. Learning updates neuron and connection tensors directly, with PyTorch gradient tracking disabled. The modules below include optional pathways whose availability and compatibility are controlled by the global definitions.
 
-\subsection{GIAANNproto\_globalDefs.py}
+\subsection{GIAANNcmn\_globalDefs.py}
 \begin{itemize}
-	\item Central configuration for all training, inference, memory, and visualisation options (e.g., \texttt{useInference}, \texttt{useSANI}, \texttt{conceptColumnsDelimitByPOS}).
-	\item Defines tensor property layout (strength, permanence, activation, time, POS, min-distance) and derives array indices and segment counts from seed length and SANI settings.
-	\item Sets dataset, device, and performance toggles, plus debug and draw flags used across the codebase.
+	\item Selects the modality, execution mode, database location, device placement, memory policy, and training/inference optimisations. Execution modes include \texttt{train}, \texttt{inference}, \texttt{trainAndInference}, and \texttt{trainDuringInference}.
+	\item Derives property, branch, and segment indices from the configuration. The efficient training layout stores strength; permanence and POS are optional, while inference adds activation and, for applicable non-LIF timing modes, time properties.
+	\item Configures feature-distance and column-distance SANI segments, optional independent or binary-tree dendritic branches, and leaky integrate-and-fire (LIF) inference with an additional soma segment. It also validates incompatible option combinations and numerical parameter ranges.
 \end{itemize}
 
-\subsection{GIAANNproto\_main.py}
+\subsection{GIAANNnlp\_globalDefs.py}
 \begin{itemize}
-	\item Entry point that loads the dataset, initialises spaCy, and orchestrates training vs. inference loops.
-	\item Implements the per-article and per-sequence pipeline: preprocessing, concept detection, observed column loading, sequence tensor construction, training or inference execution, and optional visualisation.
-	\item Handles inference modes (train-first vs. inference-only), sequence length checks, and debug output selection.
+	\item Defines corpus selection, spaCy parsing, sequence-length limits, POS and delimiter rules, subword tokenisation, auxiliary neurons, and NLP evaluation settings.
+	\item Supports word-based processing and tiktoken subwords. Subword concept columns can be identified by the first noun token, the complete consecutive noun-token span, or the parent-lemma span; exactly one identification mode must be selected.
+	\item Configures fixed tokenizer vocabularies or dynamically discovered concepts/features, benchmark filenames, and optional missing-feature inference. Effective settings depend on the selected execution and evaluation modes.
 \end{itemize}
 
-\subsection{GIAANNproto\_datasets.py}
+\subsection{GIAANNcmn\_main.py}
 \begin{itemize}
-	\item Loads the Wikipedia dataset from Hugging Face, either streamed or local-disk cached.
-	\item Supports manual dataset download into a deterministic cache folder to avoid unreliable streaming.
-	\item Enforces hard failures on missing datasets or incorrect paths.
+	\item Coordinates database startup, modality-specific dataset and prompt processing, training/inference execution, and final persistence and reporting.
+	\item Loads observed columns into RAM when configured, manages inference state backups, and dispatches training followed by inference or inference-guided training according to \texttt{executionMode}.
+	\item Dispatches independent network drawing and optional process-based inference chunks through their dedicated modules.
 \end{itemize}
 
-\subsection{GIAANNproto\_sequenceTokens.py}
+\subsection{GIAANNnlp\_main.py}
 \begin{itemize}
-	\item Defines lightweight token structures and preprocessing utilities (lemmatisation, POS/tag extraction, lowercasing).
-	\item Implements concept detection and delimiter detection using POS, tag, and word-type rules.
-	\item Provides noun-combining pretraining helpers (consecutive nouns and hyphenated noun phrases).
+	\item Initialises the configured spaCy pipelines and prepares articles as sentence, multisentence, or cropped article sequences. It applies word/subword length limits and can preserve each non-empty prompt line as an independent sequence.
+	\item Orchestrates token preprocessing, concept and feature discovery, observed-column loading, sequence tensor construction, and calls to the shared training or prediction modules.
+	\item Supports controlled vocabulary expansion during inference without training updates, resets activation state between independent prompts, and integrates ordered article prefetching, progress reporting, and optional visualisation.
 \end{itemize}
 
-\subsection{GIAANNproto\_sequencePOS.py}
+\subsection{GIAANNnlp\_datasets.py}
 \begin{itemize}
-	\item Builds and caches ``ever-POS'' dictionaries using WordNet and NLTK corpora to determine which POS tags a word can take.
-	\item Exposes fast POS membership checks used for concept detection and delimiter detection.
-	\item Provides persistent storage for POS dictionaries under the configured POS cache folder.
+	\item Loads configured Hugging Face corpora, including OSCAR and Wikipedia, using streaming or supported local-cache paths, and delegates closed-world grounded datasets to their specialised loader. Text-file prompts are processed by the NLP main module.
+	\item Supports manual Wikipedia Parquet downloads and a persistent processed-dataset cache, validates dataset entry text, and applies configured training/test-set offsets.
 \end{itemize}
 
-\subsection{GIAANNproto\_sequenceConcepts.py}
+\subsection{GIAANNnlp\_sequenceTokens.py}
 \begin{itemize}
-	\item First-pass concept growth: add new concept lemmas to the global concept column dictionary and expand global tensors.
-	\item Feature discovery: add new feature words, maintain delimiter flags, and expand feature tensors when $f$ grows.
-	\item Column segmentation: compute concept indices, delimiters, and token-to-column assignments; builds per-column spans for training/inference.
-	\item Feature activation construction: creates feature activation tensors with branch and segment assignment, POS values, and word order metadata.
+	\item Defines lightweight token and sequence representations carrying text, lemmas, POS/tags, and subword parent metadata, together with concept and reference-set delimiter predicates.
+	\item Converts spaCy tokens into tiktoken subwords while aligning UTF-8 byte spans to parent tokens, preserving token identity and transferring the configured linguistic metadata. An optional ordered-span optimisation reduces parent-token lookup work.
+	\item Retains word-token preprocessing, including lowercasing, consecutive-noun and hyphenated-noun combination, and delimiter-related preprocessing for configurations without subword tokenisation.
 \end{itemize}
 
-\subsection{GIAANNproto\_sequenceObservedColumnsExcitation.py}
+\subsection{GIAANNnlp\_sequencePOS.py}
 \begin{itemize}
-	\item Defines \texttt{SequenceObservedColumns}, the per-sequence tensor view used for both training and inference.
-	\item Extracts the sequence-specific feature subset, builds local feature mappings, and initialises feature/connection tensors.
-	\item Populates sequence tensors from observed columns and supports efficient mapping between global and local feature indices.
+	\item Builds and caches ``ever-POS'' dictionaries from WordNet, tagged NLTK corpora, and explicit overrides to identify the POS categories a word can take.
+	\item Provides POS membership queries and persistent cache loading, with explicit checks for required corpus resources and dictionary completeness.
 \end{itemize}
 
-\subsection{GIAANNproto\_databaseNetworkExcitation.py}
+\subsection{GIAANNnlp\_sequenceConcepts.py}
 \begin{itemize}
-	\item Defines the persistent database network state (concept columns, feature dictionaries, global feature tensors).
-	\item Implements \texttt{ObservedColumn} for per-concept storage of feature neurons and feature connections, with resize/expand logic.
-	\item Provides helpers for concept insertion, observed column loading/creation, and conversion utilities used in inference.
+	\item Discovers concept columns and feature tokens, or resolves their predefined tokenizer indices, and maintains deterministic and probabilistic delimiter metadata.
+	\item Computes concept spans and token-to-column assignments, retaining distinct occurrences of repeated concepts within a sequence while mapping them to shared database columns.
+	\item Constructs feature activation tensors, branch assignments, segment masks, POS values, and token-order metadata. Optional branch policies include occurrence-based assignment, random sampling, and binary-tree selection using existing connections or inference activity.
 \end{itemize}
 
-\subsection{GIAANNproto\_databaseNetworkFilesExcitation.py}
+\subsection{GIAANNcmn\_sequenceObservedColumns.py}
 \begin{itemize}
-	\item Handles all on-disk persistence: concept/feature dictionaries, observed column metadata, and sparse tensors.
-	\item Provides robust tensor shape adjustment for property and branch dimensions across versions.
-	\item Enforces hard validation for missing files, inconsistent tensor ranks, or invalid configuration.
+	\item Defines \texttt{SequenceObservedColumns}, the sequence-local view of observed columns, feature occurrences, and neuron/connection tensors used during training and inference.
+	\item Builds local/global index mappings, determines the source-feature tensors required by each column, and supports dense or sparse sequence updates restricted to the sequence's features.
+	\item Maps updates back to database coordinates, combines duplicate sparse updates, and dispatches the configured batched, native CPU, or CUDA update path. Optional branch verification filters connections already represented on other branches.
 \end{itemize}
 
-\subsection{GIAANNproto\_databaseNetworkTrainExcitation.py}
+\subsection{GIAANNcmn\_databaseNetwork.py}
 \begin{itemize}
-	\item Executes the training update rule by turning feature activations into connection activations and updating properties.
-	\item Applies POS-dependent strength scaling, context-length normalisation, and optional permanence decay.
-	\item Assigns SANI segments for connections and enforces word/column order constraints.
+	\item Defines \texttt{DatabaseNetworkClass}, holding concept/feature dictionaries, delimiter metadata, property indices, optional auxiliary state, and global neuron tensors indexed by property, branch, segment, column, and feature.
+	\item Initialises fixed subword vocabularies or dynamic dictionaries, loads or creates observed columns, and manages database growth, device copies, RAM loading, and final saves.
+	\item Separates persistent training strengths from inference activation state, supports global neuron tensor generation from column data, and maps sequence tokens to database column/feature indices.
 \end{itemize}
 
-\subsection{GIAANNproto\_predictionActivate.py}
+\subsection{Observed-column storage}
 \begin{itemize}
-	\item Implements activation updates during inference, including sequential (SANI) gating and activation decrement.
-	\item Provides sparse tensor utilities for reading and replacing activation values at specific indices.
-	\item Computes sequence column indices used for time-based activation constraints.
+	\item \texttt{GIAANNcmn\_databaseNetworkObservedColumn.py} defines \texttt{ObservedColumn}, its shared connection-storage interface, lightweight stubs, and device-specific proxies.
+	\item Stores outgoing connections separately for each source feature. Each source tensor is indexed by property, target branch, target segment, target column, and target feature, allowing only the required sources to be loaded.
+	\item Handles tensor expansion, source preparation, loading/unloading, and shared feature maps. Optional packed RAM storage uses narrower coordinate indices and materialises ordinary sparse COO tensors for computation.
 \end{itemize}
 
-\subsection{GIAANNproto\_predictionConstraints.py}
+\subsection{GIAANNcmn\_databaseNetworkFiles.py}
 \begin{itemize}
-	\item Encapsulates inference constraints for delimiter handling, internal/external column selection, and connectivity filtering.
-	\item Aggregates sparse activations into candidate (column, feature) lists and filters them by constraint state.
-	\item Raises or stops inference when connectivity constraints yield no valid candidates.
+	\item Persists global dictionaries and delimiter lists, column metadata, column neuron tensors, and per-source-feature connection files under the observed-column directory.
+	\item Remaps training properties to the inference layout, adjusts supported property/branch dimensions, and expands sparse tensor shapes as the database grows. It validates storage formats, metadata, and tensor dimensions.
+	\item Implements startup checks, template-dataset copying, incremental saves, and optional global neuron tensor generation. Inference can require an existing trained database, and database writes can be disabled for supported diagnostic/evaluation workflows.
 \end{itemize}
 
-\subsection{GIAANNproto\_predictionBeamSearch.py}
+\subsection{GIAANNcmn\_databaseNetworkTrain.py}
 \begin{itemize}
-	\item Implements beam search over activation states with depth/width control and multiple scoring strategies.
-	\item Clones activation, connection, and time state per beam to avoid cross-beam interference.
-	\item Converts best-scoring beam actions into the single-step prediction used by the main inference loop.
+	\item Builds directed connection updates from active source/target occurrences, applies order and self-transition constraints, and assigns connections to feature-distance, column-distance, combined, or modality-specific spatial segments.
+	\item Updates neuron and connection strengths through dense or sparse paths. Optional modifiers include distance-based proximity weighting, stronger internal-column connections, POS-dependent scaling, and strength limits.
+	\item Supports optional permanence updates, with inactive-permanence decay restricted to the supported dense path, and masks training targets according to prediction success during inference-guided training.
 \end{itemize}
 
-\subsection{GIAANNproto\_prediction.py}
+\subsection{Branch selection and column timing}
 \begin{itemize}
-	\item Implements the full inference loop, including the seed phase and per-token prediction phase.
-	\item Applies delimiter constraints, direct-connection enforcement, and optional beam search selection.
-	\item Updates global activation/time tensors and optionally draws or logs prediction diagnostics.
+	\item \texttt{GIAANNcmn\_databaseNetworkTrainSelectBranch.py} implements optional similarity-based branch selection. It compares prospective source/segment patterns with trained branches, reuses a sufficiently similar branch, and otherwise selects a random branch for the target feature.
+	\item \texttt{GIAANNcmn\_trainColumnSteps.py} optionally derives column-segment distances from actual column transitions, including repeated-column handling, while leaving feature timing based on token occurrences.
 \end{itemize}
 
-\subsection{GIAANNproto\_databaseNetworkDrawExcitation.py}
+\subsection{Training acceleration}
+\begin{itemize}
+	\item \texttt{GIAANNcmn\_cpuObservedColumnUpdate.py} and \texttt{GIAANNcmn\_cpuConnectionUpdate.cpp} provide parallel native CPU merges of RAM-resident sparse connection updates.
+	\item \texttt{GIAANNcmn\_cpuParallelisation2.py} and its C++ extension construct temporal connections in canonical sparse order, map and group updates by source, partition large merges, reuse unchanged coordinate storage, and update column neurons directly. The Python module also vectorises training activation preparation.
+	\item \texttt{GIAANNnlp\_parallelisation3.py} and \texttt{GIAANNnlp\_parallelisation3Worker.py} prepare articles in bounded CPU worker processes while the training process consumes results in the original order. Related options reuse token/concept metadata and prepare required connection sources in bulk.
+	\item \texttt{GIAANNcmn\_cudaObservedColumnUpdate.py} supplies an optional custom CUDA sparse accumulator. Native acceleration paths enforce their required storage, device, and feature configurations.
+	\item \texttt{GIAANNcmn\_trainConnectionOverlay.py} and \texttt{GIAANNcmn\_cpuConnectionOverlay.cpp} implement the optional \texttt{optimiseTrainConnectionOverlay} path for fixed-vocabulary, strength-only CPU RAM training. It accumulates touched coordinates over historical COO tensors in sequence order and materialises updated tensors when accessed or saved; the option is currently disabled.
+\end{itemize}
+
+\subsection{GIAANNcmn\_prediction.py}
+\begin{itemize}
+	\item Implements seed processing and subsequent token prediction, selecting either the model prediction or the observed target as the next source according to the inference mode.
+	\item Coordinates activation propagation, column and connectivity constraints, optional donor propagation, candidate selection, neuron resets, and selected-token bursting. Prediction-driven LIF inference tracks deactivated neurons for subsequent candidate exclusion.
+	\item Reports prediction-only and seed-inclusive top-1 accuracy, counts unprocessed tokens after early termination as unsuccessful predictions, and supports bits-per-byte evaluation in compatible teacher-forced configurations.
+\end{itemize}
+
+\subsection{GIAANNcmn\_predictionActivate.py}
+\begin{itemize}
+	\item Propagates source activity through trained outgoing connections, with optional per-source/per-segment input normalisation, POS scaling, activation transforms, and feature-segment weighting.
+	\item In LIF mode, advances feature-segment signals towards the soma per token and column-segment signals on column transitions, with configurable decay and resets. Soma scoring combines soma and terminal-column evidence within each branch and takes the maximum across branches.
+	\item Preserves branch identity for firing eligibility and supports binary-tree propagation. Non-LIF paths retain sequential gating and exact, biased, or untimed segment activation rules.
+	\item Includes ordered sparse propagation and decay optimisations, local source-activation lookup, and sparse value/time updates.
+\end{itemize}
+
+\subsection{GIAANNcmn\_predictionConstraints.py}
+\begin{itemize}
+	\item Encapsulates delimiter-dependent internal/external column selection, including configured external prime-concept transitions and valid same-column continuations.
+	\item Builds direct-connectivity lookups from source-feature connection tensors and filters candidate column/feature pairs. Connectivity enforcement and strict source identity are configured separately from activation scoring.
+	\item Reuses loaded observed columns where configured and raises a connectivity error or a dedicated sequence-stop exception when no valid prediction is available, according to the configured policy.
+\end{itemize}
+
+\subsection{GIAANNcmn\_predictionBeamSearch.py}
+\begin{itemize}
+	\item Supplies both single-step candidate selection and optional beam search with configurable depth, width, and activation/connection scoring strategies.
+	\item Filters candidates by segment eligibility, soma thresholds, column/connectivity constraints, and deactivation state. Optional prospective column scoring evaluates external-column transitions without changing the live activation state.
+	\item Clones activation, connection, time, and concept state for beam hypotheses and converts the best path into the next column/feature prediction. Compatible single-step paths can invoke the optional scorers described below.
+\end{itemize}
+
+\subsection{Optional prediction scoring}
+\begin{itemize}
+	\item \texttt{GIAANNcmn\_predictionContextLikelihood.py} combines LIF activation with trained immediate-source evidence, frequency priors, and smoothed evidence from recent feature-distance connections. It scores eligible candidates without modifying the live activation tensor; \texttt{inferenceContextLikelihood} is currently disabled.
+	\item \texttt{GIAANNcmn\_predictionColumnLikelihood.py} can add evidence from trained column-segment connections beyond the local feature window. In compatible teacher-forced context-likelihood configurations, \texttt{inferenceLikelihoodCalibration} applies the configured power to neuron scores before token aggregation.
+	\item \texttt{GIAANNcmn\_predictionTokenPrior.py} provides an optional bounded multiplicative prior derived from learned token-transition strengths, subject to its connectivity and inference-mode restrictions.
+	\item \texttt{GIAANNcmn\_predictionTokenAggregation.py} sums eligible neuron scores by output token, including the token represented by a prime-concept neuron, and retains the strongest representing neuron for the winning token.
+\end{itemize}
+
+\subsection{Missing-feature and semantic source inference}
+\begin{itemize}
+	\item \texttt{GIAANNcmn\_predictionInferMissingFeatures.py} supports propagation through trained proxy sources when the selected source lacks trained outgoing connections. Configurable paths use persisted source-connection files, contextual activation, source weighting/confidence, and a nonzero-signal requirement while preserving donor activations.
+	\item \texttt{GIAANNnlp\_predictionSemantic.py} conditions donor selection on the selected token and contextual column activity, can project a donor's within-column targets into the observed source column, and constructs corresponding connectivity constraints. External word-vector similarity is a separate optional source of evidence.
+	\item \texttt{GIAANNnlp\_predictionSourceEvidence.py} supports the optional graph-evidence upgrade by estimating a source neuron's training support and adapting its mixture with same-token donor evidence. These pathways are explicitly configured and are restricted by strict source-connectivity requirements.
+\end{itemize}
+
+\subsection{GIAANNcmn\_predictionPoolTransitions.py}
+\begin{itemize}
+	\item Implements optional pooling of learned immediate transitions across source neurons representing the same token when the selected source has no outgoing connectivity.
+	\item Caches token-to-source mappings, aggregates transition strengths, and retains representative target neurons. This pathway is used by compatible indirect-inference configurations with previous-prediction connectivity enforcement disabled.
+\end{itemize}
+
+\subsection{Auxiliary neuron modules}
+\begin{itemize}
+	\item \texttt{GIAANNnlp\_auxiliaryNeuronsSimilarWords.py} manages optional auxiliary features, parent-feature weights, auxiliary connection storage, training updates, and inference propagation for prime-concept and secondary features.
+	\item \texttt{GIAANNnlp\_auxiliaryNeuronsPOS.py} constructs auxiliary features from parent words, lemmas, POS categories, and subword roles.
+	\item \texttt{GIAANNnlp\_auxiliaryNeuronsAuto.py}, \texttt{GIAANNnlp\_auxiliaryNeuronsSimilarWordsAuto.py}, and \texttt{GIAANNnlp\_auxiliaryNeuronsSimilarSubwordAuto.py} build automatic similarity data and connection weights, including reverse-connection evidence and dynamic inference mappings. These modules operate when their auxiliary-neuron options are enabled.
+\end{itemize}
+
+\subsection{Optional sequence-context memory}
+\begin{itemize}
+	\item \texttt{GIAANNcmn\_sequenceContext.py} records training token sequences and boundaries and builds a persistent context index with vocabulary and file-integrity checks under \texttt{useSequenceContext}.
+	\item \texttt{GIAANNcmn\_predictionSequenceContext.py} maintains source-token history and reranks eligible predictions using smoothed matches over the configured context lengths. It requires a matching recorded training corpus and leaves candidate eligibility and live LIF activity intact.
+\end{itemize}
+
+\subsection{GIAANNcmn\_inferenceDuringTrain.py}
+\begin{itemize}
+	\item Tracks source-specific connections activated during the inference phase of inference-guided training.
+	\item Supplies optional synaptic-strength decrements to the dense and sparse training paths; the main pipeline and training module use prediction-success masks to select the targets requiring learning.
+\end{itemize}
+
+\subsection{Inference chunks and workers}
+\begin{itemize}
+	\item \texttt{GIAANNcmn\_inferenceChunks.py} freezes inference source/settings, filters prompt lines using the normal eligibility rule, and partitions independent sequences into process-sized chunks.
+	\item \texttt{GIAANNcmn\_inferenceChunkWorker.py} evaluates each chunk in a fresh process with one compute thread and database write protection. \texttt{optimisationInferenceWorkers} enables bounded concurrent execution.
+	\item The controller validates worker results, handles failures and interruption, and aggregates prediction and token counts before calculating accuracy. Unsupported combinations, including training within inference, fail configuration validation.
+\end{itemize}
+
+\subsection{Grounded evaluation modules}
+\begin{itemize}
+	\item \texttt{GIAANNnlp\_groundedDataset.py} builds configured closed-world training facts and evaluation probes, including supported and unsupported answers, and generates their inference prompts.
+	\item \texttt{GIAANNnlp\_groundedEval.py} evaluates answer positions separately from ordinary token accuracy, distinguishing justified answers, correct but ungrounded answers, grounded falsehoods, ungrounded hallucinations, and abstentions.
+\end{itemize}
+
+\subsection{Diagnostics and configuration benchmarks}
+\begin{itemize}
+	\item \texttt{GIAANNcmn\_debug.py}, \texttt{GIAANNcmn\_count.py}, and \texttt{GIAANNcmn\_executionProgress.py} provide phase timings, memory and database-size measurements, neuron/connection counts, token totals, and training/evaluation progress displays.
+	\item The separate \texttt{generalisedBenchmarkTool/} prepares isolated source snapshots, applies explicit file/line configuration edits, selects prompts, and records configuration-level results without editing the original source or trained database.
+	\item Benchmark configurations execute sequentially; each delegates chunk scheduling and worker concurrency to the native inference modules. Accuracy is derived from their aggregate counts rather than an average of chunk percentages.
+\end{itemize}
+
+\subsection{GIAANNcmn\_databaseNetworkDraw.py}
 \begin{itemize}
 	\item Renders the network graph using NetworkX/Matplotlib, supporting multiple colour schemes (segments, branches, POS, delimiters).
 	\item Extracts active feature and connection subsets from sparse tensors to visualise only non-empty structure.
@@ -149,9 +243,23 @@ The section describes the implementation of GIAANN proto v1.
 \end{center}
 
 
-\subsection{GIAANNproto\_sparseTensors.py}
+\subsection{GIAANNcmn\_databaseNetworkDrawLarge.py}
 \begin{itemize}
-	\item Provides shared sparse tensor utilities (create, slice, merge, index updates, branch reduction).
-	\item Implements branch-aware reductions and sparse index operations used in both training and inference.
-	\item Centralises sparse arithmetic for activation and strength updates.
+	\item Draws a saved database independently of sequence processing, with compact feature positions, selective column/source loading, and Matplotlib line collections for larger graphs.
+	\item Supports vector/raster output and optional three-dimensional LDraw export according to the standalone drawing configuration.
+\end{itemize}
+
+\subsection{Sparse tensor utilities}
+\begin{itemize}
+	\item \texttt{GIAANNcmn\_sparseTensors.py} provides shared sparse COO creation, slicing, merging, property replacement, index updates, and branch reductions for training and inference.
+	\item \texttt{GIAANNcmn\_predictionSparse.py} implements eligible-neuron activation lookup and ordered single-coordinate burst updates, with explicit checks on tensor layout, coordinates, and activation values.
+\end{itemize}
+
+\subsection{Experimental object-recognition modules}
+\begin{itemize}
+	\item \texttt{GIAANNor\_globalDefs.py} configures the image/video modality, datasets, snapshot geometry, receptive-field filters, and spatial or temporal encoding. \texttt{GIAANNor\_main.py} currently constructs and trains visual sequences through the shared database and update code.
+	\item \texttt{GIAANNor\_datasets.py} loads image/video data and extracts frames. \texttt{GIAANNor\_features.py}, \texttt{GIAANNor\_keypoints.py}, \texttt{GIAANNor\_snapshots.py}, and \texttt{GIAANNor\_snapshotDimensions.py} implement feature/keypoint selection, snapshot sampling, and geometry preparation.
+	\item \texttt{GIAANNor\_RFfilters.py} constructs or imports receptive-field banks, including ellipsoidal and Gabor filters, and selects filter responses. \texttt{GIAANNor\_sequenceTokens.py} maps snapshots to spatial columns, including optional retinotopic sampling.
+	\item \texttt{GIAANNor\_sequenceConcepts.py} converts selected filters into column/feature activations, while \texttt{GIAANNor\_sequenceObservedColumns.py} adapts the shared sequence representation for visual data.
+	\item \texttt{GIAANNor\_sequenceSaccades.py}, \texttt{GIAANNor\_sequenceDistance.py}, \texttt{GIAANNor\_sequenceAxis.py}, and \texttt{GIAANNor\_sequenceAxes.py} provide the configured saccade, distance, and axis-based encodings used to assign training connections to segments.
 \end{itemize}

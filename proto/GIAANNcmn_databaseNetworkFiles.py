@@ -24,6 +24,8 @@ import time
 import subprocess
 
 from GIAANNcmn_globalDefs import *
+if(optimiseTrainSequenceBatch):
+	import GIAANNcmn_trainSequenceBatch
 import GIAANNcmn_debug
 import GIAANNcmn_count
 
@@ -425,6 +427,8 @@ def expandBranchDimensions(tensor, tensorName, branchCount):
 
 
 def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSaveGlobalState=False):
+	if(optimiseTrainSequenceBatch):
+		GIAANNcmn_trainSequenceBatch.flushDatabase(databaseNetworkObject)
 	saveDataStartTime = None
 	saveObservedColumnsStartTime = None
 	if(debugPrintTrainSectionTimes):
@@ -474,6 +478,8 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 		GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "saveData.total", time.perf_counter() - saveDataStartTime)
 
 def generateGlobalFeatureNeuronsTensor(databaseNetworkObject, useRAMcolumnFeatureNeurons):
+	if(optimiseTrainSequenceBatch):
+		GIAANNcmn_trainSequenceBatch.flushDatabase(databaseNetworkObject)
 	if(databaseNetworkObject is None):
 		raise RuntimeError("generateGlobalFeatureNeuronsTensor error: databaseNetworkObject is None")
 	if(storeDatabaseGlobalFeatureNeuronsInRam or databaseNetworkObject.inferenceMode):
@@ -583,6 +589,8 @@ def observedColumnSaveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsTo
 	"""
 	Save the observed column data to disk.
 	"""
+	if(optimiseTrainSequenceBatch):
+		GIAANNcmn_trainSequenceBatch.flushDatabase(self.databaseNetworkObject)
 	validateObservedColumnStorageFormat(self.conceptIndex)
 	ensureObservedColumnFolderExists(self.conceptIndex)
 	if(resizeFeatureTensorsToCurrentSize):

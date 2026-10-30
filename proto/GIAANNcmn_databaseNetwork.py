@@ -20,10 +20,14 @@ GIA ANN common database Network
 import torch as pt
 
 from GIAANNcmn_globalDefs import *
+if(optimiseTrainSequenceBatch):
+	import GIAANNcmn_trainSequenceBatch
 import GIAANNcmn_debug
 import GIAANNcmn_databaseNetworkFiles
 from GIAANNcmn_databaseNetworkObservedColumn import ObservedColumn, ObservedColumnConnectionBase, ObservedColumnProxy, ObservedColumnStub
 import GIAANNcmn_sparseTensors
+if(optimiseTrainConnectionOverlay):
+	import GIAANNcmn_trainConnectionOverlay
 if(inferenceInferMissingFeaturesSemanticAdaptiveSupplement):
 	import GIAANNnlp_predictionSourceEvidence
 if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
@@ -67,6 +71,10 @@ class DatabaseNetworkClass():
 			GIAANNnlp_auxiliaryNeuronsSimilarWords.initialiseDatabaseNetworkAuxiliary(self, auxiliarySimilarFeaturesDict, auxiliarySimilarFeaturesList, auxiliarySimilarFeatureWordWeightsByParentWord, auxiliarySimilarLoadExistingDatabase)
 		self.setArrayIndexProperties(inferenceMode)
 		self.inferenceMode = inferenceMode
+		if(optimiseTrainSequenceBatch):
+			self.trainSequenceBatchState = None
+		if(optimiseTrainCommitThreads):
+			self.trainCommitCPUs = None
 		if(inferenceInferMissingFeaturesSemanticAdaptiveSupplement):
 			GIAANNnlp_predictionSourceEvidence.initialiseSemanticSourceEvidence(self)
 		if(inferenceInferMissingFeatures and inferenceInferMissingFeaturesSemantic):
@@ -535,34 +543,42 @@ def moveObservedColumnsDictConnectionsToDatabaseAfterTrain(observedColumnsDict, 
 	return
 
 def prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFeatureIndicesByObservedColumn):
-	if(requiredSourceFeatureIndicesByObservedColumn is None):
-		raise RuntimeError("prepareObservedColumnsForTrainSequence error: requiredSourceFeatureIndicesByObservedColumn is None")
-	for observedColumn in observedColumnsDict.values():
-		conceptIndex = int(observedColumn.conceptIndex)
-		if(conceptIndex not in requiredSourceFeatureIndicesByObservedColumn):
-			raise RuntimeError(f"prepareObservedColumnsForTrainSequence error: missing required source features for conceptIndex {conceptIndex}")
-		requiredSourceFeatureIndices = requiredSourceFeatureIndicesByObservedColumn[conceptIndex]
-		if(requiredSourceFeatureIndices is None):
-			raise RuntimeError(f"prepareObservedColumnsForTrainSequence error: requiredSourceFeatureIndices is None for conceptIndex {conceptIndex}")
-		if(len(requiredSourceFeatureIndices) == 0):
-			raise RuntimeError(f"prepareObservedColumnsForTrainSequence error: requiredSourceFeatureIndices is empty for conceptIndex {conceptIndex}")
-		if(trainSelectMostSimilarBranch):
-			observedColumn.prepareRequiredSourceFeatureConnectionsTrain(requiredSourceFeatureIndices, deviceSparse, createMissing=False)
-			observedColumn.setTrainPreparedSourceFeatureIndices(requiredSourceFeatureIndices)
-		elif(trainVerifyConnectionNonexistentAcrossBranches):
-			observedColumn.prepareRequiredSourceFeatureConnectionsTrain(requiredSourceFeatureIndices, deviceSparse, createMissing=False)
-			observedColumn.setTrainPreparedSourceFeatureIndices(requiredSourceFeatureIndices)
-		elif(not optimisationArrayIndexPropertiesEfficientSerialConnections):
-			observedColumn.prepareRequiredSourceFeatureConnectionsTrain(requiredSourceFeatureIndices, deviceSparse, createMissing=False)
-			observedColumn.setTrainPreparedSourceFeatureIndices(requiredSourceFeatureIndices)
-		else:
-			observedColumn.clearTrainPreparedSourceFeatureIndices()
+	if(optimiseTrainDeferredSourcePreparation):
+		import GIAANNcmn_trainDeferredSourcePreparation
+		GIAANNcmn_trainDeferredSourcePreparation.queue(observedColumnsDict, requiredSourceFeatureIndicesByObservedColumn)
+	else:
+		if(requiredSourceFeatureIndicesByObservedColumn is None):
+			raise RuntimeError("prepareObservedColumnsForTrainSequence error: requiredSourceFeatureIndicesByObservedColumn is None")
+		for observedColumn in observedColumnsDict.values():
+			conceptIndex = int(observedColumn.conceptIndex)
+			if(conceptIndex not in requiredSourceFeatureIndicesByObservedColumn):
+				raise RuntimeError(f"prepareObservedColumnsForTrainSequence error: missing required source features for conceptIndex {conceptIndex}")
+			requiredSourceFeatureIndices = requiredSourceFeatureIndicesByObservedColumn[conceptIndex]
+			if(requiredSourceFeatureIndices is None):
+				raise RuntimeError(f"prepareObservedColumnsForTrainSequence error: requiredSourceFeatureIndices is None for conceptIndex {conceptIndex}")
+			if(len(requiredSourceFeatureIndices) == 0):
+				raise RuntimeError(f"prepareObservedColumnsForTrainSequence error: requiredSourceFeatureIndices is empty for conceptIndex {conceptIndex}")
+			if(trainSelectMostSimilarBranch):
+				observedColumn.prepareRequiredSourceFeatureConnectionsTrain(requiredSourceFeatureIndices, deviceSparse, createMissing=False)
+				observedColumn.setTrainPreparedSourceFeatureIndices(requiredSourceFeatureIndices)
+			elif(trainVerifyConnectionNonexistentAcrossBranches):
+				observedColumn.prepareRequiredSourceFeatureConnectionsTrain(requiredSourceFeatureIndices, deviceSparse, createMissing=False)
+				observedColumn.setTrainPreparedSourceFeatureIndices(requiredSourceFeatureIndices)
+			elif(not optimisationArrayIndexPropertiesEfficientSerialConnections):
+				observedColumn.prepareRequiredSourceFeatureConnectionsTrain(requiredSourceFeatureIndices, deviceSparse, createMissing=False)
+				observedColumn.setTrainPreparedSourceFeatureIndices(requiredSourceFeatureIndices)
+			else:
+				observedColumn.clearTrainPreparedSourceFeatureIndices()
 	return
 
 def saveAllObservedColumnsToDisk(databaseNetworkObject):
+	if(optimiseTrainSequenceBatch):
+		GIAANNcmn_trainSequenceBatch.flushDatabase(databaseNetworkObject)
 	if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 		if(databaseNetworkObject.observedColumnsDictRAM is None):
 			raise RuntimeError("saveAllObservedColumnsToDisk error: observedColumnsDictRAM is None")
+		if(optimiseTrainConnectionOverlay):
+			GIAANNcmn_trainConnectionOverlay.materialiseDatabase(databaseNetworkObject)
 		for observedColumn in databaseNetworkObject.observedColumnsDictRAM.values():
 			saveAllSourceFeatures = True
 			observedColumn.saveToDisk(saveAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeTensorsOnRAMdatabaseSave)

@@ -21,6 +21,8 @@ Bounded CPU article preparation; all learning remains ordered in the parent.
 
 
 from GIAANNcmn_globalDefs import *
+if(optimiseTrainSequenceBatch):
+	import GIAANNcmn_trainSequenceBatch
 
 if(optimiseTrainParallelisation3b):
 	import os
@@ -44,6 +46,8 @@ def processDatasetPrefetched(databaseNetworkObject, sequenceCount, dataset):
 		import GIAANNnlp_main as nlp
 		validatePrefetchConfiguration(sequenceCount)
 		with ArticlePreparationPool() as pool:
+			if(optimiseTrainCommitThreads):
+				pool.bindCommitDatabase(databaseNetworkObject)
 			articles = iter(enumerate(dataset))
 			pending = deque()
 			exhausted = False
@@ -69,6 +73,8 @@ def processDatasetPrefetched(databaseNetworkObject, sequenceCount, dataset):
 					pool.workerCPUSeconds += statistics[0]
 					pool.workerWallSeconds += statistics[1]
 					sequenceCount = consumePreparedArticle(nlp, databaseNetworkObject, sequenceCount, articleIndex, prepared)
+			if(optimiseTrainSequenceBatch):
+				GIAANNcmn_trainSequenceBatch.flushDatabase(databaseNetworkObject)
 			databaseNetworkObject.parallelisation3PipelineStatistics = pool.statistics()
 		result = sequenceCount
 	return result
@@ -125,6 +131,8 @@ class ArticlePreparationPool:
 			self.workerWallSeconds = 0.0
 			self.startupSeconds = 0.0
 			self.workerIdentities = []
+			if(optimiseTrainCommitThreads):
+				self.commitDatabase = None
 
 	def __enter__(self):
 		if(optimiseTrainParallelisation3b):
@@ -166,6 +174,14 @@ class ArticlePreparationPool:
 				self.available.put(index)
 			self.executor = ThreadPoolExecutor(max_workers=parallelisation3WorkerCount)
 			self.startupSeconds = time.perf_counter()-start
+		return
+
+	def bindCommitDatabase(self, database):
+		if(optimiseTrainCommitThreads):
+			if(self.commitDatabase is not None or database.trainCommitCPUs is not None):
+				raise RuntimeError(trainCommitThreadsInvalidState)
+			database.trainCommitCPUs = tuple(self.availableCPUs[:parallelisation3TrainingThreads + parallelisation3WorkerCount])
+			self.commitDatabase = database
 		return
 
 	def prepare(self, articleIndex, entry):
@@ -216,6 +232,10 @@ class ArticlePreparationPool:
 					except subprocess.TimeoutExpired as exception:
 						failures.append(repr(exception))
 			finally:
+				if(optimiseTrainCommitThreads):
+					if(self.commitDatabase is not None):
+						self.commitDatabase.trainCommitCPUs = None
+						self.commitDatabase = None
 				pt.set_num_threads(self.originalThreads)
 				for path in Path("/proc/self/task").iterdir():
 					thread = int(path.name)
@@ -234,7 +254,11 @@ def runWorker(connectionDescriptor, cpu):
 		pt.set_num_interop_threads(parallelisation3WorkerThreads)
 		connection = socket.socket(fileno=connectionDescriptor)
 		try:
-			import GIAANNnlp_main as nlp
+			if(optimiseTrainLightweightWorkers):
+				import GIAANNnlp_trainPreparation as nlp
+				nlp.initialiseWorker()
+			else:
+				import GIAANNnlp_main as nlp
 			nlp.loadPOSdatabase()
 			nlp.GIAANNnlp_sequenceTokens.getTokeniserSubwordEncoding()
 			sendMessage(connection, (parallelisation3WorkerReady, os.getpid(), sorted(os.sched_getaffinity(0)), (optimiseTrainParallelisation3a, optimiseTrainParallelisation3b, optimiseTrainParallelisation3c, optimiseTrainParallelisation3d)))

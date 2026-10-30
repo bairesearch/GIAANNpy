@@ -21,6 +21,8 @@ Independently selectable CPU training optimisations layered on optimiseTrainPara
 
 
 from GIAANNcmn_globalDefs import *
+if(optimiseTrainSequenceBatch):
+	import GIAANNcmn_trainSequenceBatch
 if(patchTrainColumnStepsRepeatedColumns):
 	import GIAANNcmn_trainColumnSteps
 
@@ -62,12 +64,15 @@ def createTemporalConnections(featureNeuronsActive, cs, fs, columnsWordOrder, fe
 				if(inferenceLeakyIntegrateAndFire):
 					featureSegments += inferenceLeakyIntegrateAndFireSomaSegmentCount
 				internalColumns = useSANIfeaturesAndColumnsInternal
-		extension = getParallelisation2Extension()
-		if(patchTrainColumnStepsRepeatedColumns):
-			columnSteps = GIAANNcmn_trainColumnSteps.calculateColumnSteps(sequenceObservedColumns, columnsWordOrder.device)
-			result = extension.createTemporalConnections(optimiseTrainParallelisation2a, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, cs, fs, includeSameTime, trainConnectionsAllowSelfTransitions, debugConnectNodesToNextNodesInSequenceOnly, debugConnectColumnsToNextColumnsInSequenceOnly, useSANI, arrayIndexSegmentLast, mode, parallelisation2TemporalModeColumns, parallelisation2TemporalModeFeatures, parallelisation2TemporalModeCombined, columnSegments, featureSegments, internalColumns, linkFirstColumn, linkFirstFeature, lastColumnSegment, parallelisation2MaximumSegments, parallelisation2KernelGrainSize, patchTrainColumnStepsRepeatedColumns, columnSteps, patchTrainColumnStepsInvalid)
+		if(optimiseTrainSequenceBatch):
+			result = GIAANNcmn_trainSequenceBatch.createTemporalConnections(featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, cs, fs, includeSameTime, mode, columnSegments, featureSegments, internalColumns, linkFirstColumn, linkFirstFeature, lastColumnSegment, sequenceObservedColumns)
 		else:
-			result = extension.createTemporalConnections(optimiseTrainParallelisation2a, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, cs, fs, includeSameTime, trainConnectionsAllowSelfTransitions, debugConnectNodesToNextNodesInSequenceOnly, debugConnectColumnsToNextColumnsInSequenceOnly, useSANI, arrayIndexSegmentLast, mode, parallelisation2TemporalModeColumns, parallelisation2TemporalModeFeatures, parallelisation2TemporalModeCombined, columnSegments, featureSegments, internalColumns, linkFirstColumn, linkFirstFeature, lastColumnSegment, parallelisation2MaximumSegments, parallelisation2KernelGrainSize)
+			extension = getParallelisation2Extension()
+			if(patchTrainColumnStepsRepeatedColumns):
+				columnSteps = GIAANNcmn_trainColumnSteps.calculateColumnSteps(sequenceObservedColumns, columnsWordOrder.device)
+				result = extension.createTemporalConnections(optimiseTrainParallelisation2a, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, cs, fs, includeSameTime, trainConnectionsAllowSelfTransitions, debugConnectNodesToNextNodesInSequenceOnly, debugConnectColumnsToNextColumnsInSequenceOnly, useSANI, arrayIndexSegmentLast, mode, parallelisation2TemporalModeColumns, parallelisation2TemporalModeFeatures, parallelisation2TemporalModeCombined, columnSegments, featureSegments, internalColumns, linkFirstColumn, linkFirstFeature, lastColumnSegment, parallelisation2MaximumSegments, parallelisation2KernelGrainSize, patchTrainColumnStepsRepeatedColumns, columnSteps, patchTrainColumnStepsInvalid)
+			else:
+				result = extension.createTemporalConnections(optimiseTrainParallelisation2a, featureNeuronsActive, columnsWordOrder, featureNeuronsWordOrder, cs, fs, includeSameTime, trainConnectionsAllowSelfTransitions, debugConnectNodesToNextNodesInSequenceOnly, debugConnectColumnsToNextColumnsInSequenceOnly, useSANI, arrayIndexSegmentLast, mode, parallelisation2TemporalModeColumns, parallelisation2TemporalModeFeatures, parallelisation2TemporalModeCombined, columnSegments, featureSegments, internalColumns, linkFirstColumn, linkFirstFeature, lastColumnSegment, parallelisation2MaximumSegments, parallelisation2KernelGrainSize)
 	return result
 
 
