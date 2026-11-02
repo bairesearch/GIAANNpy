@@ -1,4 +1,23 @@
-"""Merge ordered training packets directly into resident int32 connection records."""
+"""GIAANNcmn_trainPackedSequenceBatch.py
+
+# Author:
+Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch.com.au)
+
+# License:
+MIT License
+
+# Installation:
+see GIAANNcmn_main.py
+
+# Usage:
+see GIAANNcmn_main.py
+
+# Description:
+GIA ANN common train Packed Sequence Batch
+
+Merge ordered training packets directly into resident int32 connection records.
+
+"""
 
 from GIAANNcmn_globalDefs import *
 

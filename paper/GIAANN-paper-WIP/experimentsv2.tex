@@ -2,7 +2,33 @@
 
 An additional set of accuracy measurements were taken with GIAANN Proto 2.
 
-A number of changes to the default settings were introduced in GIAANN Proto 2 that affect evaluation accuracies (\texttt{useDefaultsV2}):
+\subsubsection{Configuration flags}
+
+The following settings describe the current benchmark configuration in \texttt{GIAANNcmn_globalDefs.py} and \texttt{GIAANNnlp_globalDefs.py}, including values derived from conditional settings. This is a snapshot of the selected configuration, not a claim that all earlier proto v2 measurements used these values. The version notes and table-specific settings below describe those experiments.
+
+\begin{itemize}
+	\item Run mode: \texttt{useModalityNLP=True}, \texttt{useBenchmark=True}, \texttt{useDefault=False}, \texttt{useQuickExecution=False}, \texttt{useDefaultsV2=True}, \texttt{executionMode="inference"}, and \texttt{useInference=True}. Training is selected with \texttt{executionMode="train"}. The selected training size, epoch count, and seed length are \texttt{trainMaxSequences=800000}, \texttt{numberEpochs=1}, and \texttt{numSeedTokensInference=8}; training sizes and seed lengths vary in the reported experiments.
+	\item Evaluation: \texttt{datasetType="oscar"}, \texttt{useBenchmarkDefaults=True}, \texttt{useBenchmarkEvalDataSet=True}, \texttt{useBenchmarkDefaultsEvalTestSet=True}, and the derived \texttt{useBenchmarkDefaultsEvalTestSetOptim=True}. Targets are fed into subsequent steps (\texttt{inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=False}). \texttt{inferenceEvaluateTestSetTrainMaxSequences10M=True} selects the larger evaluation datasets designed to support up to ten million training sequences; the current prompt is \texttt{inference_prompt.txt.longTestOscar2-SentencePredictionsFalse}. \texttt{inferencePromptPreserveLineSequenceBoundaries=True} treats each non-empty prompt line as one independent sequence. \texttt{inferenceReportTokenAccuracyConstrainByColumn=False} and \texttt{printInferenceTop1AccuracyBitsPerByte=False}.
+	\item Sequence construction: \texttt{sentencePredictions=False}, \texttt{multisentencePredictions=False}, \texttt{numSentencesPerSequence=1}, and \texttt{sequencesCropToMaxLength=True}. Here sequences can cross sentence boundaries. \texttt{targetContextLengthInTokens=512} and \texttt{tokensPerWord=1.25} give \texttt{maxSequenceLength=409} spaCy tokens; \texttt{maxTokensPerWord=2.0} gives a separate cap of \texttt{maxSequenceLengthTokens=818} subwords.
+	\item Tokenisation and concept identity: \texttt{tokeniserSubword=True}, \texttt{tokeniserSubwordPOS=True}, \texttt{tokeniserSubwordTiktokenEncodingName="o200k_base"}, \texttt{useDedicatedFeatureListsSubword=True}, and \texttt{useDedicatedConceptListsSubword=True}. \texttt{tokeniserSubwordColumnIdentificationByFirstNounToken=True}; both \texttt{tokeniserSubwordColumnIdentificationByConsecutiveNounTokens} and \texttt{tokeniserSubwordColumnIdentificationByLemma} are \texttt{False}.
+	\item POS and delimiters: \texttt{usePOS=True}, \texttt{useSpacyForConceptNounPOSdetection=True}, \texttt{conceptColumnsDelimitByPOS=True}, \texttt{detectReferenceSetDelimitersBetweenNouns=True}, and \texttt{attachTrailingTokensToLastConcept=True}. \texttt{pretrainCombineConsecutiveNouns=False}, \texttt{pretrainCombineHyphenatedNouns=False}, and \texttt{pretrainConceptColumnsDelimitByPOSenforce=False} accompany subword tokenisation. \texttt{skipSequenceNoDelimiterDetectedBetweenConceptTokens=False} permits sequences without an explicit delimiter between concept tokens.
+	\item spaCy pipeline: \texttt{spacyPipelineOptimisations=True}, \texttt{spacyModelName="en_core_web_sm"}, \texttt{spacyPipelineSingleParse=True}, \texttt{spacyPipelineMinimalComponents=True}, \texttt{spacyPipelineBatchSequences=False}, and \texttt{spacyPipelineLightweightSentenceSegmentation=False}, as required by \texttt{sentencePredictions=False}.
+	\item Memory and tensors: \texttt{useGPUdense=False}, \texttt{useGPUsparse=False}, \texttt{useGPUfileio=False}, \texttt{useGPUsparseStrict=True}, \texttt{trainSparseConnectionsTensor=True}, \texttt{trainSparseNeuronsTensor=True}, and \texttt{arrayIndexPropertiesEfficient=True}, with \texttt{arrayType=pt.float32}. \texttt{storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam} is \texttt{True} for training and \texttt{False} for inference; \texttt{storeDatabaseGlobalFeatureNeuronsInRam} is \texttt{False} for training and \texttt{True} for inference. \texttt{optimisationStoreDatabaseResidentCoordinatesAsInt32=False} in the current configuration; earlier performance experiments identify their storage settings separately.
+	\item Training updates: \texttt{trainSequenceObservedColumnsUseSequenceFeaturesOnly=True}, \texttt{trainSequenceObservedColumnsMatchSequenceWords=True}, and \texttt{optimisationCombineSparseUpdatesPerSequence=True}. \texttt{trainConnectionStrengthNormaliseWrtContextLength=True}, with \texttt{trainConnectionStrengthProximityScale=10.0}, \texttt{trainConnectionStrengthProximityExponent=1.0}, and \texttt{trainConnectionStrengthProximityDistanceOffset=1.0}. \texttt{trainConnectionsAllowSelfTransitions=False} and \texttt{patchTrainColumnStepsRepeatedColumns=False}.
+	\item SANI and segments: \texttt{useSANI=True}, \texttt{useSANIcolumns=False}, \texttt{useSANIfeatures=False}, \texttt{useSANIfeaturesAndColumns=True}, \texttt{useSANIfeaturesAndColumnsInternal=True}, and \texttt{SANIfeaturesAndColumnsDistribution="matchedSegments"}. Both \texttt{arrayNumberOfSegmentsColumnDistance} and \texttt{arrayNumberOfSegmentsFeatureDistance} equal $\lfloor\text{seed}/2\rfloor$. With LIF, \texttt{arrayNumberOfSegments} is their sum plus \texttt{inferenceLeakyIntegrateAndFireSomaSegmentCount=1}; seed 8 therefore gives four column segments, four feature segments, and one soma segment. \texttt{SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=False} and \texttt{SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens=False}.
+	\item Dendritic branches: \texttt{multipleDendriticBranches=False}, \texttt{multipleDendriticBranchesNumber=1}, \texttt{multipleDendriticBranchesRandom=False}, and \texttt{multipleDendriticBranchesBinaryTree=False}. \texttt{trainSelectMostSimilarBranch=False} and \texttt{trainVerifyConnectionNonexistentAcrossBranches=False}.
+	\item Direct connectivity: \texttt{enforceDirectConnections=True}, \texttt{enforceDirectConnectionsSANI=True}, \texttt{enforceDirectConnectionsIgnoreSeed=True}, \texttt{predictionEnsureConnectedToPreviousPrediction=True}, and \texttt{predictionEnsureConnectedToPreviousPredictionStrict=True}. This selects the strict direct configuration: \texttt{inferenceInferMissingFeatures=False}, \texttt{inferenceReviewPatch12RetainContextWithoutOutgoingSource=False}, and \texttt{inferenceReviewPatch13poolTransitionsFromSimilarFeatures=False}. \texttt{auxiliaryNeurons=False}.
+	\item LIF timing and activations: \texttt{inferenceLeakyIntegrateAndFire=True}, \texttt{inferenceActivationFunction=True}, \texttt{inferenceLeakyIntegrateAndFireSomaActivationThreshold=0.008}, \texttt{inferenceConnectionsStrengthBoolean=False}, \texttt{inferenceSourceActivationsBoolean=True}, and \texttt{inferenceSegmentActivationsBoolean=False}. LIF represents timing through dendritic propagation, so \texttt{inferenceUseNeuronFeaturePropertiesTime=False}, \texttt{inferenceUseNeuronFeaturePropertiesTimeExact=False}, and \texttt{enforceSequentialActivation=False}. The candidate eligibility rule is \texttt{algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive"}. The older \texttt{inferenceSegmentTiming} and \texttt{inferenceActivationsType} selectors apply to non-LIF runs.
+	\item Activation reset and decay: \texttt{inferenceDeactivateSomaUponPrediction=True}, \texttt{inferenceDeactivateLastColumnSegmentUponPrediction=True}, and \texttt{inferenceDeactivateSegmentsUponPrediction=False}. Soma and last-column decay are enabled with \texttt{inferenceDecrementActivationsSoma=True}, \texttt{inferenceDecrementActivationsLastColumnSegment=True}, and both corresponding \texttt{Nonlinear} flags \texttt{True}. \texttt{inferenceReviewPatch17segmentTimingOptimisation=True} sets \texttt{inferenceDecrementActivationsSomaPerPredictedToken=1.0} and \texttt{inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn=1.0}. \texttt{inferenceBurstAllPredictionsOrTargetsInSequence=True} activates each selected target after its prediction step.
+	\item Prediction scoring: \texttt{inferenceReviewPatch11ProspectiveColumnScoring=True} and \texttt{inferenceReviewPatch14NormaliseConnectionInputs=True}, with \texttt{inferenceReviewPatch14ReferenceStrength=5.0} and \texttt{inferenceReviewPatch14ColumnInputGain=0.5}. \texttt{inferenceContextLikelihood=True}, with \texttt{inferenceContextLikelihoodPriorWeight=0.5}, \texttt{inferenceContextLikelihoodContextWeight=0.125}, and \texttt{inferenceContextLikelihoodSmoothing=1.0}. The local history length is the feature-segment count plus the soma segment (five tokens here). This scorer enables \texttt{inferenceReviewPatch16TokenAggregation=True}, including under strict direct connectivity. \texttt{inferenceColumnLikelihood=False} and \texttt{inferenceLikelihoodCalibration=False} in the current configuration.
+	\item Prediction selection and expansion: \texttt{inferenceBeamSearch=False}, with inactive beam parameters \texttt{inferenceBeamWidth=3} and \texttt{inferenceBeamDepth=6}. \texttt{inferenceAddNewFeatures=True} allows controlled column/feature expansion without training updates. \texttt{inferenceColumnConstraintsAllowExternalPrimeConceptTransitions=True}, \texttt{inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch=True}, and \texttt{inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch=True} govern column-transition candidates. \texttt{inferenceRequireExistingDatabase=True} requires a trained database for inference.
+	\item Other optional scoring mechanisms are disabled: \texttt{useSequenceContext=False}, \texttt{inferenceGraphEvidenceUpgrade=False}, \texttt{inferenceFeatureSegmentWeighting=False}, and \texttt{inferenceReviewPatch15boundedPrior=False}.
+	\item Execution optimisations: \texttt{optimisationInferenceChunks=True}, \texttt{optimisationInferenceWorkers=True}, \texttt{inferenceChunksSequenceCount=25}, \texttt{inferenceChunksWorkerThreads=1}, and \texttt{inferenceWorkersCount=8}. When \texttt{executionMode="train"}, \texttt{optimiseTrainSequenceBatch=True} and \texttt{optimiseTrainLargeBatches=True} select \texttt{trainSequenceBatchSize=4096} and \texttt{trainSequenceBatchMaxPendingEntries=67108864}; the fused-update, metadata, source-preparation, and worker optimisations are described in the performance section below. These training optimisations are disabled during inference.
+	\item Drawing: \texttt{drawNetworkDuringTrain=False}, \texttt{drawNetworkDuringInference=False}, \texttt{drawNetworkDuringTrainSave=False}, \texttt{drawNetworkDuringInferenceSave=False}, and \texttt{drawDefault=True}; segment, branch, relation-type, and delimiter drawing are disabled.
+\end{itemize}
+
+The following version notes record changes to the defaults introduced during GIAANN Proto 2 development (\texttt{useDefaultsV2}); individual options may subsequently be disabled in the selected configuration documented above.
+
 
 \subsection{proto v2j+ settings}
 \begin{itemize}
@@ -57,6 +83,13 @@ A number of changes to the default settings were introduced in GIAANN Proto 2 th
 	\item set \texttt{!predictionEnsureConnectedToPreviousPredictionStrict}:\texttt{inferenceInferMissingFeatures}
 	\item add option \texttt{inferenceContextLikelihood} (enabled) - score LIF predictions using smoothed contextual evidence and trained frequency priors, with support for independent connectivity and strictness constraints.
       \item set \texttt{!predictionEnsureConnectedToPreviousPrediction}:\texttt{useBenchmarkDefaultsEvalTestSet}:\texttt{inferenceReviewPatch16TokenAggregation=True}.
+\end{itemize}
+
+\subsection{proto v2r+ settings}
+\begin{itemize}
+	\item add option \texttt{inferenceContextLikelihood:inferenceColumnLikelihood} (enabled) - adds evidence from existing trained column-segment connections beyond the local five-token context window. Its weight is inferenceColumnLikelihoodWeight = 0.125.
+	\item add option \texttt{inferenceContextLikelihood:inferenceLikelihoodCalibration} (enabled) - takes the square root of neuron scores before the existing aggregation by output token. This softens score differences. Its exponent is inferenceLikelihoodCalibrationExponent = 0.5.
+	\item enable \texttt{patchTrainColumnStepsRepeatedColumns}.
 \end{itemize}
 
 \Cref{fig:protov2j-oscar-top1-accuracy-spacyPipelineOptimisations-inferenceConnectionStrengthTypes} graphs the v2j training-set and test-set eval results. Note the v2j test-set accuracies are significantly higher than v2k+ of the same context window size due to usage of the different (smaller v1) eval datasets (\texttt{inferenceEvaluateTestSetTrainMaxSequences10M=False}).
@@ -258,9 +291,11 @@ The tables also include the total number of trained words and tokens. There is a
 8 & 4 & 4 & 10,000  & GIAANN & 0.983 & 0.983 & 0.983 & 71.2M & 6.0GB & 2.9M & 3.8M \\
 8 & 4 & 4 & 100,000 & GIAANN & 0.966 & 0.966 & 0.966 & 657.6M & 45.7GB & 28.4M & 37.5M \\
 8 & 4 & 4 & 400,000 & GIAANN & 0.948 & 0.948 & 0.948 & 2413.2M & 150.1GB & 113.8M & 150.2M \\
+8 & 4 & 4 & 800,000 & GIAANN & 0.934 & 0.934 & 0.935 & 4566.5M & 269.7GB & 227.8M & 300.8M \\
 - & - & - & 10,000  & RoBERTa & 0.150 & 0.150 & 0.150 & 67.3M & 257.1MB & 2.4M & 3.4M \\
 - & - & - & 100,000 & RoBERTa & 0.299 & 0.299 & 0.299 & 67.3M & 257.1MB & 23.8M & 33.6M \\
 - & - & - & 400,000 & RoBERTa & 0.369 & 0.369 & 0.369 & 67.3M & 257.1MB & 94.8M & 134.0M \\
+- & - & - & 800,000 & RoBERTa & 0.393 & 0.393 & 0.393 & 67.3M & 257.1MB & 189.7M & 268.2M \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -464,9 +499,11 @@ An additional set of results were created with \texttt{sentencePredictions=False
 8 & 4 & 4 & 10,000  & GIAANN & 0.172 & 0.214 & 0.216 & 71.2M & 6.0GB & 2.9M & 3.8M \\
 8 & 4 & 4 & 100,000 & GIAANN & 0.279 & 0.307 & 0.307 & 657.6M & 45.7GB & 28.4M & 37.5M \\
 8 & 4 & 4 & 400,000 & GIAANN & 0.330 & 0.349 & 0.349 & 2413.2M & 150.1GB & 113.8M & 150.2M \\
+8 & 4 & 4 & 800,000 & GIAANN & 0.388 & 0.402 & 0.401 & 4566.5M & 269.7GB & 227.8M & 300.8M \\
 - & - & - & 10,000  & RoBERTa & 0.150 & 0.150 & 0.150 & 67.3M & 257.1MB & 2.4M & 3.4M \\
 - & - & - & 100,000 & RoBERTa & 0.299 & 0.299 & 0.299 & 67.3M & 257.1MB & 23.8M & 33.6M \\
 - & - & - & 400,000 & RoBERTa & 0.369 & 0.369 & 0.369 & 67.3M & 257.1MB & 94.8M & 134.0M \\
+- & - & - & 800,000 & RoBERTa & 0.388 & 0.388 & 0.388 & 67.3M & 257.1MB & 189.7M & 268.2M \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -545,6 +582,20 @@ A number of optimisations were introduced in GIAANN Proto 2 that affect evaluati
 	\item add option \texttt{optimisationInferenceWorkers} to execute inference chunks concurrently with a configurable worker limit.
 \end{itemize}
 
+\subsection{proto v2r+ settings}
+\begin{itemize}
+	\item add option \texttt{optimiseTrainSequenceBatch} (enabled) to batch sparse updates in sequence order and construct temporal connections in one pass.
+	\item add option \texttt{optimiseTrainFusedSequenceUpdates} (enabled) to generate mapped sparse neuron and connection updates directly without intermediate activation tensors.
+	\item add option \texttt{optimiseTrainConceptMetadata} (enabled) to construct concept boundaries using index lists instead of repeated scalar tensor operations.
+	\item add option \texttt{optimiseTrainDeferredSourcePreparation} (enabled) to prepare the union of required source connections once per batch while preserving read and save consistency.
+	\item add option \texttt{optimiseTrainLargeBatches} (enabled) to increase sequence and pending entry limits and amortize sparse merge costs across larger batches.
+	\item add option \texttt{optimiseTrainPreparationWorkers} (enabled) to allocate two training threads, six NLP workers and a queue of 24 prefetched articles.
+	\item add option \texttt{optimiseTrainCommitThreads} (enabled) to temporarily borrow allocated NLP worker cores during sparse commits and restore thread counts and affinities afterward.
+	\item add option \texttt{optimiseTrainLightweightWorkers} (enabled) to share minimal article preparation code without importing the training network into NLP workers.
+	\item add option \texttt{optimiseTrainWorkerExit} (enabled) to exit successfully completed preparation workers after socket cleanup and output flushing, avoiding interpreter teardown overhead.
+\end{itemize}
+
+
 All proto v2 performance measurements were conducted with different database feature connections active storage location for train/eval (DDR5 RAM/filesystem), with train phase feature neuron and connection sparse tensors, sparse tensor device CPU, and feature neuron sparse tensors stored independently for each column. 
 
 \texttt{optimisationStoreDatabaseResidentCoordinatesAsInt32=True} was set during all proto v2m+ training rounds to reduce RAM usage. 
@@ -572,6 +623,8 @@ Proto v2p+ GIAANN training performance measurements were taken using an AWS inst
 \Cref{tab:protov2p-oscar-performance-models-inferenceLeakyIntegrateAndFire} contains Proto v2p OSCAR-2201 performance measurements for different training sizes, models and execution phases (train, eval test-set). TSBNLP was executed on device GPU.
 
 \Cref{tab:protov2q-oscar-performance-models-inferenceLeakyIntegrateAndFire} contains Proto v2q OSCAR-2201 performance measurements for different training sizes, models and execution phases (train, eval test-set). TSBNLP was executed on device GPU.
+
+\Cref{tab:protov2r-oscar-performance-models-inferenceLeakyIntegrateAndFire} contains Proto v2r OSCAR-2201 performance measurements for different training sizes, models and execution phases (train, eval test-set). TSBNLP was executed on device GPU.
 
 \begin{table}[H]
 \centering
@@ -801,6 +854,42 @@ Proto v2p+ GIAANN training performance measurements were taken using an AWS inst
 - & - & - & 10,000  & RoBERTa & ts eval & 00:02:06 \\
 - & - & - & 100,000 & RoBERTa & ts eval & 00:02:10 \\
 - & - & - & 400,000 & RoBERTa & ts eval & 00:02:16 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Proto v2r OSCAR-2201 performance measurements for different training sizes, models and execution phases (train, eval training-set, eval test-set).}
+\label{tab:protov2r-oscar-performance-models-inferenceLeakyIntegrateAndFire}
+\begin{tabular}{rrrrrrr}
+\toprule
+\textbf{s} & \textbf{c} & \textbf{f} & \textbf{sequences} & \textbf{model} & \textbf{phase} & \textbf{t proc} \\
+\midrule
+8 & 4 & 4 & 10,000  & GIAANN  & train   & 00:01:32 \\
+8 & 4 & 4 & 100,000 & GIAANN  & train   & 00:20:18 \\
+8 & 4 & 4 & 400,000 & GIAANN  & train   & 01:15:27 \\
+8 & 4 & 4 & 800,000 & GIAANN  & train   & 03:12:00 \\
+- & - & - & 10,000  & RoBERTa & train   & 00:04:09 \\
+- & - & - & 100,000 & RoBERTa & train   & 00:40:58 \\
+- & - & - & 400,000 & RoBERTa & train   & 02:37:04 \\
+- & - & - & 800,000 & RoBERTa & train   & 05:30:45 \\
+8 & 4 & 4 & 10,000  & GIAANN  & tr eval & 00:03:44 \\
+8 & 4 & 4 & 100,000 & GIAANN  & tr eval & 00:13:46 \\
+8 & 4 & 4 & 400,000 & GIAANN  & tr eval & 00:44:34 \\
+8 & 4 & 4 & 800,000 & GIAANN  & tr eval & 01:29:04 \\
+- & - & - & 10,000  & RoBERTa & tr eval & 00:02:06 \\
+- & - & - & 100,000 & RoBERTa & tr eval & 00:02:10 \\
+- & - & - & 400,000 & RoBERTa & tr eval & 00:02:16 \\
+- & - & - & 800,000 & RoBERTa & tr eval & 00:02:04 \\
+8 & 4 & 4 & 10,000  & GIAANN  & ts eval & 00:03:39 \\
+8 & 4 & 4 & 100,000 & GIAANN  & ts eval & 00:12:56 \\
+8 & 4 & 4 & 400,000 & GIAANN  & ts eval & 00:39:26 \\
+8 & 4 & 4 & 800,000 & GIAANN  & ts eval & 01:54:42 \\
+- & - & - & 10,000  & RoBERTa & ts eval & 00:02:06 \\
+- & - & - & 100,000 & RoBERTa & ts eval & 00:02:10 \\
+- & - & - & 400,000 & RoBERTa & ts eval & 00:02:16 \\
+- & - & - & 800,000 & RoBERTa & ts eval & 00:02:04 \\
 \bottomrule
 \end{tabular}
 \end{table}

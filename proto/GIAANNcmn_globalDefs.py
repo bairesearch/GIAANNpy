@@ -54,7 +54,7 @@ if(useQuickExecution):
 elif(useDefault):
 	executionMode = "trainAndInference"	#default: trainAndInference	#optional: "train/"inference"/"trainAndInference"
 elif(useBenchmark):
-	executionMode = "train"	#optional: "train/"inference"/"trainAndInference"
+	executionMode = "inference"	#optional: "train/"inference"/"trainAndInference"
 elif(useAutoresearch):
 	executionMode = "trainAndInference"
 elif(useDrawNetworkIndependently):
@@ -197,7 +197,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 100000	#10000, 100000, 400000	#5000, 200000, 1000000
+	trainMaxSequences = 800000	#10000, 100000, 400000, 800000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 50000	#5000
@@ -599,7 +599,7 @@ optimisationNormaliseSourceFeatureIndicesDisabled = False	#default: False	#orig:
 optimisationObservedColumnsWriteMetadataCheck = False	#default: False, orig: False
 optimisationArrayIndexPropertiesEfficientSerialConnections = False	#default: False #orig: True	#uses less GPU RAM
 optimisationArrayIndexPropertiesEfficientSerialNeurons = False	#default: False #orig: False
-optimisationStoreDatabaseResidentCoordinatesAsInt32 = True	#default: False	#orig: False	#~25% database size reduction in RAM (designed for storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam), approx 25% slower train time
+optimisationStoreDatabaseResidentCoordinatesAsInt32 = False	#default: False	#orig: False	#~25% database size reduction in RAM (designed for storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam), approx 25% slower train time
 if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
 	databaseResidentCoordinateDtype = pt.int32
 	databaseResidentCoordinateMinimum = 0
@@ -1516,7 +1516,7 @@ if(drawEfficient):
 	drawEfficientDrawDeadNeurons = True	#default: True	#draw empty columns with no connected neurons
 
 #Training column-segment timing; enable only for fresh training, not continuation of an occurrence-timed checkpoint.
-patchTrainColumnStepsRepeatedColumns = True	#default: True	#orig: False	#opt-in: count database column-ID changes; adjacent repeated occurrences take zero column steps
+patchTrainColumnStepsRepeatedColumns = False	#default: True	#orig: False	#opt-in: count database column-ID changes; adjacent repeated occurrences take zero column steps
 patchTrainColumnStepsDimension = 0
 patchTrainColumnStepsRank = 1
 patchTrainColumnStepsFirst = 0
@@ -1614,10 +1614,7 @@ if(optimisationInferenceChunks):
 	inferenceChunksOutputDirectory = None	#None: retain run snapshots, logs and counts in a new system temporary directory; otherwise use this existing directory
 	inferenceChunksWorkerThreads = 1	#one Torch/BLAS compute thread per process
 if(optimisationInferenceWorkers):
-	if(useSequenceContext):
-		inferenceWorkersCount = 2
-	else:
-		inferenceWorkersCount = 8	#default: 4	#orig: 8	#limit concurrent inference processes to balance memory use and throughput	#with 400k training samples, inferenceContextLikelihood=True/False: 4/8
+	inferenceWorkersCount = 8	#default: 4	#orig: 8	#limit concurrent inference processes to balance memory use and throughput	#with 400k training samples, inferenceContextLikelihood=True/False: 4/8
 if(optimisationInferenceChunks or optimisationInferenceWorkers):
 	inferenceChunksZero = 0
 	inferenceChunksOne = 1
@@ -1714,7 +1711,7 @@ if(inferenceFeatureSegmentWeighting):
 	if(type(inferenceFeatureSegmentWeight) not in (int, float) or not math.isfinite(inferenceFeatureSegmentWeight) or inferenceFeatureSegmentWeight < inferenceFeatureSegmentWeightMinimum):
 		raise ValueError(inferenceFeatureSegmentWeightInvalidParameter)
 if(useBenchmark and executionMode == "inference" and useDefaultsV2 and useModalityNLP and inferenceLeakyIntegrateAndFire and useBenchmarkDefaultsEvalTestSetOptim and not inferenceBeamSearch):
-	inferenceContextLikelihood = False	#default: True	#orig: False	#combine the configured source evidence with smoothed contextual likelihoods before LIF candidate selection
+	inferenceContextLikelihood = True	#default: True	#orig: False	#combine the configured source evidence with smoothed contextual likelihoods before LIF candidate selection
 else:
 	inferenceContextLikelihood = False
 if(inferenceContextLikelihood):
@@ -1757,8 +1754,8 @@ if(inferenceContextLikelihood):
 		raise ValueError(inferenceContextLikelihoodInvalidParameters)
 	
 	if(not inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
-		inferenceColumnLikelihood = True	#default: True	#read trained column evidence beyond the local feature window
-		inferenceLikelihoodCalibration = True	#default: True	#square-root calibration before token aggregation
+		inferenceColumnLikelihood = False	#default: True	#read trained column evidence beyond the local feature window
+		inferenceLikelihoodCalibration = False	#default: True	#square-root calibration before token aggregation
 		inferenceLikelihoodCalibrationInvalidConfiguration = "Likelihood calibration requires the local context likelihood scorer"
 		if(inferenceLikelihoodCalibration):
 			inferenceLikelihoodCalibrationExponent = 0.5

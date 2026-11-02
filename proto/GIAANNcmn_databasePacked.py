@@ -1,4 +1,24 @@
-"""Zero-copy views of resident int32 connection records; COO remains the disk format."""
+"""GIAANNcmn_databasePacked.py
+
+# Author:
+Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch.com.au)
+
+# License:
+MIT License
+
+# Installation:
+see GIAANNcmn_main.py
+
+# Usage:
+see GIAANNcmn_main.py
+
+# Description:
+GIA ANN common database Packed
+
+Zero-copy views of resident int32 connection records; COO remains the disk format.
+
+"""
+
 
 from GIAANNcmn_globalDefs import *
 

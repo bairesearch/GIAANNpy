@@ -1,29 +1,11 @@
 
-\section{Experiments}
 
-\subsection{Setup}
+\subsection{Results (proto v1)}
 
-The experiments use the GIAANN prototype with POS-driven concept columns and SANI segments. Training is executed (\texttt{useInference=False}) only with a single epoch over a fixed number of sequences.
+The accuracy measurements were taken with GIAANN Proto 1k (equivalent to 1m).
 
-\paragraph{Dataset.}
-The corpora are a) Wikipedia from the Hugging Face dataset \texttt{wikipedia} (config \texttt{20220301.en}), and OSCAR-2201 from the Hugging Face dataset \texttt{oscar-corpus/OSCAR-2201} (config \texttt{en}). For Wikipedia, a local dataset cache is used (\texttt{useLocalDataset=True}) with manual download into \texttt{../../dataset/}, and the processed cache stored under \path{processed_dataset_cache}.
+\subsubsection{Configuration flags}
 
-\paragraph{Preprocessing and POS handling.}
-Tokens are produced by spaCy (models \texttt{en\_core\_web\_trf} or \texttt{en\_core\_web\_sm} with \texttt{spacyPipelineOptimisations=True}), lemmatised, and lowercased. POS is required (\texttt{usePOS=True}); noun detection uses spaCy POS tags (\texttt{useSpacyForConceptNounPOSdetection=True}). Concept columns are delimited by POS (\texttt{conceptColumnsDelimitByPOS=True}) using deterministic delimiter types \{VERB, ADP, POS tag, punctuation characters \texttt{;}, \texttt{:}, \texttt{.}, \texttt{?}, \texttt{!}, \texttt{.}\} and probabilistic delimiters between noun pairs (CCONJ/SCONJ, word types \texttt{is}, \texttt{are}, \texttt{,}, \texttt{(}). Consecutive nouns and hyphenated noun phrases are combined during pretraining (\texttt{pretrainCombineConsecutiveNouns=True}, \texttt{pretrainCombineHyphenatedNouns=True}).
-
-\paragraph{Training regime.}
-Training runs for 1 epoch (\texttt{numberEpochs=1}) with a maximum of 1000000 sequences (\texttt{trainMaxSequences<=1000000}), sequence length capped at 80 tokens (\texttt{maxSequenceLength=80}). \texttt{numSeedTokensInference=8,12,16} is retained for segment sizing. Single-sentence sequences are used by default (\texttt{multisentencePredictions=False}, \texttt{numSentencesPerSequence=1}). The database is stored at \texttt{/media/user/ssdpro/GIAANN/database/}.
-
-\paragraph{Hardware.}
-ASUS PRIME B760-PLUS D4 (or non-D4). ASUS NVIDIA GeForce RTX 5070 (12GB GDDR7). Intel i7 14700F. 64GB Patriot 2666Mhz DDR4 (or 64GB Corsair 6000MT/s DDR5). 1TB Samsung 990 Pro PCIe 4.0 NVMe M.2 SSD.
-
-\paragraph{Hardware (remote).}
-A limited number of experiments were conducted using a remote server with high CPU RAM: AWS r7i.24xlarge instance (768 GiB RAM, 48 physical cores, 96 virtual cores), 1TiB storage (gp3, 6000 IOPS, throughput: 1024 Mbps).
-
-\paragraph{Software.}
-NVIDIA Driver 580.126.09. CUDA 12.8. Ubuntu 24.04 LTS. IceWM. NEdit. Codex IDE extension for Visual Studio Code \citep{openai2026codexIdeExtension}.
-
-\paragraph{Configuration flags.}
 \begin{itemize}
 	\item Run mode: \texttt{useInference=False->True for train/eval}, \texttt{numSeedTokensInference=8,12,16}.
 	\item Memory: \texttt{useGPUdense=True}, \texttt{useGPUsparse=True during train, useGPUsparse=False by default during eval}, \texttt{useGPUsparseStrict=True}.
@@ -39,14 +21,6 @@ NVIDIA Driver 580.126.09. CUDA 12.8. Ubuntu 24.04 LTS. IceWM. NEdit. Codex IDE e
 	\item Drawing: \texttt{drawNetworkDuringTrain=False, drawNetworkDuringInference=False, drawDefault=True}, \texttt{drawSegments=False}, \texttt{drawBranches=False}, \texttt{drawRelationTypes=False}, \texttt{drawDelimiters=False}, \texttt{drawNetworkDuringTrainSave=True}.
 	\item Spacy pipeline optimisations: \texttt{spacyPipelineOptimisations=False by default}, When true: \texttt{spacyPipelineSingleParse = False}, \texttt{spacyPipelineBatchSequences = True}, \texttt{spacyPipelineLightweightSentenceSegmentation = True}, \texttt{spacyPipelineMinimalComponents = True}.
 \end{itemize}
-
-
-\subsection{Metrics}
-Top-1 accuracy has been calculated as a baseline performance metric.
-
-\subsection{Results (proto v1)}
-
-The accuracy measurements were taken with GIAANN Proto 1k (equivalent to 1m).
 
 \subsubsection{Training-set Accuracy}
 

@@ -1,4 +1,24 @@
-"""Temporarily borrow the preparation pool's allocated CPUs for an ordered commit."""
+"""GIAANNcmn_trainCommitThreads.py
+
+# Author:
+Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch.com.au)
+
+# License:
+MIT License
+
+# Installation:
+see GIAANNcmn_main.py
+
+# Usage:
+see GIAANNcmn_main.py
+
+# Description:
+GIA ANN common train Commit Threads
+
+Temporarily borrow the preparation pool's allocated CPUs for an ordered commit.
+
+"""
+
 
 from GIAANNcmn_globalDefs import *
 

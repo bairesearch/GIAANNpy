@@ -1,0 +1,28 @@
+\section{Experiments}
+
+\subsection{Setup}
+
+The experiments use the GIAANN prototype with POS-driven concept columns and SANI segments. Training uses a single epoch over a fixed number of sequences. Proto v1 selects training with \texttt{useInference=False}; the current proto v2 selects training and evaluation with \texttt{executionMode="train"} and \texttt{executionMode="inference"}, respectively, while retaining \texttt{useInference=True} to configure inference-compatible network structures. Version-specific settings and ablations are given with the results below.
+
+\paragraph{Dataset.}
+The corpora are a) Wikipedia from the Hugging Face dataset \texttt{wikipedia} (config \texttt{20220301.en}), and b) OSCAR-2201 from the Hugging Face dataset \texttt{oscar-corpus/OSCAR-2201} (config \texttt{en}). The proto v2 results below use OSCAR-2201. For Wikipedia, a local dataset cache is used (\texttt{useLocalDataset=True}) with manual download into the configured \texttt{datasetFolder} (currently \texttt{../../dataset/nlp/}), and the processed cache stored under \path{processed_dataset_cache}. OSCAR-2201 uses \texttt{useLocalDataset=False}.
+
+\paragraph{Preprocessing and POS handling.}
+POS is required (\texttt{usePOS=True}); noun detection uses spaCy POS tags (\texttt{useSpacyForConceptNounPOSdetection=True}). The spaCy models are \texttt{en_core_web_trf}, or \texttt{en_core_web_sm} with \texttt{spacyPipelineOptimisations=True}. Concept columns are delimited by POS (\texttt{conceptColumnsDelimitByPOS=True}) using deterministic delimiter types \{VERB, ADP, possessive tag POS, punctuation characters \texttt{;}, \texttt{:}, \texttt{.}, \texttt{?}, \texttt{!}\} and probabilistic delimiters between noun pairs (CCONJ/SCONJ, word types \texttt{is}, \texttt{are}, \texttt{,}, \texttt{(}).
+
+Proto v1 uses lowercased spaCy word tokens and lemmas, combining consecutive nouns and hyphenated noun phrases during pretraining (\texttt{pretrainCombineConsecutiveNouns=True}, \texttt{pretrainCombineHyphenatedNouns=True}). The current proto v2 uses subword tokens (\texttt{tokeniserSubword=True}) from the \texttt{o200k_base} BPE encoding of \texttt{tiktoken} \citep{openai2022tiktoken}, aligned with spaCy POS information. Its fixed subword vocabulary preserves token identity rather than lowercasing or lemmatising the encoded tokens. Both noun-combination flags are disabled in this mode; consecutive noun subwords are assigned to a concept column identified by the first noun token.
+
+\paragraph{Training regime.}
+Training runs for 1 epoch (\texttt{numberEpochs=1}), with \texttt{trainMaxSequences} varied as specified in each table; the proto v2 results include runs above one million sequences. The inference seed length (\texttt{numSeedTokensInference}) also determines the segment layout and is retained during training. Proto v1 uses single-sentence sequences capped at 80 spaCy tokens by default, with multi-sentence ablations identified separately. Proto v2 includes single-sentence, multi-sentence, and sentence-independent experiments. The current v2 configuration uses \texttt{sentencePredictions=False} and \texttt{sequencesCropToMaxLength=True}, dividing articles into spans of at most 409 spaCy tokens. This limit is derived from a nominal 512-token context using \texttt{tokensPerWord=1.25}; it is not an exact 512-subword limit. A separate subword cap is \texttt{maxSequenceLengthTokens=818}. The database location is configured by \texttt{databaseFolder}, with current v2 benchmark paths derived from \texttt{databaseFolderBaseSSD} and the run-specific configuration suffix.
+
+\paragraph{Hardware.}
+ASUS PRIME B760-PLUS D4 (or non-D4). ASUS NVIDIA GeForce RTX 5070 (12GB GDDR7). Intel i7 14700F. 64GB Patriot 2666Mhz DDR4 (or 64GB Corsair 6000MT/s DDR5). 1TB Samsung 990 Pro PCIe 4.0 NVMe M.2 SSD.
+
+\paragraph{Hardware (remote).}
+A limited number of experiments were conducted using a remote server with high CPU RAM: AWS r7i.24xlarge instance (768 GiB RAM, 48 physical cores, 96 virtual cores), 1TiB storage (gp3, 6000 IOPS, throughput: 1024 Mbps).
+
+\paragraph{Software.}
+NVIDIA Driver 580.126.09. CUDA 12.8. Ubuntu 24.04 LTS. IceWM. NEdit. Codex IDE extension for Visual Studio Code \citep{openai2026codexIdeExtension}.
+
+\subsection{Metrics}
+Top-1 next-token accuracy is the baseline performance metric, with the seed tokens providing context. Unless explicitly stated otherwise, evaluation feeds the observed target token into the next step (\texttt{inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=False}). Prediction-fed ablations are identified separately. Token accuracy depends on the tokeniser, evaluation sequences, and context length; these settings must therefore be considered when comparing proto versions and the RoBERTa baseline.

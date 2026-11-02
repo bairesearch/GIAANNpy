@@ -1,4 +1,24 @@
-"""Batch source preparation; no historical weights are read by fused sequence construction."""
+"""GIAANNcmn_trainDeferredSourcePreparation.py
+
+# Author:
+Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch.com.au)
+
+# License:
+MIT License
+
+# Installation:
+see GIAANNcmn_main.py
+
+# Usage:
+see GIAANNcmn_main.py
+
+# Description:
+GIA ANN common train Deferred Source Preparation
+
+Batch source preparation; no historical weights are read by fused sequence construction.
+
+"""
+
 
 from GIAANNcmn_globalDefs import *
 

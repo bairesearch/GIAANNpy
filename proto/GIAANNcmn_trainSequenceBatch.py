@@ -1,8 +1,28 @@
-"""Ordered CPU training batches. Stored tensors remain canonical sparse COO.
+"""GIAANNcmn_trainSequenceBatch.py
+
+# Author:
+Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch.com.au)
+
+# License:
+MIT License
+
+# Installation:
+see GIAANNcmn_main.py
+
+# Usage:
+see GIAANNcmn_main.py
+
+# Description:
+GIA ANN common train Sequence Batch
+
+Ordered CPU training batches. Stored tensors remain canonical sparse COO.
 
 Explicit flushDatabase calls expose all completed sequences before raw tensor inspection.
 Supported training, source-reader and persistence entry points flush automatically.
+
 """
+
+
 
 from GIAANNcmn_globalDefs import *
 

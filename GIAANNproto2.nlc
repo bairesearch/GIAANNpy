@@ -660,7 +660,7 @@ MANUAL; - inferenceEvaluateTestSet:inferenceUseNextTokenPredictionsOrTargetsToAc
 
 ---
 v2n (Codex App GPT-5.6):
-- start proto GIAANNproto2n1a - start multipleDendriticBranches updates:
+- add proto GIAANNproto2n1a - start multipleDendriticBranches updates:
 	- implement option trainSelectMostSimilarBranch:
 		- for every target feature during train, detect the most similar branch already trained to its planned train state:
 			- if the most similar branch is above some similarity threshold trainSelectMostSimilarBranchThreshold (e.g. if 0.5; 50% of its segments already contain prospective trained source features): 
@@ -683,7 +683,7 @@ MANUAL; - set inferenceDeactivateLastColumnSegmentUponPrediction=True by default
 
 ---
 v2o (Codex App GPT-6.0):
-- add proto GIAANNproto2o1a - start LIF inferenceReviewPatch* updates:
+- add proto GIAANNproto2o1a - start LIF inference accuracy updates (inferenceReviewPatch*):
 	- add option inferenceReviewPatch1FilterCandidatesBeforeTopK (disabled) - filter constrained candidates before top-K selection, with no prediction changes in the tested LIF and non-LIF configurations.
 	- add option inferenceReviewPatch2PreserveSelfTransitions (disabled) - reset firing neurons before accumulating new input to preserve immediate self-transitions, with only small and mixed measured accuracy changes.
 	- add option inferenceReviewPatch3SeedBurstIndependence (disabled) - reserve the skipped seed-burst-independence review option without implementing a behaviour change.
@@ -709,7 +709,7 @@ MANUAL; disable inferenceReviewPatch12RetainContextWithoutOutgoingSource
 
 ---
 v2p (Codex App GPT-6.0):
-- add proto GIAANNproto2p1a - start train/inference optimisation updates (optimiseTrainParallelisation/optimiseInference*):
+- add proto GIAANNproto2p1a - start train and inference optimisation updates (optimiseTrainParallelisation/optimiseInference*):
 	- add option optimiseTrainParallelisation1 (enabled) - merge RAM-resident training connection updates across source neurons using parallel native CPU kernels while preserving sparse COO storage and additive update results.
 	- add option optimiseTrainParallelisation2a (enabled) - construct temporal training connections directly in sorted unique sparse COO order using parallel CPU kernels to avoid repeated segment expansion, intermediate duplicates and sorting.
 	- add option optimiseTrainParallelisation2b (~enabled) - map connection deltas to database coordinates and group updates by source neuron using a native parallel CPU pass while retaining the original PyTorch duplicate-reduction order.
@@ -727,53 +727,59 @@ v2p (Codex App GPT-6.0):
 - patch debugPrintTrainTotalWords to measure numbers of words after cropping (capturing the subword limit).
 - add option debugPrintTrainTotalWhitespaceWords - also measure the number of cropped words using r"\S+" similar to the TSBNLPpt repository.
 - patch optimiseTrainParallelisation3b to allow indefinite worker idle waits while preserving communication timeouts and adding regression tests.
-- add option optimiseInferenceCPUthreads (disabled) - limit PyTorch CPU intra-op threads during inference to reduce sparse-operation threading overhead and restore the caller thread count afterwards.
-- add option optimiseInferenceSparseSomaDecay (enabled) - reuse ordered sparse coordinates during soma decay to avoid full-state sorting while preserving decay results and zero removal.
-- add option optimiseInferenceCandidateLookup (enabled) - score only eligible non-tree LIF neuron relevant activation segments while preserving scoring arithmetic and the complete live activation state.
-- add option optimiseInferenceSparsePropagation (enabled) - copy stationary column ranges directly and merge only moving feature segments with retained soma entries during non-tree LIF propagation, preserving coordinate order and activation results without full-state sorting.
-- add option optimiseInferenceSparseBurst (enabled) - locate a single CPU LIF burst coordinate by binary search and update or insert it in sorted order to avoid full-state sparse addition while preserving activation results.
-- add option optimiseInferenceSparseColumnAdvance (disabled) - advance ordered sparse column ranges and merge only terminal-column collisions, avoiding full-state sorting.
+- identify ways to significantly improve the inference performance (speed):
+	- add option optimiseInferenceCPUthreads (disabled) - limit PyTorch CPU intra-op threads during inference to reduce sparse-operation threading overhead and restore the caller thread count afterwards.
+	- add option optimiseInferenceSparseSomaDecay (enabled) - reuse ordered sparse coordinates during soma decay to avoid full-state sorting while preserving decay results and zero removal.
+	- add option optimiseInferenceCandidateLookup (enabled) - score only eligible non-tree LIF neuron relevant activation segments while preserving scoring arithmetic and the complete live activation state.
+	- add option optimiseInferenceSparsePropagation (enabled) - copy stationary column ranges directly and merge only moving feature segments with retained soma entries during non-tree LIF propagation, preserving coordinate order and activation results without full-state sorting.
+	- add option optimiseInferenceSparseBurst (enabled) - locate a single CPU LIF burst coordinate by binary search and update or insert it in sorted order to avoid full-state sparse addition while preserving activation results.
+	- add option optimiseInferenceSparseColumnAdvance (disabled) - advance ordered sparse column ranges and merge only terminal-column collisions, avoiding full-state sorting.
 
 ---
 v2q (Codex App GPT-6.0):
-- add proto GIAANNproto2q1a - start inference optimisation updates (inferenceInferMissingFeatures+optimisationInferenceChunks/Workers+inferenceContextLikelihood):
+- add proto GIAANNproto2q1a - start inference accuracy and optimisation updates (inferenceInferMissingFeatures+inferenceContextLikelihood/optimisationInferenceChunks/Workers):
 	- add option inferenceReviewPatch17segmentTimingOptimisation (enabled) - segment timing optimisation for inferenceDecrementActivationsSomaPerPredictedToken/inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn
 	- set predictionEnsureConnectedToPreviousPrediction==False:inferenceReviewPatch16TokenAggregation=True
-- add option patchInferenceUseNextTokenTargets (disabled) - popagate the exact target column and feature during target-driven inference without applying prediction-only column constraints (designed for inferenceColumnConstraintsAllowExternalPrimeConceptTransitions=False).
-- add patchTrainColumnStepsRepeatedColumns (disabled) - align training column-segment distances with LIF column transitions while preserving distinct token occurrences and feature timing.
+- spend as much time as you require to comprehensively review test-set eval accuracy:
+	- add option patchInferenceUseNextTokenTargets (disabled) - popagate the exact target column and feature during target-driven inference without applying prediction-only column constraints (designed for inferenceColumnConstraintsAllowExternalPrimeConceptTransitions=False).
+	- add patchTrainColumnStepsRepeatedColumns (disabled) - align training column-segment distances with LIF column transitions while preserving distinct token occurrences and feature timing.
 - add option inferenceRequireExistingDatabase (enabled) - patch inference (executionMode = "inference") - hard fail if the trained database folder does not already exist.
-- add option inferenceInferMissingFeaturesAllObservedTokens (enabled) - extend missing-feature inference beyond seed tokens to all observed source tokens during teacher-forced evaluation.
-- add option inferenceInferMissingFeaturesSemantic (enabled) - add token-aware contextual donor selection and project donor activation targets into the observed token column to improve missing-feature inference.
-- add option inferenceInferMissingFeaturesSemanticContextColumns (enabled) - Use contextual column activity to select donor neurons for the observed token even when those neurons have no soma activation.
+- perform a comprehensive evaluation of all possible ways to significantly increase test-set eval accuracy:
+	- add option inferenceInferMissingFeaturesAllObservedTokens (enabled) - extend missing-feature inference beyond seed tokens to all observed source tokens during teacher-forced evaluation.
+	- add option inferenceInferMissingFeaturesSemantic (enabled) - add token-aware contextual donor selection and project donor activation targets into the observed token column to improve missing-feature inference.
+	- add option inferenceInferMissingFeaturesSemanticContextColumns (enabled) - Use contextual column activity to select donor neurons for the observed token even when those neurons have no soma activation.
 - set inferenceInferMissingFeatures=True by default
 - upgrade inferenceInferMissingFeaturesAllObservedTokens/inferenceInferMissingFeaturesSemantic to support inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures=True.
 MANUAL; - set !predictionEnsureConnectedToPreviousPredictionStrict:inferenceInferMissingFeatures
 MANUAL; - set !predictionEnsureConnectedToPreviousPrediction:!predictionEnsureConnectedToPreviousPredictionStrict:inferenceInferMissingFeaturesSemanticPreferPooledTransitions=True.
-- add option optimisationInferenceChunks to evaluate sequence chunks in fresh processes with one compute thread and aggregate accuracy counts.
-- add option optimisationInferenceWorkers to execute inference chunks concurrently with a configurable worker limit.
+- upgrade the code with the optimisations from generalisedBenchmarkTool:
+	- add option optimisationInferenceChunks to evaluate sequence chunks in fresh processes with one compute thread and aggregate accuracy counts.
+	- add option optimisationInferenceWorkers to execute inference chunks concurrently with a configurable worker limit.
 - add generalisedBenchmarkTool to benchmark configurations defined by file and line edits using isolated code snapshots, configurable parallel workers, and aggregated inference accuracy.
-- add option inferenceContextLikelihood (enabled) - score LIF predictions using smoothed contextual evidence and trained frequency priors, with support for independent connectivity and strictness constraints.
+- spend as much time as you require to significantly improve test-set eval accuracy:
+	- add option inferenceContextLikelihood (enabled) - score LIF predictions using smoothed contextual evidence and trained frequency priors, with support for independent connectivity and strictness constraints.
 - upgrade generalisedBenchmarkTool to remove its own chunk+worker code (GIAANN code has its own optimisationInferenceChunks+optimisationInferenceWorkers support).
 MANUAL; - set !predictionEnsureConnectedToPreviousPrediction:useBenchmarkDefaultsEvalTestSet:inferenceReviewPatch16TokenAggregation=True.
 
 ---
 v2r (Codex App GPT-6.0):
-- add proto GIAANNproto2r1a - start inference optimisation updates (inferenceContextLikelihood):
+- add proto GIAANNproto2r1a - start inference accuracy and train optimisation updates (inferenceContextLikelihood/optimiseTrain*):
 	- add option useSequenceContext (disabled) - record training token sequences and rerank eligible GIAANN predictions using smoothed 3-8-token context matches.
 	- add option inferenceGraphEvidenceUpgrade (disabled) - adaptively share same-token source evidence for sparsely trained neurons during direct and indirect LIF inference.
 	- add option inferenceContextLikelihood:inferenceColumnLikelihood (enabled) - adds evidence from existing trained column-segment connections beyond the local five-token context window. Its weight is inferenceColumnLikelihoodWeight = 0.125.
 	- add option inferenceContextLikelihood:inferenceLikelihoodCalibration (enabled) - takes the square root of neuron scores before the existing aggregation by output token. This softens score differences. Its exponent is inferenceLikelihoodCalibrationExponent = 0.5.
 - add option inferenceFeatureSegmentWeight (disabled).
-- add option optimiseTrainConnectionOverlay (disabled) - accelerate CPU training with the database in RAM by caching updated connection values per source neuron, preserving sequence-ordered float32 additions and deferring full sparse COO merges until reads, saves, or periodic compaction. 
-- add option optimiseTrainSequenceBatch (enabled) to batch sparse updates in sequence order and construct temporal connections in one pass.
-- add option optimiseTrainFusedSequenceUpdates (enabled) to generate mapped sparse neuron and connection updates directly without intermediate activation tensors.
-- add option optimiseTrainConceptMetadata (enabled) to construct concept boundaries using index lists instead of repeated scalar tensor operations.
-- add option optimiseTrainDeferredSourcePreparation (enabled) to prepare the union of required source connections once per batch while preserving read and save consistency.
-- add option optimiseTrainLargeBatches (enabled) to increase sequence and pending entry limits and amortize sparse merge costs across larger batches.
-- add option optimiseTrainPreparationWorkers (enabled) to allocate two training threads, six NLP workers and a queue of 24 prefetched articles.
-- add option optimiseTrainCommitThreads (enabled) to temporarily borrow allocated NLP worker cores during sparse commits and restore thread counts and affinities afterward.
-- add option optimiseTrainLightweightWorkers (enabled) to share minimal article preparation code without importing the training network into NLP workers.
-- add option optimiseTrainWorkerExit (enabled) to exit successfully completed preparation workers after socket cleanup and output flushing, avoiding interpreter teardown overhead.
+- investigate ways to significantly (ie 2x or higher) improve the training time:
+	- add option optimiseTrainConnectionOverlay (disabled) - accelerate CPU training with the database in RAM by caching updated connection values per source neuron, preserving sequence-ordered float32 additions and deferring full sparse COO merges until reads, saves, or periodic compaction. 
+	- add option optimiseTrainSequenceBatch (enabled) to batch sparse updates in sequence order and construct temporal connections in one pass.
+	- add option optimiseTrainFusedSequenceUpdates (enabled) to generate mapped sparse neuron and connection updates directly without intermediate activation tensors.
+	- add option optimiseTrainConceptMetadata (enabled) to construct concept boundaries using index lists instead of repeated scalar tensor operations.
+	- add option optimiseTrainDeferredSourcePreparation (enabled) to prepare the union of required source connections once per batch while preserving read and save consistency.
+	- add option optimiseTrainLargeBatches (enabled) to increase sequence and pending entry limits and amortize sparse merge costs across larger batches.
+	- add option optimiseTrainPreparationWorkers (enabled) to allocate two training threads, six NLP workers and a queue of 24 prefetched articles.
+	- add option optimiseTrainCommitThreads (enabled) to temporarily borrow allocated NLP worker cores during sparse commits and restore thread counts and affinities afterward.
+	- add option optimiseTrainLightweightWorkers (enabled) to share minimal article preparation code without importing the training network into NLP workers.
+	- add option optimiseTrainWorkerExit (enabled) to exit successfully completed preparation workers after socket cleanup and output flushing, avoiding interpreter teardown overhead.
 - enable patchTrainColumnStepsRepeatedColumns.
 - update paper implementation/algorithm tex.
-
+- update paper experiments tex.

@@ -1,4 +1,24 @@
-"""List-based concept boundaries for the supported fixed-vocabulary training path."""
+"""GIAANNnlp_trainConceptMetadata.py
+
+# Author:
+Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch.com.au)
+
+# License:
+MIT License
+
+# Installation:
+see GIAANNcmn_main.py
+
+# Usage:
+see GIAANNcmn_main.py
+
+# Description:
+GIA ANN NLP train Concept Metadata
+
+List-based concept boundaries for the supported fixed-vocabulary training path.
+
+"""
+
 
 from GIAANNcmn_globalDefs import *
 

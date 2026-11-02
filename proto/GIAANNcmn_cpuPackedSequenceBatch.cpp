@@ -1,3 +1,22 @@
+/*GIAANNcmn_cpuPackedSequenceBatch.py
+
+# Author:
+Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch.com.au)
+
+# License:
+MIT License
+
+# Installation:
+see GIAANNcmn_main.py
+
+# Usage:
+see GIAANNcmn_main.py
+
+# Description:
+GIA ANN common cpu Packed Sequence Batch
+
+*/
+
 // Ordered float32 updates over packed int32 resident connection records.
 #include <ATen/ATen.h>
 #include <ATen/Parallel.h>
