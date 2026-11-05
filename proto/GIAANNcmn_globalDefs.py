@@ -1618,7 +1618,7 @@ if(optimisationInferenceChunks):
 	inferenceChunksOutputDirectory = None	#None: retain run snapshots, logs and counts in a new system temporary directory; otherwise use this existing directory
 	inferenceChunksWorkerThreads = 1	#one Torch/BLAS compute thread per process
 if(optimisationInferenceWorkers):
-	inferenceWorkersCount = 8	#default: 8	#orig: 8	#limit concurrent inference processes to balance memory use and throughput	#with 400k training samples, inferenceContextLikelihood=True/False: 4/8
+	inferenceWorkersCount = 12	#default: 8	#orig: 8	#limit concurrent inference processes to balance memory use and throughput	#with 400k training samples, inferenceContextLikelihood=True/False: 4/8
 if(optimisationInferenceChunks or optimisationInferenceWorkers):
 	inferenceChunksZero = 0
 	inferenceChunksOne = 1
@@ -1758,8 +1758,8 @@ if(inferenceContextLikelihood):
 		raise ValueError(inferenceContextLikelihoodInvalidParameters)
 	
 	if(not inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
-		inferenceColumnLikelihood = False	#default: True	#read trained column evidence beyond the local feature window
-		inferenceLikelihoodCalibration = False	#default: True	#square-root calibration before token aggregation
+		inferenceColumnLikelihood = True	#default: True	#read trained column evidence beyond the local feature window
+		inferenceLikelihoodCalibration = True	#default: True	#square-root calibration before token aggregation
 		inferenceLikelihoodCalibrationInvalidConfiguration = "Likelihood calibration requires the local context likelihood scorer"
 		if(inferenceLikelihoodCalibration):
 			inferenceLikelihoodCalibrationExponent = 0.5
@@ -1773,7 +1773,7 @@ if(inferenceContextLikelihood):
 			inferenceColumnLikelihoodZero = 0
 			inferenceColumnLikelihoodOne = 1
 			inferenceColumnLikelihoodEpochField = 0
-			inferenceColumnLikelihoodWeight = 0.125
+			inferenceColumnLikelihoodWeight = 0.5
 			inferenceColumnLikelihoodInvalidState = "Column likelihood requires consecutive observed-source positions and valid column evidence"
 			inferenceColumnLikelihoodInvalidEvidence = "Column likelihood evidence must be finite and non-negative"
 			inferenceColumnLikelihoodInvalidWeight = "Column likelihood weight must be finite and within [0, 1]"

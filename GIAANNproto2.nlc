@@ -508,7 +508,7 @@ v2j (Codex IDE GPT-5.5):
 			- ensure to encapsulate all skipSequenceNoDelimiterDetectedBetweenConceptTokens dependent code within context if(skipSequenceNoDelimiterDetectedBetweenConceptTokens). make no changes to the default skipSequenceNoDelimiterDetectedBetweenConceptTokens=True execution pathway.
 	- implement option SANIcolumnsLinkFirstSegmentToAllPriorTrainSeqTokens=False, which affects both useSANIfeaturesAndColumns and useSANIcolumns modes.
 		- useDefaultsV2: set SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens=False, which affects both useSANIfeaturesAndColumns and useSANIfeatures modes.
-	- optimise eval:
+	AUTORESEARCH; - optimise eval:
 		- 1. `perf(eval): vectorize SANI required-segment candidate filtering`
 			- replace Python set/list membership checks in prediction candidate filtering with tensor key membership. This keeps SANI required-segment semantics unchanged while avoiding per-candidate Python loops during long eval sequences.
 		- 2. `perf(eval): prefilter sparse candidate aggregation by required segment keys`
@@ -524,7 +524,7 @@ v2j (Codex IDE GPT-5.5):
 		- inferenceBurstAllPredictionsOrTargetsInSequence explicitly writes activation into the selected source neuron via activateSeedPredictionSegments():
 			- that guarantees the selected top-1 feature is active when the next step uses it as a source.
 			- if the selected prediction/target neuron itself was not already active, the next step could read the correct source connections but multiply them by zero or insufficient source activation.
-- patch eval optimisations:
+AUTORESEARCH; - patch eval optimisations:
 	- 2. fix(eval): preserve exact aggregation semantics when prefiltering sparse candidates by required segment keys.
 	- 4. fix(sparse): reuse validated sparse index key generation for sparse intersection.
 	- 5. fix(eval): preserve present-branch semantics in optimized sparse branch selection.
@@ -630,7 +630,7 @@ MANUAL; - update inferenceLeakyIntegrateAndFire - if(not inferenceEvaluateTestSe
 
 ---
 v2m (Codex App GPT-5.6):
-- add proto GIAANNproto2m1a - start inferenceInferMissingFeatures:
+AUTORESEARCH; - add proto GIAANNproto2m1a - start inferenceInferMissingFeatures:
 	- add option inferencePromptPreserveLineSequenceBoundaries (enabled) - process each non-empty inference prompt line as exactly one independent sequence matching the stored training boundary
 	- add option trainConnectionsAllowSelfTransitions (disabled)  - allow same-column/feature transitions required when repeated occurrences share one neuron
 	- add option inferenceColumnConstraintsAllowExternalPrimeConceptTransitions (enabled) - allow external prime-concept candidates at no-delimiter column transitions without relabelling rejected candidates
@@ -640,7 +640,7 @@ MANUAL; - update paper
 MANUAL; - extend inference_prompt.txt.longTrain/TestOscar2-SentencePredictionsFalse
 - implement option inferenceInferMissingFeatures - if a current feature is missing in a column during inference seed phase, find every instance of this feature in all columns, and propagate their signal jointly (use their combined activation).
 - implement option inferenceInferMissingFeaturesCandidateSourceWeighted - weight semantically similar candidates by their source activation value (and propagate them as a function of these activation values).
-- start inferenceInferMissingFeaturesUpdates;
+AUTORESEARCH; - start inferenceInferMissingFeaturesUpdates;
 	- implement option inferenceInferMissingFeaturesUpdate1SelectTopKCandidates (disabled) - restrict missing-feature proxy propagation to the configured top-k most contextually active source candidates.
 	- implement option inferenceInferMissingFeaturesUpdate2SourceConfidence (disabled) - gate missing-feature proxy propagation using minimum strongest-source activation and winner-to-runner-up margin requirements.
 	- implement option inferenceInferMissingFeaturesUpdate3AbsoluteSourceConfidence (enabled) - preserve the strongest source candidate absolute activation as the confidence gain applied to joint proxy propagation.
@@ -683,7 +683,7 @@ MANUAL; - set inferenceDeactivateLastColumnSegmentUponPrediction=True by default
 
 ---
 v2o (Codex App GPT-6.0):
-- add proto GIAANNproto2o1a - start LIF inference accuracy updates (inferenceReviewPatch*):
+AUTORESEARCH; - add proto GIAANNproto2o1a - start LIF inference accuracy updates (inferenceReviewPatch*):
 	- add option inferenceReviewPatch1FilterCandidatesBeforeTopK (disabled) - filter constrained candidates before top-K selection, with no prediction changes in the tested LIF and non-LIF configurations.
 	- add option inferenceReviewPatch2PreserveSelfTransitions (disabled) - reset firing neurons before accumulating new input to preserve immediate self-transitions, with only small and mixed measured accuracy changes.
 	- add option inferenceReviewPatch3SeedBurstIndependence (disabled) - reserve the skipped seed-burst-independence review option without implementing a behaviour change.
@@ -695,21 +695,21 @@ v2o (Codex App GPT-6.0):
 	- add option inferenceReviewPatch9LocalSourceActivation (enabled) - restrict soma and branch activation reductions to the requested source neuron to reduce inference lookup work.
 	- add option inferenceReviewPatch10LinearNeuronReset (enabled) - reset LIF neuron activations using vectorised neuron and segment masks across branches to avoid pairwise coordinate comparisons.
 - extract inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch (enabled) and inferenceConstraintAllowsNodeDelimiterFilteringPermitValidSameColumnContinuationsPatch (enabled).
-- add option inferenceReviewPatch11ProspectiveColumnScoring (enabled) - score external-column LIF candidates using their prospective column-transition activations while preserving current-column scores and the live activation state.
-- add option inferenceReviewPatch12RetainContextWithoutOutgoingSource (disabled) - retain newly arriving LIF context when the source connectivity lookup is empty and filter valid context candidates before top-K selection.
+AUTORESEARCH; - add option inferenceReviewPatch11ProspectiveColumnScoring (enabled) - score external-column LIF candidates using their prospective column-transition activations while preserving current-column scores and the live activation state.
+AUTORESEARCH; - add option inferenceReviewPatch12RetainContextWithoutOutgoingSource (disabled) - retain newly arriving LIF context when the source connectivity lookup is empty and filter valid context candidates before top-K selection.
 MANUAL; - update paper
-- add option inferenceReviewPatch13poolTransitionsFromSimilarFeatures (disabled) - if source neuron has no outgoing connections, pool transitions from features of same f index in different columns.
+AUTORESEARCH; - add option inferenceReviewPatch13poolTransitionsFromSimilarFeatures (disabled) - if source neuron has no outgoing connections, pool transitions from features of same f index in different columns.
 MANUAL; disable inferenceReviewPatch12RetainContextWithoutOutgoingSource
-- add option inferenceReviewPatch14NormaliseConnectionInputs - normalise each exact source neuron outgoing weights per target segment; preserves direct connectivity
+AUTORESEARCH; - add option inferenceReviewPatch14NormaliseConnectionInputs - normalise each exact source neuron outgoing weights per target segment; preserves direct connectivity
 - update inferenceReviewPatch12RetainContextWithoutOutgoingSource/inferenceReviewPatch13poolTransitionsFromSimilarFeatures to not require predictionEnsureConnectedToPreviousPrediction, and make them dependent on predictionEnsureConnectedToPreviousPrediction=False.
-- add option inferenceReviewPatch15boundedPrior:inferenceReviewPatch15OptimiseColumnSelection (disabled): computes the same column-scoring signals more efficiently. Computation optimisation: avoid copying unused segments; retain the original floating-point reduction order by default for trees. Speeds up prospective column scoring by computing only the required soma and terminal-column signals, avoiding full activation-tensor copying and propagation while preserving the scoring calculation.
-- add option inferenceReviewPatch15boundedPrior:inferenceReviewPatch15TokenTransitionPrior (disabled): applies the bounded prior to improve candidate ranking. The bounded prior multiplies each directly connected, firing-eligible candidates LIF activation by a factor between 0.5 and 1.0 derived from learned token-transition strengths, favouring well-supported transitions while preserving any LIF winner whose activation exceeds twice that of every competitor.
-- add option inferenceReviewPatch16TokenAggregation (disabled) - token aggregation sums the prediction scores of all eligible, directly connected neurons representing the same token, then selects the token with the highest combined score.
+AUTORESEARCH; - add option inferenceReviewPatch15boundedPrior:inferenceReviewPatch15OptimiseColumnSelection (disabled): computes the same column-scoring signals more efficiently. Computation optimisation: avoid copying unused segments; retain the original floating-point reduction order by default for trees. Speeds up prospective column scoring by computing only the required soma and terminal-column signals, avoiding full activation-tensor copying and propagation while preserving the scoring calculation.
+AUTORESEARCH; - add option inferenceReviewPatch15boundedPrior:inferenceReviewPatch15TokenTransitionPrior (disabled): applies the bounded prior to improve candidate ranking. The bounded prior multiplies each directly connected, firing-eligible candidates LIF activation by a factor between 0.5 and 1.0 derived from learned token-transition strengths, favouring well-supported transitions while preserving any LIF winner whose activation exceeds twice that of every competitor.
+AUTORESEARCH; - add option inferenceReviewPatch16TokenAggregation (disabled) - token aggregation sums the prediction scores of all eligible, directly connected neurons representing the same token, then selects the token with the highest combined score.
 - set inferenceCopyTemplateDatasets, and rename database folder to databaseTemplate
 
 ---
 v2p (Codex App GPT-6.0):
-- add proto GIAANNproto2p1a - start train and inference optimisation updates (optimiseTrainParallelisation/optimiseInference*):
+AUTORESEARCH; - add proto GIAANNproto2p1a - start train and inference optimisation updates (optimiseTrainParallelisation/optimiseInference*):
 	- add option optimiseTrainParallelisation1 (enabled) - merge RAM-resident training connection updates across source neurons using parallel native CPU kernels while preserving sparse COO storage and additive update results.
 	- add option optimiseTrainParallelisation2a (enabled) - construct temporal training connections directly in sorted unique sparse COO order using parallel CPU kernels to avoid repeated segment expansion, intermediate duplicates and sorting.
 	- add option optimiseTrainParallelisation2b (~enabled) - map connection deltas to database coordinates and group updates by source neuron using a native parallel CPU pass while retaining the original PyTorch duplicate-reduction order.
@@ -727,7 +727,7 @@ v2p (Codex App GPT-6.0):
 - patch debugPrintTrainTotalWords to measure numbers of words after cropping (capturing the subword limit).
 - add option debugPrintTrainTotalWhitespaceWords - also measure the number of cropped words using r"\S+" similar to the TSBNLPpt repository.
 - patch optimiseTrainParallelisation3b to allow indefinite worker idle waits while preserving communication timeouts and adding regression tests.
-- identify ways to significantly improve the inference performance (speed):
+AUTORESEARCH; - identify ways to significantly improve the inference performance (speed):
 	- add option optimiseInferenceCPUthreads (disabled) - limit PyTorch CPU intra-op threads during inference to reduce sparse-operation threading overhead and restore the caller thread count afterwards.
 	- add option optimiseInferenceSparseSomaDecay (enabled) - reuse ordered sparse coordinates during soma decay to avoid full-state sorting while preserving decay results and zero removal.
 	- add option optimiseInferenceCandidateLookup (enabled) - score only eligible non-tree LIF neuron relevant activation segments while preserving scoring arithmetic and the complete live activation state.
@@ -737,14 +737,14 @@ v2p (Codex App GPT-6.0):
 
 ---
 v2q (Codex App GPT-6.0):
-- add proto GIAANNproto2q1a - start inference accuracy and optimisation updates (inferenceInferMissingFeatures+inferenceContextLikelihood/optimisationInferenceChunks/Workers):
+AUTORESEARCH; - add proto GIAANNproto2q1a - start inference accuracy and optimisation updates (inferenceInferMissingFeatures+inferenceContextLikelihood/optimisationInferenceChunks/Workers):
 	- add option inferenceReviewPatch17segmentTimingOptimisation (enabled) - segment timing optimisation for inferenceDecrementActivationsSomaPerPredictedToken/inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn
 	- set predictionEnsureConnectedToPreviousPrediction==False:inferenceReviewPatch16TokenAggregation=True
-- spend as much time as you require to comprehensively review test-set eval accuracy:
+AUTORESEARCH; - spend as much time as you require to comprehensively review test-set eval accuracy:
 	- add option patchInferenceUseNextTokenTargets (disabled) - popagate the exact target column and feature during target-driven inference without applying prediction-only column constraints (designed for inferenceColumnConstraintsAllowExternalPrimeConceptTransitions=False).
 	- add patchTrainColumnStepsRepeatedColumns (disabled) - align training column-segment distances with LIF column transitions while preserving distinct token occurrences and feature timing.
 - add option inferenceRequireExistingDatabase (enabled) - patch inference (executionMode = "inference") - hard fail if the trained database folder does not already exist.
-- perform a comprehensive evaluation of all possible ways to significantly increase test-set eval accuracy:
+AUTORESEARCH; - perform a comprehensive evaluation of all possible ways to significantly increase test-set eval accuracy:
 	- add option inferenceInferMissingFeaturesAllObservedTokens (enabled) - extend missing-feature inference beyond seed tokens to all observed source tokens during teacher-forced evaluation.
 	- add option inferenceInferMissingFeaturesSemantic (enabled) - add token-aware contextual donor selection and project donor activation targets into the observed token column to improve missing-feature inference.
 	- add option inferenceInferMissingFeaturesSemanticContextColumns (enabled) - Use contextual column activity to select donor neurons for the observed token even when those neurons have no soma activation.
@@ -756,20 +756,20 @@ MANUAL; - set !predictionEnsureConnectedToPreviousPrediction:!predictionEnsureCo
 	- add option optimisationInferenceChunks to evaluate sequence chunks in fresh processes with one compute thread and aggregate accuracy counts.
 	- add option optimisationInferenceWorkers to execute inference chunks concurrently with a configurable worker limit.
 - add generalisedBenchmarkTool to benchmark configurations defined by file and line edits using isolated code snapshots, configurable parallel workers, and aggregated inference accuracy.
-- spend as much time as you require to significantly improve test-set eval accuracy:
+AUTORESEARCH; - spend as much time as you require to significantly improve test-set eval accuracy:
 	- add option inferenceContextLikelihood (enabled) - score LIF predictions using smoothed contextual evidence and trained frequency priors, with support for independent connectivity and strictness constraints.
 - upgrade generalisedBenchmarkTool to remove its own chunk+worker code (GIAANN code has its own optimisationInferenceChunks+optimisationInferenceWorkers support).
 MANUAL; - set !predictionEnsureConnectedToPreviousPrediction:useBenchmarkDefaultsEvalTestSet:inferenceReviewPatch16TokenAggregation=True.
 
 ---
 v2r (Codex App GPT-6.0):
-- add proto GIAANNproto2r1a - start inference accuracy and train optimisation updates (inferenceContextLikelihood/optimiseTrain*):
+AUTORESEARCH; - add proto GIAANNproto2r1a - start inference accuracy and train optimisation updates (inferenceContextLikelihood/optimiseTrain*):
 	- add option useSequenceContext (disabled) - record training token sequences and rerank eligible GIAANN predictions using smoothed 3-8-token context matches.
 	- add option inferenceGraphEvidenceUpgrade (disabled) - adaptively share same-token source evidence for sparsely trained neurons during direct and indirect LIF inference.
 	- add option inferenceContextLikelihood:inferenceColumnLikelihood (enabled) - adds evidence from existing trained column-segment connections beyond the local five-token context window. Its weight is inferenceColumnLikelihoodWeight = 0.125.
 	- add option inferenceContextLikelihood:inferenceLikelihoodCalibration (enabled) - takes the square root of neuron scores before the existing aggregation by output token. This softens score differences. Its exponent is inferenceLikelihoodCalibrationExponent = 0.5.
-- add option inferenceFeatureSegmentWeight (disabled).
-- investigate ways to significantly (ie 2x or higher) improve the training time:
+AUTORESEARCH; - add option inferenceFeatureSegmentWeight (disabled).
+AUTORESEARCH; - investigate ways to significantly (ie 2x or higher) improve the training time:
 	- add option optimiseTrainConnectionOverlay (disabled) - accelerate CPU training with the database in RAM by caching updated connection values per source neuron, preserving sequence-ordered float32 additions and deferring full sparse COO merges until reads, saves, or periodic compaction. 
 	- add option optimiseTrainSequenceBatch (enabled) to batch sparse updates in sequence order and construct temporal connections in one pass.
 	- add option optimiseTrainFusedSequenceUpdates (enabled) to generate mapped sparse neuron and connection updates directly without intermediate activation tensors.
@@ -786,3 +786,5 @@ v2r (Codex App GPT-6.0):
 - add option spacyIncreaseArticleMaxLength - raise spaCy configurable article character limit for standard and lightweight NLP pipelines when sentencePredictions=False, preventing length-limit failures on large corpus articles.
 - add option databaseWriteProgressivelyReleaseConnectionTensors - release saved connection tensors progressively during the final training save, after each successful write and once no later operation needs them.
 - update countParametersAndSize.py - fix excessive RAM usage by streaming ZIP directory entries in bounded batches and releasing tensor payloads immediately after counting.
+AUTORESEARCH; - set inferenceColumnLikelihoodWeight = 0.125 -> 0.5
+
