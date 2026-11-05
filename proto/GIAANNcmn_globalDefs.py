@@ -197,7 +197,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 800000	#10000, 100000, 400000, 800000	#5000, 200000, 1000000
+	trainMaxSequences = 1600000	#10000, 100000, 400000, 800000, 1600000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 50000	#5000
@@ -401,6 +401,10 @@ if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 	useGPUdatabase = False	#default: False	#default: False
 	resizeTensorsOnRAMdatabaseSave = False	#default: False #orig: True	#resize all feature neuron and connections tensors during final RAM database save
 	resizeTensorsOnRAMdatabaseLoad = False	#default: False #orig: True	#resize all feature neuron and connections tensors during initial RAM database load
+
+databaseWriteProgressivelyReleaseConnectionTensors = True	#release connection tensors after each successful final training column save; retain neurons and global metadata
+databaseWriteReleasedConnectionTensorsError = "Connection tensors were released after the final training save; reload the database before accessing or saving connections again"
+databaseWriteReleaseConnectionTensorsInvalidState = "Progressive connection release requires an unreleased RAM-resident training column"
 
 if(executionMode=="train" or executionMode=="trainAndInference"):
 	storeDatabaseGlobalFeatureNeuronsInRam = False		 #default: False	#orig: True		#optional	#if storeDatabaseGlobalFeatureNeuronsInRam=False use feature neuron tensors in observed columns (note feature connection tensors are always in observed columns)	#inferenceMode=True always overrides with storeDatabaseGlobalFeatureNeuronsInRam=True	
@@ -1614,7 +1618,7 @@ if(optimisationInferenceChunks):
 	inferenceChunksOutputDirectory = None	#None: retain run snapshots, logs and counts in a new system temporary directory; otherwise use this existing directory
 	inferenceChunksWorkerThreads = 1	#one Torch/BLAS compute thread per process
 if(optimisationInferenceWorkers):
-	inferenceWorkersCount = 8	#default: 4	#orig: 8	#limit concurrent inference processes to balance memory use and throughput	#with 400k training samples, inferenceContextLikelihood=True/False: 4/8
+	inferenceWorkersCount = 8	#default: 8	#orig: 8	#limit concurrent inference processes to balance memory use and throughput	#with 400k training samples, inferenceContextLikelihood=True/False: 4/8
 if(optimisationInferenceChunks or optimisationInferenceWorkers):
 	inferenceChunksZero = 0
 	inferenceChunksOne = 1

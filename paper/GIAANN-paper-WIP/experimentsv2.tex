@@ -292,10 +292,12 @@ The tables also include the total number of trained words and tokens. There is a
 8 & 4 & 4 & 100,000 & GIAANN & 0.966 & 0.966 & 0.966 & 657.6M & 45.7GB & 28.4M & 37.5M \\
 8 & 4 & 4 & 400,000 & GIAANN & 0.948 & 0.948 & 0.948 & 2413.2M & 150.1GB & 113.8M & 150.2M \\
 8 & 4 & 4 & 800,000 & GIAANN & 0.934 & 0.934 & 0.935 & 4566.5M & 269.7GB & 227.8M & 300.8M \\
+8 & 4 & 4 & 1600,000 & GIAANN & 0.918 & - & -  & 8553.6M & 480.6GB & 455.1M & 601.0M \\
 - & - & - & 10,000  & RoBERTa & 0.150 & 0.150 & 0.150 & 67.3M & 257.1MB & 2.4M & 3.4M \\
 - & - & - & 100,000 & RoBERTa & 0.299 & 0.299 & 0.299 & 67.3M & 257.1MB & 23.8M & 33.6M \\
 - & - & - & 400,000 & RoBERTa & 0.369 & 0.369 & 0.369 & 67.3M & 257.1MB & 94.8M & 134.0M \\
 - & - & - & 800,000 & RoBERTa & 0.393 & 0.393 & 0.393 & 67.3M & 257.1MB & 189.7M & 268.2M \\
+- & - & - & 1600,000 & RoBERTa & 0.412 & 0.412 & 0.412 & 67.3M & 257.1MB & 380.0M & 537.0M \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -500,10 +502,12 @@ An additional set of results were created with \texttt{sentencePredictions=False
 8 & 4 & 4 & 100,000 & GIAANN & 0.279 & 0.307 & 0.307 & 657.6M & 45.7GB & 28.4M & 37.5M \\
 8 & 4 & 4 & 400,000 & GIAANN & 0.330 & 0.349 & 0.349 & 2413.2M & 150.1GB & 113.8M & 150.2M \\
 8 & 4 & 4 & 800,000 & GIAANN & 0.388 & 0.402 & 0.401 & 4566.5M & 269.7GB & 227.8M & 300.8M \\
+8 & 4 & 4 & 1600,000 & GIAANN & 0.409 & 0.420 & - & 8553.6M & 480.6GB & 455.1M & 601.0M \\
 - & - & - & 10,000  & RoBERTa & 0.150 & 0.150 & 0.150 & 67.3M & 257.1MB & 2.4M & 3.4M \\
 - & - & - & 100,000 & RoBERTa & 0.299 & 0.299 & 0.299 & 67.3M & 257.1MB & 23.8M & 33.6M \\
 - & - & - & 400,000 & RoBERTa & 0.369 & 0.369 & 0.369 & 67.3M & 257.1MB & 94.8M & 134.0M \\
 - & - & - & 800,000 & RoBERTa & 0.388 & 0.388 & 0.388 & 67.3M & 257.1MB & 189.7M & 268.2M \\
+- & - & - & 1600,000 & RoBERTa & 0.407 & 0.407 & 0.407 & 67.3M & 257.1MB & 380.0M & 537.0M \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -870,26 +874,32 @@ Proto v2p+ GIAANN training performance measurements were taken using an AWS inst
 8 & 4 & 4 & 100,000 & GIAANN  & train   & 00:20:18 \\
 8 & 4 & 4 & 400,000 & GIAANN  & train   & 01:15:27 \\
 8 & 4 & 4 & 800,000 & GIAANN  & train   & 03:12:00 \\
+8 & 4 & 4 & 1600,000 & GIAANN  & train  & 07:12:25 \\
 - & - & - & 10,000  & RoBERTa & train   & 00:04:09 \\
 - & - & - & 100,000 & RoBERTa & train   & 00:40:58 \\
 - & - & - & 400,000 & RoBERTa & train   & 02:37:04 \\
 - & - & - & 800,000 & RoBERTa & train   & 05:30:45 \\
+- & - & - & 1600,000 & RoBERTa & train  & 10:41:02 \\
 8 & 4 & 4 & 10,000  & GIAANN  & tr eval & 00:03:44 \\
 8 & 4 & 4 & 100,000 & GIAANN  & tr eval & 00:13:46 \\
 8 & 4 & 4 & 400,000 & GIAANN  & tr eval & 00:44:34 \\
 8 & 4 & 4 & 800,000 & GIAANN  & tr eval & 01:29:04 \\
+8 & 4 & 4 & 1600,000 & GIAANN  & tr eval & 02:43:44 \\
 - & - & - & 10,000  & RoBERTa & tr eval & 00:02:06 \\
 - & - & - & 100,000 & RoBERTa & tr eval & 00:02:10 \\
 - & - & - & 400,000 & RoBERTa & tr eval & 00:02:16 \\
 - & - & - & 800,000 & RoBERTa & tr eval & 00:02:04 \\
+- & - & - & 1600,000 & RoBERTa & tr eval & 02:03:00 \\
 8 & 4 & 4 & 10,000  & GIAANN  & ts eval & 00:03:39 \\
 8 & 4 & 4 & 100,000 & GIAANN  & ts eval & 00:12:56 \\
 8 & 4 & 4 & 400,000 & GIAANN  & ts eval & 00:39:26 \\
 8 & 4 & 4 & 800,000 & GIAANN  & ts eval & 01:54:42 \\
+8 & 4 & 4 & 1600,000 & GIAANN  & ts eval & 03:35:39 \\
 - & - & - & 10,000  & RoBERTa & ts eval & 00:02:06 \\
 - & - & - & 100,000 & RoBERTa & ts eval & 00:02:10 \\
 - & - & - & 400,000 & RoBERTa & ts eval & 00:02:16 \\
 - & - & - & 800,000 & RoBERTa & ts eval & 00:02:04 \\
+- & - & - & 1600,000 & RoBERTa & ts eval & 02:03:00 \\
 \bottomrule
 \end{tabular}
 \end{table}

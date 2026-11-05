@@ -12,6 +12,8 @@ def initialiseWorker():
 	if(optimiseTrainLightweightWorkers):
 		import spacy
 		nlpArticle = spacy.load(spacyModelName, disable=trainLightweightWorkerDisabledComponents)
+		if(spacyIncreaseArticleMaxLength):
+			nlpArticle.max_length = spacyArticleMaxLength
 	return
 
 

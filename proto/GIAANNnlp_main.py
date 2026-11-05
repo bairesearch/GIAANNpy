@@ -108,6 +108,8 @@ else:
 			raise RuntimeError("sentencePredictions=False requires spacyPipelineBatchSequences=False and spacyPipelineLightweightSentenceSegmentation=False")
 		nlpArticle = spacy.load(spacyModelName, disable=["ner", "parser"])
 		nlpSequence = nlpArticle
+	if(spacyIncreaseArticleMaxLength):
+		nlpArticle.max_length = spacyArticleMaxLength
 
 
 

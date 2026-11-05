@@ -438,6 +438,7 @@ posDictFile = "everPos.wordnet.pkl.gz"
 
 #POS;
 useSpacyForConceptNounPOSdetection = True	#orig: True	#False: use GIAANNnlp_sequencePOS predetermined word-POS dictionaries for all pos detection (never use spacy dynamically assigned pos tags)
+spacyIncreaseArticleMaxLength = False
 if(sentencePredictions):
 	if(spacyPipelineOptimisations):
 		spacyModelName = 'en_core_web_sm'	#default: en_core_web_sm
@@ -463,6 +464,13 @@ else:
 	spacyPipelineBatchSequences = False	#mandatory: False
 	spacyPipelineLightweightSentenceSegmentation = False	#mandatory: False
 	spacyPipelineMinimalComponents = True	#mandatory: True
+	spacyIncreaseArticleMaxLength = True	#whole corpus articles are parsed before sequence length limits; parser and NER are disabled
+if(spacyIncreaseArticleMaxLength):
+	spacyArticleMaxLength = 10000000	#maximum article characters; retain an explicit limit without truncating or skipping articles
+	spacyArticleMaxLengthMinimum = 1
+	spacyArticleMaxLengthInvalidConfiguration = "spacyArticleMaxLength must be a positive integer character limit"
+	if(not isinstance(spacyArticleMaxLength, int) or isinstance(spacyArticleMaxLength, bool) or spacyArticleMaxLength < spacyArticleMaxLengthMinimum):
+		raise RuntimeError(spacyArticleMaxLengthInvalidConfiguration)
 
 # Define POS tag sets for nouns and non-nouns
 nounPos = {'NOUN', 'PROPN'}

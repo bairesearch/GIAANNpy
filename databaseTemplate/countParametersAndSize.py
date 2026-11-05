@@ -12,10 +12,25 @@ import argparse
 import io
 import os
 import pickle
+import struct
 import zipfile
 import torch as pt
 
 layoutType = "v1l"	#supported: "v1l", "legacy"
+
+zipReadMode = "r"
+zipBinaryReadMode = "rb"
+zipDirectoryBatchEntries = 4096
+zipDirectoryBatchBytes = 1024 ** 2
+zipEmptyField = 0
+zipDatabaseMetadataFileNames = ("conceptColumnsDict.pkl", "conceptFeaturesDict.pkl", "globalFeatureNeurons.pt")
+zipInvalidArchiveError = "countParametersAndSize error: invalid ZIP archive"
+zipInvalidDirectoryError = "countParametersAndSize error: invalid ZIP central directory bounds"
+zipTruncatedDirectoryError = "countParametersAndSize error: truncated ZIP central directory"
+zipInvalidDirectorySignatureError = "countParametersAndSize error: invalid ZIP central directory signature"
+zipInvalidEntryCountError = "countParametersAndSize error: ZIP central directory entry count mismatch"
+zipMultiDiskError = "countParametersAndSize error: multi-disk ZIP archives are not supported"
+zipClosedArchiveError = "countParametersAndSize error: ZIP archive is closed"
 
 def countNonZero(t):
 	result = 0
@@ -36,8 +51,9 @@ def getObservedColumnsPrefix(fileName):
 		result = fileName[:markerIndex + len(marker)]
 	return result
 
-def getObservedColumnsPrefixFromZip(zipInfoList):
+def getDatabaseMetadataFromZip(zipInfoList):
 	prefixes = set()
+	databaseFileInfoList = []
 	result = None
 	for info in zipInfoList:
 		if(info.is_dir()):
@@ -45,13 +61,15 @@ def getObservedColumnsPrefixFromZip(zipInfoList):
 		prefix = getObservedColumnsPrefix(info.filename)
 		if(prefix is not None):
 			prefixes.add(prefix)
+		elif(os.path.basename(info.filename) in zipDatabaseMetadataFileNames):
+			databaseFileInfoList.append(info)
 	if(len(prefixes) == 0):
 		raise RuntimeError("countParametersAndSize error: no observedColumns/ folder found inside zip")
 	if(len(prefixes) != 1):
 		raise RuntimeError("countParametersAndSize error: multiple observedColumns/ roots found inside zip: " + ", ".join(sorted(prefixes)))
 	for prefix in prefixes:
 		result = prefix
-	return result
+	return result, databaseFileInfoList
 
 def isUnsignedIntegerText(text):
 	result = text != "" and text.isdigit()
@@ -179,18 +197,19 @@ def main():
 	prefix = None
 	if(layoutType == "v1l"):
 		numSourceFeatureTensorFiles = 0
-		with zipfile.ZipFile(zipPath, "r") as zf:
-			prefix = getObservedColumnsPrefixFromZip(zf.infolist())
-			numberColumns = countDatabaseDictEntriesInZip(zf, zf.infolist(), prefix, "conceptColumnsDict.pkl")
-			numberFeatures = countDatabaseDictEntriesInZip(zf, zf.infolist(), prefix, "conceptFeaturesDict.pkl")
-			globalFeatureNeuronsInfo = getGlobalFeatureNeuronsInfoFromZip(zf.infolist(), prefix)
+		with StreamingZipFile(zipPath) as zf:
+			prefix, databaseFileInfoList = getDatabaseMetadataFromZip(zf.iterInfo())
+			numberColumns = countDatabaseDictEntriesInZip(zf, databaseFileInfoList, prefix, "conceptColumnsDict.pkl")
+			numberFeatures = countDatabaseDictEntriesInZip(zf, databaseFileInfoList, prefix, "conceptFeaturesDict.pkl")
+			globalFeatureNeuronsInfo = getGlobalFeatureNeuronsInfoFromZip(databaseFileInfoList, prefix)
 			if(globalFeatureNeuronsInfo is not None):
 				globalFeatureNeuronsPayload = loadTensorPayloadFromZip(zf, globalFeatureNeuronsInfo)
 				totalAssignedFeatureNeurons = countAssignedFeatureNeuronsInTensorPayload(globalFeatureNeuronsPayload, globalFeatureNeuronsInfo.filename, globalFeatureNeuronsTensor=True)
+				del globalFeatureNeuronsPayload
 				featureNeuronCountMethod = "globalFeatureNeurons.pt"
 			else:
 				featureNeuronCountMethod = "observedColumns/*/featureNeurons.pt"
-			for info in zf.infolist():
+			for info in zf.iterInfo():
 				if(not info.is_dir()):
 					totalZipBytesUncompressed += int(info.file_size)
 				name = info.filename
@@ -236,6 +255,7 @@ def main():
 				numFiles += 1
 				totalPtBytesUncompressed += int(info.file_size)
 				totalPtBytesCompressed += int(info.compress_size)
+				payload = None
 				try:
 					payload = loadTensorPayloadFromZip(zf, info)
 					payloadNnz, payloadLoaded = getTensorPayloadStats(payload)
@@ -253,20 +273,23 @@ def main():
 						raise RuntimeError(f"countParametersAndSize error: failed to count assigned feature neurons from {name}: {e}") from e
 					print(f"WARNING: failed to load {name}: {e}")
 					numSkipped += 1
+				finally:
+					del payload
 	elif(layoutType == "legacy"):
 		numLegacyFeatureConnectionsTensorFiles = 0
-		with zipfile.ZipFile(zipPath, "r") as zf:
-			prefix = getObservedColumnsPrefixFromZip(zf.infolist())
-			numberColumns = countDatabaseDictEntriesInZip(zf, zf.infolist(), prefix, "conceptColumnsDict.pkl")
-			numberFeatures = countDatabaseDictEntriesInZip(zf, zf.infolist(), prefix, "conceptFeaturesDict.pkl")
-			globalFeatureNeuronsInfo = getGlobalFeatureNeuronsInfoFromZip(zf.infolist(), prefix)
+		with StreamingZipFile(zipPath) as zf:
+			prefix, databaseFileInfoList = getDatabaseMetadataFromZip(zf.iterInfo())
+			numberColumns = countDatabaseDictEntriesInZip(zf, databaseFileInfoList, prefix, "conceptColumnsDict.pkl")
+			numberFeatures = countDatabaseDictEntriesInZip(zf, databaseFileInfoList, prefix, "conceptFeaturesDict.pkl")
+			globalFeatureNeuronsInfo = getGlobalFeatureNeuronsInfoFromZip(databaseFileInfoList, prefix)
 			if(globalFeatureNeuronsInfo is not None):
 				globalFeatureNeuronsPayload = loadTensorPayloadFromZip(zf, globalFeatureNeuronsInfo)
 				totalAssignedFeatureNeurons = countAssignedFeatureNeuronsInTensorPayload(globalFeatureNeuronsPayload, globalFeatureNeuronsInfo.filename, globalFeatureNeuronsTensor=True)
+				del globalFeatureNeuronsPayload
 				featureNeuronCountMethod = "globalFeatureNeurons.pt"
 			else:
 				featureNeuronCountMethod = "observedColumns/*_featureNeurons.pt"
-			for info in zf.infolist():
+			for info in zf.iterInfo():
 				if(not info.is_dir()):
 					totalZipBytesUncompressed += int(info.file_size)
 				name = info.filename
@@ -305,6 +328,7 @@ def main():
 				numFiles += 1
 				totalPtBytesUncompressed += int(info.file_size)
 				totalPtBytesCompressed += int(info.compress_size)
+				payload = None
 				try:
 					payload = loadTensorPayloadFromZip(zf, info)
 					payloadNnz, payloadLoaded = getTensorPayloadStats(payload)
@@ -322,6 +346,8 @@ def main():
 						raise RuntimeError(f"countParametersAndSize error: failed to count assigned feature neurons from {name}: {e}") from e
 					print(f"WARNING: failed to load {name}: {e}")
 					numSkipped += 1
+				finally:
+					del payload
 	else:
 		raise RuntimeError("countParametersAndSize error: unsupported layoutType = " + str(layoutType))
 
@@ -467,6 +493,80 @@ def countAssignedFeatureNeuronsInTensor(tensor, tensorName, globalFeatureNeurons
 	else:
 		raise RuntimeError("countAssignedFeatureNeuronsInTensor error: unsupported tensor layout for " + tensorName + ", layout = " + str(tensor.layout))
 	return result
+
+class StreamingZipFile(zipfile.ZipFile):
+	"""Read database members without retaining the archive's complete directory."""
+
+	def __init__(self, path):
+		super().__init__(path, zipReadMode)
+
+	def _RealGetContents(self):
+		# ZipFile.__init__ normally reads the entire central directory into RAM and
+		# retains a ZipInfo and a filename lookup entry for every member.
+		endRecord = zipfile._EndRecData(self.fp)
+		if(endRecord is None):
+			raise zipfile.BadZipFile(zipInvalidArchiveError)
+		if(endRecord[zipfile._ECD_DISK_NUMBER] != zipEmptyField or endRecord[zipfile._ECD_DISK_START] != zipEmptyField or endRecord[zipfile._ECD_ENTRIES_THIS_DISK] != endRecord[zipfile._ECD_ENTRIES_TOTAL]):
+			raise zipfile.BadZipFile(zipMultiDiskError)
+		self._comment = endRecord[zipfile._ECD_COMMENT]
+		self.directorySize = endRecord[zipfile._ECD_SIZE]
+		self.directoryEntryCount = endRecord[zipfile._ECD_ENTRIES_TOTAL]
+		self.fp.seek(zipEmptyField, os.SEEK_END)
+		directoryEnd = self.fp.tell() - zipfile.sizeEndCentDir - len(self._comment)
+		if(endRecord[zipfile._ECD_SIGNATURE] == zipfile.stringEndArchive64):
+			directoryEnd -= zipfile.sizeEndCentDir64 + zipfile.sizeEndCentDir64Locator
+		self.start_dir = directoryEnd - self.directorySize
+		self.archiveOffset = self.start_dir - endRecord[zipfile._ECD_OFFSET]
+		if(self.start_dir < zipEmptyField or self.archiveOffset < zipEmptyField):
+			raise zipfile.BadZipFile(zipInvalidDirectoryError)
+
+	def iterInfo(self):
+		if(self.fp is None):
+			raise ValueError(zipClosedArchiveError)
+		# An independent handle lets member reads seek without disturbing this scan.
+		with open(self.filename, zipBinaryReadMode) as directory:
+			directory.seek(self.start_dir)
+			directoryEnd = self.start_dir + self.directorySize
+			entryCount = zipEmptyField
+			while(directory.tell() < directoryEnd):
+				batch, batchEntryCount = self.readDirectoryBatch(directory, directoryEnd)
+				entryCount += batchEntryCount
+				# Give the standard library a small standalone central directory. It
+				# handles filename encodings, extra fields and ZIP64 member sizes/offsets.
+				endRecord = struct.pack(zipfile.structEndArchive, zipfile.stringEndArchive, zipEmptyField, zipEmptyField, batchEntryCount, batchEntryCount, len(batch), zipEmptyField, zipEmptyField)
+				with io.BytesIO(batch + endRecord) as buffer:
+					with zipfile.ZipFile(buffer, zipReadMode) as batchZip:
+						for info in batchZip.infolist():
+							info.header_offset += self.archiveOffset
+							if(info._end_offset == zipEmptyField):
+								info._end_offset = self.start_dir
+							else:
+								info._end_offset += self.archiveOffset
+							yield info
+			if(entryCount != self.directoryEntryCount):
+				raise zipfile.BadZipFile(zipInvalidEntryCountError)
+
+	def readDirectoryBatch(self, directory, directoryEnd):
+		batch = bytearray()
+		entryCount = zipEmptyField
+		while(entryCount < zipDirectoryBatchEntries and len(batch) < zipDirectoryBatchBytes and directory.tell() < directoryEnd):
+			header = directory.read(zipfile.sizeCentralDir)
+			if(len(header) != zipfile.sizeCentralDir):
+				raise zipfile.BadZipFile(zipTruncatedDirectoryError)
+			fields = struct.unpack(zipfile.structCentralDir, header)
+			if(fields[zipfile._CD_SIGNATURE] != zipfile.stringCentralDir):
+				raise zipfile.BadZipFile(zipInvalidDirectorySignatureError)
+			variableSize = fields[zipfile._CD_FILENAME_LENGTH] + fields[zipfile._CD_EXTRA_FIELD_LENGTH] + fields[zipfile._CD_COMMENT_LENGTH]
+			if(directory.tell() + variableSize > directoryEnd):
+				raise zipfile.BadZipFile(zipTruncatedDirectoryError)
+			variableData = directory.read(variableSize)
+			if(len(variableData) != variableSize):
+				raise zipfile.BadZipFile(zipTruncatedDirectoryError)
+			batch.extend(header)
+			batch.extend(variableData)
+			entryCount += 1
+		return batch, entryCount
+
 
 if __name__ == "__main__":
 	main()

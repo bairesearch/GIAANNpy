@@ -783,3 +783,6 @@ v2r (Codex App GPT-6.0):
 - enable patchTrainColumnStepsRepeatedColumns.
 - update paper implementation/algorithm tex.
 - update paper experiments tex.
+- add option spacyIncreaseArticleMaxLength - raise spaCy configurable article character limit for standard and lightweight NLP pipelines when sentencePredictions=False, preventing length-limit failures on large corpus articles.
+- add option databaseWriteProgressivelyReleaseConnectionTensors - release saved connection tensors progressively during the final training save, after each successful write and once no later operation needs them.
+- update countParametersAndSize.py - fix excessive RAM usage by streaming ZIP directory entries in bounded batches and releasing tensor payloads immediately after counting.

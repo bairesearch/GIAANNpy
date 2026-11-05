@@ -572,6 +572,11 @@ def prepareObservedColumnsForTrainSequence(observedColumnsDict, requiredSourceFe
 	return
 
 def saveAllObservedColumnsToDisk(databaseNetworkObject):
+	if(databaseWriteProgressivelyReleaseConnectionTensors):
+		if(not databaseNetworkObject.inferenceMode and storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam and databaseNetworkObject.observedColumnsDictRAM is not None):
+			for observedColumn in databaseNetworkObject.observedColumnsDictRAM.values():
+				if(observedColumn.featureConnectionsBySourceFeature is None):
+					raise RuntimeError(databaseWriteReleasedConnectionTensorsError)
 	if(optimiseTrainSequenceBatch):
 		GIAANNcmn_trainSequenceBatch.flushDatabase(databaseNetworkObject)
 	if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
@@ -582,6 +587,9 @@ def saveAllObservedColumnsToDisk(databaseNetworkObject):
 		for observedColumn in databaseNetworkObject.observedColumnsDictRAM.values():
 			saveAllSourceFeatures = True
 			observedColumn.saveToDisk(saveAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeTensorsOnRAMdatabaseSave)
+			if(databaseWriteProgressivelyReleaseConnectionTensors):
+				if(not databaseNetworkObject.inferenceMode):
+					observedColumn.releaseSavedConnectionTensors()
 	else:
 		raise RuntimeError("saveAllObservedColumnsToDisk error: storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam is False")
 	return

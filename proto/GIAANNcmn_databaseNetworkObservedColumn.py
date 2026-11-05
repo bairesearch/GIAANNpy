@@ -512,6 +512,9 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		return featureNeurons
 
 	def getDefaultConnectionTargetDevice(self):
+		if(databaseWriteProgressivelyReleaseConnectionTensors):
+			if(self.featureConnectionsBySourceFeature is None):
+				raise RuntimeError(databaseWriteReleasedConnectionTensorsError)
 		deviceTarget = deviceDatabase if storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam else deviceSparse
 		if(len(self.featureConnectionsBySourceFeature) > 0):
 			firstTensor = next(iter(self.featureConnectionsBySourceFeature.values()))
@@ -538,6 +541,9 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		return result
 
 	def getFeatureConnectionsForSourceFeature(self, sourceFeatureIndex, targetDevice=None, createMissing=False, ensureCurrentSizeOnLoad=False):
+		if(databaseWriteProgressivelyReleaseConnectionTensors):
+			if(self.featureConnectionsBySourceFeature is None):
+				raise RuntimeError(databaseWriteReleasedConnectionTensorsError)
 		if(optimiseTrainSequenceBatch):
 			GIAANNcmn_trainSequenceBatch.flushDatabase(self.databaseNetworkObject)
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
@@ -619,7 +625,30 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		return
 
 	def saveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsToCurrentSize=False):
+		if(databaseWriteProgressivelyReleaseConnectionTensors):
+			if(self.featureConnectionsBySourceFeature is None):
+				raise RuntimeError(databaseWriteReleasedConnectionTensorsError)
 		GIAANNcmn_databaseNetworkFiles.observedColumnSaveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeFeatureTensorsToCurrentSize)
+		return
+
+	def releaseSavedConnectionTensors(self):
+		if(databaseWriteProgressivelyReleaseConnectionTensors):
+			if(not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam or self.databaseNetworkObject.inferenceMode or not self.isDatabaseResidentConnectionStorage() or self.featureConnectionsBySourceFeature is None):
+				raise RuntimeError(databaseWriteReleaseConnectionTensorsInvalidState)
+			self.featureConnectionsBySourceFeature.clear()
+			self.featureConnectionsBySourceFeature = None	#Fail on accidental reuse instead of treating released connections as untrained sources.
+			self.loadedSourceFeatureIndices.clear()
+			self.trainPreparedSourceFeatureIndices.clear()
+			if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
+				self.similarAuxiliaryFeatureConnectionsBySourceFeature.clear()
+				self.similarAuxiliaryFeatureConnectionsBySourceFeature = None
+				self.similarAuxiliaryLoadedSourceFeatureIndices.clear()
+				self.similarAuxiliaryTrainPreparedSourceFeatureIndices.clear()
+			if(auxiliaryNeurons and auxiliaryNeuronsAuto and trainReverseConnections):
+				self.reverseFeatureConnectionsByTargetFeature.clear()
+				self.reverseFeatureConnectionsByTargetFeature = None
+				self.reverseLoadedTargetFeatureIndices.clear()
+				self.reverseTrainPreparedTargetFeatureIndices.clear()
 		return
 
 	@classmethod
