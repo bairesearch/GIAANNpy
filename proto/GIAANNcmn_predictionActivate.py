@@ -1411,7 +1411,14 @@ def normaliseReviewSourceConnectionInputs(featureConnectionsStrength):
 		segmentMaxima.scatter_reduce_(inferenceReviewPatch14VectorDimension, segmentIndices, connectionValues, reduce=inferenceReviewPatch14MaximumReduction)
 		positiveConnections = connectionValues > inferenceReviewPatch14MinimumStrength
 		# Empty and zero-only segments emit no input; never divide their weights by zero.
-		connectionValues[positiveConnections] *= inferenceReviewPatch14ReferenceStrength / segmentMaxima[segmentIndices[positiveConnections]]
+		if(inferenceSynapticResponsePower):
+			if(inferenceSynapticResponseExponent == inferenceSynapticResponseMaximumExponent):
+				# Preserve the original floating-point arithmetic for the identity response.
+				connectionValues[positiveConnections] *= inferenceReviewPatch14ReferenceStrength / segmentMaxima[segmentIndices[positiveConnections]]
+			else:
+				connectionValues[positiveConnections] = inferenceReviewPatch14ReferenceStrength*(connectionValues[positiveConnections]/segmentMaxima[segmentIndices[positiveConnections]]).pow(inferenceSynapticResponseExponent)
+		else:
+			connectionValues[positiveConnections] *= inferenceReviewPatch14ReferenceStrength / segmentMaxima[segmentIndices[positiveConnections]]
 		if(useSANIcolumns or useSANIfeaturesAndColumns):
 			columnConnections = segmentIndices <= arrayIndexSegmentLastColumn
 			connectionValues[columnConnections] *= inferenceReviewPatch14ColumnInputGain

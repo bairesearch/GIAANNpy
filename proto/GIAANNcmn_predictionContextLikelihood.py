@@ -200,7 +200,11 @@ def getContextLikelihoodColumnFrequencies(databaseNetworkObject, columnIndex):
 		if(columnIndex not in cache):
 			cache[columnIndex] = loadContextLikelihoodColumnFrequencies(databaseNetworkObject, columnIndex)
 			if(len(cache) > inferenceContextLikelihoodFrequencyCacheColumns):
-				cache.popitem(last=False)
+				if(inferenceSynapticResponsePower):
+					if(not inferenceSynapticResponseRetainFrequencies):
+						cache.popitem(last=False)
+				else:
+					cache.popitem(last=False)
 		cache.move_to_end(columnIndex)
 		result = cache[columnIndex]
 	else:

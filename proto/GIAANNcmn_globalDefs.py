@@ -197,7 +197,7 @@ elif(useDefault):
 	trainMaxSequences = 5000	#dev: 5000, 200000, 1000000 	#default: 5000	  #adjust as needed	#max sequences for train
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useBenchmark):
-	trainMaxSequences = 1600000	#10000, 100000, 400000, 800000, 1600000	#5000, 200000, 1000000
+	trainMaxSequences = 1000000	#10000, 100000, 400000, 800000, 1600000	#5000, 200000, 1000000
 	databaseFolderBase = databaseFolderBaseSSD
 elif(useAutoresearch):
 	trainMaxSequences = 50000	#5000
@@ -500,7 +500,7 @@ if(useInference):
 		if(useBenchmarkDefaultsEvalTestSetOptim):
 			inferenceConnectionsStrengthBoolean = False		#False: with inferenceActivationsType = "boolf" this typically provides lower train-set accuracy, higher test-set accuracy	#do not overweight by common features (e.g. determiners)
 		else:
-			inferenceConnectionsStrengthBoolean = True	#default: True
+			inferenceConnectionsStrengthBoolean = False	#default: False #orig: True
 		inferenceSourceActivationsBoolean = True	#default: True (do not sum SANI segments)	#orig: False
 	else:
 		inferenceConnectionsStrengthBoolean = False	#default: False	
@@ -1606,7 +1606,7 @@ else:
 
 #Inference optimisations workers/chunks;
 # generalisedBenchmarkTool delegates to these native inference options.
-if(executionMode == "inference" and not inferenceTrainFirstSequences):
+if(executionMode == "inference" and not inferenceTrainFirstSequences and not inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 	optimisationInferenceChunks = True	#default: True	#orig: False #opt-in: evaluate independent prompt lines in fresh CPU processes; preserve the normal inference path when disabled
 	optimisationInferenceWorkers = True	#default: True	#orig: False	#opt-in: schedule multiple chunks concurrently; requires optimisationInferenceChunks
 else:
@@ -1881,6 +1881,28 @@ if(useDefaultsV2):
 			if(not isinstance(inferenceReviewPatch14Scale, (int, float)) or isinstance(inferenceReviewPatch14Scale, bool) or not math.isfinite(inferenceReviewPatch14Scale) or inferenceReviewPatch14Scale <= inferenceReviewPatch14MinimumStrength):
 				raise RuntimeError(inferenceReviewPatch14InvalidConfiguration)
 
+	#Optional concave response to existing normalized synaptic strengths.
+	if(inferenceContextLikelihood):
+		inferenceSynapticResponsePower = False	#default: False	#orig: False
+	else:
+		inferenceSynapticResponsePower = False
+	inferenceSynapticResponseExponent = 0.5
+	if(inferenceSynapticResponsePower):
+		inferenceSynapticResponseRetainFrequencies = True	#retain immutable trained frequencies for wider candidate sets; at 1.6M the complete frequency tensors occupy about 1 GB
+	else:
+		inferenceSynapticResponseRetainFrequencies = False
+	inferenceSynapticResponseMinimumExponent = 0.0
+	inferenceSynapticResponseMaximumExponent = 1.0
+	inferenceSynapticResponseInvalidConfiguration = "Synaptic response power requires static context-likelihood LIF inference and normalized source inputs"
+	inferenceSynapticResponseInvalidExponent = "Synaptic response exponent must be a finite number within (0, 1]"
+	inferenceSynapticResponseConfigurationLabel = "inferenceSynapticResponsePower:"
+	inferenceSynapticResponseExponentLabel = "inferenceSynapticResponseExponent:"
+	if(inferenceSynapticResponsePower):
+		if(not inferenceContextLikelihood or not inferenceReviewPatch14NormaliseConnectionInputs):
+			raise RuntimeError(inferenceSynapticResponseInvalidConfiguration)
+		if(type(inferenceSynapticResponseExponent) not in (int, float) or not math.isfinite(inferenceSynapticResponseExponent) or not inferenceSynapticResponseMinimumExponent < inferenceSynapticResponseExponent <= inferenceSynapticResponseMaximumExponent):
+			raise ValueError(inferenceSynapticResponseInvalidExponent)
+
 	#Fifth LIF performance review option;
 	inferenceReviewPatch15boundedPrior = False	#default: False #master switch for patch 15: column-scoring computation optimisation and bounded token-transition prior
 	if(inferenceReviewPatch15boundedPrior):
@@ -1969,6 +1991,8 @@ else:
 	inferenceReviewPatch12RetainContextWithoutOutgoingSource = False
 	inferenceReviewPatch13poolTransitionsFromSimilarFeatures = False
 	inferenceReviewPatch14NormaliseConnectionInputs = False
+	inferenceSynapticResponsePower = False
+	inferenceSynapticResponseRetainFrequencies = False
 	inferenceReviewPatch15boundedPrior = False
 	inferenceReviewPatch15OptimiseColumnSelection = False
 	inferenceReviewPatch15TokenTransitionPrior = False
@@ -2019,6 +2043,9 @@ if(optimiseTrainLightweightWorkers):
 
 #printConfiguration;
 if(printConfiguration): 
+	if(inferenceSynapticResponsePower):
+		print(inferenceSynapticResponseConfigurationLabel, inferenceSynapticResponsePower)
+		print(inferenceSynapticResponseExponentLabel, inferenceSynapticResponseExponent)
 	if(inferenceFeatureSegmentWeighting):
 		print("inferenceFeatureSegmentWeighting:", inferenceFeatureSegmentWeighting)
 		print("inferenceFeatureSegmentWeight:", inferenceFeatureSegmentWeight)

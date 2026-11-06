@@ -602,7 +602,8 @@ AUTORESEARCH; - update inferenceLeakyIntegrateAndFire:useBenchmarkDefaultsEvalTe
 	- soma threshold: `0.004 -> 0.008`
 	- nonlinear soma decay: `0.50 -> 0.75`
 	- set inferenceConnectionsStrengthBoolean=False - preserve continuous trained connection strengths instead of converting them to Boolean values.
-- add option optimisationStoreDatabaseResidentCoordinatesAsInt32
+AUTORESEARCH; - decrease the RAM usage by 30% to 50% without affecting the actual computation/training of the network:
+	- add option optimisationStoreDatabaseResidentCoordinatesAsInt32
 - implement option inferenceLeakyIntegrateAndFire:algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive" - only pass neuron candidate selection filter if soma was immediately activated by the last segment in the dendrite. The inferenceLeakyIntegrateAndFire:algorithmMatrixSANIenforceRequirement="enforceLastSegmentMustBeActive implementation must be efficient and use no new database structures. Ensure that this functionality makes no changes to the inferenceLeakyIntegrateAndFire=False execution path.
 MANUAL; - update inferenceLeakyIntegrateAndFire - if(not inferenceEvaluateTestSet): set inferenceDecrementActivationsSomaPerPredictedToken = 1.0
 MANUAL; - constrain option useBenchmarkDefaultsEvalTestSetOptim to inferenceEvaluateTestSet, and set True by default
@@ -615,17 +616,19 @@ MANUAL; - merge inferenceEvaluateTestSet with useBenchmarkDefaultsEvalTestSet
 - inferenceLeakyIntegrateAndFire: extract inferenceDeactivateSomaUponPrediction from inferenceDeactivateNeuronsUponPrediction.
 - implement option inferenceDeactivateLastColumnSegmentUponPrediction for case inferenceLeakyIntegrateAndFire:useSANIcolumns/useSANIfeaturesAndColumns.
 MANUAL; - update inferenceLeakyIntegrateAndFire - if(not inferenceEvaluateTestSet): set inferenceDeactivateLastColumnSegmentUponPrediction
-- patch inferenceLeakyIntegrateAndFire:useSANIcolumns - record positive arrayIndexSegmentLastColumn targets as immediate last-segment eligibility keys
-- patch processColumnInferencePrediction()/propagateLeakyIntegrateAndFireActivationsEnforceLastSegment()/mergeLeakyIntegrateAndFireCurrentSomaActivationKeys()/executeBeamNodeActivation() - Preserve direct LIF terminal-signal eligibility while using propagated terminal-segment activations when no direct soma signal is available.
-- patch applyFeatureNeuronsTargetActivationPredict()/canonicaliseLeakyIntegrateAndFireSomaBranches() - Canonicalize every LIF soma-target activation onto the artificial soma's branch zero before accumulation.
-- patch executeBeamNodeActivation() - Align LIF beam-node transitions with main inference by advancing, decaying, and bursting before propagation and resetting after outgoing activation.
-- patch initialiseLeakyIntegrateAndFireSomaActivationKeys() - Initialize first-token LIF eligibility from the forced seed soma burst when bits-per-byte scoring is enabled.
-- patch inferenceDeactivateLastColumnSegmentUponPrediction - Derive last-column deactivation only after selecting the SANI layout so pure-feature LIF inference never enables a nonexistent column segment.
-- patch inferenceLeakyIntegrateAndFireSomaSegmentCount - Reserve the LIF soma as an additional artificial segment while retaining the full configured hybrid feature receptive-field length.
-- patch inferenceDecrementActivationsSoma/inferenceDeactivateSomaUponPrediction/inferenceDeactivateSegmentsUponPrediction/inferenceDeactivateLastColumnSegmentUponPrediction - Honor LIF soma-decay and soma, dendritic-segment, and last-column deactivation controls independently in main and beam inference.
-- patch propagateLeakyIntegrateAndFireActivationsEnforceLastSegment()/mergeLeakyIntegrateAndFireCurrentSomaActivationKeys()/calculateLeakyIntegrateAndFireLastSegmentSelectionActivationDistribution() - Canonicalize LIF eligibility keys as sorted unique tensors and use binary-search membership during candidate selection.
-- patch processColumnInferencePrediction()/executeBeamNodeActivation() - Require current-step direct LIF terminal-signal keys when direct connections are enforced, without substituting propagated eligibility.
-- patch selectNextColumnFeatureSeedPhase()/activateSelectedFeatureNeuronAfterPredictionPhase() - Defer forced LIF seed bursts until after post-selection soma decay so each selected seed is burst exactly once and remains active as the next token source.
+- review the leaky integrate and fire option, and verify that it is working according to specification;
+	- patch inferenceLeakyIntegrateAndFire:useSANIcolumns - record positive arrayIndexSegmentLastColumn targets as immediate last-segment eligibility keys
+- bring LIF in line with non-LIF;
+	- patch processColumnInferencePrediction()/propagateLeakyIntegrateAndFireActivationsEnforceLastSegment()/mergeLeakyIntegrateAndFireCurrentSomaActivationKeys()/executeBeamNodeActivation() - Preserve direct LIF terminal-signal eligibility while using propagated terminal-segment activations when no direct soma signal is available.
+	- patch applyFeatureNeuronsTargetActivationPredict()/canonicaliseLeakyIntegrateAndFireSomaBranches() - Canonicalize every LIF soma-target activation onto the artificial soma's branch zero before accumulation.
+	- patch executeBeamNodeActivation() - Align LIF beam-node transitions with main inference by advancing, decaying, and bursting before propagation and resetting after outgoing activation.
+	- patch initialiseLeakyIntegrateAndFireSomaActivationKeys() - Initialize first-token LIF eligibility from the forced seed soma burst when bits-per-byte scoring is enabled.
+	- patch inferenceDeactivateLastColumnSegmentUponPrediction - Derive last-column deactivation only after selecting the SANI layout so pure-feature LIF inference never enables a nonexistent column segment.
+	- patch inferenceLeakyIntegrateAndFireSomaSegmentCount - Reserve the LIF soma as an additional artificial segment while retaining the full configured hybrid feature receptive-field length.
+	- patch inferenceDecrementActivationsSoma/inferenceDeactivateSomaUponPrediction/inferenceDeactivateSegmentsUponPrediction/inferenceDeactivateLastColumnSegmentUponPrediction - Honor LIF soma-decay and soma, dendritic-segment, and last-column deactivation controls independently in main and beam inference.
+	- patch propagateLeakyIntegrateAndFireActivationsEnforceLastSegment()/mergeLeakyIntegrateAndFireCurrentSomaActivationKeys()/calculateLeakyIntegrateAndFireLastSegmentSelectionActivationDistribution() - Canonicalize LIF eligibility keys as sorted unique tensors and use binary-search membership during candidate selection.
+	- patch processColumnInferencePrediction()/executeBeamNodeActivation() - Require current-step direct LIF terminal-signal keys when direct connections are enforced, without substituting propagated eligibility.
+	- patch selectNextColumnFeatureSeedPhase()/activateSelectedFeatureNeuronAfterPredictionPhase() - Defer forced LIF seed bursts until after post-selection soma decay so each selected seed is burst exactly once and remains active as the next token source.
 - set inferenceLeakyIntegrateAndFire=True by default
 
 ---
@@ -787,4 +790,7 @@ AUTORESEARCH; - investigate ways to significantly (ie 2x or higher) improve the 
 - add option databaseWriteProgressivelyReleaseConnectionTensors - release saved connection tensors progressively during the final training save, after each successful write and once no later operation needs them.
 - update countParametersAndSize.py - fix excessive RAM usage by streaming ZIP directory entries in bounded batches and releasing tensor payloads immediately after counting.
 AUTORESEARCH; - set inferenceColumnLikelihoodWeight = 0.125 -> 0.5
-
+AUTORESEARCH; - spend as much time as you require to significantly improve the test-set eval accuracy:
+	- add option inferenceSynapticResponsePower (disabled) - improve prediction accuracy through configurable power scaling of normalized synaptic strengths before LIF integration, preserving the original behavior when disabled.
+MANUAL; - set inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures:optimisationInferenceChunks/optimisationInferenceWorkers=False
+- set inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures:inferenceConnectionsStrengthBoolean=False
