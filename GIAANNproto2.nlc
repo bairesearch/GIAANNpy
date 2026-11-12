@@ -794,3 +794,8 @@ AUTORESEARCH; - spend as much time as you require to significantly improve the t
 	- add option inferenceSynapticResponsePower (disabled) - improve prediction accuracy through configurable power scaling of normalized synaptic strengths before LIF integration, preserving the original behavior when disabled.
 MANUAL; - set inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures:optimisationInferenceChunks/optimisationInferenceWorkers=False
 - set inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures:inferenceConnectionsStrengthBoolean=False
+
+---
+v2s (Codex App GPT-6.0):
+- add proto GIAANNproto2s1a - start inferenceBeamSearch updates:
+	- patch and optimise inferenceBeamSearch with likelihood scoring, isolate speculative state and subthreshold candidate admission.

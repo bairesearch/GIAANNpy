@@ -463,8 +463,10 @@ arrayIndexPropertiesTimeCreateInference = arrayIndexPropertiesTime or inferenceU
 
 
 #Beam search;
+inferenceBeamSearchLikelihood = False
 if(useInference):
 	inferenceBeamSearch = False	#default: False	#orig: False
+	inferenceBeamSearchLikelihood = inferenceBeamSearch and useDefaultsV2 and useModalityNLP and inferenceLeakyIntegrateAndFire
 	inferenceBeamScoreStrategy = "nodeActivation"	#options: "nodeActivation", "activation_connection", "connection"
 	inferenceBeamConceptColumnNodeActivationThreshold = 0.0
 	inferenceBeamInstanceNodeActivationThreshold = 0.0
@@ -473,6 +475,44 @@ if(useInference):
 	inferenceBeamInstancePreferAdjacentOverlap = False           #optional: prioritise columns sharing active features with adjacent columns
 	inferenceBeamWidth = 3	#default: 3	#orig: 3
 	inferenceBeamDepth = 6	#default: 3	#orig: 6
+	if(inferenceBeamSearchLikelihood):
+		inferenceBeamSearchLikelihoodStrategy = "contextLikelihood"
+		inferenceBeamScoreStrategy = inferenceBeamSearchLikelihoodStrategy
+		inferenceBeamWidth = 2
+		inferenceBeamDepth = 2
+		inferenceBeamSearchAdmitSubthreshold = True
+		inferenceBeamSearchMinimumActivationRatio = 0.0
+		inferenceBeamSearchExtraCandidates = 256
+		inferenceBeamSearchContinuationWeight = 0.15
+		inferenceBeamSearchSubthresholdPenalty = 0.75
+		inferenceBeamSearchPreserveEligibleScores = False
+		inferenceBeamSearchLimitRootGap = True
+		inferenceBeamSearchMaximumRootLogGap = 0.1
+		inferenceBeamSearchRecordDiagnostics = False
+		inferenceBeamSearchDiagnosticMaximumWeight = 1.0
+		inferenceBeamSearchPruneDominated = True
+		inferenceBeamSearchProjectTerminalState = True
+		inferenceBeamSearchZero = 0
+		inferenceBeamSearchOne = 1
+		inferenceBeamSearchTwo = 2
+		inferenceBeamSearchThree = 3
+		inferenceBeamSearchMaximumWidth = 64
+		inferenceBeamSearchMaximumDepth = 8
+		inferenceBeamSearchMaximumExtraCandidates = 1024
+		inferenceBeamSearchContinuationFloor = 1e-12
+		inferenceBeamSearchMinimumScore = -1e30	#finite sentinel keeps native chunk settings serialisable; below every representable candidate log score
+		inferenceBeamSearchFeaturesKey = "features"
+		inferenceBeamSearchTimeKey = "time"
+		inferenceBeamSearchArrivalKey = "somaActivationFromLastSegmentKeys"
+		inferenceBeamSearchColumnKey = "selectedColumnIndex"
+		inferenceBeamSearchDeactivatedKey = "deactivatedNeurons"
+		inferenceBeamSearchContextAttributes = ("contextLikelihoodHistory", "contextLikelihoodColumnOrigins", "contextLikelihoodPosition", "columnLikelihoodHistory", "columnLikelihoodColumn", "columnLikelihoodEpoch", "columnLikelihoodPosition", "columnLikelihoodRecordedPosition")
+		inferenceBeamSearchConfigurationNames = ("inferenceBeamSearchLikelihood", "inferenceBeamScoreStrategy", "inferenceBeamWidth", "inferenceBeamDepth", "inferenceBeamSearchAdmitSubthreshold", "inferenceBeamSearchMinimumActivationRatio", "inferenceBeamSearchExtraCandidates", "inferenceBeamSearchContinuationWeight", "inferenceBeamSearchSubthresholdPenalty", "inferenceBeamSearchPreserveEligibleScores", "inferenceBeamSearchLimitRootGap", "inferenceBeamSearchMaximumRootLogGap", "inferenceBeamSearchPruneDominated", "inferenceBeamSearchProjectTerminalState", "inferenceBeamSearchRecordDiagnostics", "inferenceBeamSearchDiagnosticMaximumWeight")
+		inferenceBeamSearchConfigurationLabelSuffix = ":"
+		inferenceBeamSearchInvalidConfiguration = "Likelihood beam search requires static CPU single-branch NLP LIF with strict direct connections, context and column likelihood, token aggregation, no sequence memory, auxiliary sources or time properties"
+		inferenceBeamSearchInvalidParameter = "Likelihood beam search parameter is outside its supported range"
+		inferenceBeamSearchInvalidState = "Likelihood beam search received inconsistent state or candidates"
+		inferenceBeamSearchNoCandidates = "Likelihood beam search has no eligible source-connected candidates"
 	#optimisations;
 	inferenceStrengthLookupCache = True	#default: True	#orig: False	#cache strength lookup during inference
 	if(inferenceBeamSearch):
@@ -1714,7 +1754,7 @@ if(inferenceFeatureSegmentWeighting):
 		raise RuntimeError(inferenceFeatureSegmentWeightInvalidConfiguration)
 	if(type(inferenceFeatureSegmentWeight) not in (int, float) or not math.isfinite(inferenceFeatureSegmentWeight) or inferenceFeatureSegmentWeight < inferenceFeatureSegmentWeightMinimum):
 		raise ValueError(inferenceFeatureSegmentWeightInvalidParameter)
-if(useBenchmark and executionMode == "inference" and useDefaultsV2 and useModalityNLP and inferenceLeakyIntegrateAndFire and useBenchmarkDefaultsEvalTestSetOptim and not inferenceBeamSearch):
+if(useBenchmark and executionMode == "inference" and useDefaultsV2 and useModalityNLP and inferenceLeakyIntegrateAndFire and useBenchmarkDefaultsEvalTestSetOptim and (not inferenceBeamSearch or inferenceBeamSearchLikelihood)):
 	inferenceContextLikelihood = True	#default: True	#orig: False	#combine the configured source evidence with smoothed contextual likelihoods before LIF candidate selection
 else:
 	inferenceContextLikelihood = False
@@ -1748,7 +1788,7 @@ if(inferenceContextLikelihood):
 	inferenceContextLikelihoodProxyWeightTolerance = 1e-6
 	inferenceContextLikelihoodInvalidParameters = "Context likelihood weights must be finite and within [0, 1], smoothing must be finite and positive, and the frequency cache limit must be a positive integer"
 
-	if(executionMode != inferenceContextLikelihoodExecutionMode or not useDefaultsV2 or not useModalityNLP or not inferenceLeakyIntegrateAndFire or not useSANIfeaturesAndColumns or multipleDendriticBranches or not enforceDirectConnectionsSANI or inferenceBeamSearch or (predictionEnsureConnectedToPreviousPredictionStrict and inferenceInferMissingFeatures) or auxiliaryNeurons or useTrainDuringInference or inferenceTrainFirstSequences or inferenceConnectionsStrengthBoolean or not trainConnectionStrengthNormaliseWrtContextLength or trainConnectionStrengthIncreaseColumnInternal or trainConnectionStrengthPOSdependence or trainConnectionStrengthLimitMax or trainConnectionStrengthLimitTanh or inferenceConnectionStrengthPOSdependence or SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens or algorithmMatrixSANIenforceRequirement != inferenceContextLikelihoodRequiredSANI or useGPUdense or useGPUsparse or printInferenceTop1AccuracyBitsPerByte):
+	if(executionMode != inferenceContextLikelihoodExecutionMode or not useDefaultsV2 or not useModalityNLP or not inferenceLeakyIntegrateAndFire or not useSANIfeaturesAndColumns or multipleDendriticBranches or not enforceDirectConnectionsSANI or (inferenceBeamSearch and not inferenceBeamSearchLikelihood) or (predictionEnsureConnectedToPreviousPredictionStrict and inferenceInferMissingFeatures) or auxiliaryNeurons or useTrainDuringInference or inferenceTrainFirstSequences or inferenceConnectionsStrengthBoolean or not trainConnectionStrengthNormaliseWrtContextLength or trainConnectionStrengthIncreaseColumnInternal or trainConnectionStrengthPOSdependence or trainConnectionStrengthLimitMax or trainConnectionStrengthLimitTanh or inferenceConnectionStrengthPOSdependence or SANIfeaturesLinkFirstSegmentToAllPriorTrainSeqTokens or algorithmMatrixSANIenforceRequirement != inferenceContextLikelihoodRequiredSANI or useGPUdense or useGPUsparse or printInferenceTop1AccuracyBitsPerByte):
 		raise RuntimeError(inferenceContextLikelihoodInvalidConfiguration)
 	inferenceContextLikelihoodHistoryLength = arrayNumberOfSegmentsFeatureDistance + inferenceLeakyIntegrateAndFireSomaSegmentCount
 	for inferenceContextLikelihoodWeight in (inferenceContextLikelihoodPriorWeight, inferenceContextLikelihoodContextWeight):
@@ -1972,7 +2012,7 @@ if(useDefaultsV2):
 		inferenceLIFTokenAggregationInvalidToken = "Patch 16 requires each prime concept token to have a valid feature dictionary index"
 		inferenceLIFTokenAggregationInvalidTotals = "Patch 16 token activation totals must remain finite and positive"
 		if(useInference):
-			if(not inferenceLeakyIntegrateAndFire or not enforceDirectConnectionsSANI or inferenceBeamSearch or algorithmMatrixSANIenforceRequirement != inferenceLIFTokenAggregationRequiredSANICondition or (not predictionEnsureConnectedToPreviousPrediction and not (inferenceReviewPatch12RetainContextWithoutOutgoingSource and inferenceReviewPatch13poolTransitionsFromSimilarFeatures))):
+			if(not inferenceLeakyIntegrateAndFire or not enforceDirectConnectionsSANI or (inferenceBeamSearch and not inferenceBeamSearchLikelihood) or algorithmMatrixSANIenforceRequirement != inferenceLIFTokenAggregationRequiredSANICondition or (not predictionEnsureConnectedToPreviousPrediction and not (inferenceReviewPatch12RetainContextWithoutOutgoingSource and inferenceReviewPatch13poolTransitionsFromSimilarFeatures))):
 				raise RuntimeError(inferenceLIFTokenAggregationInvalidConfiguration)
 else:
 	inferenceColumnConstraintsAllowExternalPrimeConceptTransitionsBeamCandiateFilteringPatch = False
@@ -2001,6 +2041,9 @@ else:
 if(inferenceContextLikelihood):
 	if(inferenceReviewPatch15TokenTransitionPrior or not inferenceReviewPatch16TokenAggregation):
 		raise RuntimeError(inferenceContextLikelihoodInvalidConfiguration)
+	if(inferenceBeamSearchLikelihood):
+		if(not inferenceColumnLikelihood or not predictionEnsureConnectedToPreviousPredictionStrict or inferenceUseNeuronFeaturePropertiesTime or useSequenceContext or inferenceInferMissingFeatures or not inferenceBurstAllPredictionsOrTargetsInSequence):
+			raise RuntimeError(inferenceBeamSearchInvalidConfiguration)
 	
 if(useSequenceContext):
 	if(not inferenceReviewPatch16TokenAggregation or (executionMode != sequenceContextInferenceMode and (not useSaveData or debugDisableDatabaseFileWrite))):
@@ -2043,6 +2086,9 @@ if(optimiseTrainLightweightWorkers):
 
 #printConfiguration;
 if(printConfiguration): 
+	if(inferenceBeamSearchLikelihood):
+		for inferenceBeamSearchConfigurationName in inferenceBeamSearchConfigurationNames:
+			print(inferenceBeamSearchConfigurationName + inferenceBeamSearchConfigurationLabelSuffix, globals()[inferenceBeamSearchConfigurationName])
 	if(inferenceSynapticResponsePower):
 		print(inferenceSynapticResponseConfigurationLabel, inferenceSynapticResponsePower)
 		print(inferenceSynapticResponseExponentLabel, inferenceSynapticResponseExponent)

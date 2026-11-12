@@ -41,104 +41,110 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 
 
 def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, conceptActivationState=None, connectedColumnsConstraint=None, connectedColumnsFeatures=None, somaActivationFromLastSegmentKeys=None, selectedColumnIndex=None, deactivatedNeuronState=None):
-	#generate targets for debug/analysis output
-	targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNcmn_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
-
-	strengthLookup = None
-	if(globalFeatureNeuronsStrength is not None):
-		strengthLookup = buildStrengthLookup(databaseNetworkObject, globalFeatureNeuronsStrength, databaseNetworkObject.f)
-	initialConstraintState = GIAANNcmn_predictionConstraints.createConstraintState(allowedColumns, constraintMode)
-	if(inferenceLeakyIntegrateAndFire and (useSANIcolumns or useSANIfeaturesAndColumns)):
-		initialState = initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState, somaActivationFromLastSegmentKeys, selectedColumnIndex)
-	elif(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
-		initialState = initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState, somaActivationFromLastSegmentKeys)
+	if(inferenceBeamSearchLikelihood):
+		import GIAANNcmn_predictionBeamSearchLikelihood
+		column, feature = GIAANNcmn_predictionBeamSearchLikelihood.search(databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, conceptActivationState, somaActivationFromLastSegmentKeys, selectedColumnIndex, deactivatedNeuronState, allowedColumns, constraintMode, sequenceWordIndex, connectedColumnsConstraint, connectedColumnsFeatures)
+		targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNcmn_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
+		result = column, feature, targetPreviousColumnIndex, targetNextColumnIndex
 	else:
-		initialState = initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState)
-	if(inferenceLeakyIntegrateAndFire):
-		if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures and inferenceDeactivateSomaUponPrediction):
-			if(deactivatedNeuronState is None):
-				raise RuntimeError("beamSearchPredictNextFeature error: deactivatedNeuronState is required for prediction-driven LIF soma deactivation")
-			initialState["deactivatedNeurons"] = set(deactivatedNeuronState)
-	beams = [{"score": 0.0, "state": initialState, "sequence": [], "constraintState": initialConstraintState, "connectedColumns": connectedColumnsConstraint, "connectedColumnsFeatures": connectedColumnsFeatures}]
-	completedBeams = []
-	beamDepth = max(1, inferenceBeamDepth)
-	beamWidthLimit = max(1, inferenceBeamWidth)
-	tokensSequenceLength = len(tokensSequence)
-	if(sequenceWordIndex < 0 or sequenceWordIndex >= tokensSequenceLength):
-		raise RuntimeError("beamSearchPredictNextFeature error: sequenceWordIndex out of range")
-	remainingTokens = tokensSequenceLength - sequenceWordIndex
-	if(remainingTokens < beamDepth):
-		beamDepth = remainingTokens
-	result = None
+		#generate targets for debug/analysis output
+		targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNcmn_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 
-	for depthIndex in range(beamDepth):
-		depthSequenceWordIndex = sequenceWordIndex + depthIndex
-		depthSequenceColumnIndex = None
-		if(inferenceUseNeuronFeaturePropertiesTime):
-			if(useSANIcolumns or useSANIfeaturesAndColumns):
-				depthSequenceColumnIndex = GIAANNcmn_predictionActivate.calculateSequenceColumnIndex(conceptMask, depthSequenceWordIndex)
-		newBeams = []
-		for beam in beams:
-			if(inferenceReviewPatch11ProspectiveColumnScoring):
-				candidates = selectBeamCandidates(beam["state"]["features"], beam["state"].get("time"), strengthLookup, beamWidthLimit, databaseNetworkObject, beam.get("constraintState"), beam["state"].get("conceptActivations"), beam.get("connectedColumns"), beam.get("connectedColumnsFeatures"), depthSequenceWordIndex, depthSequenceColumnIndex, beam["state"].get("somaActivationFromLastSegmentKeys"), beam["state"].get("deactivatedNeurons"), selectedColumnIndex=beam["state"].get("selectedColumnIndex"))
-			elif(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
-				candidates = selectBeamCandidates(beam["state"]["features"], beam["state"].get("time"), strengthLookup, beamWidthLimit, databaseNetworkObject, beam.get("constraintState"), beam["state"].get("conceptActivations"), beam.get("connectedColumns"), beam.get("connectedColumnsFeatures"), depthSequenceWordIndex, depthSequenceColumnIndex, beam["state"].get("somaActivationFromLastSegmentKeys"), beam["state"].get("deactivatedNeurons"))
-			else:
-				candidates = selectBeamCandidates(beam["state"]["features"], beam["state"].get("time"), strengthLookup, beamWidthLimit, databaseNetworkObject, beam.get("constraintState"), beam["state"].get("conceptActivations"), beam.get("connectedColumns"), beam.get("connectedColumnsFeatures"), depthSequenceWordIndex, depthSequenceColumnIndex, None, beam["state"].get("deactivatedNeurons"))
-			if(len(candidates) == 0):
-				completedBeams.append(beam)
-				continue
-			for candidate in candidates:
-				predictInfo = describeBeamCandidate(databaseNetworkObject, candidate)
-				if(printPredictionsDuringInferencePredictBeamSearch):
-					 print("\t"*(depthIndex+2) + f"Predicting beam node(s): {predictInfo}")	   # Debug: print beam depth and the node(s)/column being predicted
-				oldState = beam["state"]
-				newState = cloneBeamActivationState(oldState)
-				for nodeColumn, nodeFeature in candidate["nodes"]:
-					executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, newState, nodeColumn, nodeFeature, depthSequenceWordIndex, depthSequenceColumnIndex)
-				newSequence = beam["sequence"] + [candidate]
-				activationGain = computeCandidateActivationGain(newState["features"], oldState["features"], candidate["nodes"])
-				if(inferenceBeamScoreStrategy == "nodeActivation"):
-					if(inferenceLeakyIntegrateAndFire):
-						activationGain = candidate.get("activationValue", activationGain)
-					elif(inferenceUseNeuronFeaturePropertiesTime):
-						# spec step (b): score beam nodes using time-modified activation.
-						activationGain = candidate.get("activationValue", activationGain)
-				candidateScore = computeBeamNodeScore(activationGain, candidate["connectionValue"])
-				newScore = beam["score"] + candidateScore
-				newConstraintState = updateConstraintStateAfterNodes(databaseNetworkObject, beam.get("constraintState"), candidate["nodes"])
-				nextConnectedColumns, nextConnectedFeatures = GIAANNcmn_predictionConstraints.buildConnectedColumnsLookupForBeamNodes(databaseNetworkObject, observedColumnsDict, candidate["nodes"])
-				newBeams.append({"score": newScore, "state": newState, "sequence": newSequence, "constraintState": newConstraintState, "connectedColumns": nextConnectedColumns, "connectedColumnsFeatures": nextConnectedFeatures})
-		if(len(newBeams) == 0):
-			break
-		newBeams.sort(key=lambda item: item["score"], reverse=True)
-		beams = newBeams[:beamWidthLimit]
+		strengthLookup = None
+		if(globalFeatureNeuronsStrength is not None):
+			strengthLookup = buildStrengthLookup(databaseNetworkObject, globalFeatureNeuronsStrength, databaseNetworkObject.f)
+		initialConstraintState = GIAANNcmn_predictionConstraints.createConstraintState(allowedColumns, constraintMode)
+		if(inferenceLeakyIntegrateAndFire and (useSANIcolumns or useSANIfeaturesAndColumns)):
+			initialState = initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState, somaActivationFromLastSegmentKeys, selectedColumnIndex)
+		elif(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+			initialState = initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState, somaActivationFromLastSegmentKeys)
+		else:
+			initialState = initialiseBeamActivationState(globalFeatureNeuronsActivation, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, conceptActivationState)
+		if(inferenceLeakyIntegrateAndFire):
+			if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures and inferenceDeactivateSomaUponPrediction):
+				if(deactivatedNeuronState is None):
+					raise RuntimeError("beamSearchPredictNextFeature error: deactivatedNeuronState is required for prediction-driven LIF soma deactivation")
+				initialState["deactivatedNeurons"] = set(deactivatedNeuronState)
+		beams = [{"score": 0.0, "state": initialState, "sequence": [], "constraintState": initialConstraintState, "connectedColumns": connectedColumnsConstraint, "connectedColumnsFeatures": connectedColumnsFeatures}]
+		completedBeams = []
+		beamDepth = max(1, inferenceBeamDepth)
+		beamWidthLimit = max(1, inferenceBeamWidth)
+		tokensSequenceLength = len(tokensSequence)
+		if(sequenceWordIndex < 0 or sequenceWordIndex >= tokensSequenceLength):
+			raise RuntimeError("beamSearchPredictNextFeature error: sequenceWordIndex out of range")
+		remainingTokens = tokensSequenceLength - sequenceWordIndex
+		if(remainingTokens < beamDepth):
+			beamDepth = remainingTokens
+		result = None
 
-	if(len(beams) == 0):
-		beams = completedBeams
+		for depthIndex in range(beamDepth):
+			depthSequenceWordIndex = sequenceWordIndex + depthIndex
+			depthSequenceColumnIndex = None
+			if(inferenceUseNeuronFeaturePropertiesTime):
+				if(useSANIcolumns or useSANIfeaturesAndColumns):
+					depthSequenceColumnIndex = GIAANNcmn_predictionActivate.calculateSequenceColumnIndex(conceptMask, depthSequenceWordIndex)
+			newBeams = []
+			for beam in beams:
+				if(inferenceReviewPatch11ProspectiveColumnScoring):
+					candidates = selectBeamCandidates(beam["state"]["features"], beam["state"].get("time"), strengthLookup, beamWidthLimit, databaseNetworkObject, beam.get("constraintState"), beam["state"].get("conceptActivations"), beam.get("connectedColumns"), beam.get("connectedColumnsFeatures"), depthSequenceWordIndex, depthSequenceColumnIndex, beam["state"].get("somaActivationFromLastSegmentKeys"), beam["state"].get("deactivatedNeurons"), selectedColumnIndex=beam["state"].get("selectedColumnIndex"))
+				elif(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
+					candidates = selectBeamCandidates(beam["state"]["features"], beam["state"].get("time"), strengthLookup, beamWidthLimit, databaseNetworkObject, beam.get("constraintState"), beam["state"].get("conceptActivations"), beam.get("connectedColumns"), beam.get("connectedColumnsFeatures"), depthSequenceWordIndex, depthSequenceColumnIndex, beam["state"].get("somaActivationFromLastSegmentKeys"), beam["state"].get("deactivatedNeurons"))
+				else:
+					candidates = selectBeamCandidates(beam["state"]["features"], beam["state"].get("time"), strengthLookup, beamWidthLimit, databaseNetworkObject, beam.get("constraintState"), beam["state"].get("conceptActivations"), beam.get("connectedColumns"), beam.get("connectedColumnsFeatures"), depthSequenceWordIndex, depthSequenceColumnIndex, None, beam["state"].get("deactivatedNeurons"))
+				if(len(candidates) == 0):
+					completedBeams.append(beam)
+					continue
+				for candidate in candidates:
+					predictInfo = describeBeamCandidate(databaseNetworkObject, candidate)
+					if(printPredictionsDuringInferencePredictBeamSearch):
+						 print("\t"*(depthIndex+2) + f"Predicting beam node(s): {predictInfo}")	   # Debug: print beam depth and the node(s)/column being predicted
+					oldState = beam["state"]
+					newState = cloneBeamActivationState(oldState)
+					for nodeColumn, nodeFeature in candidate["nodes"]:
+						executeBeamNodeActivation(databaseNetworkObject, observedColumnsDict, newState, nodeColumn, nodeFeature, depthSequenceWordIndex, depthSequenceColumnIndex)
+					newSequence = beam["sequence"] + [candidate]
+					activationGain = computeCandidateActivationGain(newState["features"], oldState["features"], candidate["nodes"])
+					if(inferenceBeamScoreStrategy == "nodeActivation"):
+						if(inferenceLeakyIntegrateAndFire):
+							activationGain = candidate.get("activationValue", activationGain)
+						elif(inferenceUseNeuronFeaturePropertiesTime):
+							# spec step (b): score beam nodes using time-modified activation.
+							activationGain = candidate.get("activationValue", activationGain)
+					candidateScore = computeBeamNodeScore(activationGain, candidate["connectionValue"])
+					newScore = beam["score"] + candidateScore
+					newConstraintState = updateConstraintStateAfterNodes(databaseNetworkObject, beam.get("constraintState"), candidate["nodes"])
+					nextConnectedColumns, nextConnectedFeatures = GIAANNcmn_predictionConstraints.buildConnectedColumnsLookupForBeamNodes(databaseNetworkObject, observedColumnsDict, candidate["nodes"])
+					newBeams.append({"score": newScore, "state": newState, "sequence": newSequence, "constraintState": newConstraintState, "connectedColumns": nextConnectedColumns, "connectedColumnsFeatures": nextConnectedFeatures})
+			if(len(newBeams) == 0):
+				break
+			newBeams.sort(key=lambda item: item["score"], reverse=True)
+			beams = newBeams[:beamWidthLimit]
 
-	if(result is None):
-		allBeams = beams + completedBeams
-		if(len(allBeams) == 0):
-			raise RuntimeError("beamSearchPredictNextFeature error: no beams available")
-		availableBeams = [beam for beam in allBeams if len(beam["sequence"]) > 0]
-		if(len(availableBeams) == 0):
-			GIAANNcmn_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "beamSearchPredictNextFeature: no candidates available")
-		bestBeam = max(availableBeams, key=lambda item: item["score"])
-		bestAction = bestBeam["sequence"][0]
-		conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = convertNodesToPrediction(bestAction["nodes"])
+		if(len(beams) == 0):
+			beams = completedBeams
+
 		if(result is None):
-			if(conceptColumnsIndicesNext is None or conceptColumnsFeatureIndicesNext is None or conceptColumnsIndicesNext.numel() == 0 or conceptColumnsFeatureIndicesNext.numel() == 0):
-				raise RuntimeError("beamSearchPredictNextFeature error: no prediction candidates available")
-			if(conceptColumnsIndicesNext.numel() != 1 or conceptColumnsFeatureIndicesNext.numel() != 1):
-				raise RuntimeError("beamSearchPredictNextFeature error: multiple prediction candidates not supported")
-			if(printPredictionsDuringInferencePredict):
-				printBestBeamPath(bestBeam, databaseNetworkObject)
-			conceptColumnIndexPred = int(conceptColumnsIndicesNext.squeeze().item())
-			conceptColumnFeatureIndexPred = int(conceptColumnsFeatureIndicesNext.squeeze().item())
-			result = (conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex)
-	if(result is None):
-		raise RuntimeError("beamSearchPredictNextFeature error: no prediction result available")
+			allBeams = beams + completedBeams
+			if(len(allBeams) == 0):
+				raise RuntimeError("beamSearchPredictNextFeature error: no beams available")
+			availableBeams = [beam for beam in allBeams if len(beam["sequence"]) > 0]
+			if(len(availableBeams) == 0):
+				GIAANNcmn_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "beamSearchPredictNextFeature: no candidates available")
+			bestBeam = max(availableBeams, key=lambda item: item["score"])
+			bestAction = bestBeam["sequence"][0]
+			conceptColumnsIndicesNext, conceptColumnsFeatureIndicesNext = convertNodesToPrediction(bestAction["nodes"])
+			if(result is None):
+				if(conceptColumnsIndicesNext is None or conceptColumnsFeatureIndicesNext is None or conceptColumnsIndicesNext.numel() == 0 or conceptColumnsFeatureIndicesNext.numel() == 0):
+					raise RuntimeError("beamSearchPredictNextFeature error: no prediction candidates available")
+				if(conceptColumnsIndicesNext.numel() != 1 or conceptColumnsFeatureIndicesNext.numel() != 1):
+					raise RuntimeError("beamSearchPredictNextFeature error: multiple prediction candidates not supported")
+				if(printPredictionsDuringInferencePredict):
+					printBestBeamPath(bestBeam, databaseNetworkObject)
+				conceptColumnIndexPred = int(conceptColumnsIndicesNext.squeeze().item())
+				conceptColumnFeatureIndexPred = int(conceptColumnsFeatureIndicesNext.squeeze().item())
+				result = (conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex)
+		if(result is None):
+			raise RuntimeError("beamSearchPredictNextFeature error: no prediction result available")
 	return result
 
 def beamSearchSelectSingleStepFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, conceptActivationState=None, connectedColumnsConstraint=None, connectedColumnsFeatures=None, somaActivationFromLastSegmentKeys=None, deactivatedNeuronState=None, selectedColumnIndex=None):
@@ -522,7 +528,7 @@ def filterCandidatesByDeactivatedNeuronState(databaseNetworkObject, columnIndice
 		raise RuntimeError("filterCandidatesByDeactivatedNeuronState error: requires inferenceLeakyIntegrateAndFire")
 	return filteredColumnIndices, filteredFeatureIndices, filteredActivationValues
 
-def calculateSelectionActivationDistribution(databaseNetworkObject, stateFeatures, stateTime, constraintState=None, connectedColumnsTensor=None, connectedColumnsFeatures=None, sequenceWordIndex=None, sequenceColumnIndex=None, applyConstraintFilter=False, somaActivationFromLastSegmentKeys=None, selectedColumnIndex=None):
+def calculateSelectionActivationDistribution(databaseNetworkObject, stateFeatures, stateTime, constraintState=None, connectedColumnsTensor=None, connectedColumnsFeatures=None, sequenceWordIndex=None, sequenceColumnIndex=None, applyConstraintFilter=False, somaActivationFromLastSegmentKeys=None, selectedColumnIndex=None, beamSearchAdmission=False):
 	columnIndices = None
 	featureIndices = None
 	activationValues = None
@@ -563,7 +569,13 @@ def calculateSelectionActivationDistribution(databaseNetworkObject, stateFeature
 		if(inferenceLeakyIntegrateAndFire):
 			columnIndices, featureIndices, activationValues = filterCandidatesByActivationThreshold(columnIndices, featureIndices, activationValues)
 			if(columnIndices is not None):
-				columnIndices, featureIndices, activationValues = filterCandidatesByLeakyIntegrateAndFireSomaActivationThreshold(columnIndices, featureIndices, activationValues)
+				if(inferenceBeamSearchLikelihood and beamSearchAdmission):
+					import GIAANNcmn_predictionBeamSearchLikelihood
+					columnIndices, featureIndices, activationValues = GIAANNcmn_predictionConstraints.filterColumnFeatureCandidatesByConstraint(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
+					if(columnIndices is not None):
+						columnIndices, featureIndices, activationValues = GIAANNcmn_predictionBeamSearchLikelihood.admitCandidates(columnIndices, featureIndices, activationValues)
+				else:
+					columnIndices, featureIndices, activationValues = filterCandidatesByLeakyIntegrateAndFireSomaActivationThreshold(columnIndices, featureIndices, activationValues)
 		else:
 			columnIndices, featureIndices, activationValues = filterCandidatesByActivationThreshold(columnIndices, featureIndices, activationValues)
 		if(requiredSegmentKeys is None):
