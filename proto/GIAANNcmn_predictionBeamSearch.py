@@ -667,7 +667,11 @@ def calculateLeakyIntegrateAndFireLastSegmentSelectionActivationDistribution(dat
 			eligibleMask = GIAANNcmn_predictionConstraints.buildSortedKeyMembershipMask(candidateKeys, somaActivationFromLastSegmentKeys)
 			if(bool(pt.any(eligibleMask).item())):
 				eligibleSomaSignalByBranch = pt.sparse_coo_tensor(stateIndices[:, eligibleMask], stateValues[eligibleMask], size=stateFeaturesSomaSignalByBranch.size(), dtype=stateFeaturesSomaSignalByBranch.dtype, device=stateFeaturesSomaSignalByBranch.device).coalesce()
-				eligibleSomaSignal = GIAANNcmn_sparseTensors.reduceSparseBranchMax(eligibleSomaSignalByBranch)
+				if(useContextRoutedBranches):
+					import GIAANNcmn_contextRoutedBranches
+					eligibleSomaSignal = GIAANNcmn_contextRoutedBranches.reduceActivations(databaseNetworkObject, eligibleSomaSignalByBranch)
+				else:
+					eligibleSomaSignal = GIAANNcmn_sparseTensors.reduceSparseBranchMax(eligibleSomaSignalByBranch)
 				eligibleIndices = eligibleSomaSignal.indices()
 				result = eligibleIndices[inferenceLeakyIntegrateAndFireSomaActivationConceptDimension].long(), eligibleIndices[inferenceLeakyIntegrateAndFireSomaActivationFeatureDimension].long(), eligibleSomaSignal.values()
 	else:

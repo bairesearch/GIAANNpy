@@ -1432,7 +1432,10 @@ def normaliseReviewSourceConnectionInputs(featureConnectionsStrength):
 
 def selectActivatedBranchIndex(globalFeatureNeuronsActivation, columnIndex, featureIndex):
 	result = arrayIndexSegmentFirst
-	if(inferenceLeakyIntegrateAndFire):
+	if(useTargetRoutedBranches):
+		import GIAANNcmn_targetRoutedBranches
+		result = GIAANNcmn_targetRoutedBranches.selectBranch(globalFeatureNeuronsActivation, columnIndex, featureIndex)
+	elif(inferenceLeakyIntegrateAndFire):
 		result = inferenceLeakyIntegrateAndFireSomaBranchIndex
 	elif(multipleDendriticBranchesBinaryTree):
 		result = selectActivatedBinaryTreeRootBranchIndex(globalFeatureNeuronsActivation, columnIndex, featureIndex)

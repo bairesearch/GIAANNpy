@@ -177,6 +177,9 @@ def observedColumnHasPersistedData(conceptIndex):
 			if(fileName.endswith(pytorchTensorFileExtension)):
 				result = True
 				break
+	if(trainVerifyConnectionNonexistentAcrossBranchesOptimisation2):
+		if(pathExists(os.path.join(connectionsFolder, branchVerifyPackedFileName))):
+			result = True
 	return result
 
 def observedColumnHasConsistentPersistedMetadata(conceptIndex):
@@ -205,12 +208,16 @@ def listObservedColumnSourceFeatureIndices(conceptIndex):
 	validateObservedColumnStorageFormat(conceptIndex)
 	connectionsFolder = getObservedColumnFeatureConnectionsFolder(conceptIndex)
 	indices = []
-	if(pathExists(connectionsFolder)):
-		for fileName in os.listdir(connectionsFolder):
-			if(not fileName.endswith(pytorchTensorFileExtension)):
-				continue
-			fileStem = fileName[:-len(pytorchTensorFileExtension)]
-			indices.append(parseObservedColumnSourceFeatureConnectionsFileBaseName(fileStem))
+	if(trainVerifyConnectionNonexistentAcrossBranchesOptimisation2):
+		import GIAANNcmn_branchVerificationStorage
+		indices = GIAANNcmn_branchVerificationStorage.listSources(conceptIndex)
+	else:
+		if(pathExists(connectionsFolder)):
+			for fileName in os.listdir(connectionsFolder):
+				if(not fileName.endswith(pytorchTensorFileExtension)):
+					continue
+				fileStem = fileName[:-len(pytorchTensorFileExtension)]
+				indices.append(parseObservedColumnSourceFeatureConnectionsFileBaseName(fileStem))
 	indices.sort()
 	return indices
 
@@ -638,7 +645,11 @@ def loadObservedColumnSourceFeatureConnectionsTensor(databaseNetworkObject, conc
 	connectionsFolder = getObservedColumnFeatureConnectionsFolder(conceptIndex)
 	fileBaseName = getObservedColumnSourceFeatureConnectionsFileBaseName(sourceFeatureIndex)
 	tensorName = f"observedColumn.featureConnectionsBySourceFeature[{conceptIndex}][{sourceFeatureIndex}]"
-	tensor = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, loadTensor(connectionsFolder, fileBaseName, targetDevice=targetDevice), tensorName)
+	if(trainVerifyConnectionNonexistentAcrossBranchesOptimisation2):
+		import GIAANNcmn_branchVerificationStorage
+		tensor = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, GIAANNcmn_branchVerificationStorage.loadSource(conceptIndex, sourceFeatureIndex, targetDevice), tensorName)
+	else:
+		tensor = adjustPropertyDimensions(databaseNetworkObject.inferenceMode, loadTensor(connectionsFolder, fileBaseName, targetDevice=targetDevice), tensorName)
 	tensor = adjustBranchDimensions(tensor, tensorName, expectedRank=5)
 	if(debugLimitFeatures):
 		tensor = GIAANNcmn_debug.applyDebugLimitFeatureConnectionsSourceTensor(tensor, databaseNetworkObject.c, databaseNetworkObject.f, tensorName)
@@ -661,6 +672,8 @@ def loadObservedColumnFeatureNeuronsTensor(databaseNetworkObject, conceptIndex, 
 	return tensor
 
 def saveObservedColumnSourceFeatureConnectionsTensor(conceptIndex, sourceFeatureIndex, tensor):
+	if(trainVerifyConnectionNonexistentAcrossBranchesOptimisation2):
+		raise RuntimeError(branchVerifyPackedInvalid)
 	connectionsFolder = getObservedColumnFeatureConnectionsFolder(conceptIndex)
 	fileBaseName = getObservedColumnSourceFeatureConnectionsFileBaseName(sourceFeatureIndex)
 	filePath = os.path.join(connectionsFolder, fileBaseName + pytorchTensorFileExtension)

@@ -93,6 +93,15 @@ def recordContextLikelihoodProxySources(databaseNetworkObject, sources, sequence
 
 def recordContextLikelihoodSource(databaseNetworkObject, connections, sequenceWordIndex):
 	if(inferenceContextLikelihood):
+		if(useContextRoutedBranches):
+			import GIAANNcmn_contextRoutedBranches
+			if(inferenceContextRoutedBranchesCounts):
+				import GIAANNcmn_contextRoutedBranchesCounts
+				GIAANNcmn_contextRoutedBranchesCounts.recordSource(databaseNetworkObject, connections)
+			connections = GIAANNcmn_contextRoutedBranches.sharedConnections(connections)
+		if(useTargetRoutedBranches):
+			import GIAANNcmn_targetRoutedBranches
+			connections = GIAANNcmn_targetRoutedBranches.collapseConnections(databaseNetworkObject, connections.coalesce())
 		validateContextLikelihoodState(databaseNetworkObject)
 		if(type(sequenceWordIndex) is not int or sequenceWordIndex != databaseNetworkObject.contextLikelihoodPosition or not databaseNetworkObject.contextLikelihoodHistory or databaseNetworkObject.contextLikelihoodHistory[-inferenceContextLikelihoodOne] is not None):
 			raise RuntimeError(inferenceContextLikelihoodInvalidState)
@@ -140,6 +149,10 @@ def scoreContextLikelihoodCandidates(databaseNetworkObject, columnIndices, featu
 			scores = (logScores - logScores.max()).exp()
 			if(inferenceLikelihoodCalibration):
 				scores = scores.pow(inferenceLikelihoodCalibrationExponent)
+			if(useContextRoutedBranches):
+				if(inferenceContextRoutedBranchesCounts):
+					import GIAANNcmn_contextRoutedBranchesCounts
+					scores = GIAANNcmn_contextRoutedBranchesCounts.scoreCandidates(databaseNetworkObject, columnIndices, featureIndices, scores)
 			if(not pt.isfinite(scores).all() or (scores <= inferenceContextLikelihoodZero).any()):
 				raise RuntimeError(inferenceContextLikelihoodInvalidEvidence)
 			result = columnIndices, featureIndices, scores
@@ -222,6 +235,8 @@ def loadContextLikelihoodColumnFrequencies(databaseNetworkObject, columnIndex):
 		indices = neurons.indices()
 		values = neurons.values()
 		mask = indices[inferenceContextLikelihoodPropertyDimension] == databaseNetworkObject.arrayIndexPropertiesStrengthIndex
+		if(useContextRoutedBranches):
+			mask = mask & (indices[inferenceContextLikelihoodOne] == contextRoutedBranchesZero)
 		values = values[mask].to(pt.float64)
 		if(not pt.isfinite(values).all() or (values < inferenceContextLikelihoodZero).any()):
 			raise RuntimeError(inferenceContextLikelihoodInvalidEvidence)

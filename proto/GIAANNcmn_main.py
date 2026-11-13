@@ -205,6 +205,12 @@ def executeMode(inferenceMode):
 	databaseNetworkObject = GIAANNcmn_databaseNetwork.initialiseDatabaseNetwork(inferenceMode)
 	if(modalityName=="NLP"):
 		databaseNetworkObject.nlp = GIAANNnlp_main.nlpSequence	#used by posStringToPosInt
+	if(useContextRoutedBranches):
+		import GIAANNcmn_contextRoutedBranches
+		GIAANNcmn_contextRoutedBranches.initialiseModel(databaseNetworkObject, inferenceMode)
+	if(useTargetRoutedBranches):
+		import GIAANNcmn_targetRoutedBranches
+		GIAANNcmn_targetRoutedBranches.initialiseModel(databaseNetworkObject, inferenceMode)
 	if(inferenceMode):
 		if(inferenceStartGenerateGlobalFeatureNeuronsTensor):
 			GIAANNcmn_databaseNetwork.generateHighMemGlobalFeatureNeuronsForInferenceStartup(databaseNetworkObject)
@@ -282,6 +288,10 @@ def executeMode(inferenceMode):
 		if(modalityName=="NLP" and auxiliaryNeurons and auxiliaryNeuronsAuto):
 			GIAANNnlp_main.trainAutoAuxiliaryNeuronsEnd(databaseNetworkObject)
 
+	if(useContextRoutedBranches):
+		if(useContextRoutedBranchesSupport and not inferenceMode):
+			import GIAANNcmn_contextRoutedBranchesSupport
+			GIAANNcmn_contextRoutedBranchesSupport.verifyTraining(databaseNetworkObject, sequenceCount)
 	if(not inferenceMode or inferenceTrainFirstSequences):
 		if(useSaveData and not debugDisableDatabaseFileWrite):
 			if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
@@ -304,6 +314,12 @@ def executeMode(inferenceMode):
 	if(useSequenceContext):
 		if(not inferenceMode):
 			GIAANNcmn_sequenceContext.finaliseSequenceContextTraining(databaseNetworkObject, sequenceCount)
+	if(useContextRoutedBranches):
+		if(not inferenceMode):
+			GIAANNcmn_contextRoutedBranches.saveModel(databaseNetworkObject, sequenceCount)
+	if(useTargetRoutedBranches):
+		if(not inferenceMode):
+			GIAANNcmn_targetRoutedBranches.saveModel(databaseNetworkObject, sequenceCount)
 
 	if(printTimeDatabaseLoadSaveTimes):
 		countPrintTimeDatabaseLoadSaveTimesProgramExecutionEndTime = time.perf_counter()

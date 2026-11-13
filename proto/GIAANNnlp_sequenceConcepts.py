@@ -686,29 +686,36 @@ def processFeatures(sequenceObservedColumns, sequenceIndex, sequence, tokens, co
 					startIndexValue = int(startIndices[sequenceConceptIndex].item())
 					endIndexValue = int(endIndices[sequenceConceptIndex].item())
 					featureIndicesInObservedTensor = sequenceObservedColumns.featureIndicesInObservedTensor
-					for j in range(startIndexValue, endIndexValue):
-						if(j >= featureIndicesInObservedTensor.shape[0]):
-							continue
-						globalFeatureIndex = int(featureIndicesInObservedTensor[j].item())
-						branchIndex = selectFeatureBranchIndex(featureBranchCounts, globalFeatureIndex)
-						if(multipleDendriticBranchesBinaryTree):
-							if(useTrainDuringInference):
-								if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
-									branchIndex = selectFeatureBinaryTreeBranchIndexFromInference(sequenceObservedColumns.databaseNetworkObject, conceptIndexKey, globalFeatureIndex, branchIndex)
-							if(trainVerifyConnectionNonexistentAcrossBranches):
-								if(multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches):
-									branchIndex = selectFeatureBinaryTreeBranchIndexFromConnections(sequenceObservedColumns, conceptIndexKey, globalFeatureIndex, branchIndex)
-						if(useSANI):
+					if(useContextRoutedBranches):
+						import GIAANNcmn_contextRoutedBranches
+						GIAANNcmn_contextRoutedBranches.activateTraining(sequenceObservedColumns, tokens, featureNeuronsActive, featureNeuronsPos, featureNeuronsWordOrder, sequenceConceptIndex, startIndexValue, endIndexValue, activeSequentialSegments)
+					elif(useTargetRoutedBranches):
+						import GIAANNcmn_targetRoutedBranches
+						GIAANNcmn_targetRoutedBranches.activateTraining(sequenceObservedColumns, tokens, featureNeuronsActive, featureNeuronsPos, featureNeuronsWordOrder, sequenceConceptIndex, startIndexValue, endIndexValue, activeSequentialSegments)
+					else:
+						for j in range(startIndexValue, endIndexValue):
+							if(j >= featureIndicesInObservedTensor.shape[0]):
+								continue
+							globalFeatureIndex = int(featureIndicesInObservedTensor[j].item())
+							branchIndex = selectFeatureBranchIndex(featureBranchCounts, globalFeatureIndex)
 							if(multipleDendriticBranchesBinaryTree):
-								binaryTreeBranchIndices = calculateFeatureBinaryTreeBranchIndices(branchIndex, activeSequentialSegments)
-								featureNeuronsActive[binaryTreeBranchIndices, activeSequentialSegments, sequenceConceptIndex, j] = 1
+								if(useTrainDuringInference):
+									if(multipleDendriticBranchesBinaryTreeDepthSelectMostActivatedRootBranches):
+										branchIndex = selectFeatureBinaryTreeBranchIndexFromInference(sequenceObservedColumns.databaseNetworkObject, conceptIndexKey, globalFeatureIndex, branchIndex)
+								if(trainVerifyConnectionNonexistentAcrossBranches):
+									if(multipleDendriticBranchesBinaryTreeDepthSelectMostConnectedRootBranches):
+										branchIndex = selectFeatureBinaryTreeBranchIndexFromConnections(sequenceObservedColumns, conceptIndexKey, globalFeatureIndex, branchIndex)
+							if(useSANI):
+								if(multipleDendriticBranchesBinaryTree):
+									binaryTreeBranchIndices = calculateFeatureBinaryTreeBranchIndices(branchIndex, activeSequentialSegments)
+									featureNeuronsActive[binaryTreeBranchIndices, activeSequentialSegments, sequenceConceptIndex, j] = 1
+								else:
+									featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, j] = 1
 							else:
-								featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, j] = 1
-						else:
-							featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, j] = 1
-						featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, tokens[j].pos)
-						featureNeuronsPos[sequenceConceptIndex, j] = featurePos
-						featureNeuronsWordOrder[sequenceConceptIndex, j] = j
+								featureNeuronsActive[branchIndex, arrayIndexSegmentFirst, sequenceConceptIndex, j] = 1
+							featurePos = posStringToPosInt(sequenceObservedColumns.databaseNetworkObject.nlp, tokens[j].pos)
+							featureNeuronsPos[sequenceConceptIndex, j] = featurePos
+							featureNeuronsWordOrder[sequenceConceptIndex, j] = j
 				else:
 					if(useSANI):
 						featureNeuronsActive[branchIndex, activeSequentialSegments, sequenceConceptIndex, startIndices[sequenceConceptIndex]:endIndices[sequenceConceptIndex]] = 1

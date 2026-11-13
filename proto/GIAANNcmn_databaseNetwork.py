@@ -366,6 +366,9 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 	p = calculateArrayNumberOfProperties(inferenceMode)
 		
 	databaseNetworkObject = DatabaseNetworkClass(inferenceMode, c, f, s, p, conceptColumnsDict, conceptColumnsList, conceptFeaturesDict, conceptFeaturesList, globalFeatureNeurons, conceptFeaturesReferenceSetDelimiterList, conceptFeaturesReferenceSetDelimiterDeterministicList, conceptFeaturesReferenceSetDelimiterProbabilisticList, auxiliarySimilarFeaturesDict, auxiliarySimilarFeaturesList, auxiliarySimilarFeatureWordWeightsByParentWord, databaseLoadedFromDisk)
+	if(trainVerifyConnectionNonexistentAcrossBranchesCumulative):
+		import GIAANNcmn_branchVerification
+		GIAANNcmn_branchVerification.initialise(databaseNetworkObject, databaseLoadedFromDisk)
 	
 	if(printTotalFeatures):
 		print("initialiseDatabaseNetwork: c = ", databaseNetworkObject.c, ", f = ", databaseNetworkObject.f)
@@ -584,6 +587,9 @@ def saveAllObservedColumnsToDisk(databaseNetworkObject):
 			raise RuntimeError("saveAllObservedColumnsToDisk error: observedColumnsDictRAM is None")
 		if(optimiseTrainConnectionOverlay):
 			GIAANNcmn_trainConnectionOverlay.materialiseDatabase(databaseNetworkObject)
+		if(trainVerifyConnectionNonexistentAcrossBranchesCumulative):
+			import GIAANNcmn_branchVerification
+			GIAANNcmn_branchVerification.saveState(databaseNetworkObject)
 		for observedColumn in databaseNetworkObject.observedColumnsDictRAM.values():
 			saveAllSourceFeatures = True
 			observedColumn.saveToDisk(saveAllSourceFeatures, resizeFeatureTensorsToCurrentSize=resizeTensorsOnRAMdatabaseSave)

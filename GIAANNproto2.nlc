@@ -799,3 +799,14 @@ MANUAL; - set inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatu
 v2s (Codex App GPT-6.0):
 - add proto GIAANNproto2s1a - start inferenceBeamSearch updates:
 	- patch and optimise inferenceBeamSearch with likelihood scoring, isolate speculative state and subthreshold candidate admission.
+AUTORESEARCH; - explore a new or existing branching (multipleDendriticBranches=True) method as a solution to the dendritic conflicting context issue (e.g. red square -> X, red circle -> Y, blue square -> Y, blue circle -> X) and iteratively test your hypotheses by executing training+inference:
+	- add option useContextRoutedBranches (disabled) - context-selective dendritic branches that preserve ordered token-prefix combinations and combine matching specialist activation with a shared baseline.
+	- add option useContextRoutedBranchesSupport (disabled) - training-frequency-based branch allocation and confidence weighting to prioritize well-supported contexts and suppress unreliable specialist activation.
+	- add option useTargetRoutedBranches (disabled) - assign each target cell a fixed context-independent dendritic branch consistently across training and inference, preserving existing behavior when disabled.
+	- add option trainVerifyConnectionNonexistentAcrossBranchesCumulative (enabled) - each source-target-segment connection has one branch owner. Shared connections reuse that branch; bridging contexts merge branches and sum their accumulated strengths.
+	- add option trainVerifyConnectionNonexistentAcrossBranchesOptimisation1 (enabled) - cached ownership lookup and native CPU updates reduced matched 10k training from 32.6 to 16.4 minutes.
+	- add option trainVerifyConnectionNonexistentAcrossBranchesOptimisation2 (enabled) - lossless indexed storage. A controlled 24-column benchmark measured 2.66% faster writes, 4.23% faster warm-cache reads, and 57% fewer bytes.
+
+
+		
+		

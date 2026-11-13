@@ -56,6 +56,9 @@ def updateConnectionSources(sequenceObservedColumns, observedColumnsByConceptInd
 			if(optimiseTrainConnectionOverlay):
 				GIAANNcmn_trainConnectionOverlay.updateConnectionSources(sourceReferences, updates, sourceSize)
 			else:
+				if(trainVerifyConnectionNonexistentAcrossBranchesOptimisation1):
+					import GIAANNcmn_branchVerification
+					updates = GIAANNcmn_branchVerification.filterOptimisedUpdates(sourceReferences, existingSources, updates, database.arrayIndexPropertiesStrengthIndex)
 				updatedSources = mergeConnectionSources(existingSources, updates, sourceSize)
 				# Finish the entire native batch before publishing any updated connection tensor.
 				for (observedColumn, sourceFeatureIndex), updatedSource in zip(sourceReferences, updatedSources):

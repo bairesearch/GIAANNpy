@@ -48,8 +48,18 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens, 
 		if(printSequenceConceptAssignmentByLine):
 			print("")	
 	trainActive = False
+	if(useContextRoutedBranches):
+		if(useContextRoutedBranchesSupport and result is not None):
+			import GIAANNcmn_contextRoutedBranchesSupport
+			supportConcepts,supportStarts,supportEnds = result
+			GIAANNcmn_contextRoutedBranchesSupport.recordTraining(sequenceObservedColumns, tokens, supportStarts, supportEnds, sequenceIndex)
+			if(trainContextRoutedBranchesSupportCollect):
+				result = None
 	if(result is not None):
 		conceptIndices, startIndices, endIndices = result
+		if(useContextRoutedBranches):
+			import GIAANNcmn_contextRoutedBranches
+			GIAANNcmn_contextRoutedBranches.prepareTraining(sequenceObservedColumns, tokens, startIndices, endIndices)
 		if(optimiseTrainFusedSequenceUpdates):
 			import GIAANNcmn_trainFusedSequence
 			sequenceObservedColumns.trainFusedSequencePacket = GIAANNcmn_trainFusedSequence.prepare(sequenceObservedColumns, conceptIndices, startIndices, endIndices)
@@ -249,6 +259,9 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 	if(debugPrintTrainSectionTimes):
 		processFeaturesActiveTrainStartTime = time.perf_counter()
 	featureNeuronsActiveTarget = featureNeuronsActive
+	if(trainVerifyConnectionNonexistentAcrossBranchesCumulative):
+		import GIAANNcmn_branchVerification
+		connectionActiveSparsePreparedCumulative = GIAANNcmn_branchVerification.prepareTraining(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder)
 	if(useTrainDuringInference):
 		if(featureNeuronsTargetMask is None):
 			raise RuntimeError("processFeaturesActiveTrain error: featureNeuronsTargetMask is None")
@@ -303,7 +316,9 @@ def processFeaturesActiveTrain(sequenceObservedColumns, featureNeuronsActive, cs
 	if(useSparseSequenceConnections):
 		featureConnectionsActive = None
 		featureConnectionsSegmentMask = None
-		if(trainSelectMostSimilarBranch):
+		if(trainVerifyConnectionNonexistentAcrossBranchesCumulative):
+			processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsTargetMask, connectionActiveSparsePreparedCumulative)
+		elif(trainSelectMostSimilarBranch):
 			processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsTargetMask, connectionActiveSparsePrepared)
 		else:
 			processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsTargetMask)
@@ -510,7 +525,11 @@ def applyTrainDuringInferenceFeatureConnectionsSparseTargetMask(connectionActive
 
 def processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, featureNeuronsPos, featureNeuronsTargetMask=None, connectionActiveSparsePrepared=None):
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
-	if(trainSelectMostSimilarBranch):
+	if(trainVerifyConnectionNonexistentAcrossBranchesCumulative):
+		if(connectionActiveSparsePrepared is None):
+			raise RuntimeError(branchVerifyInvalidInput)
+		connectionActiveSparse = connectionActiveSparsePrepared
+	elif(trainSelectMostSimilarBranch):
 		if(connectionActiveSparsePrepared is None):
 			raise RuntimeError("processFeaturesActiveTrainSparseConnections error: trainSelectMostSimilarBranch requires a prepared connection tensor")
 		connectionActiveSparse = connectionActiveSparsePrepared
@@ -522,6 +541,9 @@ def processFeaturesActiveTrainSparseConnections(sequenceObservedColumns, feature
 			connectionActiveSparse = createFeatureConnectionsActiveTrainSparse(featureNeuronsActive, cs, fs, columnsWordOrder, featureNeuronsWordOrder, trainConnectionsIncludeSameTimeIndex, sequenceObservedColumns)
 		if(useTrainDuringInference):
 			connectionActiveSparse = applyTrainDuringInferenceFeatureConnectionsSparseTargetMask(connectionActiveSparse, featureNeuronsTargetMask)
+	if(useContextRoutedBranches):
+		import GIAANNcmn_contextRoutedBranches
+		connectionActiveSparse = GIAANNcmn_contextRoutedBranches.filterTrainingConnections(connectionActiveSparse)
 	connectionActiveIndices = connectionActiveSparse.indices()
 	connectionActiveValues = connectionActiveSparse.values()
 	if(featureNeuronsWordOrder.device != connectionActiveIndices.device):

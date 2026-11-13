@@ -577,6 +577,9 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	debugTimeStart = None
 	debugTimeLast = None
 	predictionCandidatesAvailable = True
+	if(useContextRoutedBranches):
+		import GIAANNcmn_contextRoutedBranches
+		GIAANNcmn_contextRoutedBranches.prepareInference(databaseNetworkObject, tokensSequence[:sequenceWordIndex])
 	if(inferenceContextLikelihood):
 		GIAANNcmn_predictionContextLikelihood.prepareContextLikelihoodStep(databaseNetworkObject, sequenceWordIndex)
 	if(conceptColumnIndex is None or conceptColumnFeatureIndex is None):

@@ -405,6 +405,9 @@ class ObservedColumnConnectionBase:
 			raise RuntimeError(f"{errorName}.setFeatureConnectionsForSourceFeature error: tensor size {tuple(tensor.size())} does not match expected size {tuple(expectedSize)}")
 		if(not tensor.is_coalesced()):
 			tensor = tensor.coalesce()
+		if(trainVerifyConnectionNonexistentAcrossBranchesOptimisation1):
+			import GIAANNcmn_branchVerification
+			GIAANNcmn_branchVerification.invalidateIndex(self, normalisedSourceFeatureIndex, tensor)
 		if(optimiseTrainConnectionOverlay):
 			GIAANNcmn_trainConnectionOverlay.discardSource(self, normalisedSourceFeatureIndex)
 		if(optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage()):
@@ -422,6 +425,9 @@ class ObservedColumnConnectionBase:
 			GIAANNcmn_trainSequenceBatch.flushDatabase(self.databaseNetworkObject)
 		indicesToUnload = self.normaliseSourceFeatureIndices(sourceFeatureIndices) if sourceFeatureIndices is not None else sorted(self.loadedSourceFeatureIndices)
 		for sourceFeatureIndex in indicesToUnload:
+			if(trainVerifyConnectionNonexistentAcrossBranchesOptimisation1):
+				import GIAANNcmn_branchVerification
+				GIAANNcmn_branchVerification.invalidateIndex(self, sourceFeatureIndex)
 			if(optimiseTrainConnectionOverlay):
 				GIAANNcmn_trainConnectionOverlay.discardSource(self, sourceFeatureIndex)
 			if(sourceFeatureIndex in self.featureConnectionsBySourceFeature):
@@ -581,6 +587,10 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		elif(result.device != resolvedTargetDevice):
 			result = result.to(resolvedTargetDevice)
 			self.featureConnectionsBySourceFeature[normalisedSourceFeatureIndex] = result
+		if(trainVerifyConnectionNonexistentAcrossBranchesCumulative):
+			import GIAANNcmn_branchVerification
+			result = GIAANNcmn_branchVerification.canonicaliseSource(self, result)
+			self.featureConnectionsBySourceFeature[normalisedSourceFeatureIndex] = result
 		if(not (optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage())):
 			self.loadedSourceFeatureIndices.add(normalisedSourceFeatureIndex)
 		if(debugPrintTrainSectionTimesSourceFeatureConnections):
@@ -589,42 +599,51 @@ class ObservedColumn(ObservedColumnConnectionBase):
 		return result
 
 	def saveLoadedSourceFeatureConnectionsToDisk(self, sourceFeatureIndices=None):
-		if(optimiseTrainSequenceBatch):
-			GIAANNcmn_trainSequenceBatch.flushDatabase(self.databaseNetworkObject)
-		if(sourceFeatureIndices is None):
-			if(optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage()):
-				resolvedSourceFeatureIndices = sorted(self.featureConnectionsBySourceFeature.keys())
-			else:
-				resolvedSourceFeatureIndices = sorted(self.loadedSourceFeatureIndices)
+		if(trainVerifyConnectionNonexistentAcrossBranchesOptimisation2):
+			import GIAANNcmn_branchVerificationStorage
+			GIAANNcmn_branchVerificationStorage.saveColumn(self, sourceFeatureIndices)
 		else:
-			resolvedSourceFeatureIndices = self.normaliseSourceFeatureIndices(sourceFeatureIndices)
-		if(optimisationGetFeatureConnectionsForSourceFeatureCache):
-			if(self.storedSourceFeatureIndicesCache is None):
-				self.storedSourceFeatureIndicesCache = set(GIAANNcmn_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(self.conceptIndex))
-		for sourceFeatureIndex in resolvedSourceFeatureIndices:
-			if(sourceFeatureIndex not in self.featureConnectionsBySourceFeature):
-				raise RuntimeError(f"saveLoadedSourceFeatureConnectionsToDisk error: missing loaded source feature tensor {sourceFeatureIndex}")
-			if(optimiseTrainConnectionOverlay):
-				GIAANNcmn_trainConnectionOverlay.materialiseSource(self, sourceFeatureIndex)
-			sourceTensor = self.featureConnectionsBySourceFeature[sourceFeatureIndex]
-			if(optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage()):
-				if(not isinstance(sourceTensor, PackedDatabaseResidentFeatureConnections)):
-					raise RuntimeError(f"saveLoadedSourceFeatureConnectionsToDisk error: resident source feature tensor {sourceFeatureIndex} is not packed")
-				sourceTensor = sourceTensor.materialise(deviceDatabase)
-			GIAANNcmn_databaseNetworkFiles.saveObservedColumnSourceFeatureConnectionsTensor(self.conceptIndex, sourceFeatureIndex, sourceTensor)
+			if(optimiseTrainSequenceBatch):
+				GIAANNcmn_trainSequenceBatch.flushDatabase(self.databaseNetworkObject)
+			if(sourceFeatureIndices is None):
+				if(optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage()):
+					resolvedSourceFeatureIndices = sorted(self.featureConnectionsBySourceFeature.keys())
+				else:
+					resolvedSourceFeatureIndices = sorted(self.loadedSourceFeatureIndices)
+			else:
+				resolvedSourceFeatureIndices = self.normaliseSourceFeatureIndices(sourceFeatureIndices)
 			if(optimisationGetFeatureConnectionsForSourceFeatureCache):
-				if(sourceTensor.is_sparse):
-					sourceTensor = sourceTensor.coalesce()
-					tensorNNZ = sourceTensor._nnz()
-				else:
-					tensorNNZ = int(pt.count_nonzero(sourceTensor).item())
-				if(tensorNNZ > 0):
-					self.storedSourceFeatureIndicesCache.add(sourceFeatureIndex)
-				else:
-					self.storedSourceFeatureIndicesCache.discard(sourceFeatureIndex)
+				if(self.storedSourceFeatureIndicesCache is None):
+					self.storedSourceFeatureIndicesCache = set(GIAANNcmn_databaseNetworkFiles.listObservedColumnSourceFeatureIndices(self.conceptIndex))
+			for sourceFeatureIndex in resolvedSourceFeatureIndices:
+				if(sourceFeatureIndex not in self.featureConnectionsBySourceFeature):
+					raise RuntimeError(f"saveLoadedSourceFeatureConnectionsToDisk error: missing loaded source feature tensor {sourceFeatureIndex}")
+				if(optimiseTrainConnectionOverlay):
+					GIAANNcmn_trainConnectionOverlay.materialiseSource(self, sourceFeatureIndex)
+				sourceTensor = self.featureConnectionsBySourceFeature[sourceFeatureIndex]
+				if(optimisationStoreDatabaseResidentCoordinatesAsInt32 and self.isDatabaseResidentConnectionStorage()):
+					if(not isinstance(sourceTensor, PackedDatabaseResidentFeatureConnections)):
+						raise RuntimeError(f"saveLoadedSourceFeatureConnectionsToDisk error: resident source feature tensor {sourceFeatureIndex} is not packed")
+					sourceTensor = sourceTensor.materialise(deviceDatabase)
+				GIAANNcmn_databaseNetworkFiles.saveObservedColumnSourceFeatureConnectionsTensor(self.conceptIndex, sourceFeatureIndex, sourceTensor)
+				if(optimisationGetFeatureConnectionsForSourceFeatureCache):
+					if(sourceTensor.is_sparse):
+						sourceTensor = sourceTensor.coalesce()
+						tensorNNZ = sourceTensor._nnz()
+					else:
+						tensorNNZ = int(pt.count_nonzero(sourceTensor).item())
+					if(tensorNNZ > 0):
+						self.storedSourceFeatureIndicesCache.add(sourceFeatureIndex)
+					else:
+						self.storedSourceFeatureIndicesCache.discard(sourceFeatureIndex)
 		return
 
 	def saveToDisk(self, saveAllSourceFeatures, resizeFeatureTensorsToCurrentSize=False):
+		if(trainVerifyConnectionNonexistentAcrossBranchesCumulative):
+			import GIAANNcmn_branchVerification
+			GIAANNcmn_branchVerification.canonicaliseColumnNeurons(self)
+			for sourceFeatureIndex, tensor in self.featureConnectionsBySourceFeature.items():
+				self.featureConnectionsBySourceFeature[sourceFeatureIndex] = GIAANNcmn_branchVerification.canonicaliseSource(self, tensor)
 		if(databaseWriteProgressivelyReleaseConnectionTensors):
 			if(self.featureConnectionsBySourceFeature is None):
 				raise RuntimeError(databaseWriteReleasedConnectionTensorsError)
@@ -636,6 +655,9 @@ class ObservedColumn(ObservedColumnConnectionBase):
 			if(not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam or self.databaseNetworkObject.inferenceMode or not self.isDatabaseResidentConnectionStorage() or self.featureConnectionsBySourceFeature is None):
 				raise RuntimeError(databaseWriteReleaseConnectionTensorsInvalidState)
 			self.featureConnectionsBySourceFeature.clear()
+			if(trainVerifyConnectionNonexistentAcrossBranchesOptimisation1):
+				if(hasattr(self, branchVerifyIndexAttribute)):
+					self.branchVerifyIndexes.clear()
 			self.featureConnectionsBySourceFeature = None	#Fail on accidental reuse instead of treating released connections as untrained sources.
 			self.loadedSourceFeatureIndices.clear()
 			self.trainPreparedSourceFeatureIndices.clear()
