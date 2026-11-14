@@ -22,6 +22,8 @@ import time
 import math
 
 from GIAANNcmn_globalDefs import *
+if(trainDendriticBranchesPredictionErrorCorrection):
+	import GIAANNcmn_dendriticPredictionErrorCorrection
 if(useSequenceContext):
 	import GIAANNcmn_predictionSequenceContext
 if(inferenceContextLikelihood):
@@ -440,6 +442,9 @@ def processConceptWordsInferenceSequence(sequenceObservedColumns, sequenceIndex,
 		inferenceSuccessfulPredictionMask = createInferenceSuccessfulPredictionMask(tokensSequence)
 	addInferenceTop1AccuracyBitsPerByteBytes(sequencePredict)
 	conceptMask, conceptIndices, numberConcepts = GIAANNnlp_sequenceConcepts.createConceptMask(sequenceObservedColumns, tokensSequence)
+	if(trainDendriticBranchesPredictionErrorCorrection):
+		if(executionMode == dendriticCorrectionTrainMode):
+			GIAANNcmn_dendriticPredictionErrorCorrection.prepareSequence(sequenceObservedColumns, tokensSequence, conceptMask)
 	groundedAnswerTokenIndex = None
 	if(inferenceReportGroundedAccuracy):
 		groundedAnswerTokenIndex = GIAANNnlp_groundedEval.getInferenceGroundedAnswerTokenIndexForSequence(sequenceIndex, tokensSequence, conceptMask, numSeedTokens)
@@ -607,7 +612,11 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	#burst the initial seed in the sequence;
 	globalFeatureNeuronsActivation = activateInitialSeedPredictionIfRequired(sequenceWordIndex, conceptColumnIndex, conceptColumnFeatureIndex, globalFeatureNeuronsActivation)
 	
-	globalFeatureNeuronsStrength = databaseNetworkObject.globalFeatureNeurons[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
+	if(trainDendriticBranchesPredictionErrorCorrection):
+		#This learner requires inferenceStrengthLookupBypass; avoid copying the whole unused count tensor at every token.
+		globalFeatureNeuronsStrength = None
+	else:
+		globalFeatureNeuronsStrength = databaseNetworkObject.globalFeatureNeurons[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 	if(inferenceInferMissingFeatures):
 		inferMissingFeature = False
 		trainedMissingFeatureSourceColumnIndices = None
@@ -659,6 +668,9 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		#propagate LIF activations/decrement legacy activations;
 		if(inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 			globalFeatureNeuronsActivation, somaActivationFromPropagatedLastSegmentKeys = GIAANNcmn_predictionActivate.propagateLeakyIntegrateAndFireActivationsEnforceLastSegment(globalFeatureNeuronsActivation)
+			if(trainDendriticBranchesPredictionErrorCorrection):
+				if(executionMode == dendriticCorrectionTrainMode):
+					GIAANNcmn_dendriticPredictionErrorCorrection.recordEvent(databaseNetworkObject, dendriticCorrectionPropagate)
 			if(enforceDirectConnectionsSANI):
 				somaActivationFromLastSegmentKeys = pt.empty((arrayIndexSegmentFirst,), dtype=pt.long, device=globalFeatureNeuronsActivation.device)
 			else:
@@ -676,6 +688,9 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 			if(inferenceLeakyIntegrateAndFire and not (inferenceInferMissingFeatures and inferMissingFeature)):
 				reviewSourceActivationState = globalFeatureNeuronsActivation.clone()
 				globalFeatureNeuronsActivation = GIAANNcmn_predictionActivate.resetReviewNeuronActivations(globalFeatureNeuronsActivation, int(conceptColumnIndex), int(conceptColumnFeatureIndexActivation))
+				if(trainDendriticBranchesPredictionErrorCorrection):
+					if(executionMode == dendriticCorrectionTrainMode):
+						GIAANNcmn_dendriticPredictionErrorCorrection.recordEvent(databaseNetworkObject, dendriticCorrectionReset, int(conceptColumnIndex), int(conceptColumnFeatureIndexActivation))
 		#set activationSequenceWordIndex/activationSequenceColumnIndex;
 		activationSequenceWordIndex, activationSequenceColumnIndex = calculateActivationSequenceIndices(sequenceWordIndex, sequenceColumnIndex, conceptMask)
 		#process features (activate global neurons based on connection targets);
@@ -765,6 +780,12 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 				targetProbability = calculateInferenceTargetProbability(databaseNetworkObject, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, tokensSequence, sequenceWordIndex, conceptMask, allowedColumnsConstraint, constraintModePrediction, connectedColumnsConstraint, connectedColumnsFeatureMap)
 		addInferenceTop1AccuracyBitsPerByteProbability(targetProbability)
 	
+	if(trainDendriticBranchesPredictionErrorCorrection):
+		if(executionMode == dendriticCorrectionTrainMode):
+			if(not (inferenceReviewPatch2PreserveSelfTransitions and reviewSourceActivationState is not None)):
+				GIAANNcmn_dendriticPredictionErrorCorrection.recordEvent(databaseNetworkObject, dendriticCorrectionReset, int(conceptColumnIndex), int(conceptColumnFeatureIndexActivation))
+			if(not seedPhase):
+				GIAANNcmn_dendriticPredictionErrorCorrection.recordPrediction(sequenceObservedColumns, globalFeatureNeuronsActivation, sequenceWordIndex, int(conceptColumnIndex), allowedColumnsConstraint, constraintModePrediction, somaActivationFromLastSegmentKeys)
 	#select next prediction column/feature;
 	if(seedPhase):
 		#seedPhase;
@@ -786,9 +807,15 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		GIAANNcmn_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "no prediction candidates available")
 	if(inferenceLeakyIntegrateAndFire and (useSANIcolumns or useSANIfeaturesAndColumns)):
 		globalFeatureNeuronsActivation = advanceLeakyIntegrateAndFireColumnActivationsForSelectedNextNeuron(globalFeatureNeuronsActivation, conceptColumnIndex, conceptColumnIndexNext)
+		if(trainDendriticBranchesPredictionErrorCorrection):
+			if(executionMode == dendriticCorrectionTrainMode and int(conceptColumnIndexNext) != int(conceptColumnIndex)):
+				GIAANNcmn_dendriticPredictionErrorCorrection.recordEvent(databaseNetworkObject, dendriticCorrectionAdvance)
 	if(inferenceLeakyIntegrateAndFire):
 		if(inferenceDecrementActivationsSoma):
 			globalFeatureNeuronsActivation = GIAANNcmn_predictionActivate.decrementLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation)
+			if(trainDendriticBranchesPredictionErrorCorrection):
+				if(executionMode == dendriticCorrectionTrainMode):
+					GIAANNcmn_dendriticPredictionErrorCorrection.recordEvent(databaseNetworkObject, dendriticCorrectionDecay)
 
 	#calculate featurePredictionTargetMatch; 
 	featurePredictionTargetMatch, targetWord, predictedWord, targetColumnName, predictedColumnName = calculateInferencePredictionMatch(tokensSequence, sequenceWordIndex, conceptMask, databaseNetworkObject, conceptColumnIndexPred, conceptColumnFeatureIndexPred, targetPreviousColumnIndex, targetNextColumnIndex, predictionCandidatesAvailable)

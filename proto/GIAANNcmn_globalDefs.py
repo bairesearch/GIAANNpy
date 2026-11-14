@@ -221,6 +221,38 @@ numberEpochs = 1	#default: 1
 
 
 #Dendritic branches;
+if(useTrainDuringInference):
+	trainDendriticBranchesPredictionErrorCorrection = True	#margin-based local synaptic learning; executionMode="inference" retains the architecture without learning
+else:
+	trainDendriticBranchesPredictionErrorCorrection = False
+if(trainDendriticBranchesPredictionErrorCorrection):
+	dendriticCorrectionLearningRate = 0.01	#maximum normalised margin step; provisional 10k tuning, paired with the frozen-inference calibration below
+	dendriticCorrectionMargin = 0.1
+	dendriticCorrectionZero = 0
+	dendriticCorrectionOne = 1
+	dendriticCorrectionTwo = 2
+	dendriticCorrectionConnectionRank = 5
+	dendriticCorrectionTrainMode = "trainDuringInference"
+	dendriticCorrectionInferenceMode = "inference"
+	dendriticCorrectionCPU = "cpu"
+	dendriticCorrectionRequiredSANI = "enforceLastSegmentMustBeActive"
+	dendriticCorrectionFloor = "floor"
+	dendriticCorrectionPropagate = 0
+	dendriticCorrectionAdvance = 1
+	dendriticCorrectionDecay = 2
+	dendriticCorrectionReset = 3
+	dendriticCorrectionSource = 4
+	dendriticCorrectionActions = (dendriticCorrectionPropagate, dendriticCorrectionAdvance, dendriticCorrectionDecay, dendriticCorrectionReset, dendriticCorrectionSource)
+	dendriticCorrectionTraceAttribute = "dendriticCorrectionTrace"
+	dendriticCorrectionUsageAttribute = "dendriticCorrectionBranchUsage"
+	dendriticCorrectionInvalidConfiguration = "Dendritic prediction-error correction requires teacher-forced fixed-vocabulary CPU NLP LIF, independent branches, raw linear strength scoring, global neuron storage, and no competing branch learner, beam, auxiliary/proxy sources, count-based readout, strength limits, drawing, or train-time synapse adjustment"
+	dendriticCorrectionInvalidParameter = "Dendritic prediction-error correction requires finite positive learning rate/margin and multiplicative decay rates in [0, 1]"
+	dendriticCorrectionInvalidTrace = "Dendritic prediction-error correction received an invalid, stale, incomplete, or already consumed sequence trace"
+	dendriticCorrectionInvalidTensor = "Dendritic prediction-error correction requires finite non-negative sparse strengths and valid neuron/segment coordinates"
+	dendriticCorrectionNoEligibility = "Dendritic prediction-error correction has a margin violation but no causal correct-target synapses; check seed, reset and segment configuration"
+	dendriticCorrectionConfigurationLabel = "trainDendriticBranchesPredictionErrorCorrection:"
+	dendriticCorrectionLearningRateLabel = "dendriticCorrectionLearningRate:"
+	dendriticCorrectionMarginLabel = "dendriticCorrectionMargin:"
 useTargetRoutedBranches = False	#default: False	#orig: False	#fixed branch per target cell, independent of context
 if(useTargetRoutedBranches):
 	targetRoutedBranchesNumber = 8
@@ -317,6 +349,8 @@ if(inferenceLeakyIntegrateAndFire):
 else:
 	multipleDendriticBranches = True	#default: True	#orig: False
 if(useContextRoutedBranches):
+	multipleDendriticBranches = True
+if(trainDendriticBranchesPredictionErrorCorrection):
 	multipleDendriticBranches = True
 if(useTargetRoutedBranches):
 	if(useContextRoutedBranches):
@@ -711,6 +745,8 @@ if(useInference):
 			inferenceActivationFunction = False	#default:False	
 		else:
 			inferenceActivationFunction = True	#default:True	#orig:False	#required to prevent exponential runaway of activations (that negatively affects predictionNetwork loss optimisation)
+	if(trainDendriticBranchesPredictionErrorCorrection):
+		inferenceActivationFunction = False	#learn the linear LIF branch response using bounded margin steps
 	if(useSANI):
 		inferenceApplySequentialActivationSparse = True	#default: True	#orig: False
 		if(useBenchmarkDefaultsEvalTestSetOptim):
@@ -1842,6 +1878,10 @@ if(executionMode == "inference" and not inferenceTrainFirstSequences and not inf
 else:
 	optimisationInferenceChunks = False	#not supported
 	optimisationInferenceWorkers = False	#not supported
+if(trainDendriticBranchesPredictionErrorCorrection):
+	#The chunk worker does not support useTrainDuringInference, including its frozen inference configuration.
+	optimisationInferenceChunks = False
+	optimisationInferenceWorkers = False
 inferenceChunksErrorDisabled = "Inference chunk helper requires optimisationInferenceChunks=True"
 if(optimisationInferenceChunks):
 	inferenceChunksSequenceCount = 25	#maximum independent prompt sequences per fresh process
@@ -2095,6 +2135,8 @@ if(useDefaultsV2):
 		
 	#Fourth LIF performance review option;
 	inferenceReviewPatch14NormaliseConnectionInputs = True	#default: True #normalise each exact source neuron's outgoing weights per target segment; preserves direct connectivity
+	if(trainDendriticBranchesPredictionErrorCorrection):
+		inferenceReviewPatch14NormaliseConnectionInputs = False	#corrective strengths are prediction weights; normalising other outgoing weights would change the local learning rule
 	inferenceReviewPatch14InvalidConfiguration = "Patch 14 requires the option enabled with LIF and finite positive reference strength and column input gain"
 	if(inferenceReviewPatch14NormaliseConnectionInputs):
 		inferenceReviewPatch14ReferenceStrength = 5.0	#maximum normalised outgoing strength per source/segment before column gain
@@ -2306,6 +2348,32 @@ if(useTargetRoutedBranches):
 	if(type(targetRoutedBranchesNumber) is not int or targetRoutedBranchesNumber <= targetRoutedBranchesOne):
 		raise ValueError(targetRoutedBranchesInvalidConfiguration)
 
+if(trainDendriticBranchesPredictionErrorCorrection):
+	#Calibrate frozen readout to learned strengths; retain the training threshold and transport used by the 10k runs.
+	if(executionMode == dendriticCorrectionInferenceMode):
+		inferenceLeakyIntegrateAndFireSomaActivationThreshold = 0.001
+		inferenceDecrementActivationsSomaPerPredictedToken = 0.5
+		inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn = 0.5
+	#Teacher forcing must continue through absent candidates so the next supervised target can be learned.
+	patchInferenceUseNextTokenTargets = True
+	#Repeated tokens require a causal self edge and resetting the source before, rather than after, its new input.
+	trainConnectionsAllowSelfTransitions = True
+	inferenceReviewPatch2PreserveSelfTransitions = True
+	if(not useTrainDuringInference or executionMode not in (dendriticCorrectionTrainMode, dendriticCorrectionInferenceMode) or not useModalityNLP or not inferenceLeakyIntegrateAndFire or not multipleDendriticBranches or multipleDendriticBranchesNumber <= dendriticCorrectionOne or multipleDendriticBranchesBinaryTree or useContextRoutedBranches or useTargetRoutedBranches or trainSelectMostSimilarBranch or trainVerifyConnectionNonexistentAcrossBranches or inferenceTrainFirstSequences or inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures or not inferenceBurstAllPredictionsOrTargetsInSequence or not inferenceSeedNetwork or numSeedTokens < dendriticCorrectionOne or algorithmMatrixSANIenforceRequirement != dendriticCorrectionRequiredSANI):
+		raise RuntimeError(dendriticCorrectionInvalidConfiguration)
+	if(inferenceBeamSearch or auxiliaryNeurons or inferenceInferMissingFeatures or useSequenceContext or inferenceContextLikelihood or inferenceColumnLikelihood or inferenceReviewPatch16TokenAggregation or inferenceReviewPatch15TokenTransitionPrior or inferenceReviewPatch13poolTransitionsFromSimilarFeatures or inferenceReviewPatch14NormaliseConnectionInputs or inferenceActivationFunction or inferenceConnectionsStrengthBoolean or inferenceConnectionStrengthPOSdependence or inferenceFeatureSegmentWeighting or inferenceUseNeuronFeaturePropertiesTime or inferenceDuringTrainAdjustSynapseStrength or predictionColumnsMustActivateConceptFeature or not inferenceStrengthLookupBypass):
+		raise RuntimeError(dendriticCorrectionInvalidConfiguration)
+	if(deviceDatabase.type != dendriticCorrectionCPU or deviceSparse.type != dendriticCorrectionCPU or deviceDense.type != dendriticCorrectionCPU or not storeDatabaseGlobalFeatureNeuronsInRam or arrayType != pt.float32 or arrayNumberOfPropertiesTrain != dendriticCorrectionOne or not arrayIndexPropertiesStrength or not tokeniserSubword or not useDedicatedConceptListsSubword or not useDedicatedFeatureListsSubword or not tokeniserSubwordColumnIdentificationByFirstNounToken or tokeniserSubwordColumnIdentificationByConsecutiveNounTokens or tokeniserSubwordColumnIdentificationByLemma or inferenceReportTokenAccuracyConstrainByColumn or trainConnectionStrengthLimitMax or trainConnectionStrengthLimitTanh or drawNetworkDuringTrain or drawNetworkDuringInference):
+		raise RuntimeError(dendriticCorrectionInvalidConfiguration)
+	for dendriticCorrectionParameter in (dendriticCorrectionLearningRate, dendriticCorrectionMargin, j1):
+		if(type(dendriticCorrectionParameter) not in (int, float) or not math.isfinite(dendriticCorrectionParameter) or dendriticCorrectionParameter <= dendriticCorrectionZero):
+			raise ValueError(dendriticCorrectionInvalidParameter)
+	if((inferenceDecrementActivationsSoma and not inferenceDecrementActivationsSomaNonlinear) or (inferenceDecrementActivationsLastColumnSegment and not inferenceDecrementActivationsLastColumnSegmentNonlinear)):
+		raise RuntimeError(dendriticCorrectionInvalidParameter)
+	for dendriticCorrectionDecayRate in (inferenceDecrementActivationsSomaPerPredictedToken, inferenceDecrementActivationsLastColumnSegmentPerPredictedColumn):
+		if(type(dendriticCorrectionDecayRate) not in (int, float) or not math.isfinite(dendriticCorrectionDecayRate) or not dendriticCorrectionZero <= dendriticCorrectionDecayRate <= dendriticCorrectionOne):
+			raise ValueError(dendriticCorrectionInvalidParameter)
+
 #printConfiguration;
 if(trainVerifyConnectionNonexistentAcrossBranchesUpgrades):
 	if(not multipleDendriticBranches or not multipleDendriticBranchesRandom or multipleDendriticBranchesBinaryTree or useContextRoutedBranches or useTargetRoutedBranches or trainSelectMostSimilarBranch or useTrainDuringInference or auxiliaryNeurons or not useModalityNLP or not useDedicatedConceptListsSubword or not useDedicatedFeatureListsSubword or not trainSparseConnectionsTensor or not trainSparseNeuronsTensor or not trainSequenceObservedColumnsUseSequenceFeaturesOnly or not trainSequenceObservedColumnsMatchSequenceWords or optimiseTrainSequenceBatch or optimisationStoreDatabaseResidentCoordinatesAsInt32 or deviceDatabase.type != branchVerifyCPU or deviceSparse.type != branchVerifyCPU or deviceDense.type != branchVerifyCPU or arrayType != pt.float32 or arrayNumberOfPropertiesTrain != branchVerifyOne or not arrayIndexPropertiesStrength):
@@ -2314,6 +2382,10 @@ if(trainVerifyConnectionNonexistentAcrossBranchesUpgrades):
 		raise RuntimeError(branchVerifyInvalidConfiguration)
 
 if(printConfiguration): 
+	if(trainDendriticBranchesPredictionErrorCorrection):
+		print(dendriticCorrectionConfigurationLabel, trainDendriticBranchesPredictionErrorCorrection)
+		print(dendriticCorrectionLearningRateLabel, dendriticCorrectionLearningRate)
+		print(dendriticCorrectionMarginLabel, dendriticCorrectionMargin)
 	if(inferenceBeamSearchLikelihood):
 		for inferenceBeamSearchConfigurationName in inferenceBeamSearchConfigurationNames:
 			print(inferenceBeamSearchConfigurationName + inferenceBeamSearchConfigurationLabelSuffix, globals()[inferenceBeamSearchConfigurationName])

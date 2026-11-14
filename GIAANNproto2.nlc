@@ -797,7 +797,7 @@ MANUAL; - set inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatu
 
 ---
 v2s (Codex App GPT-6.0):
-- add proto GIAANNproto2s1a - start inferenceBeamSearch updates:
+- add proto GIAANNproto2s1a - start inferenceBeamSearch+multipleDendriticBranches updates:
 	- patch and optimise inferenceBeamSearch with likelihood scoring, isolate speculative state and subthreshold candidate admission.
 AUTORESEARCH; - explore a new or existing branching (multipleDendriticBranches=True) method as a solution to the dendritic conflicting context issue (e.g. red square -> X, red circle -> Y, blue square -> Y, blue circle -> X) and iteratively test your hypotheses by executing training+inference:
 	- add option useContextRoutedBranches (disabled) - context-selective dendritic branches that preserve ordered token-prefix combinations and combine matching specialist activation with a shared baseline.
@@ -807,3 +807,4 @@ AUTORESEARCH; - explore a new or existing branching (multipleDendriticBranches=T
 	- add option trainVerifyConnectionNonexistentAcrossBranchesOptimisation1 (enabled) - cached ownership lookup and native CPU updates reduced matched 10k training from 32.6 to 16.4 minutes.
 	- add option trainVerifyConnectionNonexistentAcrossBranchesOptimisation2 (enabled) - lossless indexed storage. A controlled 24-column benchmark measured 2.66% faster writes, 4.23% faster warm-cache reads, and 57% fewer bytes.
 - implement option trainVerifyConnectionNonexistentAcrossBranchesFractional (enabled) - max 50% of branches of a given segment index share the same incoming connection (rather than ensuring no repeated connections are allowed).
+- add option trainDendriticBranchesPredictionErrorCorrection - strengthen synapses supporting correct predictions and weaken competing branch synapses during trainDuringInference.

@@ -20,6 +20,8 @@ GIA ANN common Prediction Activate
 import torch as pt
 
 from GIAANNcmn_globalDefs import *
+if(trainDendriticBranchesPredictionErrorCorrection):
+	import GIAANNcmn_dendriticPredictionErrorCorrection
 if(inferenceContextLikelihood):
 	import GIAANNcmn_predictionContextLikelihood
 import GIAANNcmn_sparseTensors
@@ -1308,6 +1310,9 @@ def processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, global
 		else:
 			featureNeuronsActive = calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex)
 		featureConnectionsStrengthStored = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
+		if(trainDendriticBranchesPredictionErrorCorrection):
+			if(executionMode == dendriticCorrectionTrainMode):
+				GIAANNcmn_dendriticPredictionErrorCorrection.recordSource(databaseNetworkObject, featureConnectionsStrengthStored, sourceColumnIndex, sourceFeatureIndex, sequenceWordIndex, featureNeuronsActive)
 		if(inferenceContextLikelihood):
 			GIAANNcmn_predictionContextLikelihood.recordContextLikelihoodSource(databaseNetworkObject, featureConnectionsStrengthStored, sequenceWordIndex)
 		featureConnectionsStrength = featureConnectionsStrengthStored

@@ -27,6 +27,8 @@ from spacy.tokens import Doc
 pt.set_grad_enabled(False)
 
 from GIAANNcmn_globalDefs import *
+if(trainDendriticBranchesPredictionErrorCorrection):
+	import GIAANNcmn_dendriticPredictionErrorCorrection
 if(optimiseTrainSequenceBatch):
 	import GIAANNcmn_trainSequenceBatch
 if(useSequenceContext):
@@ -534,6 +536,9 @@ def parseMultisentenceSequenceSentencesIndividually(sequenceSentences, sequenceT
 
 def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, articleIndex, sequenceIndex, sequence, sequenceRaw, inferenceSuccessfulPredictionMask=None, sequenceWordLength=None):
 	trainMode = not inferenceMode
+	if(trainDendriticBranchesPredictionErrorCorrection):
+		if(inferenceMode and executionMode == dendriticCorrectionTrainMode):
+			GIAANNcmn_dendriticPredictionErrorCorrection.initialiseSequence(databaseNetworkObject, sequenceCount)
 	if(inferenceMode):
 		if(useTrainDuringInference):
 			if(multipleDendriticBranchesBinaryTree):
@@ -689,6 +694,8 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 			else:
 				# Process each concept word in the sequence (predict)
 				inferenceSuccessfulPredictionMask = GIAANNcmn_prediction.processConceptWordsInference(sequenceObservedColumns, sequenceCount, sequence, sequenceSeed, sequencePredict, numSeedTokens, sequenceRaw)
+		elif(trainDendriticBranchesPredictionErrorCorrection):
+			GIAANNcmn_dendriticPredictionErrorCorrection.trainSequence(sequenceObservedColumns, sequenceCount, tokens)
 		else:
 			# Process each concept word in the sequence (train)
 			requiredSourceFeatureIndicesByObservedColumn = sequenceObservedColumns.getTrainRequiredSourceFeatureIndicesByObservedColumn()
@@ -765,6 +772,9 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 	elif(printEvalSequenceBar and not trainMode and executionMode!="trainDuringInference"):
 		GIAANNcmn_executionProgress.updateEvalSequenceBar(sequenceCount)
 
+	if(trainDendriticBranchesPredictionErrorCorrection):
+		if(trainMode and executionMode == dendriticCorrectionTrainMode):
+			GIAANNcmn_dendriticPredictionErrorCorrection.finishSequence(databaseNetworkObject, sequenceCount)
 	#note sequenceCount can be used as sequenceIndex (independent of index in sequenceList) because sequenceIndex is only used to index sequence time (same for all sequences in sequenceList)
 	return inferenceSuccessfulPredictionMask
 
