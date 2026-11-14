@@ -176,8 +176,12 @@ def filterOptimisedUpdates(references, sources, updates, strengthIndex):
 				keys, branches = ownershipIndex(column, feature, tensor, strengthIndex)
 				selection = pt.nonzero(indices[branchVerifyTargetConceptAxis] == bucket, as_tuple=False).flatten()
 				query = (indices[branchVerifySegmentAxis, selection]*tensor.size(branchVerifyTargetConceptAxis) + indices[branchVerifyTargetFeatureAxis, selection])*tensor.size(branchVerifyTargetFeatureAxis) + indices[branchVerifyProspectiveTargetFeatureAxis, selection]
-				locations, found = lookup(keys, query)
-				keep[selection] = ~found
+				if(trainVerifyConnectionNonexistentAcrossBranchesFractional):
+					import GIAANNcmn_branchVerificationFractional
+					keep[selection] = GIAANNcmn_branchVerificationFractional.keepUpdates(column.branchVerifyIndexes[feature][branchVerifyFractionalCacheIndex], query, indices[branchVerifyBranchAxis, selection], values[selection] > branchVerifyZero)
+				else:
+					locations, found = lookup(keys, query)
+					keep[selection] = ~found
 			result = pt.sparse_coo_tensor(indices[:, keep], values[keep], updates.size(), dtype=updates.dtype).coalesce()
 	return result
 
@@ -194,16 +198,27 @@ def ownershipIndex(column, feature, tensor, strengthIndex):
 			if(not hasattr(column, branchVerifyIndexAttribute)):
 				column.branchVerifyIndexes = {}
 			cached = column.branchVerifyIndexes.get(feature)
+			if(trainVerifyConnectionNonexistentAcrossBranchesFractional):
+				if(cached is not None and len(cached) != branchVerifyFractionalCacheSize):
+					cached = None
 			if(cached is not None and (cached[branchVerifyZero].data_ptr() != indices.data_ptr() or cached[branchVerifyCacheVersionIndex] != indices._version or tuple(cached[branchVerifyZero].shape) != tuple(indices.shape) or cached[branchVerifyOne] != tuple(tensor.size()) or not pt.equal(cached[branchVerifyTwo], mask))):
 				cached = None
 		if(cached is None):
-			keys = (indices[branchVerifySegmentAxis, mask]*tensor.size(branchVerifyTargetConceptAxis) + indices[branchVerifyTargetConceptAxis, mask])*tensor.size(branchVerifyTargetFeatureAxis) + indices[branchVerifyTargetFeatureAxis, mask]
+			if(trainVerifyConnectionNonexistentAcrossBranchesFractional):
+				import GIAANNcmn_branchVerificationFractional
+				keys = GIAANNcmn_branchVerificationFractional.connectionKeys(indices[:, mask], tensor.size())
+			else:
+				keys = (indices[branchVerifySegmentAxis, mask]*tensor.size(branchVerifyTargetConceptAxis) + indices[branchVerifyTargetConceptAxis, mask])*tensor.size(branchVerifyTargetFeatureAxis) + indices[branchVerifyTargetFeatureAxis, mask]
 			keys, order = pt.sort(keys, stable=True)
 			branches = indices[branchVerifyBranchAxis, mask][order]
 			if(trainVerifyConnectionNonexistentAcrossBranchesCumulative and bool(pt.any(keys[branchVerifyOne:] == keys[:-branchVerifyOne]))):
 				raise RuntimeError(branchVerifyInvalidInput)
 			if(trainVerifyConnectionNonexistentAcrossBranchesOptimisation1):
-				column.branchVerifyIndexes[feature] = (indices, tuple(tensor.size()), mask, indices._version, keys, branches)
+				if(trainVerifyConnectionNonexistentAcrossBranchesFractional):
+					fractionalIndex = GIAANNcmn_branchVerificationFractional.createIndex(keys, branches)
+					column.branchVerifyIndexes[feature] = (indices, tuple(tensor.size()), mask, indices._version, fractionalIndex, keys, branches)
+				else:
+					column.branchVerifyIndexes[feature] = (indices, tuple(tensor.size()), mask, indices._version, keys, branches)
 			result = keys, branches
 		else:
 			result = cached[-branchVerifyTwo], cached[-branchVerifyOne]

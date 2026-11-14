@@ -37,7 +37,10 @@ if(auxiliaryNeurons and auxiliaryNeuronsAuto):
 
 def filterTrainVerifyConnectionNonexistentAcrossBranchesUpdates(existingConnectionSparse, connectionUpdatesSparse, strengthPropertyIndex):
 	result = connectionUpdatesSparse
-	if(trainVerifyConnectionNonexistentAcrossBranches and not trainVerifyConnectionNonexistentAcrossBranchesCumulative):
+	if(trainVerifyConnectionNonexistentAcrossBranchesFractional):
+		import GIAANNcmn_branchVerificationFractional
+		result = GIAANNcmn_branchVerificationFractional.filterTensor(existingConnectionSparse, connectionUpdatesSparse, strengthPropertyIndex)
+	elif(trainVerifyConnectionNonexistentAcrossBranches and not trainVerifyConnectionNonexistentAcrossBranchesCumulative):
 		if(not isinstance(strengthPropertyIndex, int) or isinstance(strengthPropertyIndex, bool) or strengthPropertyIndex < 0):
 			raise RuntimeError("filterTrainVerifyConnectionNonexistentAcrossBranchesUpdates error: strengthPropertyIndex is invalid")
 		if(not pt.is_tensor(existingConnectionSparse) or not pt.is_tensor(connectionUpdatesSparse)):

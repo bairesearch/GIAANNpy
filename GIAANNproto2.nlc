@@ -806,7 +806,4 @@ AUTORESEARCH; - explore a new or existing branching (multipleDendriticBranches=T
 	- add option trainVerifyConnectionNonexistentAcrossBranchesCumulative (enabled) - each source-target-segment connection has one branch owner. Shared connections reuse that branch; bridging contexts merge branches and sum their accumulated strengths.
 	- add option trainVerifyConnectionNonexistentAcrossBranchesOptimisation1 (enabled) - cached ownership lookup and native CPU updates reduced matched 10k training from 32.6 to 16.4 minutes.
 	- add option trainVerifyConnectionNonexistentAcrossBranchesOptimisation2 (enabled) - lossless indexed storage. A controlled 24-column benchmark measured 2.66% faster writes, 4.23% faster warm-cache reads, and 57% fewer bytes.
-
-
-		
-		
+- implement option trainVerifyConnectionNonexistentAcrossBranchesFractional (enabled) - max 50% of branches of a given segment index share the same incoming connection (rather than ensuring no repeated connections are allowed).

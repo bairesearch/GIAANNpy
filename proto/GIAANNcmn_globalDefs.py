@@ -405,14 +405,16 @@ else:
 	multipleDendriticBranchesRandom = False
 multipleDendriticBranchesIndexLast = multipleDendriticBranchesNumber - 1
 if(trainVerifyConnectionNonexistentAcrossBranches):
-	trainVerifyConnectionNonexistentAcrossBranchesCumulative = True	#default: True	#orig: False	#reinforce existing connections and merge target branches joined by a training context
+	trainVerifyConnectionNonexistentAcrossBranchesFractional = True	#default: True	#orig: False	#at most floor(branches/2) owners per source-target-segment connection; reinforce existing owners
+	trainVerifyConnectionNonexistentAcrossBranchesCumulative = False	#default: False	#orig: False	#reinforce existing connections and merge target branches joined by a training context
 	trainVerifyConnectionNonexistentAcrossBranchesOptimisation1 = True	#default: True	#orig: False	#cache exact ownership indexes and support parallel CPU updates
 	trainVerifyConnectionNonexistentAcrossBranchesOptimisation2 = True	#default: True	#orig: False	#indexed per-column connection storage
 else:
+	trainVerifyConnectionNonexistentAcrossBranchesFractional = False
 	trainVerifyConnectionNonexistentAcrossBranchesCumulative = False
 	trainVerifyConnectionNonexistentAcrossBranchesOptimisation1 = False
 	trainVerifyConnectionNonexistentAcrossBranchesOptimisation2 = False
-trainVerifyConnectionNonexistentAcrossBranchesUpgrades = trainVerifyConnectionNonexistentAcrossBranchesCumulative or trainVerifyConnectionNonexistentAcrossBranchesOptimisation1 or trainVerifyConnectionNonexistentAcrossBranchesOptimisation2
+trainVerifyConnectionNonexistentAcrossBranchesUpgrades = trainVerifyConnectionNonexistentAcrossBranchesFractional or trainVerifyConnectionNonexistentAcrossBranchesCumulative or trainVerifyConnectionNonexistentAcrossBranchesOptimisation1 or trainVerifyConnectionNonexistentAcrossBranchesOptimisation2
 if(trainVerifyConnectionNonexistentAcrossBranchesUpgrades):
 	branchVerifyZero = 0
 	branchVerifyOne = 1
@@ -464,6 +466,16 @@ if(trainVerifyConnectionNonexistentAcrossBranchesUpgrades):
 	branchVerifyTrainingMode = "train"
 	branchVerifyPackedTemporaryPrefix = ".connections-"
 	branchVerifyPackedInvalid = "Invalid, corrupt, mixed-format or incomplete packed connection storage"
+if(trainVerifyConnectionNonexistentAcrossBranchesFractional):
+	branchVerifyFractionalBranchDivisor = 2
+	branchVerifyFractionalCacheIndex = 4
+	branchVerifyFractionalCacheSize = 7
+	branchVerifyFractionalInvalidInput = "Fractional branch verification requires valid CPU strength-only float32 sparse updates and in-range connection keys and branches"
+	branchVerifyFractionalInvalidConfiguration = "Fractional branch verification requires verification enabled and at least two independent branches; it is incompatible with cumulative verification"
+	branchVerifyFractionalExistingOverLimit = "Existing connection exceeds the fractional branch limit; rebuild or supply a compatible checkpoint"
+	if(not trainVerifyConnectionNonexistentAcrossBranches or trainVerifyConnectionNonexistentAcrossBranchesCumulative or type(multipleDendriticBranchesNumber) is not int or multipleDendriticBranchesNumber < branchVerifyFractionalBranchDivisor):
+		raise ValueError(branchVerifyFractionalInvalidConfiguration)
+	branchVerifyFractionalMaximumOwners = multipleDendriticBranchesNumber // branchVerifyFractionalBranchDivisor
 if(useContextRoutedBranches):
 	multipleDendriticBranchesNumber = contextRoutedBranchesNumber + int(contextRoutedBranchesShared)
 	multipleDendriticBranchesIndexLast = multipleDendriticBranchesNumber - contextRoutedBranchesOne
