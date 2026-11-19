@@ -279,41 +279,12 @@ if(useContextRoutedBranches):
 	contextRoutedBranchesLength = 2
 	contextRoutedBranchesShared = True
 	contextRoutedBranchesRandom = False
-	contextRoutedBranchesExact = True	#allocate a distinct, exact-prefix prototype per specialist branch; shared branch handles unallocated contexts
-	useContextRoutedBranchesSupport = False	#default: False	#orig: False	#two-pass training-only support selection and optional confidence weighting
-	if(useContextRoutedBranchesSupport):
-		trainContextRoutedBranchesSupportCollect = False	#first run: collect a plan without training synapses; second run: train a fresh checkpoint from that plan
-		contextRoutedBranchesSupportFrequency = True	#False retains first-observation allocation as a matched control
-		inferenceContextRoutedBranchesSupportConfidence = True
-		contextRoutedBranchesSupportMinimum = 2
-		contextRoutedBranchesSupportTau = 4.0
-		contextRoutedBranchesSupportPlanFile = "contextRoutedBranchesSupportPlan.pkl"
-		contextRoutedBranchesSupportFile = "contextRoutedBranchesSupport.pkl"
-		contextRoutedBranchesSupportSchema = 1
-		contextRoutedBranchesSupportPickleProtocol = 4
-		contextRoutedBranchesSupportFrameFormat = "<Q"
-		contextRoutedBranchesSupportSchemaKey = "support_schema"
-		contextRoutedBranchesSupportCountsKey = "counts"
-		contextRoutedBranchesSupportMetadataKey = "metadata"
-		contextRoutedBranchesSupportStreamKey = "stream_sha256"
-		contextRoutedBranchesSupportSequencesKey = "trainable_sequences"
-		contextRoutedBranchesSupportTokensKey = "trainable_tokens"
-		contextRoutedBranchesSupportEnabledKey = "support"
-		contextRoutedBranchesSupportFrequencyKey = "support_frequency"
-		contextRoutedBranchesSupportHashKey = "support_sha256"
-		contextRoutedBranchesSupportInvalid = "Invalid context-branch support plan, support counts, training stream, or configuration"
-	contextRoutedBranchesPrototypeFile = "contextRoutedBranchesPrototypes.pkl"
-	contextRoutedBranchesExactKey = "exact"
-	contextRoutedBranchesPrototypeHashKey = "prototypes_sha256"
-	contextRoutedBranchesHashBlockBytes = 1048576
 	contextRoutedBranchesTrainingConnectionRank = 6
 	contextRoutedBranchesSourceConceptAxis = 2
 	contextRoutedBranchesSourceFeatureAxis = 3
 	contextRoutedBranchesTargetConceptAxis = 4
 	contextRoutedBranchesTargetFeatureAxis = 5
 	contextRoutedBranchesSelfFilterKey = "same_occurrence_self_connections_filtered"
-	contextRoutedBranchesReadBinary = "rb"
-	contextRoutedBranchesCreateBinary = "xb"
 	contextRoutedBranchesEmptyPayload = b""
 	contextRoutedBranchesTrainingAttribute = "contextRoutedBranchesTraining"
 	contextRoutedBranchesInferenceAttribute = "contextRoutedBranchesInference"
@@ -341,7 +312,7 @@ if(useContextRoutedBranches):
 	contextRoutedBranchesRandomKey = "random"
 	contextRoutedBranchesVocabularyKey = "vocabulary"
 	contextRoutedBranchesSequencesKey = "sequences"
-	contextRoutedBranchesInvalidConfiguration = "Context-routed branches require fresh single-epoch fixed-vocabulary CPU NLP LIF training or teacher-forced inference, independent branches, and no self transitions, competing selectors, beam, token-transition prior or sequence-context memory; likelihood requires a shared branch"
+	contextRoutedBranchesInvalidConfiguration = "Context-routed branches require fresh single-epoch fixed-vocabulary CPU NLP LIF training or teacher-forced inference, independent branches, and no self transitions, competing selectors, beam or token-transition prior; likelihood requires a shared branch"
 	contextRoutedBranchesInvalidInput = "Invalid context-routed branch input or inconsistent sequence state"
 	contextRoutedBranchesInvalidModel = "Missing, incompatible, or already existing context-routed branch model metadata"
 if(inferenceLeakyIntegrateAndFire):
@@ -673,9 +644,14 @@ arrayIndexPropertiesTimeCreateInference = arrayIndexPropertiesTime or inferenceU
 
 
 #Beam search;
-inferenceBeamSearchLikelihood = False
 if(useInference):
 	inferenceBeamSearch = False	#default: False	#orig: False
+	if(inferenceBeamSearch):
+		inferenceBeamSearchObservedSources = False	#experimental: infer the latent source cell after observing its subword
+		if(inferenceBeamSearchObservedSources):
+			inferenceBeamSearchObservedSourceInvalidConfiguration = "Observed-source search requires frozen, single-branch, teacher-forced subword likelihood beam inference"
+	else:
+		inferenceBeamSearchObservedSources = False
 	inferenceBeamSearchLikelihood = inferenceBeamSearch and useDefaultsV2 and useModalityNLP and inferenceLeakyIntegrateAndFire
 	inferenceBeamScoreStrategy = "nodeActivation"	#options: "nodeActivation", "activation_connection", "connection"
 	inferenceBeamConceptColumnNodeActivationThreshold = 0.0
@@ -719,10 +695,30 @@ if(useInference):
 		inferenceBeamSearchContextAttributes = ("contextLikelihoodHistory", "contextLikelihoodColumnOrigins", "contextLikelihoodPosition", "columnLikelihoodHistory", "columnLikelihoodColumn", "columnLikelihoodEpoch", "columnLikelihoodPosition", "columnLikelihoodRecordedPosition")
 		inferenceBeamSearchConfigurationNames = ("inferenceBeamSearchLikelihood", "inferenceBeamScoreStrategy", "inferenceBeamWidth", "inferenceBeamDepth", "inferenceBeamSearchAdmitSubthreshold", "inferenceBeamSearchMinimumActivationRatio", "inferenceBeamSearchExtraCandidates", "inferenceBeamSearchContinuationWeight", "inferenceBeamSearchSubthresholdPenalty", "inferenceBeamSearchPreserveEligibleScores", "inferenceBeamSearchLimitRootGap", "inferenceBeamSearchMaximumRootLogGap", "inferenceBeamSearchPruneDominated", "inferenceBeamSearchProjectTerminalState", "inferenceBeamSearchRecordDiagnostics", "inferenceBeamSearchDiagnosticMaximumWeight")
 		inferenceBeamSearchConfigurationLabelSuffix = ":"
-		inferenceBeamSearchInvalidConfiguration = "Likelihood beam search requires static CPU single-branch NLP LIF with strict direct connections, context and column likelihood, token aggregation, no sequence memory, auxiliary sources or time properties"
+		inferenceBeamSearchInvalidConfiguration = "Likelihood beam search requires static CPU single-branch NLP LIF with strict direct connections, context and column likelihood, token aggregation, no auxiliary sources or time properties"
 		inferenceBeamSearchInvalidParameter = "Likelihood beam search parameter is outside its supported range"
 		inferenceBeamSearchInvalidState = "Likelihood beam search received inconsistent state or candidates"
 		inferenceBeamSearchNoCandidates = "Likelihood beam search has no eligible source-connected candidates"
+		if(inferenceBeamSearchObservedSources):
+			inferenceBeamDepth = inferenceBeamSearchOne	#posterior predictive next-token decision
+			inferenceBeamSearchObservedSourceContext = True	#apply the existing dendritic likelihood to the latent-source predictive distribution
+			inferenceBeamWidth = 64
+			inferenceBeamSearchObservedSourcePoolWeight = 0.75
+			inferenceBeamSearchObservedSourcePriorWeight = 0.01
+			inferenceBeamSearchObservedSourceIndexDirectory = None	#None reads the frozen native checkpoint directly
+			inferenceBeamSearchObservedSourceRowCache = 2048
+			inferenceBeamSearchObservedSourcePoolCache = 128
+			inferenceBeamSearchObservedSourceIndexVersion = 1
+			inferenceBeamSearchObservedSourceIndexFile = "manifest.json"
+			inferenceBeamSearchObservedSourceArraySuffix = ".npy"
+			inferenceBeamSearchObservedSourceMapMode = "r"
+			inferenceBeamSearchObservedSourceSort = "stable"
+			inferenceBeamSearchObservedSourceArrays = ("keys", "counts", "lex", "rows", "targets", "strengths", "pooledRows", "pooledTargets", "pooledStrengths")
+			inferenceBeamSearchObservedSourceManifestKeys = ("version", "database", "concepts", "features", "segment", "vocabulary")
+			inferenceBeamSearchObservedSourceInvalidIndex = "Observed-source index does not match the frozen checkpoint"
+			inferenceBeamSearchObservedSourceIndexAttribute = "observedSourceIndex"
+			inferenceBeamSearchConfigurationNames += ("inferenceBeamSearchObservedSources", "inferenceBeamSearchObservedSourceContext", "inferenceBeamSearchObservedSourcePoolWeight", "inferenceBeamSearchObservedSourcePriorWeight", "inferenceBeamSearchObservedSourceIndexDirectory")
+
 	#optimisations;
 	inferenceStrengthLookupCache = True	#default: True	#orig: False	#cache strength lookup during inference
 	if(inferenceBeamSearch):
@@ -1799,77 +1795,6 @@ if(patchTrainColumnStepsRepeatedColumns):
 		raise RuntimeError(patchTrainColumnStepsInvalid)
 
 
-#Optional joint sequence-context memory. Build it during fresh training or replay the exact training prefix before enabling inference.
-if(useBenchmark and not useQuickExecution and useModalityNLP and useDefaultsV2 and inferenceLeakyIntegrateAndFire and not inferenceBeamSearch):
-	useSequenceContext = False	#default: False #non-standard NLP LIF benchmark
-	#sequenceContextRebuildIndexes = False
-	sequenceContextMinimumLength = 3
-	sequenceContextMaximumLength = 8
-	sequenceContextInitialSmoothing = 16.0
-	sequenceContextSmoothingDecay = 0.5
-	sequenceContextMinimumSmoothing = 0.25
-	sequenceContextZero = 0
-	sequenceContextOne = 1
-	sequenceContextBits = 18
-	sequenceContextKeyBits = 64
-	sequenceContextPositionBits = 32
-	sequenceContextSchema = 1
-	sequenceContextPickleProtocol = 4
-	sequenceContextHashChunkBytes = 1048576
-	sequenceContextFolder = databaseFolder + "sequenceContext/"
-	sequenceContextTokensFile = "tokens.u32"
-	sequenceContextBoundariesFile = "boundaries.npy"
-	sequenceContextKeysFile = "keys.npy"
-	sequenceContextOffsetsFile = "offsets.npy"
-	sequenceContextPositionsFile = "positions.npy"
-	sequenceContextMetadataFile = "metadata.json"
-	sequenceContextTokenDtype = "<u4"
-	sequenceContextKeyDtype = "<u8"
-	sequenceContextFloatDtype = "float64"
-	sequenceContextReadMode = "r"
-	sequenceContextWriteMode = "xb"
-	sequenceContextReadBinaryMode = "rb"
-	sequenceContextAppendMode = "ab"
-	sequenceContextTextWriteMode = "x"
-	sequenceContextEncoding = "utf-8"
-	sequenceContextStableSort = "stable"
-	sequenceContextSearchRight = "right"
-	sequenceContextSchemaField = "schema"
-	sequenceContextVocabularyField = "vocabulary_sha256"
-	sequenceContextFeaturesField = "features"
-	sequenceContextProcessedField = "processed_sequences"
-	sequenceContextTrainedField = "trained_sequences"
-	sequenceContextTokensField = "tokens"
-	sequenceContextMinimumField = "minimum_length"
-	sequenceContextBitsField = "key_bits"
-	sequenceContextFilesField = "files_sha256"
-	sequenceContextModelAttribute = "sequenceContextModel"
-	sequenceContextHistoryAttribute = "sequenceContextHistory"
-	sequenceContextTrainingAttribute = "sequenceContextTrainingBoundaries"
-	sequenceContextModes = ("train", "inference", "trainAndInference")
-	sequenceContextTrainMode = "train"
-	sequenceContextInferenceMode = "inference"
-	sequenceContextConfigurationLabel = "useSequenceContext:"
-	sequenceContextInvalidConfiguration = "Sequence context requires static CPU LIF NLP, fixed BPE features and first-noun-token columns, single-step token aggregation, one fresh training epoch, and no auxiliary neurons, training during inference, or BPB"
-	sequenceContextInvalidParameters = "Sequence context requires valid context lengths, positive finite smoothing, decay in (0, 1], and a packed key fitting uint64"
-	sequenceContextInvalidState = "Sequence context requires an initialised matching database, consecutive causal source steps, and valid fixed-vocabulary token indices"
-	sequenceContextInvalidTraining = "Sequence context training requires a fresh output folder, successful nonempty training sequences in increasing order, and fewer than 2**32 tokens"
-	sequenceContextInvalidModel = "Sequence context model is incomplete, corrupt, or incompatible with this checkpoint, vocabulary, or configured context index"
-	sequenceContextInvalidCandidates = "Sequence context requires legal candidate vectors with finite positive activation values"
-	sequenceContextInvalidIndex = "Sequence context index requires valid increasing sequence boundaries and fixed-vocabulary tokens"
-	if(((not useContextRoutedBranches and not useTargetRoutedBranches and not trainVerifyConnectionNonexistentAcrossBranchesUpgrades) or useSequenceContext) and (not useModalityNLP or not useDefaultsV2 or not inferenceLeakyIntegrateAndFire or not tokeniserSubword or not useDedicatedFeatureListsSubword or not tokeniserSubwordColumnIdentificationByFirstNounToken or inferenceBeamSearch or multipleDendriticBranches or auxiliaryNeurons or useTrainDuringInference or inferenceTrainFirstSequences or useGPUdense or useGPUsparse or printInferenceTop1AccuracyBitsPerByte or executionMode not in sequenceContextModes or numberEpochs != sequenceContextOne or trainSetStartOffsetSequences != sequenceContextZero)):
-		raise RuntimeError(sequenceContextInvalidConfiguration)
-	if(type(sequenceContextMinimumLength) is not int or type(sequenceContextMaximumLength) is not int or type(sequenceContextBits) is not int or not sequenceContextOne <= sequenceContextMinimumLength <= sequenceContextMaximumLength or sequenceContextBits <= sequenceContextZero or sequenceContextBits * sequenceContextMinimumLength > sequenceContextKeyBits):
-		raise ValueError(sequenceContextInvalidParameters)
-	for sequenceContextParameter in (sequenceContextInitialSmoothing, sequenceContextSmoothingDecay, sequenceContextMinimumSmoothing):
-		if(type(sequenceContextParameter) not in (int, float) or not math.isfinite(sequenceContextParameter) or sequenceContextParameter <= sequenceContextZero):
-			raise ValueError(sequenceContextInvalidParameters)
-	if(sequenceContextSmoothingDecay > sequenceContextOne or sequenceContextMinimumSmoothing > sequenceContextInitialSmoothing):
-		raise ValueError(sequenceContextInvalidParameters)
-else:
-	useSequenceContext = False
-
-
 #Inference optimisations workers/chunks;
 # generalisedBenchmarkTool delegates to these native inference options.
 if(executionMode == "inference" and not inferenceTrainFirstSequences and not inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
@@ -2227,7 +2152,7 @@ if(useDefaultsV2):
 			inferenceReviewPatch16TokenAggregation = True	#default: True #sum eligible neuron scores by output token, then retain the strongest neuron for the winning token
 		else:
 			inferenceReviewPatch16TokenAggregation = False
-	if(inferenceContextLikelihood or useSequenceContext):
+	if(inferenceContextLikelihood):
 		inferenceReviewPatch16TokenAggregation = True
 	if(inferenceReviewPatch16TokenAggregation):
 		inferenceLIFTokenAggregationVectorDimension = 0
@@ -2274,12 +2199,8 @@ if(inferenceContextLikelihood):
 	if(inferenceReviewPatch15TokenTransitionPrior or not inferenceReviewPatch16TokenAggregation):
 		raise RuntimeError(inferenceContextLikelihoodInvalidConfiguration)
 	if(inferenceBeamSearchLikelihood):
-		if(not inferenceColumnLikelihood or not predictionEnsureConnectedToPreviousPredictionStrict or inferenceUseNeuronFeaturePropertiesTime or useSequenceContext or inferenceInferMissingFeatures or not inferenceBurstAllPredictionsOrTargetsInSequence):
+		if(not inferenceColumnLikelihood or not predictionEnsureConnectedToPreviousPredictionStrict or inferenceUseNeuronFeaturePropertiesTime or inferenceInferMissingFeatures or not inferenceBurstAllPredictionsOrTargetsInSequence):
 			raise RuntimeError(inferenceBeamSearchInvalidConfiguration)
-	
-if(useSequenceContext):
-	if(not inferenceReviewPatch16TokenAggregation or (executionMode != sequenceContextInferenceMode and (not useSaveData or debugDisableDatabaseFileWrite))):
-		raise RuntimeError(sequenceContextInvalidConfiguration)
 
 if(inferenceInferMissingFeaturesSemanticAdaptiveSupplement):
 	if(inferenceBeamSearch or multipleDendriticBranches):
@@ -2291,10 +2212,10 @@ if(optimiseTrainSequenceBatch):
 	if(not optimiseTrainParallelisation1 or not optimiseTrainParallelisation2a or not optimiseTrainParallelisation2b or not optimiseTrainParallelisation2e or not optimiseTrainParallelisation3c or not trainSparseConnectionsTensor or not trainSparseNeuronsTensor or not trainSequenceObservedColumnsUseSequenceFeaturesOnly or not trainSequenceObservedColumnsMatchSequenceWords):
 		raise RuntimeError(trainSequenceBatchInvalidConfiguration)
 	if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
-		if(deviceDatabase.type != trainSequenceBatchDeviceType or deviceSparse.type != trainSequenceBatchDeviceType or deviceDense.type != trainSequenceBatchDeviceType or optimiseTrainConnectionOverlay or multipleDendriticBranches or trainSelectMostSimilarBranch or trainVerifyConnectionNonexistentAcrossBranches or auxiliaryNeurons or useTrainDuringInference or useSequenceContext or drawNetworkDuringTrain or debugReloadGlobalFeatureNeuronsEverySequence):
+		if(deviceDatabase.type != trainSequenceBatchDeviceType or deviceSparse.type != trainSequenceBatchDeviceType or deviceDense.type != trainSequenceBatchDeviceType or optimiseTrainConnectionOverlay or multipleDendriticBranches or trainSelectMostSimilarBranch or trainVerifyConnectionNonexistentAcrossBranches or auxiliaryNeurons or useTrainDuringInference or drawNetworkDuringTrain or debugReloadGlobalFeatureNeuronsEverySequence):
 			raise RuntimeError(trainSequenceBatchInvalidConfiguration)
 	else:
-		if(deviceDatabase.type != trainSequenceBatchDeviceType or deviceSparse.type != trainSequenceBatchDeviceType or deviceDense.type != trainSequenceBatchDeviceType or optimisationStoreDatabaseResidentCoordinatesAsInt32 or optimiseTrainConnectionOverlay or multipleDendriticBranches or trainSelectMostSimilarBranch or trainVerifyConnectionNonexistentAcrossBranches or auxiliaryNeurons or useTrainDuringInference or useSequenceContext or drawNetworkDuringTrain or debugReloadGlobalFeatureNeuronsEverySequence):
+		if(deviceDatabase.type != trainSequenceBatchDeviceType or deviceSparse.type != trainSequenceBatchDeviceType or deviceDense.type != trainSequenceBatchDeviceType or optimisationStoreDatabaseResidentCoordinatesAsInt32 or optimiseTrainConnectionOverlay or multipleDendriticBranches or trainSelectMostSimilarBranch or trainVerifyConnectionNonexistentAcrossBranches or auxiliaryNeurons or useTrainDuringInference or drawNetworkDuringTrain or debugReloadGlobalFeatureNeuronsEverySequence):
 			raise RuntimeError(trainSequenceBatchInvalidConfiguration)
 	for trainSequenceBatchLimit in (trainSequenceBatchSize, trainSequenceBatchMaxPendingEntries, trainSequenceBatchGrainSize):
 		if(type(trainSequenceBatchLimit) is not int or trainSequenceBatchLimit < trainSequenceBatchOne):
@@ -2317,13 +2238,11 @@ if(optimiseTrainLightweightWorkers):
 		raise RuntimeError(trainOptimisationsInvalidConfiguration)
 
 if(useContextRoutedBranches):
-	if(not useModalityNLP or not useDefaultsV2 or not inferenceLeakyIntegrateAndFire or not tokeniserSubword or not useDedicatedFeatureListsSubword or not useDedicatedConceptListsSubword or not trainSequenceObservedColumnsMatchSequenceWords or not trainSequenceObservedColumnsUseSequenceFeaturesOnly or multipleDendriticBranchesBinaryTree or trainSelectMostSimilarBranch or trainVerifyConnectionNonexistentAcrossBranches or useTrainDuringInference or inferenceTrainFirstSequences or auxiliaryNeurons or useSequenceContext or (inferenceContextLikelihood and not contextRoutedBranchesShared) or inferenceBeamSearch or useGPUdense or useGPUsparse or inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures or not trainSparseConnectionsTensor or trainConnectionsAllowSelfTransitions or inferenceReviewPatch15TokenTransitionPrior or executionMode not in contextRoutedBranchesModes or numberEpochs != contextRoutedBranchesOne):
+	if(not useModalityNLP or not useDefaultsV2 or not inferenceLeakyIntegrateAndFire or not tokeniserSubword or not useDedicatedFeatureListsSubword or not useDedicatedConceptListsSubword or not trainSequenceObservedColumnsMatchSequenceWords or not trainSequenceObservedColumnsUseSequenceFeaturesOnly or multipleDendriticBranchesBinaryTree or trainSelectMostSimilarBranch or trainVerifyConnectionNonexistentAcrossBranches or useTrainDuringInference or inferenceTrainFirstSequences or auxiliaryNeurons or (inferenceContextLikelihood and not contextRoutedBranchesShared) or inferenceBeamSearch or useGPUdense or useGPUsparse or inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures or not trainSparseConnectionsTensor or trainConnectionsAllowSelfTransitions or inferenceReviewPatch15TokenTransitionPrior or executionMode not in contextRoutedBranchesModes or numberEpochs != contextRoutedBranchesOne):
 		raise RuntimeError(contextRoutedBranchesInvalidConfiguration)
 	if(type(contextRoutedBranchesNumber) is not int or contextRoutedBranchesNumber <= contextRoutedBranchesOne or type(contextRoutedBranchesLength) is not int or not contextRoutedBranchesOne <= contextRoutedBranchesLength <= contextRoutedBranchesMaximumLength or type(contextRoutedBranchesGain) not in (int, float) or not math.isfinite(contextRoutedBranchesGain) or contextRoutedBranchesGain < contextRoutedBranchesZero):
 		raise ValueError(contextRoutedBranchesInvalidConfiguration)
 	if(contextRoutedBranchesShared and not inferenceContextRoutedBranchesGating):
-		raise RuntimeError(contextRoutedBranchesInvalidConfiguration)
-	if(contextRoutedBranchesExact and (not contextRoutedBranchesShared or contextRoutedBranchesRandom)):
 		raise RuntimeError(contextRoutedBranchesInvalidConfiguration)
 	if(not useSANIfeaturesAndColumns or algorithmMatrixSANIenforceRequirement != contextRoutedBranchesRequiredSANI):
 		raise RuntimeError(contextRoutedBranchesInvalidConfiguration)
@@ -2332,18 +2251,10 @@ if(useContextRoutedBranches):
 			raise RuntimeError(contextRoutedBranchesInvalidConfiguration)
 		if(type(contextRoutedBranchesSmoothing) not in (int, float) or not math.isfinite(contextRoutedBranchesSmoothing) or contextRoutedBranchesSmoothing <= contextRoutedBranchesZero):
 			raise ValueError(contextRoutedBranchesInvalidConfiguration)
-	if(useContextRoutedBranchesSupport):
-		if(not contextRoutedBranchesExact or not contextRoutedBranchesShared or inferenceContextRoutedBranchesCounts or type(contextRoutedBranchesSupportFrequency) is not bool or type(trainContextRoutedBranchesSupportCollect) is not bool or (trainContextRoutedBranchesSupportCollect and executionMode == contextRoutedBranchesInferenceMode) or type(contextRoutedBranchesSupportPlanFile) is not str or not contextRoutedBranchesSupportPlanFile):
-			raise RuntimeError(contextRoutedBranchesSupportInvalid)
-		if(type(contextRoutedBranchesSupportMinimum) is not int or contextRoutedBranchesSupportMinimum < contextRoutedBranchesOne or type(contextRoutedBranchesSupportTau) not in (int, float) or not math.isfinite(contextRoutedBranchesSupportTau) or contextRoutedBranchesSupportTau < contextRoutedBranchesZero):
-			raise ValueError(contextRoutedBranchesSupportInvalid)
-		if(trainContextRoutedBranchesSupportCollect):
-			useSaveData = False
-			debugDisableDatabaseFileWrite = True
 
 
 if(useTargetRoutedBranches):
-	if(not useModalityNLP or not useDefaultsV2 or not inferenceLeakyIntegrateAndFire or not tokeniserSubword or not useDedicatedFeatureListsSubword or not useDedicatedConceptListsSubword or not trainSequenceObservedColumnsMatchSequenceWords or not trainSequenceObservedColumnsUseSequenceFeaturesOnly or multipleDendriticBranchesBinaryTree or trainSelectMostSimilarBranch or trainVerifyConnectionNonexistentAcrossBranches or useTrainDuringInference or inferenceTrainFirstSequences or auxiliaryNeurons or useSequenceContext or inferenceBeamSearch or useGPUdense or useGPUsparse or inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures or not trainSparseConnectionsTensor or trainConnectionsAllowSelfTransitions or printInferenceTop1AccuracyBitsPerByte or inferenceReviewPatch15TokenTransitionPrior or executionMode not in targetRoutedBranchesModes or numberEpochs != targetRoutedBranchesOne or trainSetStartOffsetSequences != targetRoutedBranchesZero):
+	if(not useModalityNLP or not useDefaultsV2 or not inferenceLeakyIntegrateAndFire or not tokeniserSubword or not useDedicatedFeatureListsSubword or not useDedicatedConceptListsSubword or not trainSequenceObservedColumnsMatchSequenceWords or not trainSequenceObservedColumnsUseSequenceFeaturesOnly or multipleDendriticBranchesBinaryTree or trainSelectMostSimilarBranch or trainVerifyConnectionNonexistentAcrossBranches or useTrainDuringInference or inferenceTrainFirstSequences or auxiliaryNeurons or inferenceBeamSearch or useGPUdense or useGPUsparse or inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures or not trainSparseConnectionsTensor or trainConnectionsAllowSelfTransitions or printInferenceTop1AccuracyBitsPerByte or inferenceReviewPatch15TokenTransitionPrior or executionMode not in targetRoutedBranchesModes or numberEpochs != targetRoutedBranchesOne or trainSetStartOffsetSequences != targetRoutedBranchesZero):
 		raise RuntimeError(targetRoutedBranchesInvalidConfiguration)
 	if(type(targetRoutedBranchesNumber) is not int or targetRoutedBranchesNumber <= targetRoutedBranchesOne):
 		raise ValueError(targetRoutedBranchesInvalidConfiguration)
@@ -2361,7 +2272,7 @@ if(trainDendriticBranchesPredictionErrorCorrection):
 	inferenceReviewPatch2PreserveSelfTransitions = True
 	if(not useTrainDuringInference or executionMode not in (dendriticCorrectionTrainMode, dendriticCorrectionInferenceMode) or not useModalityNLP or not inferenceLeakyIntegrateAndFire or not multipleDendriticBranches or multipleDendriticBranchesNumber <= dendriticCorrectionOne or multipleDendriticBranchesBinaryTree or useContextRoutedBranches or useTargetRoutedBranches or trainSelectMostSimilarBranch or trainVerifyConnectionNonexistentAcrossBranches or inferenceTrainFirstSequences or inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures or not inferenceBurstAllPredictionsOrTargetsInSequence or not inferenceSeedNetwork or numSeedTokens < dendriticCorrectionOne or algorithmMatrixSANIenforceRequirement != dendriticCorrectionRequiredSANI):
 		raise RuntimeError(dendriticCorrectionInvalidConfiguration)
-	if(inferenceBeamSearch or auxiliaryNeurons or inferenceInferMissingFeatures or useSequenceContext or inferenceContextLikelihood or inferenceColumnLikelihood or inferenceReviewPatch16TokenAggregation or inferenceReviewPatch15TokenTransitionPrior or inferenceReviewPatch13poolTransitionsFromSimilarFeatures or inferenceReviewPatch14NormaliseConnectionInputs or inferenceActivationFunction or inferenceConnectionsStrengthBoolean or inferenceConnectionStrengthPOSdependence or inferenceFeatureSegmentWeighting or inferenceUseNeuronFeaturePropertiesTime or inferenceDuringTrainAdjustSynapseStrength or predictionColumnsMustActivateConceptFeature or not inferenceStrengthLookupBypass):
+	if(inferenceBeamSearch or auxiliaryNeurons or inferenceInferMissingFeatures or inferenceContextLikelihood or inferenceColumnLikelihood or inferenceReviewPatch16TokenAggregation or inferenceReviewPatch15TokenTransitionPrior or inferenceReviewPatch13poolTransitionsFromSimilarFeatures or inferenceReviewPatch14NormaliseConnectionInputs or inferenceActivationFunction or inferenceConnectionsStrengthBoolean or inferenceConnectionStrengthPOSdependence or inferenceFeatureSegmentWeighting or inferenceUseNeuronFeaturePropertiesTime or inferenceDuringTrainAdjustSynapseStrength or predictionColumnsMustActivateConceptFeature or not inferenceStrengthLookupBypass):
 		raise RuntimeError(dendriticCorrectionInvalidConfiguration)
 	if(deviceDatabase.type != dendriticCorrectionCPU or deviceSparse.type != dendriticCorrectionCPU or deviceDense.type != dendriticCorrectionCPU or not storeDatabaseGlobalFeatureNeuronsInRam or arrayType != pt.float32 or arrayNumberOfPropertiesTrain != dendriticCorrectionOne or not arrayIndexPropertiesStrength or not tokeniserSubword or not useDedicatedConceptListsSubword or not useDedicatedFeatureListsSubword or not tokeniserSubwordColumnIdentificationByFirstNounToken or tokeniserSubwordColumnIdentificationByConsecutiveNounTokens or tokeniserSubwordColumnIdentificationByLemma or inferenceReportTokenAccuracyConstrainByColumn or trainConnectionStrengthLimitMax or trainConnectionStrengthLimitTanh or drawNetworkDuringTrain or drawNetworkDuringInference):
 		raise RuntimeError(dendriticCorrectionInvalidConfiguration)
@@ -2381,6 +2292,9 @@ if(trainVerifyConnectionNonexistentAcrossBranchesUpgrades):
 	if(executionMode == branchVerifyTrainingMode and (not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam or storeDatabaseGlobalFeatureNeuronsInRam)):
 		raise RuntimeError(branchVerifyInvalidConfiguration)
 
+if(inferenceBeamSearchObservedSources):
+	if(not inferenceBeamSearchLikelihood or not inferenceContextLikelihood or not inferenceColumnLikelihood or not tokeniserSubword or not useDedicatedConceptListsSubword or not useDedicatedFeatureListsSubword or inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures or multipleDendriticBranches or useTrainDuringInference or inferenceTrainFirstSequences):
+		raise ValueError(inferenceBeamSearchObservedSourceInvalidConfiguration)
 if(printConfiguration): 
 	if(trainDendriticBranchesPredictionErrorCorrection):
 		print(dendriticCorrectionConfigurationLabel, trainDendriticBranchesPredictionErrorCorrection)
@@ -2397,8 +2311,6 @@ if(printConfiguration):
 		print("inferenceFeatureSegmentWeight:", inferenceFeatureSegmentWeight)
 	if(inferenceInferMissingFeaturesSemanticAdaptiveSupplement):
 		print(inferenceSemanticSourceEvidenceConfigurationLabel, inferenceInferMissingFeaturesSemanticAdaptiveSupplement)
-	if(useSequenceContext):
-		print(sequenceContextConfigurationLabel, useSequenceContext)
 	if(inferenceContextLikelihood):
 		print(inferenceContextLikelihoodConfigurationLabel, inferenceContextLikelihood)
 		if(inferenceColumnLikelihood):

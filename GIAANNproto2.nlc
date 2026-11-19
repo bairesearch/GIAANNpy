@@ -808,3 +808,4 @@ AUTORESEARCH; - explore a new or existing branching (multipleDendriticBranches=T
 	- add option trainVerifyConnectionNonexistentAcrossBranchesOptimisation2 (enabled) - lossless indexed storage. A controlled 24-column benchmark measured 2.66% faster writes, 4.23% faster warm-cache reads, and 57% fewer bytes.
 - implement option trainVerifyConnectionNonexistentAcrossBranchesFractional (enabled) - max 50% of branches of a given segment index share the same incoming connection (rather than ensuring no repeated connections are allowed).
 - add option trainDendriticBranchesPredictionErrorCorrection - strengthen synapses supporting correct predictions and weaken competing branch synapses during trainDuringInference.
+- remove all options that look up training data to predict future tokens (useSequenceContext, contextRoutedBranchesExact).

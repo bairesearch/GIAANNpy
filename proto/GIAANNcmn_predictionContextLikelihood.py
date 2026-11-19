@@ -36,6 +36,9 @@ def initialiseContextLikelihoodSequence(databaseNetworkObject):
 		if(not databaseNetworkObject.inferenceMode or databaseNetworkObject.c <= inferenceContextLikelihoodZero or databaseNetworkObject.f <= inferenceContextLikelihoodZero):
 			raise RuntimeError(inferenceContextLikelihoodInvalidState)
 		databaseNetworkObject.contextLikelihoodHistory = []
+		if(inferenceBeamSearchObservedSources):
+			databaseNetworkObject.observedSourcePosition = inferenceBeamSearchZero
+			databaseNetworkObject.observedSourcePosterior = None
 		databaseNetworkObject.contextLikelihoodColumnOrigins = {}
 		databaseNetworkObject.contextLikelihoodPosition = -inferenceContextLikelihoodOne
 		databaseNetworkObject.contextLikelihoodShape = (databaseNetworkObject.c, databaseNetworkObject.f)

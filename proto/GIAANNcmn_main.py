@@ -57,8 +57,6 @@ pt.set_grad_enabled(False)
 from GIAANNcmn_globalDefs import *
 if(optimiseTrainSequenceBatch):
 	import GIAANNcmn_trainSequenceBatch
-if(useSequenceContext):
-	import GIAANNcmn_sequenceContext
 import GIAANNcmn_debug
 import GIAANNcmn_count
 import GIAANNcmn_databaseNetwork
@@ -233,9 +231,6 @@ def executeMode(inferenceMode):
 		if(printTimeDatabaseLoadSaveTimes):
 			countPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime = countPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamExecutionTime + (time.perf_counter() - countPrintTimeDatabaseLoadSaveTimesLoadAllObservedColumnsToRamStartTime)
 		
-	if(useSequenceContext):
-		if(not inferenceMode):
-			GIAANNcmn_sequenceContext.initialiseSequenceContextTraining(databaseNetworkObject)
 
 	for epochIndex in range(numberEpochs):
 		#print("\nepochIndex = ", epochIndex)
@@ -288,10 +283,6 @@ def executeMode(inferenceMode):
 		if(modalityName=="NLP" and auxiliaryNeurons and auxiliaryNeuronsAuto):
 			GIAANNnlp_main.trainAutoAuxiliaryNeuronsEnd(databaseNetworkObject)
 
-	if(useContextRoutedBranches):
-		if(useContextRoutedBranchesSupport and not inferenceMode):
-			import GIAANNcmn_contextRoutedBranchesSupport
-			GIAANNcmn_contextRoutedBranchesSupport.verifyTraining(databaseNetworkObject, sequenceCount)
 	if(not inferenceMode or inferenceTrainFirstSequences):
 		if(useSaveData and not debugDisableDatabaseFileWrite):
 			if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
@@ -311,9 +302,6 @@ def executeMode(inferenceMode):
 				GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("saveData(final)")
 			#only required if trainMaxSequences%saveGlobalFeatureNeuronsRate != 0
 
-	if(useSequenceContext):
-		if(not inferenceMode):
-			GIAANNcmn_sequenceContext.finaliseSequenceContextTraining(databaseNetworkObject, sequenceCount)
 	if(useContextRoutedBranches):
 		if(not inferenceMode):
 			GIAANNcmn_contextRoutedBranches.saveModel(databaseNetworkObject, sequenceCount)

@@ -21,8 +21,6 @@ import torch as pt
 import time
 
 from GIAANNcmn_globalDefs import *
-if(useSequenceContext):
-	import GIAANNcmn_predictionSequenceContext
 if(inferenceContextLikelihood):
 	import GIAANNcmn_predictionContextLikelihood
 if(inferenceReviewPatch15TokenTransitionPrior):
@@ -43,7 +41,11 @@ if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 def beamSearchPredictNextFeature(sequenceObservedColumns, databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsStrength, globalFeatureConnectionsActivation, globalFeatureNeuronsTime, tokensSequence, wordPredictionIndex, sequenceWordIndex, conceptMask, allowedColumns=None, constraintMode=None, conceptActivationState=None, connectedColumnsConstraint=None, connectedColumnsFeatures=None, somaActivationFromLastSegmentKeys=None, selectedColumnIndex=None, deactivatedNeuronState=None):
 	if(inferenceBeamSearchLikelihood):
 		import GIAANNcmn_predictionBeamSearchLikelihood
-		column, feature = GIAANNcmn_predictionBeamSearchLikelihood.search(databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, conceptActivationState, somaActivationFromLastSegmentKeys, selectedColumnIndex, deactivatedNeuronState, allowedColumns, constraintMode, sequenceWordIndex, connectedColumnsConstraint, connectedColumnsFeatures)
+		if(inferenceBeamSearchObservedSources):
+			import GIAANNcmn_predictionBeamSearchObservedSources
+			column, feature = GIAANNcmn_predictionBeamSearchObservedSources.predict(databaseNetworkObject, tokensSequence, sequenceWordIndex)
+		else:
+			column, feature = GIAANNcmn_predictionBeamSearchLikelihood.search(databaseNetworkObject, observedColumnsDict, globalFeatureNeuronsActivation, globalFeatureNeuronsTime, conceptActivationState, somaActivationFromLastSegmentKeys, selectedColumnIndex, deactivatedNeuronState, allowedColumns, constraintMode, sequenceWordIndex, connectedColumnsConstraint, connectedColumnsFeatures)
 		targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNcmn_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 		result = column, feature, targetPreviousColumnIndex, targetNextColumnIndex
 	else:
@@ -482,10 +484,7 @@ def selectBeamCandidates(stateFeatures, stateTime, strengthLookup, candidateLimi
 			if(inferenceContextLikelihood and columnIndices is not None):
 				columnIndices, featureIndices, activationValues = GIAANNcmn_predictionContextLikelihood.scoreContextLikelihoodCandidates(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
 			if(columnIndices is not None and (predictionEnsureConnectedToPreviousPrediction or connectedColumnsTensor is None or connectedColumnsTensor.numel() > arrayIndexSegmentFirst)):
-				if(useSequenceContext):
-					columnIndices, featureIndices, activationValues = GIAANNcmn_predictionSequenceContext.scoreSequenceContextCandidates(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
-				if(columnIndices is not None):
-					columnIndices, featureIndices, activationValues = GIAANNcmn_predictionTokenAggregation.selectLIFTokenAggregationCandidate(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
+				columnIndices, featureIndices, activationValues = GIAANNcmn_predictionTokenAggregation.selectLIFTokenAggregationCandidate(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState)
 		if(columnIndices is not None):
 			candidates = selectBeamCandidatesInstanceNodes(columnIndices, featureIndices, activationValues, strengthLookup, candidateLimit, databaseNetworkObject.f, databaseNetworkObject, constraintState, conceptActivationState)
 	return candidates

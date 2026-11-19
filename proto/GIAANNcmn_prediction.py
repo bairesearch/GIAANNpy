@@ -24,8 +24,6 @@ import math
 from GIAANNcmn_globalDefs import *
 if(trainDendriticBranchesPredictionErrorCorrection):
 	import GIAANNcmn_dendriticPredictionErrorCorrection
-if(useSequenceContext):
-	import GIAANNcmn_predictionSequenceContext
 if(inferenceContextLikelihood):
 	import GIAANNcmn_predictionContextLikelihood
 if(inferenceColumnLikelihood):
@@ -423,8 +421,6 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	return result
 
 def processConceptWordsInferenceSequence(sequenceObservedColumns, sequenceIndex, sequence, sequenceSeed, sequencePredict, numSeedTokens, sequenceRaw):
-	if(useSequenceContext):
-		GIAANNcmn_predictionSequenceContext.initialiseSequenceContextInference(sequenceObservedColumns.databaseNetworkObject)
 	if(inferenceContextLikelihood):
 		GIAANNcmn_predictionContextLikelihood.initialiseContextLikelihoodSequence(sequenceObservedColumns.databaseNetworkObject)
 	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
@@ -591,8 +587,6 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 		raise RuntimeError("processColumnInferencePrediction error: expected single concept/feature prediction pair")
 	if(inferenceColumnLikelihood):
 		GIAANNcmn_predictionColumnLikelihood.prepareColumnLikelihoodStep(databaseNetworkObject, sequenceWordIndex, int(conceptColumnIndex))
-	if(useSequenceContext):
-		GIAANNcmn_predictionSequenceContext.prepareSequenceContextStep(databaseNetworkObject, sequenceWordIndex, int(conceptColumnIndex), int(conceptColumnFeatureIndex))
 	if(inferenceReviewPatch15TokenTransitionPrior):
 		databaseNetworkObject.inferenceLIFTokenPriorSource = (int(conceptColumnIndex), int(conceptColumnFeatureIndex))
 	if(globalFeatureNeuronsActivation is None):

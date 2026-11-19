@@ -1,4 +1,21 @@
-"""Likelihood beam search with isolated speculative state and bounded candidate admission.
+"""GIAANNcmn_predictionContextLikelihood.py
+
+# Author:
+Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch.com.au)
+
+# License:
+MIT License
+
+# Installation:
+see GIAANNcmn_main.py
+
+# Usage:
+see GIAANNcmn_main.py
+
+# Description: 
+GIA ANN common prediction Context Likelihood
+
+Likelihood beam search with isolated speculative state and bounded candidate admission.
 
 For depth greater than one, score the root log probability plus the configured
 weight times the mean continuation log probability. Normalisation uses all
@@ -6,6 +23,7 @@ admitted output tokens before beam truncation. Each token retains the native
 strongest-neuron representative for its speculative state transition.
 An optional root-score margin restricts which first-token alternatives may win;
 it is a prediction policy, separate from exact probability-bound pruning.
+
 """
 
 from dataclasses import dataclass
@@ -222,7 +240,7 @@ def selectTerminalNeuronState(database, features, neurons):
 
 def validateConfiguration():
 	if(inferenceBeamSearchLikelihood):
-		if(not inferenceBeamSearch or inferenceBeamScoreStrategy != inferenceBeamSearchLikelihoodStrategy or not inferenceContextLikelihood or not inferenceColumnLikelihood or not inferenceReviewPatch16TokenAggregation or not predictionEnsureConnectedToPreviousPredictionStrict or not inferenceLeakyIntegrateAndFire or multipleDendriticBranches or useTrainDuringInference or inferenceTrainFirstSequences or useSequenceContext or auxiliaryNeurons or inferenceUseNeuronFeaturePropertiesTime or useGPUdense or useGPUsparse):
+		if(not inferenceBeamSearch or inferenceBeamScoreStrategy != inferenceBeamSearchLikelihoodStrategy or not inferenceContextLikelihood or not inferenceColumnLikelihood or not inferenceReviewPatch16TokenAggregation or not predictionEnsureConnectedToPreviousPredictionStrict or not inferenceLeakyIntegrateAndFire or multipleDendriticBranches or useTrainDuringInference or inferenceTrainFirstSequences or auxiliaryNeurons or inferenceUseNeuronFeaturePropertiesTime or useGPUdense or useGPUsparse):
 			raise RuntimeError(inferenceBeamSearchInvalidConfiguration)
 		for value, maximum in ((inferenceBeamWidth, inferenceBeamSearchMaximumWidth), (inferenceBeamDepth, inferenceBeamSearchMaximumDepth)):
 			if(type(value) is not int or not inferenceBeamSearchOne <= value <= maximum):

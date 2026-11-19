@@ -163,12 +163,6 @@ This section describes the current GIAANN proto v2 implementation in \texttt{pro
 	\item \texttt{GIAANNnlp\_auxiliaryNeuronsAuto.py}, \texttt{GIAANNnlp\_auxiliaryNeuronsSimilarWordsAuto.py}, and \texttt{GIAANNnlp\_auxiliaryNeuronsSimilarSubwordAuto.py} build automatic similarity data and connection weights, including reverse-connection evidence and dynamic inference mappings. These modules operate when their auxiliary-neuron options are enabled.
 \end{itemize}
 
-\subsection{Optional sequence-context memory}
-\begin{itemize}
-	\item \texttt{GIAANNcmn\_sequenceContext.py} records training token sequences and boundaries and builds a persistent context index with vocabulary and file-integrity checks under \texttt{useSequenceContext}.
-	\item \texttt{GIAANNcmn\_predictionSequenceContext.py} maintains source-token history and reranks eligible predictions using smoothed matches over the configured context lengths. It requires a matching recorded training corpus and leaves candidate eligibility and live LIF activity intact.
-\end{itemize}
-
 \subsection{GIAANNcmn\_inferenceDuringTrain.py}
 \begin{itemize}
 	\item Tracks source-specific connections activated during the inference phase of inference-guided training.

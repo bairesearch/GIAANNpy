@@ -48,13 +48,6 @@ def trainConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens, 
 		if(printSequenceConceptAssignmentByLine):
 			print("")	
 	trainActive = False
-	if(useContextRoutedBranches):
-		if(useContextRoutedBranchesSupport and result is not None):
-			import GIAANNcmn_contextRoutedBranchesSupport
-			supportConcepts,supportStarts,supportEnds = result
-			GIAANNcmn_contextRoutedBranchesSupport.recordTraining(sequenceObservedColumns, tokens, supportStarts, supportEnds, sequenceIndex)
-			if(trainContextRoutedBranchesSupportCollect):
-				result = None
 	if(result is not None):
 		conceptIndices, startIndices, endIndices = result
 		if(useContextRoutedBranches):

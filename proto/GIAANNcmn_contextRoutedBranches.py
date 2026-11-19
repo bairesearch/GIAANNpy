@@ -23,7 +23,6 @@ Experimental ordered-prefix routing of native dendritic branch connections.
 import hashlib
 import json
 import random
-import pickle
 from pathlib import Path
 import torch as pt
 from GIAANNcmn_globalDefs import *
@@ -35,36 +34,17 @@ def initialiseModel(database, inferenceMode):
 		if(inferenceMode):
 			if(not path.is_file() or json.loads(path.read_text(encoding=contextRoutedBranchesEncoding)) != modelMetadata(database)):
 				raise RuntimeError(contextRoutedBranchesInvalidModel)
-		elif(path.exists() or (Path(databaseFolder)/contextRoutedBranchesPrototypeFile).exists() or Path(conceptColumnsDictFile).exists() or any(Path(observedColumnsDir).iterdir())):
+		elif(path.exists() or Path(conceptColumnsDictFile).exists() or any(Path(observedColumnsDir).iterdir())):
 			raise RuntimeError(contextRoutedBranchesInvalidModel)
-		if(contextRoutedBranchesExact):
-			if(inferenceMode):
-				with (Path(databaseFolder)/contextRoutedBranchesPrototypeFile).open(contextRoutedBranchesReadBinary) as source:
-					database.contextRoutedBranchesPrototypes = pickle.load(source)
-			else:
-				database.contextRoutedBranchesPrototypes = {}
-		if(useContextRoutedBranchesSupport):
-			import GIAANNcmn_contextRoutedBranchesSupport
-			GIAANNcmn_contextRoutedBranchesSupport.initialise(database, inferenceMode)
 	return
 
 
 def saveModel(database, sequenceCount):
 	if(useContextRoutedBranches):
-		if(useContextRoutedBranchesSupport and trainContextRoutedBranchesSupportCollect):
-			import GIAANNcmn_contextRoutedBranchesSupport
-			GIAANNcmn_contextRoutedBranchesSupport.saveCollection(database, sequenceCount)
-		else:
-			path = Path(databaseFolder)/contextRoutedBranchesModelFile
-			if(type(sequenceCount) is not int or sequenceCount != trainMaxSequences or debugDisableDatabaseFileWrite or path.exists()):
-				raise RuntimeError(contextRoutedBranchesInvalidModel)
-			if(useContextRoutedBranchesSupport):
-				import GIAANNcmn_contextRoutedBranchesSupport
-				GIAANNcmn_contextRoutedBranchesSupport.saveTraining(database, sequenceCount)
-			if(contextRoutedBranchesExact):
-				with (Path(databaseFolder)/contextRoutedBranchesPrototypeFile).open(contextRoutedBranchesCreateBinary) as output:
-					pickle.dump(database.contextRoutedBranchesPrototypes, output)
-			path.write_text(json.dumps(modelMetadata(database), sort_keys=True), encoding=contextRoutedBranchesEncoding)
+		path = Path(databaseFolder)/contextRoutedBranchesModelFile
+		if(type(sequenceCount) is not int or sequenceCount != trainMaxSequences or debugDisableDatabaseFileWrite or path.exists()):
+			raise RuntimeError(contextRoutedBranchesInvalidModel)
+		path.write_text(json.dumps(modelMetadata(database), sort_keys=True), encoding=contextRoutedBranchesEncoding)
 	return
 
 
@@ -72,28 +52,16 @@ def prepareTraining(sequence, tokens, starts, ends):
 	if(useContextRoutedBranches):
 		if(len(tokens) != sequence.fs or starts.shape != ends.shape or starts.dim() != contextRoutedBranchesOne or starts.numel() != sequence.cs):
 			raise RuntimeError(contextRoutedBranchesInvalidInput)
-		identities = tokenIdentities(tokens)
-		concepts = sequence.conceptIndicesInSequenceObservedTensor.tolist()
-		features = sequence.featureIndicesInObservedTensor.tolist()
-		if(len(concepts) != sequence.cs or len(features) != sequence.fs):
+		if(len(sequence.conceptIndicesInSequenceObservedTensor) != sequence.cs or len(sequence.featureIndicesInObservedTensor) != sequence.fs):
 			raise RuntimeError(contextRoutedBranchesInvalidInput)
+		identities = tokenIdentities(tokens)
 		branches = pt.full((len(tokens),), -contextRoutedBranchesOne, dtype=pt.long)
-		for concept,start,end in zip(concepts,starts.tolist(),ends.tolist()):
+		for start,end in zip(starts.tolist(),ends.tolist()):
 			if(not contextRoutedBranchesZero <= start < end <= len(tokens)):
 				raise RuntimeError(contextRoutedBranchesInvalidInput)
 			for position in range(start,end):
 				prefix = tuple(identities[max(contextRoutedBranchesZero,position-contextRoutedBranchesLength):position])
-				if(contextRoutedBranchesExact):
-					key = concept*sequence.databaseNetworkObject.f+features[position]
-					if(useContextRoutedBranchesSupport):
-						import GIAANNcmn_contextRoutedBranchesSupport
-						branch = GIAANNcmn_contextRoutedBranchesSupport.trainingBranch(sequence.databaseNetworkObject, key, prefix)
-					else:
-						patterns = sequence.databaseNetworkObject.contextRoutedBranchesPrototypes.setdefault(key, {})
-						if(prefix not in patterns and len(patterns)<contextRoutedBranchesNumber):
-							patterns[prefix] = len(patterns)+contextRoutedBranchesOne
-						branch = patterns.get(prefix, contextRoutedBranchesZero)
-				elif(contextRoutedBranchesRandom):
+				if(contextRoutedBranchesRandom):
 					branch = random.randrange(contextRoutedBranchesNumber) + int(contextRoutedBranchesShared)
 				else:
 					branch = route(prefix)
@@ -135,8 +103,7 @@ def filterTrainingConnections(connections):
 
 def prepareInference(database, prefix):
 	if(useContextRoutedBranches):
-		database.contextRoutedBranchesPrefix = tuple(tokenIdentities(prefix[-contextRoutedBranchesLength:]))
-		database.contextRoutedBranchesInference = route(database.contextRoutedBranchesPrefix)
+		database.contextRoutedBranchesInference = route(tokenIdentities(prefix[-contextRoutedBranchesLength:]))
 		if(inferenceContextRoutedBranchesCounts):
 			import GIAANNcmn_contextRoutedBranchesCounts
 			GIAANNcmn_contextRoutedBranchesCounts.prepareInference(database)
@@ -153,11 +120,7 @@ def reduceActivations(database, signals):
 			branches = indices[contextRoutedBranchesZero]
 			selected = selectBranches(database, indices)
 			if(contextRoutedBranchesShared):
-				if(useContextRoutedBranchesSupport and inferenceContextRoutedBranchesSupportConfidence):
-					import GIAANNcmn_contextRoutedBranchesSupport
-					weights = (branches == contextRoutedBranchesZero).to(values.dtype) + GIAANNcmn_contextRoutedBranchesSupport.confidence(database, indices, selected).to(values.dtype)*contextRoutedBranchesGain
-				else:
-					weights = (branches == contextRoutedBranchesZero).to(values.dtype) + selected.to(values.dtype)*contextRoutedBranchesGain
+				weights = (branches == contextRoutedBranchesZero).to(values.dtype) + selected.to(values.dtype)*contextRoutedBranchesGain
 			else:
 				weights = selected.to(values.dtype)
 			mask = weights > contextRoutedBranchesZero
@@ -173,9 +136,6 @@ def selectBranches(database, indices):
 	if(useContextRoutedBranches):
 		branches = indices[contextRoutedBranchesZero]
 		result = branches == database.contextRoutedBranchesInference
-		if(contextRoutedBranchesExact):
-			keys = (indices[contextRoutedBranchesOne]*database.f+indices[-contextRoutedBranchesOne]).tolist()
-			result = pt.tensor([branch>contextRoutedBranchesZero and database.contextRoutedBranchesPrototypes.get(key, {}).get(database.contextRoutedBranchesPrefix) == branch for key,branch in zip(keys,branches.tolist())], dtype=pt.bool, device=indices.device)
 	return result
 
 
@@ -186,16 +146,6 @@ def modelMetadata(database):
 		result = {contextRoutedBranchesSchemaKey:contextRoutedBranchesSchema, contextRoutedBranchesLengthKey:contextRoutedBranchesLength, contextRoutedBranchesCountKey:multipleDendriticBranchesNumber, contextRoutedBranchesSharedKey:contextRoutedBranchesShared, contextRoutedBranchesRandomKey:contextRoutedBranchesRandom, contextRoutedBranchesVocabularyKey:vocabulary, contextRoutedBranchesSequencesKey:trainMaxSequences}
 		if(contextRoutedBranchesShared):
 			result[contextRoutedBranchesSelfFilterKey] = True
-		if(contextRoutedBranchesExact):
-			digest = hashlib.sha256()
-			with (Path(databaseFolder)/contextRoutedBranchesPrototypeFile).open(contextRoutedBranchesReadBinary) as source:
-				while(block := source.read(contextRoutedBranchesHashBlockBytes)):
-					digest.update(block)
-			result[contextRoutedBranchesExactKey] = True
-			result[contextRoutedBranchesPrototypeHashKey] = digest.hexdigest()
-		if(useContextRoutedBranchesSupport):
-			import GIAANNcmn_contextRoutedBranchesSupport
-			result.update(GIAANNcmn_contextRoutedBranchesSupport.modelMetadata())
 	return result
 
 
