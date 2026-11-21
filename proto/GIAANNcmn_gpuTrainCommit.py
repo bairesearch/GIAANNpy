@@ -1,7 +1,7 @@
 """Ordered GPU commits for CPU-resident GIAANN sparse training batches."""
 from GIAANNcmn_globalDefs import *
 
-if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 	import os
 	import sysconfig
 	from importlib import util
@@ -16,7 +16,7 @@ if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
 
 def mergeConnections(state):
 	result = None
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		import GIAANNcmn_trainSequenceBatch as batches
 		import GIAANNcmn_trainDeferredSourcePreparation as preparation
 		eligible = not debugPrintTrainSectionTimesSourceFeatureConnections and not trainVerifyConnectionNonexistentAcrossBranchesOptimisation1 and not optimiseTrainConnectionOverlay and sum(tensor._nnz() for keys, tensor in state.connections) >= gpuCustomSparseTensorDriverMinEntries
@@ -37,11 +37,11 @@ def mergeConnections(state):
 
 def merge(state, deferred):
 	result = None
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		from GIAANNcmn_databaseNetworkObservedColumn import PackedDatabaseResidentFeatureConnections
 		dtype = _recordType if optimisationStoreDatabaseResidentCoordinatesAsInt32 else np.dtype(np.int32)
 		with pt.cuda.device(driver.cudaDeviceIndex()):
-			keys, updates = getExtension().merge((useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver), state.columns, deferred, state.connections, state.sourceShape, trainSequenceBatchBucketDimension, optimisationStoreDatabaseResidentCoordinatesAsInt32, False, PackedDatabaseResidentFeatureConnections, dtype, gpuCustomSparseTensorDriverCommitTileEntries, trainSequenceBatchInvalidInput, historyRatio(), mergeSparseHistory if useHybridGPUCPUcustomSparseTensorDriver else None)
+			keys, updates = getExtension().merge((useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver), state.columns, deferred, state.connections, state.sourceShape, trainSequenceBatchBucketDimension, optimisationStoreDatabaseResidentCoordinatesAsInt32, False, PackedDatabaseResidentFeatureConnections, dtype, gpuCustomSparseTensorDriverCommitTileEntries, trainSequenceBatchInvalidInput, historyRatio(), mergeSparseHistory if useGPUCPUhybridCustomSparseTensorDriver else None)
 		if(updates is not None):
 			result = keys, updates
 	return result
@@ -49,11 +49,11 @@ def merge(state, deferred):
 
 def mergeNeurons(state, shape):
 	result = None
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		import GIAANNcmn_trainSequenceBatch as batches
 		if(sum(tensor._nnz() for keys, tensor in state.neurons) >= gpuCustomSparseTensorDriverMinEntries):
 			with pt.cuda.device(driver.cudaDeviceIndex()):
-				keys, updates = getExtension().merge((useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver), state.columns, {}, state.neurons, shape, trainSequenceBatchBucketDimension, False, True, None, np.dtype(np.int32), gpuCustomSparseTensorDriverCommitTileEntries, trainSequenceBatchInvalidInput, historyRatio(), mergeSparseHistory if useHybridGPUCPUcustomSparseTensorDriver else None)
+				keys, updates = getExtension().merge((useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver), state.columns, {}, state.neurons, shape, trainSequenceBatchBucketDimension, False, True, None, np.dtype(np.int32), gpuCustomSparseTensorDriverCommitTileEntries, trainSequenceBatchInvalidInput, historyRatio(), mergeSparseHistory if useGPUCPUhybridCustomSparseTensorDriver else None)
 			if(updates is not None):
 				result = keys, updates.outputs
 		if(result is None):
@@ -63,14 +63,14 @@ def mergeNeurons(state, shape):
 
 def historyRatio():
 	result = 0
-	if(useHybridGPUCPUcustomSparseTensorDriver and not optimisationStoreDatabaseResidentCoordinatesAsInt32):
+	if(useGPUCPUhybridCustomSparseTensorDriver and not optimisationStoreDatabaseResidentCoordinatesAsInt32):
 		result = gpuCustomSparseTensorDriverHistoryRatio
 	return result
 
 
 def mergeSparseHistory(sources, updates, mappings, target):
 	result = None
-	if(useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUCPUhybridCustomSparseTensorDriver):
 		import GIAANNcmn_trainSequenceBatch as batches
 		result = batches.getExtension().mergeSequenceBatch(optimiseTrainSequenceBatch, sources, updates, mappings, list(target), trainSequenceBatchBucketDimension, trainSequenceBatchGrainSize, trainSequenceBatchInvalidInput)
 	return result
@@ -78,13 +78,13 @@ def mergeSparseHistory(sources, updates, mappings, target):
 
 def referencePackets(packets):
 	result = None
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		result = [(keys.tolist(), tensor) for keys, tensor in packets]
 	return result
 
 
 def prepareOutstanding(state, updates):
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		if(not state.committing or state.failed or not storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam or not state.database.observedColumnsRAMLoaded or state.database.inferenceMode or pt.device(deviceSparse).type != trainSequenceBatchDeviceType or pt.device(deviceDatabase).type != trainSequenceBatchDeviceType):
 			raise RuntimeError(trainSequenceBatchInvalidState)
 		updates.prepareOutstanding(state.deferredSourcePreparation, state.sourceShape, deviceSparse, trainSequenceBatchInvalidInput)
@@ -94,7 +94,7 @@ def prepareOutstanding(state, updates):
 
 def isPending(updates):
 	result = False
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		result = _extension is not None and isinstance(updates, _extension.Pending)
 	return result
 
@@ -102,7 +102,7 @@ def isPending(updates):
 def getExtension():
 	global _extension
 	result = None
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		if(_extension is None):
 			folder = os.path.dirname(os.path.abspath(__file__))
 			binary = os.path.join(folder, gpuCustomSparseTensorDriverCommitName+sysconfig.get_config_var("EXT_SUFFIX"))

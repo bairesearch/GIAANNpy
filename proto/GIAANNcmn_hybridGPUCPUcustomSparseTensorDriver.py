@@ -2,13 +2,13 @@
 
 from GIAANNcmn_globalDefs import *
 
-if(useHybridGPUCPUcustomSparseTensorDriver):
+if(useGPUCPUhybridCustomSparseTensorDriver):
 	import ctypes as C
 	from GIAANNcmn_gpuCustomSparseTensorDriver import canNormalise, coalesceTensor, gatherCanonical, nativeLibrary, normalise, propagateBlockSparse, sliceCanonical, supportsTensor, unitEntryStride
 
 
 def addTensors(left, right, concatenateUpdates=False):
-	if(useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUCPUhybridCustomSparseTensorDriver):
 		left = coalesceTensor(left)
 		right = coalesceTensor(right)
 		result = None
@@ -26,7 +26,7 @@ def addTensors(left, right, concatenateUpdates=False):
 
 
 def ordinaryValues(left, right):
-	if(useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUCPUhybridCustomSparseTensorDriver):
 		threads = min(pt.get_num_threads(), gpuCustomSparseTensorDriverPackThreads)
 		result = True
 		for tensor in (left, right):
@@ -45,7 +45,7 @@ def ordinaryValues(left, right):
 
 
 def mergeDelta(left, right):
-	if(useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUCPUhybridCustomSparseTensorDriver):
 		baseFirst = left._nnz() >= right._nnz()
 		base, update = (left, right) if baseFirst else (right, left)
 		rank = base.dim()
@@ -66,7 +66,7 @@ def mergeDelta(left, right):
 
 def mergeOrdered(left, right):
 	"""Intersect canonical key streams and write disjoint ranges of the exact-size union."""
-	if(useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUCPUhybridCustomSparseTensorDriver):
 		rank = left.dim()
 		sizes = (C.c_uint64*rank)(*left.shape)
 		threads = min(pt.get_num_threads(), gpuCustomSparseTensorDriverPackThreads)
@@ -91,7 +91,7 @@ def mergeOrdered(left, right):
 
 def selectLeading(tensor, index):
 	"""A leading coordinate occupies one contiguous range of a canonical COO tensor."""
-	if(useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUCPUhybridCustomSparseTensorDriver):
 		if(isinstance(tensor, pt.Tensor) and supportsTensor(tensor) and tensor.is_coalesced() and tensor.dim() > 1 and type(index) is int and 0 <= index < tensor.size(0)):
 			result = sliceCanonical(tensor, 0, index, tensor.device)
 		else:
@@ -100,13 +100,13 @@ def selectLeading(tensor, index):
 
 
 def supportsActivation(tensor):
-	if(useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUCPUhybridCustomSparseTensorDriver):
 		result = supportsTensor(tensor) and tensor.is_coalesced() and tensor.dim() == inferenceLeakyIntegrateAndFireNeuronTensorRank and tensor.size(0)*tensor.size(1) <= gpuCustomSparseTensorDriverMaxLookupFibers and gpuCustomSparseTensorDriverMergeTile <= tensor._nnz() <= gpuCustomSparseTensorDriverMaxEntries
 	return result
 
 
 def findNeuron(tensor, column, feature):
-	if(useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUCPUhybridCustomSparseTensorDriver):
 		indices = unitEntryStride(tensor.indices())
 		positions = pt.empty(tensor.size(0)*tensor.size(1), dtype=pt.int64, device=tensor.device)
 		count = nativeLibrary().coo_find_neuron(indices.data_ptr(), indices.stride(0), tensor._nnz(), tensor.size(0), tensor.size(1), column, feature, positions.data_ptr())
@@ -115,7 +115,7 @@ def findNeuron(tensor, column, feature):
 
 
 def validateCandidateState(tensor):
-	if(useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUCPUhybridCustomSparseTensorDriver):
 		indices = unitEntryStride(tensor.indices())
 		values = tensor.values().contiguous()
 		shape = (C.c_int64*tensor.dim())(*tensor.shape)
@@ -125,7 +125,7 @@ def validateCandidateState(tensor):
 
 
 def candidatePositions(tensor, keys, segments):
-	if(useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUCPUhybridCustomSparseTensorDriver):
 		indices = unitEntryStride(tensor.indices())
 		shape = (C.c_int64*tensor.dim())(*tensor.shape)
 		keys = keys.contiguous()
@@ -138,7 +138,7 @@ def candidatePositions(tensor, keys, segments):
 
 
 def decaySoma(tensor, soma, rate, multiply):
-	if(useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUCPUhybridCustomSparseTensorDriver):
 		indices = unitEntryStride(tensor.indices())
 		inputValues = tensor.values().contiguous()
 		scaled = pt.empty_like(inputValues)
@@ -159,6 +159,6 @@ def decaySoma(tensor, soma, rate, multiply):
 
 
 def canMerge(left, right):
-	if(useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUCPUhybridCustomSparseTensorDriver):
 		result = supportsTensor(left) and supportsTensor(right) and left.shape == right.shape and min(left._nnz(), right._nnz()) > 0 and gpuCustomSparseTensorDriverMinEntries <= left._nnz()+right._nnz() <= gpuCustomSparseTensorDriverMaxEntries
 	return result

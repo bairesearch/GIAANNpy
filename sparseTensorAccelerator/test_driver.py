@@ -10,13 +10,13 @@ import torch as pt
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"proto"))
 import GIAANNcmn_globalDefs as defs
 
-if(defs.useGPUcustomSparseTensorDriver or defs.useHybridGPUCPUcustomSparseTensorDriver):
+if(defs.useGPUcustomSparseTensorDriver or defs.useGPUCPUhybridCustomSparseTensorDriver):
 	import GIAANNcmn_gpuCustomSparseTensorDriver as cudaDriver
-	if(defs.useHybridGPUCPUcustomSparseTensorDriver):
+	if(defs.useGPUCPUhybridCustomSparseTensorDriver):
 		import GIAANNcmn_hybridGPUCPUcustomSparseTensorDriver as driver
 	else:
 		driver = cudaDriver
-	activeFlag = "useHybridGPUCPUcustomSparseTensorDriver" if defs.useHybridGPUCPUcustomSparseTensorDriver else "useGPUcustomSparseTensorDriver"
+	activeFlag = "useGPUCPUhybridCustomSparseTensorDriver" if defs.useGPUCPUhybridCustomSparseTensorDriver else "useGPUcustomSparseTensorDriver"
 	import GIAANNcmn_sequenceObservedColumns as columns
 	import GIAANNcmn_sparseTensors as sparse
 
@@ -29,7 +29,7 @@ def smallDispatch():
 		yield
 
 
-@unittest.skipUnless(defs.useGPUcustomSparseTensorDriver or defs.useHybridGPUCPUcustomSparseTensorDriver, "Enable one custom driver to run hardware tests")
+@unittest.skipUnless(defs.useGPUcustomSparseTensorDriver or defs.useGPUCPUhybridCustomSparseTensorDriver, "Enable one custom driver to run hardware tests")
 class GPUCustomSparseTensorDriverTests(unittest.TestCase):
 	def assertCOOEqual(self, actual, expected):
 		self.assertEqual((actual.shape, actual.dtype, actual.device, actual.is_coalesced()), (expected.shape, expected.dtype, expected.device, expected.is_coalesced()))
@@ -234,7 +234,7 @@ class GPUCustomSparseTensorDriverTests(unittest.TestCase):
 			with self.assertRaises(ValueError):
 				driver.addTensors(left, bad)
 
-	@unittest.skipUnless(defs.useHybridGPUCPUcustomSparseTensorDriver, "Hybrid host policy")
+	@unittest.skipUnless(defs.useGPUCPUhybridCustomSparseTensorDriver, "Hybrid host policy")
 	def testIndexedStateAndDecay(self):
 		generator = pt.Generator().manual_seed(651)
 		shape = (3, 9, 11, 97)
@@ -329,7 +329,7 @@ class GPUCustomSparseTensorDriverTests(unittest.TestCase):
 				activation.normaliseReviewSourceConnectionInputs(x)
 
 	@unittest.skipUnless(getattr(defs, "optimiseTrainFusedSequenceUpdates", False), "requires GIAANN batched training mode")
-	@unittest.skipUnless(defs.useHybridGPUCPUcustomSparseTensorDriver, "Hybrid host policy")
+	@unittest.skipUnless(defs.useGPUCPUhybridCustomSparseTensorDriver, "Hybrid host policy")
 	def testBatchedTrainingPacketDispatch(self):
 		from types import SimpleNamespace
 		import GIAANNcmn_trainFusedSequence as fused
@@ -342,7 +342,7 @@ class GPUCustomSparseTensorDriverTests(unittest.TestCase):
 						features %= 37
 					sequence = SimpleNamespace(fs=length, cs=1, conceptIndicesInSequenceObservedTensor=pt.tensor([12]), databaseNetworkObject=db, getObservedColumnFeatureIndices=lambda: (features, pt.arange(length)))
 					inputs = (sequence, pt.tensor([0]), pt.tensor([0]), pt.tensor([length]))
-					with patch.object(fused, "useHybridGPUCPUcustomSparseTensorDriver", False):
+					with patch.object(fused, "useGPUCPUhybridCustomSparseTensorDriver", False):
 						expected = fused.prepare(*inputs)
 					actual = fused.prepare(*inputs)
 					for result, reference in zip(actual, expected):
@@ -368,6 +368,48 @@ class GPUCustomSparseTensorDriverTests(unittest.TestCase):
 					result = driver.propagateBlockSparse(weight, x, bias, 3)
 					self.assertEqual(result.device, x.device)
 					pt.testing.assert_close(result.float(), reference, rtol=0.005 if dtype == pt.float16 else 1e-5, atol=0.03 if dtype == pt.float16 else 1e-5)
+
+
+@unittest.skipUnless(defs.useGPUstockSparseTensorDriver and defs.optimiseTrainSequenceBatch, "Enable the stock CUDA driver in training mode")
+class StockCUDATrainingTests(unittest.TestCase):
+	def testPackedMergeAcrossTilesAndEmptySources(self):
+		from types import SimpleNamespace
+		import GIAANNcmn_stockSparseTensorDriver as stock
+		import GIAANNcmn_databasePacked as storage
+		from GIAANNcmn_databaseNetworkObservedColumn import PackedDatabaseResidentFeatureConnections as Packed
+		shape = (1, 1, 3, 2, 7)
+		history = pt.sparse_coo_tensor([[0], [0], [1], [0], [2]], [4.0], (1, 1, 3, 1, 4)).coalesce()
+		empty = pt.sparse_coo_tensor(size=shape).coalesce()
+		column = SimpleNamespace(featureConnectionsBySourceFeature={0: Packed(history), 1: Packed(empty), 2: Packed(empty)}, loadedSourceFeatureIndices={0, 1, 2})
+		keys = pt.tensor([0, 1, 2])
+		coords = pt.tensor([[0, 0, 0], [0, 0, 0], [1, 1, 2], [0, 0, 2], [0, 0, 1], [2, 2, 6]])
+		raw = pt.sparse_coo_tensor(coords, [-2.0, -2.0, 3.0], (1, 1, 3, 3, 2, 7))
+		packet = stock.coalesceTensor(raw)
+		self.assertTrue(packet.is_cpu and packet.is_coalesced())
+		names, pending = stock.getExtension().merge({0: column}, {}, [(keys, packet)], shape, 3, False, Packed, storage.getEntryDtype(), 1, defs.trainSequenceBatchInvalidInput, stock.reduceTile)
+		self.assertEqual((names, pending.inputEntries, pending.outputEntries, pending.tiles), ([0, 1, 2], 3, 2, 2))
+		self.assertEqual(column.featureConnectionsBySourceFeature[0].entries["values"].tolist(), [4.0])
+		pending.publish()
+		for feature, coordinates, values in [(0, [[0, 0, 1, 0, 2]], [0.0]), (1, [], []), (2, [[0, 0, 2, 1, 6]], [3.0])]:
+			self.assertEqual(column.featureConnectionsBySourceFeature[feature].shape, shape)
+			records = column.featureConnectionsBySourceFeature[feature].entries
+			self.assertEqual(records["indices"].tolist(), coordinates)
+			self.assertEqual(records["values"].tolist(), values)
+
+
+@unittest.skipUnless(defs.useGPUstockSparseTensorDriver and defs.executionMode == "inference" and defs.inferenceContextLikelihood, "Enable stock CUDA context-likelihood inference")
+class StockCUDAInferenceTests(unittest.TestCase):
+	def testDuplicateFeatureFrequenciesStayOnCUDA(self):
+		from types import SimpleNamespace
+		import GIAANNcmn_predictionContextLikelihood as scorer
+		db = SimpleNamespace(c=1, f=5, arrayIndexPropertiesStrengthIndex=0)
+		neurons = pt.sparse_coo_tensor([[0, 0, 0], [0, 0, 0], [0, 1, 1], [2, 2, 4]], [3.0, 7.0, 5.0], (1, 1, 2, 5), device="cuda")
+		with patch.object(scorer.GIAANNcmn_databaseNetworkFiles, "loadObservedColumnFeatureNeuronsTensor", return_value=neurons) as loader:
+			keys, frequencies = scorer.loadContextLikelihoodColumnFrequencies(db, 0)
+		loader.assert_called_once_with(db, 0, targetDevice="cuda")
+		self.assertEqual((keys.device, frequencies.device, frequencies.dtype), (neurons.device, neurons.device, pt.float64))
+		self.assertEqual(keys.tolist(), [2, 4])
+		self.assertEqual(frequencies.tolist(), [7.0, 5.0])
 
 
 if(__name__ == "__main__"):

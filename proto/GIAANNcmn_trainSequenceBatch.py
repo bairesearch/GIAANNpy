@@ -30,8 +30,11 @@ if(optimisationStoreDatabaseResidentCoordinatesAsInt32):
 	if(optimiseTrainSequenceBatch):
 		import GIAANNcmn_trainPackedSequenceBatch
 
-if(optimiseTrainSequenceBatch and (useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver)):
+if(optimiseTrainSequenceBatch and useGPUstockSparseTensorDriver):
+	import GIAANNcmn_stockSparseTensorDriver as sparseTrainCommit
+elif(optimiseTrainSequenceBatch and (useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver)):
 	import GIAANNcmn_gpuTrainCommit
+	sparseTrainCommit = GIAANNcmn_gpuTrainCommit
 
 if(optimiseTrainSequenceBatch):
 	import os
@@ -68,7 +71,7 @@ def queueSequence(sequence, observedColumns, inference, mode):
 			if(column.databaseNetworkObject is not database or not column.isDatabaseResidentConnectionStorage() or concept < trainSequenceBatchZero or concept >= database.c or (concept in state.columns and state.columns[concept] is not column)):
 				raise RuntimeError(trainSequenceBatchInvalidState)
 		state.columns.update(columns)
-		if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+		if(useGPUstockSparseTensorDriver or useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 			# Keep a private snapshot of the compact source IDs until commit.
 			state.neurons.append((neuronKeys.clone(), neuronUpdates))
 			state.connections.append((connectionKeys.clone(), connectionUpdates))
@@ -101,19 +104,19 @@ def flushDatabase(database):
 				try:
 					if(optimiseTrainCommitThreads):
 						commitThreads = GIAANNcmn_trainCommitThreads.begin(database)
-					if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
-						connectionKeys, connectionUpdates = GIAANNcmn_gpuTrainCommit.mergeConnections(state)
+					if(useGPUstockSparseTensorDriver or useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
+						connectionKeys, connectionUpdates = sparseTrainCommit.mergeConnections(state)
 					else:
 						if(optimiseTrainDeferredSourcePreparation):
 							GIAANNcmn_trainDeferredSourcePreparation.prepare(state)
 						connectionKeys, connectionUpdates = mergePackets(state, state.connections, state.sourceShape, True)
 					neuronShape = state.sourceShape[:trainSequenceBatchBucketDimension] + (database.f,)
-					if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
-						neuronKeys, neuronUpdates = GIAANNcmn_gpuTrainCommit.mergeNeurons(state, neuronShape)
+					if(useGPUstockSparseTensorDriver or useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
+						neuronKeys, neuronUpdates = sparseTrainCommit.mergeNeurons(state, neuronShape)
 					else:
 						neuronKeys, neuronUpdates = mergePackets(state, state.neurons, neuronShape, False)
 					# Both native merges must succeed before any tensors are published.
-					if((useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver) and GIAANNcmn_gpuTrainCommit.isPending(connectionUpdates)):
+					if((useGPUstockSparseTensorDriver or useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver) and sparseTrainCommit.isPending(connectionUpdates)):
 						connectionUpdates.publish()
 					else:
 						for key, tensor in zip(connectionKeys, connectionUpdates):

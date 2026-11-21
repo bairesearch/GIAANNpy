@@ -20,7 +20,7 @@ GIA ANN common prediction sparse activation lookups and updates for inference.
 import torch as pt
 
 from GIAANNcmn_globalDefs import *
-if(useHybridGPUCPUcustomSparseTensorDriver):
+if(useGPUCPUhybridCustomSparseTensorDriver):
 	import GIAANNcmn_hybridGPUCPUcustomSparseTensorDriver as sparseDriver
 
 
@@ -37,7 +37,7 @@ def selectInferenceCandidateActivationState(stateFeatures, eligibleKeys):
 				segments.append(arrayIndexSegmentLastColumn)
 				if(inferenceReviewPatch11ProspectiveColumnScoring and arrayIndexSegmentLastColumn > inferenceCandidateLookupZero):
 					segments.append(arrayIndexSegmentLastColumn-inferenceCandidateLookupStep)
-			if(useHybridGPUCPUcustomSparseTensorDriver and sparseDriver.supportsActivation(activation) and eligibleKeys.numel() <= gpuCustomSparseTensorDriverMaxEntries):
+			if(useGPUCPUhybridCustomSparseTensorDriver and sparseDriver.supportsActivation(activation) and eligibleKeys.numel() <= gpuCustomSparseTensorDriverMaxEntries):
 				selectedPositions = sparseDriver.candidatePositions(activation, eligibleKeys, segments)
 			else:
 				maxConcepts = activation.shape[inferenceLeakyIntegrateAndFireConceptDimension]
@@ -126,7 +126,7 @@ def validateInferenceCandidateActivationState(stateFeatures, eligibleKeys):
 				raise RuntimeError(inferenceCandidateLookupInvalidKeys)
 		result = stateFeatures.coalesce()
 		if(result._nnz() > inferenceCandidateLookupZero):
-			if(useHybridGPUCPUcustomSparseTensorDriver and sparseDriver.supportsActivation(result)):
+			if(useGPUCPUhybridCustomSparseTensorDriver and sparseDriver.supportsActivation(result)):
 				sparseDriver.validateCandidateState(result)
 			else:
 				if(not bool(pt.all(pt.isfinite(result.values())).item()) or bool(pt.any(result.values() < inferenceCandidateLookupZero).item())):

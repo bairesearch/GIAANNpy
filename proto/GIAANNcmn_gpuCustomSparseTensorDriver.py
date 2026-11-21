@@ -2,7 +2,7 @@
 
 from GIAANNcmn_globalDefs import *
 
-if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 	import atexit
 	import ctypes as C
 	import numpy as np
@@ -24,7 +24,7 @@ if(useGPUcustomSparseTensorDriver):
 
 def nativeLibrary():
 	global _lib
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		if(_lib is None):
 			with _libraryLock:
 				if(_lib is None):
@@ -33,7 +33,7 @@ def nativeLibrary():
 
 
 def loadNativeLibrary():
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		try:
 			library = C.CDLL(str(Path(__file__).with_name(gpuCustomSparseTensorDriverLibrary)))
 		except OSError as error:
@@ -88,7 +88,7 @@ def loadNativeLibrary():
 
 
 def cudaDeviceIndex():
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		if(executionMode == "train" and (not pt.cuda.is_available() or gpuCustomSparseTensorDriverDeviceIndex >= pt.cuda.device_count())):
 			raise RuntimeError(gpuCustomSparseTensorDriverUnavailable)
 	return gpuCustomSparseTensorDriverDeviceIndex
@@ -97,7 +97,7 @@ def cudaDeviceIndex():
 @pt.inference_mode()
 def propagateBlockSparse(weight, state, bias, steps=1):
 	"""Compute repeated ReLU(weight @ state + bias) for callers with CPU BSR input."""
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		if(weight.layout != pt.sparse_bsr or weight.ndim != 2 or weight.size(0) != weight.size(1) or state.layout != pt.strided or bias.layout != pt.strided or state.ndim != 2 or state.size(0) != weight.size(0) or min(state.shape) < 1 or bias.shape != (weight.size(0),) or type(steps) is not int or steps < 1):
 			raise ValueError(gpuCustomSparseTensorDriverInvalidBlocks)
 		if(weight.dtype not in (pt.float32, pt.float16) or any(t.device.type != gpuCustomSparseTensorDriverCPU or t.dtype != weight.dtype or t.requires_grad for t in (weight, state, bias))):
@@ -137,7 +137,7 @@ def propagateBlockSparse(weight, state, bias, steps=1):
 
 
 def propagateRaggedBlocks(blocks, ptr, col, degree, current, base, steps):
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		phases = []
 		for slot in range(int(degree.max(initial=0))):
 			rows = np.flatnonzero(degree > slot)
@@ -161,8 +161,8 @@ def propagateRaggedBlocks(blocks, ptr, col, degree, current, base, steps):
 
 
 def coalesceTensor(tensor):
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
-		if(supportsTensor(tensor) and not tensor.is_coalesced() and gpuCustomSparseTensorDriverMinEntries <= tensor._nnz() <= gpuCustomSparseTensorDriverMaxEntries and (useHybridGPUCPUcustomSparseTensorDriver or math.prod(tensor.shape) <= np.iinfo(np.int64).max)):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
+		if(supportsTensor(tensor) and not tensor.is_coalesced() and gpuCustomSparseTensorDriverMinEntries <= tensor._nnz() <= gpuCustomSparseTensorDriverMaxEntries and (useGPUCPUhybridCustomSparseTensorDriver or math.prod(tensor.shape) <= np.iinfo(np.int64).max)):
 			result = reduceCoordinates((tensor,))
 			if(result is None):	#the order of duplicate FP32 additions can affect this result
 				result = tensor.coalesce()
@@ -172,7 +172,7 @@ def coalesceTensor(tensor):
 
 
 def unitEntryStride(indices):
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		result = indices if indices.stride(1) == 1 else indices.contiguous()
 	return result
 
@@ -180,8 +180,8 @@ def unitEntryStride(indices):
 def gatherCanonical(tensor, queries, dtype):
 	"""Read scalar values at query coordinates from canonical FP32 COO on its resident device."""
 	result = None
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
-		if(isinstance(tensor, pt.Tensor) and (useHybridGPUCPUcustomSparseTensorDriver or tensor.is_cuda) and tensor.layout == pt.sparse_coo and isinstance(queries, pt.Tensor)):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
+		if(isinstance(tensor, pt.Tensor) and (useGPUCPUhybridCustomSparseTensorDriver or tensor.is_cuda) and tensor.layout == pt.sparse_coo and isinstance(queries, pt.Tensor)):
 			import GIAANNcmn_gpuTrainCommit as native
 			stream = pt.cuda.current_stream(tensor.device).cuda_stream if tensor.is_cuda else 0
 			result = native.getExtension().gather(useGPUcustomSparseTensorDriver, tensor, queries, gpuCustomSparseTensorDriverMinGatherEntries, gpuCustomSparseTensorDriverMaxEntries, gpuCustomSparseTensorDriverMaxRank, gpuCustomSparseTensorDriverPackThreads, stream)
@@ -193,8 +193,8 @@ def gatherCanonical(tensor, queries, dtype):
 def sliceCanonical(tensor, axis, index, target):
 	"""Select the contiguous range of a COO axis preceded only by singleton axes."""
 	result = None
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
-		if(isinstance(tensor, pt.Tensor) and (useHybridGPUCPUcustomSparseTensorDriver or tensor.is_cuda) and tensor.layout == pt.sparse_coo and tensor.dtype == pt.float32 and tensor.is_coalesced() and not tensor.requires_grad and tensor.dense_dim() == 0 and tensor.dim() > 1 and type(axis) is int and type(index) is int and 0 <= axis < tensor.dim() and all(size == 1 for size in tensor.shape[:axis]) and tensor.device.type in (gpuCustomSparseTensorDriverCPU, gpuCustomSparseTensorDriverCUDA)):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
+		if(isinstance(tensor, pt.Tensor) and (useGPUCPUhybridCustomSparseTensorDriver or tensor.is_cuda) and tensor.layout == pt.sparse_coo and tensor.dtype == pt.float32 and tensor.is_coalesced() and not tensor.requires_grad and tensor.dense_dim() == 0 and tensor.dim() > 1 and type(axis) is int and type(index) is int and 0 <= axis < tensor.dim() and all(size == 1 for size in tensor.shape[:axis]) and tensor.device.type in (gpuCustomSparseTensorDriverCPU, gpuCustomSparseTensorDriverCUDA)):
 			indices = tensor.indices()
 			if(0 <= index < tensor.shape[axis] and tensor._nnz()):
 				row = indices[axis]
@@ -222,19 +222,19 @@ def sliceCanonical(tensor, axis, index, target):
 
 
 def canNormalise(tensor):
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		result = (supportsTensor(tensor) or (useGPUcustomSparseTensorDriver and supportsDeviceTensor(tensor))) and (useGPUcustomSparseTensorDriver or tensor.is_coalesced()) and tensor.dim() == inferenceLeakyIntegrateAndFireNeuronTensorRank and tensor.size(0) == multipleDendriticBranchesNumber == 1 and tensor.size(1) == arrayNumberOfSegments and 0 < tensor.size(1) <= gpuCustomSparseTensorDriverMaxSegments and min(tensor.shape) > 0 and gpuCustomSparseTensorDriverMinEntries <= tensor._nnz() <= gpuCustomSparseTensorDriverMaxEntries and (not inferenceSynapticResponsePower or inferenceSynapticResponseExponent == inferenceSynapticResponseMaximumExponent)
 	return result
 
 
 def normalise(tensor, active=1.0):
 	"""Transfer FP32 strengths and compute a segmented maximum and scaled output on CUDA."""
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		device = tensor.device if tensor.is_cuda else pt.device(gpuCustomSparseTensorDriverCUDA, cudaDeviceIndex())
 		segments = tensor.size(inferenceLeakyIntegrateAndFireSegmentDimension)
 		lastColumn = arrayIndexSegmentLastColumn if useSANIcolumns or useSANIfeaturesAndColumns else -1
 		with pt.cuda.device(device):
-			if(useHybridGPUCPUcustomSparseTensorDriver):
+			if(useGPUCPUhybridCustomSparseTensorDriver):
 				indices = unitEntryStride(tensor.indices())
 				dimensions = (C.c_uint64*tensor.dim())(*tensor.shape)
 				threads = min(pt.get_num_threads(), gpuCustomSparseTensorDriverPackThreads)
@@ -341,13 +341,13 @@ def mergeCUDA(left, right):
 
 
 def supportsTensor(tensor):
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		result = tensor.layout == pt.sparse_coo and tensor.device.type == gpuCustomSparseTensorDriverCPU and tensor.dtype == pt.float32 and not tensor.requires_grad and 0 < tensor.dim() <= gpuCustomSparseTensorDriverMaxRank and tensor.dense_dim() == 0
 	return result
 
 
 def reduceCoordinates(operands):
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		result = None
 		shape = operands[0].shape
 		rank = len(shape)
@@ -384,7 +384,7 @@ def reduceCoordinates(operands):
 
 def reserveWorkspace(count):
 	global _capacity
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		if(count > _capacity):
 			if(_workspace.value is not None):
 				nativeLibrary().sorter_close(_workspace)
@@ -398,7 +398,7 @@ def reserveWorkspace(count):
 
 def releaseWorkspace():
 	global _capacity
-	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 		with _lock:
 			if(_workspace.value is not None):
 				with pt.cuda.device(cudaDeviceIndex()):
@@ -407,5 +407,5 @@ def releaseWorkspace():
 				_capacity = 0
 
 
-if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 	atexit.register(releaseWorkspace)

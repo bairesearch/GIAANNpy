@@ -366,16 +366,17 @@ cd ldr_wgpu
 cargo run --release -p ldr_viewer "../ldraw" "../GIAANNpy/database/GIAANNproto1xAllColumnsDraw.ldr"
 ```
 
-### Optional CUDA sparse tensor driver
+### Optional CUDA sparse tensor drivers
 
-Build the native kernels for the RTX 5070 with `make -C sparseTensorAccelerator NVCC=/usr/local/cuda/bin/nvcc CUDA_ARCH=sm_120`. This requires a CUDA toolkit with CUB, GNU Make, a C++17 compiler with OpenMP and CUDA-enabled PyTorch. The build installs `libgiaann_coo.so` beside the Python modules so GIAANN inference workers load the same kernels. To prebuild the PyTorch adapter in the application environment, run `make -C sparseTensorAccelerator bridge PYTHON=python`.
+For the custom drivers, build the native kernels for the RTX 5070 with `make -C sparseTensorAccelerator NVCC=/usr/local/cuda/bin/nvcc CUDA_ARCH=sm_120`. This requires a CUDA toolkit with CUB, GNU Make, a C++17 compiler with OpenMP and CUDA-enabled PyTorch. The build installs `libgiaann_coo.so` beside the Python modules so GIAANN inference workers load the same kernels. To prebuild the PyTorch adapter in the application environment, run `make -C sparseTensorAccelerator bridge PYTHON=python`.
 
-Select one driver in `proto/GIAANNcmn_globalDefs.py`. Both flags default to `False`, which selects the stock GIAANN paths. The flags are independent of the database storage device.
+Select one driver in `proto/GIAANNcmn_globalDefs.py`. All three flags default to `False`. Set `useGPUstockSparseTensorDriver = True` to use the benchmarked stock PyTorch CUDA configuration. Select a separate `train` or `inference` execution mode. Training uses the configured sequence limit, packed int32 connection records in CPU RAM, two preparation workers and four prefetched articles. Its CPU-only C++ transport builds on first use with the C++ compiler, Ninja and OpenMP. Inference uses one process, loads the active sparse tensors on CUDA and keeps file I/O on CPU. Both modes require CUDA-enabled PyTorch.
 
 | Flag | Sparse operations selected by the driver |
 | --- | --- |
+| `useGPUstockSparseTensorDriver` | Stock PyTorch CUDA coalesces every training packet and merges neuron and connection batches in tiles. CUDA FP32 reductions can differ slightly from CPU. During inference the active sparse state and context-likelihood scorer stay on CUDA. |
 | `useGPUcustomSparseTensorDriver` | CUDA merges canonical FP32 COO tensors, sorts and reduces eligible uncoalesced CPU COO updates, normalises large segmented connection strengths, and commits batches of neuron and connection updates in sequence order. CUDA-resident tensors also support indexed gather and segment slicing. |
-| `useHybridGPUCPUcustomSparseTensorDriver` | The previous adaptive driver. It uses CUDA sorting, normalisation and training commits alongside CPU ordered and delta merges, indexed lookup, soma decay, CPU gathers, slicing and its specialised training packet builder. Existing configurations that need the previously measured behaviour should select this flag. |
+| `useGPUCPUhybridCustomSparseTensorDriver` | The previous adaptive driver. It uses CUDA sorting, normalisation and training commits alongside CPU ordered and delta merges, indexed lookup, soma decay, CPU gathers, slicing and its specialised training packet builder. Existing configurations that need the previously measured behaviour should select this flag. |
 
 The GPU driver can stage CPU operands for a supported CUDA operation and return the result to its original device. Device-resident additions stay on their CUDA device. The COO union validates the coordinates and computes insertion positions on CUDA, scans the duplicate counts on the current stream, and writes one output per distinct coordinate. Addition retains explicit zeros. The default threshold for merges, coalescing and normalisation is 65,536 stored entries. Unsupported layouts, small CPU operations and cases requiring PyTorch’s exact floating-point reduction order follow the stock operation. Indexed gathers on CPU and the CPU neuron, candidate and decay optimisations belong to the hybrid mode.
 

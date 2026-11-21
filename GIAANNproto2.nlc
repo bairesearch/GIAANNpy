@@ -812,3 +812,4 @@ AUTORESEARCH; - explore a new or existing branching (multipleDendriticBranches=T
 - add option !predictionEnsureConnectedToPreviousPredictionStrict:inferencePoolObservedTokenOnAbstention - predict the next token from pooled one-step connection strengths across cells representing the last observed token when the decoder finds no candidate.
 - add option useHybridGPUCPUcustomSparseTensorDriver - accelerate GIAANN sparse COO operations during training and inference with optimized CPU and CUDA kernels.
 - add option useGPUcustomSparseTensorDriver - accelerate GIAANN sparse COO addition, connection-strength normalisation, and batched training updates on CUDA.
+- add option useGPUstockSparseTensorDriver - merge packed training updates with stock PyTorch on CUDA and keep sparse inference tensors on the GPU.

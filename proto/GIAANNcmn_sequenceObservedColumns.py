@@ -23,7 +23,7 @@ import time
 from GIAANNcmn_globalDefs import *
 if(useGPUcustomSparseTensorDriver):
 	import GIAANNcmn_gpuCustomSparseTensorDriver as sparseDriver
-elif(useHybridGPUCPUcustomSparseTensorDriver):
+elif(useGPUCPUhybridCustomSparseTensorDriver):
 	import GIAANNcmn_hybridGPUCPUcustomSparseTensorDriver as sparseDriver
 if(optimiseTrainSequenceBatch):
 	import GIAANNcmn_trainSequenceBatch
@@ -1792,7 +1792,7 @@ class SequenceObservedColumns:
 				indicesList = []
 				valuesList = []
 				for updateSparse in updatesList:
-					if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+					if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):
 						updateSparse = sparseDriver.coalesceTensor(updateSparse)
 					else:
 						updateSparse = updateSparse.coalesce()
@@ -1813,7 +1813,7 @@ class SequenceObservedColumns:
 			return combinedSparse
 
 	def addSparseUpdate(self, targetSparse, updateSparse):
-		if((useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver) and targetSparse.dtype == arrayType and targetSparse.device == deviceSparse and sparseDriver.canMerge(targetSparse, updateSparse)):
+		if((useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver) and targetSparse.dtype == arrayType and targetSparse.device == deviceSparse and sparseDriver.canMerge(targetSparse, updateSparse)):
 			targetSparse = sparseDriver.addTensors(targetSparse, updateSparse, concatenateUpdates=True)
 			targetSparse.values().clamp_(min=0)
 		else:
@@ -1889,7 +1889,7 @@ class SequenceObservedColumns:
 		if(updateSparse._nnz() > 0):
 			if(optimisationUseCUDAObservedColumnUpdateKernel):
 				resultSparse = self.addSparseUpdateNonNegativeCUDA(targetSparse, updateSparse)
-			elif((useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver) and targetSparse.dtype == arrayType and targetSparse.device == deviceSparse and sparseDriver.canMerge(targetSparse, updateSparse)):
+			elif((useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver) and targetSparse.dtype == arrayType and targetSparse.device == deviceSparse and sparseDriver.canMerge(targetSparse, updateSparse)):
 				resultSparse = sparseDriver.addTensors(targetSparse, updateSparse, concatenateUpdates=True)
 			else:
 				if not targetSparse.is_coalesced():

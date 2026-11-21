@@ -23,7 +23,9 @@ if(optimiseTrainFusedSequenceUpdates):
 	import os
 	from torch.utils.cpp_extension import load
 	import GIAANNcmn_trainColumnSteps
-	if(useHybridGPUCPUcustomSparseTensorDriver):
+	if(useGPUstockSparseTensorDriver):
+		import GIAANNcmn_stockSparseTensorDriver as sparseDriver
+	elif(useGPUCPUhybridCustomSparseTensorDriver):
 		import GIAANNcmn_hybridGPUCPUcustomSparseTensorDriver as sparseDriver
 	_extension = None
 
@@ -43,10 +45,11 @@ def prepare(sequence, concepts, starts, ends):
 		if(trainConnectionStrengthNormaliseWrtContextLength):
 			proximity = trainConnectionStrengthProximityScale / pt.pow(pt.arange(sequence.fs, dtype=arrayType) + trainConnectionStrengthProximityDistanceOffset, trainConnectionStrengthProximityExponent)
 		connectionSegments = arrayNumberOfSegmentsFeatureDistance + (inferenceLeakyIntegrateAndFireSomaSegmentCount if inferenceLeakyIntegrateAndFire else trainSequenceBatchZero)
+		# Stock CUDA coalesces every raw packet. The hybrid driver uses a size threshold.
 		# An ordered pair emits at most one column and one feature edge; each word
 		# contributes at most one neuron update per segment. If both upper bounds
 		# fit below dispatch size, use the ordinary batched trainer all the way.
-		useDriverPackets = useHybridGPUCPUcustomSparseTensorDriver and max(sequence.fs*(sequence.fs+1), sequence.fs*arrayNumberOfSegments) >= gpuCustomSparseTensorDriverMinEntries
+		useDriverPackets = useGPUstockSparseTensorDriver or (useGPUCPUhybridCustomSparseTensorDriver and max(sequence.fs*(sequence.fs+1), sequence.fs*arrayNumberOfSegments) >= gpuCustomSparseTensorDriverMinEntries)
 		if(useDriverPackets):
 			preparePackets = getExtension().prepareDriverPackets
 		else:

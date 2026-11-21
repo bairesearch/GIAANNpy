@@ -246,7 +246,10 @@ def loadContextLikelihoodColumnFrequencies(databaseNetworkObject, columnIndex):
 		keys, inverse = pt.unique(indices[inferenceContextLikelihoodNeuronFeatureDimension, mask], sorted=True, return_inverse=True)
 		if((keys < inferenceContextLikelihoodZero).any() or (keys >= databaseNetworkObject.f).any()):
 			raise RuntimeError(inferenceContextLikelihoodInvalidEvidence)
-		frequencies = pt.zeros(keys.shape, dtype=pt.float64)
+		if(useGPUstockSparseTensorDriver):
+			frequencies = pt.zeros_like(keys, dtype=pt.float64)
+		else:
+			frequencies = pt.zeros(keys.shape, dtype=pt.float64)
 		frequencies.scatter_reduce_(inferenceContextLikelihoodZero, inverse, values, reduce=inferenceContextLikelihoodMaximumReduction)
 		result = keys, frequencies
 	else:
