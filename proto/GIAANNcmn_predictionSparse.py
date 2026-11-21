@@ -20,6 +20,8 @@ GIA ANN common prediction sparse activation lookups and updates for inference.
 import torch as pt
 
 from GIAANNcmn_globalDefs import *
+if(useHybridGPUCPUcustomSparseTensorDriver):
+	import GIAANNcmn_hybridGPUCPUcustomSparseTensorDriver as sparseDriver
 
 
 def selectInferenceCandidateActivationState(stateFeatures, eligibleKeys):
@@ -30,27 +32,30 @@ def selectInferenceCandidateActivationState(stateFeatures, eligibleKeys):
 		values = activation.values()
 		selectedPositions = pt.empty((inferenceCandidateLookupZero,), dtype=pt.long, device=activation.device)
 		if(activation._nnz() > inferenceCandidateLookupZero and eligibleKeys.numel() > inferenceCandidateLookupZero):
-			maxConcepts = activation.shape[inferenceLeakyIntegrateAndFireConceptDimension]
-			maxFeatures = activation.shape[inferenceLeakyIntegrateAndFireFeatureDimension]
-			neuronsPerBranch = maxConcepts*maxFeatures
-			keys = pt.unique_consecutive(eligibleKeys)
-			branches = pt.div(keys, neuronsPerBranch, rounding_mode=inferenceCandidateLookupRoundingMode)
-			neurons = pt.remainder(keys, neuronsPerBranch)
 			segments = [arrayIndexSegmentSoma]
 			if(useSANIcolumns or useSANIfeaturesAndColumns):
 				segments.append(arrayIndexSegmentLastColumn)
 				if(inferenceReviewPatch11ProspectiveColumnScoring and arrayIndexSegmentLastColumn > inferenceCandidateLookupZero):
 					segments.append(arrayIndexSegmentLastColumn-inferenceCandidateLookupStep)
-			segmentIndices = pt.tensor(segments, dtype=pt.long, device=activation.device)
-			queryKeys = (branches.unsqueeze(inferenceCandidateLookupVectorDimension)*arrayNumberOfSegments+segmentIndices.unsqueeze(inferenceCandidateLookupEntryDimension))*neuronsPerBranch+neurons.unsqueeze(inferenceCandidateLookupVectorDimension)
-			#Coalesced COO coordinates already have the same order as these scalar keys.
-			stateKeys = ((indices[inferenceLeakyIntegrateAndFireBranchDimension]*arrayNumberOfSegments+indices[inferenceLeakyIntegrateAndFireSegmentDimension])*maxConcepts+indices[inferenceLeakyIntegrateAndFireConceptDimension])*maxFeatures+indices[inferenceLeakyIntegrateAndFireFeatureDimension]
-			positions = pt.searchsorted(stateKeys, queryKeys)
-			inRange = positions < stateKeys.numel()
-			positions = positions.clamp(max=stateKeys.numel()-inferenceCandidateLookupStep)
-			matches = inRange & (stateKeys[positions] == queryKeys)
-			#Queries are unique; sorting their matched positions preserves canonical COO order.
-			selectedPositions = pt.sort(positions[matches]).values
+			if(useHybridGPUCPUcustomSparseTensorDriver and sparseDriver.supportsActivation(activation) and eligibleKeys.numel() <= gpuCustomSparseTensorDriverMaxEntries):
+				selectedPositions = sparseDriver.candidatePositions(activation, eligibleKeys, segments)
+			else:
+				maxConcepts = activation.shape[inferenceLeakyIntegrateAndFireConceptDimension]
+				maxFeatures = activation.shape[inferenceLeakyIntegrateAndFireFeatureDimension]
+				neuronsPerBranch = maxConcepts*maxFeatures
+				keys = pt.unique_consecutive(eligibleKeys)
+				branches = pt.div(keys, neuronsPerBranch, rounding_mode=inferenceCandidateLookupRoundingMode)
+				neurons = pt.remainder(keys, neuronsPerBranch)
+				segmentIndices = pt.tensor(segments, dtype=pt.long, device=activation.device)
+				queryKeys = (branches.unsqueeze(inferenceCandidateLookupVectorDimension)*arrayNumberOfSegments+segmentIndices.unsqueeze(inferenceCandidateLookupEntryDimension))*neuronsPerBranch+neurons.unsqueeze(inferenceCandidateLookupVectorDimension)
+				#Coalesced COO coordinates already have the same order as these scalar keys.
+				stateKeys = ((indices[inferenceLeakyIntegrateAndFireBranchDimension]*arrayNumberOfSegments+indices[inferenceLeakyIntegrateAndFireSegmentDimension])*maxConcepts+indices[inferenceLeakyIntegrateAndFireConceptDimension])*maxFeatures+indices[inferenceLeakyIntegrateAndFireFeatureDimension]
+				positions = pt.searchsorted(stateKeys, queryKeys)
+				inRange = positions < stateKeys.numel()
+				positions = positions.clamp(max=stateKeys.numel()-inferenceCandidateLookupStep)
+				matches = inRange & (stateKeys[positions] == queryKeys)
+				#Queries are unique; sorting their matched positions preserves canonical COO order.
+				selectedPositions = pt.sort(positions[matches]).values
 		result = pt.sparse_coo_tensor(indices.index_select(inferenceCandidateLookupEntryDimension, selectedPositions), values.index_select(inferenceCandidateLookupVectorDimension, selectedPositions), size=activation.size(), dtype=activation.dtype, device=activation.device, is_coalesced=True)
 	else:
 		raise RuntimeError(inferenceCandidateLookupInvalidConfiguration)
@@ -121,11 +126,14 @@ def validateInferenceCandidateActivationState(stateFeatures, eligibleKeys):
 				raise RuntimeError(inferenceCandidateLookupInvalidKeys)
 		result = stateFeatures.coalesce()
 		if(result._nnz() > inferenceCandidateLookupZero):
-			if(not bool(pt.all(pt.isfinite(result.values())).item()) or bool(pt.any(result.values() < inferenceCandidateLookupZero).item())):
-				raise RuntimeError(inferenceCandidateLookupInvalidState)
-			shape = pt.tensor(result.shape, dtype=pt.long, device=result.device)
-			if(bool(pt.any(result.indices().amin(dim=inferenceCandidateLookupEntryDimension) < inferenceCandidateLookupZero).item()) or bool(pt.any(result.indices().amax(dim=inferenceCandidateLookupEntryDimension) >= shape).item())):
-				raise RuntimeError(inferenceCandidateLookupInvalidState)
+			if(useHybridGPUCPUcustomSparseTensorDriver and sparseDriver.supportsActivation(result)):
+				sparseDriver.validateCandidateState(result)
+			else:
+				if(not bool(pt.all(pt.isfinite(result.values())).item()) or bool(pt.any(result.values() < inferenceCandidateLookupZero).item())):
+					raise RuntimeError(inferenceCandidateLookupInvalidState)
+				shape = pt.tensor(result.shape, dtype=pt.long, device=result.device)
+				if(bool(pt.any(result.indices().amin(dim=inferenceCandidateLookupEntryDimension) < inferenceCandidateLookupZero).item()) or bool(pt.any(result.indices().amax(dim=inferenceCandidateLookupEntryDimension) >= shape).item())):
+					raise RuntimeError(inferenceCandidateLookupInvalidState)
 	else:
 		raise RuntimeError(inferenceCandidateLookupInvalidConfiguration)
 	return result

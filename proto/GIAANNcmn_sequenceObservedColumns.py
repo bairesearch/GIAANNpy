@@ -21,6 +21,10 @@ import torch as pt
 import time
 
 from GIAANNcmn_globalDefs import *
+if(useGPUcustomSparseTensorDriver):
+	import GIAANNcmn_gpuCustomSparseTensorDriver as sparseDriver
+elif(useHybridGPUCPUcustomSparseTensorDriver):
+	import GIAANNcmn_hybridGPUCPUcustomSparseTensorDriver as sparseDriver
 if(optimiseTrainSequenceBatch):
 	import GIAANNcmn_trainSequenceBatch
 import GIAANNcmn_debug
@@ -1788,7 +1792,10 @@ class SequenceObservedColumns:
 				indicesList = []
 				valuesList = []
 				for updateSparse in updatesList:
-					updateSparse = updateSparse.coalesce()
+					if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+						updateSparse = sparseDriver.coalesceTensor(updateSparse)
+					else:
+						updateSparse = updateSparse.coalesce()
 					indicesList.append(updateSparse.indices())
 					valuesList.append(updateSparse.values())
 				if(len(indicesList) > 0):
@@ -1806,18 +1813,22 @@ class SequenceObservedColumns:
 			return combinedSparse
 
 	def addSparseUpdate(self, targetSparse, updateSparse):
-		targetSparse = targetSparse.coalesce()
-		updateSparse = updateSparse.coalesce()
-		indicesTarget = targetSparse.indices()
-		valuesTarget = targetSparse.values()
-		indicesUpdate = updateSparse.indices()
-		valuesUpdate = updateSparse.values()
-		if(indicesUpdate.numel() > 0):
-			combinedIndices = pt.cat([indicesTarget, indicesUpdate], dim=1)
-			combinedValues = pt.cat([valuesTarget, valuesUpdate], dim=0)
-			targetSparse = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSparse.size(), dtype=arrayType, device=deviceSparse)
-			targetSparse = targetSparse.coalesce()
+		if((useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver) and targetSparse.dtype == arrayType and targetSparse.device == deviceSparse and sparseDriver.canMerge(targetSparse, updateSparse)):
+			targetSparse = sparseDriver.addTensors(targetSparse, updateSparse, concatenateUpdates=True)
 			targetSparse.values().clamp_(min=0)
+		else:
+			targetSparse = targetSparse.coalesce()
+			updateSparse = updateSparse.coalesce()
+			indicesTarget = targetSparse.indices()
+			valuesTarget = targetSparse.values()
+			indicesUpdate = updateSparse.indices()
+			valuesUpdate = updateSparse.values()
+			if(indicesUpdate.numel() > 0):
+				combinedIndices = pt.cat([indicesTarget, indicesUpdate], dim=1)
+				combinedValues = pt.cat([valuesTarget, valuesUpdate], dim=0)
+				targetSparse = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=targetSparse.size(), dtype=arrayType, device=deviceSparse)
+				targetSparse = targetSparse.coalesce()
+				targetSparse.values().clamp_(min=0)
 		return targetSparse
 
 	def validateCUDAObservedColumnUpdateInputs(self, targetSparse, updateSparse):
@@ -1878,6 +1889,8 @@ class SequenceObservedColumns:
 		if(updateSparse._nnz() > 0):
 			if(optimisationUseCUDAObservedColumnUpdateKernel):
 				resultSparse = self.addSparseUpdateNonNegativeCUDA(targetSparse, updateSparse)
+			elif((useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver) and targetSparse.dtype == arrayType and targetSparse.device == deviceSparse and sparseDriver.canMerge(targetSparse, updateSparse)):
+				resultSparse = sparseDriver.addTensors(targetSparse, updateSparse, concatenateUpdates=True)
 			else:
 				if not targetSparse.is_coalesced():
 					targetSparse = targetSparse.coalesce()

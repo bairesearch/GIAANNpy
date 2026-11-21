@@ -82,8 +82,11 @@ class DatabaseNetworkClass():
 			self.inferenceSemanticObservedSourceTrained = False
 			self.inferenceSemanticVectorVocabulary = None
 			self.inferenceSemanticCandidateState = None
-		if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
+		if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures or inferencePoolObservedTokenOnAbstention):
 			self.inferenceReviewPatch13SourceIndex = None
+		if(inferencePoolObservedTokenOnAbstention):
+			self.pooledObservedTokenPredictions = {}
+		if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
 			self.inferenceReviewPatch13Predictions = {}
 		if(inferenceReviewPatch15TokenTransitionPrior):
 			self.inferenceLIFTokenPriorSource = None

@@ -37,11 +37,28 @@ def selectPooledTransition(databaseNetworkObject, sourceColumnIndex, sourceFeatu
 			if(not pt.is_tensor(connectedColumnsConstraint) or connectedColumnsConstraint.dim() != inferenceReviewPatch13ConnectivityRank):
 				raise RuntimeError(inferenceReviewPatch13InvalidConnectivity)
 			if(connectedColumnsConstraint.numel() == arrayIndexSegmentFirst):
-				if(databaseNetworkObject.inferenceReviewPatch13SourceIndex is None):
-					databaseNetworkObject.inferenceReviewPatch13SourceIndex = buildPooledTransitionSourceIndex(databaseNetworkObject)
-				if(sourceToken not in databaseNetworkObject.inferenceReviewPatch13Predictions):
-					databaseNetworkObject.inferenceReviewPatch13Predictions[sourceToken] = calculatePooledTransition(databaseNetworkObject, sourceToken)
-				result = databaseNetworkObject.inferenceReviewPatch13Predictions[sourceToken]
+				result = getCachedPooledTransition(databaseNetworkObject, sourceToken, databaseNetworkObject.inferenceReviewPatch13Predictions)
+	return result
+
+
+def selectPooledTransitionOnAbstention(databaseNetworkObject, observedToken):
+	result = None
+	if(inferencePoolObservedTokenOnAbstention):
+		validatePooledTransitionDatabase(databaseNetworkObject)
+		if(not isinstance(observedToken, str) or not observedToken):
+			raise ValueError(inferencePoolObservedTokenInvalidToken)
+		result = getCachedPooledTransition(databaseNetworkObject, observedToken, databaseNetworkObject.pooledObservedTokenPredictions, onAbstention=True)
+	return result
+
+
+def getCachedPooledTransition(databaseNetworkObject, sourceToken, predictions, onAbstention=False):
+	result = None
+	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures or inferencePoolObservedTokenOnAbstention):
+		if(sourceToken not in predictions):
+			if(databaseNetworkObject.inferenceReviewPatch13SourceIndex is None):
+				databaseNetworkObject.inferenceReviewPatch13SourceIndex = buildPooledTransitionSourceIndex(databaseNetworkObject)
+			predictions[sourceToken] = calculatePooledTransition(databaseNetworkObject, sourceToken, onAbstention)
+		result = predictions[sourceToken]
 	return result
 
 
@@ -65,6 +82,12 @@ def validatePooledTransitionConfiguration(databaseNetworkObject):
 		#The cache represents a static trained graph; beam search and BPB need their own pooled distributions.
 		if(not inferenceLeakyIntegrateAndFire or inferenceBeamSearch or printInferenceTop1AccuracyBitsPerByte or useTrainDuringInference or (inferenceInferMissingFeatures and not inferenceInferMissingFeaturesSemantic)):
 			raise RuntimeError(inferenceReviewPatch13InvalidConfiguration)
+		validatePooledTransitionDatabase(databaseNetworkObject)
+	return
+
+
+def validatePooledTransitionDatabase(databaseNetworkObject):
+	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures or inferencePoolObservedTokenOnAbstention):
 		if(databaseNetworkObject is None or not databaseNetworkObject.inferenceMode or len(databaseNetworkObject.conceptColumnsList) != databaseNetworkObject.c or len(databaseNetworkObject.conceptFeaturesList) != databaseNetworkObject.f or databaseNetworkObject.arrayIndexPropertiesStrengthIndex is None):
 			raise RuntimeError(inferenceReviewPatch13InvalidDatabase)
 		if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
@@ -75,7 +98,7 @@ def validatePooledTransitionConfiguration(databaseNetworkObject):
 
 def buildPooledTransitionSourceIndex(databaseNetworkObject):
 	result = None
-	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
+	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures or inferencePoolObservedTokenOnAbstention):
 		#Index filenames once, then read only the source tensors needed for each queried token.
 		#Use a fixed stride so inference vocabulary growth cannot change stored source coordinates.
 		sourceFeatureStride = databaseNetworkObject.f
@@ -92,7 +115,7 @@ def buildPooledTransitionSourceIndex(databaseNetworkObject):
 
 
 def indexPooledTransitionSources(databaseNetworkObject, sourcesByToken, sourceFeatureStride, sourceColumnIndex, sourceFeatureIndices):
-	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
+	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures or inferencePoolObservedTokenOnAbstention):
 		if(not isinstance(sourceFeatureStride, Integral) or sourceFeatureStride != databaseNetworkObject.f or sourceFeatureStride <= arrayIndexSegmentFirst):
 			raise RuntimeError(inferenceReviewPatch13InvalidDatabase)
 		for sourceFeatureIndex in sourceFeatureIndices:
@@ -103,13 +126,14 @@ def indexPooledTransitionSources(databaseNetworkObject, sourcesByToken, sourceFe
 	return
 
 
-def calculatePooledTransition(databaseNetworkObject, sourceToken):
+def calculatePooledTransition(databaseNetworkObject, sourceToken, onAbstention=False):
 	result = None
-	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
+	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures or inferencePoolObservedTokenOnAbstention):
 		sourceFeatureStride, sourcesByToken = databaseNetworkObject.inferenceReviewPatch13SourceIndex
 		targetStrengths = {}
 		targetExemplars = {}
 		targetExemplarStrengths = {}
+		cellStrengths = {} if inferencePoolObservedTokenOnAbstention and onAbstention else None
 		if(sourceToken in sourcesByToken):
 			for sourceKey in sourcesByToken[sourceToken]:
 				sourceColumnIndex, sourceFeatureIndex = divmod(sourceKey, sourceFeatureStride)
@@ -118,16 +142,28 @@ def calculatePooledTransition(databaseNetworkObject, sourceToken):
 					sourceConnections = observedColumn.getFeatureConnectionsForSourceFeature(sourceFeatureIndex, targetDevice=inferenceReviewPatch13PoolDevice, createMissing=False)
 				else:
 					sourceConnections = GIAANNcmn_databaseNetworkFiles.loadObservedColumnSourceFeatureConnectionsTensor(databaseNetworkObject, sourceColumnIndex, sourceFeatureIndex, inferenceReviewPatch13PoolDevice)
-				accumulatePooledTransitionStrengths(databaseNetworkObject, sourceConnections, targetStrengths, targetExemplars, targetExemplarStrengths)
+				accumulatePooledTransitionStrengths(databaseNetworkObject, sourceConnections, targetStrengths, targetExemplars, targetExemplarStrengths, cellStrengths)
 		if(targetStrengths):
-			#Ties retain the first target encountered in sorted source-column/source-feature and COO order.
-			winningToken = max(targetStrengths, key=targetStrengths.get)
+			if(inferencePoolObservedTokenOnAbstention and onAbstention):
+				# Break equal token totals by vocabulary index. Column-only prime tokens follow ordinary features.
+				winningToken = min(targetStrengths, key=lambda token: (-targetStrengths[token], getPooledTransitionTokenOrder(databaseNetworkObject, token, sourceFeatureStride)))
+			else:
+				winningToken = max(targetStrengths, key=targetStrengths.get)
 			result = targetExemplars[winningToken]
 	return result
 
 
-def accumulatePooledTransitionStrengths(databaseNetworkObject, sourceConnections, targetStrengths, targetExemplars, targetExemplarStrengths):
-	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
+def getPooledTransitionTokenOrder(databaseNetworkObject, token, sourceFeatureStride):
+	result = None
+	if(inferencePoolObservedTokenOnAbstention):
+		result = databaseNetworkObject.conceptFeaturesDict.get(token, sourceFeatureStride)
+		if(result >= sourceFeatureStride):
+			result = sourceFeatureStride + databaseNetworkObject.conceptColumnsDict[token]
+	return result
+
+
+def accumulatePooledTransitionStrengths(databaseNetworkObject, sourceConnections, targetStrengths, targetExemplars, targetExemplarStrengths, cellStrengths=None):
+	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures or inferencePoolObservedTokenOnAbstention):
 		if(not pt.is_tensor(sourceConnections) or sourceConnections.layout != pt.sparse_coo or sourceConnections.dim() != inferenceReviewPatch13ConnectionTensorRank):
 			raise RuntimeError(inferenceReviewPatch13InvalidConnections)
 		if(sourceConnections.shape[inferenceReviewPatch13PropertyDimension] != databaseNetworkObject.arrayNumberOfProperties or sourceConnections.shape[inferenceReviewPatch13BranchDimension] != multipleDendriticBranchesNumber or sourceConnections.shape[inferenceReviewPatch13SegmentDimension] != arrayNumberOfSegments or sourceConnections.shape[inferenceReviewPatch13ColumnDimension] > databaseNetworkObject.c or sourceConnections.shape[inferenceReviewPatch13FeatureDimension] > databaseNetworkObject.f):
@@ -150,15 +186,21 @@ def accumulatePooledTransitionStrengths(databaseNetworkObject, sourceConnections
 			if(not math.isfinite(pooledStrength)):
 				raise RuntimeError(inferenceReviewPatch13InvalidConnections)
 			targetStrengths[targetToken] = pooledStrength
-			if(targetToken not in targetExemplarStrengths or strength > targetExemplarStrengths[targetToken]):
-				targetExemplarStrengths[targetToken] = strength
+			exemplarScore = strength
+			if(inferencePoolObservedTokenOnAbstention and cellStrengths is not None):
+				# Pool by physical destination too. Equal cell totals prefer the lowest column, then its ordinary feature.
+				cell = targetColumnIndex, targetFeatureIndex
+				cellStrengths[cell] = cellStrengths.get(cell, inferenceReviewPatch13MinimumStrength) + strength
+				exemplarScore = (cellStrengths[cell], -targetColumnIndex, targetFeatureIndex != featureIndexPrimeConceptNeuron)
+			if(targetToken not in targetExemplarStrengths or exemplarScore > targetExemplarStrengths[targetToken]):
+				targetExemplarStrengths[targetToken] = exemplarScore
 				targetExemplars[targetToken] = targetColumnIndex, targetFeatureIndex
 	return
 
 
 def getPooledTransitionToken(databaseNetworkObject, columnIndex, featureIndex):
 	result = None
-	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
+	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures or inferencePoolObservedTokenOnAbstention):
 		if(not isinstance(columnIndex, Integral) or isinstance(columnIndex, bool) or not isinstance(featureIndex, Integral) or isinstance(featureIndex, bool) or columnIndex < arrayIndexSegmentFirst or columnIndex >= databaseNetworkObject.c or featureIndex < arrayIndexSegmentFirst or featureIndex >= databaseNetworkObject.f):
 			raise RuntimeError(inferenceReviewPatch13InvalidNeuron)
 		#Ordinary features share f across columns; each f=0 prime denotes its own column's token.

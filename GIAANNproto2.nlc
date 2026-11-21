@@ -809,3 +809,6 @@ AUTORESEARCH; - explore a new or existing branching (multipleDendriticBranches=T
 - implement option trainVerifyConnectionNonexistentAcrossBranchesFractional (enabled) - max 50% of branches of a given segment index share the same incoming connection (rather than ensuring no repeated connections are allowed).
 - add option trainDendriticBranchesPredictionErrorCorrection - strengthen synapses supporting correct predictions and weaken competing branch synapses during trainDuringInference.
 - remove all options that look up training data to predict future tokens (useSequenceContext, contextRoutedBranchesExact).
+- add option !predictionEnsureConnectedToPreviousPredictionStrict:inferencePoolObservedTokenOnAbstention - predict the next token from pooled one-step connection strengths across cells representing the last observed token when the decoder finds no candidate.
+- add option useHybridGPUCPUcustomSparseTensorDriver - accelerate GIAANN sparse COO operations during training and inference with optimized CPU and CUDA kernels.
+- add option useGPUcustomSparseTensorDriver - accelerate GIAANN sparse COO addition, connection-strength normalisation, and batched training updates on CUDA.

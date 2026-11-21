@@ -5,3 +5,6 @@
 .hf_modules_cache/
 .vscode/
 archive/cuda_observed_column_update_ext/build/
+/proto/libgiaann_coo.so
+/proto/giaann_gpu_train_commit*.so
+/sparseTensorAccelerator/build/

@@ -41,7 +41,7 @@ else:
 #Execution mode selection;
 useQuickExecution = True	#intro: True	#default: False
 useDefault = False	#default: True
-useBenchmark = False		#use benchmark file naming schemes and evals
+useBenchmark = False	#use benchmark file naming schemes and evals
 useAutoresearch = False
 useDrawNetworkIndependently = False
 useTrainDuringInference = False
@@ -561,6 +561,44 @@ elif(useModalityNLP):
 			useGPUsparse = False	#default: False	#orig: True		#slight performance increase during train (does not use significant additional GPU ram during train)
 		else:
 			useGPUsparse = False	#default: False	#orig: True	#inference requires high RAM to store sparse tensors	#inference can be slightly faster CPU sparse tensor operations
+useGPUcustomSparseTensorDriver = False	#default: False	#orig: False	#opt-in: dispatch supported sparse operations to CUDA
+useHybridGPUCPUcustomSparseTensorDriver = False		#default: False	#orig: False	#opt-in: use the original adaptive CPU/CUDA sparse driver
+if(useGPUcustomSparseTensorDriver and useHybridGPUCPUcustomSparseTensorDriver):
+	raise ValueError("Select only one custom sparse tensor driver")
+gpuCustomSparseTensorDriverDisabled = "Enable a custom sparse tensor driver for GPU propagation"
+if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+	gpuCustomSparseTensorDriverMinEntries = 65536
+	gpuCustomSparseTensorDriverMaxEntries = (1 << 31)-1
+	gpuCustomSparseTensorDriverMaxRank = 64
+	gpuCustomSparseTensorDriverMinGatherEntries = 1
+	gpuCustomSparseTensorDriverActivationRank = 4
+	gpuCustomSparseTensorDriverCUDA = "cuda"
+	gpuCustomSparseTensorDriverHistoryRatio = 16
+	gpuCustomSparseTensorDriverCommitTileEntries = 1048576
+	gpuCustomSparseTensorDriverCompilerFlags = ["-O3", "-fopenmp"]
+	gpuCustomSparseTensorDriverLinkerFlags = ["-fopenmp"]
+	gpuCustomSparseTensorDriverCommitName = "giaann_gpu_train_commit"
+	gpuCustomSparseTensorDriverCommitSource = "GIAANNcmn_gpuTrainCommit.cpp"
+	gpuCustomSparseTensorDriverInvalidBlocks = "Expected square CPU FP16/FP32 BSR weights, matching dense state and bias, and a positive number of propagation steps"
+	gpuCustomSparseTensorDriverInvalidCoordinates = 1
+	gpuCustomSparseTensorDriverMergeTile = 4096
+	gpuCustomSparseTensorDriverDeltaRatio = 64
+	gpuCustomSparseTensorDriverMaxSegments = 64
+	gpuCustomSparseTensorDriverMaxLookupFibers = 512
+	gpuCustomSparseTensorDriverPartitionFields = 4
+	gpuCustomSparseTensorDriverPackThreads = 8
+	gpuCustomSparseTensorDriverDeviceIndex = 0	#logical CUDA device within CUDA_VISIBLE_DEVICES
+	gpuCustomSparseTensorDriverLibrary = "libgiaann_coo.so"
+	gpuCustomSparseTensorDriverCPU = "cpu"
+	gpuCustomSparseTensorDriverVisibleDevices = "CUDA_VISIBLE_DEVICES"
+	hybridGPUCPUcustomSparseTensorDriverLabel = "useHybridGPUCPUcustomSparseTensorDriver:"
+	gpuCustomSparseTensorDriverLabel = "useGPUcustomSparseTensorDriver:"
+	gpuCustomSparseTensorDriverUnavailable = "GPU custom sparse tensor driver requires a visible CUDA device and a positive COO dispatch threshold"
+	gpuCustomSparseTensorDriverBuildError = "Cannot load the GIAANN COO driver. Build it with make -C sparseTensorAccelerator for your GPU."
+	gpuCustomSparseTensorDriverInvalidDecay = "Soma decay requires finite non-negative input activation values"
+	gpuCustomSparseTensorDriverInvalidKey = "GPU custom sparse tensor driver encountered an out-of-bounds COO coordinate"
+	if(gpuCustomSparseTensorDriverDeviceIndex < 0 or not 0 < gpuCustomSparseTensorDriverMinEntries <= gpuCustomSparseTensorDriverMaxEntries or ((useGPUcustomSparseTensorDriver or executionMode != "train") and (not pt.cuda.is_available() or gpuCustomSparseTensorDriverDeviceIndex >= pt.cuda.device_count()))):
+		raise RuntimeError(gpuCustomSparseTensorDriverUnavailable)
 useGPUsparseStrict = True	#default: True	#orig: False	#optional	#enforce strict sparse device during transfer to/from dense tensors (make conversion process always use sparse device)	 #no significant difference in speed; can theoretically affect peak CPU or GPU RAM
 useGPUfileio = False	#default: False	#orig: useGPUsparse
 
@@ -1852,6 +1890,8 @@ if(optimisationInferenceChunks or optimisationInferenceWorkers):
 	inferenceChunksWorkerArgumentCount = 2
 	inferenceChunksGlobPattern = "*"
 	inferenceChunksEnvironment = {"OMP_NUM_THREADS": str(inferenceChunksOne), "MKL_NUM_THREADS": str(inferenceChunksOne), "OPENBLAS_NUM_THREADS": str(inferenceChunksOne), "NUMEXPR_NUM_THREADS": str(inferenceChunksOne), "BLIS_NUM_THREADS": str(inferenceChunksOne), "PYTHONDONTWRITEBYTECODE": str(inferenceChunksOne), "PYTHONUNBUFFERED": str(inferenceChunksOne), "CUDA_VISIBLE_DEVICES": ""}
+	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+		del inferenceChunksEnvironment[gpuCustomSparseTensorDriverVisibleDevices]	#inherit the parent's visible CUDA devices for optional COO offloads
 	inferenceChunksPythonPathEnvironment = "PYTHONPATH"
 	inferenceChunksMatplotlibEnvironment = "MPLCONFIGDIR"
 	inferenceChunksOperationalOverrides = {"inferenceCopyTemplateDatasets": False, "debugDisableDatabaseFileWrite": True}
@@ -2040,7 +2080,18 @@ if(useDefaultsV2):
 		inferenceReviewPatch13poolTransitionsFromSimilarFeatures = False
 	else:
 		inferenceReviewPatch13poolTransitionsFromSimilarFeatures = True	 #pool immediate trained transitions by token identity when the source has no outgoing connections; permits continuations learned in other columns	#this improves test-set accuracy but enables hallicination
-	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
+	if(predictionEnsureConnectedToPreviousPredictionStrict):
+		inferencePoolObservedTokenOnAbstention = False
+	else:
+		inferencePoolObservedTokenOnAbstention = True	#default: True	#orig: False	#opt-in: after final selection abstains, pool immediate trained strengths across cells emitting the last observed token
+	if(inferencePoolObservedTokenOnAbstention):
+		inferencePoolObservedTokenPreviousOffset = 1
+		inferencePoolObservedTokenInvalidToken = "Pooling on abstention requires a nonempty observed token"
+		inferencePoolObservedTokenConfigurationLabel = "inferencePoolObservedTokenOnAbstention:"
+		inferencePoolObservedTokenInvalidConfiguration = "Pooling on abstention requires frozen LIF inference with BPB disabled"
+		if(not inferenceLeakyIntegrateAndFire or useTrainDuringInference or inferenceTrainFirstSequences or printInferenceTop1AccuracyBitsPerByte):
+			raise ValueError(inferencePoolObservedTokenInvalidConfiguration)
+	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures or inferencePoolObservedTokenOnAbstention):
 		inferenceReviewPatch13ConnectivityRank = 1
 		inferenceReviewPatch13ConnectionTensorRank = 5
 		inferenceReviewPatch13PropertyDimension = 0
@@ -2187,6 +2238,7 @@ else:
 	inferenceReviewPatch11ProspectiveColumnScoring = False
 	inferenceReviewPatch12RetainContextWithoutOutgoingSource = False
 	inferenceReviewPatch13poolTransitionsFromSimilarFeatures = False
+	inferencePoolObservedTokenOnAbstention = False
 	inferenceReviewPatch14NormaliseConnectionInputs = False
 	inferenceSynapticResponsePower = False
 	inferenceSynapticResponseRetainFrequencies = False
@@ -2364,6 +2416,8 @@ if(printConfiguration):
 	print("inferenceLeakyIntegrateAndFire:", inferenceLeakyIntegrateAndFire)
 	if(inferenceLeakyIntegrateAndFire):
 		print("inferenceLeakyIntegrateAndFireSomaActivationThreshold:", inferenceLeakyIntegrateAndFireSomaActivationThreshold)
+		if(inferencePoolObservedTokenOnAbstention):
+			print(inferencePoolObservedTokenConfigurationLabel, inferencePoolObservedTokenOnAbstention)
 		if(inferenceReviewPatch15OptimiseColumnSelection):
 			print("inferenceReviewPatch15OptimiseColumnSelection:", inferenceReviewPatch15OptimiseColumnSelection)
 		if(inferenceReviewPatch15TokenTransitionPrior):
@@ -2426,6 +2480,9 @@ if(printConfiguration):
 	print("#RAM;")
 	print("useGPUdense:", useGPUdense)
 	print("useGPUsparse:", useGPUsparse)
+	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+		print(gpuCustomSparseTensorDriverLabel, useGPUcustomSparseTensorDriver)
+		print(hybridGPUCPUcustomSparseTensorDriverLabel, useHybridGPUCPUcustomSparseTensorDriver)
 	print("useGPUfileio:", useGPUfileio)
 	if(executionMode=="train" or executionMode=="trainAndInference" or executionMode=="trainDuringInference"):
 		print("\ttrainSparseConnectionsTensor:", trainSparseConnectionsTensor)

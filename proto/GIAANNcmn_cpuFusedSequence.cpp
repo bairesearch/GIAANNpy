@@ -27,6 +27,7 @@ GIA ANN common cpu Fused Sequence
 #include <limits>
 #include <cmath>
 
+template<bool useHybridGPUCPUcustomSparseTensorDriver>
 std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> preparePackets(bool enabled, const at::Tensor& concepts, const at::Tensor& starts, const at::Tensor& ends, const at::Tensor& conceptMap, const at::Tensor& featureMap, const at::Tensor& steps, const at::Tensor& proximity, const std::vector<int64_t>& shape, int64_t columnSegments, int64_t activationFeatureSegments, int64_t connectionFeatureSegments, bool allowSelf, bool nextWordOnly, bool nextColumnOnly, int64_t zero, int64_t one, int64_t sourceRank, int64_t connectionRank, int64_t propertyDimension, int64_t branchDimension, int64_t segmentDimension, int64_t bucketDimension, int64_t targetConceptDimension, int64_t targetFeatureDimension, const std::string& invalid)
 {
 	std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> result;
@@ -68,6 +69,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> preparePackets(bool e
 		// Generate sequence coordinates in exactly the original segment/source/target order.
 		struct Pair { int64_t source; int64_t target; };
 		std::vector<std::vector<Pair>> pairs(shape[segmentDimension]);
+		std::vector<uint8_t> hasEdges;
+		if constexpr(useHybridGPUCPUcustomSparseTensorDriver) hasEdges.resize(fs);
 		int64_t finalColumn = zero;
 		for(const auto source : activeWords)
 		{
@@ -84,6 +87,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> preparePackets(bool e
 				const int64_t columnDistance = step[targetColumn] - step[sourceColumn];
 				if((!nextWordOnly || wordDistance <= one) && (!nextColumnOnly || targetColumn <= sourceColumn + one))
 				{
+					if constexpr(useHybridGPUCPUcustomSparseTensorDriver) hasEdges[source] |= columnDistance < columnSegments || wordDistance <= connectionFeatureSegments;
 					if(columnDistance < columnSegments) pairs[columnSegments - columnDistance - one].push_back({source, *target});
 					if(wordDistance <= connectionFeatureSegments) pairs[columnSegments + connectionFeatureSegments - std::max<int64_t>(one, wordDistance)].push_back({source, *target});
 				}
@@ -98,10 +102,28 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> preparePackets(bool e
 		}
 		auto connectionIndices = at::empty({connectionRank, count}, concepts.options());
 		auto connectionValues = at::empty({count}, proximity.options());
-		auto sourceKeys = at::empty({count}, concepts.options());
+		at::Tensor sourceKeys, connectionKeys;
+		std::vector<int64_t> sourceBuckets;
+		if constexpr(useHybridGPUCPUcustomSparseTensorDriver)
+		{
+			// The bucket depends only on the source word. Sort it once per emitting
+			// word, then reuse the inverse for every edge emitted by that word.
+			std::vector<int64_t> emitting;
+			for(auto word : activeWords) if(hasEdges[word]) emitting.push_back(word);
+			auto wordKeys = at::empty({int64_t(emitting.size())}, concepts.options());
+			auto keys = wordKeys.data_ptr<int64_t>();
+			for(size_t i=0;i<emitting.size();++i) keys[i]=cm[owner[emitting[i]]]*shape[targetConceptDimension]+fm[emitting[i]];
+			auto unique=at::_unique2(wordKeys,true,true,false);
+			connectionKeys=std::get<0>(unique);
+			auto inverse=std::get<1>(unique).data_ptr<int64_t>();
+			sourceBuckets.resize(fs);
+			for(size_t i=0;i<emitting.size();++i) sourceBuckets[emitting[i]]=inverse[i];
+		}
+		else sourceKeys = at::empty({count}, concepts.options());
 		auto ci = connectionIndices.accessor<int64_t, 2>();
 		auto cv = connectionValues.accessor<float, 1>();
-		auto sk = sourceKeys.accessor<int64_t, 1>();
+		auto sk = useHybridGPUCPUcustomSparseTensorDriver ? nullptr : sourceKeys.data_ptr<int64_t>();
+
 		int64_t output = zero;
 		for(int64_t segment = zero; segment < shape[segmentDimension]; ++segment)
 		{
@@ -114,16 +136,21 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> preparePackets(bool e
 				ci[segmentDimension][output] = segment;
 				ci[targetConceptDimension][output] = cm[targetColumn];
 				ci[targetFeatureDimension][output] = fm[pair.target];
-				sk[output] = cm[sourceColumn] * shape[targetConceptDimension] + fm[pair.source];
+				if constexpr(useHybridGPUCPUcustomSparseTensorDriver) ci[bucketDimension][output] = sourceBuckets[pair.source];
+				else sk[output] = cm[sourceColumn] * shape[targetConceptDimension] + fm[pair.source];
 				cv[output] = weights[pair.target-pair.source];
 				++output;
 			}
 		}
-		const auto connectionUnique = at::_unique2(sourceKeys, true, true, false);
-		const auto connectionKeys = std::get<0>(connectionUnique);
-		connectionIndices.select(zero, bucketDimension).copy_(std::get<1>(connectionUnique));
+		if constexpr(!useHybridGPUCPUcustomSparseTensorDriver)
+		{
+			const auto connectionUnique = at::_unique2(sourceKeys, true, true, false);
+			connectionKeys = std::get<0>(connectionUnique);
+			connectionIndices.select(zero, bucketDimension).copy_(std::get<1>(connectionUnique));
+		}
 		const std::vector<int64_t> connectionShape = {one, one, shape[segmentDimension], connectionKeys.numel(), shape[bucketDimension], shape[targetConceptDimension]};
-		auto connectionPacket = at::sparse_coo_tensor(connectionIndices, connectionValues, connectionShape, proximity.options().layout(at::kSparse)).coalesce();
+		auto connectionPacket = at::sparse_coo_tensor(connectionIndices, connectionValues, connectionShape, proximity.options().layout(at::kSparse));
+		if constexpr(!useHybridGPUCPUcustomSparseTensorDriver) connectionPacket = connectionPacket.coalesce();
 		int64_t neuronCount = zero;
 		for(int64_t column = zero; column < cs; ++column)
 		{
@@ -160,7 +187,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> preparePackets(bool e
 		}
 		TORCH_CHECK(output == neuronCount, invalid);
 		const std::vector<int64_t> neuronShape = {one, one, shape[segmentDimension], neuronKeys.numel(), shape[targetConceptDimension]};
-		auto neuronPacket = at::sparse_coo_tensor(neuronIndices, neuronValues, neuronShape, proximity.options().layout(at::kSparse)).coalesce();
+		auto neuronPacket = at::sparse_coo_tensor(neuronIndices, neuronValues, neuronShape, proximity.options().layout(at::kSparse));
+		if constexpr(!useHybridGPUCPUcustomSparseTensorDriver) neuronPacket = neuronPacket.coalesce();
 		result = std::make_tuple(neuronKeys, neuronPacket, connectionKeys, connectionPacket);
 	}
 	return result;
@@ -168,5 +196,6 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> preparePackets(bool e
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, module)
 {
-	module.def("preparePackets", &preparePackets, pybind11::call_guard<pybind11::gil_scoped_release>());
+	module.def("prepareDriverPackets", &preparePackets<true>, pybind11::call_guard<pybind11::gil_scoped_release>());
+	module.def("preparePackets", &preparePackets<false>, pybind11::call_guard<pybind11::gil_scoped_release>());
 }

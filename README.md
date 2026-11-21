@@ -365,3 +365,20 @@ mv GIAANNpy/database/4-4CUBE.DAT ldraw/parts/4-4cube.dat
 cd ldr_wgpu
 cargo run --release -p ldr_viewer "../ldraw" "../GIAANNpy/database/GIAANNproto1xAllColumnsDraw.ldr"
 ```
+
+### Optional CUDA sparse tensor driver
+
+Build the native kernels for the RTX 5070 with `make -C sparseTensorAccelerator NVCC=/usr/local/cuda/bin/nvcc CUDA_ARCH=sm_120`. This requires a CUDA toolkit with CUB, GNU Make, a C++17 compiler with OpenMP and CUDA-enabled PyTorch. The build installs `libgiaann_coo.so` beside the Python modules so GIAANN inference workers load the same kernels. To prebuild the PyTorch adapter in the application environment, run `make -C sparseTensorAccelerator bridge PYTHON=python`.
+
+Select one driver in `proto/GIAANNcmn_globalDefs.py`. Both flags default to `False`, which selects the stock GIAANN paths. The flags are independent of the database storage device.
+
+| Flag | Sparse operations selected by the driver |
+| --- | --- |
+| `useGPUcustomSparseTensorDriver` | CUDA merges canonical FP32 COO tensors, sorts and reduces eligible uncoalesced CPU COO updates, normalises large segmented connection strengths, and commits batches of neuron and connection updates in sequence order. CUDA-resident tensors also support indexed gather and segment slicing. |
+| `useHybridGPUCPUcustomSparseTensorDriver` | The previous adaptive driver. It uses CUDA sorting, normalisation and training commits alongside CPU ordered and delta merges, indexed lookup, soma decay, CPU gathers, slicing and its specialised training packet builder. Existing configurations that need the previously measured behaviour should select this flag. |
+
+The GPU driver can stage CPU operands for a supported CUDA operation and return the result to its original device. Device-resident additions stay on their CUDA device. The COO union validates the coordinates and computes insertion positions on CUDA, scans the duplicate counts on the current stream, and writes one output per distinct coordinate. Addition retains explicit zeros. The default threshold for merges, coalescing and normalisation is 65,536 stored entries. Unsupported layouts, small CPU operations and cases requiring PyTorch’s exact floating-point reduction order follow the stock operation. Indexed gathers on CPU and the CPU neuron, candidate and decay optimisations belong to the hybrid mode.
+
+For batched training, the GPU driver uses the stock sequence packet builder. Eligible batches merge with historical weights in bounded CUDA tiles using stable sorting and FP32 addition in sequence order. The existing database representation is preserved. For unpacked COO histories the hybrid mode can instead bulk-publish a CPU merge at a history-to-update ratio of 16 or higher. The GPU driver has no such host-merge dispatch.
+
+For CPU BSR weights and a dense batch of state columns, `GIAANNcmn_gpuCustomSparseTensorDriver.propagateBlockSparse(weight, state, bias, steps)` computes repeated `ReLU(weight @ state + bias)`. The previously measured 13.2–14.2× hardware speedup used 48 steps, FP32 with TF32 disabled, 1,024 state columns, and four occupied 1,536 × 1,536 blocks in a 6,144 × 6,144 matrix. GIAANN's normal COO prediction loop uses its existing dendritic update rules. Run `python sparseTensorAccelerator/test_driver.py` with the flag enabled to check both interfaces on your GPU.

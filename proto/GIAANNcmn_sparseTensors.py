@@ -20,6 +20,10 @@ GIA ANN common predictive sparse Tensors
 import torch as pt
 
 from GIAANNcmn_globalDefs import *
+if(useGPUcustomSparseTensorDriver):
+	import GIAANNcmn_gpuCustomSparseTensorDriver as sparseDriver
+elif(useHybridGPUCPUcustomSparseTensorDriver):
+	import GIAANNcmn_hybridGPUCPUcustomSparseTensorDriver as sparseDriver
 
 def createEmptySparseTensor(shape):
 	sparseZeroTensor = pt.sparse_coo_tensor(indices=pt.empty((len(shape), 0), dtype=pt.long), values=pt.empty(0), size=shape, device=deviceSparse)
@@ -46,6 +50,14 @@ def buildSparseTensorIndexKeys(indices, size):
 
 def gatherSparseTensorValuesAtIndices(tensor, indices, dtype):
 	result = None
+	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+		result = sparseDriver.gatherCanonical(tensor, indices, dtype)
+	if(result is None):
+		result = gatherSparseTensorValuesAtIndicesReference(tensor, indices, dtype)
+	return result
+
+def gatherSparseTensorValuesAtIndicesReference(tensor, indices, dtype):
+	result = None
 	if(indices is None):
 		raise RuntimeError("gatherSparseTensorValuesAtIndices error: indices is None")
 	if(indices.dim() != 2):
@@ -57,7 +69,10 @@ def gatherSparseTensorValuesAtIndices(tensor, indices, dtype):
 			raise RuntimeError("gatherSparseTensorValuesAtIndices error: tensor/index rank mismatch")
 		queryKeys = buildSparseTensorIndexKeys(indices, tensor.size())
 		if(tensor.is_sparse):
-			tensor = tensor.coalesce()
+			if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+				tensor = sparseDriver.coalesceTensor(tensor)
+			else:
+				tensor = tensor.coalesce()
 			if(tensor._nnz() == 0):
 				result = pt.zeros((indices.shape[1],), dtype=dtype, device=indices.device)
 			else:
@@ -130,12 +145,19 @@ def scaleSparseTensorByBranchValues(sparseTensor, branchValues):
 	branchValues = branchValues.to(values.device)
 	branchIndices = indices[0]
 	scaledValues = values * branchValues[branchIndices]
-	return pt.sparse_coo_tensor(indices, scaledValues, size=sparseTensor.size(), device=sparseTensor.device).coalesce()
+	if(useHybridGPUCPUcustomSparseTensorDriver and not sparseTensor.requires_grad and not scaledValues.requires_grad and sparseTensor._nnz() > 1):
+		result = pt.sparse_coo_tensor(indices.clone(), scaledValues, size=sparseTensor.size(), device=sparseTensor.device, is_coalesced=True)
+	else:
+		result = pt.sparse_coo_tensor(indices, scaledValues, size=sparseTensor.size(), device=sparseTensor.device).coalesce()
+	return result
 
 def collapseSparseBranchDimension(sparseTensor):
 	if(sparseTensor is None):
 		return sparseTensor
-	sparseTensor = sparseTensor.coalesce()
+	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+		sparseTensor = sparseDriver.coalesceTensor(sparseTensor)
+	else:
+		sparseTensor = sparseTensor.coalesce()
 	if(sparseTensor._nnz() == 0):
 		newSize = sparseTensor.size()[1:]
 		emptyIndices = pt.empty((len(newSize), 0), dtype=pt.long, device=sparseTensor.device)
@@ -147,7 +169,12 @@ def collapseSparseBranchDimension(sparseTensor):
 		return sparseTensor
 	newIndices = indices[1:]
 	newSize = sparseTensor.size()[1:]
-	return pt.sparse_coo_tensor(newIndices, values, size=newSize, device=sparseTensor.device).coalesce()
+	collapsed = pt.sparse_coo_tensor(newIndices, values, size=newSize, device=sparseTensor.device)
+	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+		result = sparseDriver.coalesceTensor(collapsed)
+	else:
+		result = collapsed.coalesce()
+	return result
 
 def reduceSparseBranchMax(sparseTensor):
 	result = None
@@ -250,7 +277,10 @@ def mergeTensorSlicesSum(originalSparseTensor, sparseSlices, d):
 	# Create the updated sparse tensor and coalesce to handle duplicates
 	mergedSparseTensor = pt.sparse_coo_tensor(finalIndices, finalValues, size=finalSize, device=deviceSparse)
 
-	mergedSparseTensor = mergedSparseTensor.coalesce()
+	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+		mergedSparseTensor = sparseDriver.coalesceTensor(mergedSparseTensor)
+	else:
+		mergedSparseTensor = mergedSparseTensor.coalesce()
 	mergedSparseTensor.values().clamp_(min=0)
 
 	return mergedSparseTensor
@@ -316,6 +346,14 @@ def sliceSparseTensorMulti(sparseTensor, sliceDim, sliceIndices):
 	
 
 def sliceSparseTensor(sparseTensor, sliceDim, sliceIndex):
+	result = None
+	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+		result = sparseDriver.sliceCanonical(sparseTensor, sliceDim, sliceIndex, deviceSparse)
+	if(result is None):
+		result = sliceSparseTensorReference(sparseTensor, sliceDim, sliceIndex)
+	return result
+
+def sliceSparseTensorReference(sparseTensor, sliceDim, sliceIndex):
 	"""
 	Slices a PyTorch sparse tensor along a specified dimension at a given index.
 
@@ -469,7 +507,10 @@ def sparseAssign(A, B, *indices):
 	newA = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=A.shape, dtype=A.dtype, device=deviceSparse)
 
 	# Coalesce the tensor to sum duplicate indices
-	newA = newA.coalesce()
+	if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+		newA = sparseDriver.coalesceTensor(newA)
+	else:
+		newA = newA.coalesce()
 
 	return newA
 

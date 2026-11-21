@@ -23,6 +23,8 @@ if(optimiseTrainFusedSequenceUpdates):
 	import os
 	from torch.utils.cpp_extension import load
 	import GIAANNcmn_trainColumnSteps
+	if(useHybridGPUCPUcustomSparseTensorDriver):
+		import GIAANNcmn_hybridGPUCPUcustomSparseTensorDriver as sparseDriver
 	_extension = None
 
 
@@ -41,7 +43,18 @@ def prepare(sequence, concepts, starts, ends):
 		if(trainConnectionStrengthNormaliseWrtContextLength):
 			proximity = trainConnectionStrengthProximityScale / pt.pow(pt.arange(sequence.fs, dtype=arrayType) + trainConnectionStrengthProximityDistanceOffset, trainConnectionStrengthProximityExponent)
 		connectionSegments = arrayNumberOfSegmentsFeatureDistance + (inferenceLeakyIntegrateAndFireSomaSegmentCount if inferenceLeakyIntegrateAndFire else trainSequenceBatchZero)
-		result = getExtension().preparePackets(optimiseTrainFusedSequenceUpdates, concepts, starts, ends, sequence.conceptIndicesInSequenceObservedTensor, features, steps, proximity, shape, arrayNumberOfSegmentsColumnDistance, arrayNumberOfSegmentsFeatureDistance, connectionSegments, trainConnectionsAllowSelfTransitions, debugConnectNodesToNextNodesInSequenceOnly, debugConnectColumnsToNextColumnsInSequenceOnly, trainSequenceBatchZero, trainSequenceBatchOne, trainFusedSourceRank, trainFusedConnectionRank, trainFusedPropertyDimension, trainFusedBranchDimension, trainFusedSegmentDimension, trainFusedBucketDimension, trainFusedTargetConceptDimension, trainFusedTargetFeatureDimension, trainFusedInvalidInput)
+		# An ordered pair emits at most one column and one feature edge; each word
+		# contributes at most one neuron update per segment. If both upper bounds
+		# fit below dispatch size, use the ordinary batched trainer all the way.
+		useDriverPackets = useHybridGPUCPUcustomSparseTensorDriver and max(sequence.fs*(sequence.fs+1), sequence.fs*arrayNumberOfSegments) >= gpuCustomSparseTensorDriverMinEntries
+		if(useDriverPackets):
+			preparePackets = getExtension().prepareDriverPackets
+		else:
+			preparePackets = getExtension().preparePackets
+		result = preparePackets(optimiseTrainFusedSequenceUpdates, concepts, starts, ends, sequence.conceptIndicesInSequenceObservedTensor, features, steps, proximity, shape, arrayNumberOfSegmentsColumnDistance, arrayNumberOfSegmentsFeatureDistance, connectionSegments, trainConnectionsAllowSelfTransitions, debugConnectNodesToNextNodesInSequenceOnly, debugConnectColumnsToNextColumnsInSequenceOnly, trainSequenceBatchZero, trainSequenceBatchOne, trainFusedSourceRank, trainFusedConnectionRank, trainFusedPropertyDimension, trainFusedBranchDimension, trainFusedSegmentDimension, trainFusedBucketDimension, trainFusedTargetConceptDimension, trainFusedTargetFeatureDimension, trainFusedInvalidInput)
+		if(useDriverPackets):
+			neuronKeys, neurons, connectionKeys, connections = result
+			result = neuronKeys, sparseDriver.coalesceTensor(neurons), connectionKeys, sparseDriver.coalesceTensor(connections)
 	return result
 
 

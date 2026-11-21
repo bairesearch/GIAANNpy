@@ -20,6 +20,10 @@ GIA ANN common Prediction Activate
 import torch as pt
 
 from GIAANNcmn_globalDefs import *
+if(useGPUcustomSparseTensorDriver):
+	import GIAANNcmn_gpuCustomSparseTensorDriver as sparseDriver
+elif(useHybridGPUCPUcustomSparseTensorDriver):
+	import GIAANNcmn_hybridGPUCPUcustomSparseTensorDriver as sparseDriver
 if(trainDendriticBranchesPredictionErrorCorrection):
 	import GIAANNcmn_dendriticPredictionErrorCorrection
 if(inferenceContextLikelihood):
@@ -184,7 +188,10 @@ def propagateOrderedLeakyIntegrateAndFireActivations(activationSparse):
 			movingIndices[inferenceLeakyIntegrateAndFireSegmentDimension] += inferenceSparsePropagationStep
 			moving = pt.sparse_coo_tensor(movingIndices, values[stationaryEnd:somaStart], size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device, is_coalesced=True)
 			soma = pt.sparse_coo_tensor(indices[:, somaStart:branchEnd], values[somaStart:branchEnd], size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device, is_coalesced=True)
-			advanced = (moving+soma).coalesce()
+			if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+				advanced = sparseDriver.addTensors(moving, soma)
+			else:
+				advanced = (moving+soma).coalesce()
 			#Stationary columns need only a bulk copy, not a sparse merge or coordinate masks on every token.
 			resultIndices.extend((indices[:, branchStart:stationaryEnd], advanced.indices()))
 			resultValues.extend((values[branchStart:stationaryEnd], advanced.values()))
@@ -281,7 +288,10 @@ def advanceOrderedLeakyIntegrateAndFireColumnActivations(activationSparse):
 			#Only incoming and retained terminal entries can collide; earlier columns and feature/soma ranges remain ordered.
 			incoming = pt.sparse_coo_tensor(advancedIndices[:, incomingOffset:], values[incomingStart:terminalStart], size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device, is_coalesced=True)
 			terminal = pt.sparse_coo_tensor(indices[:, terminalStart:terminalEnd], terminalValues, size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device, is_coalesced=True)
-			mergedTerminal = (incoming+terminal).coalesce()
+			if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+				mergedTerminal = sparseDriver.addTensors(incoming, terminal)
+			else:
+				mergedTerminal = (incoming+terminal).coalesce()
 			resultIndices.extend((advancedIndices[:, :incomingOffset], mergedTerminal.indices(), indices[:, terminalEnd:branchEnd]))
 			resultValues.extend((values[branchStart:incomingStart], mergedTerminal.values(), values[terminalEnd:branchEnd]))
 		combinedIndices = pt.cat(resultIndices, dim=inferenceSparseColumnAdvanceEntryDimension)
@@ -302,39 +312,43 @@ def decrementLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation)
 		if(globalFeatureNeuronsActivation.dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireBranchDimension] != multipleDendriticBranchesNumber or globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireSegmentDimension] != arrayNumberOfSegments):
 			raise RuntimeError("decrementLeakyIntegrateAndFireSomaActivation error: activation tensor shape is invalid")
 		activationSparse = globalFeatureNeuronsActivation.coalesce()
-		activationIndices = activationSparse.indices()
-		activationValues = activationSparse.values()
-		if(activationValues.numel() > 0):
-			if(not bool(pt.all(pt.isfinite(activationValues)).item())):
-				raise RuntimeError("decrementLeakyIntegrateAndFireSomaActivation error: activation values must be finite")
-			if(bool(pt.any(activationValues < 0).item())):
-				raise RuntimeError("decrementLeakyIntegrateAndFireSomaActivation error: activation values must be non-negative")
-		if(optimiseInferenceSparseSomaDecay):
-			combinedActivation = activationSparse
-			combinedIndices = activationIndices
-			combinedValues = activationValues.clone()
+		if(useHybridGPUCPUcustomSparseTensorDriver and optimiseInferenceSparseSomaDecay and sparseDriver.supportsActivation(activationSparse)):
+			rate = 1.0-inferenceDecrementActivationsSomaPerPredictedToken if inferenceDecrementActivationsSomaNonlinear else inferenceDecrementActivationsSomaPerPredictedToken
+			result = sparseDriver.decaySoma(activationSparse, arrayIndexSegmentSoma, rate, inferenceDecrementActivationsSomaNonlinear)
 		else:
-			somaMask = activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
-			dendriticIndices = activationIndices[:, pt.logical_not(somaMask)]
-			dendriticValues = activationValues[pt.logical_not(somaMask)]
-			somaIndices = activationIndices[:, somaMask]
-			somaValues = activationValues[somaMask]
-			combinedIndices = pt.cat((dendriticIndices, somaIndices), dim=1)
-			combinedValues = pt.cat((dendriticValues, somaValues), dim=0)
-			combinedActivation = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
-			combinedIndices = combinedActivation.indices()
-			combinedValues = combinedActivation.values().clone()
-		decrementMask = combinedIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
-		if(inferenceDecrementActivationsSomaNonlinear):
-			combinedValues[decrementMask] = combinedValues[decrementMask] * (1.0-inferenceDecrementActivationsSomaPerPredictedToken)
-		else:
-			combinedValues[decrementMask] = pt.clamp(combinedValues[decrementMask]-inferenceDecrementActivationsSomaPerPredictedToken, min=0.0)
-		positiveMask = combinedValues > 0
-		if(optimiseInferenceSparseSomaDecay):
-			#Changing values and retaining an ordered subset cannot introduce duplicate or unsorted coordinates.
-			result = pt.sparse_coo_tensor(combinedIndices[:, positiveMask], combinedValues[positiveMask], size=combinedActivation.size(), dtype=combinedActivation.dtype, device=combinedActivation.device, is_coalesced=True)
-		else:
-			result = pt.sparse_coo_tensor(combinedIndices[:, positiveMask], combinedValues[positiveMask], size=combinedActivation.size(), dtype=combinedActivation.dtype, device=combinedActivation.device).coalesce()
+			activationIndices = activationSparse.indices()
+			activationValues = activationSparse.values()
+			if(activationValues.numel() > 0):
+				if(not bool(pt.all(pt.isfinite(activationValues)).item())):
+					raise RuntimeError("decrementLeakyIntegrateAndFireSomaActivation error: activation values must be finite")
+				if(bool(pt.any(activationValues < 0).item())):
+					raise RuntimeError("decrementLeakyIntegrateAndFireSomaActivation error: activation values must be non-negative")
+			if(optimiseInferenceSparseSomaDecay):
+				combinedActivation = activationSparse
+				combinedIndices = activationIndices
+				combinedValues = activationValues.clone()
+			else:
+				somaMask = activationIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
+				dendriticIndices = activationIndices[:, pt.logical_not(somaMask)]
+				dendriticValues = activationValues[pt.logical_not(somaMask)]
+				somaIndices = activationIndices[:, somaMask]
+				somaValues = activationValues[somaMask]
+				combinedIndices = pt.cat((dendriticIndices, somaIndices), dim=1)
+				combinedValues = pt.cat((dendriticValues, somaValues), dim=0)
+				combinedActivation = pt.sparse_coo_tensor(combinedIndices, combinedValues, size=activationSparse.size(), dtype=activationSparse.dtype, device=activationSparse.device).coalesce()
+				combinedIndices = combinedActivation.indices()
+				combinedValues = combinedActivation.values().clone()
+			decrementMask = combinedIndices[inferenceLeakyIntegrateAndFireSegmentDimension] == arrayIndexSegmentSoma
+			if(inferenceDecrementActivationsSomaNonlinear):
+				combinedValues[decrementMask] = combinedValues[decrementMask] * (1.0-inferenceDecrementActivationsSomaPerPredictedToken)
+			else:
+				combinedValues[decrementMask] = pt.clamp(combinedValues[decrementMask]-inferenceDecrementActivationsSomaPerPredictedToken, min=0.0)
+			positiveMask = combinedValues > 0
+			if(optimiseInferenceSparseSomaDecay):
+				#Changing values and retaining an ordered subset cannot introduce duplicate or unsorted coordinates.
+				result = pt.sparse_coo_tensor(combinedIndices[:, positiveMask], combinedValues[positiveMask], size=combinedActivation.size(), dtype=combinedActivation.dtype, device=combinedActivation.device, is_coalesced=True)
+			else:
+				result = pt.sparse_coo_tensor(combinedIndices[:, positiveMask], combinedValues[positiveMask], size=combinedActivation.size(), dtype=combinedActivation.dtype, device=combinedActivation.device).coalesce()
 	else:
 		raise RuntimeError("decrementLeakyIntegrateAndFireSomaActivation error: requires inferenceLeakyIntegrateAndFire")
 	return result
@@ -350,7 +364,12 @@ def resetReviewNeuronActivations(activation, columnIndex, featureIndex):
 			raise RuntimeError(inferenceReviewPatchInvalidResetState)
 		activation = activation.coalesce()
 		indices = activation.indices()
-		segments = indices[inferenceLeakyIntegrateAndFireSegmentDimension]
+		useIndexedReset = useHybridGPUCPUcustomSparseTensorDriver and sparseDriver.supportsActivation(activation)
+		if(useIndexedReset):
+			positions = sparseDriver.findNeuron(activation, columnIndex, featureIndex)
+			segments = indices[inferenceLeakyIntegrateAndFireSegmentDimension, positions]
+		else:
+			segments = indices[inferenceLeakyIntegrateAndFireSegmentDimension]
 		resetMask = pt.zeros_like(segments, dtype=pt.bool)
 		if(inferenceDeactivateSegmentsUponPrediction):
 			resetMask |= segments < arrayIndexSegmentSoma
@@ -360,7 +379,10 @@ def resetReviewNeuronActivations(activation, columnIndex, featureIndex):
 			if(not (useSANIcolumns or useSANIfeaturesAndColumns)):
 				raise RuntimeError(inferenceReviewPatchInvalidResetSegments)
 			resetMask |= segments == arrayIndexSegmentLastColumn
-		resetMask &= (indices[inferenceLeakyIntegrateAndFireConceptDimension] == columnIndex) & (indices[inferenceLeakyIntegrateAndFireFeatureDimension] == featureIndex)
+		if(useIndexedReset):
+			resetMask = positions[resetMask]
+		else:
+			resetMask &= (indices[inferenceLeakyIntegrateAndFireConceptDimension] == columnIndex) & (indices[inferenceLeakyIntegrateAndFireFeatureDimension] == featureIndex)
 		activation.values()[resetMask] = arrayIndexSegmentFirst
 		result = activation
 	else:
@@ -715,6 +737,14 @@ def buildSparseIndexKeys(indices, size):
 
 def gatherSparseTensorValuesAtIndices(tensor, indices, dtype):
 	result = None
+	if((useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver) and tensor is not None and tensor.dim() == gpuCustomSparseTensorDriverActivationRank):
+		result = sparseDriver.gatherCanonical(tensor, indices, dtype)
+	if(result is None):
+		result = gatherSparseTensorValuesAtIndicesReference(tensor, indices, dtype)
+	return result
+
+def gatherSparseTensorValuesAtIndicesReference(tensor, indices, dtype):
+	result = None
 	if(tensor is None):
 		result = pt.zeros((indices.shape[1],), dtype=dtype, device=indices.device)
 	else:
@@ -1065,22 +1095,34 @@ def calculateFeatureNeuronSourceActivationPredictLeakyIntegrateAndFire(globalFea
 		sourceFeatureIndex = int(sourceFeatureIndex)
 		if(sourceColumnIndex < arrayIndexSegmentFirst or sourceColumnIndex >= globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireConceptDimension] or sourceFeatureIndex < arrayIndexSegmentFirst or sourceFeatureIndex >= globalFeatureNeuronsActivation.shape[inferenceLeakyIntegrateAndFireFeatureDimension]):
 			raise RuntimeError("calculateFeatureNeuronSourceActivationPredictLeakyIntegrateAndFire error: source neuron index out of range")
-		if(inferenceReviewPatch9LocalSourceActivation):
-			sourceSparse = globalFeatureNeuronsActivation.coalesce()
-			sourceIndices = sourceSparse.indices()
-			sourceMask = (sourceIndices[inferenceLeakyIntegrateAndFireConceptDimension] == sourceColumnIndex) & (sourceIndices[inferenceLeakyIntegrateAndFireFeatureDimension] == sourceFeatureIndex)
-			sourceSparse = pt.sparse_coo_tensor(sourceIndices[:, sourceMask], sourceSparse.values()[sourceMask], size=sourceSparse.size(), dtype=sourceSparse.dtype, device=sourceSparse.device).coalesce()
-			somaActivation = calculateLeakyIntegrateAndFireSomaActivation(sourceSparse)
+		if(useHybridGPUCPUcustomSparseTensorDriver and inferenceReviewPatch9LocalSourceActivation and multipleDendriticBranchesNumber == 1 and not multipleDendriticBranchesBinaryTree and sparseDriver.supportsActivation(globalFeatureNeuronsActivation) and globalFeatureNeuronsActivation.shape[:2] == (multipleDendriticBranchesNumber, arrayNumberOfSegments) and (not (useSANIcolumns or useSANIfeaturesAndColumns) or arrayIndexSegmentFirst <= arrayIndexSegmentLastColumn < arrayIndexSegmentSoma)):
+			positions = sparseDriver.findNeuron(globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex)
+			segments = globalFeatureNeuronsActivation.indices()[inferenceLeakyIntegrateAndFireSegmentDimension, positions]
+			selected = segments == arrayIndexSegmentSoma
+			if(useSANIcolumns or useSANIfeaturesAndColumns):
+				selected |= segments == arrayIndexSegmentLastColumn
+			sourceActivation = globalFeatureNeuronsActivation.values()[positions[selected]].sum()
+			result = (sourceActivation >= inferenceLeakyIntegrateAndFireSomaActivationThreshold).to(globalFeatureNeuronsActivation.dtype)
 		else:
-			somaActivation = calculateLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation)
-		somaActivation = somaActivation.coalesce()
-		somaIndices = somaActivation.indices()
-		somaValues = somaActivation.values()
-		sourceMask = (somaIndices[inferenceLeakyIntegrateAndFireSomaActivationConceptDimension] == sourceColumnIndex) & (somaIndices[inferenceLeakyIntegrateAndFireSomaActivationFeatureDimension] == sourceFeatureIndex)
-		sourceActivation = pt.zeros((), dtype=somaActivation.dtype, device=somaActivation.device)
-		if(sourceMask.any()):
-			sourceActivation = somaValues[sourceMask].sum()
-		result = (sourceActivation >= inferenceLeakyIntegrateAndFireSomaActivationThreshold).to(somaActivation.dtype)
+			if(inferenceReviewPatch9LocalSourceActivation):
+				sourceSparse = globalFeatureNeuronsActivation.coalesce()
+				sourceIndices = sourceSparse.indices()
+				if(useHybridGPUCPUcustomSparseTensorDriver and sparseDriver.supportsActivation(sourceSparse)):
+					sourceMask = sparseDriver.findNeuron(sourceSparse, sourceColumnIndex, sourceFeatureIndex)
+				else:
+					sourceMask = (sourceIndices[inferenceLeakyIntegrateAndFireConceptDimension] == sourceColumnIndex) & (sourceIndices[inferenceLeakyIntegrateAndFireFeatureDimension] == sourceFeatureIndex)
+				sourceSparse = pt.sparse_coo_tensor(sourceIndices[:, sourceMask], sourceSparse.values()[sourceMask], size=sourceSparse.size(), dtype=sourceSparse.dtype, device=sourceSparse.device).coalesce()
+				somaActivation = calculateLeakyIntegrateAndFireSomaActivation(sourceSparse)
+			else:
+				somaActivation = calculateLeakyIntegrateAndFireSomaActivation(globalFeatureNeuronsActivation)
+			somaActivation = somaActivation.coalesce()
+			somaIndices = somaActivation.indices()
+			somaValues = somaActivation.values()
+			sourceMask = (somaIndices[inferenceLeakyIntegrateAndFireSomaActivationConceptDimension] == sourceColumnIndex) & (somaIndices[inferenceLeakyIntegrateAndFireSomaActivationFeatureDimension] == sourceFeatureIndex)
+			sourceActivation = pt.zeros((), dtype=somaActivation.dtype, device=somaActivation.device)
+			if(sourceMask.any()):
+				sourceActivation = somaValues[sourceMask].sum()
+			result = (sourceActivation >= inferenceLeakyIntegrateAndFireSomaActivationThreshold).to(somaActivation.dtype)
 	else:
 		raise RuntimeError("calculateFeatureNeuronSourceActivationPredictLeakyIntegrateAndFire error: requires inferenceLeakyIntegrateAndFire")
 	return result
@@ -1230,7 +1272,10 @@ def applyFeatureNeuronsTargetActivationPredict(databaseNetworkObject, globalFeat
 			raise RuntimeError("applyFeatureNeuronsTargetActivationPredict error: leaky integrate-and-fire activation tensors must be sparse")
 		if(globalFeatureNeuronsActivation.size() != featureNeuronsTargetActivation.size()):
 			raise RuntimeError("applyFeatureNeuronsTargetActivationPredict error: leaky integrate-and-fire activation tensor shapes must match")
-		globalFeatureNeuronsActivation = (globalFeatureNeuronsActivation.coalesce() + featureNeuronsTargetActivation.coalesce()).coalesce()
+		if(useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver):
+			globalFeatureNeuronsActivation = sparseDriver.addTensors(globalFeatureNeuronsActivation, featureNeuronsTargetActivation)
+		else:
+			globalFeatureNeuronsActivation = (globalFeatureNeuronsActivation.coalesce() + featureNeuronsTargetActivation.coalesce()).coalesce()
 	else:
 		if(inferenceUseNeuronFeaturePropertiesTimeExact):
 			# spec step (a): only allow segment activation when the time difference to the previous segment is exactly 1.
@@ -1274,7 +1319,10 @@ def processFeaturesActivePredict(databaseNetworkObject, globalFeatureNeuronsActi
 		featureNeuronsActive = calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex)
 
 	#target neuron activation dependence on connection strength;
-	featureConnectionsStrengthStored = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
+	if(useHybridGPUCPUcustomSparseTensorDriver):
+		featureConnectionsStrengthStored = sparseDriver.selectLeading(featureConnections, databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
+	else:
+		featureConnectionsStrengthStored = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 	featureConnectionsStrength = featureConnectionsStrengthStored
 	if(inferenceConnectionStrengthPOSdependence):
 		featureConnectionsPos = featureConnections[databaseNetworkObject.arrayIndexPropertiesPosIndex]
@@ -1309,7 +1357,10 @@ def processFeaturesActivePredictEnforceLastSegment(databaseNetworkObject, global
 			featureNeuronsActive = calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, reviewSourceActivationState, sourceColumnIndex, sourceFeatureIndex)
 		else:
 			featureNeuronsActive = calculateFeatureNeuronSourceActivationPredict(databaseNetworkObject, globalFeatureNeuronsActivation, sourceColumnIndex, sourceFeatureIndex)
-		featureConnectionsStrengthStored = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
+		if(useHybridGPUCPUcustomSparseTensorDriver):
+			featureConnectionsStrengthStored = sparseDriver.selectLeading(featureConnections, databaseNetworkObject.arrayIndexPropertiesStrengthIndex)
+		else:
+			featureConnectionsStrengthStored = featureConnections[databaseNetworkObject.arrayIndexPropertiesStrengthIndex]
 		if(trainDendriticBranchesPredictionErrorCorrection):
 			if(executionMode == dendriticCorrectionTrainMode):
 				GIAANNcmn_dendriticPredictionErrorCorrection.recordSource(databaseNetworkObject, featureConnectionsStrengthStored, sourceColumnIndex, sourceFeatureIndex, sequenceWordIndex, featureNeuronsActive)
@@ -1379,20 +1430,23 @@ def mergeLeakyIntegrateAndFireCurrentSomaActivationKeys(somaActivationFromLastSe
 
 def calculateFeatureNeuronsTargetActivationPredict(featureConnectionsStrength, featureNeuronsActive):
 	result = None
-	if(inferenceReviewPatch14NormaliseConnectionInputs):
-		featureConnectionsStrength = normaliseReviewSourceConnectionInputs(featureConnectionsStrength)
-	if(featureConnectionsStrength.is_sparse):
-		if(featureNeuronsActive.dim() == 0):
-			branchCount = featureConnectionsStrength.size(0)
-			branchValues = pt.full((branchCount,), featureNeuronsActive.item(), dtype=featureNeuronsActive.dtype, device=featureNeuronsActive.device)
-			result = GIAANNcmn_sparseTensors.scaleSparseTensorByBranchValues(featureConnectionsStrength, branchValues)
-		else:
-			result = GIAANNcmn_sparseTensors.scaleSparseTensorByBranchValues(featureConnectionsStrength, featureNeuronsActive)
+	if((useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver) and inferenceReviewPatch14NormaliseConnectionInputs and isinstance(featureConnectionsStrength, pt.Tensor) and featureConnectionsStrength.dim() == inferenceLeakyIntegrateAndFireNeuronTensorRank and featureNeuronsActive.dtype == pt.float32 and (featureNeuronsActive.device.type == gpuCustomSparseTensorDriverCPU or (useGPUcustomSparseTensorDriver and featureNeuronsActive.device == featureConnectionsStrength.device)) and not featureNeuronsActive.requires_grad and featureNeuronsActive.shape in ((), (1,)) and sparseDriver.canNormalise(featureConnectionsStrength)):
+		result = sparseDriver.normalise(featureConnectionsStrength, featureNeuronsActive.item())
 	else:
-		if(featureNeuronsActive.dim() == 0):
-			result = featureConnectionsStrength * featureNeuronsActive
+		if(inferenceReviewPatch14NormaliseConnectionInputs):
+			featureConnectionsStrength = normaliseReviewSourceConnectionInputs(featureConnectionsStrength)
+		if(featureConnectionsStrength.is_sparse):
+			if(featureNeuronsActive.dim() == 0):
+				branchCount = featureConnectionsStrength.size(0)
+				branchValues = pt.full((branchCount,), featureNeuronsActive.item(), dtype=featureNeuronsActive.dtype, device=featureNeuronsActive.device)
+				result = GIAANNcmn_sparseTensors.scaleSparseTensorByBranchValues(featureConnectionsStrength, branchValues)
+			else:
+				result = GIAANNcmn_sparseTensors.scaleSparseTensorByBranchValues(featureConnectionsStrength, featureNeuronsActive)
 		else:
-			result = featureConnectionsStrength * featureNeuronsActive.view(-1, 1, 1, 1)
+			if(featureNeuronsActive.dim() == 0):
+				result = featureConnectionsStrength * featureNeuronsActive
+			else:
+				result = featureConnectionsStrength * featureNeuronsActive.view(-1, 1, 1, 1)
 	return result
 
 def normaliseReviewSourceConnectionInputs(featureConnectionsStrength):
@@ -1401,36 +1455,39 @@ def normaliseReviewSourceConnectionInputs(featureConnectionsStrength):
 			raise RuntimeError(inferenceReviewPatch14InvalidConnections)
 		if(featureConnectionsStrength.dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or featureConnectionsStrength.sparse_dim() != inferenceLeakyIntegrateAndFireNeuronTensorRank or featureConnectionsStrength.size(inferenceLeakyIntegrateAndFireBranchDimension) != multipleDendriticBranchesNumber or featureConnectionsStrength.size(inferenceLeakyIntegrateAndFireSegmentDimension) != arrayNumberOfSegments or min(featureConnectionsStrength.size()) <= inferenceReviewPatch14MinimumStrength):
 			raise RuntimeError(inferenceReviewPatch14InvalidConnections)
-		connectionIndices = featureConnectionsStrength._indices()
-		connectionShape = pt.tensor(featureConnectionsStrength.size(), dtype=connectionIndices.dtype, device=connectionIndices.device).unsqueeze(inferenceReviewPatch14EntryDimension)
-		if((connectionIndices < inferenceReviewPatch14MinimumStrength).any() or (connectionIndices >= connectionShape).any() or not pt.isfinite(featureConnectionsStrength._values()).all() or (featureConnectionsStrength._values() < inferenceReviewPatch14MinimumStrength).any()):
-			raise RuntimeError(inferenceReviewPatch14InvalidConnections)
-		connectionsSparse = featureConnectionsStrength.coalesce()
-		connectionIndices = connectionsSparse.indices()
-		connectionValues = connectionsSparse.values().clone()
-		if(not pt.isfinite(connectionValues).all()):
-			raise RuntimeError(inferenceReviewPatch14InvalidConnections)
-		# This tensor belongs to one exact source neuron; only its outgoing targets share a segment maximum.
-		segmentIndices = connectionIndices[inferenceLeakyIntegrateAndFireSegmentDimension]
-		segmentMaxima = pt.zeros((arrayNumberOfSegments,), dtype=connectionValues.dtype, device=connectionValues.device)
-		segmentMaxima.scatter_reduce_(inferenceReviewPatch14VectorDimension, segmentIndices, connectionValues, reduce=inferenceReviewPatch14MaximumReduction)
-		positiveConnections = connectionValues > inferenceReviewPatch14MinimumStrength
-		# Empty and zero-only segments emit no input; never divide their weights by zero.
-		if(inferenceSynapticResponsePower):
-			if(inferenceSynapticResponseExponent == inferenceSynapticResponseMaximumExponent):
-				# Preserve the original floating-point arithmetic for the identity response.
-				connectionValues[positiveConnections] *= inferenceReviewPatch14ReferenceStrength / segmentMaxima[segmentIndices[positiveConnections]]
-			else:
-				connectionValues[positiveConnections] = inferenceReviewPatch14ReferenceStrength*(connectionValues[positiveConnections]/segmentMaxima[segmentIndices[positiveConnections]]).pow(inferenceSynapticResponseExponent)
+		if((useGPUcustomSparseTensorDriver or useHybridGPUCPUcustomSparseTensorDriver) and sparseDriver.canNormalise(featureConnectionsStrength)):
+			result = sparseDriver.normalise(featureConnectionsStrength)
 		else:
-			connectionValues[positiveConnections] *= inferenceReviewPatch14ReferenceStrength / segmentMaxima[segmentIndices[positiveConnections]]
-		if(useSANIcolumns or useSANIfeaturesAndColumns):
-			columnConnections = segmentIndices <= arrayIndexSegmentLastColumn
-			connectionValues[columnConnections] *= inferenceReviewPatch14ColumnInputGain
-		if(not pt.isfinite(connectionValues).all() or (connectionValues[positiveConnections] <= inferenceReviewPatch14MinimumStrength).any()):
-			raise RuntimeError(inferenceReviewPatch14InvalidNormalisedStrength)
-		# Preserve the stored weights and coordinates; source activation and the existing sigmoid follow this transformation.
-		result = pt.sparse_coo_tensor(connectionIndices, connectionValues, size=connectionsSparse.size(), dtype=connectionsSparse.dtype, device=connectionsSparse.device).coalesce()
+			connectionIndices = featureConnectionsStrength._indices()
+			connectionShape = pt.tensor(featureConnectionsStrength.size(), dtype=connectionIndices.dtype, device=connectionIndices.device).unsqueeze(inferenceReviewPatch14EntryDimension)
+			if((connectionIndices < inferenceReviewPatch14MinimumStrength).any() or (connectionIndices >= connectionShape).any() or not pt.isfinite(featureConnectionsStrength._values()).all() or (featureConnectionsStrength._values() < inferenceReviewPatch14MinimumStrength).any()):
+				raise RuntimeError(inferenceReviewPatch14InvalidConnections)
+			connectionsSparse = featureConnectionsStrength.coalesce()
+			connectionIndices = connectionsSparse.indices()
+			connectionValues = connectionsSparse.values().clone()
+			if(not pt.isfinite(connectionValues).all()):
+				raise RuntimeError(inferenceReviewPatch14InvalidConnections)
+			# This tensor belongs to one exact source neuron; only its outgoing targets share a segment maximum.
+			segmentIndices = connectionIndices[inferenceLeakyIntegrateAndFireSegmentDimension]
+			segmentMaxima = pt.zeros((arrayNumberOfSegments,), dtype=connectionValues.dtype, device=connectionValues.device)
+			segmentMaxima.scatter_reduce_(inferenceReviewPatch14VectorDimension, segmentIndices, connectionValues, reduce=inferenceReviewPatch14MaximumReduction)
+			positiveConnections = connectionValues > inferenceReviewPatch14MinimumStrength
+			# Empty and zero-only segments emit no input; never divide their weights by zero.
+			if(inferenceSynapticResponsePower):
+				if(inferenceSynapticResponseExponent == inferenceSynapticResponseMaximumExponent):
+					# Preserve the original floating-point arithmetic for the identity response.
+					connectionValues[positiveConnections] *= inferenceReviewPatch14ReferenceStrength / segmentMaxima[segmentIndices[positiveConnections]]
+				else:
+					connectionValues[positiveConnections] = inferenceReviewPatch14ReferenceStrength*(connectionValues[positiveConnections]/segmentMaxima[segmentIndices[positiveConnections]]).pow(inferenceSynapticResponseExponent)
+			else:
+				connectionValues[positiveConnections] *= inferenceReviewPatch14ReferenceStrength / segmentMaxima[segmentIndices[positiveConnections]]
+			if(useSANIcolumns or useSANIfeaturesAndColumns):
+				columnConnections = segmentIndices <= arrayIndexSegmentLastColumn
+				connectionValues[columnConnections] *= inferenceReviewPatch14ColumnInputGain
+			if(not pt.isfinite(connectionValues).all() or (connectionValues[positiveConnections] <= inferenceReviewPatch14MinimumStrength).any()):
+				raise RuntimeError(inferenceReviewPatch14InvalidNormalisedStrength)
+			# Preserve the stored weights and coordinates; source activation and the existing sigmoid follow this transformation.
+			result = pt.sparse_coo_tensor(connectionIndices, connectionValues, size=connectionsSparse.size(), dtype=connectionsSparse.dtype, device=connectionsSparse.device).coalesce()
 	else:
 		raise RuntimeError(inferenceReviewPatch14InvalidConfiguration)
 	return result
