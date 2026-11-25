@@ -22,6 +22,10 @@ import time
 import math
 
 from GIAANNcmn_globalDefs import *
+if(inferenceUpgradeReadout):
+	import GIAANNcmn_predictionUpgrades
+if(inferenceUpgradePrefixOnlyEvaluation):
+	import GIAANNnlp_observableAnchors
 if(trainDendriticBranchesPredictionErrorCorrection):
 	import GIAANNcmn_dendriticPredictionErrorCorrection
 if(inferenceContextLikelihood):
@@ -421,6 +425,8 @@ def processConceptWordsInference(sequenceObservedColumns, sequenceIndex, sequenc
 	return result
 
 def processConceptWordsInferenceSequence(sequenceObservedColumns, sequenceIndex, sequence, sequenceSeed, sequencePredict, numSeedTokens, sequenceRaw):
+	if(inferenceUpgradeReadout):
+		GIAANNcmn_predictionUpgrades.initialiseSequence(sequenceObservedColumns.databaseNetworkObject)
 	if(inferenceContextLikelihood):
 		GIAANNcmn_predictionContextLikelihood.initialiseContextLikelihoodSequence(sequenceObservedColumns.databaseNetworkObject)
 	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures):
@@ -433,6 +439,8 @@ def processConceptWordsInferenceSequence(sequenceObservedColumns, sequenceIndex,
 	sequenceWordIndex = 0
 
 	tokensSequence = GIAANNnlp_sequenceTokens.getTokens(sequence)
+	if(inferenceUpgradePrefixOnlyEvaluation):
+		tokensSequence = GIAANNnlp_observableAnchors.neutralTokens(sequenceObservedColumns.databaseNetworkObject, tokensSequence)
 	inferenceSuccessfulPredictionMask = None
 	if(useTrainDuringInference):
 		inferenceSuccessfulPredictionMask = createInferenceSuccessfulPredictionMask(tokensSequence)
@@ -575,6 +583,10 @@ def processColumnInferencePrediction(sequenceObservedColumns, sequenceIndex, obs
 	
 	#intialise function variables;
 	databaseNetworkObject = sequenceObservedColumns.databaseNetworkObject
+	if(inferenceUpgradePrefixOnlyEvaluation):
+		sequenceObservedColumns, tokensSequence, conceptMask = GIAANNnlp_observableAnchors.stepView(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, seedPhase)
+	if(inferenceUpgradeReadout and sequenceWordIndex > upgradeZero):
+		databaseNetworkObject.upgradeReadout.observe(databaseNetworkObject, int(conceptColumnIndex), int(conceptColumnFeatureIndex), seedPhase)
 	debugTimeStart = None
 	debugTimeLast = None
 	predictionCandidatesAvailable = True
@@ -984,7 +996,7 @@ def calculateConnectedColumnsConstraint(databaseNetworkObject, observedColumnsDi
 	if(predictionEnsureConnectedToPreviousPrediction and (inferenceSeedNetwork and sequenceWordIndex > 0) and connectedColumnsConstraint is not None and connectedColumnsConstraint.numel() == 0 and inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		if(inferenceReviewPatch12RetainContextWithoutOutgoingSource and inferenceLeakyIntegrateAndFire and algorithmMatrixSANIenforceRequirement=="enforceLastSegmentMustBeActive"):
 			pass	#The selection stage still raises if no eligible context candidate remains.
-		elif((inferenceReviewPatch13poolTransitionsFromSimilarFeatures or inferencePoolObservedTokenOnAbstention) and not seedPhase):
+		elif((inferenceReviewPatch13poolTransitionsFromSimilarFeatures or inferencePoolObservedTokenOnAbstention or inferenceUpgradeReadout) and not seedPhase):
 			pass	#Try shared trained transitions before the normal no-candidate handling.
 		else:
 			GIAANNcmn_predictionConstraints.raiseOrStopPredictionConnectivityError(sequenceWordIndex, wordPredictionIndex, tokensSequence, "previous prediction has no outgoing connections")
@@ -1241,7 +1253,7 @@ def selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetw
 					previousIndex = sequenceWordIndex - inferencePoolObservedTokenPreviousOffset
 					observedToken = tokensSequence[previousIndex].word if tokeniserSubword else getInferenceTargetWord(tokensSequence, conceptMask, previousIndex)
 				pooledPrediction = GIAANNcmn_predictionPoolTransitions.selectPooledTransitionOnAbstention(databaseNetworkObject, observedToken)
-			if(pooledPrediction is None and inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+			if(pooledPrediction is None and inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures and not inferenceUpgradeReadout):
 				raise
 			targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNcmn_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 			if(pooledPrediction is None):
@@ -1250,6 +1262,17 @@ def selectNextColumnFeaturePredictionPhase(sequenceObservedColumns, databaseNetw
 				conceptColumnFeatureIndexPred = int(targetFeatureIndex)
 			else:
 				conceptColumnIndexPred, conceptColumnFeatureIndexPred = pooledPrediction
+	if(inferenceUpgradeReadout):
+		nativeCell = (conceptColumnIndexPred, conceptColumnFeatureIndexPred) if predictionCandidatesAvailable else None
+		selection = databaseNetworkObject.upgradeReadout.select(databaseNetworkObject, nativeCell)
+		predictionCandidatesAvailable = selection is not None
+		if(predictionCandidatesAvailable):
+			conceptColumnIndexPred, conceptColumnFeatureIndexPred = selection
+		elif(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
+			raise GIAANNcmn_predictionConstraints.InferenceStopSequenceNoPredictionCandidatesAvailable(upgradeNoContinuation)
+	if(inferenceUpgradePrefixOnlyEvaluation):
+		sequenceObservedColumns.revealObservation()
+		targetPreviousColumnIndex, targetNextColumnIndex, targetFeatureIndex = GIAANNcmn_databaseNetwork.getTokenConceptFeatureIndexTensor(sequenceObservedColumns, tokensSequence, conceptMask, sequenceWordIndex, kcNetwork)
 	if(inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 		conceptColumnIndexNext = conceptColumnIndexPred	#use prediction as next selected feature
 		conceptColumnFeatureIndexNext = conceptColumnFeatureIndexPred	#use prediction as next selected feature

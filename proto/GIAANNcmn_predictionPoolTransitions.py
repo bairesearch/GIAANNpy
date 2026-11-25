@@ -24,6 +24,8 @@ import math
 import torch as pt
 
 from GIAANNcmn_globalDefs import *
+if(inferenceUpgradeReadout):
+	from functools import lru_cache, partial
 import GIAANNcmn_databaseNetworkFiles
 import GIAANNcmn_predictionConstraints
 
@@ -54,11 +56,21 @@ def selectPooledTransitionOnAbstention(databaseNetworkObject, observedToken):
 def getCachedPooledTransition(databaseNetworkObject, sourceToken, predictions, onAbstention=False):
 	result = None
 	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures or inferencePoolObservedTokenOnAbstention):
-		if(sourceToken not in predictions):
+		if(inferenceUpgradeReadout and hasattr(databaseNetworkObject, upgradeReadoutAttribute)):
 			if(databaseNetworkObject.inferenceReviewPatch13SourceIndex is None):
 				databaseNetworkObject.inferenceReviewPatch13SourceIndex = buildPooledTransitionSourceIndex(databaseNetworkObject)
-			predictions[sourceToken] = calculatePooledTransition(databaseNetworkObject, sourceToken, onAbstention)
-		result = predictions[sourceToken]
+			if(not hasattr(databaseNetworkObject, upgradePooledCandidatesAttribute)):
+				databaseNetworkObject.upgradePooledCandidates = lru_cache(maxsize=upgradePooledCandidatesCache)(partial(calculatePooledTransition, databaseNetworkObject, includeScores=True))
+			result, candidates = databaseNetworkObject.upgradePooledCandidates(sourceToken, onAbstention)
+			predictions[sourceToken] = result
+			if(result is not None):
+				databaseNetworkObject.upgradeReadout.localCandidates = candidates
+		else:
+			if(sourceToken not in predictions):
+				if(databaseNetworkObject.inferenceReviewPatch13SourceIndex is None):
+					databaseNetworkObject.inferenceReviewPatch13SourceIndex = buildPooledTransitionSourceIndex(databaseNetworkObject)
+				predictions[sourceToken] = calculatePooledTransition(databaseNetworkObject, sourceToken, onAbstention)
+			result = predictions[sourceToken]
 	return result
 
 
@@ -126,7 +138,7 @@ def indexPooledTransitionSources(databaseNetworkObject, sourcesByToken, sourceFe
 	return
 
 
-def calculatePooledTransition(databaseNetworkObject, sourceToken, onAbstention=False):
+def calculatePooledTransition(databaseNetworkObject, sourceToken, onAbstention=False, includeScores=False):
 	result = None
 	if(inferenceReviewPatch13poolTransitionsFromSimilarFeatures or inferencePoolObservedTokenOnAbstention):
 		sourceFeatureStride, sourcesByToken = databaseNetworkObject.inferenceReviewPatch13SourceIndex
@@ -150,6 +162,12 @@ def calculatePooledTransition(databaseNetworkObject, sourceToken, onAbstention=F
 			else:
 				winningToken = max(targetStrengths, key=targetStrengths.get)
 			result = targetExemplars[winningToken]
+		if(inferenceUpgradeReadout and includeScores):
+			candidates = None
+			if(result is not None):
+				columns, features = zip(*(targetExemplars[token] for token in targetStrengths))
+				candidates = pt.tensor(columns, dtype=pt.long), pt.tensor(features, dtype=pt.long), pt.tensor(list(targetStrengths.values()), dtype=pt.float64)
+			result = result, candidates
 	return result
 
 

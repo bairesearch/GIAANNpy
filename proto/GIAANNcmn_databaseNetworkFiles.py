@@ -73,6 +73,10 @@ def clearDatabaseFiles():
 	clearResult = subprocess.run(["bash", clearScriptExecutionPath], cwd=databaseFolderPath, check=False)
 	if(clearResult.returncode != 0):
 		raise RuntimeError("clearDatabaseFiles error: clear.sh failed with return code " + str(clearResult.returncode))
+	if(inferenceUpgradeLearnSharedInputDendriticBranches):
+		branchFile = os.path.join(databaseFolderPath, upgradeBranchStorageName)
+		if(os.path.isfile(branchFile)):
+			os.remove(branchFile)
 	return
 
 def pathExists(pathName):
@@ -481,6 +485,8 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 				conceptFeaturesReferenceSetDelimiterDict = dict(enumerate(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList))
 				saveDictFile(conceptFeaturesReferenceSetDelimiterListFile, conceptFeaturesReferenceSetDelimiterDict)
 	
+	if(inferenceUpgradeLearnSharedInputDendriticBranches and not databaseNetworkObject.inferenceMode):
+		databaseNetworkObject.sharedInputBranches.commit()
 	if(debugPrintTrainSectionTimes):
 		GIAANNcmn_debug.debugTrainSectionTimesAdd(databaseNetworkObject, "saveData.total", time.perf_counter() - saveDataStartTime)
 

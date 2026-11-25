@@ -159,6 +159,8 @@ def scoreContextLikelihoodCandidates(databaseNetworkObject, columnIndices, featu
 			if(not pt.isfinite(scores).all() or (scores <= inferenceContextLikelihoodZero).any()):
 				raise RuntimeError(inferenceContextLikelihoodInvalidEvidence)
 			result = columnIndices, featureIndices, scores
+			if(inferenceUpgradeReadout and hasattr(databaseNetworkObject, upgradeReadoutAttribute)):
+				databaseNetworkObject.upgradeReadout.localCandidates = result
 	return result
 
 

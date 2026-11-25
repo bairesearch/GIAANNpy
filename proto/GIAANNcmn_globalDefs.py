@@ -692,6 +692,38 @@ if(trainSelectMostSimilarBranch):
 arrayIndexPropertiesActivationCreateInference = arrayIndexPropertiesActivation or True
 arrayIndexPropertiesTimeCreateInference = arrayIndexPropertiesTime or inferenceUseNeuronFeaturePropertiesTime
 
+if(predictionEnsureConnectedToPreviousPredictionStrict==False):
+	inferenceUpgradeObservedSourcesOnAbstention = False	#default: False #orig: False	#keep every prediction the baseline makes. When it cannot predict, use the most likely next token from the observed-source cells.
+	inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions = True	#default: True #orig: False 	#when the baseline can predict, give extra weight to existing synapses recently traversed in the same excerpt. When it abstains, use observed-source inference.
+	inferenceUpgradeAdaptLocalAndObservedSourceWeights = False	#default: False #orig: False	#combine the baseline and observed-source predictions, giving more weight to whichever has been more accurate earlier in the excerpt. Also give a temporary boost to recently used connections.
+else:
+	inferenceUpgradeObservedSourcesOnAbstention = False
+	inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions = False
+	inferenceUpgradeAdaptLocalAndObservedSourceWeights = False
+inferenceUpgradePrefixOnlyEvaluation = False	#default: False #orig: False- assign each token to a concept column using only the text available when the prediction is due. The historical evaluator can change its prediction when a noun after the target changed.
+if(inferenceUpgradePrefixOnlyEvaluation):
+	trainUpgradeWithObservableNounAnchors = True	#default: True #orig: False	 #train and evaluate with the same rule for starting a concept column, using noun information available as each token arrives.
+	if(predictionEnsureConnectedToPreviousPrediction==False):
+		inferenceUpgradeLearnSharedInputDendriticBranches = True	#default: True #orig: False	 #train branches to respond when the two preceding observed tokens activate inputs to the same branch, then combine that evidence with the baseline prediction. Allowing those inputs to meet anywhere on the same target cell.
+	else:
+		inferenceUpgradeLearnSharedInputDendriticBranches = False
+	if(predictionEnsureConnectedToPreviousPredictionStrict==False):
+		inferenceUpgradeObservedSourceInference = True	#default: True #orig: False	#keep up to 64 plausible source cells and combines the next-token evidence from their trained outgoing connections. The baseline assigns the last observed token to one source cell.
+		inferenceUpgradeApplyBranchEvidenceByCandidateToken = True	#default: True #orig: False	 #sum learned branch evidence across cells predicting the same token and uses that sum to increase the token score.
+	else:
+		inferenceUpgradeObservedSourceInference = False
+		inferenceUpgradeApplyBranchEvidenceByCandidateToken = False
+else:
+	inferenceUpgradeObservedSourceInference = False
+	trainUpgradeWithObservableNounAnchors = False
+	inferenceUpgradeLearnSharedInputDendriticBranches = False
+	inferenceUpgradeApplyBranchEvidenceByCandidateToken = False
+
+inferenceUpgradeObservedSources = inferenceUpgradeObservedSourcesOnAbstention or inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions or inferenceUpgradeAdaptLocalAndObservedSourceWeights or inferenceUpgradeObservedSourceInference or inferenceUpgradeApplyBranchEvidenceByCandidateToken
+inferenceUpgradeReadout = inferenceUpgradeObservedSources or inferenceUpgradeLearnSharedInputDendriticBranches
+inferenceUpgradeBranchBank = inferenceUpgradeLearnSharedInputDendriticBranches or inferenceUpgradeApplyBranchEvidenceByCandidateToken
+if(inferenceUpgradeReadout or inferenceUpgradePrefixOnlyEvaluation or trainUpgradeWithObservableNounAnchors):
+	from GIAANNcmn_upgradeGlobalDefs import *
 
 #Beam search;
 if(useInference):
@@ -711,6 +743,28 @@ if(useInference):
 	inferenceBeamInstancePreferAdjacentOverlap = False           #optional: prioritise columns sharing active features with adjacent columns
 	inferenceBeamWidth = 3	#default: 3	#orig: 3
 	inferenceBeamDepth = 6	#default: 3	#orig: 6
+	if(inferenceBeamSearchLikelihood or inferenceUpgradeObservedSources):
+		inferenceBeamSearchZero = 0
+		inferenceBeamSearchOne = 1
+		inferenceBeamSearchTwo = 2
+		inferenceBeamSearchMaximumWidth = 64
+		inferenceBeamSearchInvalidParameter = "Likelihood beam search parameter is outside its supported range"
+		inferenceBeamSearchInvalidState = "Likelihood beam search received inconsistent state or candidates"
+	if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):
+		inferenceBeamSearchObservedSourcePoolWeight = 0.75
+		inferenceBeamSearchObservedSourcePriorWeight = 0.01
+		inferenceBeamSearchObservedSourceIndexDirectory = None	#None reads the frozen native checkpoint directly
+		inferenceBeamSearchObservedSourceRowCache = 2048
+		inferenceBeamSearchObservedSourcePoolCache = 128
+		inferenceBeamSearchObservedSourceIndexVersion = 1
+		inferenceBeamSearchObservedSourceIndexFile = "manifest.json"
+		inferenceBeamSearchObservedSourceArraySuffix = ".npy"
+		inferenceBeamSearchObservedSourceMapMode = "r"
+		inferenceBeamSearchObservedSourceSort = "stable"
+		inferenceBeamSearchObservedSourceArrays = ("keys", "counts", "lex", "rows", "targets", "strengths", "pooledRows", "pooledTargets", "pooledStrengths")
+		inferenceBeamSearchObservedSourceManifestKeys = ("version", "database", "concepts", "features", "segment", "vocabulary")
+		inferenceBeamSearchObservedSourceInvalidIndex = "Observed-source index does not match the frozen checkpoint"
+		inferenceBeamSearchObservedSourceIndexAttribute = "observedSourceIndex"
 	if(inferenceBeamSearchLikelihood):
 		inferenceBeamSearchLikelihoodStrategy = "contextLikelihood"
 		inferenceBeamScoreStrategy = inferenceBeamSearchLikelihoodStrategy
@@ -728,11 +782,7 @@ if(useInference):
 		inferenceBeamSearchDiagnosticMaximumWeight = 1.0
 		inferenceBeamSearchPruneDominated = True
 		inferenceBeamSearchProjectTerminalState = True
-		inferenceBeamSearchZero = 0
-		inferenceBeamSearchOne = 1
-		inferenceBeamSearchTwo = 2
 		inferenceBeamSearchThree = 3
-		inferenceBeamSearchMaximumWidth = 64
 		inferenceBeamSearchMaximumDepth = 8
 		inferenceBeamSearchMaximumExtraCandidates = 1024
 		inferenceBeamSearchContinuationFloor = 1e-12
@@ -746,27 +796,11 @@ if(useInference):
 		inferenceBeamSearchConfigurationNames = ("inferenceBeamSearchLikelihood", "inferenceBeamScoreStrategy", "inferenceBeamWidth", "inferenceBeamDepth", "inferenceBeamSearchAdmitSubthreshold", "inferenceBeamSearchMinimumActivationRatio", "inferenceBeamSearchExtraCandidates", "inferenceBeamSearchContinuationWeight", "inferenceBeamSearchSubthresholdPenalty", "inferenceBeamSearchPreserveEligibleScores", "inferenceBeamSearchLimitRootGap", "inferenceBeamSearchMaximumRootLogGap", "inferenceBeamSearchPruneDominated", "inferenceBeamSearchProjectTerminalState", "inferenceBeamSearchRecordDiagnostics", "inferenceBeamSearchDiagnosticMaximumWeight")
 		inferenceBeamSearchConfigurationLabelSuffix = ":"
 		inferenceBeamSearchInvalidConfiguration = "Likelihood beam search requires static CPU single-branch NLP LIF with strict direct connections, context and column likelihood, token aggregation, no auxiliary sources or time properties"
-		inferenceBeamSearchInvalidParameter = "Likelihood beam search parameter is outside its supported range"
-		inferenceBeamSearchInvalidState = "Likelihood beam search received inconsistent state or candidates"
 		inferenceBeamSearchNoCandidates = "Likelihood beam search has no eligible source-connected candidates"
 		if(inferenceBeamSearchObservedSources):
 			inferenceBeamDepth = inferenceBeamSearchOne	#posterior predictive next-token decision
 			inferenceBeamSearchObservedSourceContext = True	#apply the existing dendritic likelihood to the latent-source predictive distribution
 			inferenceBeamWidth = 64
-			inferenceBeamSearchObservedSourcePoolWeight = 0.75
-			inferenceBeamSearchObservedSourcePriorWeight = 0.01
-			inferenceBeamSearchObservedSourceIndexDirectory = None	#None reads the frozen native checkpoint directly
-			inferenceBeamSearchObservedSourceRowCache = 2048
-			inferenceBeamSearchObservedSourcePoolCache = 128
-			inferenceBeamSearchObservedSourceIndexVersion = 1
-			inferenceBeamSearchObservedSourceIndexFile = "manifest.json"
-			inferenceBeamSearchObservedSourceArraySuffix = ".npy"
-			inferenceBeamSearchObservedSourceMapMode = "r"
-			inferenceBeamSearchObservedSourceSort = "stable"
-			inferenceBeamSearchObservedSourceArrays = ("keys", "counts", "lex", "rows", "targets", "strengths", "pooledRows", "pooledTargets", "pooledStrengths")
-			inferenceBeamSearchObservedSourceManifestKeys = ("version", "database", "concepts", "features", "segment", "vocabulary")
-			inferenceBeamSearchObservedSourceInvalidIndex = "Observed-source index does not match the frozen checkpoint"
-			inferenceBeamSearchObservedSourceIndexAttribute = "observedSourceIndex"
 			inferenceBeamSearchConfigurationNames += ("inferenceBeamSearchObservedSources", "inferenceBeamSearchObservedSourceContext", "inferenceBeamSearchObservedSourcePoolWeight", "inferenceBeamSearchObservedSourcePriorWeight", "inferenceBeamSearchObservedSourceIndexDirectory")
 
 	#optimisations;
@@ -2264,6 +2298,9 @@ else:
 	inferenceReviewPatch15TokenTransitionPrior = False
 	inferenceReviewPatch16TokenAggregation = False
 
+
+
+#precondition checks:
 if(inferenceContextLikelihood):
 	if(inferenceReviewPatch15TokenTransitionPrior or not inferenceReviewPatch16TokenAggregation):
 		raise RuntimeError(inferenceContextLikelihoodInvalidConfiguration)

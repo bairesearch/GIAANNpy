@@ -797,7 +797,7 @@ MANUAL; - set inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatu
 
 ---
 v2s (Codex App GPT-6.0):
-- add proto GIAANNproto2s1a - start inferenceBeamSearch+multipleDendriticBranches updates:
+- add proto GIAANNproto2s1a - start inferenceBeamSearch+multipleDendriticBranches+useGPU*SparseTensorDriver updates:
 	- patch and optimise inferenceBeamSearch with likelihood scoring, isolate speculative state and subthreshold candidate admission.
 AUTORESEARCH; - explore a new or existing branching (multipleDendriticBranches=True) method as a solution to the dendritic conflicting context issue (e.g. red square -> X, red circle -> Y, blue square -> Y, blue circle -> X) and iteratively test your hypotheses by executing training+inference:
 	- add option useContextRoutedBranches (disabled) - context-selective dendritic branches that preserve ordered token-prefix combinations and combine matching specialist activation with a shared baseline.
@@ -808,8 +808,22 @@ AUTORESEARCH; - explore a new or existing branching (multipleDendriticBranches=T
 	- add option trainVerifyConnectionNonexistentAcrossBranchesOptimisation2 (enabled) - lossless indexed storage. A controlled 24-column benchmark measured 2.66% faster writes, 4.23% faster warm-cache reads, and 57% fewer bytes.
 - implement option trainVerifyConnectionNonexistentAcrossBranchesFractional (enabled) - max 50% of branches of a given segment index share the same incoming connection (rather than ensuring no repeated connections are allowed).
 - add option trainDendriticBranchesPredictionErrorCorrection - strengthen synapses supporting correct predictions and weaken competing branch synapses during trainDuringInference.
+Codex App GPT-6.2:
 - remove all options that look up training data to predict future tokens (useSequenceContext, contextRoutedBranchesExact).
 - add option !predictionEnsureConnectedToPreviousPredictionStrict:inferencePoolObservedTokenOnAbstention - predict the next token from pooled one-step connection strengths across cells representing the last observed token when the decoder finds no candidate.
-- add option useHybridGPUCPUcustomSparseTensorDriver - accelerate GIAANN sparse COO operations during training and inference with optimized CPU and CUDA kernels.
+- add option useGPUCPUhybridCustomSparseTensorDriver - accelerate GIAANN sparse COO operations during training and inference with optimized CPU and CUDA kernels.
 - add option useGPUcustomSparseTensorDriver - accelerate GIAANN sparse COO addition, connection-strength normalisation, and batched training updates on CUDA.
 - add option useGPUstockSparseTensorDriver - merge packed training updates with stock PyTorch on CUDA and keep sparse inference tensors on the GPU.
+
+---
+v2t (Codex App GPT-6.2):
+- add proto GIAANNproto2t1a - start inference updates:
+	- add option inferenceUpgradeObservedSourcesOnAbstention (disabled) - keep every prediction the baseline makes. When it cannot predict, use the most likely next token from the observed-source cells.
+	- add option inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions (enabled) - when the baseline can predict, give extra weight to existing synapses recently traversed in the same excerpt. When it abstains, use observed-source inference.
+	- add option inferenceUpgradeAdaptLocalAndObservedSourceWeights (disabled) - combine the baseline and observed-source predictions, giving more weight to whichever has been more accurate earlier in the excerpt. Also give a temporary boost to recently used connections.
+	- add option inferenceUpgradePrefixOnlyEvaluation (disabled) - assign each token to a concept column using only the text available when the prediction is due. The historical evaluator can change its prediction when a noun after the target changed.
+		- add option inferenceUpgradeObservedSourceInference - keep up to 64 plausible source cells and combines the next-token evidence from their trained outgoing connections. The baseline assigns the last observed token to one source cell.
+		- add option trainUpgradeWithObservableNounAnchors - train and evaluate with the same rule for starting a concept column, using noun information available as each token arrives.
+		- add option inferenceUpgradeLearnSharedInputDendriticBranches - train branches to respond when the two preceding observed tokens activate inputs to the same branch, then combine that evidence with the baseline prediction. Allowing those inputs to meet anywhere on the same target cell.
+		- add option inferenceUpgradeApplyBranchEvidenceByCandidateToken - sum learned branch evidence across cells predicting the same token and uses that sum to increase the token score.
+

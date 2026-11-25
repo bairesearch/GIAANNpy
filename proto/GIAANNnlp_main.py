@@ -27,6 +27,10 @@ from spacy.tokens import Doc
 pt.set_grad_enabled(False)
 
 from GIAANNcmn_globalDefs import *
+if(inferenceUpgradePrefixOnlyEvaluation):
+	import GIAANNnlp_observableAnchors
+if(inferenceUpgradeLearnSharedInputDendriticBranches):
+	import GIAANNcmn_sharedInputBranches
 if(trainDendriticBranchesPredictionErrorCorrection):
 	import GIAANNcmn_dendriticPredictionErrorCorrection
 if(optimiseTrainSequenceBatch):
@@ -600,7 +604,8 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 	if(storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam):
 		if(not databaseNetworkObject.observedColumnsRAMLoaded):
 			raise RuntimeError("processSequence error: storeDatabaseFeatureConnectionsAndColumnFeatureNeuronsInRam requires observedColumnsRAMLoaded after startup")
-	if(inferenceMode and inferenceAddNewFeatures):
+	prefixEvaluation = inferenceMode and inferenceUpgradePrefixOnlyEvaluation
+	if(inferenceMode and inferenceAddNewFeatures and not prefixEvaluation):
 		expandSequenceForInference(databaseNetworkObject, sequence)
 		allowNewFeatures = False
 
@@ -611,7 +616,11 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 	if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
 		GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("firstPass")
 	
-	if(optimiseTrainParallelisation3d and trainMode):
+	if(prefixEvaluation):
+		tokens = GIAANNnlp_sequenceTokens.getTokens(sequence)
+		sequenceObservedColumns = GIAANNnlp_observableAnchors.buildSequence(databaseNetworkObject, tokens)
+		conceptsFound = True
+	elif(optimiseTrainParallelisation3d and trainMode):
 		tokens = GIAANNnlp_sequenceTokens.getTokens(sequence)
 		conceptsFound, conceptMask = GIAANNnlp_sequenceConcepts.firstPass(databaseNetworkObject, sequence, allowNewFeatures, tokens)
 	else:
@@ -627,7 +636,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		if(debugPrintTrainSectionTimes and trainMode):
 			getTokensStartTime = time.perf_counter()
 		
-		if(not optimiseTrainParallelisation3d or not trainMode):
+		if(not prefixEvaluation and (not optimiseTrainParallelisation3d or not trainMode)):
 			tokens = GIAANNnlp_sequenceTokens.getTokens(sequence)
 		if(inferenceMode and useTrainDuringInference and inferenceSuccessfulPredictionMask is None):
 			inferenceSuccessfulPredictionMask = GIAANNcmn_prediction.createInferenceSuccessfulPredictionMask(tokens)
@@ -641,7 +650,7 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		if(tokeniserSubword):
 			if(useDedicatedFeatureListsSubword):
 				runFeatureDetection = True
-		if(runFeatureDetection):
+		if(runFeatureDetection and not prefixEvaluation):
 			if(debugPrintTrainSectionTimes and trainMode):
 				detectNewFeaturesStartTime = time.perf_counter()
 			if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
@@ -664,7 +673,8 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
 			GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("secondPass")
 		
-		observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNnlp_sequenceConcepts.secondPass(databaseNetworkObject, tokens, inferenceMode)
+		if(not prefixEvaluation):
+			observedColumnsDict, observedColumnsSequenceWordIndexDict = GIAANNnlp_sequenceConcepts.secondPass(databaseNetworkObject, tokens, inferenceMode)
 		
 		if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
 			GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("secondPass")
@@ -678,7 +688,8 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 		if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
 			GIAANNcmn_debug.debugResetGpuRamMaxUsagePhaseLocal("SequenceObservedColumns.__init__")
 		
-		sequenceObservedColumns = GIAANNcmn_sequenceObservedColumns.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict, inferenceMode)
+		if(not prefixEvaluation):
+			sequenceObservedColumns = GIAANNcmn_sequenceObservedColumns.SequenceObservedColumns(databaseNetworkObject, tokens, observedColumnsDict, observedColumnsSequenceWordIndexDict, inferenceMode)
 		
 		if(debugPrintRamMaxUsagePhaseLocal and not inferenceMode):
 			GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("SequenceObservedColumns.__init__")
@@ -721,6 +732,8 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 				GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("trainConceptWords")
 			
 			if(trained):
+				if(inferenceUpgradeLearnSharedInputDendriticBranches):
+					GIAANNcmn_sharedInputBranches.learnSequence(sequenceObservedColumns, tokens)
 				# Update observed columns from sequence observed columns
 				updateObservedColumnsWrapperStartTime = None
 				

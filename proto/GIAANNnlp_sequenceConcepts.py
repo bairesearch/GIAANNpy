@@ -21,6 +21,8 @@ import random
 import torch as pt
 
 from GIAANNcmn_globalDefs import *
+if(trainUpgradeWithObservableNounAnchors):
+	import GIAANNnlp_observableAnchors
 import GIAANNcmn_databaseNetwork
 import GIAANNnlp_sequenceTokens
 if(optimiseTrainParallelisation2f):
@@ -36,7 +38,9 @@ def isTokenConceptColumnCandidate(token, tokens, tokenIndex):
 			raise RuntimeError("isTokenConceptColumnCandidate error: tokenIndex must be an int")
 		if(tokenIndex < 0 or tokenIndex >= len(tokens)):
 			raise RuntimeError("isTokenConceptColumnCandidate error: tokenIndex out of range")
-	if usePOS:
+	if(trainUpgradeWithObservableNounAnchors):
+		result = GIAANNnlp_observableAnchors.observableAnchor(tokens, tokenIndex)
+	elif usePOS:
 		if(GIAANNnlp_sequenceTokens.isConcept(token)):
 			result = True
 			if(tokeniserSubword):
@@ -400,7 +404,18 @@ def has_next_reference_delimiter(token_index, sequenceLength, sequenceReferenceS
 		return False
 	return token_is_reference_set_delimiter(next_index, sequenceReferenceSetDelimiterList)
 
-if(optimiseTrainConceptMetadata):
+if(trainUpgradeWithObservableNounAnchors):
+	def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
+		if(trainUpgradeWithObservableNounAnchors):
+			mask, starts, count = createConceptMask(sequenceObservedColumns, tokens)
+			if(not count or starts[upgradeZero].item() != upgradeZero):
+				raise ValueError(upgradeInvalidSource)
+			ends = pt.cat((starts[upgradeOne:], starts.new_tensor([len(tokens)])))
+			assignment = buildSequenceConceptAssignment(sequenceObservedColumns, sequence, tokens, starts, starts, ends)
+			if(printSequenceConceptAssignment):
+				sequenceObservedColumns.sentenceWithConceptAssignment = assignment
+		return starts, starts, ends
+elif(optimiseTrainConceptMetadata):
 	def processConceptWords(sequenceObservedColumns, sequenceIndex, sequence, tokens):
 		result = None
 		if(optimiseTrainConceptMetadata):

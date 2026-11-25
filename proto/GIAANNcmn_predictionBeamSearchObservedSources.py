@@ -61,7 +61,7 @@ def predict(database, tokens, position):
 
 
 def observe(index, posterior, token, width, poolWeight, priorWeight):
-	if(inferenceBeamSearchObservedSources):
+	if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):
 		if(type(token) is not int or not inferenceBeamSearchZero < token < index.database.f or type(width) is not int or not inferenceBeamSearchOne <= width <= inferenceBeamSearchMaximumWidth or type(poolWeight) not in (int, float) or not inferenceBeamSearchZero <= poolWeight <= inferenceBeamSearchOne or type(priorWeight) not in (int, float) or not inferenceBeamSearchZero < priorWeight <= inferenceBeamSearchOne):
 			raise ValueError(inferenceBeamSearchInvalidParameter)
 		start, end = index.lex[token:token + inferenceBeamSearchTwo]
@@ -97,14 +97,14 @@ def observe(index, posterior, token, width, poolWeight, priorWeight):
 
 
 def addObservedMass(mass, start, end, targets, strengths, scale):
-	if(inferenceBeamSearchObservedSources):
+	if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):
 		left, right = targets.searchsorted((start, end))
 		mass[targets[left:right] - start] += strengths[left:right].astype(np.float64, copy=False) * scale
 	return
 
 
 def outgoing(index, posterior):
-	if(inferenceBeamSearchObservedSources):
+	if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):
 		_, sources, probabilities = posterior
 		parts, weights = [], []
 		for source, probability in zip(sources, probabilities):
@@ -117,7 +117,7 @@ def outgoing(index, posterior):
 
 
 def applyDendriticEvidence(index, cells, masses):
-	if(inferenceBeamSearchObservedSources and inferenceBeamSearchObservedSourceContext):
+	if((inferenceBeamSearchObservedSources and inferenceBeamSearchObservedSourceContext) or inferenceUpgradeObservedSources):
 		database = index.database
 		if(database.columnLikelihoodPosition != database.contextLikelihoodPosition or database.columnLikelihoodColumn is None):
 			raise RuntimeError(inferenceBeamSearchInvalidState)
@@ -158,14 +158,15 @@ def applyDendriticEvidence(index, cells, masses):
 
 
 def addSegmentEvidence(result, keys, base, frame, segment, stride, smoothing):
-	if(inferenceBeamSearchObservedSources and inferenceBeamSearchObservedSourceContext):
+	if((inferenceBeamSearchObservedSources and inferenceBeamSearchObservedSourceContext) or inferenceUpgradeObservedSources):
 		if(keys.size and segment >= inferenceBeamSearchZero):
 			frameKeys, weights = frame
 			offset = segment * stride
-			left, right = frameKeys.numpy().searchsorted((offset + keys[inferenceBeamSearchZero], offset + keys[-inferenceBeamSearchOne] + inferenceBeamSearchOne))
+			frameKeysCPU = frameKeys.cpu().numpy()
+			left, right = frameKeysCPU.searchsorted((offset + keys[inferenceBeamSearchZero], offset + keys[-inferenceBeamSearchOne] + inferenceBeamSearchOne))
 			if(left < right):
-				available = frameKeys.numpy()[left:right] - offset
-				values = weights.numpy()[left:right]
+				available = frameKeysCPU[left:right] - offset
+				values = weights[left:right].cpu().numpy()
 				# Probe the smaller sorted set. Every stored key identifies exactly one physical candidate.
 				if(available.size < keys.size):
 					candidates = keys.searchsorted(available)
@@ -182,7 +183,7 @@ def addSegmentEvidence(result, keys, base, frame, segment, stride, smoothing):
 
 
 def winner(index, cells, masses):
-	if(inferenceBeamSearchObservedSources):
+	if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):
 		# Cell ordinals are sorted by emitted token. Ties select the lowest token, then the lowest cell key.
 		tokens = index.keys[cells] // (inferenceBeamSearchTwo * index.database.c)
 		starts = np.r_[inferenceBeamSearchZero, np.flatnonzero(tokens[inferenceBeamSearchOne:] != tokens[:-inferenceBeamSearchOne]) + inferenceBeamSearchOne]
@@ -194,7 +195,7 @@ def winner(index, cells, masses):
 
 
 def sumByCell(parts, weights):
-	if(inferenceBeamSearchObservedSources):
+	if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):
 		if(parts):
 			keys = np.concatenate(parts)
 			order = np.argsort(keys, kind=inferenceBeamSearchObservedSourceSort)
@@ -209,11 +210,14 @@ def sumByCell(parts, weights):
 class SourceIndex:
 	"""Cell ordinals sort first by emitted subword, then by column and prime status."""
 	def __init__(self, database):
-		if(inferenceBeamSearchObservedSources):
-			import GIAANNcmn_predictionBeamSearchLikelihood as beam
-			beam.validateConfiguration()
-			if(inferenceBeamDepth != inferenceBeamSearchOne or inferenceBeamSearchRecordDiagnostics or type(inferenceBeamSearchObservedSourceContext) is not bool or any(type(size) is not int or size <= inferenceBeamSearchZero for size in (inferenceBeamSearchObservedSourceRowCache, inferenceBeamSearchObservedSourcePoolCache))):
+		if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):
+			if(any(type(size) is not int or size <= inferenceBeamSearchZero for size in (inferenceBeamSearchObservedSourceRowCache, inferenceBeamSearchObservedSourcePoolCache))):
 				raise ValueError(inferenceBeamSearchInvalidParameter)
+			if(inferenceBeamSearchObservedSources):
+				import GIAANNcmn_predictionBeamSearchLikelihood as beam
+				beam.validateConfiguration()
+				if(inferenceBeamDepth != inferenceBeamSearchOne or inferenceBeamSearchRecordDiagnostics or type(inferenceBeamSearchObservedSourceContext) is not bool):
+					raise ValueError(inferenceBeamSearchInvalidParameter)
 			self.database = database
 			if(database.f != database.c + inferenceBeamSearchOne or any(database.conceptFeaturesDict[word] != col + inferenceBeamSearchOne for col, word in enumerate(database.conceptColumnsList))):
 				raise RuntimeError(inferenceBeamSearchObservedSourceInvalidIndex)
@@ -230,7 +234,7 @@ class SourceIndex:
 		return
 
 	def loadMapped(self, directory):
-		if(inferenceBeamSearchObservedSources):
+		if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):
 			digests = [hashlib.sha256(Path(file).read_bytes()).hexdigest() for file in (conceptColumnsDictFile, conceptFeaturesDictFile)]
 			expected = dict(zip(inferenceBeamSearchObservedSourceManifestKeys, (inferenceBeamSearchObservedSourceIndexVersion, str(Path(databaseFolder).resolve()), self.database.c, self.database.f, arrayIndexSegmentSoma, digests)))
 			if(json.loads((directory / inferenceBeamSearchObservedSourceIndexFile).read_text()) != expected):
@@ -251,13 +255,14 @@ class SourceIndex:
 		return
 
 	def loadNative(self):
-		if(inferenceBeamSearchObservedSources):
+		if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):
 			keys, counts = [], []
 			for column in files.listPersistedObservedColumnConceptIndices():
 				features, frequencies = likelihood.loadContextLikelihoodColumnFrequencies(self.database, column)
-				active = frequencies.numpy() > inferenceBeamSearchZero
-				keys.append(self.encode(column, features.numpy()[active]))
-				counts.append(frequencies.numpy()[active])
+				frequencies = frequencies.cpu().numpy()
+				active = frequencies > inferenceBeamSearchZero
+				keys.append(self.encode(column, features.cpu().numpy()[active]))
+				counts.append(frequencies[active])
 			if(not keys):
 				raise RuntimeError(inferenceBeamSearchObservedSourceInvalidIndex)
 			physical = np.concatenate(keys)
@@ -268,14 +273,14 @@ class SourceIndex:
 		return
 
 	def encode(self, columns, features):
-		if(inferenceBeamSearchObservedSources):
+		if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):
 			prime = features == featureIndexPrimeConceptNeuron
 			tokens = np.where(prime, columns + inferenceBeamSearchOne, features)
 			result = (tokens * self.database.c + columns) * inferenceBeamSearchTwo + prime
 		return result
 
 	def decode(self, source):
-		if(inferenceBeamSearchObservedSources):
+		if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):
 			if(not isinstance(source, (int, np.integer)) or not inferenceBeamSearchZero <= source < self.keys.size):
 				raise ValueError(inferenceBeamSearchInvalidParameter)
 			value, prime = divmod(int(self.keys[source]), inferenceBeamSearchTwo)
@@ -284,7 +289,7 @@ class SourceIndex:
 		return result
 
 	def readRow(self, source):
-		if(inferenceBeamSearchObservedSources):
+		if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):
 			if(not isinstance(source, (int, np.integer)) or not inferenceBeamSearchZero <= source < self.keys.size):
 				raise ValueError(inferenceBeamSearchInvalidParameter)
 			if(self.mapped):
@@ -296,13 +301,17 @@ class SourceIndex:
 		return result
 
 	def nativeRow(self, source):
-		if(inferenceBeamSearchObservedSources):
+		if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):
 			column, feature = self.decode(source)
 			path = Path(files.getObservedColumnFeatureConnectionsFolder(column)) / (files.getObservedColumnSourceFeatureConnectionsFileBaseName(feature) + pytorchTensorFileExtension)
-			if(path.is_file()):
+			if(inferenceUpgradeObservedSources and trainVerifyConnectionNonexistentAcrossBranchesOptimisation2):
+				present = feature in files.listObservedColumnSourceFeatureIndices(column)
+			else:
+				present = path.is_file()
+			if(present):
 				tensor = files.loadObservedColumnSourceFeatureConnectionsTensor(self.database, column, feature, inferenceContextLikelihoodDevice).coalesce()
-				prop, branch, segment, columns, features = tensor.indices().numpy()
-				values = tensor.values().numpy()
+				prop, branch, segment, columns, features = tensor.indices().cpu().numpy()
+				values = tensor.values().cpu().numpy()
 				mask = (prop == self.database.arrayIndexPropertiesStrengthIndex) & (branch == inferenceBeamSearchZero) & (segment == arrayIndexSegmentSoma)
 				if(not np.isfinite(values[mask]).all() or np.any(values[mask] < inferenceBeamSearchZero)):
 					raise RuntimeError(inferenceBeamSearchInvalidState)
@@ -318,7 +327,7 @@ class SourceIndex:
 		return result
 
 	def readPool(self, token):
-		if(inferenceBeamSearchObservedSources):
+		if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):
 			if(not isinstance(token, (int, np.integer)) or not inferenceBeamSearchZero < token < self.database.f):
 				raise ValueError(inferenceBeamSearchInvalidParameter)
 			if(self.mapped):
@@ -336,7 +345,7 @@ class SourceIndex:
 		return result
 
 	def distribution(self, targets, strengths):
-		if(inferenceBeamSearchObservedSources):
+		if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):
 			total = strengths.sum(dtype=np.float64)
 			if(self.mapped and targets.size and (targets[inferenceBeamSearchZero] < inferenceBeamSearchZero or targets[-inferenceBeamSearchOne] >= self.keys.size or not np.isfinite(total) or np.any(strengths <= inferenceBeamSearchZero) or np.any(targets[inferenceBeamSearchOne:] <= targets[:-inferenceBeamSearchOne]))):
 				raise RuntimeError(inferenceBeamSearchObservedSourceInvalidIndex)
