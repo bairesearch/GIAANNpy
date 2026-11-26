@@ -1,4 +1,24 @@
-"""Shared preparation for lightweight training workers and the enabled parent path."""
+"""GIAANNnlp_trainPreparation.py
+
+# Author:
+Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch.com.au)
+
+# License:
+MIT License
+
+# Installation:
+see GIAANNcmn_main.py
+
+# Usage:
+see GIAANNcmn_main.py
+
+# Description:
+GIA ANN NLP train Preparation
+
+Shared preparation for lightweight training workers and the enabled parent path.  
+
+"""
+
 
 from GIAANNcmn_globalDefs import *
 

@@ -817,7 +817,7 @@ Codex App GPT-6.2:
 
 ---
 v2t (Codex App GPT-6.2):
-- add proto GIAANNproto2t1a - start inference updates:
+AUTORESEARCH; - add proto GIAANNproto2t1a - start inference updates:
 	- add option inferenceUpgradeObservedSourcesOnAbstention (disabled) - keep every prediction the baseline makes. When it cannot predict, use the most likely next token from the observed-source cells.
 	- add option inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions (enabled) - when the baseline can predict, give extra weight to existing synapses recently traversed in the same excerpt. When it abstains, use observed-source inference.
 	- add option inferenceUpgradeAdaptLocalAndObservedSourceWeights (disabled) - combine the baseline and observed-source predictions, giving more weight to whichever has been more accurate earlier in the excerpt. Also give a temporary boost to recently used connections.
@@ -826,4 +826,9 @@ v2t (Codex App GPT-6.2):
 		- add option trainUpgradeWithObservableNounAnchors - train and evaluate with the same rule for starting a concept column, using noun information available as each token arrives.
 		- add option inferenceUpgradeLearnSharedInputDendriticBranches - train branches to respond when the two preceding observed tokens activate inputs to the same branch, then combine that evidence with the baseline prediction. Allowing those inputs to meet anywhere on the same target cell.
 		- add option inferenceUpgradeApplyBranchEvidenceByCandidateToken - sum learned branch evidence across cells predicting the same token and uses that sum to increase the token score.
+AUTORESEARCH; - examine the GIAANN project and its paper (including git history) and perform a systematic analysis to identify the likely most promising next research avenues to explore. Specifically with respect to enhancing the eval test-set accuracy:
+	- add option inferenceUpgradeRerankStrictCandidates (enabled) - rerank the baseline candidates by giving equal weight to its own scores and to evidence from other cells representing the last observed token. Give recently used connections a temporary boost and reduce the influence of unusually strong individual connections. If the baseline has no candidate, it still abstains.
+	- add option inferenceUpgradeCombineNativeAndObservedSourceVotes (enabled) - use the same two votes, but allow the other cells representing the last observed token to nominate candidates through their own trained connections. Their candidate can win even when the baseline predicts a different token or abstains.
+	- add option trainUpgradeLearnEightLagInputs (disabled) - during training, each target cell learns which tokens send it input at each of the eight preceding positions. During inference, a cell needs a learned connection from the latest token and gains support when earlier tokens also match their learned positions. 
+	- add option inferenceUpgradeApplyBranchVoteOnce (disabled) - apply the learned branch evidence once when combining it with the other prediction scores. The current code counts that evidence twice when both branch-mixing paths are active.
 

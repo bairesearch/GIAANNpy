@@ -1,4 +1,25 @@
-"""Ordered GPU commits for CPU-resident GIAANN sparse training batches."""
+"""GIAANNcmn_gpuTrainCommit.py
+
+# Author:
+Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch.com.au)
+
+# License:
+MIT License
+
+# Installation:
+see GIAANNcmn_main.py
+
+# Usage:
+see GIAANNcmn_main.py
+
+# Description:
+GIA ANN common gpu Train Commit
+
+Ordered GPU commits for CPU-resident GIAANN sparse training batches.
+
+"""
+
+
 from GIAANNcmn_globalDefs import *
 
 if(useGPUcustomSparseTensorDriver or useGPUCPUhybridCustomSparseTensorDriver):

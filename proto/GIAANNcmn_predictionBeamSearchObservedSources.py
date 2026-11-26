@@ -302,14 +302,8 @@ class SourceIndex:
 
 	def nativeRow(self, source):
 		if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):
-			column, feature = self.decode(source)
-			path = Path(files.getObservedColumnFeatureConnectionsFolder(column)) / (files.getObservedColumnSourceFeatureConnectionsFileBaseName(feature) + pytorchTensorFileExtension)
-			if(inferenceUpgradeObservedSources and trainVerifyConnectionNonexistentAcrossBranchesOptimisation2):
-				present = feature in files.listObservedColumnSourceFeatureIndices(column)
-			else:
-				present = path.is_file()
-			if(present):
-				tensor = files.loadObservedColumnSourceFeatureConnectionsTensor(self.database, column, feature, inferenceContextLikelihoodDevice).coalesce()
+			tensor = self.loadSourceTensor(source)
+			if(tensor is not None):
 				prop, branch, segment, columns, features = tensor.indices().cpu().numpy()
 				values = tensor.values().cpu().numpy()
 				mask = (prop == self.database.arrayIndexPropertiesStrengthIndex) & (branch == inferenceBeamSearchZero) & (segment == arrayIndexSegmentSoma)
@@ -325,6 +319,19 @@ class SourceIndex:
 			else:
 				result = sumByCell([], [])
 		return result
+
+	def loadSourceTensor(self, source):
+		tensor = None
+		if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):
+			column, feature = self.decode(source)
+			path = Path(files.getObservedColumnFeatureConnectionsFolder(column)) / (files.getObservedColumnSourceFeatureConnectionsFileBaseName(feature) + pytorchTensorFileExtension)
+			if(inferenceUpgradeObservedSources and trainVerifyConnectionNonexistentAcrossBranchesOptimisation2):
+				present = feature in files.listObservedColumnSourceFeatureIndices(column)
+			else:
+				present = path.is_file()
+			if(present):
+				tensor = files.loadObservedColumnSourceFeatureConnectionsTensor(self.database, column, feature, inferenceContextLikelihoodDevice).coalesce()
+		return tensor
 
 	def readPool(self, token):
 		if(inferenceBeamSearchObservedSources or inferenceUpgradeObservedSources):

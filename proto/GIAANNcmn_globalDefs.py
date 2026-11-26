@@ -515,8 +515,32 @@ predictionEnsureConnectedToPreviousPrediction = True	#default: True	#ensure ever
 predictionEnsureConnectedToPreviousPredictionStrict = True	#default: False #orig: True	#True: predictions must flow from features and column of same name as currently selected token, False: predictions must flow from features of the same name as the currently selected token.
 
 
+#inference upgrades;
+
+if(useDefaultsV2):
+	#Calibrated inference and lag-specific input options;
+	if(predictionEnsureConnectedToPreviousPredictionStrict==False):
+		inferenceUpgradeRerankStrictCandidates = True	#default: True	#orig: False 	#redundant: this functionality is included in inferenceUpgradeCombineNativeAndObservedSourceVotes
+		inferenceUpgradeCombineNativeAndObservedSourceVotes = True #default: True	#orig: False #use the same two votes, but allow the other cells representing the last observed token to nominate candidates through their own trained connections. Their candidate can win even when the baseline predicts a different token or abstains.
+	else:
+		inferenceUpgradeRerankStrictCandidates = True #default: True	#orig: False #rerank the baseline candidates by giving equal weight to its own scores and to evidence from other cells representing the last observed token. Give recently used connections a temporary boost and reduce the influence of unusually strong individual connections. If the baseline has no candidate, it still abstains.
+		inferenceUpgradeCombineNativeAndObservedSourceVotes = False
+	trainUpgradeLearnEightLagInputs = False #default: False	#orig: False	#during training, each target cell learns which tokens send it input at each of the eight preceding positions. During inference, a cell needs a learned connection from the latest token and gains support when earlier tokens also match their learned positions.
+	if(predictionEnsureConnectedToPreviousPrediction==False):
+		inferenceUpgradeApplyBranchVoteOnce = False #default: False	#orig: False	#apply the learned branch evidence once when combining it with the other prediction scores. The current code counts that evidence twice when both branch-mixing paths are active.
+	else:
+		inferenceUpgradeApplyBranchVoteOnce = False
+	# Both votes use the selected native source for the local half of the competition.
+else:
+	inferenceUpgradeRerankStrictCandidates = False
+	inferenceUpgradeCombineNativeAndObservedSourceVotes = False
+	trainUpgradeLearnEightLagInputs = False
+	inferenceUpgradeApplyBranchVoteOnce = False
+inferenceUpgradeCalibratedVotes = (inferenceUpgradeRerankStrictCandidates or inferenceUpgradeCombineNativeAndObservedSourceVotes) and useBenchmark and useBenchmarkDefaultsEvalTestSetOptim and executionMode == "inference" and useModalityNLP and useDefaultsV2 and inferenceLeakyIntegrateAndFire
+
 #Inference graph evidence upgrade;
 inferenceGraphEvidenceUpgrade = False	#default: False	#enable adaptive source evidence sharing; False retains the existing context-likelihood scorer and source behaviour
+
 
 
 #modality global defs;
@@ -692,38 +716,161 @@ if(trainSelectMostSimilarBranch):
 arrayIndexPropertiesActivationCreateInference = arrayIndexPropertiesActivation or True
 arrayIndexPropertiesTimeCreateInference = arrayIndexPropertiesTime or inferenceUseNeuronFeaturePropertiesTime
 
-if(predictionEnsureConnectedToPreviousPredictionStrict==False):
-	inferenceUpgradeObservedSourcesOnAbstention = False	#default: False #orig: False	#keep every prediction the baseline makes. When it cannot predict, use the most likely next token from the observed-source cells.
-	inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions = True	#default: True #orig: False 	#when the baseline can predict, give extra weight to existing synapses recently traversed in the same excerpt. When it abstains, use observed-source inference.
-	inferenceUpgradeAdaptLocalAndObservedSourceWeights = False	#default: False #orig: False	#combine the baseline and observed-source predictions, giving more weight to whichever has been more accurate earlier in the excerpt. Also give a temporary boost to recently used connections.
+
+#inference upgrades;
+if(useDefaultsV2):
+	if(predictionEnsureConnectedToPreviousPredictionStrict==False):
+		inferenceUpgradeObservedSourcesOnAbstention = False	#default: False #orig: False	#keep every prediction the baseline makes. When it cannot predict, use the most likely next token from the observed-source cells.
+		inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions = True	#default: True #orig: False 	#when the baseline can predict, give extra weight to existing synapses recently traversed in the same excerpt. When it abstains, use observed-source inference.
+		inferenceUpgradeAdaptLocalAndObservedSourceWeights = False	#default: False #orig: False	#combine the baseline and observed-source predictions, giving more weight to whichever has been more accurate earlier in the excerpt. Also give a temporary boost to recently used connections.
+	else:
+		inferenceUpgradeObservedSourcesOnAbstention = False
+		inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions = False
+		inferenceUpgradeAdaptLocalAndObservedSourceWeights = False
+	inferenceUpgradePrefixOnlyEvaluation = False	#default: False #orig: False- assign each token to a concept column using only the text available when the prediction is due. The historical evaluator can change its prediction when a noun after the target changed.
+	if(inferenceUpgradePrefixOnlyEvaluation):
+		trainUpgradeWithObservableNounAnchors = True	#default: True #orig: False	 #train and evaluate with the same rule for starting a concept column, using noun information available as each token arrives.
+		if(predictionEnsureConnectedToPreviousPrediction==False):
+			inferenceUpgradeLearnSharedInputDendriticBranches = True	#default: True #orig: False	 #train branches to respond when the two preceding observed tokens activate inputs to the same branch, then combine that evidence with the baseline prediction. Allowing those inputs to meet anywhere on the same target cell.
+		else:
+			inferenceUpgradeLearnSharedInputDendriticBranches = False
+		if(predictionEnsureConnectedToPreviousPredictionStrict==False):
+			inferenceUpgradeObservedSourceInference = True	#default: True #orig: False	#keep up to 64 plausible source cells and combines the next-token evidence from their trained outgoing connections. The baseline assigns the last observed token to one source cell.
+			inferenceUpgradeApplyBranchEvidenceByCandidateToken = True	#default: True #orig: False	 #sum learned branch evidence across cells predicting the same token and uses that sum to increase the token score.
+		else:
+			inferenceUpgradeObservedSourceInference = False
+			inferenceUpgradeApplyBranchEvidenceByCandidateToken = False
+	else:
+		inferenceUpgradeObservedSourceInference = False
+		trainUpgradeWithObservableNounAnchors = False
+		inferenceUpgradeLearnSharedInputDendriticBranches = False
+		inferenceUpgradeApplyBranchEvidenceByCandidateToken = False
 else:
 	inferenceUpgradeObservedSourcesOnAbstention = False
 	inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions = False
 	inferenceUpgradeAdaptLocalAndObservedSourceWeights = False
-inferenceUpgradePrefixOnlyEvaluation = False	#default: False #orig: False- assign each token to a concept column using only the text available when the prediction is due. The historical evaluator can change its prediction when a noun after the target changed.
-if(inferenceUpgradePrefixOnlyEvaluation):
-	trainUpgradeWithObservableNounAnchors = True	#default: True #orig: False	 #train and evaluate with the same rule for starting a concept column, using noun information available as each token arrives.
-	if(predictionEnsureConnectedToPreviousPrediction==False):
-		inferenceUpgradeLearnSharedInputDendriticBranches = True	#default: True #orig: False	 #train branches to respond when the two preceding observed tokens activate inputs to the same branch, then combine that evidence with the baseline prediction. Allowing those inputs to meet anywhere on the same target cell.
-	else:
-		inferenceUpgradeLearnSharedInputDendriticBranches = False
-	if(predictionEnsureConnectedToPreviousPredictionStrict==False):
-		inferenceUpgradeObservedSourceInference = True	#default: True #orig: False	#keep up to 64 plausible source cells and combines the next-token evidence from their trained outgoing connections. The baseline assigns the last observed token to one source cell.
-		inferenceUpgradeApplyBranchEvidenceByCandidateToken = True	#default: True #orig: False	 #sum learned branch evidence across cells predicting the same token and uses that sum to increase the token score.
-	else:
-		inferenceUpgradeObservedSourceInference = False
-		inferenceUpgradeApplyBranchEvidenceByCandidateToken = False
-else:
+	inferenceUpgradePrefixOnlyEvaluation = False
 	inferenceUpgradeObservedSourceInference = False
 	trainUpgradeWithObservableNounAnchors = False
 	inferenceUpgradeLearnSharedInputDendriticBranches = False
 	inferenceUpgradeApplyBranchEvidenceByCandidateToken = False
-
-inferenceUpgradeObservedSources = inferenceUpgradeObservedSourcesOnAbstention or inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions or inferenceUpgradeAdaptLocalAndObservedSourceWeights or inferenceUpgradeObservedSourceInference or inferenceUpgradeApplyBranchEvidenceByCandidateToken
-inferenceUpgradeReadout = inferenceUpgradeObservedSources or inferenceUpgradeLearnSharedInputDendriticBranches
+	
+inferenceUpgradeObservedSources = inferenceUpgradeCalibratedVotes or inferenceUpgradeObservedSourcesOnAbstention or inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions or inferenceUpgradeAdaptLocalAndObservedSourceWeights or inferenceUpgradeObservedSourceInference or inferenceUpgradeApplyBranchEvidenceByCandidateToken
+inferenceUpgradeReadout = inferenceUpgradeObservedSources or inferenceUpgradeLearnSharedInputDendriticBranches or trainUpgradeLearnEightLagInputs
 inferenceUpgradeBranchBank = inferenceUpgradeLearnSharedInputDendriticBranches or inferenceUpgradeApplyBranchEvidenceByCandidateToken
 if(inferenceUpgradeReadout or inferenceUpgradePrefixOnlyEvaluation or trainUpgradeWithObservableNounAnchors):
-	from GIAANNcmn_upgradeGlobalDefs import *
+	"""Parameters of the observed-source, causal routing and shared-input branch upgrades."""
+
+	upgradeZero = 0
+	upgradeOne = 1
+	upgradeTwo = 2
+	upgradeAbsent = -1
+	upgradeSourceWidth = 64
+	upgradeTraceWindow = 128
+	upgradeTraceStrength = 0.25
+	upgradeAdvantageDecay = 0.97
+	upgradeAdvantageScale = 2.0
+	upgradeAdvantageLimit = 6.0
+	upgradeBranchCount = 4
+	upgradeBranchSlots = 4
+	upgradeBranchAfferentCache = 128
+	upgradeBranchRecruitment = 8
+	upgradeBranchQueryBatch = 512
+	upgradeBranchReadExposures = "SELECT target,count FROM exposures WHERE target IN ({})"
+	upgradeBranchReadContacts = "SELECT target,branch,compartment,source,weight FROM contacts WHERE target IN ({})"
+	upgradeBranchAddExposures = "INSERT INTO exposures VALUES(?,?) ON CONFLICT(target) DO UPDATE SET count=count+excluded.count"
+	upgradeBranchAddContacts = "INSERT INTO contacts VALUES(?,?,?,?,?) ON CONFLICT(target,branch,compartment,source) DO UPDATE SET weight=weight+excluded.weight"
+	upgradeProximal = 0
+	upgradeDistal = 1
+	upgradeBranchHalf = 0.5
+	upgradeBranchSmoothing = 8.0
+	upgradeBranchGainCap = 3.0
+	upgradeBranchStorageName = "sharedInputDendriticBranches.sqlite3"
+	upgradeBranchStorageVersion = 1
+	upgradeUTF8 = "utf-8"
+	upgradeNeutralPOS = "X"
+	upgradeInvalidConfiguration = "Prediction upgrades require the fixed aligned subword vocabulary and a single-branch native likelihood readout."
+	upgradeInvalidSource = "Prediction upgrade received an invalid physical source, candidate, or sequence position."
+	upgradeInvalidScores = "Prediction upgrade received invalid native or distributed candidate weights."
+	upgradeInvalidBranchStore = "Shared-input dendritic checkpoint is missing or incompatible. Train with inferenceUpgradeLearnSharedInputDendriticBranches enabled before scoring with branch evidence."
+	upgradeReadoutAttribute = "upgradeReadout"
+	upgradePooledCandidatesAttribute = "upgradePooledCandidates"
+	upgradePooledCandidatesCache = 128
+	upgradeNoContinuation = "No trained local, observed-source or branch evidence for this prediction"
+	upgradeInvalidPrefixConfiguration = "Prefix-only evaluation requires teacher-forced native subword likelihood inference, a nonempty seed and fixed first-noun columns."
+
+	# Fixed-lag source smoothing and competition between native and observed-source votes.
+	upgradeSourceHistoryLags = 4
+	upgradeRetainedSources = 8
+	upgradeTransmittingSources = 4
+	upgradeReversePoolWeight = 0.1
+	upgradeCalibratedVoteWeight = 0.5
+	upgradeImmediateStrengthExponent = 0.5
+	upgradeDelayedEvidenceGain = 2.0
+	upgradeCalibratedTokenLimit = 48
+	upgradeSourceFrameCacheSize = 128
+	upgradeStableSort = "stable"
+
+	# Afferents use a subword, a lag compartment and a physical postsynaptic cell.
+	upgradeInputLags = 8
+	upgradeInputMinimumCount = 2
+	upgradeInputProposals = 256
+	upgradeInputTokenLimit = 12
+	upgradeInputVoteWeight = 0.125
+	upgradeInputPrior = 0.5
+	upgradeInputSupport = 16.0
+	upgradeInputEvidenceExponent = 0.5
+	upgradeInputRowCache = 128
+	upgradeInputStorageName = "eightLagInputs.sqlite3"
+	upgradeInputStorageVersion = 1
+	upgradeInputPackedDirectory = None	# Optional read-only packed physical afferents from the matching training run.
+	upgradeInputInvalidStore = "Eight-lag input checkpoint is missing or incompatible with the network and its training ownership."
+	upgradeInputInvalidHistory = "Eight-lag input scoring requires one to eight valid observed subwords from the current sequence."
+	upgradeInputMemoryDatabase = ":memory:"
+	upgradeInputReadOnly = "?mode=ro"
+	upgradeInputReadWrite = "?mode=rw"
+	upgradeInputMetadataSchema = "CREATE TABLE metadata(version INTEGER, columns INTEGER, features INTEGER, lags INTEGER, observableAnchors INTEGER)"
+	upgradeInputInsertMetadata = "INSERT INTO metadata VALUES(?,?,?,?,?)"
+	upgradeInputReadMetadata = "SELECT * FROM metadata"
+	upgradeInputCellsSchema = "CREATE TABLE cells(target INTEGER PRIMARY KEY, count INTEGER NOT NULL)"
+	upgradeInputWordsSchema = "CREATE TABLE words(source INTEGER PRIMARY KEY, count INTEGER NOT NULL)"
+	upgradeInputContactsSchema = "CREATE TABLE contacts(lag INTEGER, source INTEGER, target INTEGER, count INTEGER NOT NULL, PRIMARY KEY(lag,source,target)) WITHOUT ROWID"
+	upgradeInputAddCell = "INSERT INTO cells VALUES(?,?) ON CONFLICT(target) DO UPDATE SET count=count+excluded.count"
+	upgradeInputAddWord = "INSERT INTO words VALUES(?,?) ON CONFLICT(source) DO UPDATE SET count=count+excluded.count"
+	upgradeInputAddContact = "INSERT INTO contacts VALUES(?,?,?,?) ON CONFLICT(lag,source,target) DO UPDATE SET count=count+excluded.count"
+	upgradeInputReadWords = "SELECT source,count FROM words ORDER BY source"
+	upgradeInputReadRow = "SELECT target,count FROM contacts WHERE lag=? AND source=? AND count>=? ORDER BY target"
+	upgradeInputReadCells = "SELECT target,count FROM cells WHERE target IN ({}) ORDER BY target"
+	upgradeInputQueryBatch = 512
+	upgradeInputBegin = "BEGIN"
+	upgradeInputSavepoint = "SAVEPOINT eight_lag_sequence"
+	upgradeInputRollback = "ROLLBACK TO eight_lag_sequence"
+	upgradeInputRelease = "RELEASE eight_lag_sequence"
+	upgradeInputReadyFile = "ready.json"
+	upgradeInputFrequenciesFile = "lexical_frequencies.npy"
+	upgradeInputCellsFile = "cells.bin"
+	upgradeInputPackedEvents = "events"
+	upgradeInputPackedTargets = "targets"
+	upgradeInputPackedLags = "lags"
+	upgradeInputCellAddress = "address"
+	upgradeInputCellCount = "count"
+	upgradeInputUInt64 = "<u8"
+	upgradeInputUInt32 = "<u4"
+	upgradeInputReadMode = "r"
+	upgradeInputLagFile = "lag{}"
+	upgradeInputRowSuffix = ".rows"
+	upgradeInputContactsSuffix = ".bin"
+	upgradeCalibratedSourceFrameAttribute = "calibratedSourceFrame"
+	upgradeInputSQLSeparator = ","
+	upgradeInputSQLParameter = "?"
+	upgradeInputTrainingFile = "training.json"
+	upgradeInputPackedSequenceCount = "count"
+	upgradeInputPackedObservations = "observations"
+	upgradeInputPackedOwnership = "observableAnchors"
+	upgradeInputRankOffsetsSuffix = ".prows"
+	upgradeInputNomineesSuffix = ".ptop"
+
+
 
 #Beam search;
 if(useInference):

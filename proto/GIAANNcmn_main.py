@@ -333,6 +333,8 @@ def executeMode(inferenceMode):
 			GIAANNcmn_prediction.printInferenceTop1Accuracy(databaseNetworkObject, autoresearchExecutionTimeInference, autoresearchExecutionTimeTrain)
 		if(inferenceMode and inferenceReportGroundedAccuracy):
 			GIAANNnlp_groundedEval.printInferenceGroundedAccuracy(databaseNetworkObject, autoresearchExecutionTimeInference, autoresearchExecutionTimeTrain)
+	if(trainUpgradeLearnEightLagInputs):
+		databaseNetworkObject.eightLagInputs.close()
 	if(inferenceUpgradeBranchBank and (inferenceMode or inferenceUpgradeLearnSharedInputDendriticBranches)):
 		databaseNetworkObject.sharedInputBranches.close()
 

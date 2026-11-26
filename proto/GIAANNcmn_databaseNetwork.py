@@ -378,6 +378,9 @@ def initialiseDatabaseNetwork(inferenceMode, loadExistingDatabaseOverride=False)
 		if(auxiliaryNeurons and auxiliaryNeuronsSimilar):
 			print("initialiseDatabaseNetwork: fas = ", databaseNetworkObject.fas)
 	
+	if(trainUpgradeLearnEightLagInputs):
+		import GIAANNcmn_eightLagInputs
+		GIAANNcmn_eightLagInputs.initialise(databaseNetworkObject, databaseLoadedFromDisk)
 	if(inferenceUpgradeBranchBank and (inferenceMode or inferenceUpgradeLearnSharedInputDendriticBranches)):
 		import GIAANNcmn_sharedInputBranches
 		GIAANNcmn_sharedInputBranches.initialise(databaseNetworkObject, databaseLoadedFromDisk)

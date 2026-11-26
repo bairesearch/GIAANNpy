@@ -29,6 +29,8 @@ pt.set_grad_enabled(False)
 from GIAANNcmn_globalDefs import *
 if(inferenceUpgradePrefixOnlyEvaluation):
 	import GIAANNnlp_observableAnchors
+if(trainUpgradeLearnEightLagInputs):
+	import GIAANNcmn_eightLagInputs
 if(inferenceUpgradeLearnSharedInputDendriticBranches):
 	import GIAANNcmn_sharedInputBranches
 if(trainDendriticBranchesPredictionErrorCorrection):
@@ -732,6 +734,8 @@ def processSequence(databaseNetworkObject, inferenceMode, sequenceCount, article
 				GIAANNcmn_debug.debugRecordGpuRamMaxUsagePhaseLocal("trainConceptWords")
 			
 			if(trained):
+				if(trainUpgradeLearnEightLagInputs):
+					GIAANNcmn_eightLagInputs.learnSequence(sequenceObservedColumns, tokens)
 				if(inferenceUpgradeLearnSharedInputDendriticBranches):
 					GIAANNcmn_sharedInputBranches.learnSequence(sequenceObservedColumns, tokens)
 				# Update observed columns from sequence observed columns

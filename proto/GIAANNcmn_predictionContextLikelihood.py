@@ -110,6 +110,15 @@ def recordContextLikelihoodSource(databaseNetworkObject, connections, sequenceWo
 			raise RuntimeError(inferenceContextLikelihoodInvalidState)
 		validateContextLikelihoodConnections(databaseNetworkObject, connections)
 		connections = connections.coalesce()
+		keys, counts = getContextLikelihoodFeatureFrame(databaseNetworkObject, connections)
+		databaseNetworkObject.contextLikelihoodHistory[-inferenceContextLikelihoodOne] = keys, counts
+		if(inferenceColumnLikelihood):
+			GIAANNcmn_predictionColumnLikelihood.recordColumnLikelihoodSource(databaseNetworkObject, connections, sequenceWordIndex)
+	return
+
+
+def getContextLikelihoodFeatureFrame(databaseNetworkObject, connections):
+	if(inferenceContextLikelihood):
 		indices = connections.indices()
 		values = connections.values()
 		segmentIndices = indices[inferenceContextLikelihoodSegmentDimension]
@@ -121,10 +130,7 @@ def recordContextLikelihoodSource(databaseNetworkObject, connections, sequenceWo
 		counts = values[mask].to(pt.float64) * (distances + trainConnectionStrengthProximityDistanceOffset).pow(trainConnectionStrengthProximityExponent) / trainConnectionStrengthProximityScale
 		if(not pt.isfinite(counts).all() or (counts <= inferenceContextLikelihoodZero).any()):
 			raise RuntimeError(inferenceContextLikelihoodInvalidConnections)
-		databaseNetworkObject.contextLikelihoodHistory[-inferenceContextLikelihoodOne] = keys, counts
-		if(inferenceColumnLikelihood):
-			GIAANNcmn_predictionColumnLikelihood.recordColumnLikelihoodSource(databaseNetworkObject, connections, sequenceWordIndex)
-	return
+	return keys, counts
 
 
 def scoreContextLikelihoodCandidates(databaseNetworkObject, columnIndices, featureIndices, activationValues, constraintState):

@@ -73,6 +73,10 @@ def clearDatabaseFiles():
 	clearResult = subprocess.run(["bash", clearScriptExecutionPath], cwd=databaseFolderPath, check=False)
 	if(clearResult.returncode != 0):
 		raise RuntimeError("clearDatabaseFiles error: clear.sh failed with return code " + str(clearResult.returncode))
+	if(trainUpgradeLearnEightLagInputs):
+		inputFile = os.path.join(databaseFolderPath, upgradeInputStorageName)
+		if(os.path.isfile(inputFile)):
+			os.remove(inputFile)
 	if(inferenceUpgradeLearnSharedInputDendriticBranches):
 		branchFile = os.path.join(databaseFolderPath, upgradeBranchStorageName)
 		if(os.path.isfile(branchFile)):
@@ -485,6 +489,8 @@ def saveData(databaseNetworkObject, observedColumnsDict, sequenceCount, forceSav
 				conceptFeaturesReferenceSetDelimiterDict = dict(enumerate(databaseNetworkObject.conceptFeaturesReferenceSetDelimiterList))
 				saveDictFile(conceptFeaturesReferenceSetDelimiterListFile, conceptFeaturesReferenceSetDelimiterDict)
 	
+	if(trainUpgradeLearnEightLagInputs and not databaseNetworkObject.inferenceMode):
+		databaseNetworkObject.eightLagInputs.connection.commit()
 	if(inferenceUpgradeLearnSharedInputDendriticBranches and not databaseNetworkObject.inferenceMode):
 		databaseNetworkObject.sharedInputBranches.commit()
 	if(debugPrintTrainSectionTimes):

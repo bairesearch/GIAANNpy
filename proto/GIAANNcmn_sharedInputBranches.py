@@ -1,4 +1,25 @@
-"""Shared lexical afferents on two compartments of a physical target branch."""
+"""GIAANNcmn_sharedInputBranches.py
+
+# Author:
+Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch.com.au)
+
+# License:
+MIT License
+
+# Installation:
+see GIAANNcmn_main.py
+
+# Usage:
+see GIAANNcmn_main.py
+
+# Description:
+GIA ANN common shared Input Branches
+
+Shared lexical afferents on two compartments of a physical target branch.
+
+"""
+
+
 
 from collections import Counter
 from functools import lru_cache
@@ -55,13 +76,7 @@ def learnSequence(sequence, tokens):
 	if(inferenceUpgradeLearnSharedInputDendriticBranches):
 		database = sequence.databaseNetworkObject
 		connection = database.sharedInputBranches
-		words = [sequenceTokens.getTokeniserSubwordFeatureIndex(token) for token in tokens]
-		cells = []
-		for position, (column, word) in enumerate(zip(sequence.tokenConceptColumnIndexList, words, strict=True)):
-			if(column is None or not upgradeZero <= column < database.c or not upgradeZero < word < database.f):
-				raise ValueError(upgradeInvalidSource)
-			feature = featureIndexPrimeConceptNeuron if position in sequence.columnsIndexSequenceWordIndexDict else word
-			cells.append(int(column) * database.f + int(feature))
+		words, cells = trainingWordsAndCells(sequence, tokens)
 		if(not connection.in_transaction):
 			connection.execute("BEGIN")
 		connection.execute("SAVEPOINT learn_sequence")
@@ -73,6 +88,19 @@ def learnSequence(sequence, tokens):
 		finally:
 			connection.execute("RELEASE learn_sequence")
 	return
+
+
+def trainingWordsAndCells(sequence, tokens):
+	if(inferenceUpgradeLearnSharedInputDendriticBranches or trainUpgradeLearnEightLagInputs):
+		database = sequence.databaseNetworkObject
+		words = [sequenceTokens.getTokeniserSubwordFeatureIndex(token) for token in tokens]
+		cells = []
+		for position, (column, word) in enumerate(zip(sequence.tokenConceptColumnIndexList, words, strict=True)):
+			if(column is None or not upgradeZero <= column < database.c or not upgradeZero < word < database.f):
+				raise ValueError(upgradeInvalidSource)
+			feature = featureIndexPrimeConceptNeuron if position in sequence.columnsIndexSequenceWordIndexDict else word
+			cells.append(int(column) * database.f + int(feature))
+	return words, cells
 
 
 def updateAfferents(connection, cells, words):

@@ -59,7 +59,7 @@ from GIAANNcmn_globalDefs import useDefaultsV2
 from GIAANNcmn_globalDefs import useBenchmarkDefaultsEvalTestSetOptim
 from GIAANNcmn_globalDefs import inferenceLeakyIntegrateAndFire
 from GIAANNcmn_globalDefs import inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures
-from GIAANNcmn_globalDefs import predictionEnsureConnectedToPreviousPredictionStrict, predictionEnsureConnectedToPreviousPrediction
+from GIAANNcmn_globalDefs import predictionEnsureConnectedToPreviousPredictionStrict, predictionEnsureConnectedToPreviousPrediction, inferenceUpgradeCalibratedVotes
 
 
 
@@ -634,7 +634,7 @@ if(inferenceReportGroundedAccuracy):
 #Auxiliary neurons;
 inferenceInferMissingFeaturesSemanticDisabledError = "Semantic missing-feature inference helper called while its feature is disabled"
 if(useDefaultsV2):
-	if(predictionEnsureConnectedToPreviousPredictionStrict):
+	if(predictionEnsureConnectedToPreviousPredictionStrict or inferenceUpgradeCalibratedVotes):
 		inferenceInferMissingFeatures = False
 	else:
 		inferenceInferMissingFeatures = True	#default: True	#orig: False	#Auxiliary method #2	#this breaks a strict interpretation of predictionEnsureConnectedToPreviousPrediction=True

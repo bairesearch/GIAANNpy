@@ -3,6 +3,7 @@
 # Author:
 Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch.com.au)
 
+# License:
 MIT License
 
 # Installation:

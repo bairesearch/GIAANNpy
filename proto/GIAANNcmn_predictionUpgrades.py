@@ -1,10 +1,33 @@
-"""Sequence-local readouts over the trained physical connections."""
+"""GIAANNcmn_predictionUpgrades.py
+
+# Author:
+Richard Bruce Baxter - Copyright (c) 2024-2026 BAI Research Pty Ltd (bairesearch.com.au)
+
+MIT License
+
+# Installation:
+see GIAANNcmn_main.py
+
+# Usage:
+see GIAANNcmn_main.py
+
+# Description:
+GIA ANN common prediction Upgrades
+
+Sequence-local readouts over the trained physical connections.
+
+"""
+
 
 from collections import Counter, deque
 import numpy as np
 from GIAANNcmn_globalDefs import *
 if(inferenceUpgradeObservedSources):
 	import GIAANNcmn_predictionBeamSearchObservedSources as observedSources
+if(inferenceUpgradeCalibratedVotes):
+	import GIAANNcmn_calibratedVotes as calibratedVotes
+if(trainUpgradeLearnEightLagInputs):
+	import GIAANNcmn_eightLagInputs as eightLagInputs
 if(inferenceUpgradeBranchBank):
 	import GIAANNcmn_sharedInputBranches as branches
 
@@ -80,6 +103,15 @@ def fromOrdinals(index, ordinals, weights):
 	return result
 
 
+def strongestTokenScores(scores, limit):
+	if(inferenceUpgradeCalibratedVotes or trainUpgradeLearnEightLagInputs):
+		if(type(limit) is not int or limit < upgradeOne):
+			raise ValueError(upgradeInvalidScores)
+		order = np.argsort(-scores.weights, kind=upgradeStableSort)[:limit]
+		result = TokenScores(scores.words[order], scores.weights[order].astype(np.float32), scores.cells[order])
+	return result
+
+
 def initialiseSequence(database):
 	if(inferenceUpgradeReadout):
 		if(not tokeniserSubword or not useDedicatedFeatureListsSubword or not inferenceContextLikelihood or not inferenceColumnLikelihood or inferenceBeamSearch or not inferenceLeakyIntegrateAndFire or multipleDendriticBranchesNumber != upgradeOne or useTrainDuringInference or inferenceTrainFirstSequences or numSeedTokens < upgradeOne or database.f != database.c + upgradeOne):
@@ -87,6 +119,8 @@ def initialiseSequence(database):
 		if(inferenceUpgradeObservedSources and not hasattr(database, inferenceBeamSearchObservedSourceIndexAttribute)):
 			database.observedSourceIndex = observedSources.SourceIndex(database)
 		database.upgradeReadout = SequenceReadout()
+		if(inferenceUpgradeCalibratedVotes):
+			database.upgradeReadout.sourceHistory = calibratedVotes.SourceHistory(database.observedSourceIndex)
 	return
 
 
@@ -99,6 +133,8 @@ class SequenceReadout:
 			self.previousTraceSource = None
 			self.exactContacts, self.sharedContacts = Counter(), Counter()
 			self.expiry = deque()
+			if(trainUpgradeLearnEightLagInputs):
+				self.inputHistory = deque(maxlen=upgradeInputLags)
 		return
 
 	def observe(self, database, column, feature, seed):
@@ -107,24 +143,28 @@ class SequenceReadout:
 				raise ValueError(upgradeInvalidSource)
 			self.previousWord, self.word = self.word, feature or column + upgradeOne
 			self.localCandidates = None
+			if(trainUpgradeLearnEightLagInputs):
+				self.inputHistory.append(self.word)
 			if(inferenceUpgradeAdaptLocalAndObservedSourceWeights and not inferenceUseNextTokenPredictionsOrTargetsToActivateNextColumnFeatures):
 				self.advantage = upgradeAdvantageDecay * self.advantage + int(self.observedWinner == self.word) - int(self.nativeWinner == self.word)
 			if(inferenceUpgradeObservedSources):
 				index = database.observedSourceIndex
 				self.posterior = observedSources.observe(index, self.posterior, self.word, upgradeSourceWidth, inferenceBeamSearchObservedSourcePoolWeight, inferenceBeamSearchObservedSourcePriorWeight)
-				if(not seed and (inferenceUpgradeAdaptLocalAndObservedSourceWeights or inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions)):
+				if(inferenceUpgradeCalibratedVotes):
+					self.sourceHistory.observe(self.posterior, column, feature)
+				if(not seed and (inferenceUpgradeAdaptLocalAndObservedSourceWeights or inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions or inferenceUpgradeCalibratedVotes)):
 					self.advanceTraces(index, column, feature)
 		return
 
 	def advanceTraces(self, index, column, feature):
-		if(inferenceUpgradeAdaptLocalAndObservedSourceWeights or inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions):
+		if(inferenceUpgradeAdaptLocalAndObservedSourceWeights or inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions or inferenceUpgradeCalibratedVotes):
 			key = int(index.encode(np.int64(column), np.int64(feature)))
 			ordinal = int(index.keys.searchsorted(key))
 			if(ordinal >= index.keys.size or index.keys[ordinal] != key):
 				ordinal = None
 			if(self.previousTraceSource is not None):
 				lastOrdinal, lastWord = self.previousTraceSource
-				exact = traversedContact(index.row, lastOrdinal, ordinal) if inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions else None
+				exact = traversedContact(index.row, lastOrdinal, ordinal) if inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions or inferenceUpgradeCalibratedVotes else None
 				shared = traversedContact(index.pool, lastWord, ordinal) if inferenceUpgradeAdaptLocalAndObservedSourceWeights else None
 				self.expiry.append((exact, shared))
 				for trace, contact in zip((self.exactContacts, self.sharedContacts), (exact, shared), strict=True):
@@ -143,7 +183,12 @@ class SequenceReadout:
 		if(inferenceUpgradeReadout):
 			nativeWord = None if nativeCell is None else nativeCell[upgradeOne] or nativeCell[upgradeZero] + upgradeOne
 			local = self.localDistribution(database, nativeCell)
-			observed = self.observedDistribution(database, nativeCell)
+			nativeCandidates = local
+			if(inferenceUpgradeCalibratedVotes):
+				cells, mass = self.sourceHistory.score(self.posterior)
+				observed = fromOrdinals(database.observedSourceIndex, cells, mass).normalise()
+			else:
+				observed = self.observedDistribution(database, nativeCell)
 			observedPrimary = inferenceUpgradeObservedSourceInference or inferenceUpgradeApplyBranchEvidenceByCandidateToken
 			if(inferenceUpgradeBranchBank):
 				cells, weights = branches.response(database, self.word, self.previousWord)
@@ -154,7 +199,7 @@ class SequenceReadout:
 				if(inferenceUpgradeLearnSharedInputDendriticBranches and drive.words.size):
 					peak = drive.weights.max()
 					alpha = upgradeBranchHalf * peak / (upgradeBranchSmoothing + peak)
-					if(observedPrimary and not inferenceUpgradeAdaptLocalAndObservedSourceWeights):
+					if(observedPrimary and not inferenceUpgradeAdaptLocalAndObservedSourceWeights and not inferenceUpgradeApplyBranchVoteOnce):
 						observed = combine((observed, upgradeOne - alpha), (drive.normalise(), alpha))
 					else:
 						drive.normalise()
@@ -163,27 +208,59 @@ class SequenceReadout:
 					else:
 						local = combine((local, upgradeOne - alpha), (drive, alpha))
 			# Exact traversal boosts belong to the local vote before adaptive mixing.
-			if(inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions and nativeCell is not None):
+			if((inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions or inferenceUpgradeCalibratedVotes) and nativeCell is not None and self.previousTraceSource is not None):
 				exact = traceResponse(database.observedSourceIndex, self.exactContacts, self.previousTraceSource[upgradeZero])
 				if(exact.words.size):
 					local = combine((local, upgradeOne), (exact, upgradeTraceStrength))
-			result = observed if observedPrimary else local
-			if(inferenceUpgradeAdaptLocalAndObservedSourceWeights):
-				result = self.adaptiveDistribution(database, local, observed, nativeWord)
-			# An explicit abstention fill uses the distributed forecast even when adaptation is enabled.
-			if((inferenceUpgradeObservedSourcesOnAbstention or inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions) and nativeCell is None and observed.words.size):
-				result = observed
-			# The local readout keeps its native tie break. Distributed readouts break ties by token ID.
-			preferNative = not (observedPrimary or inferenceUpgradeAdaptLocalAndObservedSourceWeights or (inferenceUpgradeLearnSharedInputDendriticBranches and drive.words.size))
-			selected = result.winner(preferred=nativeWord if preferNative else None)
-			if(nativeCell is not None and preferNative and not inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions):
-				pair = nativeCell
-			elif(selected is None):
-				pair = None
-			elif(selected[upgradeZero] == nativeWord and preferNative):
-				pair = nativeCell
+			if(inferenceUpgradeCalibratedVotes):
+				pair = self.selectCalibrated(database, nativeCandidates, local, observed)
 			else:
-				pair = divmod(selected[upgradeOne], database.f)
+				result = observed if observedPrimary else local
+				if(inferenceUpgradeAdaptLocalAndObservedSourceWeights):
+					result = self.adaptiveDistribution(database, local, observed, nativeWord)
+				# An explicit abstention fill uses the distributed forecast even when adaptation is enabled.
+				if((inferenceUpgradeObservedSourcesOnAbstention or inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions) and nativeCell is None and observed.words.size):
+					result = observed
+				# The local readout keeps its native tie break. Distributed readouts break ties by token ID.
+				preferNative = not (observedPrimary or inferenceUpgradeAdaptLocalAndObservedSourceWeights or (inferenceUpgradeLearnSharedInputDendriticBranches and drive.words.size))
+				if(trainUpgradeLearnEightLagInputs):
+					bank = eightLagInputs.response(database, self.inputHistory)
+					if(predictionEnsureConnectedToPreviousPredictionStrict):
+						result = TokenScores(nativeCandidates.words, (upgradeOne - upgradeInputVoteWeight) * result.lookup(nativeCandidates.words) + upgradeInputVoteWeight * bank.lookup(nativeCandidates.words), nativeCandidates.cells)
+					else:
+						result = combine((result, upgradeOne - upgradeInputVoteWeight), (bank, upgradeInputVoteWeight))
+					preferNative = False
+				selected = result.winner(preferred=nativeWord if preferNative else None)
+				if(nativeCell is not None and preferNative and not inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions):
+					pair = nativeCell
+				elif(selected is None):
+					pair = None
+				elif(selected[upgradeZero] == nativeWord and preferNative):
+					pair = nativeCell
+				else:
+					pair = divmod(selected[upgradeOne], database.f)
+		return pair
+
+	def selectCalibrated(self, database, nativeCandidates, local, observed):
+		pair = None
+		if(inferenceUpgradeCalibratedVotes):
+			# Combine takes precedence when both options are enabled. A bounded vote retains its original probability mass.
+			if(not inferenceUpgradeCombineNativeAndObservedSourceVotes or trainUpgradeLearnEightLagInputs):
+				observed = strongestTokenScores(observed, upgradeCalibratedTokenLimit)
+			weight = upgradeCalibratedVoteWeight
+			inputVote = TokenScores()
+			inputWeight = upgradeZero
+			if(trainUpgradeLearnEightLagInputs):
+				inputVote = eightLagInputs.response(database, self.inputHistory)
+				inputWeight = upgradeInputVoteWeight
+			if(inferenceUpgradeCombineNativeAndObservedSourceVotes):
+				winner = combine((local, upgradeOne - weight), (observed, weight - inputWeight), (inputVote, inputWeight)).winner()
+			elif(inferenceUpgradeRerankStrictCandidates):
+				words = nativeCandidates.words
+				mass = (upgradeOne - weight) * local.lookup(words) + (weight - inputWeight) * observed.lookup(words) + inputWeight * inputVote.lookup(words)
+				winner = TokenScores(words, mass, nativeCandidates.cells).winner()
+			if(winner is not None):
+				pair = divmod(winner[upgradeOne], database.f)
 		return pair
 
 	def localDistribution(self, database, nativeCell):
@@ -219,7 +296,7 @@ class SequenceReadout:
 
 def traversedContact(row, source, destination):
 	result = None
-	if((inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions or inferenceUpgradeAdaptLocalAndObservedSourceWeights) and source is not None and destination is not None):
+	if((inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions or inferenceUpgradeAdaptLocalAndObservedSourceWeights or inferenceUpgradeCalibratedVotes) and source is not None and destination is not None):
 		targets, strengths, total = row(source)
 		position = targets.searchsorted(destination)
 		if(position < targets.size and targets[position] == destination):
@@ -228,7 +305,7 @@ def traversedContact(row, source, destination):
 
 
 def traceResponse(index, contacts, source):
-	if(inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions or inferenceUpgradeAdaptLocalAndObservedSourceWeights):
+	if(inferenceUpgradeFacilitateRecentSynapsesAndFillAbstentions or inferenceUpgradeAdaptLocalAndObservedSourceWeights or inferenceUpgradeCalibratedVotes):
 		targets = [(destination, count) for (origin, destination), count in contacts.items() if origin == source]
 		ordinals = np.asarray([destination for destination, count in targets], dtype=np.int64)
 		result = fromOrdinals(index, ordinals, [count for destination, count in targets])
